@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Foras Ads</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:620px;margin:auto;padding:18px;background:#f4f4f4;color:#111}.card{background:#fff;border-radius:18px;padding:20px;box-shadow:0 2px 12px #0001}h1{text-align:center}label{display:block;margin-top:14px;font-weight:bold}input,textarea,button{width:100%;box-sizing:border-box;padding:13px;margin-top:7px;border-radius:10px;border:1px solid #ccc;font-size:16px}textarea{min-height:100px}button{border:0;background:#111;color:#fff;font-weight:bold;margin-top:18px}.secondary{background:#555}.status{margin-top:18px;padding:12px;border-radius:10px;background:#eee}.small{font-size:13px;color:#666}
+</style></head>
+<body><div class="card">
+<h1>🎬 Foras Ads</h1><p class="small">إنشاء إعلان فيديو من الهاتف — الإصدار الأول</p>
+<label>اسم المنتج</label><input id="product" value="مضخة مياه FORAS P100">
+<label>السعر</label><input id="price" placeholder="مثال: 90 دينار">
+<label>رقم التواصل</label><input id="contact" placeholder="واتساب / هاتف">
+<label>صورة المنتج</label><input id="image" type="file" accept="image/*">
+<label>نص الإعلان</label><textarea id="copy">حل عملي لضخ المياه. جودة واعتمادية للاستخدام اليومي.</textarea>
+<button onclick="generate()">🎬 إنشاء الفيديو</button>
+<button class="secondary" onclick="publish('both')">🚀 نشر على Facebook + YouTube</button>
+<div id="status" class="status">جاهز.</div>
+</div>
+<script>
+function generate(){document.getElementById('status').textContent='تم تجهيز بيانات الإعلان. اربط الواجهة بخادم Python لتوليد ملف MP4.'}
+function publish(where){document.getElementById('status').textContent='النشر يحتاج تشغيل الخادم وربط OAuth/Graph API. لا تضع أي Token داخل هذه الصفحة.'}
+</script></body></html>
