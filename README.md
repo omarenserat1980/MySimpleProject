@@ -1,30 +1,22 @@
-# Foras P100 Video Ad Generator
+# Foras Ads
 
-مشروع بسيط لإنشاء إعلان فيديو عمودي لمضخة **Foras P100** مناسب لفيسبوك وواتساب.
+تطبيق لإنشاء إعلانات فيديو عمودية للمنتجات من الهاتف، مع تجهيز النشر إلى Facebook وYouTube.
 
-## التشغيل
+## Android APK
 
-1. ثبّت Python 3.10 أو أحدث.
-2. ثبّت المتطلبات:
+تمت إضافة مشروع Android داخل `android/` مع واجهة تطبيق تفتح خادم Foras Ads المحلي. ملف GitHub Actions في `.github/workflows/android-apk.yml` يبني نسخة Debug APK ويرفعها كـ Artifact باسم `ForasAds-debug-apk`.
 
-```bash
-pip install -r requirements.txt
-```
+### مهم
 
-3. ضع صورة المنتج في المجلد `assets` باسم:
+نسخة APK الحالية هي واجهة Android للخادم. محرك إنشاء الفيديو Python/MoviePy يعمل على الجهاز الذي يشغّل الخادم؛ لذلك لكي يعمل الإنشاء محلياً على الهاتف، شغّل `run_mobile.py` في بيئة Python/Termux على الهاتف، ثم افتح التطبيق.
 
-`foras_p100.jpg`
-
-4. شغّل:
+## تشغيل محرك الفيديو
 
 ```bash
-python generate_ad.py
+pip install -r requirements-publishing.txt
+python run_mobile.py
 ```
 
-سيتم إنشاء الفيديو في:
+الصورة ترفع من الهاتف، والفيديو الناتج يكون عمودياً 1080×1920 ومناسباً للفيديوهات القصيرة.
 
-`output/foras_p100_ad.mp4`
-
-## ملاحظة
-
-البرنامج لا يخترع مواصفات المنتج. النصوص الموجودة في الإعلان قابلة للتعديل من أعلى ملف `generate_ad.py`، ويمكن إضافة السعر ورقم واتساب بعد تحديدهما.
+لا تضع OAuth tokens أو مفاتيح API داخل GitHub. إعداد Facebook وYouTube يتم لاحقاً عبر متغيرات البيئة/تسجيل الدخول الرسمي.
