@@ -1,0 +1,13 @@
+{
+  "name": "Foras Ads",
+  "short_name": "Foras Ads",
+  "description": "إنشاء إعلانات فيديو للمنتجات من الهاتف",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "ar",
+  "dir": "rtl",
+  "theme_color": "#111111",
+  "background_color": "#f4f4f4",
+  "icons": []
+}
