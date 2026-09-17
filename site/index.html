@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827"><meta name="description" content="Foras Ads - صانع إعلانات الفيديو">
+<title>Foras Ads</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+<header class="hero"><div class="logo">🎬</div><div><h1>Foras Ads</h1><p>صانع إعلان فيديو من الهاتف</p></div></header>
+<section class="card">
+<label>اسم المنتج</label><input id="product" value="مضخة مياه FORAS P100">
+<div class="grid"><div><label>السعر</label><input id="price" placeholder="مثال: 90 دينار"></div><div><label>رقم التواصل</label><input id="contact" placeholder="واتساب / هاتف"></div></div>
+<label>نص الإعلان</label><textarea id="copy">حل عملي لضخ المياه. جودة واعتمادية للاستخدام اليومي.</textarea>
+<label>صورة المنتج</label><input id="image" type="file" accept="image/*"><p id="imageInfo" class="hint">اختر صورة واضحة للمنتج.</p>
+<div class="actions"><button id="generate">🎬 إنشاء الفيديو</button><button id="download" class="secondary" disabled>⬇️ حفظ الفيديو</button></div>
+<div id="status" class="status">جاهز.</div><video id="preview" controls playsinline></video><a id="downloadLink" class="download-link" hidden>حفظ الفيديو</a>
+</section>
+<section class="card info"><h2>النشر</h2><p>هذه نسخة ويب تعمل مباشرة من المتصفح ولا تحتاج Termux. إنشاء الفيديو يتم على جهازك. النشر التلقائي إلى Facebook وYouTube يحتاج OAuth وخادم آمن، وسنضيفه في مرحلة مستقلة.</p></section>
+</main><script src="app.js"></script>
+</body></html>
