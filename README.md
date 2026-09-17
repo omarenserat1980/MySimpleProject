@@ -4,19 +4,17 @@
 
 ## Android APK
 
-تمت إضافة مشروع Android داخل `android/` مع واجهة تطبيق تفتح خادم Foras Ads المحلي. ملف GitHub Actions في `.github/workflows/android-apk.yml` يبني نسخة Debug APK ويرفعها كـ Artifact باسم `ForasAds-debug-apk`.
+يوجد مشروع Android داخل `android/`. التطبيق يفتح واجهة Foras Ads ويمكنه الاتصال بخادم Foras Ads المحلي أو بعنوان خادم آخر تكتبه داخل التطبيق.
 
-### مهم
+ملف GitHub Actions في `.github/workflows/android-apk.yml` يبني نسخة Debug APK ويرفعها كـ Artifact باسم `ForasAds-debug-apk`.
 
-نسخة APK الحالية هي واجهة Android للخادم. محرك إنشاء الفيديو Python/MoviePy يعمل على الجهاز الذي يشغّل الخادم؛ لذلك لكي يعمل الإنشاء محلياً على الهاتف، شغّل `run_mobile.py` في بيئة Python/Termux على الهاتف، ثم افتح التطبيق.
+## مهم قبل الاستخدام
 
-## تشغيل محرك الفيديو
+هذا الـAPK هو واجهة Android للمشروع، أما محرك إنشاء الفيديو Python/MoviePy فهو خادم منفصل. لذلك لا أعتبر التطبيق "مولد فيديو مستقل بالكامل" بعد. لتوليد الفيديو محلياً على الهاتف، شغّل `run_mobile.py` في Python/Termux على الهاتف ثم افتح التطبيق واترك العنوان `http://127.0.0.1:8080/`.
 
 ```bash
 pip install -r requirements-publishing.txt
 python run_mobile.py
 ```
 
-الصورة ترفع من الهاتف، والفيديو الناتج يكون عمودياً 1080×1920 ومناسباً للفيديوهات القصيرة.
-
-لا تضع OAuth tokens أو مفاتيح API داخل GitHub. إعداد Facebook وYouTube يتم لاحقاً عبر متغيرات البيئة/تسجيل الدخول الرسمي.
+الفيديو الناتج عمودي 1080×1920. نشر Facebook وYouTube يحتاج إعداد OAuth/Graph API رسمي ولا يتم تخزين الأسرار داخل GitHub.
