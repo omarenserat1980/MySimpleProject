@@ -3,5 +3,6 @@
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">#111111</item>
+        <item name="android:navigationBarColor">#ffffff</item>
     </style>
 </resources>
