@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بيت المضخات والعدد والدهانات</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f7fb;color:#172033}
+header{background:linear-gradient(135deg,#075985,#0ea5e9);color:#fff;padding:42px 20px;text-align:center}
+header h1{margin:0 0 10px;font-size:32px}header p{margin:0;font-size:17px}
+.container{max-width:1200px;margin:25px auto;padding:0 15px}
+.search{width:100%;padding:15px;border:1px solid #d5dce5;border-radius:12px;font-size:17px;margin-bottom:18px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:25px}.filters button{border:0;border-radius:20px;padding:10px 16px;background:#fff;cursor:pointer;box-shadow:0 1px 5px #ccd3dc}.filters button:hover{background:#0ea5e9;color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+.card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.08)}.thumb{width:100%;display:block}
+.content{padding:16px}.content h3{margin:0 0 12px;font-size:19px}.tag{display:inline-block;padding:5px 10px;border-radius:20px;background:#e0f2fe;color:#075985;font-size:13px}
+.watch{display:block;text-align:center;margin-top:15px;background:#075985;color:#fff;text-decoration:none;padding:11px;border-radius:9px}
+.empty{text-align:center;padding:40px;background:#fff;border-radius:15px;display:none}
+footer{text-align:center;background:#102033;color:#fff;padding:25px;margin-top:40px}
+</style>
+</head>
+<body>
+<header>
+<h1>💧 بيت المضخات والعدد والدهانات</h1>
+<p>مكتبة فيديوهات المضخات والمعدات من YouTube</p>
+</header>
+<main class="container">
+<input id="search" class="search" placeholder="🔎 ابحث عن مضخة أو نوع أو شركة...">
+<div class="filters">
+<button data-filter="all">الكل</button>
+<button data-filter="Foras">Foras</button>
+<button data-filter="LEO">LEO</button>
+<button data-filter="Pedrollo">Pedrollo</button>
+<button data-filter="غاطسة">غاطسة</button>
+<button data-filter="ضغط">ضغط</button>
+<button data-filter="ري">ري</button>
+<button data-filter="صيانة">صيانة</button>
+</div>
+<section id="grid" class="grid"></section>
+<div id="empty" class="empty">لا توجد نتائج مطابقة.</div>
+</main>
+<footer>© بيت المضخات والعدد والدهانات</footer>
+<script>
+const videos=[
+["مضخة مياه Foras","https://www.youtube.com/watch?v=1t_uMCT0enA","Foras"],
+["شرح مضخة مياه Foras","https://www.youtube.com/watch?v=SwwjYNSSXx4","Foras"],
+["مضخة Foras","https://www.youtube.com/watch?v=9-wtyKhfMr0","Foras"],
+["شرح مضخة مياه LEO","https://www.youtube.com/watch?v=a1lp8QG93LM","LEO"],
+["مضخة LEO","https://www.youtube.com/watch?v=fllg1tyJ4H0","LEO"],
+["مضخة LEO","https://www.youtube.com/watch?v=chiKB907-VU","LEO"],
+["مضخة LEO","https://www.youtube.com/watch?v=HBYvXYkxunI","LEO"],
+["مضخة Pedrollo","https://www.youtube.com/watch?v=LmR1o3tUycg","Pedrollo"],
+["مضخة Pedrollo","https://www.youtube.com/watch?v=0ZBQiKZkPlQ","Pedrollo"],
+["مضخة Pedrollo","https://www.youtube.com/watch?v=MZhTWKtPooQ","Pedrollo"],
+["تركيب مضخة غاطسة","https://www.youtube.com/watch?v=k0sD2wrGSVA","غاطسة"],
+["شرح مضخة غاطسة","https://www.youtube.com/watch?v=Imvoe4rZKNM","غاطسة"],
+["تشغيل مضخة غاطسة","https://www.youtube.com/watch?v=TkoVC6-b7pE","غاطسة"],
+["مضخة غاطسة","https://www.youtube.com/watch?v=Io-kg7qnLD4","غاطسة"],
+["مضخة ضغط مياه","https://www.youtube.com/watch?v=JGRBC7pwerg","ضغط"],
+["مضخة ضغط مياه","https://www.youtube.com/watch?v=VJS4eO4GF40","ضغط"],
+["Booster Pump","https://www.youtube.com/watch?v=UFtWb7UyPcg","ضغط"],
+["مضخات الري","https://www.youtube.com/watch?v=bGy-v122t80","ري"],
+["مضخات الري","https://www.youtube.com/watch?v=9aCLR0Rly28","ري"],
+["مضخات الري","https://www.youtube.com/watch?v=6_-GzUb1_MI","ري"],
+["صيانة مضخات المياه","https://www.youtube.com/watch?v=mKXTsazANi0","صيانة"],
+["صيانة مضخة","https://www.youtube.com/watch?v=x9vIinPX4qQ","صيانة"],
+["إصلاح مضخة مياه","https://www.youtube.com/watch?v=TzfMiuhLe7I","صيانة"],
+["صيانة المضخات","https://www.youtube.com/watch?v=Q8AojGwXD90","صيانة"]
+];
+function id(url){const m=url.match(/[?&]v=([^&]+)/)||url.match(/youtu\.be\/([^?]+)/);return m?m[1]:""}
+function render(filter="all",q=""){
+ const grid=document.getElementById("grid"),empty=document.getElementById("empty");grid.innerHTML="";
+ const s=q.trim().toLowerCase();
+ const list=videos.filter(v=>(filter==="all"||v[2]===filter)&&(!s||(v[0]+" "+v[2]).toLowerCase().includes(s)));
+ list.forEach(v=>{const i=id(v[1]);grid.insertAdjacentHTML("beforeend",`<article class="card"><img class="thumb" loading="lazy" src="https://img.youtube.com/vi/${i}/hqdefault.jpg" alt=""><div class="content"><h3>${v[0]}</h3><span class="tag">${v[2]}</span><a class="watch" href="${v[1]}" target="_blank" rel="noopener">▶ مشاهدة الفيديو على YouTube</a></div></article>`)});
+ empty.style.display=list.length?"none":"block";
+}
+let filter="all";document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.filter;render(filter,document.getElementById("search").value)});
+document.getElementById("search").oninput=e=>render(filter,e.target.value);render();
+</script>
+</body>
+</html>
