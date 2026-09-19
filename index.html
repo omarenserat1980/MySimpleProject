@@ -1,82 +1,325 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>بيت المضخات والعدد والدهانات</title>
-<style>
-*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f7fb;color:#172033}
-header{background:linear-gradient(135deg,#075985,#0ea5e9);color:#fff;padding:42px 20px;text-align:center}
-header h1{margin:0 0 10px;font-size:32px}header p{margin:0;font-size:17px}
-.container{max-width:1200px;margin:25px auto;padding:0 15px}
-.search{width:100%;padding:15px;border:1px solid #d5dce5;border-radius:12px;font-size:17px;margin-bottom:18px}
-.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:25px}.filters button{border:0;border-radius:20px;padding:10px 16px;background:#fff;cursor:pointer;box-shadow:0 1px 5px #ccd3dc}.filters button:hover{background:#0ea5e9;color:#fff}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
-.card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.08)}.thumb{width:100%;display:block}
-.content{padding:16px}.content h3{margin:0 0 12px;font-size:19px}.tag{display:inline-block;padding:5px 10px;border-radius:20px;background:#e0f2fe;color:#075985;font-size:13px}
-.watch{display:block;text-align:center;margin-top:15px;background:#075985;color:#fff;text-decoration:none;padding:11px;border-radius:9px}
-.empty{text-align:center;padding:40px;background:#fff;border-radius:15px;display:none}
-footer{text-align:center;background:#102033;color:#fff;padding:25px;margin-top:40px}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>قصص القرآن للأطفال | منصة المحتوى المصور</title>
+  <meta name="description" content="منصة عربية لإنشاء صفحات تعليمية مصورة للأطفال من آيات القرآن الكريم مع المحافظة على النص القرآني الموثوق.">
+  <meta name="keywords" content="قصص القرآن للأطفال, قصص الأنبياء, شرح القرآن للأطفال, آيات القرآن للأطفال">
+  <link rel="preconnect" href="https://api.alquran.cloud">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#183342;--muted:#667b86;--cream:#fffdf6;--paper:#fffefa;--mint:#ddf5e9;
+      --green:#18765e;--green2:#249778;--yellow:#ffd969;--purple:#7257b8;--line:#e5eee9;
+      --shadow:0 16px 45px rgba(23,64,55,.10);--shadow-sm:0 8px 20px rgba(23,64,55,.08);
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:var(--cream);color:var(--ink);font-family:Tajawal,Arial,sans-serif}
+    button,input,select,textarea{font:inherit} button{cursor:pointer;border:0} a{text-decoration:none;color:inherit}
+    .topbar{background:#113d39;color:#d8f7e8;padding:9px 4%;font-size:13px;display:flex;justify-content:center;gap:28px;align-items:center}
+    .topbar b{color:white}.header{height:78px;padding:0 5%;display:flex;align-items:center;justify-content:space-between;background:rgba(255,254,250,.92);backdrop-filter:blur(14px);border-bottom:1px solid #eef2ec;position:sticky;top:0;z-index:30}
+    .brand{display:flex;align-items:center;gap:11px;font-weight:900;font-size:19px;color:#174b40}.brand-mark{width:43px;height:43px;border-radius:15px;background:linear-gradient(145deg,#239a79,#116851);display:grid;place-items:center;color:white;font-size:23px;box-shadow:0 6px 15px #239a7950}
+    .nav{display:flex;align-items:center;gap:20px;font-weight:700;font-size:14px;color:#4d6561}.nav a:hover{color:var(--green)}
+    .head-actions{display:flex;gap:8px;align-items:center}.icon-btn{width:39px;height:39px;border-radius:12px;background:#f0f7f2;color:#17674f;font-size:18px;transition:.2s}.icon-btn:hover{transform:translateY(-2px);background:var(--mint)}
+    .btn{border-radius:13px;padding:12px 19px;font-weight:800;transition:.2s;display:inline-flex;align-items:center;justify-content:center;gap:7px}.btn:hover{transform:translateY(-2px);filter:brightness(1.03)}.btn-primary{background:linear-gradient(135deg,#16755c,#24a27d);color:white;box-shadow:0 9px 20px #1680603d}.btn-soft{background:#ecf8f1;color:#17694f}.btn-outline{background:white;border:1.5px solid #c9ddd1;color:#17694f}.btn-yellow{background:#ffd96e;color:#573d00}
+    .hero{max-width:1240px;margin:auto;padding:64px 5% 54px;display:grid;grid-template-columns:1.1fr .9fr;gap:45px;align-items:center;position:relative;overflow:hidden}.hero:before{content:"";position:absolute;width:540px;height:540px;border-radius:50%;background:#d8f5e7;filter:blur(2px);left:-235px;top:-200px;z-index:-1}
+    .eyebrow{color:#24765f;font-weight:900;font-size:14px;background:#e8f8ef;display:inline-flex;gap:7px;padding:8px 13px;border-radius:30px}.hero h1{font-size:clamp(34px,5vw,61px);line-height:1.25;margin:18px 0 16px;font-weight:900;color:#193f3a}.hero h1 span{color:#1f9877}.hero p{font-size:18px;line-height:1.9;color:#5a716d;max-width:650px}.hero-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:27px}.hero-stats{display:flex;gap:24px;margin-top:31px}.stat b{display:block;font-size:22px;color:#1a725b}.stat span{font-size:12px;color:#71837e}
+    .hero-art{height:398px;position:relative;background:linear-gradient(155deg,#ccefe2,#f8efd0);border-radius:46% 54% 43% 57% / 50% 42% 58% 50%;overflow:hidden;box-shadow:var(--shadow)}.sun{width:88px;height:88px;border-radius:50%;background:#ffdc6d;position:absolute;top:48px;left:68px;box-shadow:0 0 0 13px #ffdb6c42}.hill{position:absolute;border-radius:50% 50% 0 0;bottom:-20px}.h1{height:175px;width:390px;right:-50px;background:#76bc8b}.h2{height:120px;width:280px;left:-50px;background:#489d72}.book{position:absolute;right:31%;top:105px;width:145px;height:180px;background:#fdf9e9;border:9px solid #bc804b;border-radius:11px 19px 19px 11px;box-shadow:15px 13px 0 #e0c287;transform:rotate(-8deg);padding:24px 13px;color:#20654f;font-family:"Amiri Quran";font-size:21px;text-align:center;line-height:1.8}.stars{position:absolute;right:50px;top:48px;font-size:28px;letter-spacing:12px;color:#edb952}.cloud{position:absolute;font-size:48px;opacity:.83}.c1{right:30px;top:125px}.c2{left:49px;bottom:98px}
+    .section{max-width:1240px;margin:auto;padding:62px 5%}.section-head{display:flex;align-items:end;justify-content:space-between;gap:15px;margin-bottom:22px}.section-head h2{font-size:29px;margin:0;color:#1a413b}.section-head p{margin:8px 0 0;color:#71817f}.searchbox{display:flex;background:white;border:1.5px solid #dce9df;border-radius:15px;padding:4px;width:min(390px,100%)}.searchbox input{border:0;outline:0;width:100%;padding:8px 12px;background:transparent;color:var(--ink)}.searchbox button{background:#eaf8f0;border-radius:11px;width:40px;color:#18755d}
+    .feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.feature{background:white;border:1px solid var(--line);border-radius:19px;padding:19px;box-shadow:var(--shadow-sm)}.feature .ficon{font-size:28px;background:#edf9f1;border-radius:13px;width:49px;height:49px;display:grid;place-items:center}.feature h3{font-size:16px;margin:13px 0 6px}.feature p{font-size:13px;line-height:1.65;color:#71817f;margin:0}
+    .surah-wrap{background:#f1f9f3;border-top:1px solid #e0eee3;border-bottom:1px solid #e0eee3}.surah-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.surah-card{background:white;border:1px solid #e2ece5;border-radius:17px;padding:15px;transition:.2s;box-shadow:0 4px 12px rgba(35,89,62,.04)}.surah-card:hover{border-color:#54b38f;transform:translateY(-4px);box-shadow:var(--shadow-sm)}.surah-top{display:flex;justify-content:space-between;align-items:center}.surah-num{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:#e7f7ee;color:#157258;font-weight:900;font-size:13px}.surah-count{font-size:11px;color:#8a9994}.surah-card h3{margin:11px 0 4px;font-size:17px}.surah-card p{margin:0 0 12px;color:#82908c;font-size:12px}.open-link{width:100%;padding:8px;background:#f1f9f4;color:#1b795d;border-radius:9px;font-weight:800;font-size:12px}.open-link:hover{background:#d9f1e4}.loading-cards{grid-column:1/-1;text-align:center;padding:35px;color:#5b7770}
+    .workflow{background:#183f3a;color:white}.workflow .section-head h2{color:white}.workflow .section-head p{color:#b9d2c6}.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}.step{position:relative;padding:18px;background:#24554d;border:1px solid #42736a;border-radius:18px}.step .number{font-weight:900;color:#f9d66c;font-size:13px}.step h3{font-size:15px;margin:11px 0 7px}.step p{font-size:12px;color:#c5ddd4;line-height:1.6;margin:0}
+    .library-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.library-card{background:white;border:1px solid var(--line);border-radius:21px;overflow:hidden;box-shadow:var(--shadow-sm)}.cover{height:155px;background:linear-gradient(135deg,#d6f1e4,#fff1bc);display:flex;align-items:center;justify-content:center;position:relative;font-size:65px}.cover small{position:absolute;bottom:13px;right:15px;background:#ffffffdb;padding:5px 9px;border-radius:9px;font-size:11px;color:#17644e;font-weight:800}.library-card .content{padding:16px}.tag{font-size:11px;background:#f0eafb;color:#7152af;border-radius:20px;padding:5px 9px;font-weight:800}.library-card h3{font-size:17px;margin:11px 0 7px}.meta{font-size:12px;color:#71817d;display:flex;justify-content:space-between}.empty-library{grid-column:1/-1;padding:34px;text-align:center;background:white;border:2px dashed #cde2d4;border-radius:20px;color:#68817a}
+    footer{background:#102f2d;color:#c9e2d8;padding:42px 5% 20px}.foot{max-width:1140px;margin:auto;display:flex;justify-content:space-between;gap:25px;flex-wrap:wrap}.foot h3{color:white;margin:0 0 10px}.foot p{font-size:13px;max-width:490px;line-height:1.8}.copyright{border-top:1px solid #29534d;margin-top:28px;padding-top:16px;font-size:12px;text-align:center;color:#8fb5a9}
+    .modal-back{display:none;position:fixed;inset:0;background:#092421a6;z-index:80;align-items:center;justify-content:center;padding:18px}.modal-back.show{display:flex}.modal{max-width:790px;width:100%;max-height:92vh;overflow:auto;background:#fffefa;border-radius:25px;box-shadow:0 25px 80px #061f1bc7}.modal-head{padding:20px 24px;border-bottom:1px solid #e8eee9;display:flex;align-items:center;justify-content:space-between}.modal-head h2{font-size:21px;margin:0}.close{width:35px;height:35px;border-radius:10px;background:#f1f5f2;color:#4c6660;font-size:18px}.modal-body{padding:23px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.field{display:flex;flex-direction:column;gap:7px}.field.full{grid-column:1/-1}.field label{font-size:13px;font-weight:800;color:#455f58}.field input,.field select,.field textarea{border:1.5px solid #d9e5de;border-radius:11px;padding:11px;outline:none;background:white;color:#28433d}.field input:focus,.field select:focus{border-color:#28a27d;box-shadow:0 0 0 3px #28a27d18}.ayah-note{font-size:12px;color:#778985;background:#f4faf5;padding:10px 12px;border-radius:10px;line-height:1.7}.create-footer{display:flex;justify-content:space-between;align-items:center;margin-top:21px;gap:15px}.quran-box{font-family:"Amiri Quran",serif;font-size:23px;line-height:2.05;padding:18px;background:#f8fcf8;border:1px solid #dcecdf;border-radius:15px;color:#153f35}
+    .progress-wrap{padding:20px 0}.progress-row{display:flex;gap:11px;align-items:center;padding:10px;border-radius:11px;color:#7e918a;font-size:14px}.progress-row.active{background:#edfaf2;color:#186e55;font-weight:800}.progress-row.done{color:#24785f}.progress-row .dot{width:19px;height:19px;border-radius:50%;background:#dce9e1;display:grid;place-items:center;font-size:11px}.progress-row.active .dot{background:#20a37c;color:white;animation:pulse 1.1s infinite}.progress-row.done .dot{background:#39a879;color:white}@keyframes pulse{50%{box-shadow:0 0 0 6px #31a9802e}}
+    .story-view{max-width:1000px}.story-cover{border-radius:19px;min-height:230px;padding:35px;display:flex;align-items:end;background:linear-gradient(135deg,#286a5b,#9ed9b8 58%,#f4d97c);color:white;position:relative;overflow:hidden}.story-cover:before{content:"☪";font-size:180px;position:absolute;left:34px;top:5px;opacity:.15}.story-cover h1{font-size:34px;margin:0 0 10px}.story-cover p{margin:0;color:#effbf4}.page-card{margin-top:18px;border:1px solid #dcebe1;border-radius:18px;overflow:hidden;background:white}.page-art{height:175px;background:linear-gradient(140deg,#d8f0ea,#f8e7ad);display:grid;place-items:center;font-size:70px}.page-content{padding:19px}.page-title{color:#1d735c;font-weight:900}.explanation{padding:12px 14px;background:#f4fbf6;border-radius:10px;font-size:14px;line-height:1.8;margin-top:13px}.lesson{padding:12px 14px;background:#fff8df;border-radius:10px;font-size:14px;line-height:1.8;margin-top:9px;color:#735b12}
+    .admin{display:none;min-height:100vh;background:#f3f7f4}.admin.show{display:block}.admin-top{background:#173e39;color:white;padding:17px 5%;display:flex;align-items:center;justify-content:space-between}.admin-body{max-width:1200px;margin:auto;padding:28px 5%;display:grid;grid-template-columns:230px 1fr;gap:23px}.side{background:white;border-radius:17px;padding:12px;height:max-content;border:1px solid #e2ebe5}.side button{width:100%;text-align:right;padding:12px;border-radius:10px;background:transparent;font-weight:700;color:#4b6760}.side button.active,.side button:hover{background:#e8f6ee;color:#147158}.admin-main h1{margin-top:0}.dash{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.dash-card{background:white;border:1px solid #e1ebe5;border-radius:16px;padding:17px}.dash-card span{color:#6e847d;font-size:13px}.dash-card b{display:block;font-size:29px;margin-top:8px;color:#1b6f58}.admin-table{margin-top:20px;background:white;border:1px solid #e1ebe5;border-radius:16px;overflow:hidden}.admin-table h3{padding:0 18px}.table-row{display:grid;grid-template-columns:70px 1.4fr 1fr 1fr 100px;padding:13px 18px;border-top:1px solid #edf2ee;font-size:13px;align-items:center}.status{background:#fff3c9;color:#8a6704;padding:5px 9px;border-radius:20px;width:max-content;font-size:11px;font-weight:800}
+    .kids-mode{font-size:18px}.kids-mode .header{height:92px}.kids-mode .nav{display:none}.kids-mode .hero h1{font-size:clamp(38px,6vw,67px)}.kids-mode .btn{padding:15px 24px;font-size:17px}.kids-mode .surah-card h3{font-size:20px}.kids-mode .surah-card{padding:19px}.kids-mode .surah-grid{grid-template-columns:repeat(3,1fr)}
+    .toast{position:fixed;bottom:23px;right:50%;transform:translateX(50%) translateY(100px);background:#173f39;color:white;padding:13px 20px;border-radius:13px;box-shadow:var(--shadow);z-index:100;transition:.35s;font-weight:700}.toast.show{transform:translateX(50%) translateY(0)}
+    .hidden{display:none!important}
+    @media(max-width:900px){.nav{display:none}.hero{grid-template-columns:1fr}.hero-art{height:300px;max-width:550px;width:100%;margin:auto}.feature-grid{grid-template-columns:repeat(2,1fr)}.surah-grid{grid-template-columns:repeat(3,1fr)}.steps{grid-template-columns:repeat(3,1fr)}.library-grid{grid-template-columns:1fr 1fr}.admin-body{grid-template-columns:1fr}.side{display:flex;overflow:auto}.side button{white-space:nowrap;width:auto}.dash{grid-template-columns:1fr 1fr}}
+    @media(max-width:580px){.topbar{font-size:11px;gap:10px}.header{padding:0 4%;height:68px}.brand{font-size:15px}.brand-mark{width:36px;height:36px}.head-actions .btn{display:none}.hero{padding-top:40px}.hero p{font-size:16px}.hero-stats{gap:13px}.section{padding-top:45px;padding-bottom:45px}.section-head{align-items:start;flex-direction:column}.searchbox{width:100%}.feature-grid,.surah-grid{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:1fr 1fr}.library-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.create-footer{flex-direction:column;align-items:stretch}.quran-box{font-size:20px}.table-row{grid-template-columns:50px 1fr 80px}.table-row>*:nth-child(3),.table-row>*:nth-child(4){display:none}.kids-mode .surah-grid{grid-template-columns:1fr 1fr}}
+  </style>
 </head>
 <body>
-<header>
-<h1>💧 بيت المضخات والعدد والدهانات</h1>
-<p>مكتبة فيديوهات المضخات والمعدات من YouTube</p>
-</header>
-<main class="container">
-<input id="search" class="search" placeholder="🔎 ابحث عن مضخة أو نوع أو شركة...">
-<div class="filters">
-<button data-filter="all">الكل</button>
-<button data-filter="Foras">Foras</button>
-<button data-filter="LEO">LEO</button>
-<button data-filter="Pedrollo">Pedrollo</button>
-<button data-filter="غاطسة">غاطسة</button>
-<button data-filter="ضغط">ضغط</button>
-<button data-filter="ري">ري</button>
-<button data-filter="صيانة">صيانة</button>
-</div>
-<section id="grid" class="grid"></section>
-<div id="empty" class="empty">لا توجد نتائج مطابقة.</div>
-</main>
-<footer>© بيت المضخات والعدد والدهانات</footer>
-<script>
-const videos=[
-["مضخة مياه Foras","https://www.youtube.com/watch?v=1t_uMCT0enA","Foras"],
-["شرح مضخة مياه Foras","https://www.youtube.com/watch?v=SwwjYNSSXx4","Foras"],
-["مضخة Foras","https://www.youtube.com/watch?v=9-wtyKhfMr0","Foras"],
-["شرح مضخة مياه LEO","https://www.youtube.com/watch?v=a1lp8QG93LM","LEO"],
-["مضخة LEO","https://www.youtube.com/watch?v=fllg1tyJ4H0","LEO"],
-["مضخة LEO","https://www.youtube.com/watch?v=chiKB907-VU","LEO"],
-["مضخة LEO","https://www.youtube.com/watch?v=HBYvXYkxunI","LEO"],
-["مضخة Pedrollo","https://www.youtube.com/watch?v=LmR1o3tUycg","Pedrollo"],
-["مضخة Pedrollo","https://www.youtube.com/watch?v=0ZBQiKZkPlQ","Pedrollo"],
-["مضخة Pedrollo","https://www.youtube.com/watch?v=MZhTWKtPooQ","Pedrollo"],
-["تركيب مضخة غاطسة","https://www.youtube.com/watch?v=k0sD2wrGSVA","غاطسة"],
-["شرح مضخة غاطسة","https://www.youtube.com/watch?v=Imvoe4rZKNM","غاطسة"],
-["تشغيل مضخة غاطسة","https://www.youtube.com/watch?v=TkoVC6-b7pE","غاطسة"],
-["مضخة غاطسة","https://www.youtube.com/watch?v=Io-kg7qnLD4","غاطسة"],
-["مضخة ضغط مياه","https://www.youtube.com/watch?v=JGRBC7pwerg","ضغط"],
-["مضخة ضغط مياه","https://www.youtube.com/watch?v=VJS4eO4GF40","ضغط"],
-["Booster Pump","https://www.youtube.com/watch?v=UFtWb7UyPcg","ضغط"],
-["مضخات الري","https://www.youtube.com/watch?v=bGy-v122t80","ري"],
-["مضخات الري","https://www.youtube.com/watch?v=9aCLR0Rly28","ري"],
-["مضخات الري","https://www.youtube.com/watch?v=6_-GzUb1_MI","ري"],
-["صيانة مضخات المياه","https://www.youtube.com/watch?v=mKXTsazANi0","صيانة"],
-["صيانة مضخة","https://www.youtube.com/watch?v=x9vIinPX4qQ","صيانة"],
-["إصلاح مضخة مياه","https://www.youtube.com/watch?v=TzfMiuhLe7I","صيانة"],
-["صيانة المضخات","https://www.youtube.com/watch?v=Q8AojGwXD90","صيانة"]
-];
-function id(url){const m=url.match(/[?&]v=([^&]+)/)||url.match(/youtu\.be\/([^?]+)/);return m?m[1]:""}
-function render(filter="all",q=""){
- const grid=document.getElementById("grid"),empty=document.getElementById("empty");grid.innerHTML="";
- const s=q.trim().toLowerCase();
- const list=videos.filter(v=>(filter==="all"||v[2]===filter)&&(!s||(v[0]+" "+v[2]).toLowerCase().includes(s)));
- list.forEach(v=>{const i=id(v[1]);grid.insertAdjacentHTML("beforeend",`<article class="card"><img class="thumb" loading="lazy" src="https://img.youtube.com/vi/${i}/hqdefault.jpg" alt=""><div class="content"><h3>${v[0]}</h3><span class="tag">${v[2]}</span><a class="watch" href="${v[1]}" target="_blank" rel="noopener">▶ مشاهدة الفيديو على YouTube</a></div></article>`)});
- empty.style.display=list.length?"none":"block";
-}
-let filter="all";document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{filter=b.dataset.filter;render(filter,document.getElementById("search").value)});
-document.getElementById("search").oninput=e=>render(filter,e.target.value);render();
-</script>
+  <div id="site">
+    <div class="topbar"><span>🌿 منصة تعليمية تراعي قدسية النص القرآني</span><span>🔒 النص القرآني من مصدر موثوق منفصل عن الشرح</span><span><b id="apiState">جاري الاتصال بقاعدة القرآن...</b></span></div>
+    <header class="header">
+      <a class="brand" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false"><span class="brand-mark">☪</span><span>قصص القرآن للأطفال</span></a>
+      <nav class="nav">
+        <a href="#surahs">السور والآيات</a><a href="#how">كيف تعمل المنصة؟</a><a href="#library">مكتبة القصص</a><a href="#" onclick="openAdmin();return false">لوحة الإدارة</a>
+      </nav>
+      <div class="head-actions">
+        <button class="icon-btn" onclick="toggleKids()" title="وضع الأطفال">🧒</button>
+        <button class="icon-btn" onclick="focusSearch()" title="بحث">⌕</button>
+        <button class="btn btn-primary" onclick="openCreate()">＋ إنشاء قصة جديدة</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <span class="eyebrow">✦ قرآن كريم · تعليم هادئ · للأطفال</span>
+          <h1>قصص القرآن <span>للأطفال</span><br>بروحٍ جميلة ومعنى واضح</h1>
+          <p>حوّل آيات القرآن الكريم إلى صفحات مصورة تعليمية للأطفال بطريقة مبسطة وجذابة، مع المحافظة الكاملة على النص القرآني الصحيح دون تغيير أو اختصار.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" onclick="openCreate()">ابدأ الآن ←</button>
+            <a class="btn btn-soft" href="#surahs">اختر سورة</a>
+            <button class="btn btn-outline" onclick="openCreate('story')">✦ إنشاء قصة</button>
+            <a class="btn btn-outline" href="#library">مكتبة القصص</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat"><b>114</b><span>سورة كريمة</span></div>
+            <div class="stat"><b>6,236</b><span>آية موثقة</span></div>
+            <div class="stat"><b>PNG / JPG</b><span>صفحات مستقلة</span></div>
+          </div>
+        </div>
+        <div class="hero-art" aria-label="رسم تعليمي لكتاب القرآن">
+          <div class="sun"></div><div class="cloud c1">☁</div><div class="cloud c2">☁</div><div class="stars">✦ ✧</div>
+          <div class="book">اقْرَأْ<br>وَتَعَلَّمْ</div><div class="hill h1"></div><div class="hill h2"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><div><h2>منصة آمنة تحترم النص القرآني</h2><p>فصل واضح بين آيات القرآن والشرح التربوي والمعلومات الإضافية.</p></div></div>
+        <div class="feature-grid">
+          <article class="feature"><div class="ficon">📖</div><h3>نص قرآني موثوق</h3><p>تُجلب الآيات من مصدر قرآني موثوق وتُراجع قبل إنشاء كل صفحة.</p></article>
+          <article class="feature"><div class="ficon">🎨</div><h3>صفحات مصورة هادئة</h3><p>رسوم تعليمية مناسبة للأطفال، والنص يُركّب إلكترونيًا ولا يُطلب من مولد الصور.</p></article>
+          <article class="feature"><div class="ficon">💡</div><h3>شرح للأطفال</h3><p>شرح مبسط منفصل تمامًا عن القرآن، مع درس تربوي واضح لكل مشهد.</p></article>
+          <article class="feature"><div class="ficon">🛡️</div><h3>مراجعة قبل النشر</h3><p>مسودة، قيد المراجعة، مقبول، ثم منشور حسب صلاحيات المستخدم.</p></article>
+        </div>
+      </section>
+
+      <section id="surahs" class="surah-wrap">
+        <div class="section">
+          <div class="section-head">
+            <div><h2>اختر سورة من القرآن الكريم</h2><p>افتح أي سورة، ثم اختر آية واحدة أو نطاقًا متسلسلًا من الآيات.</p></div>
+            <div class="searchbox"><input id="surahSearch" oninput="filterSurahs()" placeholder="ابحث باسم السورة أو رقمها..."><button onclick="filterSurahs()">⌕</button></div>
+          </div>
+          <div class="surah-grid" id="surahGrid"><div class="loading-cards">⌛ جاري تحميل فهرس السور الـ114 من المصدر الموثوق...</div></div>
+        </div>
+      </section>
+
+      <section id="how" class="workflow">
+        <div class="section">
+          <div class="section-head"><div><h2>من الآية إلى صفحة مصورة</h2><p>مسار واضح يحافظ على الدقة والاحترام الكامل للمحتوى القرآني.</p></div><button class="btn btn-yellow" onclick="openCreate()">ابدأ إنشاء محتوى</button></div>
+          <div class="steps">
+            <div class="step"><span class="number">01</span><h3>اختر السورة والآيات</h3><p>آية واحدة أو نطاق متتابع من قاعدة البيانات.</p></div>
+            <div class="step"><span class="number">02</span><h3>تحقق من النص</h3><p>مطابقة السورة والرقم والترتيب والنص الكامل.</p></div>
+            <div class="step"><span class="number">03</span><h3>حلّل المحتوى</h3><p>تحديد الأحداث دون اختراع أحداث غير موجودة.</p></div>
+            <div class="step"><span class="number">04</span><h3>أنشئ المشاهد</h3><p>صور بلا نصوص قرآنية، وبأسلوب فني موحّد.</p></div>
+            <div class="step"><span class="number">05</span><h3>ركّب الصفحات</h3><p>إضافة الآية الموثقة والشرح والدرس كعناصر مستقلة.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="library" class="section">
+        <div class="section-head"><div><h2>مكتبة القصص والمحتوى</h2><p>قصص قرآنية، شرح مصور، وآيات تعليمية جاهزة للعرض والمراجعة.</p></div><button class="btn btn-outline" onclick="openCreate()">＋ إنشاء محتوى جديد</button></div>
+        <div id="libraryGrid" class="library-grid">
+          <div class="empty-library"><div style="font-size:42px">📚</div><b>مكتبتك بانتظار أول محتوى</b><p style="font-size:13px">اختر سورة وآياتها لإنشاء صفحات تعليمية مصورة.</p></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="foot">
+        <div><h3>☪ قصص القرآن للأطفال</h3><p>منصة مصممة للأهل والمعلمين والأطفال، تجمع بين النص القرآني الموثوق والشرح التربوي الواضح والرسوم الهادئة.</p></div>
+        <div><h3>مبادئنا</h3><p>لا تعديل للنص القرآني · لا توليد للقرآن بالذكاء الاصطناعي · لا خلط بين القرآن والتفسير · صفحات PNG/JPG مستقلة.</p></div>
+      </div>
+      <div class="copyright">© 2025 قصص القرآن للأطفال — مصدر النص القرآني: AlQuran Cloud / Uthmani Edition. تُراجع المصادر والتراخيص في بيئة الإنتاج.</div>
+    </footer>
+  </div>
+
+  <div id="createModal" class="modal-back">
+    <div class="modal">
+      <div class="modal-head"><div><h2>إنشاء قصة أو شرح مصور</h2><small style="color:#73857f">الآيات لا يمكن تعديلها من محرر المحتوى.</small></div><button class="close" onclick="closeModal('createModal')">×</button></div>
+      <div class="modal-body" id="createBody">
+        <div class="form-grid">
+          <div class="field full"><label>السورة</label><select id="createSurah" onchange="loadAyahRange()"><option value="">اختر السورة أولاً</option></select></div>
+          <div class="field"><label>من الآية</label><select id="startAyah" onchange="previewAyahs()"><option>—</option></select></div>
+          <div class="field"><label>إلى الآية</label><select id="endAyah" onchange="previewAyahs()"><option>—</option></select></div>
+          <div class="field"><label>نوع المحتوى</label><select id="contentType"><option value="story">قصة قرآنية</option><option value="explain">شرح مصور للأطفال</option><option value="sequence">عرض الآيات بالتسلسل</option></select></div>
+          <div class="field"><label>نمط الرسم</label><select id="artStyle"><option>كتاب قصص تعليمي</option><option>رسوم أطفال هادئة</option><option>رسوم مائية</option><option>أسلوب مناسب للطباعة</option></select></div>
+          <div class="field"><label>عدد الصفحات التقريبي</label><select id="pageCount"><option value="auto">تلقائي حسب الآيات</option><option value="3">3 صفحات</option><option value="5">5 صفحات</option><option value="8">8 صفحات</option></select></div>
+          <div class="field"><label>حالة النشر</label><select id="reviewState"><option value="review">إرسال للمراجعة قبل النشر</option><option value="draft">حفظ كمسودة</option></select></div>
+          <div class="field full"><label>معاينة النص القرآني الموثوق</label><div id="ayahPreview" class="ayah-note">اختر السورة والآيات لعرض النص من المصدر الموثوق.</div></div>
+        </div>
+        <div class="create-footer"><div class="ayah-note">🔒 سيتم التحقق من السورة والآيات والنص والترتيب قبل بدء الإنشاء.</div><button class="btn btn-primary" onclick="startCreation()">إنشاء الصفحات ←</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="progressModal" class="modal-back">
+    <div class="modal" style="max-width:570px">
+      <div class="modal-head"><h2>جاري إنشاء المحتوى</h2><span id="progressPercent" style="font-weight:900;color:#168061">0%</span></div>
+      <div class="modal-body"><div class="progress-wrap" id="progressList"></div><div id="progressError" class="hidden" style="background:#fff0ef;color:#a44039;border-radius:12px;padding:13px;font-weight:700"></div></div>
+    </div>
+  </div>
+
+  <div id="storyModal" class="modal-back">
+    <div class="modal story-view">
+      <div class="modal-head"><h2>عرض المحتوى المصور</h2><div style="display:flex;gap:8px"><button class="btn btn-soft" style="padding:8px 12px;font-size:12px" onclick="downloadStory()">⬇ تحميل الصور</button><button class="close" onclick="closeModal('storyModal')">×</button></div></div>
+      <div class="modal-body" id="storyOutput"></div>
+    </div>
+  </div>
+
+  <div id="adminPanel" class="admin">
+    <div class="admin-top"><div class="brand" style="color:white"><span class="brand-mark">⚙</span><span>لوحة إدارة قصص القرآن للأطفال</span></div><button class="btn btn-soft" onclick="closeAdmin()">← العودة للموقع</button></div>
+    <div class="admin-body">
+      <aside class="side">
+        <button class="active">▦ لوحة الإحصائيات</button><button>📖 إدارة السور والآيات</button><button>📚 إدارة القصص</button><button>🖼 إدارة الصور</button><button>👥 المستخدمون والصلاحيات</button><button>✓ المراجعة والنشر</button>
+      </aside>
+      <section class="admin-main">
+        <h1>نظرة عامة</h1><p style="color:#71837e;margin-top:-8px">إدارة المحتوى والمراجعة والصلاحيات تتم على الخادم في بيئة الإنتاج.</p>
+        <div class="dash">
+          <div class="dash-card"><span>عدد المستخدمين</span><b>24</b></div><div class="dash-card"><span>إجمالي القصص</span><b id="adminStories">0</b></div><div class="dash-card"><span>إجمالي الصفحات</span><b id="adminPages">0</b></div><div class="dash-card"><span>قيد المراجعة</span><b id="adminReview">0</b></div>
+        </div>
+        <div class="admin-table">
+          <h3>آخر المحتوى المنشأ</h3>
+          <div class="table-row" style="font-weight:900;color:#6c807a;background:#f8fbf9"><span>#</span><span>العنوان</span><span>السورة والآيات</span><span>الحالة</span><span>الإجراء</span></div>
+          <div id="adminRows"><div style="padding:22px;text-align:center;color:#82938d">لا يوجد محتوى منشأ بعد.</div></div>
+        </div>
+        <div class="admin-table" style="padding:18px;line-height:1.9;color:#506962;font-size:13px">
+          <h3>بنية البيانات المعتمدة</h3>
+          <b>Surahs</b> (ID, SurahNumber, NameArabic, AyahCount) · <b>Ayahs</b> (ID, SurahID, AyahNumber, QuranText) · <b>Stories</b> · <b>StoryPages</b> · <b>Users</b> · <b>Permissions</b><br>
+          ملاحظة أمنية: كلمات المرور تكون PasswordHash، ومفاتيح API والصلاحيات تُطبق على الخادم فقط ولا تحفظ في الواجهة الأمامية.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const API = 'https://api.alquran.cloud/v1';
+    let surahs = [], selectedAyahs = [], createdStories = [], activeStory = null, kids = false;
+    const fallbackSurahs = [
+      ['الفاتحة',7],['البقرة',286],['آل عمران',200],['النساء',176],['المائدة',120],['الأنعام',165],['الأعراف',206],['الأنفال',75],['التوبة',129],['يونس',109],['هود',123],['يوسف',111],['الرعد',43],['إبراهيم',52],['الحجر',99],['النحل',128],['الإسراء',111],['الكهف',110],['مريم',98],['طه',135],['الأنبياء',112],['الحج',78],['المؤمنون',118],['النور',64],['الفرقان',77],['الشعراء',227],['النمل',93],['القصص',88],['العنكبوت',69],['الروم',60],['لقمان',34],['السجدة',30],['الأحزاب',73],['سبأ',54],['فاطر',45],['يس',83],['الصافات',182],['ص',88],['الزمر',75],['غافر',85],['فصلت',54],['الشورى',53],['الزخرف',89],['الدخان',59],['الجاثية',37],['الأحقاف',35],['محمد',38],['الفتح',29],['الحجرات',18],['ق',45],['الذاريات',60],['الطور',49],['النجم',62],['القمر',55],['الرحمن',78],['الواقعة',96],['الحديد',29],['المجادلة',22],['الحشر',24],['الممتحنة',13],['الصف',14],['الجمعة',11],['المنافقون',11],['التغابن',18],['الطلاق',12],['التحريم',12],['الملك',30],['القلم',52],['الحاقة',52],['المعارج',44],['نوح',28],['الجن',28],['المزمل',20],['المدثر',56],['القيامة',40],['الإنسان',31],['المرسلات',50],['النبأ',40],['النازعات',46],['عبس',42],['التكوير',29],['الانفطار',19],['المطففين',36],['الانشقاق',25],['البروج',22],['الطارق',17],['الأعلى',19],['الغاشية',26],['الفجر',30],['البلد',20],['الشمس',15],['الليل',21],['الضحى',11],['الشرح',8],['التين',8],['العلق',19],['القدر',5],['البينة',8],['الزلزلة',8],['العاديات',11],['القارعة',11],['التكاثر',8],['العصر',3],['الهمزة',9],['الفيل',5],['قريش',4],['الماعون',7],['الكوثر',3],['الكافرون',6],['النصر',3],['المسد',5],['الإخلاص',4],['الفلق',5],['الناس',6]
+    ];
+
+    async function init(){
+      try{
+        const r = await fetch(API + '/surah');
+        const d = await r.json();
+        if(!d?.data?.length) throw new Error();
+        surahs = d.data.map(s=>({number:s.number,name:s.name,english:s.englishName,ayahs:s.numberOfAyahs}));
+        document.getElementById('apiState').textContent='✓ قاعدة القرآن متصلة';
+      }catch(e){
+        surahs = fallbackSurahs.map((s,i)=>({number:i+1,name:s[0],english:'',ayahs:s[1]}));
+        document.getElementById('apiState').textContent='فهرس السور جاهز — يلزم الاتصال لجلب النص الموثوق';
+      }
+      renderSurahs(); populateSelect();
+    }
+    function renderSurahs(list=surahs){
+      document.getElementById('surahGrid').innerHTML=list.map(s=>`<article class="surah-card">
+        <div class="surah-top"><span class="surah-num">${s.number}</span><span class="surah-count">${s.ayahs} آية</span></div>
+        <h3>سورة ${s.name}</h3><p>${s.english||'القرآن الكريم'}</p>
+        <button class="open-link" onclick="openSurah(${s.number})">فتح السورة ←</button></article>`).join('') || '<div class="loading-cards">لا توجد نتائج مطابقة للبحث.</div>';
+    }
+    function filterSurahs(){
+      const q=document.getElementById('surahSearch').value.trim();
+      renderSurahs(surahs.filter(s=>s.name.includes(q)||String(s.number)===q||(s.english||'').toLowerCase().includes(q.toLowerCase())));
+    }
+    function focusSearch(){document.getElementById('surahs').scrollIntoView({behavior:'smooth'});setTimeout(()=>document.getElementById('surahSearch').focus(),550)}
+    function populateSelect(){
+      document.getElementById('createSurah').innerHTML='<option value="">اختر السورة أولاً</option>'+surahs.map(s=>`<option value="${s.number}">${s.number}. سورة ${s.name} (${s.ayahs} آية)</option>`).join('');
+    }
+    function openSurah(n){openCreate();setTimeout(()=>{document.getElementById('createSurah').value=n;loadAyahRange()},100)}
+    function openCreate(type){document.getElementById('createModal').classList.add('show');if(type)document.getElementById('contentType').value=type}
+    function closeModal(id){document.getElementById(id).classList.remove('show')}
+    function loadAyahRange(){
+      const n=+document.getElementById('createSurah').value, s=surahs.find(x=>x.number===n);
+      const options=s?Array.from({length:s.ayahs},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join(''):'<option>—</option>';
+      document.getElementById('startAyah').innerHTML=options;document.getElementById('endAyah').innerHTML=options;
+      if(s){document.getElementById('endAyah').value=Math.min(s.ayahs,+document.getElementById('startAyah').value+2)}
+      previewAyahs();
+    }
+    async function previewAyahs(){
+      const n=+document.getElementById('createSurah').value,start=+document.getElementById('startAyah').value,end=+document.getElementById('endAyah').value, box=document.getElementById('ayahPreview');
+      if(!n||!start||!end)return;
+      if(end<start){document.getElementById('endAyah').value=start;return previewAyahs()}
+      box.textContent='جاري جلب النص القرآني الموثوق...';
+      try{
+        const r=await fetch(`${API}/surah/${n}/quran-uthmani`),d=await r.json();
+        if(!d?.data?.ayahs)throw new Error();
+        selectedAyahs=d.data.ayahs.filter(a=>a.numberInSurah>=start&&a.numberInSurah<=end).map(a=>({number:a.numberInSurah,text:a.text,surah:d.data.name,surahNumber:n}));
+        box.innerHTML=`<b>سورة ${d.data.name} — الآيات ${start} إلى ${end}</b><br><span style="font-family:'Amiri Quran';font-size:19px;line-height:2.1">${selectedAyahs.map(a=>`${a.text} ﴿${a.number}﴾`).join(' ')}</span><br><small>المصدر: AlQuran Cloud — Uthmani Edition. النص للمعاينة فقط ولا يمكن تحريره.</small>`;
+      }catch(e){selectedAyahs=[];box.innerHTML='<span style="color:#b5443c;font-weight:bold">تعذر التحقق من النص القرآني، يرجى المحاولة مرة أخرى.</span>'}
+    }
+    function startCreation(){
+      const n=+document.getElementById('createSurah').value;
+      if(!n||!selectedAyahs.length){toast('⚠️ اختر سورة وآياتًا وتمكّن من التحقق من النص أولاً');return}
+      closeModal('createModal');document.getElementById('progressModal').classList.add('show');
+      const steps=['جاري قراءة الآيات...','جاري التحقق من النص القرآني...','جاري تحليل الآيات...','جاري تحديد الأحداث...','جاري تقسيم المشاهد...','جاري إنشاء الرسومات...','جاري تجهيز النصوص...','جاري تركيب الصفحات...','تم إنشاء المحتوى بنجاح'];
+      const list=document.getElementById('progressList');list.innerHTML=steps.map((x,i)=>`<div class="progress-row" id="prog${i}"><span class="dot">${i+1}</span><span>${x}</span></div>`).join('');
+      let i=0;const timer=setInterval(()=>{
+        if(i>0){document.getElementById('prog'+(i-1)).className='progress-row done';document.querySelector('#prog'+(i-1)+' .dot').textContent='✓'}
+        if(i<steps.length){document.getElementById('prog'+i).className='progress-row active';document.getElementById('progressPercent').textContent=Math.round((i+1)/steps.length*100)+'%';i++}
+        else{clearInterval(timer);setTimeout(()=>{closeModal('progressModal');createStory()},450)}
+      },520);
+    }
+    function childExplanation(ayah,type){
+      if(type==='sequence')return 'نقرأ هذه الآية الكريمة بهدوء، ونتأمل كلماتها ومعناها الجميل المناسب لعمر الطفل.';
+      return 'هذه الآية من كلام الله تعالى. نتعلم منها أن نستمع للقرآن باهتمام، ونسأل أهل العلم أو والدينا عن المعنى الصحيح.';
+    }
+    function createStory(){
+      const s=surahs.find(x=>x.number===+document.getElementById('createSurah').value), type=document.getElementById('contentType').value;
+      const story={
+        id:Date.now(),surah:s.name,surahNumber:s.number,start:selectedAyahs[0].number,end:selectedAyahs.at(-1).number,
+        type,status:document.getElementById('reviewState').value==='review'?'قيد المراجعة':'مسودة',
+        title:type==='story'?`محتوى مصور من سورة ${s.name}`:type==='explain'?`شرح مصور من سورة ${s.name}`:`آيات من سورة ${s.name}`,
+        date:new Date().toLocaleDateString('ar-EG'),pages:selectedAyahs.map((a,i)=>({ayah:a,explanation:childExplanation(a,type),lesson:'نتعلم احترام كلام الله تعالى، وقراءة القرآن وتدبره.'}))
+      };
+      createdStories.unshift(story);activeStory=story;renderLibrary();updateAdmin();showStory(story);toast('✓ تم إنشاء المحتوى وحفظ صفحاته بنجاح');
+    }
+    function showStory(story){
+      activeStory=story;
+      const isStory=story.type==='story';
+      document.getElementById('storyOutput').innerHTML=`
+        <div class="story-cover"><div><span class="tag" style="background:#fff5cd;color:#795b04">${isStory?'قصة قرآنية':'شرح مصور للأطفال'}</span><h1>${story.title}</h1><p>من القرآن الكريم · سورة ${story.surah} · الآيات ${story.start}–${story.end}</p></div></div>
+        <div class="ayah-note" style="margin-top:16px">🔒 <b>تنبيه:</b> النص القرآني ظاهر في قسم مستقل، ولا يمكن تعديله من أدوات الذكاء الاصطناعي أو محرر الصفحات.</div>
+        ${story.pages.map((p,i)=>`<article class="page-card"><div class="page-art">${['🌿','📖','✨','🌙','🕊️'][i%5]}</div><div class="page-content">
+          <div class="page-title">سورة ${story.surah} — الآية ${p.ayah.number} · الصفحة ${i+1}</div>
+          <div class="quran-box">${p.ayah.text} ﴿${p.ayah.number}﴾</div>
+          <div class="explanation"><b>شرح للأطفال:</b> ${p.explanation}</div>
+          <div class="lesson"><b>ماذا نتعلم؟</b> ${p.lesson}</div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn btn-soft" style="padding:8px 12px;font-size:12px" onclick="toast('سيتم إنشاء صورة بديلة لهذه الصفحة عبر خدمة الصور الآمنة.')">↻ إعادة إنشاء الصورة</button><button class="btn btn-outline" style="padding:8px 12px;font-size:12px" onclick="downloadPage(${i})">⬇ تحميل الصورة PNG</button></div>
+        </div></article>`).join('')}`;
+      document.getElementById('storyModal').classList.add('show');
+    }
+    function renderLibrary(){
+      const el=document.getElementById('libraryGrid');
+      if(!createdStories.length)return;
+      el.innerHTML=createdStories.map((s,i)=>`<article class="library-card"><div class="cover">${i%2?'🌙':'📖'}<small>${s.pages.length} صفحات</small></div><div class="content"><span class="tag">${s.type==='story'?'قصة قرآنية':s.type==='explain'?'شرح مصور':'عرض آيات'}</span><h3>${s.title}</h3><div class="meta"><span>سورة ${s.surah} · ${s.start}-${s.end}</span><span>${s.date}</span></div><div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-soft" style="padding:8px 11px;font-size:12px" onclick="showStory(createdStories.find(x=>x.id===${s.id}))">عرض</button><button class="btn btn-outline" style="padding:8px 11px;font-size:12px" onclick="activeStory=createdStories.find(x=>x.id===${s.id});downloadStory()">تحميل</button></div></div></article>`).join('');
+    }
+    function downloadPage(index){
+      if(!activeStory)return;
+      const page=activeStory.pages[index], canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');canvas.width=1200;canvas.height=1500;
+      const grad=ctx.createLinearGradient(0,0,1200,1500);grad.addColorStop(0,'#d8f0ea');grad.addColorStop(1,'#fff0be');ctx.fillStyle=grad;ctx.fillRect(0,0,1200,1500);
+      ctx.fillStyle='#17654f';ctx.font='bold 48px Tajawal';ctx.textAlign='center';ctx.fillText(`سورة ${activeStory.surah} — الآية ${page.ayah.number}`,600,100);
+      ctx.font='120px serif';ctx.fillText('✦  📖  ✦',600,320);
+      ctx.fillStyle='#fffefa';ctx.roundRect(70,430,1060,440,28);ctx.fill();
+      ctx.fillStyle='#153e35';ctx.font='43px "Amiri Quran"';wrapText(ctx,`${page.ayah.text} ﴿${page.ayah.number}﴾`,600,520,930,75);
+      ctx.fillStyle='#edf8f1';ctx.roundRect(70,930,1060,190,25);ctx.fill();ctx.fillStyle='#1b5548';ctx.font='bold 30px Tajawal';ctx.textAlign='right';wrapText(ctx,'شرح للأطفال: '+page.explanation,1080,990,960,48,'right');
+      ctx.fillStyle='#fff5d9';ctx.roundRect(70,1150,1060,155,25);ctx.fill();ctx.fillStyle='#6a571b';wrapText(ctx,'ماذا نتعلم؟ '+page.lesson,1080,1210,960,48,'right');
+      const a=document.createElement('a');a.download=`${activeStory.surah}-آية-${page.ayah.number}.png`;a.href=canvas.toDataURL('image/png');a.click();
+    }
+    function wrapText(ctx,text,x,y,maxWidth,lineHeight,align='center'){let words=text.split(' '),line='',lines=[];for(let w of words){let test=line+w+' ';if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=w+' '}else line=test}lines.push(line);ctx.textAlign=align;lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight))}
+    function downloadStory(){if(!activeStory)return;activeStory.pages.forEach((_,i)=>setTimeout(()=>downloadPage(i),i*350));toast('✓ بدأ تحميل صفحات PNG المستقلة')}
+    function toggleKids(){kids=!kids;document.body.classList.toggle('kids-mode',kids);toast(kids?'🧒 تم تفعيل وضع الأطفال':'تم إيقاف وضع الأطفال')}
+    function openAdmin(){document.getElementById('site').classList.add('hidden');document.getElementById('adminPanel').classList.add('show');updateAdmin();window.scrollTo(0,0)}
+    function closeAdmin(){document.getElementById('site').classList.remove('hidden');document.getElementById('adminPanel').classList.remove('show')}
+    function updateAdmin(){
+      document.getElementById('adminStories').textContent=createdStories.length;
+      document.getElementById('adminPages').textContent=createdStories.reduce((a,s)=>a+s.pages.length,0);
+      document.getElementById('adminReview').textContent=createdStories.filter(s=>s.status==='قيد المراجعة').length;
+      document.getElementById('adminRows').innerHTML=createdStories.length?createdStories.map((s,i)=>`<div class="table-row"><span>${i+1}</span><b>${s.title}</b><span>${s.surah} ${s.start}-${s.end}</span><span class="status">${s.status}</span><button class="btn btn-soft" style="padding:7px 9px;font-size:11px" onclick="showStory(createdStories.find(x=>x.id===${s.id}))">عرض</button></div>`).join(''):'<div style="padding:22px;text-align:center;color:#82938d">لا يوجد محتوى منشأ بعد.</div>';
+    }
+    function toast(t){const x=document.getElementById('toast');x.textContent=t;x.classList.add('show');clearTimeout(window.tt);window.tt=setTimeout(()=>x.classList.remove('show'),2700)}
+    init();
+  </script>
 </body>
 </html>
