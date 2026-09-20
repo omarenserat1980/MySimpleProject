@@ -1,961 +1,816 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>قصص القرآن للأطفال - حوّل آيات القرآن إلى صفحات مصورة تعليمية</title>
-<meta name="description" content="منصة عربية احترافية لتحويل آيات القرآن الكريم إلى قصص وشروح مصورة تعليمية للأطفال مع المحافظة الكاملة على النص القرآني الصحيح.">
-<meta name="keywords" content="قصص القرآن للأطفال, قصص الأنبياء, شرح سورة, آيات القرآن للأطفال, تعليم القرآن">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>Rollplox — Sky Roll Adventure</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm"
+  }
+}
+</script>
 <style>
-  :root{
-    --emerald:#0f766e;
-    --gold:#c9a227;
-  }
-  *{font-family:'Cairo','Tajawal',sans-serif;}
-  .quran-text{font-family:'Amiri',serif; line-height:2.2;}
-  body{background:linear-gradient(160deg,#f6fbf9 0%,#eef7f4 100%); color:#1f2937;}
-  .hidden-view{display:none !important;}
-  .fade-in{animation:fade .5s ease;}
-  @keyframes fade{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-  .card-hover{transition:all .25s ease;}
-  .card-hover:hover{transform:translateY(-5px);box-shadow:0 18px 40px -12px rgba(15,118,110,.35);}
-  ::-webkit-scrollbar{width:10px;height:10px;}
-  ::-webkit-scrollbar-thumb{background:#0f766e;border-radius:10px;}
-  ::-webkit-scrollbar-track{background:#e2e8f0;}
-  .gold-grad{background:linear-gradient(135deg,#c9a227,#f0d97d);}
-  .emerald-grad{background:linear-gradient(135deg,#0f766e,#14b8a6);}
-  .hero-pattern{
-    background-image:radial-gradient(circle at 20% 20%,rgba(20,184,166,.15),transparent 40%),
-                     radial-gradient(circle at 80% 80%,rgba(201,162,39,.15),transparent 40%);
-  }
-  .step-active{background:#0f766e;color:#fff;}
-  .step-done{background:#14b8a6;color:#fff;}
-  .kids-mode body{font-size:20px;}
-  .scene-frame{border:6px solid #fff;box-shadow:0 10px 30px -8px rgba(0,0,0,.25);border-radius:16px;overflow:hidden;}
-  .glow-halo{filter:drop-shadow(0 0 14px rgba(255,255,255,.95));}
-  input:focus,select:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.15);}
+  *{ -webkit-tap-highlight-color: transparent; user-select:none; }
+  body{ margin:0; overflow:hidden; background:#87CEEB; font-family:'Fredoka',system-ui; overscroll-behavior:none; touch-action:none; }
+  #canvas-container{ position:absolute; inset:0; }
+  #canvas-container canvas{ display:block; width:100%; height:100%; }
+  .glass{ background:rgba(255,255,255,0.85); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.6); }
+  .blox-shadow{ box-shadow: 0 12px 0 rgba(0,0,0,0.15), 0 20px 40px rgba(0,0,0,0.15); }
+  .btn-blox{ transition: all .12s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 6px 0 rgba(0,0,0,0.2); }
+  .btn-blox:active{ transform:translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
+  .title-3d{ text-shadow: 0 2px 0 #fff, 0 4px 0 #FFD93D, 0 6px 0 #FF6B6B, 0 8px 20px rgba(0,0,0,0.2); }
+  @keyframes float { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-8px) rotate(1deg)} }
+  @keyframes spin-slow { from{transform:rotateY(0)} to{transform:rotateY(360deg)} }
+  @keyframes pop { 0%{transform:scale(0.8)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  .animate-float{ animation: float 3s ease-in-out infinite; }
+  .animate-pop{ animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
+  #joystickBase{ position:absolute; left:18px; bottom:18px; width:122px; height:122px; border-radius:50%; background:rgba(255,255,255,0.22); border:2px solid rgba(255,255,255,0.5); backdrop-filter:blur(12px); display:none; align-items:center; justify-content:center; z-index:30; touch-action:none; }
+  #joystickKnob{ width:54px; height:54px; border-radius:50%; background:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.25), inset 0 -4px 0 rgba(0,0,0,0.12); position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
+  #jumpBtn{ position:absolute; right:18px; bottom:18px; width:84px; height:84px; border-radius:50%; background:#fff; border:3px solid #111; box-shadow:0 8px 0 #111; display:none; align-items:center; justify-content:center; z-index:30; font-weight:700; font-size:14px; letter-spacing:0.04em; touch-action:none; }
+  #jumpBtn.active{ transform:translateY(4px); box-shadow:0 4px 0 #111; }
+  @media (pointer:coarse){ #joystickBase, #jumpBtn{ display:flex; } }
+  .shake{ animation: shake .3s ease; }
+  @keyframes shake{ 0%,100%{transform:translate(0)} 20%{transform:translate(-6px,2px)} 40%{transform:translate(6px,-2px)} 60%{transform:translate(-4px,1px)} 80%{transform:translate(4px,-1px)} }
 </style>
 </head>
-<body class="min-h-screen">
+<body class="bg-[#87CEEB]">
+<div id="canvas-container"></div>
 
-<!-- ============ NAVBAR ============ -->
-<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-emerald-100 shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-    <div class="flex items-center gap-3 cursor-pointer" onclick="nav('home')">
-      <div class="w-11 h-11 emerald-grad rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg">📖</div>
+<!-- HUD -->
+<div id="hud" class="hidden absolute inset-0 pointer-events-none z-20">
+  <div class="absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start gap-2 pointer-events-auto">
+    <div class="glass rounded-[18px] px-4 py-2.5 flex items-center gap-3 blox-shadow">
+      <div class="w-9 h-9 rounded-xl bg-[#111] text-white grid place-items-center font-bold text-[13px]">LVL</div>
       <div>
-        <h1 class="font-black text-lg text-emerald-800 leading-tight">قصص القرآن للأطفال</h1>
-        <p class="text-[11px] text-gray-400 -mt-0.5">محتوى قرآني مصور تعليمي</p>
+        <div id="hudLevelName" class="font-bold leading-none text-[15px] tracking-tight">BLOX HOP</div>
+        <div class="text-[11px] opacity-60 font-semibold tracking-widest">ROLLPLOX</div>
       </div>
     </div>
-    <nav class="hidden lg:flex items-center gap-1 text-sm font-semibold">
-      <button onclick="nav('home')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">الرئيسية</button>
-      <button onclick="nav('surahs')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">السور</button>
-      <button onclick="nav('create')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">إنشاء قصة</button>
-      <button onclick="nav('library')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">مكتبة القصص</button>
-      <button onclick="nav('search')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">بحث</button>
-      <button onclick="nav('admin')" class="px-3 py-2 rounded-lg hover:bg-emerald-50 text-gray-600">لوحة الإدارة</button>
-    </nav>
-    <div class="flex items-center gap-2">
-      <button onclick="nav('kids')" class="gold-grad text-white text-sm font-bold px-4 py-2 rounded-xl shadow hover:opacity-90">🧒 وضع الأطفال</button>
-      <button onclick="toggleMobileMenu()" class="lg:hidden w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 text-xl">☰</button>
+    <div class="flex gap-2">
+      <div class="glass rounded-[16px] px-3.5 py-2 flex items-center gap-2 blox-shadow">
+        <div class="w-7 h-7 rounded-full bg-[#FFD93D] border-2 border-black grid place-items-center text-[14px]">◆</div>
+        <div id="hudCoins" class="font-bold text-[15px]">0 / 5</div>
+      </div>
+      <div class="glass rounded-[16px] px-3.5 py-2 flex items-center gap-2 blox-shadow">
+        <div class="w-7 h-7 rounded-full bg-black text-white grid place-items-center">◷</div>
+        <div id="hudTimer" class="font-bold text-[15px] tabular-nums">00:00</div>
+      </div>
+      <button id="hudMenuBtn" class="glass rounded-[16px] w-11 h-11 grid place-items-center blox-shadow hover:scale-105 transition">☰</button>
     </div>
   </div>
-  <div id="mobileMenu" class="hidden lg:hidden bg-white border-t border-emerald-100 px-4 py-2 grid grid-cols-2 gap-1 text-sm font-semibold">
-    <button onclick="nav('home');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">الرئيسية</button>
-    <button onclick="nav('surahs');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">السور</button>
-    <button onclick="nav('create');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">إنشاء قصة</button>
-    <button onclick="nav('library');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">المكتبة</button>
-    <button onclick="nav('search');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">بحث</button>
-    <button onclick="nav('admin');toggleMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-emerald-50">الإدارة</button>
-  </div>
-</header>
-
-<main id="app" class="max-w-7xl mx-auto px-4 py-8"></main>
-
-<!-- ============ HOME ============ -->
-<template id="tpl-home">
-  <section class="fade-in">
-    <div class="hero-pattern rounded-3xl overflow-hidden bg-white shadow-xl border border-emerald-50">
-      <div class="grid md:grid-cols-2 gap-6 items-center p-8 md:p-12">
-        <div>
-          <span class="inline-block bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full mb-4">✨ منصة تعليمية موثوقة</span>
-          <h2 class="text-3xl md:text-5xl font-black text-emerald-900 leading-tight mb-4">قصص القرآن للأطفال</h2>
-          <p class="text-gray-600 text-lg leading-relaxed mb-6">حوّل آيات القرآن الكريم إلى صفحات مصورة تعليمية للأطفال بطريقة مبسطة وجذابة، مع المحافظة الكاملة على النص القرآني الصحيح دون تغيير أو اختصار أو إضافة.</p>
-          <div class="flex flex-wrap gap-3">
-            <button onclick="nav('create')" class="emerald-grad text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:opacity-90">🚀 ابدأ الآن</button>
-            <button onclick="nav('surahs')" class="bg-white border-2 border-emerald-200 text-emerald-700 font-bold px-6 py-3 rounded-xl hover:bg-emerald-50">📚 اختر سورة</button>
-            <button onclick="nav('create')" class="bg-white border-2 border-emerald-200 text-emerald-700 font-bold px-6 py-3 rounded-xl hover:bg-emerald-50">🎨 إنشاء قصة</button>
-            <button onclick="nav('library')" class="bg-white border-2 border-emerald-200 text-emerald-700 font-bold px-6 py-3 rounded-xl hover:bg-emerald-50">🗂️ مكتبة القصص</button>
-            <button onclick="nav('search')" class="bg-white border-2 border-emerald-200 text-emerald-700 font-bold px-6 py-3 rounded-xl hover:bg-emerald-50">🔍 بحث</button>
-          </div>
-        </div>
-        <div class="relative">
-          <div class="scene-frame aspect-[4/3]" id="heroScene"></div>
-          <div class="absolute -bottom-4 -right-4 bg-white rounded-2xl shadow-lg px-4 py-3 border border-emerald-50">
-            <div class="text-2xl font-black text-emerald-700">114</div>
-            <div class="text-xs text-gray-500">سورة كاملة</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-50 text-center"><div class="text-3xl mb-1">✅</div><div class="font-bold text-emerald-800">تحقق من النص</div><div class="text-xs text-gray-500 mt-1">من مصدر قرآني موثوق</div></div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-50 text-center"><div class="text-3xl mb-1">🎨</div><div class="font-bold text-emerald-800">صور مناسبة للأطفال</div><div class="text-xs text-gray-500 mt-1">هادئة وغير مخيفة</div></div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-50 text-center"><div class="text-3xl mb-1">🕌</div><div class="font-bold text-emerald-800">احترام الأنبياء</div><div class="text-xs text-gray-500 mt-1">دون إظهار الوجوه</div></div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-emerald-50 text-center"><div class="text-3xl mb-1">🖼️</div><div class="font-bold text-emerald-800">صفحات PNG/JPG</div><div class="text-xs text-gray-500 mt-1">قابلة للتحميل</div></div>
-    </div>
-
-    <div class="flex items-center justify-between mt-12 mb-4">
-      <h3 class="text-2xl font-black text-emerald-900">📖 جميع السور (114)</h3>
-      <div class="relative w-56 max-w-full">
-        <input id="homeSurahSearch" oninput="renderSurahCards(this.value,'homeSurahGrid')" placeholder="ابحث عن سورة..." class="w-full border border-emerald-100 rounded-xl px-4 py-2 text-sm bg-white">
-      </div>
-    </div>
-    <div id="homeSurahGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-  </section>
-</template>
-
-<!-- ============ SURAHS ============ -->
-<template id="tpl-surahs">
-  <section class="fade-in">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-      <div><h2 class="text-3xl font-black text-emerald-900">📚 فهرس السور</h2><p class="text-gray-500">اختر سورة لعرض آياتها وإنشاء محتوى مصور.</p></div>
-      <div class="relative w-full md:w-72">
-        <input id="surahSearch" oninput="renderSurahCards(this.value,'surahGrid')" placeholder="🔍 ابحث بالاسم أو الرقم..." class="w-full border border-emerald-100 rounded-xl px-4 py-3 bg-white">
-      </div>
-    </div>
-    <div id="surahGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-  </section>
-</template>
-
-<!-- ============ CREATE WIZARD ============ -->
-<template id="tpl-create">
-  <section class="fade-in max-w-4xl mx-auto">
-    <h2 class="text-3xl font-black text-emerald-900 mb-1">➕ إنشاء قصة جديدة</h2>
-    <p class="text-gray-500 mb-6">اتبع الخطوات لتحويل الآيات إلى صفحات مصورة تعليمية.</p>
-    <div class="bg-white rounded-3xl shadow-lg border border-emerald-50 p-6 md:p-8">
-      <div id="wizardSteps" class="flex items-center justify-between mb-8 text-xs font-bold text-gray-400"></div>
-
-      <!-- step 1 -->
-      <div id="wstep-1" class="wstep">
-        <label class="block font-bold text-emerald-800 mb-2">1) اختر السورة</label>
-        <select id="cSurah" onchange="onCreateSurahChange()" class="w-full border border-emerald-100 rounded-xl px-4 py-3 bg-white"></select>
-      </div>
-      <!-- step 2 -->
-      <div id="wstep-2" class="wstep hidden">
-        <label class="block font-bold text-emerald-800 mb-2">2) اختر الآيات</label>
-        <div class="grid grid-cols-2 gap-4">
-          <div><span class="text-sm text-gray-500">من الآية</span><select id="cStart" class="w-full border border-emerald-100 rounded-xl px-4 py-3 bg-white"></select></div>
-          <div><span class="text-sm text-gray-500">إلى الآية</span><select id="cEnd" class="w-full border border-emerald-100 rounded-xl px-4 py-3 bg-white"></select></div>
-        </div>
-        <p id="cAyahHint" class="text-xs text-gray-400 mt-2"></p>
-      </div>
-      <!-- step 3 -->
-      <div id="wstep-3" class="wstep hidden">
-        <label class="block font-bold text-emerald-800 mb-3">3) اختر نوع المحتوى</label>
-        <div class="grid md:grid-cols-3 gap-3" id="typeOptions">
-          <label class="cursor-pointer border-2 border-emerald-100 rounded-2xl p-4 hover:border-emerald-400 flex flex-col gap-1"><input type="radio" name="ctype" value="story" checked class="ml-2"><span class="font-bold">📜 قصة قرآنية</span><span class="text-xs text-gray-500">للآيات ذات الأحداث المترابطة</span></label>
-          <label class="cursor-pointer border-2 border-emerald-100 rounded-2xl p-4 hover:border-emerald-400 flex flex-col gap-1"><input type="radio" name="ctype" value="explain" class="ml-2"><span class="font-bold">💡 شرح مصور للأطفال</span><span class="text-xs text-gray-500">للآيات غير القصصية</span></label>
-          <label class="cursor-pointer border-2 border-emerald-100 rounded-2xl p-4 hover:border-emerald-400 flex flex-col gap-1"><input type="radio" name="ctype" value="sequence" class="ml-2"><span class="font-bold">🔢 عرض الآيات بالتسلسل</span><span class="text-xs text-gray-500">صفحة لكل آية</span></label>
-        </div>
-      </div>
-      <!-- step 4 -->
-      <div id="wstep-4" class="wstep hidden">
-        <label class="block font-bold text-emerald-800 mb-3">4) اختر نمط الرسم</label>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="styleOptions"></div>
-      </div>
-      <!-- step 5 -->
-      <div id="wstep-5" class="wstep hidden">
-        <label class="block font-bold text-emerald-800 mb-2">5) عدد الصفحات التقريبي</label>
-        <input id="cPages" type="range" min="1" max="12" value="4" oninput="document.getElementById('pagesVal').textContent=this.value" class="w-full accent-emerald-600">
-        <div class="text-center font-black text-emerald-700 text-2xl mt-1"><span id="pagesVal">4</span> صفحات</div>
-        <label class="flex items-center gap-2 mt-4 text-sm text-gray-600"><input type="checkbox" id="cReview" class="accent-emerald-600"> تفعيل المراجعة قبل النشر (الحالة: مسودة → قيد المراجعة → مقبول → منشور)</label>
-      </div>
-
-      <div class="flex justify-between mt-8">
-        <button id="wPrev" onclick="wizardPrev()" class="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200">السابق</button>
-        <button id="wNext" onclick="wizardNext()" class="emerald-grad text-white px-6 py-2.5 rounded-xl font-bold shadow hover:opacity-90">التالي</button>
-      </div>
-    </div>
-  </section>
-</template>
-
-<!-- ============ LIBRARY ============ -->
-<template id="tpl-library">
-  <section class="fade-in">
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-      <div><h2 class="text-3xl font-black text-emerald-900">🗂️ مكتبة القصص</h2><p class="text-gray-500">جميع القصص والشروح التي أنشأتها.</p></div>
-      <button onclick="nav('create')" class="emerald-grad text-white font-bold px-5 py-3 rounded-xl shadow">+ إنشاء قصة جديدة</button>
-    </div>
-    <div class="flex flex-wrap gap-2 mb-6" id="libFilters"></div>
-    <div id="libGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
-  </section>
-</template>
-
-<!-- ============ SEARCH ============ -->
-<template id="tpl-search">
-  <section class="fade-in">
-    <h2 class="text-3xl font-black text-emerald-900 mb-4">🔍 البحث</h2>
-    <div class="relative mb-6">
-      <input id="globalSearch" oninput="runSearch(this.value)" placeholder="ابحث بالسورة، رقم السورة، رقم الآية، عنوان قصة، اسم نبي، كلمة مفتاحية..." class="w-full border border-emerald-100 rounded-2xl px-5 py-4 bg-white shadow-sm text-lg">
-    </div>
-    <div id="searchResults" class="space-y-6"></div>
-  </section>
-</template>
-
-<!-- ============ KIDS MODE ============ -->
-<template id="tpl-kids">
-  <section class="fade-in text-center">
-    <div class="bg-gradient-to-br from-amber-100 via-emerald-50 to-sky-100 rounded-3xl p-8 shadow-lg border border-white">
-      <h2 class="text-4xl font-black text-emerald-800 mb-2">🧒 وضع الأطفال</h2>
-      <p class="text-gray-600 text-lg mb-8">اختر قصة لتقرأها وتشاهد صورها الجميلة!</p>
-      <div id="kidsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-    </div>
-  </section>
-</template>
-
-<!-- ============ ADMIN ============ -->
-<template id="tpl-admin">
-  <section class="fade-in">
-    <h2 class="text-3xl font-black text-emerald-900 mb-6">🛠️ لوحة الإدارة</h2>
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="adminStats"></div>
-    <div class="grid lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-2xl shadow border border-emerald-50 p-6">
-        <h3 class="font-black text-emerald-800 mb-4">📖 إدارة السور والآيات</h3>
-        <div class="max-h-72 overflow-y-auto text-sm border border-gray-100 rounded-xl">
-          <table class="w-full text-right">
-            <thead class="bg-emerald-50 text-emerald-800 sticky top-0"><tr><th class="p-2">#</th><th class="p-2">السورة</th><th class="p-2">الآيات</th><th class="p-2">المصدر</th></tr></thead>
-            <tbody id="adminSurahTable"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="bg-white rounded-2xl shadow border border-emerald-50 p-6">
-        <h3 class="font-black text-emerald-800 mb-4">👥 إدارة المستخدمين والصلاحيات</h3>
-        <div id="adminUsers" class="space-y-3"></div>
-        <button onclick="alert('نموذج إضافة مستخدم (يُطبّق على الخادم مع تشفير كلمة المرور PasswordHash)')" class="mt-4 w-full bg-emerald-50 text-emerald-700 font-bold py-2 rounded-xl hover:bg-emerald-100">+ إضافة مستخدم</button>
-      </div>
-      <div class="bg-white rounded-2xl shadow border border-emerald-50 p-6">
-        <h3 class="font-black text-emerald-800 mb-4">📜 إدارة القصص (مراجعة / نشر)</h3>
-        <div id="adminStories" class="space-y-3 max-h-72 overflow-y-auto"></div>
-      </div>
-      <div class="bg-white rounded-2xl shadow border border-emerald-50 p-6">
-        <h3 class="font-black text-emerald-800 mb-4">🔐 نظام الصلاحيات</h3>
-        <p class="text-xs text-gray-500 mb-3">تُطبّق الصلاحيات على الخادم وليس فقط بإخفاء الأزرار.</p>
-        <div class="grid grid-cols-2 gap-2 text-sm" id="permList"></div>
-      </div>
-    </div>
-  </section>
-</template>
-
-<!-- ============ SURAH VIEW ============ -->
-<template id="tpl-surahview">
-  <section class="fade-in" id="surahViewRoot"></section>
-</template>
-
-<!-- ============ STORY VIEW ============ -->
-<template id="tpl-storyview">
-  <section class="fade-in" id="storyViewRoot"></section>
-</template>
-
-<!-- ============ PROGRESS MODAL ============ -->
-<div id="progressModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-  <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
-    <div class="text-center mb-6">
-      <div class="w-16 h-16 mx-auto emerald-grad rounded-full flex items-center justify-center text-3xl text-white animate-pulse">✨</div>
-      <h3 class="font-black text-emerald-900 text-xl mt-3">جاري إنشاء المحتوى</h3>
-    </div>
-    <div id="progressSteps" class="space-y-2 text-sm"></div>
-    <div class="w-full bg-gray-100 rounded-full h-2.5 mt-6 overflow-hidden"><div id="progressBar" class="emerald-grad h-2.5 rounded-full transition-all duration-300" style="width:0%"></div></div>
-    <p id="progressError" class="hidden text-red-600 text-center font-bold mt-4"></p>
+  <div class="absolute bottom-3 left-1/2 -translate-x-1/2 glass rounded-full px-4 py-1.5 text-[11px] font-bold tracking-widest opacity-70 pointer-events-none hidden md:flex gap-3">
+    <span>WASD / STICK TO ROLL</span><span class="opacity-30">•</span><span>SPACE TO JUMP</span><span class="opacity-30">•</span><span>DRAG TO LOOK</span>
   </div>
 </div>
 
-<footer class="bg-emerald-900 text-emerald-100 mt-16 py-10">
-  <div class="max-w-7xl mx-auto px-4 grid md:grid-cols-3 gap-8">
-    <div>
-      <h4 class="font-black text-white text-lg mb-2">📖 قصص القرآن للأطفال</h4>
-      <p class="text-sm text-emerald-200 leading-relaxed">منصة تعليمية تحترم النص القرآني وتحققه من مصدر موثوق قبل إنشاء أي محتوى مصور.</p>
+<!-- MENU -->
+<div id="menuScreen" class="absolute inset-0 z-30 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_#fff_0%,_#87CEEB_55%,_#5AB0D6_100%)]">
+  <div class="w-full max-w-[560px]">
+    <div class="text-center mb-6 animate-float">
+      <h1 class="title-3d font-black tracking-[-0.04em] leading-[0.85] text-[68px] md:text-[88px]" style="font-family:'Space Grotesk'">
+        <span class="inline-block bg-[#FF5A5F] text-white px-3 rounded-[14px] rotate-[-2deg]">ROLL</span><br>
+        <span class="inline-block bg-[#111] text-[#FFD93D] px-4 rounded-[14px] rotate-[2deg] mt-1">PLOX</span>
+      </h1>
+      <div class="mt-4 inline-flex glass rounded-full px-4 py-1.5 text-[12px] font-bold tracking-widest">MOMENTUM • HOP • DON'T DROP</div>
     </div>
-    <div>
-      <h4 class="font-bold text-white mb-2">روابط</h4>
-      <ul class="text-sm space-y-1 text-emerald-200">
-        <li><button onclick="nav('surahs')" class="hover:text-white">فهرس السور</button></li>
-        <li><button onclick="nav('create')" class="hover:text-white">إنشاء قصة</button></li>
-        <li><button onclick="nav('library')" class="hover:text-white">مكتبة القصص</button></li>
-      </ul>
-    </div>
-    <div>
-      <h4 class="font-bold text-white mb-2">تنويه</h4>
-      <p class="text-sm text-emerald-200 leading-relaxed">النص القرآني مفصول تمامًا عن الشرح. الشروح والمعلومات الإضافية اجتهادية للتبسيط ولا تُقدَّم على أنها قرآن.</p>
-    </div>
-  </div>
-  <p class="text-center text-emerald-300 text-xs mt-8">© 2024 قصص القرآن للأطفال — جميع الحقوق محفوظة</p>
-</footer>
 
-<script>
-/* =========================================================
-   قاعدة بيانات السور (جميع الـ114) — الأسماء وعدد الآيات
-   ========================================================= */
-const SURAHS = [
-[1,"الفاتحة",7],[2,"البقرة",286],[3,"آل عمران",200],[4,"النساء",176],[5,"المائدة",120],[6,"الأنعام",165],[7,"الأعراف",206],[8,"الأنفال",75],[9,"التوبة",129],[10,"يونس",109],[11,"هود",123],[12,"يوسف",111],[13,"الرعد",43],[14,"إبراهيم",52],[15,"الحجر",99],[16,"النحل",128],[17,"الإسراء",111],[18,"الكهف",110],[19,"مريم",98],[20,"طه",135],[21,"الأنبياء",112],[22,"الحج",78],[23,"المؤمنون",118],[24,"النور",64],[25,"الفرقان",77],[26,"الشعراء",227],[27,"النمل",93],[28,"القصص",88],[29,"العنكبوت",69],[30,"الروم",60],[31,"لقمان",34],[32,"السجدة",30],[33,"الأحزاب",73],[34,"سبأ",54],[35,"فاطر",45],[36,"يس",83],[37,"الصافات",182],[38,"ص",88],[39,"الزمر",75],[40,"غافر",85],[41,"فصلت",54],[42,"الشورى",53],[43,"الزخرف",89],[44,"الدخان",59],[45,"الجاثية",37],[46,"الأحقاف",35],[47,"محمد",38],[48,"الفتح",29],[49,"الحجرات",18],[50,"ق",45],[51,"الذاريات",60],[52,"الطور",49],[53,"النجم",62],[54,"القمر",55],[55,"الرحمن",78],[56,"الواقعة",96],[57,"الحديد",29],[58,"المجادلة",22],[59,"الحشر",24],[60,"الممتحنة",13],[61,"الصف",14],[62,"الجمعة",11],[63,"المنافقون",11],[64,"التغابن",18],[65,"الطلاق",12],[66,"التحريم",12],[67,"الملك",30],[68,"القلم",52],[69,"الحاقة",52],[70,"المعارج",44],[71,"نوح",28],[72,"الجن",28],[73,"المزمل",20],[74,"المدثر",56],[75,"القيامة",40],[76,"الإنسان",31],[77,"المرسلات",50],[78,"النبأ",40],[79,"النازعات",46],[80,"عبس",42],[81,"التكوير",29],[82,"الانفطار",19],[83,"المطففين",36],[84,"الانشقاق",25],[85,"البروج",22],[86,"الطارق",17],[87,"الأعلى",19],[88,"الغاشية",26],[89,"الفجر",30],[90,"البلد",20],[91,"الشمس",15],[92,"الليل",21],[93,"الضحى",11],[94,"الشرح",8],[95,"التين",8],[96,"العلق",19],[97,"القدر",5],[98,"البينة",8],[99,"الزلزلة",8],[100,"العاديات",11],[101,"القارعة",11],[102,"التكاثر",8],[103,"العصر",3],[104,"الهمزة",9],[105,"الفيل",5],[106,"قريش",4],[107,"الماعون",7],[108,"الكوثر",3],[109,"الكافرون",6],[110,"النصر",3],[111,"المسد",5],[112,"الإخلاص",4],[113,"الفلق",5],[114,"الناس",6]
-].map(s=>({number:s[0],name:s[1],ayahCount:s[2]}));
+    <div class="glass rounded-[28px] p-6 md:p-7 blox-shadow animate-pop">
+      <div class="flex gap-3 mb-5">
+        <div class="flex-1">
+          <button id="playBtn" class="btn-blox w-full bg-[#111] text-white rounded-[18px] py-4 font-bold text-[18px] tracking-wide flex items-center justify-center gap-2">
+            <span class="text-[20px]">▶</span> PLAY NOW
+          </button>
+          <div class="text-[11px] text-center mt-2 font-semibold opacity-60 tracking-widest">3 HANDCRAFTED SKY ISLANDS</div>
+        </div>
+        <button id="soundToggle" class="btn-blox w-[64px] bg-white border-[3px] border-black rounded-[18px] grid place-items-center text-[22px]">🔊</button>
+      </div>
 
-/* =========================================================
-   نصوص قرآنية موثوقة (عيّنات محفوظة محليًا) — بقية السور
-   تُجلب من مصدر قرآني موثوق (api.alquran.cloud) عند الطلب.
-   ========================================================= */
-const QURAN_TEXT = {
-1:["بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ","الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ","الرَّحْمَٰنِ الرَّحِيمِ","مَالِكِ يَوْمِ الدِّينِ","إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ","اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ","صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ"],
-12:["الر ۚ تِلْكَ آيَاتُ الْكِتَابِ الْمُبِينِ","إِنَّا أَنزَلْنَاهُ قُرْآنًا عَرَبِيًّا لَّعَلَّكُمْ تَعْقِلُونَ","نَحْنُ نَقُصُّ عَلَيْكَ أَحْسَنَ الْقَصَصِ بِمَا أَوْحَيْنَا إِلَيْكَ هَٰذَا الْقُرْآنَ وَإِن كُنتَ مِن قَبْلِهِ لَمِنَ الْغَافِلِينَ","إِذْ قَالَ يُوسُفُ لِأَبِيهِ يَا أَبَتِ إِنِّي رَأَيْتُ أَحَدَ عَشَرَ كَوْكَبًا وَالشَّمْسَ وَالْقَمَرَ رَأَيْتُهُمْ لِي سَاجِدِينَ","قَالَ يَا بُنَيَّ لَا تَقْصُصْ رُؤْيَاكَ عَلَىٰ إِخْوَتِكَ فَيَكِيدُوا لَكَ كَيْدًا ۖ إِنَّ الشَّيْطَانَ لِلْإِنسَانِ عَدُوٌّ مُّبِينٌ","وَكَذَٰلِكَ يَجْتَبِيكَ رَبُّكَ وَيُعَلِّمُكَ مِن تَأْوِيلِ الْأَحَادِيثِ وَيُتِمُّ نِعْمَتَهُ عَلَيْكَ وَعَلَىٰ آلِ يَعْقُوبَ كَمَا أَتَمَّهَا عَلَىٰ أَبَوَيْكَ مِن قَبْلُ إِبْرَاهِيمَ وَإِسْحَاقَ ۚ إِنَّ رَبَّكَ عَلِيمٌ حَكِيمٌ"],
-103:["وَالْعَصْرِ","إِنَّ الْإِنسَانَ لَفِي خُسْرٍ","إِلَّا الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ وَتَوَاصَوْا بِالْحَقِّ وَتَوَاصَوْا بِالصَّبْرِ"],
-105:["أَلَمْ تَرَ كَيْفَ فَعَلَ رَبُّكَ بِأَصْحَابِ الْفِيلِ","أَلَمْ يَجْعَلْ كَيْدَهُمْ فِي تَضْلِيلٍ","وَأَرْسَلَ عَلَيْهِمْ طَيْرًا أَبَابِيلَ","تَرْمِيهِم بِحِجَارَةٍ مِّن سِجِّيلٍ","فَجَعَلَهُمْ كَعَصْفٍ مَّأْكُولٍ"],
-108:["إِنَّا أَعْطَيْنَاكَ الْكَوْثَرَ","فَصَلِّ لِرَبِّكَ وَانْحَرْ","إِنَّ شَانِئَكَ هُوَ الْأَبْتَرُ"],
-112:["قُلْ هُوَ اللَّهُ أَحَدٌ","اللَّهُ الصَّمَدُ","لَمْ يَلِدْ وَلَمْ يُولَدْ","وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ"],
-113:["قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ","مِن شَرِّ مَا خَلَقَ","وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ","وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ","وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ"],
-114:["قُلْ أَعُوذُ بِرَبِّ النَّاسِ","مَلِكِ النَّاسِ","إِلَٰهِ النَّاسِ","مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ","الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ","مِنَ الْجِنَّةِ وَالنَّاسِ"]
-};
+      <div class="grid grid-cols-3 gap-3 mb-5">
+        <button data-level="0" class="levelPick btn-blox bg-[#FF6B6B] border-[3px] border-black rounded-[18px] p-3 text-left">
+          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 1</div>
+          <div class="font-bold leading-tight text-[14px]">BLOX HOP</div>
+          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[35%] bg-black rounded-full"></div></div>
+        </button>
+        <button data-level="1" class="levelPick btn-blox bg-[#4ECDC4] border-[3px] border-black rounded-[18px] p-3 text-left">
+          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 2</div>
+          <div class="font-bold leading-tight text-[14px]">SKY SERPENT</div>
+          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[60%] bg-black rounded-full"></div></div>
+        </button>
+        <button data-level="2" class="levelPick btn-blox bg-[#FFE66D] border-[3px] border-black rounded-[18px] p-3 text-left">
+          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 3</div>
+          <div class="font-bold leading-tight text-[14px]">PLOX PEAKS</div>
+          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[90%] bg-black rounded-full"></div></div>
+        </button>
+      </div>
 
-/* شروح مبسطة (منفصلة تمامًا عن النص القرآني) */
-const KID_EXPLAIN = {
-1:{ex:"سورة الفاتحة نفتتح بها صلاتنا، ونحمد الله ونطلب منه أن يهدينا إلى الطريق الصحيح.",lesson:"نبدأ كل شيء باسم الله، ونطلب الهداية من ربنا وحده."},
-12:{ex:"سورة يوسف تحكي قصة نبي كريم صبر على أذى إخوته، وأكرمه الله وجعله عزيزًا في مصر.",lesson:"الصبر والعفو والتوكل على الله يرفع صاحبه ويكرمه."},
-103:{ex:"يقسم الله بالعصر أن الناس في خسارة إلا من آمن وعمل الصالحات ونصح غيره بالحق والصبر.",lesson:"احرص على الإيمان والعمل الطيب ونصيحة أصدقائك بالخير."},
-105:{ex:"أراد أصحاب الفيل هدم الكعبة، فأرسل الله طيرًا صغيرة حمتها بحجارة، فحفظ الله بيته.",lesson:"الله قادر على حماية الحق ولو بأصغر المخلوقات."},
-108:{ex:"أعطى الله نبيه الكوثر وهو خير كثير، وأمره أن يصلي ويشكر ربه.",lesson:"نشكر الله على نعمه ونصلي له."},
-112:{ex:"الله واحد أحد، لا شريك له، لم يلد ولم يولد، ولا يشبهه شيء.",lesson:"نؤمن أن الله واحد لا مثيل له."},
-113:{ex:"نستعيذ بالله رب الفلق من كل شر وأذى في الليل والنهار.",lesson:"نلجأ إلى الله ليحمينا من كل مكروه."},
-114:{ex:"نستعيذ بالله رب الناس ومالكهم من وسوسة الشيطان.",lesson:"نستعين بالله ليطرد عنا الوسواس والخوف."}
-};
-
-const STYLES=[["watercolor","🎨 رسوم مائية","#a5d8ff"],["storybook","📚 كتاب قصص","#ffd8a8"],["cartoon","😊 كرتوني تربوي","#b2f2bb"],["kids","🖍️ رسوم أطفال","#ffc9c9"],["print","🖨️ مناسب للطباعة","#e5dbff"]];
-
-/* الأنبياء لعدم إظهار الوجوه */
-const PROPHET_SURAHS={12:"يوسف عليه السلام",71:"نوح عليه السلام",14:"إبراهيم عليه السلام",19:"مريم وعيسى وزكريا ويحيى",21:"الأنبياء",10:"يونس عليه السلام"};
-
-/* =========================================================
-   حالة التطبيق + التخزين
-   ========================================================= */
-let STATE={surah:null,start:1,end:1};
-let wizardStep=1;
-const LIB_KEY='quran_stories_lib';
-function loadLib(){try{return JSON.parse(localStorage.getItem(LIB_KEY))||[]}catch(e){return[]}}
-function saveLib(l){localStorage.setItem(LIB_KEY,JSON.stringify(l))}
-
-const USERS=[
- {name:"مدير النظام",email:"admin@app.com",role:"مدير",perms:["إنشاء قصة","تعديل قصة","إنشاء الصور","نشر المحتوى","إدارة المستخدمين","إدارة السور والآيات","حذف القصص"]},
- {name:"معلمة قرآن",email:"teacher@app.com",role:"محرر",perms:["إنشاء قصة","تعديل قصة","إنشاء الصور","تحميل الصور"]},
- {name:"ولي أمر",email:"parent@app.com",role:"مستخدم",perms:["إنشاء قصة","تحميل الصور"]}
-];
-const ALL_PERMS=["إنشاء قصة","تعديل قصة","إنشاء الصور","إعادة إنشاء الصور","تحميل الصور","حذف القصص","نشر المحتوى","إدارة المستخدمين","إدارة السور والآيات"];
-
-/* =========================================================
-   جلب آيات السورة (محلي أو من مصدر موثوق)
-   ========================================================= */
-async function getAyahs(surahNum){
-  if(QURAN_TEXT[surahNum]) return {source:"قاعدة بيانات محلية موثوقة (رسم عثماني)",ayahs:QURAN_TEXT[surahNum]};
-  // محاولة الجلب من مصدر قرآني موثوق ومرخص
-  try{
-    const r=await fetch(`https://api.alquran.cloud/v1/surah/${surahNum}/quran-uthmani`);
-    const j=await r.json();
-    if(j&&j.data&&j.data.ayahs){
-      let arr=j.data.ayahs.map(a=>a.text);
-      // إزالة البسملة المكررة في بداية السور (تبقى نصًا صحيحًا للآية الأولى حسب المصدر)
-      QURAN_TEXT[surahNum]=arr;
-      return {source:"مصدر قرآني موثوق: AlQuran Cloud (رسم عثماني)",ayahs:arr};
-    }
-  }catch(e){}
-  return {source:null,ayahs:null};
-}
-
-/* التحقق من النص القرآني */
-function verifyText(ayahs,start,end,expectedCount){
-  if(!ayahs||!ayahs.length) return false;
-  for(let i=start;i<=end;i++){
-    if(!ayahs[i-1]||ayahs[i-1].trim().length<2) return false;
-  }
-  if(end<start) return false;
-  return true;
-}
-
-/* =========================================================
-   التنقل بين الصفحات
-   ========================================================= */
-function nav(view,arg){
-  document.getElementById('app').scrollIntoView({behavior:'smooth',block:'start'});
-  const app=document.getElementById('app');
-  const tpl=document.getElementById('tpl-'+view);
-  if(!tpl){return}
-  app.innerHTML='';
-  app.appendChild(tpl.content.cloneNode(true));
-  if(view==='home'){renderSurahCards('','homeSurahGrid');drawScene(document.getElementById('heroScene'),{style:'storybook',scene:'كتاب القرآن المصور',prophet:false});}
-  if(view==='surahs') renderSurahCards('','surahGrid');
-  if(view==='create') initWizard();
-  if(view==='library') renderLibrary();
-  if(view==='search'){}
-  if(view==='kids') renderKids();
-  if(view==='admin') renderAdmin();
-  if(view==='surahview') renderSurahView(arg);
-}
-function toggleMobileMenu(){document.getElementById('mobileMenu').classList.toggle('hidden')}
-
-/* =========================================================
-   بطاقات السور
-   ========================================================= */
-function renderSurahCards(q,gridId){
-  const grid=document.getElementById(gridId); if(!grid)return;
-  q=(q||'').trim();
-  const list=SURAHS.filter(s=>!q||s.name.includes(q)||String(s.number)===q||String(s.number).includes(q));
-  grid.innerHTML=list.map(s=>`
-    <div class="card-hover bg-white rounded-2xl border border-emerald-50 shadow-sm p-5 flex items-center gap-4">
-      <div class="relative w-14 h-14 flex-shrink-0">
-        <div class="w-14 h-14 rotate-45 gold-grad rounded-lg flex items-center justify-center">
-          <span class="-rotate-45 text-white font-black">${s.number}</span>
+      <div class="bg-[#111] text-white rounded-[18px] p-4 flex gap-4 items-center">
+        <div class="w-12 h-12 rounded-[12px] bg-white text-black grid place-items-center font-black text-[20px]">?</div>
+        <div class="text-[13px] leading-[1.35]">
+          <b class="text-[#FFD93D]">How to play:</b> Roll with momentum, build speed, time your jumps. Moving plox are slippery — ride them! Collect yellow Plox for style points.
         </div>
       </div>
-      <div class="flex-1">
-        <h4 class="font-black text-emerald-900 text-lg">سورة ${s.name}</h4>
-        <p class="text-xs text-gray-400">${s.ayahCount} آية · ترتيب ${s.number}</p>
-        <button onclick="nav('surahview',${s.number})" class="mt-2 text-sm emerald-grad text-white font-bold px-4 py-1.5 rounded-lg shadow hover:opacity-90">فتح السورة ←</button>
+    </div>
+
+    <div class="text-center mt-4 text-[11px] font-bold tracking-widest opacity-50">BUILT WITH THREE + CANNON • 60FPS PHYSICS • MOBILE READY</div>
+  </div>
+</div>
+
+<!-- LEVEL COMPLETE -->
+<div id="levelCompleteScreen" class="hidden absolute inset-0 z-30 items-center justify-center p-4 bg-[rgba(0,0,0,0.35)] backdrop-blur-[8px]">
+  <div class="glass rounded-[28px] p-7 w-full max-w-[420px] blox-shadow text-center animate-pop">
+    <div class="inline-flex bg-[#00E5A0] text-black border-[3px] border-black rounded-full px-4 py-1 font-black tracking-widest text-[12px] mb-3">LEVEL CLEAR!</div>
+    <h2 id="lcTitle" class="font-black text-[32px] leading-none tracking-tight" style="font-family:'Space Grotesk'">NICE ROLL!</h2>
+    <div id="lcStars" class="flex justify-center gap-1 my-4 text-[36px]"></div>
+    <div class="grid grid-cols-2 gap-3 text-left mb-5">
+      <div class="bg-white border-[3px] border-black rounded-[16px] p-3">
+        <div class="text-[11px] font-bold tracking-widest opacity-60">TIME</div>
+        <div id="lcTime" class="font-black text-[20px]">00:12</div>
       </div>
-    </div>`).join('');
-  if(!list.length) grid.innerHTML='<p class="text-gray-400 col-span-full text-center py-10">لا توجد نتائج.</p>';
-}
-
-/* =========================================================
-   عرض السورة
-   ========================================================= */
-async function renderSurahView(num){
-  const s=SURAHS.find(x=>x.number==num); if(!s)return;
-  STATE.surah=s;
-  const root=document.getElementById('surahViewRoot');
-  root.innerHTML=`
-  <button onclick="nav('surahs')" class="text-emerald-700 font-bold mb-4">→ العودة للفهرس</button>
-  <div class="emerald-grad rounded-3xl p-8 text-white shadow-lg mb-6 relative overflow-hidden">
-    <div class="absolute -left-6 -top-6 text-9xl opacity-10">﴾</div>
-    <span class="bg-white/20 text-xs px-3 py-1 rounded-full">السورة رقم ${s.number}</span>
-    <h2 class="text-4xl font-black mt-2">سورة ${s.name}</h2>
-    <p class="text-emerald-50 mt-1">${s.ayahCount} آية</p>
-  </div>
-  <div class="grid md:grid-cols-3 gap-4 mb-6">
-    <input id="ayahSearch" oninput="filterAyahs(this.value)" placeholder="🔍 بحث داخل السورة..." class="border border-emerald-100 rounded-xl px-4 py-3 bg-white md:col-span-1">
-    <div class="flex gap-2 md:col-span-2">
-      <select id="svStart" class="flex-1 border border-emerald-100 rounded-xl px-3 py-3 bg-white"></select>
-      <span class="self-center text-gray-400 font-bold">إلى</span>
-      <select id="svEnd" class="flex-1 border border-emerald-100 rounded-xl px-3 py-3 bg-white"></select>
-      <button onclick="goCreateFromSurah()" class="gold-grad text-white font-bold px-4 rounded-xl whitespace-nowrap">🎨 إنشاء محتوى</button>
+      <div class="bg-[#FFD93D] border-[3px] border-black rounded-[16px] p-3">
+        <div class="text-[11px] font-bold tracking-widest opacity-70">PLOX</div>
+        <div id="lcCoins" class="font-black text-[20px]">5/5</div>
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button id="lcMenuBtn" class="btn-blox flex-1 bg-white border-[3px] border-black rounded-[16px] py-3.5 font-bold">MENU</button>
+      <button id="nextLevelBtn" class="btn-blox flex-1 bg-black text-white rounded-[16px] py-3.5 font-bold">NEXT →</button>
     </div>
   </div>
-  <div id="ayahList" class="bg-white rounded-2xl shadow border border-emerald-50 p-6 min-h-[200px]">
-    <div class="text-center py-10 text-gray-400">⏳ جاري جلب الآيات من المصدر الموثوق...</div>
-  </div>`;
-  // options
-  const optHtml=Array.from({length:s.ayahCount},(_,i)=>`<option value="${i+1}">الآية ${i+1}</option>`).join('');
-  document.getElementById('svStart').innerHTML=optHtml;
-  document.getElementById('svEnd').innerHTML=optHtml;
+</div>
 
-  const data=await getAyahs(num);
-  const box=document.getElementById('ayahList');
-  if(!data.ayahs){
-    box.innerHTML=`<p class="text-red-600 font-bold text-center py-8">تعذر جلب النص القرآني من المصدر. تأكد من الاتصال بالإنترنت أو اختر إحدى السور المحفوظة محليًا (مثل الفاتحة، يوسف، الإخلاص، الفلق، الناس).</p>`;
-    return;
+<!-- FINAL -->
+<div id="finalScreen" class="hidden absolute inset-0 z-30 items-center justify-center p-4 bg-[radial-gradient(ellipse_at_center,_#FFE66D_0%,_#FF6B6B_100%)]">
+  <div class="glass rounded-[32px] p-8 w-full max-w-[520px] blox-shadow text-center animate-pop border-[4px] border-black">
+    <div class="text-[64px] leading-none">🏆</div>
+    <h2 class="font-black text-[42px] leading-[0.9] tracking-tight mt-2" style="font-family:'Space Grotesk'">PLOX<br>CHAMPION!</h2>
+    <p class="mt-3 font-semibold opacity-70">You rolled through all floating islands without rage-quitting. Respect.</p>
+    <div class="grid grid-cols-3 gap-3 mt-6">
+      <div class="bg-white border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">LEVELS</div><div class="font-black text-[22px]">3/3</div></div>
+      <div class="bg-[#FFD93D] border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">PLOX</div><div id="finalCoins" class="font-black text-[22px]">0</div></div>
+      <div class="bg-black text-white border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">TIME</div><div id="finalTime" class="font-black text-[22px]">00:00</div></div>
+    </div>
+    <button id="finalRestartBtn" class="btn-blox mt-6 w-full bg-black text-white rounded-[18px] py-4 font-black text-[18px]">PLAY AGAIN ↻</button>
+  </div>
+</div>
+
+<!-- MOBILE CONTROLS -->
+<div id="joystickBase"><div id="joystickKnob"></div></div>
+<button id="jumpBtn">JUMP</button>
+
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+
+let scene, camera, renderer, world, clock;
+let ballBody, ballMesh;
+let platforms = [];
+let coins = [];
+let particles = [];
+let goalMesh, goalLight, goalBaseMesh, goalPos = new THREE.Vector3();
+let currentLevel = 0;
+let gameState = 'menu'; // menu, playing, levelComplete, final
+let keys = {};
+let joystick = {x:0,y:0};
+let cameraYaw = 0.6, cameraPitch = 0.35, cameraDistance = 11;
+let isDraggingCam = false, lastCamX = 0;
+let isGrounded = false, groundedBody = null;
+let lastSafePos = new CANNON.Vec3(0,4,0);
+let coinsCollected = 0;
+let startTime = 0;
+let totalCoins = 0, totalTime = 0;
+let audioCtx = null, soundOn = true;
+let lastTrail = 0;
+let decorative = [];
+
+const LEVELS = [
+  {
+    name:"BLOX HOP",
+    targetTime:28,
+    start:{x:0,y:4,z:0},
+    platforms:[
+      {x:0,y:0,z:0,w:9,h:1.2,d:9,color:0xffffff},
+      {x:0,y:0,z:-13,w:6,h:1,d:6,color:0xFF6B6B},
+      {x:0,y:0.6,z:-26,w:5,h:1,d:5,color:0x4ECDC4},
+      {x:6,y:1.2,z:-36,w:5,h:1,d:5,color:0xFFE66D},
+      {x:-5,y:1.8,z:-48,w:5,h:1,d:5,color:0xA8E6CF},
+      {x:0,y:2.6,z:-62,w:7,h:1.2,d:7,color:0xffffff},
+    ],
+    coins:[
+      {x:0,y:2,z:-6},{x:0,y:2,z:-13},{x:0,y:2.6,z:-26},{x:6,y:3.2,z:-36},{x:-5,y:3.8,z:-48}
+    ],
+    goal:{x:0,y:4.6,z:-62}
+  },
+  {
+    name:"SKY SERPENT",
+    targetTime:42,
+    start:{x:0,y:4,z:0},
+    platforms:[
+      {x:0,y:0,z:0,w:6,h:1,d:6,color:0xffffff},
+      {x:11,y:0,z:0,w:5,h:1,d:5,color:0xFF6B6B},
+      {x:11,y:0,z:-12,w:5,h:1,d:5,color:0xFFE66D},
+      {x:0,y:0.5,z:-12,w:5,h:1,d:5,color:0x4ECDC4},
+      {x:0,y:0.5,z:-24,w:4,h:1,d:4,color:0xffffff},
+      {x:8,y:1.8,z:-26,w:4,h:1,d:4,color:0xFF8A65, moving:{axis:'x', amp:5.5, speed:0.9}},
+      {x:-7,y:2.8,z:-34,w:5,h:1,d:5,color:0xA8E6CF},
+      {x:-7,y:3.8,z:-48,w:5,h:1,d:5,color:0xCE93D8},
+      {x:2,y:5,z:-52,w:7,h:1.2,d:7,color:0xffffff},
+    ],
+    coins:[
+      {x:11,y:2,z:0},{x:11,y:2,z:-12},{x:0,y:2.5,z:-12},{x:0,y:2.5,z:-24},{x:8,y:3.8,z:-26},{x:-7,y:4.8,z:-34},{x:-7,y:5.8,z:-48}
+    ],
+    goal:{x:2,y:7,z:-52}
+  },
+  {
+    name:"PLOX PEAKS",
+    targetTime:55,
+    start:{x:0,y:4,z:0},
+    platforms:[
+      {x:0,y:0,z:0,w:5,h:1,d:5,color:0xffffff},
+      {x:0,y:2.2,z:-11,w:3.2,h:1,d:3.2,color:0xFF6B6B},
+      {x:5,y:4.2,z:-15,w:3.2,h:1,d:3.2,color:0xFFE66D},
+      {x:11,y:6.2,z:-15,w:3.2,h:1,d:3.2,color:0x4ECDC4, moving:{axis:'z', amp:5, speed:1.0}},
+      {x:18,y:8.2,z:-15,w:4,h:1,d:4,color:0xA8E6CF},
+      {x:18,y:10.5,z:-26,w:3.2,h:1,d:3.2,color:0xFF8A65},
+      {x:8,y:12.5,z:-30,w:3.2,h:1,d:3.2,color:0xCE93D8, moving:{axis:'x', amp:4.5, speed:1.15}},
+      {x:0,y:14.8,z:-30,w:6,h:1.2,d:6,color:0xffffff},
+    ],
+    coins:[
+      {x:0,y:4.2,z:-11},{x:5,y:6.2,z:-15},{x:11,y:8.2,z:-15},{x:18,y:10.2,z:-15},{x:18,y:12.5,z:-26},{x:8,y:14.5,z:-30},{x:0,y:16.8,z:-30}
+    ],
+    goal:{x:0,y:16.8,z:-30}
   }
-  window._currentAyahs=data.ayahs;
-  box.innerHTML=`
-    <div class="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mb-4">
-      <span>✅ تم التحقق من النص القرآني</span><span class="text-gray-400">| المصدر: ${data.source}</span>
-    </div>
-    <div id="ayahRows" class="space-y-3">
-    ${data.ayahs.map((t,i)=>`
-      <div class="ayah-row flex items-start gap-3 p-3 rounded-xl hover:bg-emerald-50/50 border-b border-gray-50" data-t="${t}">
-        <span class="mt-1 w-8 h-8 flex-shrink-0 gold-grad text-white rounded-full flex items-center justify-center text-xs font-bold">${i+1}</span>
-        <p class="quran-text text-xl text-gray-800 flex-1">${t}</p>
-      </div>`).join('')}
-    </div>`;
-}
-function filterAyahs(q){
-  q=(q||'').trim();
-  document.querySelectorAll('#ayahRows .ayah-row').forEach(r=>{
-    r.style.display=(!q||r.dataset.t.includes(q))?'':'none';
+];
+
+function init(){
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xA7DFFF, 28, 95);
+  scene.background = new THREE.Color(0x87CEEB);
+
+  camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 200);
+  camera.position.set(6,7,10);
+
+  renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  // lights
+  const amb = new THREE.AmbientLight(0xffffff, 0.72);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.15);
+  dir.position.set(14,22,10);
+  dir.castShadow = true;
+  dir.shadow.mapSize.set(2048,2048);
+  dir.shadow.camera.left=-40; dir.shadow.camera.right=40; dir.shadow.camera.top=40; dir.shadow.camera.bottom=-40;
+  dir.shadow.camera.near=1; dir.shadow.camera.far=80;
+  dir.shadow.bias=-0.0004;
+  scene.add(dir);
+
+  // physics
+  world = new CANNON.World({gravity:new CANNON.Vec3(0,-20,0)});
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 12;
+  const ballMat = new CANNON.Material('ball');
+  const groundMat = new CANNON.Material('ground');
+  world.addContactMaterial(new CANNON.ContactMaterial(ballMat, groundMat, {friction:0.42, restitution:0.18}));
+  world._ballMat = ballMat; world._groundMat = groundMat;
+
+  clock = new THREE.Clock();
+
+  // ball
+  const ballGeo = new THREE.SphereGeometry(0.52, 32, 32);
+  const ballMatThree = new THREE.MeshStandardMaterial({color:0xFF4D5A, roughness:0.25, metalness:0.15, emissive:0x330000, emissiveIntensity:0.15});
+  ballMesh = new THREE.Mesh(ballGeo, ballMatThree);
+  ballMesh.castShadow = true; ballMesh.receiveShadow = true;
+  scene.add(ballMesh);
+
+  ballBody = new CANNON.Body({
+    mass:5,
+    shape:new CANNON.Sphere(0.52),
+    material: ballMat,
+    linearDamping:0.18,
+    angularDamping:0.18,
+    allowSleep:false
   });
-}
-function goCreateFromSurah(){
-  const st=+document.getElementById('svStart').value, en=+document.getElementById('svEnd').value;
-  STATE.start=Math.min(st,en); STATE.end=Math.max(st,en);
-  nav('create');
-  setTimeout(()=>{
-    document.getElementById('cSurah').value=STATE.surah.number;
-    onCreateSurahChange();
-    document.getElementById('cStart').value=STATE.start;
-    document.getElementById('cEnd').value=STATE.end;
-  },50);
-}
+  ballBody.position.set(0,4,0);
+  world.addBody(ballBody);
 
-/* =========================================================
-   معالج الإنشاء (Wizard)
-   ========================================================= */
-function initWizard(){
-  wizardStep=1;
-  const sel=document.getElementById('cSurah');
-  sel.innerHTML=SURAHS.map(s=>`<option value="${s.number}">${s.number} - سورة ${s.name} (${s.ayahCount} آية)</option>`).join('');
-  if(STATE.surah) sel.value=STATE.surah.number;
-  document.getElementById('styleOptions').innerHTML=STYLES.map((s,i)=>`
-    <label class="cursor-pointer border-2 border-emerald-100 rounded-xl p-4 text-center hover:border-emerald-400 flex flex-col items-center gap-2">
-      <input type="radio" name="cstyle" value="${s[0]}" ${i===0?'checked':''} class="hidden peer">
-      <div class="w-full h-16 rounded-lg peer-checked:ring-4 ring-emerald-300" style="background:${s[2]}"></div>
-      <span class="font-bold text-sm">${s[1]}</span>
-    </label>`).join('');
-  onCreateSurahChange();
-  renderWizardSteps();
-  showWizardStep(1);
-}
-function onCreateSurahChange(){
-  const num=+document.getElementById('cSurah').value;
-  const s=SURAHS.find(x=>x.number===num);
-  const opt=Array.from({length:s.ayahCount},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
-  document.getElementById('cStart').innerHTML=opt;
-  document.getElementById('cEnd').innerHTML=opt;
-  document.getElementById('cAyahHint').textContent=`سورة ${s.name} تحتوي على ${s.ayahCount} آية. مثال: من الآية 1 إلى الآية ${Math.min(20,s.ayahCount)}.`;
-}
-function renderWizardSteps(){
-  const titles=["السورة","الآيات","النوع","النمط","الصفحات"];
-  document.getElementById('wizardSteps').innerHTML=titles.map((t,i)=>`
-    <div class="flex-1 flex flex-col items-center gap-1">
-      <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold ${i+1<wizardStep?'step-done':i+1===wizardStep?'step-active':'bg-gray-100'}">${i+1<wizardStep?'✓':i+1}</div>
-      <span class="${i+1===wizardStep?'text-emerald-700':''}">${t}</span>
-    </div>`).join('<div class="h-0.5 flex-1 bg-gray-100 mt-4"></div>');
-}
-function showWizardStep(n){
-  document.querySelectorAll('.wstep').forEach(e=>e.classList.add('hidden'));
-  document.getElementById('wstep-'+n).classList.remove('hidden');
-  document.getElementById('wPrev').style.visibility=n===1?'hidden':'visible';
-  document.getElementById('wNext').textContent=n===5?'🚀 إنشاء الصفحات':'التالي';
-  renderWizardSteps();
-}
-function wizardPrev(){if(wizardStep>1){wizardStep--;showWizardStep(wizardStep)}}
-function wizardNext(){
-  if(wizardStep===2){
-    const st=+document.getElementById('cStart').value,en=+document.getElementById('cEnd').value;
-    if(en<st){alert('يجب أن تكون آية النهاية بعد آية البداية.');return}
+  // decorative clouds / floating blox
+  for(let i=0;i<18;i++){
+    const s = 0.6 + Math.random()*1.6;
+    const g = new THREE.BoxGeometry(s,s,s);
+    const m = new THREE.MeshStandardMaterial({color: new THREE.Color().setHSL(Math.random()*0.15+0.05,0.6,0.85), roughness:0.9});
+    const mesh = new THREE.Mesh(g,m);
+    mesh.position.set((Math.random()-0.5)*90, -8 - Math.random()*18, (Math.random()-0.5)*120 -20);
+    mesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
+    mesh.castShadow=false; mesh.receiveShadow=true;
+    scene.add(mesh);
+    decorative.push({mesh, rotSpeed: (Math.random()-0.5)*0.6, float: Math.random()*Math.PI*2});
   }
-  if(wizardStep<5){wizardStep++;showWizardStep(wizardStep);}
-  else generateStory();
+  for(let i=0;i<12;i++){
+    const cloud = new THREE.Group();
+    const baseY = 18 + Math.random()*12;
+    for(let j=0;j<4;j++){
+      const sg = new THREE.SphereGeometry(1.2+Math.random()*1.4,12,10);
+      const sm = new THREE.MeshStandardMaterial({color:0xffffff, roughness:1, transparent:true, opacity:0.9});
+      const sMesh = new THREE.Mesh(sg, sm);
+      sMesh.position.set((Math.random()-0.5)*3, (Math.random()-0.5)*0.8, (Math.random()-0.5)*2);
+      cloud.add(sMesh);
+    }
+    cloud.position.set((Math.random()-0.5)*80, baseY, (Math.random()-0.5)*80 -30);
+    scene.add(cloud);
+    decorative.push({mesh:cloud, rotSpeed:0, float:Math.random()*6, isCloud:true, baseY});
+  }
+
+  // events
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if(e.code==='Space') keys[' ']=true; if(e.key==='Escape'&&gameState==='playing'){ showMenu(); } });
+  window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; if(e.code==='Space') keys[' ']=false; });
+  setupPointer();
+  setupJoystick();
+  setupUI();
+
+  createLevel(0);
+  animate();
 }
 
-/* =========================================================
-   إنشاء القصة + التحقق + شريط التقدم
-   ========================================================= */
-const PROGRESS_STEPS=["جاري قراءة الآيات...","جاري التحقق من النص القرآني...","جاري تحليل الآيات...","جاري تحديد الأحداث...","جاري تقسيم المشاهد...","جاري إنشاء الرسومات...","جاري تجهيز النصوص...","جاري تركيب الصفحات..."];
+function onResize(){
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
 
-async function generateStory(){
-  const num=+document.getElementById('cSurah').value;
-  const s=SURAHS.find(x=>x.number===num);
-  const start=+document.getElementById('cStart').value, end=+document.getElementById('cEnd').value;
-  const type=document.querySelector('input[name="ctype"]:checked').value;
-  const style=document.querySelector('input[name="cstyle"]:checked').value;
-  const pages=+document.getElementById('cPages').value;
-  const review=document.getElementById('cReview').checked;
+function setupPointer(){
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', e=>{
+    if(e.target.closest('#joystickBase')||e.target.closest('#jumpBtn')) return;
+    isDraggingCam = true; lastCamX = e.clientX; el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!isDraggingCam) return;
+    const dx = e.clientX - lastCamX;
+    cameraYaw -= dx*0.0045;
+    lastCamX = e.clientX;
+  });
+  el.addEventListener('pointerup', ()=>{ isDraggingCam=false; });
+  el.addEventListener('wheel', e=>{
+    cameraDistance = THREE.MathUtils.clamp(cameraDistance + e.deltaY*0.01, 5, 18);
+  }, {passive:true});
+}
 
-  const modal=document.getElementById('progressModal');
-  modal.classList.remove('hidden');
-  const stepsBox=document.getElementById('progressSteps');
-  const bar=document.getElementById('progressBar');
-  const errEl=document.getElementById('progressError');
-  errEl.classList.add('hidden');
-  stepsBox.innerHTML='';
-  let ayahs=null;
+function setupJoystick(){
+  const base = document.getElementById('joystickBase');
+  const knob = document.getElementById('joystickKnob');
+  let active=false, touchId=null, center={x:0,y:0}, maxR=44;
+  function updCenter(){ const r=base.getBoundingClientRect(); center.x=r.left+r.width/2; center.y=r.top+r.height/2; maxR=r.width/2-12; }
+  base.addEventListener('touchstart', e=>{
+    e.preventDefault(); updCenter(); active=true; const t=e.touches[0]; touchId=t.identifier;
+    handle(t.clientX,t.clientY);
+  },{passive:false});
+  base.addEventListener('pointerdown', e=>{ updCenter(); active=true; touchId='mouse'; handle(e.clientX,e.clientY); base.setPointerCapture(e.pointerId); });
+  window.addEventListener('touchmove', e=>{
+    if(!active) return; for(const t of e.touches){ if(t.identifier===touchId){ e.preventDefault(); handle(t.clientX,t.clientY); break; } }
+  },{passive:false});
+  window.addEventListener('pointermove', e=>{ if(!active||touchId!=='mouse') return; handle(e.clientX,e.clientY); });
+  function end(){ active=false; touchId=null; knob.style.transform='translate(-50%,-50%)'; joystick.x=0; joystick.y=0; }
+  window.addEventListener('touchend', e=>{ let still=false; for(const t of e.touches) if(t.identifier===touchId) still=true; if(!still) end(); });
+  window.addEventListener('pointerup', e=>{ if(touchId==='mouse') end(); });
+  function handle(cx,cy){
+    const dx=cx-center.x, dy=cy-center.y;
+    const dist=Math.hypot(dx,dy); const ang=Math.atan2(dy,dx);
+    const cd=Math.min(dist,maxR);
+    const nx=Math.cos(ang)*cd, ny=Math.sin(ang)*cd;
+    knob.style.transform=`translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+    joystick.x = nx/maxR; joystick.y = -ny/maxR;
+  }
 
-  for(let i=0;i<PROGRESS_STEPS.length;i++){
-    const div=document.createElement('div');
-    div.className='flex items-center gap-2 text-gray-500';
-    div.innerHTML=`<span class="anim">⏳</span> ${PROGRESS_STEPS[i]}`;
-    stepsBox.appendChild(div);
-    await sleep(450);
+  const jumpBtn=document.getElementById('jumpBtn');
+  const setJump = v=>{ keys[' ']=v; keys['space']=v; if(v) jumpBtn.classList.add('active'); else jumpBtn.classList.remove('active'); };
+  jumpBtn.addEventListener('touchstart', e=>{ e.preventDefault(); setJump(true); },{passive:false});
+  jumpBtn.addEventListener('touchend', e=>{ e.preventDefault(); setJump(false); },{passive:false});
+  jumpBtn.addEventListener('pointerdown', e=>{ setJump(true); });
+  window.addEventListener('pointerup', ()=> setJump(false));
+}
 
-    if(i===0){ // قراءة الآيات
-      const data=await getAyahs(num);
-      ayahs=data.ayahs;
-      window._srcName=data.source;
-    }
-    if(i===1){ // التحقق
-      if(!verifyText(ayahs,start,end,s.ayahCount)){
-        div.innerHTML=`<span>❌</span> فشل التحقق`;
-        errEl.textContent="تعذر التحقق من النص القرآني، يرجى المحاولة مرة أخرى.";
-        errEl.classList.remove('hidden');
-        return;
+function setupUI(){
+  document.getElementById('playBtn').onclick = ()=> startGame(currentLevel);
+  document.querySelectorAll('.levelPick').forEach(b=> b.onclick=()=>{ currentLevel=parseInt(b.dataset.level); startGame(currentLevel); });
+  document.getElementById('nextLevelBtn').onclick = ()=>{
+    if(currentLevel < LEVELS.length-1){ currentLevel++; startGame(currentLevel); }
+    else showFinal();
+  };
+  document.getElementById('lcMenuBtn').onclick = ()=> showMenu();
+  document.getElementById('finalRestartBtn').onclick = ()=>{ totalCoins=0; totalTime=0; currentLevel=0; showMenu(); };
+  document.getElementById('hudMenuBtn').onclick = ()=> showMenu();
+  document.getElementById('soundToggle').onclick = (e)=>{
+    soundOn=!soundOn; e.currentTarget.textContent = soundOn?'🔊':'🔇';
+    if(soundOn) ensureAudio();
+  };
+}
+
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+}
+function playSound(type){
+  if(!soundOn) return;
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  if(type==='coin'){
+    [0,0.12].forEach((d,i)=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(i?1200:650, now+d); o.frequency.exponentialRampToValueAtTime(i?1600:1100, now+d+0.18);
+      g.gain.setValueAtTime(0.35, now+d); g.gain.exponentialRampToValueAtTime(0.001, now+d+0.28);
+      o.connect(g); g.connect(audioCtx.destination); o.start(now+d); o.stop(now+d+0.3);
+    });
+  } else if(type==='jump'){
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.frequency.setValueAtTime(180, now); o.frequency.linearRampToValueAtTime(520, now+0.16);
+    g.gain.setValueAtTime(0.45, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.22);
+    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+0.24);
+  } else if(type==='fall'){
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(380, now); o.frequency.linearRampToValueAtTime(70, now+0.45);
+    g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.5);
+    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+0.55);
+  } else if(type==='win'){
+    [0,0.14,0.28,0.42].forEach((d,i)=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.frequency.setValueAtTime(300 + i*180, now+d);
+      g.gain.setValueAtTime(0.38, now+d); g.gain.exponentialRampToValueAtTime(0.001, now+d+0.5);
+      o.connect(g); g.connect(audioCtx.destination); o.start(now+d); o.stop(now+d+0.55);
+    });
+  }
+}
+
+function clearLevel(){
+  platforms.forEach(p=>{
+    if(p.body) world.removeBody(p.body);
+    if(p.mesh) scene.remove(p.mesh);
+  });
+  platforms=[];
+  coins.forEach(c=>{ scene.remove(c.mesh); if(c.light) scene.remove(c.light); });
+  coins=[];
+  particles.forEach(p=> scene.remove(p.mesh)); particles=[];
+  if(goalMesh) scene.remove(goalMesh);
+  if(goalLight) scene.remove(goalLight);
+  if(goalBaseMesh) scene.remove(goalBaseMesh);
+  goalMesh=null; goalLight=null; goalBaseMesh=null;
+}
+
+function createLevel(idx){
+  clearLevel();
+  const lvl = LEVELS[idx];
+  // platforms
+  lvl.platforms.forEach(pd=>{
+    const geo = new THREE.BoxGeometry(pd.w, pd.h, pd.d);
+    const mat = new THREE.MeshStandardMaterial({color: pd.color, roughness:0.78, metalness:0.05});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(pd.x, pd.y, pd.z);
+    mesh.receiveShadow=true; mesh.castShadow=true;
+    // add edge highlight
+    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:0x000000, transparent:true, opacity:0.18}));
+    mesh.add(edge);
+    scene.add(mesh);
+
+    const half = new CANNON.Vec3(pd.w/2, pd.h/2, pd.d/2);
+    const shape = new CANNON.Box(half);
+    const body = new CANNON.Body({mass:0, shape, material: world._groundMat, position:new CANNON.Vec3(pd.x,pd.y,pd.z)});
+    if(pd.moving){ body.type=CANNON.Body.KINEMATIC; }
+    world.addBody(body);
+    platforms.push({mesh, body, isMoving:!!pd.moving, moving:pd.moving, basePos:new CANNON.Vec3(pd.x,pd.y,pd.z), half});
+  });
+  // coins
+  lvl.coins.forEach(cd=>{
+    const geo = new THREE.OctahedronGeometry(0.42,0);
+    const mat = new THREE.MeshStandardMaterial({color:0xFFD93D, emissive:0xFFAA00, emissiveIntensity:0.35, metalness:0.2, roughness:0.35});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(cd.x, cd.y, cd.z);
+    mesh.castShadow=true;
+    scene.add(mesh);
+    const light = new THREE.PointLight(0xFFD93D, 0.7, 4);
+    light.position.copy(mesh.position);
+    scene.add(light);
+    coins.push({mesh, light, pos:new THREE.Vector3(cd.x,cd.y,cd.z), collected:false, baseY:cd.y});
+  });
+  // goal
+  const g = lvl.goal;
+  goalPos.set(g.x,g.y,g.z);
+  const torusGeo = new THREE.TorusGeometry(1.25,0.28,16,48);
+  const torusMat = new THREE.MeshStandardMaterial({color:0x00FFB2, emissive:0x00FFB2, emissiveIntensity:0.7, roughness:0.3});
+  goalMesh = new THREE.Mesh(torusGeo, torusMat);
+  goalMesh.position.copy(goalPos);
+  goalMesh.castShadow=true;
+  scene.add(goalMesh);
+  goalLight = new THREE.PointLight(0x00FFB2, 2.2, 12);
+  goalLight.position.copy(goalPos);
+  scene.add(goalLight);
+  // ball reset
+  ballBody.position.set(lvl.start.x, lvl.start.y, lvl.start.z);
+  ballBody.velocity.set(0,0,0);
+  ballBody.angularVelocity.set(0,0,0);
+  lastSafePos.copy(ballBody.position);
+  coinsCollected=0;
+  // camera reset-ish
+  cameraYaw = 0.5; cameraDistance = 11;
+  updateHUD();
+}
+
+function startGame(idx){
+  currentLevel = idx;
+  createLevel(idx);
+  gameState='playing';
+  document.getElementById('menuScreen').classList.add('hidden');
+  document.getElementById('levelCompleteScreen').classList.add('hidden');
+  document.getElementById('levelCompleteScreen').classList.remove('flex');
+  document.getElementById('finalScreen').classList.add('hidden');
+  document.getElementById('finalScreen').classList.remove('flex');
+  document.getElementById('hud').classList.remove('hidden');
+  startTime = performance.now();
+  ensureAudio();
+}
+
+function showMenu(){
+  gameState='menu';
+  document.getElementById('menuScreen').classList.remove('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('levelCompleteScreen').classList.add('hidden');
+  document.getElementById('levelCompleteScreen').classList.remove('flex');
+  document.getElementById('finalScreen').classList.add('hidden');
+  document.getElementById('finalScreen').classList.remove('flex');
+}
+
+function showLevelComplete(){
+  gameState='levelComplete';
+  const elapsed = (performance.now()-startTime)/1000;
+  totalTime+=elapsed; totalCoins+=coinsCollected;
+  const lvl = LEVELS[currentLevel];
+  const stars = calcStars(coinsCollected, lvl.coins.length, elapsed, lvl.targetTime);
+  document.getElementById('lcTitle').textContent = stars===3?'PERFECT ROLL!': stars===2?'SICK ROLL!':'NICE ROLL!';
+  document.getElementById('lcTime').textContent = formatTime(elapsed);
+  document.getElementById('lcCoins').textContent = `${coinsCollected}/${lvl.coins.length}`;
+  const cont=document.getElementById('lcStars'); cont.innerHTML='';
+  for(let i=0;i<3;i++){ const d=document.createElement('div'); d.textContent=i<stars?'★':'☆'; d.className=`${i<stars?'text-[#111]':'text-black/20'} text-[38px] leading-none drop-shadow-sm`; cont.appendChild(d); }
+  document.getElementById('levelCompleteScreen').classList.remove('hidden');
+  document.getElementById('levelCompleteScreen').classList.add('flex');
+  document.getElementById('nextLevelBtn').textContent = currentLevel < LEVELS.length-1 ? 'NEXT →' : 'FINALE →';
+  playSound('win');
+  spawnConfetti(goalPos, 24);
+}
+
+function showFinal(){
+  gameState='final';
+  document.getElementById('levelCompleteScreen').classList.add('hidden');
+  document.getElementById('levelCompleteScreen').classList.remove('flex');
+  document.getElementById('finalScreen').classList.remove('hidden');
+  document.getElementById('finalScreen').classList.add('flex');
+  document.getElementById('finalCoins').textContent = `${totalCoins}`;
+  document.getElementById('finalTime').textContent = formatTime(totalTime);
+}
+
+function calcStars(collected,total,time,target){
+  let s=1;
+  if(collected===total) s++;
+  if(time <= target) s++;
+  if(collected===total && time <= target*0.75) s=3;
+  return Math.min(3,s);
+}
+function formatTime(sec){
+  const m=Math.floor(sec/60), s=Math.floor(sec%60);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function updateHUD(){
+  document.getElementById('hudLevelName').textContent = LEVELS[currentLevel].name;
+  document.getElementById('hudCoins').textContent = `${coinsCollected} / ${coins.length}`;
+}
+
+function spawnParticles(pos, color=0xFFD93D, count=10, speed=4){
+  for(let i=0;i<count;i++){
+    const geo = new THREE.TetrahedronGeometry(0.12+Math.random()*0.08,0);
+    const mat = new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.3, transparent:true, opacity:1});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    const vel = new THREE.Vector3((Math.random()-0.5)*speed, Math.random()*speed*0.8+1, (Math.random()-0.5)*speed);
+    particles.push({mesh, vel, life:0.7, max:0.7});
+  }
+}
+function spawnConfetti(pos,count){
+  for(let i=0;i<count;i++){
+    const geo = new THREE.BoxGeometry(0.18,0.18,0.18);
+    const col = new THREE.Color().setHSL(Math.random(),0.9,0.6);
+    const mat = new THREE.MeshStandardMaterial({color:col, transparent:true, opacity:1});
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    const vel = new THREE.Vector3((Math.random()-0.5)*8, Math.random()*6+2, (Math.random()-0.5)*8);
+    particles.push({mesh, vel, life:1.2, max:1.2, rot:new THREE.Vector3(Math.random()*6,Math.random()*6,Math.random()*6)});
+  }
+}
+
+function updateGrounded(){
+  // raycast
+  const from = new CANNON.Vec3(ballBody.position.x, ballBody.position.y, ballBody.position.z);
+  const to = new CANNON.Vec3(from.x, from.y-1.25, from.z);
+  const res = new CANNON.RaycastResult();
+  let hit=false;
+  try{ hit = world.raycastClosest(from,to,{},res); }catch{}
+  if(hit && res.hasHit && res.body!==ballBody && res.distance<1.2){
+    isGrounded=true; groundedBody=res.body; return;
+  }
+  // fallback platform check
+  isGrounded=false; groundedBody=null;
+  const bp = ballBody.position;
+  for(const p of platforms){
+    if(!p.body) continue;
+    const bpos=p.body.position, h=p.half;
+    if(Math.abs(bp.x-bpos.x) <= h.x+0.35 && Math.abs(bp.z-bpos.z) <= h.z+0.35){
+      const top=bpos.y+h.y;
+      const dy=bp.y - top;
+      if(dy>=-0.25 && dy<=0.75 && ballBody.velocity.y < 1.5){
+        isGrounded=true; groundedBody=p.body; return;
       }
     }
-    div.innerHTML=`<span class="text-emerald-600">✓</span> <span class="text-gray-700">${PROGRESS_STEPS[i]}</span>`;
-    bar.style.width=Math.round(((i+1)/(PROGRESS_STEPS.length+1))*100)+'%';
   }
-
-  // بناء الصفحات
-  const selectedAyahs=[];
-  for(let a=start;a<=end;a++) selectedAyahs.push({n:a,t:ayahs[a-1]});
-  const storyPages=buildPages(s,selectedAyahs,type,style,pages);
-
-  bar.style.width='100%';
-  const done=document.createElement('div');
-  done.className='flex items-center gap-2 text-emerald-700 font-black mt-1';
-  done.innerHTML='🎉 تم إنشاء المحتوى بنجاح';
-  stepsBox.appendChild(done);
-  await sleep(600);
-
-  const isProphet=!!PROPHET_SURAHS[num];
-  const title = type==='story' ? (isProphet?`قصة ${PROPHET_SURAHS[num]}`:`قصة من سورة ${s.name}`) : type==='explain' ? `شرح مصور من سورة ${s.name}` : `آيات سورة ${s.name} بالتسلسل`;
-  const story={
-    id:Date.now(),
-    title, surahName:s.name, surahNum:num, start, end,
-    type, style, pages:storyPages,
-    category: isProphet?'قصص الأنبياء': type==='explain'?'شرح مصور': type==='sequence'?'آيات للأطفال':'قصص قرآنية',
-    status: review?'قيد المراجعة':'منشور',
-    createdBy:'ولي أمر', createdAt:new Date().toISOString(),
-    source: window._srcName
-  };
-  const lib=loadLib(); lib.unshift(story); saveLib(lib);
-
-  modal.classList.add('hidden');
-  nav('storyview',story.id);
 }
 
-function buildPages(s,ayahs,type,style,targetPages){
-  const isProphet=!!PROPHET_SURAHS[s.number];
-  const scenes={
-    12:["رؤيا يوسف: الكواكب والشمس والقمر","يوسف الصغير مع أبيه يعقوب","نصيحة الأب لابنه","اصطفاء الله ليوسف"],
-    105:["أصحاب الفيل يقتربون من الكعبة","الفيل يمتنع عن التقدم","طير أبابيل في السماء","حماية الله لبيته الحرام"],
-  };
-  let pages=[];
-  if(type==='sequence'){
-    ayahs.forEach((a,i)=>{
-      pages.push({page:i+1,ayahNum:a.n,ayahText:a.t,title:`سورة ${s.name} — الآية ${a.n}`,
-        explanation:(KID_EXPLAIN[s.number]?KID_EXPLAIN[s.number].ex:"شرح مبسط للآية مناسب لعمر الطفل مع الحفاظ على المعنى."),
-        lesson:(KID_EXPLAIN[s.number]?KID_EXPLAIN[s.number].lesson:"قيمة تعليمية طيبة نتعلمها من هذه الآية."),
-        style,prophet:isProphet,scene:`سورة ${s.name}`});
-    });
-  } else {
-    const n=Math.min(Math.max(targetPages,1),ayahs.length);
-    const per=Math.ceil(ayahs.length/n);
-    for(let i=0;i<ayahs.length;i+=per){
-      const chunk=ayahs.slice(i,i+per);
-      const pi=Math.floor(i/per);
-      const sceneTitle=(scenes[s.number]&&scenes[s.number][pi])||(type==='story'?`المشهد ${pi+1}`:`شرح مصور للأطفال ${pi+1}`);
-      pages.push({
-        page:pi+1,
-        ayahNum:chunk.length===1?chunk[0].n:`${chunk[0].n}-${chunk[chunk.length-1].n}`,
-        ayahText:chunk.map(c=>c.t).join(' '),
-        title:sceneTitle,
-        explanation:(KID_EXPLAIN[s.number]?KID_EXPLAIN[s.number].ex:"شرح مبسط وسهل يناسب الأطفال، معتمد على معنى الآيات دون اختراع أحداث."),
-        lesson:(KID_EXPLAIN[s.number]?KID_EXPLAIN[s.number].lesson:"قيمة تعليمية مرتبطة مباشرة بمضمون الآيات."),
-        style,prophet:isProphet,scene:sceneTitle
-      });
+function animate(){
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 1/30);
+  const t = performance.now()*0.001;
+
+  // decorative anim
+  decorative.forEach(d=>{
+    if(d.isCloud){
+      d.mesh.position.y = d.baseY + Math.sin(t*0.4 + d.float)*0.8;
+      d.mesh.rotation.y += delta*0.05;
+    }else{
+      d.mesh.rotation.x += d.rotSpeed*delta;
+      d.mesh.rotation.y += d.rotSpeed*delta*0.7;
+      d.mesh.position.y += Math.sin(t*0.6 + d.float)*0.002;
     }
+  });
+
+  if(gameState==='playing'){
+    // input
+    const forward = new THREE.Vector3();
+    forward.subVectors(ballMesh.position, camera.position); forward.y=0; forward.normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
+
+    let ix=0, iz=0;
+    if(keys['w']||keys['arrowup']) iz+=1;
+    if(keys['s']||keys['arrowdown']) iz-=1;
+    if(keys['a']||keys['arrowleft']) ix-=1;
+    if(keys['d']||keys['arrowright']) ix+=1;
+    ix+=joystick.x; iz+=joystick.y;
+    const mag=Math.hypot(ix,iz);
+    if(mag>1){ ix/=mag; iz/=mag; }
+
+    const moveForce = 70;
+    const f = new THREE.Vector3().addScaledVector(forward, iz).addScaledVector(right, ix).multiplyScalar(moveForce);
+    ballBody.applyForce(new CANNON.Vec3(f.x,0,f.z), ballBody.position);
+
+    // jump
+    if((keys[' ']||keys['space']) && isGrounded){
+      ballBody.applyImpulse(new CANNON.Vec3(0,13.5,0), ballBody.position);
+      isGrounded=false;
+      playSound('jump');
+      spawnParticles(new THREE.Vector3(ballBody.position.x, ballBody.position.y-0.5, ballBody.position.z), 0xffffff, 6, 2.5);
+    }
+
+    // moving platforms update (before physics step)
+    platforms.forEach(p=>{
+      if(!p.isMoving) return;
+      const amp=p.moving.amp, spd=p.moving.speed, axis=p.moving.axis;
+      const off=Math.sin(t*spd)*amp;
+      const newPos=new CANNON.Vec3().copy(p.basePos);
+      if(axis==='x') newPos.x+=off;
+      if(axis==='z') newPos.z+=off;
+      if(axis==='y') newPos.y+=off;
+      const deltaPos=new CANNON.Vec3().copy(newPos).vsub(p.body.position);
+      const vel = delta>0.0001 ? new CANNON.Vec3().copy(deltaPos).scale(1/delta) : new CANNON.Vec3(0,0,0);
+      // if ball is on this platform, carry it
+      if(isGrounded && groundedBody===p.body){
+        ballBody.position.vadd(deltaPos, ballBody.position);
+      }
+      p.body.velocity.copy(vel);
+      p.body.position.copy(newPos);
+    });
+
+    world.step(1/60, delta, 4);
+    updateGrounded();
+
+    // update last safe pos
+    if(isGrounded && ballBody.velocity.length()<4){
+      lastSafePos.copy(ballBody.position);
+      lastSafePos.y+=0.6;
+    }
+
+    // sync meshes
+    ballMesh.position.set(ballBody.position.x, ballBody.position.y, ballBody.position.z);
+    ballMesh.quaternion.copy(ballBody.quaternion);
+    // manual rolling visual tweak
+    const v=ballBody.velocity;
+    const r=0.52;
+    if(v.length()>0.2){
+      ballBody.angularVelocity.x = -v.z / r;
+      ballBody.angularVelocity.z = v.x / r;
+    }
+
+    platforms.forEach(p=>{ if(p.body) p.mesh.position.set(p.body.position.x,p.body.position.y,p.body.position.z); });
+
+    // coins
+    coins.forEach(c=>{
+      if(c.collected) return;
+      c.mesh.rotation.y+=delta*2.2;
+      c.mesh.position.y = c.baseY + Math.sin(t*2 + c.pos.x)*0.22;
+      if(c.light) c.light.position.copy(c.mesh.position);
+      const d = ballMesh.position.distanceTo(c.mesh.position);
+      if(d<1.15){
+        c.collected=true;
+        c.mesh.visible=false;
+        if(c.light) c.light.intensity=0;
+        coinsCollected++;
+        updateHUD();
+        playSound('coin');
+        spawnParticles(c.mesh.position.clone(), 0xFFD93D, 10, 3.5);
+      }
+    });
+
+    // goal
+    if(goalMesh){
+      goalMesh.rotation.y+=delta*1.2;
+      goalMesh.position.y = goalPos.y + Math.sin(t*1.6)*0.18;
+      goalLight.position.copy(goalMesh.position);
+      goalLight.intensity = 2 + Math.sin(t*3)*0.4;
+      if(ballMesh.position.distanceTo(goalMesh.position) < 1.9){
+        showLevelComplete();
+      }
+    }
+
+    // fall check
+    if(ballBody.position.y < -18){
+      playSound('fall');
+      document.getElementById('canvas-container').classList.add('shake');
+      setTimeout(()=>document.getElementById('canvas-container').classList.remove('shake'),320);
+      ballBody.position.copy(lastSafePos);
+      ballBody.velocity.set(0,0,0);
+      ballBody.angularVelocity.set(0,0,0);
+      spawnParticles(new THREE.Vector3(ballBody.position.x, ballBody.position.y-0.5, ballBody.position.z), 0x888888, 12, 3);
+    }
+
+    // trail
+    if(ballBody.velocity.length()>2 && performance.now()-lastTrail>55){
+      lastTrail=performance.now();
+      const geo=new THREE.SphereGeometry(0.12,8,8);
+      const mat=new THREE.MeshStandardMaterial({color:0xFF4D5A, transparent:true, opacity:0.55});
+      const m=new THREE.Mesh(geo,mat);
+      m.position.copy(ballMesh.position);
+      scene.add(m);
+      particles.push({mesh:m, vel:new THREE.Vector3(0,0,0), life:0.45, max:0.45, isTrail:true});
+    }
+
+    // HUD timer
+    document.getElementById('hudTimer').textContent = formatTime((performance.now()-startTime)/1000);
   }
-  return pages;
-}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
-/* =========================================================
-   رسم المشهد (SVG) — دون ملامح وجه للأنبياء
-   ========================================================= */
-const STYLE_BG={watercolor:["#e3f2fd","#bbdefb"],storybook:["#fff3e0","#ffe0b2"],cartoon:["#e8f5e9","#c8e6c9"],kids:["#fce4ec","#f8bbd0"],print:["#f3e5f5","#e1bee7"]};
-function drawScene(el,p){
-  if(!el)return;
-  const bg=STYLE_BG[p.style]||["#e3f2fd","#bbdefb"];
-  const halo = p.prophet ? `
-    <g>
-      <circle cx="200" cy="150" r="42" fill="#fff" opacity="0.95" filter="url(#glow)"/>
-      <circle cx="200" cy="150" r="55" fill="none" stroke="#fff" stroke-width="3" opacity="0.6"/>
-      <rect x="180" y="185" width="40" height="80" rx="18" fill="#e0f2f1" opacity="0.9"/>
-      <text x="200" y="290" text-anchor="middle" font-size="12" fill="#0f766e" font-family="Cairo">شخصية بلا ملامح — احترامًا للأنبياء</text>
-    </g>` : `
-    <g>
-      <circle cx="150" cy="150" r="26" fill="#0f766e" opacity="0.85"/>
-      <rect x="132" y="176" width="36" height="55" rx="16" fill="#14b8a6" opacity="0.85"/>
-      <circle cx="255" cy="160" r="20" fill="#c9a227" opacity="0.85"/>
-      <rect x="241" y="182" width="28" height="44" rx="13" fill="#e0a800" opacity="0.85"/>
-    </g>`;
-  el.innerHTML=`
-  <svg viewBox="0 0 400 300" class="w-full h-full">
-    <defs>
-      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bg[0]}"/><stop offset="1" stop-color="${bg[1]}"/></linearGradient>
-      <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    </defs>
-    <rect width="400" height="300" fill="url(#sky)"/>
-    <circle cx="330" cy="55" r="30" fill="#ffe082" opacity="0.9"/>
-    ${p.prophet?'':'<g opacity="0.5"><circle cx="70" cy="60" r="14" fill="#fff"/><circle cx="90" cy="60" r="18" fill="#fff"/><circle cx="110" cy="60" r="14" fill="#fff"/></g>'}
-    <path d="M0 240 Q100 200 200 235 T400 230 V300 H0 Z" fill="#a5d6a7" opacity="0.85"/>
-    <path d="M0 265 Q120 240 260 270 T400 260 V300 H0 Z" fill="#81c784" opacity="0.9"/>
-    ${halo}
-    <text x="200" y="30" text-anchor="middle" font-size="14" fill="#0f766e" font-family="Cairo" font-weight="bold">${(p.scene||'').slice(0,34)}</text>
-  </svg>`;
+  // particles update
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.life-=delta;
+    if(p.life<=0){ scene.remove(p.mesh); particles.splice(i,1); continue; }
+    p.mesh.position.addScaledVector(p.vel, delta);
+    p.vel.y -= delta*9.8*0.6;
+    if(p.rot){ p.mesh.rotation.x+=p.rot.x*delta; p.mesh.rotation.y+=p.rot.y*delta; p.mesh.rotation.z+=p.rot.z*delta; }
+    if(p.mesh.material){ p.mesh.material.opacity = p.life / p.max; const s= p.isTrail ? (p.life/p.max) : 1; p.mesh.scale.setScalar(s); }
+  }
+
+  // camera follow
+  const target = ballMesh.position;
+  const yaw = cameraYaw;
+  const dist = cameraDistance;
+  const height = 4.2 + cameraPitch*3;
+  const camX = target.x + Math.sin(yaw)*dist;
+  const camZ = target.z + Math.cos(yaw)*dist;
+  const camY = target.y + height;
+  const desired = new THREE.Vector3(camX, camY, camZ);
+  camera.position.lerp(desired, 0.12);
+  camera.lookAt(target.x, target.y+0.6, target.z);
+
+  renderer.render(scene, camera);
 }
 
-/* =========================================================
-   عرض القصة (الغلاف + الصفحات)
-   ========================================================= */
-function renderStoryView(id){
-  const lib=loadLib(); const st=lib.find(x=>x.id==id); if(!st)return;
-  const root=document.getElementById('storyViewRoot');
-  const rangeTxt=st.start===st.end?`الآية ${st.start}`:`الآيات ${st.start}–${st.end}`;
-  root.innerHTML=`
-  <button onclick="nav('library')" class="text-emerald-700 font-bold mb-4">→ العودة للمكتبة</button>
-  <!-- الغلاف -->
-  <div class="rounded-3xl overflow-hidden shadow-xl mb-8 bg-white border border-emerald-50">
-    <div class="grid md:grid-cols-2">
-      <div class="scene-frame m-4" id="coverScene" style="aspect-ratio:4/3"></div>
-      <div class="p-8 flex flex-col justify-center emerald-grad text-white">
-        <span class="text-sm opacity-80">من القرآن الكريم</span>
-        <h2 class="text-3xl font-black mt-1">${st.title}</h2>
-        <p class="mt-2 text-emerald-50">سورة ${st.surahName} — ${rangeTxt}</p>
-        <p class="text-xs mt-1 opacity-80">${st.pages.length} صفحة · ${st.category} · الحالة: ${st.status}</p>
-        <div class="flex gap-2 mt-5 flex-wrap">
-          <button onclick="downloadAll(${st.id})" class="bg-white text-emerald-700 font-bold px-4 py-2 rounded-xl">⬇️ تحميل جميع الصور</button>
-          <button onclick="alert('سيتم تجميع الصور في ملف ZIP على الخادم عند توفر الخدمة.')" class="bg-white/20 text-white font-bold px-4 py-2 rounded-xl">🗜️ تحميل ZIP</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="flex items-center justify-between mb-4">
-    <h3 class="text-2xl font-black text-emerald-900">📄 الصفحات المصورة</h3>
-    <span class="text-xs text-gray-400">المصدر: ${st.source||'قاعدة بيانات موثوقة'}</span>
-  </div>
-  <div class="grid md:grid-cols-2 gap-6" id="pagesGrid"></div>`;
-
-  drawScene(document.getElementById('coverScene'),{style:st.style,scene:st.title,prophet:!!PROPHET_SURAHS[st.surahNum]});
-
-  const grid=document.getElementById('pagesGrid');
-  st.pages.forEach((pg,idx)=>{
-    const card=document.createElement('div');
-    card.className='bg-white rounded-3xl shadow-lg border border-emerald-50 overflow-hidden';
-    card.id='pageCard-'+idx;
-    card.innerHTML=`
-      <div class="flex items-center justify-between px-4 pt-4">
-        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">سورة ${st.surahName} — الآية ${pg.ayahNum}</span>
-        <span class="text-xs text-gray-400">صفحة ${pg.page}</span>
-      </div>
-      <div class="px-4 pt-3">
-        <h4 class="font-black text-emerald-900 mb-2">${st.type==='explain'?'شرح مصور: ':''}${pg.title}</h4>
-        <div class="scene-frame" id="pgScene-${idx}" style="aspect-ratio:16/10"></div>
-      </div>
-      <div class="p-4 space-y-3">
-        <div class="bg-emerald-50/60 border-r-4 border-emerald-600 rounded-lg p-3">
-          <div class="text-[11px] text-emerald-700 font-bold mb-1">النص القرآني ✅ (محقّق)</div>
-          <p class="quran-text text-xl text-gray-800 text-center">${pg.ayahText}</p>
-        </div>
-        <div class="bg-amber-50/60 rounded-lg p-3">
-          <div class="text-[11px] text-amber-700 font-bold mb-1">💡 شرح للأطفال</div>
-          <p class="text-sm text-gray-700 leading-relaxed">${pg.explanation}</p>
-        </div>
-        <div class="bg-sky-50/60 rounded-lg p-3">
-          <div class="text-[11px] text-sky-700 font-bold mb-1">🌟 ماذا نتعلم؟</div>
-          <p class="text-sm text-gray-700 leading-relaxed">${pg.lesson}</p>
-        </div>
-        <div class="flex gap-2 flex-wrap pt-1">
-          <button onclick="downloadPage(${st.id},${idx})" class="text-sm bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg">⬇️ تحميل الصورة</button>
-          <button onclick="regenImage(${st.id},${idx})" class="text-sm bg-gray-100 text-gray-700 font-bold px-3 py-1.5 rounded-lg">🔄 إعادة إنشاء الصورة</button>
-          <button onclick="editPage(${st.id},${idx})" class="text-sm bg-gray-100 text-gray-700 font-bold px-3 py-1.5 rounded-lg">✏️ تعديل الشرح</button>
-        </div>
-        <p class="text-[10px] text-gray-400">ملاحظة: لا يمكن تعديل النص القرآني من المحرر؛ لتغيير الآية اختر آية أخرى من قاعدة البيانات.</p>
-      </div>`;
-    grid.appendChild(card);
-    drawScene(document.getElementById('pgScene-'+idx),{style:pg.style,scene:pg.scene,prophet:pg.prophet});
-  });
-}
-function regenImage(id,idx){
-  const el=document.getElementById('pgScene-'+idx);
-  el.innerHTML='<div class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400">⏳ جاري إعادة الإنشاء...</div>';
-  const lib=loadLib();const st=lib.find(x=>x.id==id);const pg=st.pages[idx];
-  const styles=Object.keys(STYLE_BG);pg.style=styles[Math.floor(Math.random()*styles.length)];
-  saveLib(lib);
-  setTimeout(()=>drawScene(el,{style:pg.style,scene:pg.scene,prophet:pg.prophet}),700);
-}
-function editPage(id,idx){
-  const lib=loadLib();const st=lib.find(x=>x.id==id);const pg=st.pages[idx];
-  const ex=prompt("تعديل الشرح للأطفال:",pg.explanation);if(ex===null)return;
-  const ls=prompt("تعديل الدرس المستفاد:",pg.lesson);if(ls===null)return;
-  pg.explanation=ex;pg.lesson=ls;saveLib(lib);renderStoryView(id);
-}
-
-/* تحويل مشهد SVG إلى صورة PNG قابلة للتحميل مع النص القرآني إلكترونيًا */
-function renderPageToCanvas(st,pg,cb){
-  const c=document.createElement('canvas');c.width=1000;c.height=1400;
-  const ctx=c.getContext('2d');
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,1000,1400);
-  // header
-  ctx.fillStyle='#0f766e';ctx.fillRect(0,0,1000,110);
-  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.direction='rtl';
-  ctx.font='bold 40px Cairo,sans-serif';
-  ctx.fillText(`سورة ${st.surahName} — الآية ${pg.ayahNum}`,500,68);
-  // scene
-  const sceneEl=document.getElementById('pgScene-'+st.pages.indexOf(pg));
-  const svg=sceneEl?sceneEl.querySelector('svg'):null;
-  const drawRest=()=>{
-    // Quran box
-    ctx.fillStyle='#ecfdf5';ctx.fillRect(60,720,880,240);
-    ctx.fillStyle='#0f766e';ctx.fillRect(940,720,8,240);
-    ctx.fillStyle='#065f46';ctx.font='bold 26px Cairo';ctx.textAlign='right';ctx.fillText('النص القرآني ✅',910,760);
-    ctx.fillStyle='#111827';ctx.font='40px Amiri,serif';ctx.textAlign='center';
-    wrapText(ctx,pg.ayahText,500,830,860,52);
-    // explanation
-    ctx.fillStyle='#fffbeb';ctx.fillRect(60,990,880,170);
-    ctx.fillStyle='#b45309';ctx.font='bold 24px Cairo';ctx.textAlign='right';ctx.fillText('💡 شرح للأطفال',910,1025);
-    ctx.fillStyle='#374151';ctx.font='24px Cairo';ctx.textAlign='center';wrapText(ctx,pg.explanation,500,1065,840,34);
-    // lesson
-    ctx.fillStyle='#eff6ff';ctx.fillRect(60,1190,880,150);
-    ctx.fillStyle='#1d4ed8';ctx.font='bold 24px Cairo';ctx.textAlign='right';ctx.fillText('🌟 ماذا نتعلم؟',910,1225);
-    ctx.fillStyle='#374151';ctx.font='24px Cairo';ctx.textAlign='center';wrapText(ctx,pg.lesson,500,1265,840,34);
-    ctx.fillStyle='#9ca3af';ctx.font='18px Cairo';ctx.fillText('قصص القرآن للأطفال — النص القرآني محقّق من مصدر موثوق',500,1375);
-    cb(c);
-  };
-  if(svg){
-    const data=new XMLSerializer().serializeToString(svg);
-    const img=new Image();
-    img.onload=()=>{ctx.drawImage(img,60,140,880,550);drawRest();};
-    img.onerror=drawRest;
-    img.src='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(data)));
-  }else drawRest();
-}
-function wrapText(ctx,text,x,y,maxW,lh){
-  const words=text.split(' ');let line='';let ly=y;
-  for(let w of words){const test=line+w+' ';if(ctx.measureText(test).width>maxW&&line){ctx.fillText(line,x,ly);line=w+' ';ly+=lh;}else line=test;}
-  ctx.fillText(line,x,ly);
-}
-function downloadPage(id,idx){
-  const lib=loadLib();const st=lib.find(x=>x.id==id);
-  renderPageToCanvas(st,st.pages[idx],c=>{
-    const a=document.createElement('a');a.download=`${st.surahName}_ayah_${st.pages[idx].ayahNum}.png`;a.href=c.toDataURL('image/png');a.click();
-  });
-}
-function downloadAll(id){
-  const lib=loadLib();const st=lib.find(x=>x.id==id);
-  st.pages.forEach((pg,i)=>setTimeout(()=>downloadPage(id,i),i*400));
-}
-
-/* =========================================================
-   المكتبة
-   ========================================================= */
-const CATS=["الكل","قصص الأنبياء","قصص قرآنية","شرح مصور","آيات للأطفال","محتوى تعليمي"];
-let libFilter="الكل";
-function renderLibrary(){
-  const fb=document.getElementById('libFilters');
-  fb.innerHTML=CATS.map(c=>`<button onclick="libFilter='${c}';renderLibrary()" class="px-4 py-2 rounded-xl text-sm font-bold ${libFilter===c?'emerald-grad text-white':'bg-white border border-emerald-100 text-gray-600'}">${c}</button>`).join('');
-  const grid=document.getElementById('libGrid');
-  let lib=loadLib();
-  if(libFilter!=="الكل") lib=lib.filter(x=>x.category===libFilter);
-  if(!lib.length){grid.innerHTML=`<div class="col-span-full text-center py-16 text-gray-400"><div class="text-5xl mb-3">📭</div><p>لا يوجد محتوى بعد. <button onclick="nav('create')" class="text-emerald-700 font-bold underline">أنشئ أول قصة</button></p></div>`;return;}
-  grid.innerHTML='';
-  lib.forEach((st,i)=>{
-    const card=document.createElement('div');
-    card.className='card-hover bg-white rounded-3xl shadow border border-emerald-50 overflow-hidden';
-    card.innerHTML=`
-      <div class="scene-frame m-0 rounded-none" id="libScene-${i}" style="aspect-ratio:16/9"></div>
-      <div class="p-5">
-        <span class="text-[11px] font-bold px-2 py-1 rounded-full ${st.status==='منشور'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}">${st.status}</span>
-        <h4 class="font-black text-emerald-900 mt-2">${st.title}</h4>
-        <p class="text-xs text-gray-400 mt-1">سورة ${st.surahName} · الآيات ${st.start}–${st.end} · ${st.pages.length} صفحة</p>
-        <p class="text-[11px] text-gray-400 mt-0.5">${new Date(st.createdAt).toLocaleDateString('ar-EG')} · ${st.category}</p>
-        <div class="flex gap-2 mt-4">
-          <button onclick="nav('storyview',${st.id})" class="flex-1 emerald-grad text-white font-bold py-2 rounded-xl text-sm">👁️ عرض</button>
-          <button onclick="downloadAll(${st.id})" class="bg-gray-100 text-gray-700 font-bold px-3 rounded-xl text-sm">⬇️</button>
-          <button onclick="deleteStory(${st.id})" class="bg-red-50 text-red-600 font-bold px-3 rounded-xl text-sm">🗑️</button>
-        </div>
-      </div>`;
-    grid.appendChild(card);
-    drawScene(document.getElementById('libScene-'+i),{style:st.style,scene:st.title,prophet:!!PROPHET_SURAHS[st.surahNum]});
-  });
-}
-function deleteStory(id){if(!confirm('حذف هذه القصة؟'))return;saveLib(loadLib().filter(x=>x.id!=id));renderLibrary();}
-
-/* =========================================================
-   وضع الأطفال
-   ========================================================= */
-function renderKids(){
-  const grid=document.getElementById('kidsGrid');
-  let lib=loadLib();
-  if(!lib.length){grid.innerHTML=`<div class="col-span-full text-gray-500"><p class="text-xl">لا توجد قصص بعد.</p><button onclick="nav('create')" class="mt-3 gold-grad text-white font-black px-6 py-3 rounded-2xl text-lg">✨ أنشئ قصة</button></div>`;return;}
-  grid.innerHTML='';
-  lib.forEach((st,i)=>{
-    const d=document.createElement('button');
-    d.onclick=()=>nav('storyview',st.id);
-    d.className='bg-white rounded-3xl shadow-lg overflow-hidden card-hover text-center border-4 border-white';
-    d.innerHTML=`<div class="scene-frame rounded-none m-0" id="kidScene-${i}" style="aspect-ratio:4/3"></div><div class="p-4"><h4 class="text-xl font-black text-emerald-800">${st.title}</h4><p class="text-emerald-600 font-bold mt-1">سورة ${st.surahName} 📖</p></div>`;
-    grid.appendChild(d);
-    drawScene(document.getElementById('kidScene-'+i),{style:st.style,scene:st.title,prophet:!!PROPHET_SURAHS[st.surahNum]});
-  });
-}
-
-/* =========================================================
-   البحث
-   ========================================================= */
-function runSearch(q){
-  q=(q||'').trim();
-  const box=document.getElementById('searchResults');
-  if(!q){box.innerHTML='<p class="text-gray-400 text-center py-10">اكتب كلمة للبحث...</p>';return;}
-  const surahHits=SURAHS.filter(s=>s.name.includes(q)||String(s.number).includes(q));
-  const lib=loadLib().filter(st=>st.title.includes(q)||st.surahName.includes(q)||st.category.includes(q));
-  const prophetHits=Object.entries(PROPHET_SURAHS).filter(([k,v])=>v.includes(q));
-  let html='';
-  if(surahHits.length){html+=`<div><h3 class="font-black text-emerald-800 mb-3">📖 السور (${surahHits.length})</h3><div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${surahHits.slice(0,12).map(s=>`<button onclick="nav('surahview',${s.number})" class="bg-white border border-emerald-50 rounded-xl p-4 text-right hover:shadow"><b class="text-emerald-800">سورة ${s.name}</b><p class="text-xs text-gray-400">رقم ${s.number} · ${s.ayahCount} آية</p></button>`).join('')}</div></div>`;}
-  if(prophetHits.length){html+=`<div><h3 class="font-black text-emerald-800 mb-3">🕌 الأنبياء</h3><div class="grid sm:grid-cols-2 gap-3">${prophetHits.map(([k,v])=>`<button onclick="nav('surahview',${k})" class="bg-white border border-emerald-50 rounded-xl p-4 text-right hover:shadow"><b class="text-emerald-800">${v}</b><p class="text-xs text-gray-400">في سورة ${SURAHS.find(s=>s.number==k).name}</p></button>`).join('')}</div></div>`;}
-  if(lib.length){html+=`<div><h3 class="font-black text-emerald-800 mb-3">🗂️ من المكتبة (${lib.length})</h3><div class="grid sm:grid-cols-2 gap-3">${lib.map(st=>`<button onclick="nav('storyview',${st.id})" class="bg-white border border-emerald-50 rounded-xl p-4 text-right hover:shadow"><b class="text-emerald-800">${st.title}</b><p class="text-xs text-gray-400">سورة ${st.surahName} · ${st.category}</p></button>`).join('')}</div></div>`;}
-  box.innerHTML=html||'<p class="text-gray-400 text-center py-10">لا توجد نتائج مطابقة.</p>';
-}
-
-/* =========================================================
-   لوحة الإدارة
-   ========================================================= */
-function renderAdmin(){
-  const lib=loadLib();
-  const totalPages=lib.reduce((a,s)=>a+s.pages.length,0);
-  const stats=[
-    ["المستخدمون",USERS.length,"👥"],["القصص",lib.length,"📜"],["الصفحات",totalPages,"📄"],
-    ["الصور",totalPages,"🖼️"],["منشور",lib.filter(s=>s.status==='منشور').length,"✅"],["قيد المراجعة",lib.filter(s=>s.status==='قيد المراجعة').length,"⏳"]
-  ];
-  document.getElementById('adminStats').innerHTML=stats.map(s=>`<div class="bg-white rounded-2xl p-4 shadow border border-emerald-50 text-center"><div class="text-2xl">${s[2]}</div><div class="text-2xl font-black text-emerald-800">${s[1]}</div><div class="text-xs text-gray-400">${s[0]}</div></div>`).join('');
-  document.getElementById('adminSurahTable').innerHTML=SURAHS.map(s=>`<tr class="border-b border-gray-50"><td class="p-2">${s.number}</td><td class="p-2 font-bold">${s.name}</td><td class="p-2">${s.ayahCount}</td><td class="p-2"><span class="text-xs ${QURAN_TEXT[s.number]?'text-emerald-600':'text-gray-400'}">${QURAN_TEXT[s.number]?'محلي ✓':'مصدر موثوق'}</span></td></tr>`).join('');
-  document.getElementById('adminUsers').innerHTML=USERS.map(u=>`<div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between"><div><b>${u.name}</b><p class="text-xs text-gray-400">${u.email} · ${u.role}</p></div><div class="flex gap-1"><button onclick="alert('صلاحيات ${u.name}:\\n${u.perms.join('، ')}')" class="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded">صلاحيات</button><button class="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded">تعطيل</button></div></div>`).join('');
-  const st=document.getElementById('adminStories');
-  st.innerHTML=lib.length?lib.map(s=>`<div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between"><div><b class="text-sm">${s.title}</b><p class="text-xs text-gray-400">${s.status}</p></div><div class="flex gap-1">${s.status!=='منشور'?`<button onclick="publishStory(${s.id})" class="text-xs bg-emerald-600 text-white px-2 py-1 rounded">نشر</button>`:`<button onclick="unpublishStory(${s.id})" class="text-xs bg-gray-100 px-2 py-1 rounded">إلغاء النشر</button>`}<button onclick="deleteStory(${s.id});renderAdmin()" class="text-xs bg-red-50 text-red-600 px-2 py-1 rounded">حذف</button></div></div>`).join(''):'<p class="text-gray-400 text-sm">لا توجد قصص.</p>';
-  document.getElementById('permList').innerHTML=ALL_PERMS.map(p=>`<label class="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2"><input type="checkbox" checked class="accent-emerald-600"> ${p}</label>`).join('');
-}
-function publishStory(id){const l=loadLib();const s=l.find(x=>x.id==id);s.status='منشور';saveLib(l);renderAdmin();}
-function unpublishStory(id){const l=loadLib();const s=l.find(x=>x.id==id);s.status='مسودة';saveLib(l);renderAdmin();}
-
-/* دعم قوالب العرض الفرعية */
-document.getElementById('tpl-storyview');
-const _origNav=nav;
-function renderStoryViewWrap(id){renderStoryView(id)}
-
-/* ربط nav للقوالب الفرعية */
-(function(){
-  const app=document.getElementById('app');
-  const observer=()=>{};
-})();
-
-/* توسيع nav لعرض السورة/القصة */
-const origNav=nav;
-nav=function(view,arg){
-  const app=document.getElementById('app');
-  const tpl=document.getElementById('tpl-'+view);
-  if(!tpl){return}
-  app.innerHTML='';app.appendChild(tpl.content.cloneNode(true));
-  window.scrollTo({top:0,behavior:'smooth'});
-  if(view==='home'){renderSurahCards('','homeSurahGrid');drawScene(document.getElementById('heroScene'),{style:'storybook',scene:'القرآن الكريم للأطفال',prophet:false});}
-  else if(view==='surahs') renderSurahCards('','surahGrid');
-  else if(view==='create') initWizard();
-  else if(view==='library') renderLibrary();
-  else if(view==='kids') renderKids();
-  else if(view==='admin') renderAdmin();
-  else if(view==='surahview') renderSurahView(arg);
-  else if(view==='storyview') renderStoryView(arg);
-};
-
-/* بدء التطبيق */
-nav('home');
+init();
 </script>
 </body>
 </html>
