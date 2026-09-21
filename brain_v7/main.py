@@ -516,3 +516,54 @@ def plan_tasks(goal_id:int):
     tasks=[{"title":"inspect","action":"INSPECT_GOAL","command":["python","--version"],"approved":False}]
     return {"ok":True,"goal":dict(goal),"tasks":tasks,
             "note":"هذه خطة أولية آمنة؛ لا يتم تنفيذها دون موافقة صريحة."}
+
+
+# V7.7 - Planner + Error Recovery
+class RecoveryIn(BaseModel):
+    goal_id: int
+    task: dict
+    result: dict
+    attempt: int = 1
+
+def recovery_plan(task, result, attempt):
+    error=str(result.get("error") or result.get("stderr") or "UNKNOWN_ERROR")
+    # Conservative recovery: diagnostics first, never silently broaden permissions.
+    return {
+        "goal_id": task.get("goal_id"),
+        "attempt": attempt + 1,
+        "diagnosis": error[:1000],
+        "steps":[
+            {"action":"INSPECT_ERROR","command":["python","--version"],"approved":False},
+            {"action":"RETRY_OR_REPLAN","approved":False}
+        ],
+        "requires_approval":True
+    }
+
+@app.post("/api/tasks/recover")
+def recover_task(body: RecoveryIn):
+    plan=recovery_plan(body.task,body.result,body.attempt)
+    with closing(db()) as con:
+        event(con,"RECOVERY_PLAN",plan)
+        con.commit()
+    return {"ok":True,"recovery":plan}
+
+@app.post("/api/tasks/feedback")
+def task_feedback(body: RecoveryIn):
+    success=bool(body.result.get("ok"))
+    with closing(db()) as con:
+        event(con,"TASK_FEEDBACK",{
+            "goal_id":body.goal_id,
+            "attempt":body.attempt,
+            "success":success,
+            "result":body.result
+        })
+        if success:
+            con.execute("UPDATE goals SET status='DONE' WHERE id=?",(body.goal_id,))
+            state_data={"status":"LEARNED","goal_id":body.goal_id,
+                        "last_action":"TASK_COMPLETED","prediction_error":0.0}
+        else:
+            state_data={"status":"ERROR_ANALYSIS","goal_id":body.goal_id,
+                        "last_action":"RECOVERY_REQUIRED","prediction_error":1.0}
+        con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(state_data,ensure_ascii=False),))
+        con.commit()
+    return {"ok":True,"status":"LEARNED" if success else "RECOVERY_REQUIRED"}
