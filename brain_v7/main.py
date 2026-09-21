@@ -17,7 +17,8 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-5")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 WORKER_ENABLED = os.getenv("WORKER_ENABLED", "false").lower() == "true"
 WORKER_INTERVAL = int(os.getenv("WORKER_INTERVAL", "60"))
-PERMISSIONS = {k: os.getenv("PERM_"+k, "false").lower() == "true" for k in ("READ","WRITE","EXECUTE","NETWORK","SYSTEM")}
+PERMISSIONS = {k: os.getenv("PERM_"+k, "true").lower() == "true" for k in ("READ","WRITE","EXECUTE","NETWORK")}
+PERMISSIONS["SYSTEM"] = os.getenv("PERM_SYSTEM", "false").lower() == "true"
 
 worker_task = None
 
