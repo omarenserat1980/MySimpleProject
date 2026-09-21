@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import asyncio
+import json
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
@@ -399,3 +400,64 @@ def runtime_execute():
 @app.get("/api/runtime/loop")
 def runtime_loop_status():
     return {"architecture":["PERCEIVE","GOAL","OPTIONS","DECIDE","ACT","OBSERVE","ERROR","LEARN"],"permissions":PERMISSIONS,"worker_enabled":WORKER_ENABLED}
+
+
+# V7.5 - Local Agent Bridge
+AGENT_URL = os.getenv("AGENT_URL", "")
+AGENT_TOKEN = os.getenv("AGENT_TOKEN", "")
+AGENT_TIMEOUT = int(os.getenv("AGENT_TIMEOUT", "60"))
+
+class AgentExecIn(BaseModel):
+    command: list[str]
+    cwd: str = "."
+    timeout: int = 30
+    approved: bool = False
+
+@app.get("/api/agent/status")
+async def agent_status():
+    if not AGENT_URL:
+        return {"configured": False, "connected": False}
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(f"{AGENT_URL.rstrip('/')}/health")
+            return {"configured": True, "connected": r.is_success, "agent": r.json() if r.is_success else None}
+    except Exception as e:
+        return {"configured": True, "connected": False, "error": str(e)}
+
+@app.post("/api/agent/execute")
+async def agent_execute(body: AgentExecIn):
+    if not AGENT_URL:
+        return {"ok": False, "error": "AGENT_NOT_CONFIGURED"}
+    if not PERMISSIONS.get("EXECUTE", False):
+        return {"ok": False, "error": "EXECUTE_PERMISSION_DENIED"}
+    if not body.approved:
+        return {"ok": False, "error": "EXPLICIT_APPROVAL_REQUIRED"}
+    if not body.command or len(body.command) > 32:
+        return {"ok": False, "error": "INVALID_COMMAND"}
+    payload = {"command": body.command, "cwd": body.cwd, "timeout": body.timeout}
+    headers = {"X-Agent-Token": AGENT_TOKEN} if AGENT_TOKEN else {}
+    try:
+        async with httpx.AsyncClient(timeout=AGENT_TIMEOUT) as client:
+            r = await client.post(f"{AGENT_URL.rstrip('/')}/execute", params={"token": AGENT_TOKEN}, headers=headers, json=payload)
+            result = r.json()
+        with closing(db()) as con:
+            event(con, "AGENT_EXECUTION", {"command": body.command, "result": result})
+            con.commit()
+        return result
+    except Exception as e:
+        with closing(db()) as con:
+            event(con, "AGENT_ERROR", {"error": str(e), "command": body.command})
+            con.commit()
+        return {"ok": False, "error": "AGENT_CONNECTION_ERROR", "detail": str(e)}
+
+@app.post("/api/runtime/agent-step")
+async def runtime_agent_step():
+    with closing(db()) as con:
+        goal=con.execute("SELECT * FROM goals WHERE status='IN_PROGRESS' ORDER BY priority DESC,id LIMIT 1").fetchone()
+    if not goal:
+        return {"status":"IDLE","reason":"NO_ACTIVE_GOAL"}
+    selected=runtime.choose(goal)
+    if selected["id"] == "inspect":
+        return {"status":"READY","action":"INSPECT_GOAL","goal_id":goal["id"]}
+    return {"status":"READY","action":selected["action"],"goal_id":goal["id"],
+            "message":"العقل جهّز الأمر؛ التنفيذ على الجهاز يحتاج موافقة صريحة."}
