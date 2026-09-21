@@ -17,6 +17,7 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-5")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 WORKER_ENABLED = os.getenv("WORKER_ENABLED", "false").lower() == "true"
 WORKER_INTERVAL = int(os.getenv("WORKER_INTERVAL", "60"))
+PERMISSIONS = {k: os.getenv("PERM_"+k, "false").lower() == "true" for k in ("READ","WRITE","EXECUTE","NETWORK","SYSTEM")}
 
 worker_task = None
 
@@ -89,6 +90,10 @@ class MemoryIn(BaseModel):
 class GoalIn(BaseModel):
     text: str
     priority: float = 0.5
+
+class PermissionIn(BaseModel):
+    name: str
+    enabled: bool
 
 def event(con, typ, payload):
     import json
@@ -209,6 +214,21 @@ def events():
     with closing(db()) as con:
         rows=con.execute("SELECT * FROM events ORDER BY id DESC LIMIT 100").fetchall()
         return [dict(r) for r in rows]
+
+@app.get("/api/permissions")
+def permissions():
+    return {"permissions": PERMISSIONS, "policy": "صلاحيات صريحة ومحددة؛ لا يوجد وصول غير مقيد للنظام."}
+
+@app.post("/api/permissions")
+def set_permission(body: PermissionIn):
+    name = body.name.upper()
+    if name not in PERMISSIONS:
+        return {"ok": False, "error": "UNKNOWN_PERMISSION"}
+    PERMISSIONS[name] = body.enabled
+    with closing(db()) as con:
+        event(con, "PERMISSION_CHANGED", {"name": name, "enabled": body.enabled})
+        con.commit()
+    return {"ok": True, "name": name, "enabled": body.enabled}
 
 @app.get("/api/llm/status")
 def llm_status():
