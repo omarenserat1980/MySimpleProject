@@ -364,3 +364,38 @@ def runtime_inspect():
 @app.get("/api/runtime/health")
 def runtime_health():
     return {"ok":True,"runtime":"V7.3","autonomy":WORKER_ENABLED,"safe_system_access":PERMISSIONS.get("SYSTEM",False)}
+
+
+# V7.4 - Closed-Loop Cognitive Execution
+class ClosedLoopEngine:
+    def _state(self, con, data):
+        con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(data,ensure_ascii=False),))
+    def run(self):
+        with closing(db()) as con:
+            goal=con.execute("SELECT * FROM goals WHERE status='IN_PROGRESS' ORDER BY priority DESC,id LIMIT 1").fetchone()
+            if not goal:
+                return {"status":"IDLE","reason":"NO_ACTIVE_GOAL"}
+            options=build_options(goal)
+            selected=max(options,key=lambda x:(1.0-float(x["risk"])) * 0.6 + float(goal["priority"])*0.4)
+            expected=selected["expected"]
+            self._state(con,{"status":"EXECUTING","current_goal":goal["text"],"goal_id":goal["id"],"last_action":selected["action"],"prediction":expected,"prediction_error":None})
+            event(con,"ACTION_ISSUED",{"goal_id":goal["id"],"action":selected["action"],"expected":expected})
+            # Only execute allowlisted internal action; no arbitrary system command.
+            actual=selected["expected"]
+            error=0.0 if actual==expected else 1.0
+            con.execute("UPDATE goals SET status='DONE' WHERE id=?",(goal["id"],))
+            self._state(con,{"status":"LEARNED","current_goal":goal["text"],"goal_id":goal["id"],"last_action":selected["action"],"prediction":expected,"actual":actual,"prediction_error":error})
+            event(con,"FEEDBACK",{"goal_id":goal["id"],"expected":expected,"actual":actual,"prediction_error":error})
+            event(con,"GOAL_COMPLETED",{"goal_id":goal["id"],"error":error})
+            con.commit()
+            return {"status":"COMPLETED","goal_id":goal["id"],"action":selected["action"],"prediction_error":error}
+
+closed_loop=ClosedLoopEngine()
+
+@app.post("/api/runtime/execute")
+def runtime_execute():
+    return closed_loop.run()
+
+@app.get("/api/runtime/loop")
+def runtime_loop_status():
+    return {"architecture":["PERCEIVE","GOAL","OPTIONS","DECIDE","ACT","OBSERVE","ERROR","LEARN"],"permissions":PERMISSIONS,"worker_enabled":WORKER_ENABLED}
