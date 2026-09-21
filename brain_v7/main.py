@@ -308,3 +308,17 @@ async def autonomous_loop():
 if __name__=="__main__":
     import uvicorn
     uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8000")))
+
+
+# V7.2 cognitive metrics
+
+def cognitive_metrics():
+    with closing(db()) as con:
+        goals_count=con.execute("SELECT COUNT(*) n FROM goals").fetchone()["n"]
+        events_count=con.execute("SELECT COUNT(*) n FROM events").fetchone()["n"]
+        memories_count=con.execute("SELECT COUNT(*) n FROM memories").fetchone()["n"]
+    return {"goals":goals_count,"events":events_count,"memories":memories_count,"permissions":PERMISSIONS}
+
+@app.get("/api/metrics")
+def metrics():
+    return cognitive_metrics()
