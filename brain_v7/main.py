@@ -322,3 +322,45 @@ def cognitive_metrics():
 @app.get("/api/metrics")
 def metrics():
     return cognitive_metrics()
+
+
+# V7.3 - Cognitive Runtime Control Plane
+
+class CognitiveRuntime:
+    def snapshot(self):
+        with closing(db()) as con:
+            s=con.execute("SELECT data FROM state WHERE id=1").fetchone()
+            return json.loads(s["data"])
+
+    def choose(self, goal):
+        options=build_options(goal)
+        for o in options:
+            o["score"]=round((1.0-float(o["risk"]))*0.6+float(goal["priority"])*0.4,4)
+        return max(options,key=lambda x:x["score"])
+
+    def step(self):
+        with closing(db()) as con:
+            goal=con.execute("SELECT * FROM goals WHERE status='PENDING' ORDER BY priority DESC,id LIMIT 1").fetchone()
+            if not goal:
+                return {"status":"IDLE","reason":"NO_GOAL"}
+            selected=self.choose(goal)
+            con.execute("UPDATE goals SET status='IN_PROGRESS' WHERE id=?",(goal["id"],))
+            state_data={"status":"DECIDING","current_goal":goal["text"],"goal_id":goal["id"],"options":build_options(goal),"selected_option":selected,"prediction":selected["expected"],"prediction_error":None}
+            con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(state_data,ensure_ascii=False),))
+            event(con,"COGNITIVE_STEP",{"goal_id":goal["id"],"selected":selected})
+            con.commit()
+            return {"status":"DECIDING","goal":dict(goal),"selected":selected}
+
+runtime=CognitiveRuntime()
+
+@app.post("/api/runtime/step")
+def runtime_step():
+    return runtime.step()
+
+@app.get("/api/runtime/inspect")
+def runtime_inspect():
+    return {"state":runtime.snapshot(),"metrics":cognitive_metrics(),"tools":TOOL_REGISTRY}
+
+@app.get("/api/runtime/health")
+def runtime_health():
+    return {"ok":True,"runtime":"V7.3","autonomy":WORKER_ENABLED,"safe_system_access":PERMISSIONS.get("SYSTEM",False)}
