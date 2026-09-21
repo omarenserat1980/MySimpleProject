@@ -1,12 +1,13 @@
 import os
 import sqlite3
-import time
+import asyncio
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -17,7 +18,22 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 WORKER_ENABLED = os.getenv("WORKER_ENABLED", "false").lower() == "true"
 WORKER_INTERVAL = int(os.getenv("WORKER_INTERVAL", "60"))
 
-app = FastAPI(title="Electronic Brain V7", version="7.0")
+worker_task = None
+
+@asynccontextmanager
+async def lifespan(app):
+    global worker_task
+    if WORKER_ENABLED:
+        worker_task = asyncio.create_task(autonomous_loop())
+    yield
+    if worker_task:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+
+app = FastAPI(title="Electronic Brain V7", version="7.1", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -155,18 +171,38 @@ def add_goal(body: GoalIn):
         return {"id":cur.lastrowid,"status":"PENDING"}
 
 @app.post("/api/cycle")
+def build_options(goal):
+    return [
+        {"id":"inspect","action":"INSPECT_GOAL","expected":"فحص الهدف والسياق قبل التنفيذ","risk":0.10},
+        {"id":"plan","action":"PLAN_AND_OBSERVE","expected":"بناء خطة آمنة ومراقبة النتيجة","risk":0.20},
+        {"id":"research","action":"RESEARCH_GAP","expected":"تحديد المعلومات الناقصة قبل القرار","risk":0.15},
+    ]
+
+def choose_option(options):
+    return max(options, key=lambda x: (1.0 - x["risk"]))
+
 def cycle():
     with closing(db()) as con:
         goal=con.execute("SELECT * FROM goals WHERE status='PENDING' ORDER BY priority DESC,id LIMIT 1").fetchone()
         if not goal:
             return {"status":"IDLE","message":"لا يوجد هدف معلق."}
+        options = build_options(goal)
+        selected = choose_option(options)
         con.execute("UPDATE goals SET status='IN_PROGRESS' WHERE id=?",(goal["id"],))
         import json
-        s={"status":"EXECUTING","current_goal":goal["text"],"last_action":"PLAN_AND_OBSERVE"}
+        s={
+            "status":"EXECUTING",
+            "current_goal":goal["text"],
+            "last_action":selected["action"],
+            "options":options,
+            "selected_option":selected["id"],
+            "prediction":selected["expected"],
+            "prediction_error":None
+        }
         con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(s,ensure_ascii=False),))
-        event(con,"CYCLE",{"goal_id":goal["id"],"action":"PLAN_AND_OBSERVE"})
+        event(con,"DECISION",{"goal_id":goal["id"],"options":options,"selected":selected})
         con.commit()
-        return {"status":"EXECUTING","goal":dict(goal),"action":"PLAN_AND_OBSERVE"}
+        return {"status":"EXECUTING","goal":dict(goal),"options":options,"selected":selected}
 
 @app.get("/api/events")
 def events():
@@ -178,13 +214,18 @@ def events():
 def llm_status():
     return {"configured":bool(LLM_API_KEY),"model":LLM_MODEL,"base_url":LLM_BASE_URL}
 
-def worker():
-    while WORKER_ENABLED:
+async def autonomous_loop():
+    while True:
         try:
-            cycle()
+            result = cycle()
+            if result.get("status") == "IDLE":
+                await asyncio.sleep(WORKER_INTERVAL)
+            else:
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            raise
         except Exception:
-            pass
-        time.sleep(WORKER_INTERVAL)
+            await asyncio.sleep(WORKER_INTERVAL)
 
 if __name__=="__main__":
     import uvicorn
