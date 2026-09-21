@@ -1,0 +1,19 @@
+name: brain-v7-test
+on:
+  push:
+    paths: ["brain_v7/**"]
+  pull_request:
+    paths: ["brain_v7/**"]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: brain_v7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m compileall .
