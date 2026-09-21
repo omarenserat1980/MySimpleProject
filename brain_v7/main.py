@@ -176,7 +176,6 @@ def add_goal(body: GoalIn):
         con.commit()
         return {"id":cur.lastrowid,"status":"PENDING"}
 
-@app.post("/api/cycle")
 def build_options(goal):
     return [
         {"id":"inspect","action":"INSPECT_GOAL","expected":"فحص الهدف والسياق قبل التنفيذ","risk":0.10},
@@ -209,6 +208,64 @@ def cycle():
         event(con,"DECISION",{"goal_id":goal["id"],"options":options,"selected":selected})
         con.commit()
         return {"status":"EXECUTING","goal":dict(goal),"options":options,"selected":selected}
+
+TOOL_REGISTRY = {
+    "inspect_state": {"permission": "READ", "description": "قراءة حالة العقل"},
+    "save_memory": {"permission": "WRITE", "description": "حفظ ذاكرة"},
+    "plan_cycle": {"permission": "EXECUTE", "description": "تشغيل دورة قرار آمنة"},
+    "web_request": {"permission": "NETWORK", "description": "طلب شبكي عبر أداة محددة"},
+}
+
+class ToolCallIn(BaseModel):
+    tool: str
+    args: dict = {}
+
+def tool_allowed(tool):
+    spec = TOOL_REGISTRY.get(tool)
+    if not spec:
+        return False, "UNKNOWN_TOOL"
+    if not PERMISSIONS.get(spec["permission"], False):
+        return False, "PERMISSION_DENIED"
+    return True, spec
+
+@app.get("/api/tools")
+def tools():
+    return {"tools": TOOL_REGISTRY, "permissions": PERMISSIONS}
+
+@app.post("/api/tools/call")
+async def call_tool(body: ToolCallIn):
+    allowed, spec = tool_allowed(body.tool)
+    with closing(db()) as con:
+        if not allowed:
+            event(con, "TOOL_DENIED", {"tool": body.tool, "reason": spec})
+            con.commit()
+            return {"ok": False, "error": spec}
+        try:
+            if body.tool == "inspect_state":
+                result = state()
+            elif body.tool == "save_memory":
+                key, value = body.args.get("key"), body.args.get("value")
+                if not key or value is None:
+                    return {"ok": False, "error": "INVALID_ARGS"}
+                result = save_memory(MemoryIn(key=key, value=str(value)))
+            elif body.tool == "plan_cycle":
+                result = cycle()
+            elif body.tool == "web_request":
+                url = body.args.get("url")
+                if not url or not (url.startswith("https://") or url.startswith("http://")):
+                    return {"ok": False, "error": "INVALID_URL"}
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    r = await client.get(url)
+                    result = {"status_code": r.status_code, "url": str(r.url), "text": r.text[:5000]}
+            else:
+                result = {"error": "UNIMPLEMENTED"}
+            event(con, "TOOL_EXECUTED", {"tool": body.tool, "result": result})
+            con.commit()
+            return {"ok": True, "tool": body.tool, "result": result}
+        except Exception as e:
+            event(con, "TOOL_ERROR", {"tool": body.tool, "error": str(e)})
+            con.commit()
+            return {"ok": False, "error": "TOOL_EXECUTION_ERROR"}
 
 @app.get("/api/events")
 def events():
