@@ -461,3 +461,58 @@ async def runtime_agent_step():
         return {"status":"READY","action":"INSPECT_GOAL","goal_id":goal["id"]}
     return {"status":"READY","action":selected["action"],"goal_id":goal["id"],
             "message":"العقل جهّز الأمر؛ التنفيذ على الجهاز يحتاج موافقة صريحة."}
+
+
+# V7.6 - Autonomous Task Executor
+class TaskIn(BaseModel):
+    goal_id: int
+    tasks: list[dict]
+
+@app.post("/api/tasks/create")
+def create_tasks(body: TaskIn):
+    if not body.tasks:
+        return {"ok":False,"error":"NO_TASKS"}
+    with closing(db()) as con:
+        for i,t in enumerate(body.tasks):
+            event(con,"TASK_CREATED",{"goal_id":body.goal_id,"index":i,"task":t})
+        con.commit()
+    return {"ok":True,"goal_id":body.goal_id,"count":len(body.tasks)}
+
+@app.post("/api/tasks/run")
+async def run_tasks(body: TaskIn):
+    if not PERMISSIONS.get("EXECUTE",False):
+        return {"ok":False,"error":"EXECUTE_PERMISSION_DENIED"}
+    results=[]
+    for i,t in enumerate(body.tasks):
+        command=t.get("command")
+        if not isinstance(command,list) or not command:
+            results.append({"index":i,"status":"SKIPPED","error":"INVALID_COMMAND"})
+            continue
+        approved=bool(t.get("approved",False))
+        if not approved:
+            results.append({"index":i,"status":"WAITING_APPROVAL","command":command})
+            continue
+        result=await agent_execute(AgentExecIn(command=command,cwd=t.get("cwd","."),
+                                               timeout=int(t.get("timeout",30)),approved=True))
+        results.append({"index":i,"status":"DONE" if result.get("ok") else "FAILED","result":result})
+        if not result.get("ok"):
+            with closing(db()) as con:
+                event(con,"TASK_FAILED",{"goal_id":body.goal_id,"index":i,"result":result})
+                con.commit()
+            break
+        with closing(db()) as con:
+            event(con,"TASK_COMPLETED",{"goal_id":body.goal_id,"index":i,"result":result})
+            con.commit()
+    return {"ok":True,"goal_id":body.goal_id,"results":results}
+
+@app.post("/api/tasks/plan")
+def plan_tasks(goal_id:int):
+    with closing(db()) as con:
+        goal=con.execute("SELECT * FROM goals WHERE id=?",(goal_id,)).fetchone()
+    if not goal:
+        return {"ok":False,"error":"GOAL_NOT_FOUND"}
+    text=goal["text"]
+    # Deterministic safe decomposition; an LLM can later replace this planner.
+    tasks=[{"title":"inspect","action":"INSPECT_GOAL","command":["python","--version"],"approved":False}]
+    return {"ok":True,"goal":dict(goal),"tasks":tasks,
+            "note":"هذه خطة أولية آمنة؛ لا يتم تنفيذها دون موافقة صريحة."}
