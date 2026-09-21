@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>العقل الإلكتروني V7</title>
+<style>
+body{margin:0;font-family:system-ui;background:#0b1020;color:#eef}main{max-width:1000px;margin:auto;padding:20px}.grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}.card{background:#151c32;border:1px solid #293352;border-radius:16px;padding:16px;margin-bottom:16px}textarea,input,button{font:inherit;border-radius:10px;padding:11px}textarea,input{width:100%;box-sizing:border-box;background:#0d1427;color:#fff;border:1px solid #34405f}button{cursor:pointer;border:0;margin-top:8px}.messages{min-height:300px;max-height:500px;overflow:auto}.msg{padding:10px;margin:8px 0;border-radius:10px;background:#202943}.user{background:#26385b}.row{display:flex;gap:8px}.row>*{flex:1}.muted{color:#aab4ce}@media(max-width:750px){.grid{grid-template-columns:1fr}}
+</style></head><body><main>
+<h1>🧠 العقل الإلكتروني V7</h1><p class="muted">واجهة مستقلة تتصل بـ Brain Backend عبر HTTP</p>
+<div class="grid"><section>
+<div class="card"><h2>💬 المحادثة</h2><div id="messages" class="messages"></div><textarea id="message" rows="3" placeholder="اكتب للعقل..."></textarea><button onclick="send()">إرسال</button></div>
+<div class="card"><h2>🎯 هدف جديد</h2><input id="goal" placeholder="مثلاً: تحسين الذاكرة"><button onclick="addGoal()">إضافة الهدف</button><button onclick="cycle()">تشغيل دورة العقل</button></div>
+</section>
+<aside><div class="card"><h3>📊 الحالة</h3><pre id="state">...</pre></div><div class="card"><h3>🔌 نموذج اللغة</h3><pre id="llm">...</pre></div><div class="card"><h3>🧠 الذاكرة</h3><pre id="memory">...</pre></div></aside></div>
+</main><script>
+const API=(localStorage.BRAIN_API||'').replace(/\/$/,'');
+async function get(p,o={}){const r=await fetch(API+p,o);if(!r.ok)throw Error(await r.text());return r.json()}
+function show(msg,role){const d=document.createElement('div');d.className='msg '+role;d.textContent=(role==='user'?'أنت: ':'العقل: ')+msg;document.querySelector('#messages').appendChild(d);document.querySelector('#messages').scrollTop=999999}
+async function send(){const el=document.querySelector('#message'),m=el.value.trim();if(!m)return;el.value='';show(m,'user');try{const x=await get('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});show(x.reply,'assistant');refresh()}catch(e){show('تعذر الاتصال بالـBackend: '+e.message,'assistant')}}
+async function addGoal(){const text=document.querySelector('#goal').value.trim();if(!text)return;await get('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,priority:.5})});document.querySelector('#goal').value='';refresh()}
+async function cycle(){try{await get('/api/cycle',{method:'POST'});refresh()}catch(e){alert(e.message)}}
+async function refresh(){try{state.textContent=JSON.stringify(await get('/api/state'),null,2);llm.textContent=JSON.stringify(await get('/api/llm/status'),null,2);memory.textContent=JSON.stringify(await get('/api/memory'),null,2)}catch(e){}}
+refresh();get('/api/messages').then(a=>a.forEach(x=>show(x.content,x.role==='user'?'user':'assistant'))).catch(()=>{});
+</script></body></html>
