@@ -1,7 +1,7 @@
-"""Safe bridge from the cognitive orchestrator to the local Agent.
+"""Bounded bridge from the cognitive brain to the local Agent.
 
-Only named, predefined actions are executable. Unknown actions remain proposals.
-No shell strings and no shell=True are used.
+The brain may execute only registered, non-destructive terminal tasks. Tasks are
+represented as argv lists; no shell=True or shell strings are accepted.
 """
 import os
 from typing import Any
@@ -16,6 +16,9 @@ SAFE_ACTIONS = {
     "git_version": ["git", "--version"],
     "git_status": ["git", "status", "--short"],
     "inspect": ["python", "-c", "print('Electronic Brain Agent inspection OK')"],
+    "termux_pwd": ["pwd"],
+    "termux_list": ["ls", "-la"],
+    "python_help": ["python", "-c", "print('Python execution bridge OK')"],
 }
 
 def execute_action(action: str, state: dict[str, Any]) -> dict[str, Any]:
@@ -34,11 +37,12 @@ def execute_action(action: str, state: dict[str, Any]) -> dict[str, Any]:
             "reason": "AGENT_TOKEN_NOT_CONFIGURED",
         }
 
+    timeout = max(1, min(int(state.get("timeout", 30)), 60))
     try:
         response = httpx.post(
             f"{AGENT_URL}/execute",
             params={"token": AGENT_TOKEN},
-            json={"command": command, "timeout": 30, "cwd": "."},
+            json={"command": command, "timeout": timeout, "cwd": "."},
             timeout=AGENT_TIMEOUT,
         )
         response.raise_for_status()
@@ -56,3 +60,23 @@ def execute_action(action: str, state: dict[str, Any]) -> dict[str, Any]:
             "command": command,
             "error": str(exc),
         }
+
+
+def execute_task(actions: list[str], state: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Execute a bounded sequence and stop on the first failure."""
+    state = state or {}
+    results = []
+    for index, action in enumerate(actions):
+        result = execute_action(action, state)
+        results.append({"step": index + 1, **result})
+        if result.get("status") != "EXECUTED":
+            return {
+                "status": "FAILED",
+                "completed_steps": index,
+                "results": results,
+            }
+    return {
+        "status": "COMPLETED",
+        "completed_steps": len(results),
+        "results": results,
+    }
