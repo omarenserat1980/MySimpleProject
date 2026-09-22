@@ -8,6 +8,7 @@ from .cognitive_orchestrator import CognitiveOrchestrator
 from .agent_executor import execute_action
 from .chat_engine import BrainChat
 from .terminal_bridge import terminal_bridge
+from .autonomous_task import autonomous_task
 
 router = APIRouter(prefix="/api/autonomous", tags=["autonomous"])
 orchestrator = CognitiveOrchestrator(action_executor=execute_action)
@@ -45,6 +46,12 @@ class TerminalRunRequest(BaseModel):
     actions: list[str] = Field(default_factory=list)
     timeout: int = Field(default=30, ge=1, le=60)
     stop_on_failure: bool = True
+
+
+class AutonomousTaskRequest(BaseModel):
+    objective: str
+    timeout: int = Field(default=30, ge=1, le=60)
+    max_steps: int = Field(default=12, ge=1, le=12)
 
 
 @router.get("/status")
@@ -87,6 +94,20 @@ def terminal_run(req: TerminalRunRequest):
         objective=req.objective,
         timeout=req.timeout,
         stop_on_failure=req.stop_on_failure,
+    )
+
+
+@router.get("/task/status")
+def task_status():
+    return autonomous_task.status()
+
+
+@router.post("/task/run")
+def task_run(req: AutonomousTaskRequest):
+    return autonomous_task.run(
+        req.objective,
+        timeout=req.timeout,
+        max_steps=req.max_steps,
     )
 
 
