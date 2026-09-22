@@ -15,6 +15,14 @@ class CycleRequest(BaseModel):
     expected: Any = None
     horizon: int = 5
 
+class LoopRequest(BaseModel):
+    objective: str = "run bounded autonomous loop"
+    gaps: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=lambda: ["inspect"])
+    expected: Any = None
+    action_expectations: dict[str, Any] = Field(default_factory=dict)
+    horizon: int = 5
+
 class ImprovementRequest(BaseModel):
     id: str
     description: str
@@ -27,6 +35,11 @@ def autonomous_status():
 def autonomous_cycle(req: CycleRequest):
     payload = req.model_dump() if hasattr(req, "model_dump") else req.dict()
     return orchestrator.step(payload)
+
+@router.post("/loop")
+def autonomous_loop(req: LoopRequest):
+    payload = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    return orchestrator.run_loop(payload)
 
 @router.post("/improvement")
 def propose_improvement(req: ImprovementRequest):
