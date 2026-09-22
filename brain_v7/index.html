@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🧠 العقل الإلكتروني</title>
+<style>
+body{margin:0;background:#0b1020;color:#e8eefc;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif}
+*{box-sizing:border-box}.wrap{max-width:1100px;margin:auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border:1px solid #26304a;border-radius:18px;background:#121a2d}
+h1{margin:0;font-size:22px}.online{color:#65e6a0;font-size:14px}.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;margin-top:14px}
+.card{background:#121a2d;border:1px solid #26304a;border-radius:18px;padding:16px}.chat{min-height:520px;display:flex;flex-direction:column}
+.messages{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:12px}.msg{padding:11px 13px;border-radius:14px;white-space:pre-wrap;line-height:1.55}.user{background:#20365c;align-self:flex-start;max-width:88%}.bot{background:#19243a;align-self:flex-end;max-width:88%}
+form{display:flex;gap:8px}textarea{flex:1;resize:none;border:1px solid #33405e;border-radius:12px;background:#0d1425;color:#fff;padding:12px;min-height:52px}button{border:0;border-radius:12px;padding:0 18px;background:#3b82f6;color:white;font-weight:700}
+.side{display:grid;gap:14px}.stat{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #26304a}.stat:last-child{border-bottom:0}.label{color:#aab6cf}.value{font-weight:700}
+pre{white-space:pre-wrap;word-break:break-word;margin:0;color:#cfe0ff;font-size:13px;max-height:240px;overflow:auto}.flow{display:flex;flex-wrap:wrap;gap:7px}.flow span{padding:7px 9px;border:1px solid #33405e;border-radius:10px;font-size:12px}
+.small{color:#91a0bc;font-size:12px}.error{color:#ff8b8b}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.chat{min-height:460px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><div><h1>🧠 العقل الإلكتروني</h1><div class="small">واجهة التحكم الرئيسية</div></div><div id="online" class="online">● جاري الفحص...</div></header>
+<div class="grid">
+<section class="card chat">
+<div id="messages" class="messages"><div class="msg bot">أنا متصل بواجهة العقل. اكتب هدفك أو سؤالك وسأعرض النتيجة هنا.</div></div>
+<form id="chatForm"><textarea id="input" placeholder="تحدث مع العقل مباشرة..." required></textarea><button>إرسال</button></form>
+</section>
+<aside class="side">
+<div class="card"><h3>حالة العقل</h3><div class="stat"><span class="label">الحالة</span><span id="status" class="value">...</span></div><div class="stat"><span class="label">الأهداف</span><span id="goals" class="value">...</span></div><div class="stat"><span class="label">الذاكرة</span><span id="memory" class="value">...</span></div><div class="stat"><span class="label">الأحداث</span><span id="events" class="value">...</span></div></div>
+<div class="card"><h3>دورة العقل</h3><div class="flow"><span>الإدراك</span><span>الهدف</span><span>الخيارات</span><span>القرار</span><span>التنفيذ</span><span>الملاحظة</span><span>الخطأ</span><span>التعلم</span></div></div>
+<div class="card"><h3>الحالة الحالية</h3><pre id="state">جارٍ التحميل...</pre></div>
+</aside>
+</div>
+<div class="card" style="margin-top:14px"><h3>آخر الأحداث</h3><pre id="eventsList">جارٍ التحميل...</pre></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+async function get(path){const r=await fetch(path); if(!r.ok) throw new Error(r.status); return r.json();}
+function add(role,text){const d=document.createElement('div');d.className='msg '+(role==='user'?'user':'bot');d.textContent=text;$('messages').appendChild(d);$('messages').scrollTop=$('messages').scrollHeight;}
+async function refresh(){
+ try{
+  const [h,s,m,g,e]=await Promise.all([get('/health'),get('/api/state'),get('/api/memory'),get('/api/goals'),get('/api/events')]);
+  $('online').textContent='● متصل'; $('status').textContent=s.status||'READY'; $('goals').textContent=g.length; $('memory').textContent=m.length; $('events').textContent=e.length;
+  $('state').textContent=JSON.stringify(s,null,2); $('eventsList').textContent=e.slice(0,12).map(x=>x.created_at+' | '+x.type+' | '+x.payload).join('\n')||'لا توجد أحداث بعد';
+ }catch(err){$('online').textContent='● غير متصل';$('online').className='error';}
+}
+$('chatForm').addEventListener('submit',async ev=>{
+ ev.preventDefault(); const input=$('input'); const message=input.value.trim(); if(!message)return;
+ add('user',message); input.value=''; add('bot','أفكر...');
+ const placeholder=$('messages').lastChild;
+ try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});const data=await r.json();placeholder.textContent=data.reply||JSON.stringify(data);await refresh();}
+ catch(e){placeholder.textContent='تعذر الاتصال بالعقل: '+e.message;placeholder.className='msg bot error';}
+});
+refresh(); setInterval(refresh,3000);
+</script>
+</body>
+</html>
