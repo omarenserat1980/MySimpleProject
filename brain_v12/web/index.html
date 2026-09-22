@@ -1,35 +1,92 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>العقل الإلكتروني V12</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>العقل الإلكتروني V12 — مركز التحكم</title>
 <style>
-body{margin:0;background:#0b1020;color:#edf2ff;font-family:system-ui}main{max-width:1100px;margin:auto;padding:16px}
-.top,.card{background:#121a2d;border:1px solid #2b3854;border-radius:18px;padding:16px}.top{display:flex;justify-content:space-between}
-.grid{display:grid;grid-template-columns:1.6fr 1fr;gap:14px;margin-top:14px}.chat{min-height:520px;display:flex;flex-direction:column}.msgs{flex:1;overflow:auto}
-.m{padding:11px;margin:8px;border-radius:13px;white-space:pre-wrap}.u{background:#20385f}.a{background:#19243a}
-form{display:flex;gap:8px}textarea{flex:1;background:#0d1425;color:white;border:1px solid #34415e;border-radius:12px;padding:12px}
-button{background:#3b82f6;color:white;border:0;border-radius:12px;padding:10px 18px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #26304a;padding:9px}
-.flow{display:flex;flex-wrap:wrap;gap:6px}.flow span{border:1px solid #34415e;border-radius:9px;padding:6px;font-size:12px}pre{white-space:pre-wrap;overflow:auto}
-@media(max-width:800px){.grid{grid-template-columns:1fr}}
-</style></head>
-<body><main>
-<div class="top"><div><h2>🧠 العقل الإلكتروني V12</h2><small>واجهة التعامل المباشر</small></div><b id="conn">● فحص الاتصال...</b></div>
-<div class="grid">
-<section class="card chat"><div id="msgs" class="msgs"><div class="m a">العقل جاهز. اكتب لي ما تريد.</div></div>
-<form id="f"><textarea id="q" required placeholder="تحدث مع العقل..."></textarea><button>إرسال</button></form>
-<div style="display:flex;gap:8px;margin-top:8px"><button id="run" type="button">تشغيل الدورة</button><button id="refresh" type="button">تحديث</button></div></section>
-<aside>
-<div class="card"><h3>الحالة</h3><div class="row"><span>State</span><b id="st">...</b></div><div class="row"><span>Goals</span><b id="go">0</b></div><div class="row"><span>Memory</span><b id="me">0</b></div></div>
-<div class="card" style="margin-top:14px"><h3>الدورة</h3><div class="flow"><span>إدراك</span><span>فهم</span><span>ذاكرة</span><span>هدف</span><span>تخطيط</span><span>قرار</span><span>تنفيذ</span><span>ملاحظة</span><span>خطأ</span><span>تعلم</span></div></div>
-<div class="card" style="margin-top:14px"><h3>الحالة الحالية</h3><pre id="state">...</pre></div>
-</aside></div></main>
+:root{--bg:#07101d;--panel:#0e1a2b;--panel2:#13243a;--line:#263b55;--txt:#edf5ff;--muted:#9db0c7;--accent:#4da3ff;--ok:#37d39a;--warn:#ffc857;--danger:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#07101d,#0a1525 55%,#0d1b2d);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,sans-serif}button,input,textarea,select{font:inherit}button{border:0;border-radius:11px;padding:10px 14px;background:var(--accent);color:white;cursor:pointer}button.secondary{background:#1c3049}button.danger{background:#9d3047}.app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{background:#091524;border-left:1px solid var(--line);padding:15px;position:sticky;top:0;height:100vh;overflow:auto}.brand{font-size:20px;font-weight:800;padding:12px}.brand small{display:block;color:var(--muted);font-size:11px;margin-top:4px}.nav button{display:block;width:100%;text-align:right;background:transparent;margin:4px 0;color:#c9d7e8}.nav button.active,.nav button:hover{background:var(--panel2);color:white}.main{padding:18px;max-width:1500px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.top h1{font-size:22px;margin:0}.status{border:1px solid var(--line);background:var(--panel);padding:8px 12px;border-radius:20px}.dot{color:var(--ok)}.view{display:none}.view.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.card{background:rgba(14,26,43,.94);border:1px solid var(--line);border-radius:17px;padding:15px}.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}.span3{grid-column:span 3}.card h2,.card h3{margin-top:0}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#0a1626;border:1px solid var(--line);padding:14px;border-radius:13px}.stat b{font-size:22px;display:block}.muted{color:var(--muted)}.chat{height:calc(100vh - 120px);min-height:600px;display:flex;flex-direction:column}.messages{flex:1;overflow:auto;padding:5px}.msg{padding:11px 13px;border-radius:14px;margin:8px 0;white-space:pre-wrap;max-width:88%}.user{background:#1d4168;margin-right:auto}.assistant{background:#16283d;margin-left:auto}.composer{display:flex;gap:7px;align-items:end}.composer textarea{flex:1;min-height:54px;max-height:180px;background:#091524;color:white;border:1px solid var(--line);border-radius:13px;padding:12px}.tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.media{width:100%;max-height:360px;object-fit:contain;background:#050b13;border-radius:12px;margin-top:8px}.panel{background:#091524;border:1px solid var(--line);border-radius:12px;padding:10px}.list{display:grid;gap:8px}.item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0a1626;border:1px solid var(--line);padding:10px;border-radius:12px}.badge{padding:4px 8px;border-radius:20px;background:#203b56;font-size:11px}.ok{color:var(--ok)}pre{white-space:pre-wrap;overflow:auto;max-height:420px;color:#cfe1f7}.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:15px;z-index:20}.modal.show{display:flex}.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:800px;width:100%;padding:18px}video{width:100%;background:#000;border-radius:12px}.menuTitle{color:var(--muted);font-size:11px;padding:15px 10px 5px}@media(max-width:900px){.app{grid-template-columns:1fr}.side{height:auto;position:relative;border-left:0;border-bottom:1px solid var(--line)}.nav{display:flex;overflow:auto}.nav button{min-width:max-content}.stats{grid-template-columns:repeat(2,1fr)}.span8,.span6,.span4,.span3{grid-column:span 12}.chat{height:75vh;min-height:500px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+<div class="brand">🧠 العقل الإلكتروني<small>V12 • مركز التحكم المتعدد الوسائط</small></div>
+<div class="menuTitle">العقل</div><div class="nav">
+<button class="active" data-view="home">🏠 الرئيسية</button><button data-view="chat">💬 المحادثة</button><button data-view="cycle">🔄 الدورة المعرفية</button><button data-view="goals">🎯 الأهداف والخطط</button><button data-view="memory">🧠 الذاكرة والتعلم</button>
+</div>
+<div class="menuTitle">الوسائط والذكاء</div><div class="nav">
+<button data-view="media">🖼️ الصور والملفات</button><button data-view="camera">📷 الكاميرا</button><button data-view="video">🎬 الفيديو</button><button data-view="voice">🎙️ الصوت</button><button data-view="ai">🤖 AI Gateway</button>
+</div>
+<div class="menuTitle">الأدوات والنظام</div><div class="nav">
+<button data-view="plugins">🔌 المكونات الإضافية</button><button data-view="tools">🛠️ الأدوات</button><button data-view="agent">⚙️ الوكيل والتنفيذ</button><button data-view="events">📊 سجل الأحداث</button><button data-view="settings">⚙️ الإعدادات</button>
+</div>
+</aside>
+<main class="main">
+<header class="top"><div><h1 id="title">الرئيسية</h1><span class="muted">منصة واحدة للحوار، الإدراك، التخطيط، الأدوات والوسائط</span></div><div class="status"><span class="dot">●</span> <span id="connection">جاري الفحص</span></div></header>
+
+<section id="home" class="view active">
+<div class="stats"><div class="stat">الحالة<b id="sState">—</b></div><div class="stat">الأهداف<b id="sGoals">0</b></div><div class="stat">الذاكرة<b id="sMem">0</b></div><div class="stat">الأحداث<b id="sEvents">0</b></div></div>
+<div class="grid" style="margin-top:12px">
+<div class="card span8"><h2>🧠 مركز العقل</h2><div class="panel"><b>المسار المعرفي</b><div class="tools"><span class="badge">إدراك</span><span class="badge">فهم</span><span class="badge">ذاكرة</span><span class="badge">هدف</span><span class="badge">تخطيط</span><span class="badge">قرار</span><span class="badge">تنفيذ</span><span class="badge">ملاحظة</span><span class="badge">خطأ</span><span class="badge">تعلم</span></div></div><pre id="homeState">—</pre></div>
+<div class="card span4"><h2>⚡ وصول سريع</h2><div class="list"><button onclick="show('chat')">💬 ابدأ محادثة</button><button onclick="show('camera')">📷 افتح الكاميرا</button><button onclick="show('media')">🖼️ أضف صورة/ملف</button><button onclick="show('voice')">🎙️ محادثة صوتية</button><button onclick="show('plugins')">🔌 إدارة المكونات</button></div></div>
+</div></section>
+
+<section id="chat" class="view"><div class="card chat"><h2>💬 المحادثة والحوار</h2><div id="messages" class="messages"><div class="msg assistant">العقل جاهز. اكتب أو استخدم الصوت أو أرفق صورة/ملف.</div></div><div class="composer"><textarea id="q" placeholder="اكتب أمرك أو سؤالك..."></textarea><button onclick="sendChat()">إرسال</button></div><div class="tools"><button class="secondary" onclick="startSpeech()">🎙️ تحدث</button><button class="secondary" onclick="speakLast()">🔊 اقرأ الرد</button><button class="secondary" onclick="document.getElementById('fileInput').click()">📎 إرفاق</button><button class="secondary" onclick="show('camera')">📷 كاميرا</button><button onclick="runCycle()">🔄 تشغيل الدورة</button></div><input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.txt" hidden onchange="uploadMedia(this.files[0])"></div></section>
+
+<section id="cycle" class="view"><div class="grid"><div class="card span8"><h2>🔄 الدورة المعرفية</h2><div class="tools" style="font-size:18px"><span class="badge">إدراك</span>→<span class="badge">فهم</span>→<span class="badge">ذاكرة</span>→<span class="badge">هدف</span>→<span class="badge">خطة</span>→<span class="badge">قرار</span>→<span class="badge">تنفيذ</span>→<span class="badge">ملاحظة</span>→<span class="badge">تعلم</span></div><pre id="cycleOut">اضغط تشغيل الدورة.</pre><button onclick="runCycle()">تشغيل الدورة الآن</button></div><div class="card span4"><h3>الحالة</h3><pre id="cycleState">—</pre></div></div></section>
+
+<section id="goals" class="view"><div class="grid"><div class="card span6"><h2>🎯 إضافة هدف</h2><input id="goalText" placeholder="مثلاً: بناء متجر..." style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px"><br><br><button onclick="addGoal()">إضافة الهدف</button></div><div class="card span6"><h2>📋 الأهداف</h2><div id="goalsList" class="list">—</div></div></div></section>
+
+<section id="memory" class="view"><div class="grid"><div class="card span6"><h2>🧠 الذاكرة</h2><div id="memoryList" class="list">—</div></div><div class="card span6"><h2>📚 تعلم جديد</h2><textarea id="lesson" placeholder="درس أو معلومة يجب أن يتذكرها العقل..." style="width:100%;min-height:120px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px"></textarea><br><button onclick="learn()">حفظ الدرس</button></div></div></section>
+
+<section id="media" class="view"><div class="grid"><div class="card span8"><h2>🖼️ مركز الوسائط</h2><p class="muted">صور، فيديو، صوت وملفات. ارفع الوسيط ليصبح جزءاً من سياق العقل.</p><input type="file" id="mediaPick" accept="image/*,video/*,audio/*,.pdf,.txt"><button onclick="uploadPicked()">رفع إلى العقل</button><div id="mediaResult"></div></div><div class="card span4"><h3>أدوات الصور والفيديو</h3><div class="list"><button onclick="alert('واجهة تحليل الصور جاهزة للربط بمزود Vision AI.')">👁️ تحليل صورة</button><button onclick="alert('واجهة توليد الصور جاهزة للربط بمزود Image AI.')">🎨 توليد صورة</button><button onclick="alert('واجهة الفيديو جاهزة للربط بمزود Video AI.')">🎬 إنشاء فيديو</button></div></div></div></section>
+
+<section id="camera" class="view"><div class="grid"><div class="card span8"><h2>📷 الكاميرا</h2><video id="cameraVideo" autoplay playsinline></video><canvas id="snap" hidden></canvas><div class="tools"><button onclick="openCamera()">تشغيل الكاميرا</button><button onclick="capture()">📸 التقاط</button><button class="secondary" onclick="stopCamera()">إيقاف</button></div><img id="shot" class="media" hidden></div><div class="card span4"><h3>ماذا يفعل العقل بالصورة؟</h3><p>التقاط → حفظ → إدخال إلى سياق الحوار → Vision AI → تحليل → قرار/أداة تالية.</p></div></div></section>
+
+<section id="video" class="view"><div class="card"><h2>🎬 استوديو الفيديو</h2><input type="file" accept="video/*" onchange="uploadMedia(this.files[0])"><p class="muted">رفع الفيديو متاح الآن. تحليل/توليد الفيديو يعتمد على موصل AI يتم تفعيله من AI Gateway.</p></div></section>
+
+<section id="voice" class="view"><div class="grid"><div class="card span6"><h2>🎙️ المحادثة الصوتية</h2><button onclick="startSpeech()">🎤 ابدأ الاستماع</button><button class="secondary" onclick="speechSynthesis.cancel()">⏹️ إيقاف الصوت</button><p id="speechText" class="panel">اضغط تحدث ثم تكلم.</p></div><div class="card span6"><h2>🔊 تحويل الرد إلى كلام</h2><p>يستخدم محرك الكلام المتاح في المتصفح حالياً، ويمكن ربط مزود صوت AI من صفحة AI Gateway.</p></div></div></section>
+
+<section id="ai" class="view"><div class="grid"><div class="card span8"><h2>🤖 AI Gateway</h2><p>طبقة موحدة تسمح للعقل باستخدام نماذج محادثة ورؤية وصوت وصور وفيديو دون ربط القلب بمزود واحد.</p><div class="list"><div class="item">💬 Language AI <span class="badge">Provider</span></div><div class="item">👁️ Vision AI <span class="badge">Provider</span></div><div class="item">🎙️ Speech AI <span class="badge">Provider</span></div><div class="item">🎨 Image AI <span class="badge">Provider</span></div><div class="item">🎬 Video AI <span class="badge">Provider</span></div></div></div><div class="card span4"><h3>🔐 المفاتيح والاتصال</h3><p class="muted">لا نضع مفاتيح API داخل الواجهة. تُضبط في بيئة الخادم/الأسرار.</p><button onclick="show('settings')">إعداد الموصلات</button></div></div></section>
+
+<section id="plugins" class="view"><div class="card"><h2>🔌 مدير المكونات الإضافية</h2><div id="pluginsList" class="list">تحميل...</div><p class="muted">المكونات الخارجية لا تحصل على صلاحيات التنفيذ تلقائياً؛ لكل مكون صلاحية وحدود.</p></div></section>
+
+<section id="tools" class="view"><div class="card"><h2>🛠️ مدير الأدوات</h2><div id="toolsList" class="list">تحميل...</div></div></section>
+
+<section id="agent" class="view"><div class="grid"><div class="card span6"><h2>⚙️ الوكيل Agent</h2><pre id="agentStatus">—</pre></div><div class="card span6"><h2>🔐 تنفيذ آمن</h2><p>التنفيذ الخارجي يحتاج موافقة صريحة، ويظل داخل الـ sandbox والأوامر المسموحة.</p><button onclick="loadAgent()">فحص الوكيل</button></div></div></section>
+
+<section id="events" class="view"><div class="card"><h2>📊 سجل الأحداث</h2><pre id="eventsList">—</pre></div></section>
+
+<section id="settings" class="view"><div class="grid"><div class="card span6"><h2>⚙️ إعدادات النظام</h2><div class="list"><div class="item">🧠 Core <span class="badge">V12</span></div><div class="item">🔒 Execution <span class="badge">Approval + Sandbox</span></div><div class="item">📷 Camera <span class="badge">Browser Permission</span></div><div class="item">🎙️ Microphone <span class="badge">Browser Permission</span></div><div class="item">🤖 AI <span class="badge">Gateway</span></div></div></div><div class="card span6"><h2>🔌 الموصلات</h2><p>يمكن ربط مزودي AI والأدوات الخارجية عبر Plugins/Gateway. مفاتيح الخدمات تحفظ خارج الواجهة.</p></div></div></section>
+</main></div>
+<div id="modal" class="modal"><div class="box"><button class="secondary" onclick="closeModal()">إغلاق</button><pre id="modalText"></pre></div></div>
 <script>
-const $=x=>document.getElementById(x);
-async function j(u,o){let r=await fetch(u,o);return r.json()}
-async function refresh(){try{let[s,g,m]=await Promise.all([j('/api/state'),j('/api/goals'),j('/api/memory')]);$('conn').textContent='● متصل';$('st').textContent=s.status||'READY';$('go').textContent=g.length;$('me').textContent=m.length;$('state').textContent=JSON.stringify(s,null,2)}catch(e){$('conn').textContent='● غير متصل'}}
-$('f').onsubmit=async e=>{e.preventDefault();let q=$('q').value.trim();if(!q)return;let d=document.createElement('div');d.className='m u';d.textContent=q;$('msgs').append(d);$('q').value='';let r=await j('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});let a=document.createElement('div');a.className='m a';a.textContent=r.reply;$('msgs').append(a);refresh()};
-$("run").onclick=async()=>{let r=await j('/api/run',{method:'POST'});let a=document.createElement('div');a.className='m a';a.textContent=JSON.stringify(r,null,2);$('msgs').append(a);refresh()};
-$("refresh").onclick=refresh;
-refresh();setInterval(refresh,3000);
-</script></body></html>
+const $=id=>document.getElementById(id);let lastReply='',stream=null;
+function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));let b=document.querySelector('[data-view="'+id+'"]');if(b)$('title').textContent=b.textContent; if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='plugins'||id==='tools')loadCaps();if(id==='events')loadEvents();if(id==='agent')loadAgent();if(id==='cycle')loadState();}
+async function api(url,opt){let r=await fetch(url,opt);return r.json()}
+async function refresh(){try{let [s,g,m,e]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events')]);$('connection').textContent='متصل';$('sState').textContent=s.status||'READY';$('sGoals').textContent=g.length;$('sMem').textContent=m.length;$('sEvents').textContent=e.length;$('homeState').textContent=JSON.stringify(s,null,2)}catch(e){$('connection').textContent='غير متصل'}}
+async function sendChat(){let q=$('q').value.trim();if(!q)return;addMsg(q,'user');$('q').value='';let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});lastReply=r.reply||JSON.stringify(r);addMsg(lastReply,'assistant');refresh()}
+function addMsg(t,c){let d=document.createElement('div');d.className='msg '+c;d.textContent=t;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight}
+async function runCycle(){let r=await api('/api/run',{method:'POST'});$('cycleOut').textContent=JSON.stringify(r,null,2);addMsg(JSON.stringify(r,null,2),'assistant');refresh()}
+async function loadState(){let s=await api('/api/state');$('cycleState').textContent=JSON.stringify(s,null,2)}
+async function loadGoals(){let g=await api('/api/goals');$('goalsList').innerHTML=g.map(x=>'<div class="item"><span>'+esc(x.text)+'</span><span class="badge">'+x.status+'</span></div>').join('')||'لا توجد أهداف'}
+async function addGoal(){let t=$('goalText').value.trim();if(!t)return;await api('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,priority:.8})});$('goalText').value='';loadGoals();refresh()}
+async function loadMemory(){let m=await api('/api/memory');$('memoryList').innerHTML=m.map(x=>'<div class="item"><span>'+esc(x.key)+'</span><span class="muted">'+esc(x.value)+'</span></div>').join('')||'لا توجد ذكريات'}
+async function learn(){let t=$('lesson').value.trim();if(!t)return;await api('/api/learn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lesson:t})});$('lesson').value='';loadMemory()}
+async function loadEvents(){let e=await api('/api/events');$('eventsList').textContent=JSON.stringify(e,null,2)}
+async function loadAgent(){let a=await api('/api/agent/status');$('agentStatus').textContent=JSON.stringify(a,null,2)}
+async function loadCaps(){let c=await api('/api/capabilities');$('pluginsList').innerHTML=c.plugins.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+' <span class="badge">'+x.permission+'</span></span><span class="'+(x.enabled?'ok':'muted')+'">'+(x.enabled?'مفعل':'غير مفعل')+'</span></div>').join('');$('toolsList').innerHTML=c.tools.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+'</span><span class="badge">'+x.risk+'</span></div>').join('')}
+async function uploadPicked(){let f=$('mediaPick').files[0];if(f)await uploadMedia(f)}
+async function uploadMedia(f){if(!f)return;let fd=new FormData();fd.append('file',f);let r=await api('/api/media/upload',{method:'POST',body:fd});$('mediaResult').innerHTML='<div class="panel">تم الاستلام: '+esc(r.filename)+'<br>'+esc(r.content_type||'')+'</div>';if(r.url&&r.content_type?.startsWith('image/')){$('mediaResult').innerHTML+='<img class="media" src="'+r.url+'">'}else if(r.url&&r.content_type?.startsWith('video/')){$('mediaResult').innerHTML+='<video class="media" controls src="'+r.url+'"></video>'}}
+async function openCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});$('cameraVideo').srcObject=stream}catch(e){alert('لم يتم السماح بالكاميرا: '+e.message)}}
+function stopCamera(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null}
+function capture(){let v=$('cameraVideo'),c=$('snap'),i=$('shot');if(!stream)return alert('شغل الكاميرا أولاً');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);i.src=c.toDataURL('image/jpeg',.9);i.hidden=false}
+function startSpeech(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert('التعرف الصوتي غير متاح في هذا المتصفح.');let r=new SR();r.lang='ar-JO';r.interimResults=false;r.onresult=e=>{$('q').value=e.results[0][0].transcript;$('speechText').textContent=e.results[0][0].transcript;show('chat');sendChat()};r.onerror=e=>{$('speechText').textContent='خطأ: '+e.error};r.start();$('speechText').textContent='أستمع...'}
+function speakLast(){if(!lastReply)return;let u=new SpeechSynthesisUtterance(lastReply);u.lang='ar-JO';speechSynthesis.speak(u)}
+function closeModal(){$('modal').classList.remove('show')}function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+refresh();setInterval(refresh,5000);
+</script>
+</body></html>
