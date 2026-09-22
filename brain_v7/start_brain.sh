@@ -11,7 +11,12 @@ if ! command -v python >/dev/null 2>&1; then
   exit 1
 fi
 
-python -m pip install -r requirements.txt
+# Install only when the required imports are missing.
+# This avoids pulling Rust-based watchfiles on Android/Termux.
+if ! python -c "import fastapi,pydantic,uvicorn,httpx" >/dev/null 2>&1; then
+  echo "Installing Android-safe Python dependencies..."
+  python -m pip install -r requirements.txt
+fi
 
 TOKEN_FILE="$ROOT/.agent_token"
 if [ ! -f "$TOKEN_FILE" ]; then
