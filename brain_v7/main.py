@@ -41,8 +41,6 @@ async def lifespan(app):
 app = FastAPI(title="Electronic Brain V7", version="7.1", lifespan=lifespan)
 app.include_router(autonomous_router)
 
-app.mount("/", StaticFiles(directory=os.path.dirname(__file__), html=True), name="brain-ui")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -311,10 +309,6 @@ async def autonomous_loop():
             raise
         except Exception:
             await asyncio.sleep(WORKER_INTERVAL)
-
-if __name__=="__main__":
-    import uvicorn
-    uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8000")))
 
 
 # V7.2 cognitive metrics
@@ -722,3 +716,11 @@ async def autonomous_build(body: AutonomousBuildIn):
         }
 
     return {"ok":False,"status":"BUILD_STOPPED","history":history}
+
+
+# Main entrypoint and browser UI are registered after all API routes so "/" does not shadow /api/*.
+app.mount("/", StaticFiles(directory=os.path.dirname(__file__), html=True), name="brain-ui")
+
+if __name__=="__main__":
+    import uvicorn
+    uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8000")))
