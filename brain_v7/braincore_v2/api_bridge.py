@@ -1,4 +1,4 @@
-"""FastAPI bridge for the cognitive orchestrator and chat layer."""
+"""FastAPI bridge for the cognitive orchestrator, chat, and terminal bridge."""
 from typing import Any
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from .cognitive_orchestrator import CognitiveOrchestrator
 from .agent_executor import execute_action
 from .chat_engine import BrainChat
+from .terminal_bridge import terminal_bridge
 
 router = APIRouter(prefix="/api/autonomous", tags=["autonomous"])
 orchestrator = CognitiveOrchestrator(action_executor=execute_action)
@@ -39,6 +40,13 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class TerminalRunRequest(BaseModel):
+    objective: str = ""
+    actions: list[str] = Field(default_factory=list)
+    timeout: int = Field(default=30, ge=1, le=60)
+    stop_on_failure: bool = True
+
+
 @router.get("/status")
 def autonomous_status():
     return orchestrator.status()
@@ -60,6 +68,26 @@ def autonomous_loop(req: LoopRequest):
 def propose_improvement(req: ImprovementRequest):
     p = orchestrator.propose_improvement(req.id, req.description)
     return {"id": p.id, "description": p.description, "status": p.status}
+
+
+@router.get("/terminal/status")
+def terminal_status():
+    return terminal_bridge.status()
+
+
+@router.post("/terminal/plan")
+def terminal_plan(req: TerminalRunRequest):
+    return terminal_bridge.plan(req.actions, req.objective)
+
+
+@router.post("/terminal/run")
+def terminal_run(req: TerminalRunRequest):
+    return terminal_bridge.run(
+        req.actions,
+        objective=req.objective,
+        timeout=req.timeout,
+        stop_on_failure=req.stop_on_failure,
+    )
 
 
 @router.get("/chat", response_class=HTMLResponse)
