@@ -3,6 +3,7 @@ on:
   push:
     branches: ["main"]
     paths:
+      - "index.html"
       - "brain_v12/web/**"
       - ".github/workflows/brain-v12-pages.yml"
   workflow_dispatch:
@@ -23,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare site
         run: |
+          rm -rf _site
           mkdir -p _site
           cp brain_v12/web/index.html _site/index.html
       - uses: actions/configure-pages@v5
