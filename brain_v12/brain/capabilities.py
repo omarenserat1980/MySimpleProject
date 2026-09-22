@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 CAPABILITIES = [
+    {"id":"self_improvement","name":"التطوير الذاتي المراقب","icon":"🔄","category":"cognitive","status":"sandbox"},
     {"id":"chat","name":"المحادثة والحوار","icon":"💬","category":"communication","status":"ready"},
     {"id":"voice","name":"الصوت","icon":"🎙️","category":"media","status":"browser"},
     {"id":"camera","name":"الكاميرا","icon":"📷","category":"media","status":"browser"},
@@ -43,6 +44,7 @@ PLUGINS = [
 ]
 
 TOOLS = [
+    {"id":"self-improvement","name":"Self Improvement Planner","icon":"🔄","risk":"high"},
     {"id":"chat","name":"Chat","icon":"💬","risk":"low"},
     {"id":"upload","name":"Upload Media","icon":"📤","risk":"low"},
     {"id":"camera","name":"Camera Capture","icon":"📷","risk":"medium"},
