@@ -1,11 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
 from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
+from .brain.orchestrator import CognitiveOrchestrator
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
@@ -13,6 +14,7 @@ store.init()
 brain=BrainCore(store)
 agent=Agent()
 builder=SoftwareBuilder()
+orchestrator=CognitiveOrchestrator(store,brain,builder)
 app=FastAPI(title="Electronic Brain V12",version="12.0")
 
 class Chat(BaseModel):
@@ -32,6 +34,18 @@ class Exec(BaseModel):
     cwd:str="."
     timeout:int=30
     approved:bool=False
+
+@app.post("/api/media/upload")
+async def media_upload(file: UploadFile = File(...)):
+    media_dir=os.path.join(ROOT,"web","media")
+    os.makedirs(media_dir,exist_ok=True)
+    safe=os.path.basename(file.filename or "upload.bin")
+    target=os.path.join(media_dir,safe)
+    data=await file.read()
+    with open(target,"wb") as f:
+        f.write(data)
+    store.event("MEDIA_RECEIVED",{"filename":safe,"content_type":file.content_type,"size":len(data)})
+    return {"ok":True,"filename":safe,"url":f"/media/{safe}","content_type":file.content_type,"size":len(data)}
 
 @app.get("/health")
 def health():
@@ -144,6 +158,7 @@ def builder_plan(project:str,objective:str):
     store.event("BUILDER_PLAN",plan)
     return plan
 
+app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 
 if __name__=="__main__":
