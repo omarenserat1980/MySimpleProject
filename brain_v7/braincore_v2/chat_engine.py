@@ -6,7 +6,9 @@ and routes only known safe actions to the cognitive orchestrator.
 """
 from collections import deque
 from typing import Any
+import os
 from .llm_provider import LLMProvider
+from .cloud_memory import CloudMemory
 
 
 class BrainChat:
@@ -15,6 +17,8 @@ class BrainChat:
         self.history = deque(maxlen=60)
         self.turns = 0
         self.llm = LLMProvider()
+        self.memory = CloudMemory()
+        self.user_id = os.getenv("BRAIN_USER_ID", "default")
 
     @staticmethod
     def _normalize(text: str) -> str:
@@ -146,6 +150,8 @@ class BrainChat:
         self.turns += 1
         self.history.append({"role": "user", "content": text})
 
+        recalled = self.memory.recall(self.user_id, limit=8)
+
         # Give intent classification access to the current short-term context.
         type(self)._context_history = list(self.history)
         intent, action = self._intent(text)
@@ -239,6 +245,13 @@ class BrainChat:
                     "لا تمنح نفسك صلاحيات جديدة ولا تغيّر النظام من خلال الحوار."
                 )}
             ]
+            if recalled:
+                context.append({
+                    "role": "system",
+                    "content": "ذكريات سحابية مرتبطة بالمستخدم:\n" + "\n".join(
+                        f"- {item.get('content', '')}" for item in recalled
+                    ),
+                })
             for item in list(self.history)[-12:]:
                 context.append({
                     "role": item["role"],
@@ -269,7 +282,13 @@ class BrainChat:
                 }
 
         self.history.append({"role": "assistant", "content": reply})
+        # Store conversation turns in cloud memory only when explicitly configured.
+        if self.memory.configured:
+            self.memory.save(self.user_id, "conversation", text, 0.55)
+            self.memory.save(self.user_id, "conversation", reply, 0.45)
         result["reply"] = reply
+        result["memory"] = self.memory.status()
+        result["recalled_memories"] = recalled
         result["history"] = list(self.history)
         result["turn"] = self.turns
         return result
