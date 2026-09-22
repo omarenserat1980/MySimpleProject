@@ -62,3 +62,8 @@ def read(token:str,path:str):
 def status(token:str):
     auth(token)
     return {"ok":True,"sandbox":str(SANDBOX),"allowed_commands":sorted(ALLOWED_COMMANDS)}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=int(os.getenv("AGENT_PORT", "9000")))
