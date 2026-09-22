@@ -47,11 +47,40 @@ def messages():
 
 @app.post("/api/chat")
 def chat(body:Chat):
-    store.add_message("user",body.message)
-    reply=f"استلمت: {body.message}. سأربطها بالحالة والذاكرة والهدف والتخطيط."
+    message=body.message.strip()
+    if not message:
+        return {"ok":False,"error":"EMPTY_MESSAGE"}
+
+    store.add_message("user",message)
+    store.event("PERCEPTION",{"message":message})
+
+    goal=store.active_goal()
+    created_goal=False
+    if not goal:
+        goal_id=store.add_goal(message,0.8)
+        created_goal=True
+        goal=store.active_goal()
+
+    decision=brain.think()
+    selected=decision.get("selected")
+    if decision.get("status")=="DECIDING" and selected:
+        reply=(
+            f"فهمت الطلب وربطته بهدف نشط.\n"
+            f"الهدف: {decision.get('current_goal')}\n"
+            f"القرار الحالي: {selected.get('action')}\n"
+            f"الخطوة المتوقعة: {selected.get('expected')}\n"
+            f"الحالة: DECIDING"
+        )
+    else:
+        reply=f"تم تسجيل الطلب، لكن لا يوجد قرار قابل للتنفيذ الآن: {decision.get('reason','UNKNOWN')}"
     store.add_message("assistant",reply)
-    store.event("PERCEPTION",{"message":body.message})
-    return {"reply":reply}
+    return {
+        "ok":True,
+        "reply":reply,
+        "created_goal":created_goal,
+        "goal_id":goal["id"] if goal else None,
+        "decision":decision
+    }
 
 @app.get("/api/memory")
 def memory():
