@@ -1,6 +1,6 @@
 """FastAPI bridge for the cognitive orchestrator."""
 from typing import Any
-from fastapi import APIRouter
+from fastapi import APIRouter\nfrom fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from .cognitive_orchestrator import CognitiveOrchestrator
 from .agent_executor import execute_action
