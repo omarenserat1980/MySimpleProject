@@ -1,9 +1,4 @@
-"""Arabic intent, conversation, and smart-memory layer for the Electronic Brain V9.2.
-
-Long-term memory is selective: only explicit, useful facts are stored. Ordinary
-conversation is kept in short-term history but is not automatically persisted.
-"""
-
+"""Arabic intent, conversation, smart memory, and bounded terminal control."""
 from collections import deque
 from typing import Any
 import os
@@ -56,6 +51,14 @@ class BrainChat:
         if cls._has_any(t, ("ذاكرتك", "ماذا تتذكر", "شو بتتذكر", "ماذا حفظت", "شو محفوظ بذاكرتك", "شو بتعرف عني")):
             return "memory", None
 
+        # Safe terminal controls: only map natural language to registered actions.
+        if cls._has_any(t, ("اعرض ملفات التيرمنال", "اعرض الملفات", "شو موجود بالمجلد", "اعرض محتويات المجلد")):
+            return "action", "termux_list"
+        if cls._has_any(t, ("وين انا", "اين انا", "وين المجلد", "اعرف موقعي الحالي", "مسار المجلد")):
+            return "action", "termux_pwd"
+        if cls._has_any(t, ("افحص التيرمنال", "اختبر التيرمنال", "هل التيرمنال شغال")):
+            return "action", "inspect"
+
         has_ai = cls._has_any(t, ("شات جي بي تي", "شات جيتي بي", "chatgpt", "تشات جي بي تي", "شات جي تي بي"))
         has_dev = cls._has_any(t, ("اطلب", "اسال", "احكي", "اكتب", "اعطي", "طور", "تطوير", "برومبت", "تعليمات"))
         if (cls._has_any(t, ("خطة التطوير", "كيف نطورك", "كيف اطورك")) or
@@ -83,33 +86,22 @@ class BrainChat:
 
     @staticmethod
     def _extract_memories(text: str) -> list[tuple[str, str, float]]:
-        """Extract only explicit, stable facts worth long-term storage."""
         raw = text.strip()
         n = BrainChat._normalize(raw)
         memories: list[tuple[str, str, float]] = []
-
         prefixes = (
-            ("identity", "اسمي "),
-            ("identity", "انا اسمي "),
-            ("identity", "أنا اسمي "),
-            ("preference", "احب "),
-            ("preference", "أحب "),
-            ("preference", "افضل "),
-            ("preference", "أفضل "),
-            ("goal", "هدفي "),
-            ("goal", "هدفي هو "),
+            ("identity", "اسمي "), ("identity", "انا اسمي "), ("identity", "أنا اسمي "),
+            ("preference", "احب "), ("preference", "أحب "),
+            ("preference", "افضل "), ("preference", "أفضل "),
+            ("goal", "هدفي "), ("goal", "هدفي هو "),
             ("project", "مشروعي "),
         )
         for kind, prefix in prefixes:
             if n.startswith(BrainChat._normalize(prefix)):
                 memories.append((kind, raw, 0.85 if kind in ("identity", "goal") else 0.75))
                 break
-
-        # Explicit requests to remember something are also durable memories.
         if any(x in n for x in ("احفظ ان", "تذكر ان", "خلي بذاكرتك", "اريد حفظ")):
             memories.append(("explicit", raw, 0.9))
-
-        # Remove duplicate classifications of the same message.
         unique = []
         seen = set()
         for item in memories:
@@ -136,7 +128,6 @@ class BrainChat:
         self.turns += 1
         self.history.append({"role": "user", "content": text})
         recalled = self.memory.recall(self.user_id, limit=8)
-
         type(self)._context_history = list(self.history)
         intent, action = self._intent(text)
 
@@ -147,13 +138,13 @@ class BrainChat:
             reply = "أنا العقل الإلكتروني الذي نبنيه في مشروعك. أعمل حاليًا محليًا عبر Python وFastAPI، ولدي طبقات للأهداف والتخطيط والتنفيذ والتعلم والتحسين."
             result = {"status": "CHAT", "intent": intent}
         elif intent == "capabilities":
-            reply = "أستطيع حاليًا إدارة أهداف وخطط محدودة، وتنفيذ أفعال مسموحة عبر الـAgent، وتسجيل التجارب والتعلم من النتائج، وفحص حالتي. أما الفهم الحر الواسع للحوار فيحتاج إلى نموذج لغوي حقيقي."
+            reply = "أستطيع حاليًا إدارة أهداف وخطط محدودة، وتنفيذ أفعال مسموحة عبر الـAgent، وتسجيل التجارب والتعلم من النتائج، وفحص حالتي. كما أصبحت أملك جسرًا محدودًا للتعامل مع Terminal عبر أوامر مسجلة مسبقًا."
             result = {"status": "CHAT", "intent": intent}
         elif intent == "self_improvement":
             reply = "نعم، أستطيع المشاركة في تطوير نفسي بشكل مضبوط: أكتشف نقصًا، أقترح تحسينًا، نختبره، نقيس النتيجة، ثم نحفظ الدرس. حاليًا لا أعدل كودي عشوائيًا من تلقاء نفسي."
             result = {"status": "CHAT", "intent": intent}
         elif intent == "gaps":
-            reply = "أهم ما ينقصني حاليًا: نموذج لغوي للحوار العام، ذاكرة طويلة المدى ذكية، فهم أفضل للسياق، نظام تقييم واختبار للتعديلات، وأدوات أكثر مع صلاحيات واضحة."
+            reply = "أهم ما ينقصني حاليًا: نموذج لغوي للحوار العام، فهم أفضل للسياق، نظام تقييم واختبار للتعديلات، وأدوات أكثر مع صلاحيات واضحة."
             result = {"status": "CHAT", "intent": intent}
         elif intent == "memory":
             recent = [x for x in self.history if x["role"] == "user"][-5:]
@@ -201,7 +192,6 @@ class BrainChat:
                 reply = "أفهم أنك تتحدث معي بشكل طبيعي. أفهم عدة نوايا عربية وأستخدم ذاكرة سحابية انتقائية، لكن محرك اللغة العام غير مهيأ أو غير متاح الآن."
                 result = {"status": "CHAT", "intent": intent, "action": None, "llm": self.llm.status()}
 
-        # Long-term memory is selective: do not persist every conversation turn.
         saved_memories = []
         if self.memory.configured:
             for kind, content, importance in self._extract_memories(text):
