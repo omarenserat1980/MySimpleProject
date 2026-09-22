@@ -61,6 +61,8 @@ class AutonomousTask:
             return "pytest_collect"
         if ("git" in t or "مستودع" in t or "كود" in t) and "git_status" not in done:
             return "git_status"
+        if ("فيديو" in t or "video" in t or "wan" in t) and "video_generate" not in done:
+            return "video_generate"
         if "python_version" not in done and ("python" in t or "بايثون" in t):
             return "python_version"
 
@@ -101,7 +103,7 @@ class AutonomousTask:
                 self.current["status"] = "COMPLETED"
                 break
 
-            result = execute_action(action, {"timeout": max(1, min(int(timeout), 60))})
+            result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
             observation = {
                 "step": index,
                 "action": action,
