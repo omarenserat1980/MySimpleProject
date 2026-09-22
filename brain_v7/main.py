@@ -567,3 +567,48 @@ def task_feedback(body: RecoveryIn):
         con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(state_data,ensure_ascii=False),))
         con.commit()
     return {"ok":True,"status":"LEARNED" if success else "RECOVERY_REQUIRED"}
+
+
+# V7.8 - Autonomous Software Builder
+class BuildIn(BaseModel):
+    project: str
+    objective: str
+    max_iterations: int = 10
+
+def build_plan(objective):
+    return [
+        {"id":"inspect","title":"فحص المشروع","status":"PENDING"},
+        {"id":"design","title":"تصميم الحل","status":"PENDING"},
+        {"id":"implement","title":"تنفيذ الكود","status":"PENDING"},
+        {"id":"test","title":"تشغيل الاختبارات","status":"PENDING"},
+        {"id":"repair","title":"إصلاح الأخطاء","status":"PENDING"},
+        {"id":"verify","title":"التحقق النهائي","status":"PENDING"},
+    ]
+
+@app.post("/api/builder/plan")
+def builder_plan(body: BuildIn):
+    plan=build_plan(body.objective)
+    with closing(db()) as con:
+        event(con,"BUILDER_PLAN",{"project":body.project,"objective":body.objective,"plan":plan})
+        con.commit()
+    return {"ok":True,"project":body.project,"objective":body.objective,"plan":plan}
+
+@app.post("/api/builder/start")
+async def builder_start(body: BuildIn):
+    if not PERMISSIONS.get("EXECUTE",False):
+        return {"ok":False,"error":"EXECUTE_PERMISSION_DENIED"}
+    plan=build_plan(body.objective)
+    with closing(db()) as con:
+        event(con,"BUILDER_STARTED",{"project":body.project,"objective":body.objective,"max_iterations":body.max_iterations})
+        con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps({
+            "status":"BUILDING","project":body.project,"objective":body.objective,
+            "iteration":0,"max_iterations":body.max_iterations,"plan":plan,
+            "message":"الخطة جاهزة؛ التنفيذ الفعلي يحتاج Brain Agent متصلًا ومصرحًا."
+        },ensure_ascii=False),))
+        con.commit()
+    return {"ok":True,"status":"BUILDING","project":body.project,"plan":plan,
+            "next":"CONNECT_AGENT_AND_EXECUTE"}
+
+@app.get("/api/builder/status")
+def builder_status():
+    return {"state":runtime.snapshot()}
