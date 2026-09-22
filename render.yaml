@@ -1,11 +1,8 @@
 services:
   - type: web
-    name: electronic-brain-relay
+    name: electronic-brain-v12
     runtime: python
-    rootDir: brain_v7
-    buildCommand: pip install -r relay_requirements.txt
-    startCommand: uvicorn relay_server:app --host 0.0.0.0 --port $PORT
+    rootDir: brain_v12
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
-    envVars:
-      - key: RELAY_TOKEN
-        sync: false
