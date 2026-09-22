@@ -1,14 +1,12 @@
-"""FastAPI bridge for the cognitive orchestrator.
-
-This module is framework-light: import it from main.py and mount the router.
-"""
+"""FastAPI bridge for the cognitive orchestrator."""
 from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from .cognitive_orchestrator import CognitiveOrchestrator
+from .agent_executor import execute_action
 
 router = APIRouter(prefix="/api/autonomous", tags=["autonomous"])
-orchestrator = CognitiveOrchestrator()
+orchestrator = CognitiveOrchestrator(action_executor=execute_action)
 
 class CycleRequest(BaseModel):
     objective: str = "inspect and improve current state"
@@ -27,7 +25,8 @@ def autonomous_status():
 
 @router.post("/cycle")
 def autonomous_cycle(req: CycleRequest):
-    return orchestrator.step(req.model_dump())
+    payload = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    return orchestrator.step(payload)
 
 @router.post("/improvement")
 def propose_improvement(req: ImprovementRequest):
