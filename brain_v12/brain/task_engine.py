@@ -1,0 +1,25 @@
+"""Task graph for long-horizon execution."""
+from uuid import uuid4
+
+class TaskEngine:
+    def __init__(self):
+        self.tasks = {}
+
+    def create(self, title: str, parent_id=None, depends_on=None):
+        tid = str(uuid4())
+        self.tasks[tid] = {"id":tid,"title":title,"parent_id":parent_id,
+                           "depends_on":depends_on or [],"status":"PENDING","attempts":0}
+        return self.tasks[tid]
+
+    def ready(self):
+        done = {k for k,v in self.tasks.items() if v["status"] == "COMPLETED"}
+        return [v for v in self.tasks.values() if v["status"]=="PENDING" and all(d in done for d in v["depends_on"])]
+
+    def update(self, task_id: str, status: str):
+        if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
+        self.tasks[task_id]["status"]=status
+        if status=="RUNNING": self.tasks[task_id]["attempts"] += 1
+        return self.tasks[task_id]
+
+    def snapshot(self):
+        return {"tasks":list(self.tasks.values()),"ready":self.ready()}
