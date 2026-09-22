@@ -1,30 +1,14 @@
-# Foras P100 Video Ad Generator
+# Electronic Brain V12
 
-مشروع بسيط لإنشاء إعلان فيديو عمودي لمضخة **Foras P100** مناسب لفيسبوك وواتساب.
+هذا المستودع أصبح مخصصًا لـ **العقل الإلكتروني V12**.
 
-## التشغيل
+## البنية
+- `brain_v12/` — النواة والخدمات والواجهة.
+- `brain_v12/web/index.html` — واجهة V12 العربية RTL.
+- `brain_v12/start_brain.sh` — تشغيل الخدمة محليًا.
+- `.github/workflows/brain-v12-pages.yml` — نشر واجهة V12 على GitHub Pages.
 
-1. ثبّت Python 3.10 أو أحدث.
-2. ثبّت المتطلبات:
+## الحلقة المعرفية
+Perceive → Understand → Memory → Goal → Plan → Decide → Act → Observe → Learn
 
-```bash
-pip install -r requirements.txt
-```
-
-3. ضع صورة المنتج في المجلد `assets` باسم:
-
-`foras_p100.jpg`
-
-4. شغّل:
-
-```bash
-python generate_ad.py
-```
-
-سيتم إنشاء الفيديو في:
-
-`output/foras_p100_ad.mp4`
-
-## ملاحظة
-
-البرنامج لا يخترع مواصفات المنتج. النصوص الموجودة في الإعلان قابلة للتعديل من أعلى ملف `generate_ad.py`، ويمكن إضافة السعر ورقم واتساب بعد تحديدهما.
+تمت إزالة ملفات مشروع المضخة من جذر المشروع حتى لا تبقى واجهة أو تشغيلات خاصة بالمضخات ضمن المشروع الحالي.
