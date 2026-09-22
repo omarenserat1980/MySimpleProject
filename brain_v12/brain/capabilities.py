@@ -1,0 +1,37 @@
+from __future__ import annotations
+
+CAPABILITIES = [
+    {"id":"chat","name":"المحادثة والحوار","icon":"💬","category":"communication","status":"ready"},
+    {"id":"voice","name":"الصوت","icon":"🎙️","category":"media","status":"browser"},
+    {"id":"camera","name":"الكاميرا","icon":"📷","category":"media","status":"browser"},
+    {"id":"images","name":"الصور والرؤية","icon":"🖼️","category":"ai","status":"ready"},
+    {"id":"video","name":"الفيديو","icon":"🎬","category":"media","status":"ready"},
+    {"id":"vision_ai","name":"تحليل الصور","icon":"👁️","category":"ai","status":"provider"},
+    {"id":"speech_ai","name":"تحويل الكلام/النص","icon":"🗣️","category":"ai","status":"provider"},
+    {"id":"image_ai","name":"توليد وتعديل الصور","icon":"🎨","category":"ai","status":"provider"},
+    {"id":"video_ai","name":"توليد الفيديو","icon":"🎞️","category":"ai","status":"provider"},
+    {"id":"web_tools","name":"الويب والبحث","icon":"🌐","category":"tools","status":"plugin"},
+    {"id":"developer","name":"البرمجة والبناء","icon":"💻","category":"tools","status":"ready"},
+    {"id":"files","name":"الملفات","icon":"📁","category":"tools","status":"ready"},
+    {"id":"memory","name":"الذاكرة","icon":"🧠","category":"cognitive","status":"ready"},
+    {"id":"planner","name":"التخطيط والقرار","icon":"🎯","category":"cognitive","status":"ready"},
+]
+
+PLUGINS = [
+    {"id":"browser","name":"Web/Search","icon":"🌐","enabled":False,"permission":"search"},
+    {"id":"image-tools","name":"Image Tools","icon":"🖼️","enabled":True,"permission":"media"},
+    {"id":"camera","name":"Camera","icon":"📷","enabled":True,"permission":"camera"},
+    {"id":"video-tools","name":"Video Tools","icon":"🎬","enabled":True,"permission":"media"},
+    {"id":"voice","name":"Voice","icon":"🎙️","enabled":True,"permission":"microphone"},
+    {"id":"developer-agent","name":"Developer Agent","icon":"💻","enabled":True,"permission":"sandbox"},
+    {"id":"canva","name":"Canva","icon":"🎨","enabled":False,"permission":"external"},
+]
+
+TOOLS = [
+    {"id":"chat","name":"Chat","icon":"💬","risk":"low"},
+    {"id":"upload","name":"Upload Media","icon":"📤","risk":"low"},
+    {"id":"camera","name":"Camera Capture","icon":"📷","risk":"medium"},
+    {"id":"voice","name":"Voice Input/Output","icon":"🎙️","risk":"low"},
+    {"id":"agent","name":"Sandbox Agent","icon":"⚙️","risk":"high"},
+    {"id":"builder","name":"Software Builder","icon":"🛠️","risk":"medium"},
+]
