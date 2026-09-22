@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from braincore_v2.api_bridge import router as autonomous_router
 
 DB_PATH = os.getenv("BRAIN_DB", "brain_v7.db")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
@@ -37,6 +38,8 @@ async def lifespan(app):
             pass
 
 app = FastAPI(title="Electronic Brain V7", version="7.1", lifespan=lifespan)
+app.include_router(autonomous_router)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
