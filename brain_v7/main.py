@@ -612,3 +612,48 @@ async def builder_start(body: BuildIn):
 @app.get("/api/builder/status")
 def builder_status():
     return {"state":runtime.snapshot()}
+
+
+# V7.9 - Build Loop Controller
+class BuildLoopIn(BaseModel):
+    project: str
+    objective: str
+    iteration: int = 0
+    max_iterations: int = 10
+    last_result: dict = {}
+
+def build_iteration(body: BuildLoopIn):
+    if body.iteration >= body.max_iterations:
+        return {"ok":False,"status":"MAX_ITERATIONS","iteration":body.iteration}
+    steps=build_plan(body.objective)
+    if body.last_result and not body.last_result.get("ok",False):
+        steps=[x for x in steps if x["id"] in ("inspect","repair","test","verify")]
+    with closing(db()) as con:
+        event(con,"BUILD_ITERATION",{
+            "project":body.project,"objective":body.objective,
+            "iteration":body.iteration+1,"steps":steps,
+            "previous_result":body.last_result
+        })
+        con.commit()
+    return {"ok":True,"status":"NEXT_ITERATION","iteration":body.iteration+1,
+            "steps":steps,"requires_agent":True}
+
+@app.post("/api/builder/iterate")
+def builder_iterate(body: BuildLoopIn):
+    return build_iteration(body)
+
+@app.post("/api/builder/complete")
+def builder_complete(body: BuildLoopIn):
+    success=bool(body.last_result.get("ok"))
+    with closing(db()) as con:
+        state_data={
+            "status":"COMPLETED" if success else "BUILD_FAILED",
+            "project":body.project,
+            "objective":body.objective,
+            "iteration":body.iteration,
+            "result":body.last_result
+        }
+        con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps(state_data,ensure_ascii=False),))
+        event(con,"BUILD_COMPLETED" if success else "BUILD_FAILED",state_data)
+        con.commit()
+    return {"ok":success,"status":state_data["status"],"iteration":body.iteration}
