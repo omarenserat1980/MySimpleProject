@@ -8,6 +8,7 @@ from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
 from .brain.orchestrator import CognitiveOrchestrator
 from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
+from .brain.self_improvement import SelfImprovementEngine
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
@@ -16,6 +17,7 @@ brain=BrainCore(store)
 agent=Agent()
 builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder)
+self_improver=SelfImprovementEngine()
 app=FastAPI(title="Electronic Brain V12",version="12.0")
 
 class Chat(BaseModel):
@@ -35,6 +37,9 @@ class Exec(BaseModel):
     cwd:str="."
     timeout:int=30
     approved:bool=False
+class Improve(BaseModel):
+    objective:str
+    files:list[str]=[]
 
 @app.post("/api/media/upload")
 async def media_upload(file: UploadFile = File(...)):
@@ -141,6 +146,21 @@ def events():
 @app.get("/api/agent/status")
 def agent_status():
     return agent.status()
+
+@app.get("/api/self-improvement/status")
+def self_improvement_status():
+    return self_improver.status()
+
+@app.post("/api/self-improvement/propose")
+def self_improvement_propose(body:Improve):
+    result=self_improver.propose(body.objective,body.files)
+    store.event("SELF_IMPROVEMENT_PROPOSAL",result)
+    return result
+
+@app.post("/api/self-improvement/record-approval")
+def self_improvement_record_approval(body:Improve):
+    store.event("SELF_IMPROVEMENT_APPROVAL",{"objective":body.objective,"files":body.files})
+    return {"ok":True,"approved":True,"note":"Approval is recorded; repository writes still require an explicit write implementation and credentials."}
 
 @app.post("/api/agent/execute")
 def agent_execute(body:Exec):
