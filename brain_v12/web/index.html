@@ -17,7 +17,8 @@ button{background:#3b82f6;color:white;border:0;border-radius:12px;padding:10px 1
 <div class="top"><div><h2>🧠 العقل الإلكتروني V12</h2><small>واجهة التعامل المباشر</small></div><b id="conn">● فحص الاتصال...</b></div>
 <div class="grid">
 <section class="card chat"><div id="msgs" class="msgs"><div class="m a">العقل جاهز. اكتب لي ما تريد.</div></div>
-<form id="f"><textarea id="q" required placeholder="تحدث مع العقل..."></textarea><button>إرسال</button></form></section>
+<form id="f"><textarea id="q" required placeholder="تحدث مع العقل..."></textarea><button>إرسال</button></form>
+<div style="display:flex;gap:8px;margin-top:8px"><button id="run" type="button">تشغيل الدورة</button><button id="refresh" type="button">تحديث</button></div></section>
 <aside>
 <div class="card"><h3>الحالة</h3><div class="row"><span>State</span><b id="st">...</b></div><div class="row"><span>Goals</span><b id="go">0</b></div><div class="row"><span>Memory</span><b id="me">0</b></div></div>
 <div class="card" style="margin-top:14px"><h3>الدورة</h3><div class="flow"><span>إدراك</span><span>فهم</span><span>ذاكرة</span><span>هدف</span><span>تخطيط</span><span>قرار</span><span>تنفيذ</span><span>ملاحظة</span><span>خطأ</span><span>تعلم</span></div></div>
@@ -28,5 +29,7 @@ const $=x=>document.getElementById(x);
 async function j(u,o){let r=await fetch(u,o);return r.json()}
 async function refresh(){try{let[s,g,m]=await Promise.all([j('/api/state'),j('/api/goals'),j('/api/memory')]);$('conn').textContent='● متصل';$('st').textContent=s.status||'READY';$('go').textContent=g.length;$('me').textContent=m.length;$('state').textContent=JSON.stringify(s,null,2)}catch(e){$('conn').textContent='● غير متصل'}}
 $('f').onsubmit=async e=>{e.preventDefault();let q=$('q').value.trim();if(!q)return;let d=document.createElement('div');d.className='m u';d.textContent=q;$('msgs').append(d);$('q').value='';let r=await j('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});let a=document.createElement('div');a.className='m a';a.textContent=r.reply;$('msgs').append(a);refresh()};
+$("run").onclick=async()=>{let r=await j('/api/run',{method:'POST'});let a=document.createElement('div');a.className='m a';a.textContent=JSON.stringify(r,null,2);$('msgs').append(a);refresh()};
+$("refresh").onclick=refresh;
 refresh();setInterval(refresh,3000);
 </script></body></html>
