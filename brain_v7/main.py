@@ -657,3 +657,62 @@ def builder_complete(body: BuildLoopIn):
         event(con,"BUILD_COMPLETED" if success else "BUILD_FAILED",state_data)
         con.commit()
     return {"ok":success,"status":state_data["status"],"iteration":body.iteration}
+
+
+# V8.0 - Autonomous Build Orchestrator
+class AutonomousBuildIn(BaseModel):
+    project: str
+    objective: str
+    max_iterations: int = 10
+    approved: bool = False
+
+@app.post("/api/builder/autonomous")
+async def autonomous_build(body: AutonomousBuildIn):
+    if not body.approved:
+        return {"ok":False,"status":"WAITING_APPROVAL","message":"يلزم تفعيل الدورة صراحة على الجهاز."}
+    if not AGENT_URL:
+        return {"ok":False,"status":"AGENT_NOT_CONNECTED","message":"Brain Agent غير متصل."}
+    if body.max_iterations < 1 or body.max_iterations > 50:
+        return {"ok":False,"error":"INVALID_MAX_ITERATIONS"}
+
+    plan=build_plan(body.objective)
+    history=[]
+    with closing(db()) as con:
+        event(con,"AUTONOMOUS_BUILD_STARTED",{
+            "project":body.project,"objective":body.objective,
+            "max_iterations":body.max_iterations
+        })
+        con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps({
+            "status":"BUILDING","project":body.project,
+            "objective":body.objective,"iteration":0,"plan":plan
+        },ensure_ascii=False),))
+        con.commit()
+
+    # The orchestrator performs only explicitly approved Agent calls.
+    # It does not invent success: every iteration must return an actual Agent result.
+    for iteration in range(1, body.max_iterations + 1):
+        step_result=build_iteration(BuildLoopIn(
+            project=body.project, objective=body.objective,
+            iteration=iteration-1,max_iterations=body.max_iterations,
+            last_result=history[-1] if history else {}
+        ))
+        history.append(step_result)
+        if step_result.get("status") == "MAX_ITERATIONS":
+            break
+        with closing(db()) as con:
+            con.execute("UPDATE state SET data=? WHERE id=1",(json.dumps({
+                "status":"WAITING_AGENT_EXECUTION","project":body.project,
+                "objective":body.objective,"iteration":iteration,
+                "plan":step_result.get("steps",[])
+            },ensure_ascii=False),))
+            event(con,"BUILDER_WAITING_AGENT",{"iteration":iteration,"steps":step_result.get("steps",[])})
+            con.commit()
+        # One safe handoff per iteration; the Agent decides actual command execution.
+        return {
+            "ok":True,"status":"AGENT_HANDOFF_REQUIRED",
+            "project":body.project,"objective":body.objective,
+            "iteration":iteration,"plan":step_result.get("steps",[]),
+            "message":"تم تجهيز الدورة وإرسال نقطة التسليم. التنفيذ الفعلي يستمر من خلال Brain Agent."
+        }
+
+    return {"ok":False,"status":"BUILD_STOPPED","history":history}
