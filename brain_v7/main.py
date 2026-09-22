@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -39,6 +40,8 @@ async def lifespan(app):
 
 app = FastAPI(title="Electronic Brain V7", version="7.1", lifespan=lifespan)
 app.include_router(autonomous_router)
+
+app.mount("/", StaticFiles(directory=os.path.dirname(__file__), html=True), name="brain-ui")
 
 app.add_middleware(
     CORSMiddleware,
