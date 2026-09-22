@@ -43,6 +43,9 @@ class BrainCore:
         return {"ok":True,"state":state}
 
     def learn(self,lesson):
+        state=self.snapshot()
+        state.update({"status":"LEARNED","lesson":lesson})
+        self.store.set_state(state)
         self.store.save_memory("lesson:last",lesson)
         self.store.event("LEARNING",{"lesson":lesson})
-        return {"ok":True,"lesson":lesson}
+        return {"ok":True,"lesson":lesson,"state":state}
