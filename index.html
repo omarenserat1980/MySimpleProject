@@ -1,816 +1,129 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-<title>Rollplox — Sky Roll Adventure</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm"
-  }
-}
-</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>العقل الإلكتروني V12 — مركز التحكم</title>
 <style>
-  *{ -webkit-tap-highlight-color: transparent; user-select:none; }
-  body{ margin:0; overflow:hidden; background:#87CEEB; font-family:'Fredoka',system-ui; overscroll-behavior:none; touch-action:none; }
-  #canvas-container{ position:absolute; inset:0; }
-  #canvas-container canvas{ display:block; width:100%; height:100%; }
-  .glass{ background:rgba(255,255,255,0.85); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.6); }
-  .blox-shadow{ box-shadow: 0 12px 0 rgba(0,0,0,0.15), 0 20px 40px rgba(0,0,0,0.15); }
-  .btn-blox{ transition: all .12s cubic-bezier(.34,1.56,.64,1); box-shadow: 0 6px 0 rgba(0,0,0,0.2); }
-  .btn-blox:active{ transform:translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.2); }
-  .title-3d{ text-shadow: 0 2px 0 #fff, 0 4px 0 #FFD93D, 0 6px 0 #FF6B6B, 0 8px 20px rgba(0,0,0,0.2); }
-  @keyframes float { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-8px) rotate(1deg)} }
-  @keyframes spin-slow { from{transform:rotateY(0)} to{transform:rotateY(360deg)} }
-  @keyframes pop { 0%{transform:scale(0.8)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
-  .animate-float{ animation: float 3s ease-in-out infinite; }
-  .animate-pop{ animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
-  #joystickBase{ position:absolute; left:18px; bottom:18px; width:122px; height:122px; border-radius:50%; background:rgba(255,255,255,0.22); border:2px solid rgba(255,255,255,0.5); backdrop-filter:blur(12px); display:none; align-items:center; justify-content:center; z-index:30; touch-action:none; }
-  #joystickKnob{ width:54px; height:54px; border-radius:50%; background:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.25), inset 0 -4px 0 rgba(0,0,0,0.12); position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
-  #jumpBtn{ position:absolute; right:18px; bottom:18px; width:84px; height:84px; border-radius:50%; background:#fff; border:3px solid #111; box-shadow:0 8px 0 #111; display:none; align-items:center; justify-content:center; z-index:30; font-weight:700; font-size:14px; letter-spacing:0.04em; touch-action:none; }
-  #jumpBtn.active{ transform:translateY(4px); box-shadow:0 4px 0 #111; }
-  @media (pointer:coarse){ #joystickBase, #jumpBtn{ display:flex; } }
-  .shake{ animation: shake .3s ease; }
-  @keyframes shake{ 0%,100%{transform:translate(0)} 20%{transform:translate(-6px,2px)} 40%{transform:translate(6px,-2px)} 60%{transform:translate(-4px,1px)} 80%{transform:translate(4px,-1px)} }
+:root{--bg:#07101d;--panel:#0e1a2b;--panel2:#13243a;--line:#263b55;--txt:#edf5ff;--muted:#9db0c7;--accent:#4da3ff;--ok:#37d39a;--warn:#ffc857;--danger:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#07101d,#0a1525 55%,#0d1b2d);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,sans-serif}button,input,textarea,select{font:inherit}button{border:0;border-radius:11px;padding:10px 14px;background:var(--accent);color:white;cursor:pointer}button.secondary{background:#1c3049}button.danger{background:#9d3047}.app{display:grid;grid-template-columns:250px 1fr;min-height:100vh}.side{background:#091524;border-left:1px solid var(--line);padding:15px;position:sticky;top:0;height:100vh;overflow:auto}.brand{font-size:20px;font-weight:800;padding:12px}.brand small{display:block;color:var(--muted);font-size:11px;margin-top:4px}.nav button{display:block;width:100%;text-align:right;background:transparent;margin:4px 0;color:#c9d7e8}.nav button.active,.nav button:hover{background:var(--panel2);color:white}.main{padding:18px;max-width:1500px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.top h1{font-size:22px;margin:0}.status{border:1px solid var(--line);background:var(--panel);padding:8px 12px;border-radius:20px}.dot{color:var(--ok)}.view{display:none}.view.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.card{background:rgba(14,26,43,.94);border:1px solid var(--line);border-radius:17px;padding:15px}.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}.span3{grid-column:span 3}.card h2,.card h3{margin-top:0}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#0a1626;border:1px solid var(--line);padding:14px;border-radius:13px}.stat b{font-size:22px;display:block}.muted{color:var(--muted)}.chat{height:calc(100vh - 120px);min-height:600px;display:flex;flex-direction:column}.messages{flex:1;overflow:auto;padding:5px}.msg{padding:11px 13px;border-radius:14px;margin:8px 0;white-space:pre-wrap;max-width:88%}.user{background:#1d4168;margin-right:auto}.assistant{background:#16283d;margin-left:auto}.composer{display:flex;gap:7px;align-items:end}.composer textarea{flex:1;min-height:54px;max-height:180px;background:#091524;color:white;border:1px solid var(--line);border-radius:13px;padding:12px}.tools{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.media{width:100%;max-height:360px;object-fit:contain;background:#050b13;border-radius:12px;margin-top:8px}.panel{background:#091524;border:1px solid var(--line);border-radius:12px;padding:10px}.list{display:grid;gap:8px}.item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0a1626;border:1px solid var(--line);padding:10px;border-radius:12px}.badge{padding:4px 8px;border-radius:20px;background:#203b56;font-size:11px}.ok{color:var(--ok)}pre{white-space:pre-wrap;overflow:auto;max-height:420px;color:#cfe1f7}.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;padding:15px;z-index:20}.modal.show{display:flex}.modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;max-width:800px;width:100%;padding:18px}video{width:100%;background:#000;border-radius:12px}.menuTitle{color:var(--muted);font-size:11px;padding:15px 10px 5px}@media(max-width:900px){.app{grid-template-columns:1fr}.side{height:auto;position:relative;border-left:0;border-bottom:1px solid var(--line)}.nav{display:flex;overflow:auto}.nav button{min-width:max-content}.stats{grid-template-columns:repeat(2,1fr)}.span8,.span6,.span4,.span3{grid-column:span 12}.chat{height:75vh;min-height:500px}}
 </style>
 </head>
-<body class="bg-[#87CEEB]">
-<div id="canvas-container"></div>
-
-<!-- HUD -->
-<div id="hud" class="hidden absolute inset-0 pointer-events-none z-20">
-  <div class="absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start gap-2 pointer-events-auto">
-    <div class="glass rounded-[18px] px-4 py-2.5 flex items-center gap-3 blox-shadow">
-      <div class="w-9 h-9 rounded-xl bg-[#111] text-white grid place-items-center font-bold text-[13px]">LVL</div>
-      <div>
-        <div id="hudLevelName" class="font-bold leading-none text-[15px] tracking-tight">BLOX HOP</div>
-        <div class="text-[11px] opacity-60 font-semibold tracking-widest">ROLLPLOX</div>
-      </div>
-    </div>
-    <div class="flex gap-2">
-      <div class="glass rounded-[16px] px-3.5 py-2 flex items-center gap-2 blox-shadow">
-        <div class="w-7 h-7 rounded-full bg-[#FFD93D] border-2 border-black grid place-items-center text-[14px]">◆</div>
-        <div id="hudCoins" class="font-bold text-[15px]">0 / 5</div>
-      </div>
-      <div class="glass rounded-[16px] px-3.5 py-2 flex items-center gap-2 blox-shadow">
-        <div class="w-7 h-7 rounded-full bg-black text-white grid place-items-center">◷</div>
-        <div id="hudTimer" class="font-bold text-[15px] tabular-nums">00:00</div>
-      </div>
-      <button id="hudMenuBtn" class="glass rounded-[16px] w-11 h-11 grid place-items-center blox-shadow hover:scale-105 transition">☰</button>
-    </div>
-  </div>
-  <div class="absolute bottom-3 left-1/2 -translate-x-1/2 glass rounded-full px-4 py-1.5 text-[11px] font-bold tracking-widest opacity-70 pointer-events-none hidden md:flex gap-3">
-    <span>WASD / STICK TO ROLL</span><span class="opacity-30">•</span><span>SPACE TO JUMP</span><span class="opacity-30">•</span><span>DRAG TO LOOK</span>
-  </div>
+<body>
+<div class="app">
+<aside class="side">
+<div class="brand">🧠 العقل الإلكتروني<small>V12 • مركز التحكم المتعدد الوسائط</small></div>
+<div class="menuTitle">العقل</div><div class="nav">
+<button class="active" data-view="home">🏠 الرئيسية</button><button data-view="chat">💬 المحادثة</button><button data-view="cycle">🔄 الدورة المعرفية</button><button data-view="goals">🎯 الأهداف والخطط</button><button data-view="memory">🧠 الذاكرة والتعلم</button>
 </div>
-
-<!-- MENU -->
-<div id="menuScreen" class="absolute inset-0 z-30 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_#fff_0%,_#87CEEB_55%,_#5AB0D6_100%)]">
-  <div class="w-full max-w-[560px]">
-    <div class="text-center mb-6 animate-float">
-      <h1 class="title-3d font-black tracking-[-0.04em] leading-[0.85] text-[68px] md:text-[88px]" style="font-family:'Space Grotesk'">
-        <span class="inline-block bg-[#FF5A5F] text-white px-3 rounded-[14px] rotate-[-2deg]">ROLL</span><br>
-        <span class="inline-block bg-[#111] text-[#FFD93D] px-4 rounded-[14px] rotate-[2deg] mt-1">PLOX</span>
-      </h1>
-      <div class="mt-4 inline-flex glass rounded-full px-4 py-1.5 text-[12px] font-bold tracking-widest">MOMENTUM • HOP • DON'T DROP</div>
-    </div>
-
-    <div class="glass rounded-[28px] p-6 md:p-7 blox-shadow animate-pop">
-      <div class="flex gap-3 mb-5">
-        <div class="flex-1">
-          <button id="playBtn" class="btn-blox w-full bg-[#111] text-white rounded-[18px] py-4 font-bold text-[18px] tracking-wide flex items-center justify-center gap-2">
-            <span class="text-[20px]">▶</span> PLAY NOW
-          </button>
-          <div class="text-[11px] text-center mt-2 font-semibold opacity-60 tracking-widest">3 HANDCRAFTED SKY ISLANDS</div>
-        </div>
-        <button id="soundToggle" class="btn-blox w-[64px] bg-white border-[3px] border-black rounded-[18px] grid place-items-center text-[22px]">🔊</button>
-      </div>
-
-      <div class="grid grid-cols-3 gap-3 mb-5">
-        <button data-level="0" class="levelPick btn-blox bg-[#FF6B6B] border-[3px] border-black rounded-[18px] p-3 text-left">
-          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 1</div>
-          <div class="font-bold leading-tight text-[14px]">BLOX HOP</div>
-          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[35%] bg-black rounded-full"></div></div>
-        </button>
-        <button data-level="1" class="levelPick btn-blox bg-[#4ECDC4] border-[3px] border-black rounded-[18px] p-3 text-left">
-          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 2</div>
-          <div class="font-bold leading-tight text-[14px]">SKY SERPENT</div>
-          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[60%] bg-black rounded-full"></div></div>
-        </button>
-        <button data-level="2" class="levelPick btn-blox bg-[#FFE66D] border-[3px] border-black rounded-[18px] p-3 text-left">
-          <div class="text-[11px] font-bold tracking-widest opacity-80">LVL 3</div>
-          <div class="font-bold leading-tight text-[14px]">PLOX PEAKS</div>
-          <div class="mt-2 h-1.5 bg-black/20 rounded-full overflow-hidden"><div class="h-full w-[90%] bg-black rounded-full"></div></div>
-        </button>
-      </div>
-
-      <div class="bg-[#111] text-white rounded-[18px] p-4 flex gap-4 items-center">
-        <div class="w-12 h-12 rounded-[12px] bg-white text-black grid place-items-center font-black text-[20px]">?</div>
-        <div class="text-[13px] leading-[1.35]">
-          <b class="text-[#FFD93D]">How to play:</b> Roll with momentum, build speed, time your jumps. Moving plox are slippery — ride them! Collect yellow Plox for style points.
-        </div>
-      </div>
-    </div>
-
-    <div class="text-center mt-4 text-[11px] font-bold tracking-widest opacity-50">BUILT WITH THREE + CANNON • 60FPS PHYSICS • MOBILE READY</div>
-  </div>
+<div class="menuTitle">الوسائط والذكاء</div><div class="nav">
+<button data-view="media">🖼️ الصور والملفات</button><button data-view="camera">📷 الكاميرا</button><button data-view="video">🎬 الفيديو</button><button data-view="voice">🎙️ الصوت</button><button data-view="ai">🤖 AI Gateway</button>
 </div>
-
-<!-- LEVEL COMPLETE -->
-<div id="levelCompleteScreen" class="hidden absolute inset-0 z-30 items-center justify-center p-4 bg-[rgba(0,0,0,0.35)] backdrop-blur-[8px]">
-  <div class="glass rounded-[28px] p-7 w-full max-w-[420px] blox-shadow text-center animate-pop">
-    <div class="inline-flex bg-[#00E5A0] text-black border-[3px] border-black rounded-full px-4 py-1 font-black tracking-widest text-[12px] mb-3">LEVEL CLEAR!</div>
-    <h2 id="lcTitle" class="font-black text-[32px] leading-none tracking-tight" style="font-family:'Space Grotesk'">NICE ROLL!</h2>
-    <div id="lcStars" class="flex justify-center gap-1 my-4 text-[36px]"></div>
-    <div class="grid grid-cols-2 gap-3 text-left mb-5">
-      <div class="bg-white border-[3px] border-black rounded-[16px] p-3">
-        <div class="text-[11px] font-bold tracking-widest opacity-60">TIME</div>
-        <div id="lcTime" class="font-black text-[20px]">00:12</div>
-      </div>
-      <div class="bg-[#FFD93D] border-[3px] border-black rounded-[16px] p-3">
-        <div class="text-[11px] font-bold tracking-widest opacity-70">PLOX</div>
-        <div id="lcCoins" class="font-black text-[20px]">5/5</div>
-      </div>
-    </div>
-    <div class="flex gap-3">
-      <button id="lcMenuBtn" class="btn-blox flex-1 bg-white border-[3px] border-black rounded-[16px] py-3.5 font-bold">MENU</button>
-      <button id="nextLevelBtn" class="btn-blox flex-1 bg-black text-white rounded-[16px] py-3.5 font-bold">NEXT →</button>
-    </div>
-  </div>
+<div class="menuTitle">الأدوات والنظام</div><div class="nav">
+<button data-view="plugins">🔌 المكونات الإضافية</button><button data-view="tools">🛠️ الأدوات</button><button data-view="agent">⚙️ الوكيل والتنفيذ</button><button data-view="selfImprovement">🔄 التطوير الذاتي</button><button data-view="events">📊 سجل الأحداث</button><button data-view="settings">⚙️ الإعدادات</button>
 </div>
+</aside>
+<main class="main">
+<header class="top"><div><h1 id="title">الرئيسية</h1><span class="muted">منصة واحدة للحوار، الإدراك، التخطيط، الأدوات والوسائط</span></div><div class="status"><span class="dot">●</span> <span id="connection">جاري الفحص</span></div></header>
 
-<!-- FINAL -->
-<div id="finalScreen" class="hidden absolute inset-0 z-30 items-center justify-center p-4 bg-[radial-gradient(ellipse_at_center,_#FFE66D_0%,_#FF6B6B_100%)]">
-  <div class="glass rounded-[32px] p-8 w-full max-w-[520px] blox-shadow text-center animate-pop border-[4px] border-black">
-    <div class="text-[64px] leading-none">🏆</div>
-    <h2 class="font-black text-[42px] leading-[0.9] tracking-tight mt-2" style="font-family:'Space Grotesk'">PLOX<br>CHAMPION!</h2>
-    <p class="mt-3 font-semibold opacity-70">You rolled through all floating islands without rage-quitting. Respect.</p>
-    <div class="grid grid-cols-3 gap-3 mt-6">
-      <div class="bg-white border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">LEVELS</div><div class="font-black text-[22px]">3/3</div></div>
-      <div class="bg-[#FFD93D] border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">PLOX</div><div id="finalCoins" class="font-black text-[22px]">0</div></div>
-      <div class="bg-black text-white border-[3px] border-black rounded-[18px] p-3"><div class="text-[11px] font-bold opacity-60 tracking-widest">TIME</div><div id="finalTime" class="font-black text-[22px]">00:00</div></div>
-    </div>
-    <button id="finalRestartBtn" class="btn-blox mt-6 w-full bg-black text-white rounded-[18px] py-4 font-black text-[18px]">PLAY AGAIN ↻</button>
-  </div>
+<section id="home" class="view active">
+<div class="stats"><div class="stat">الحالة<b id="sState">—</b></div><div class="stat">الأهداف<b id="sGoals">0</b></div><div class="stat">الذاكرة<b id="sMem">0</b></div><div class="stat">الأحداث<b id="sEvents">0</b></div></div>
+<div class="grid" style="margin-top:12px">
+<div class="card span8"><h2>🧠 مركز العقل</h2><div class="panel"><b>المسار المعرفي</b><div class="tools"><span class="badge">إدراك</span><span class="badge">فهم</span><span class="badge">ذاكرة</span><span class="badge">هدف</span><span class="badge">تخطيط</span><span class="badge">قرار</span><span class="badge">تنفيذ</span><span class="badge">ملاحظة</span><span class="badge">خطأ</span><span class="badge">تعلم</span></div></div><pre id="homeState">—</pre></div>
+<div class="card span4"><h2>⚡ وصول سريع</h2><div class="list"><button onclick="show('chat')">💬 ابدأ محادثة</button><button onclick="show('camera')">📷 افتح الكاميرا</button><button onclick="show('media')">🖼️ أضف صورة/ملف</button><button onclick="show('voice')">🎙️ محادثة صوتية</button><button onclick="show('plugins')">🔌 إدارة المكونات</button></div></div>
+</div></section>
+
+<section id="chat" class="view"><div class="card chat"><h2>💬 المحادثة والحوار</h2><div id="messages" class="messages"><div class="msg assistant">العقل جاهز. اكتب أو استخدم الصوت أو أرفق صورة/ملف.</div></div><div class="composer"><textarea id="q" placeholder="اكتب أمرك أو سؤالك..."></textarea><button onclick="sendChat()">إرسال</button></div><div class="tools"><button class="secondary" onclick="startSpeech()">🎙️ تحدث</button><button class="secondary" onclick="speakLast()">🔊 اقرأ الرد</button><button class="secondary" onclick="document.getElementById('fileInput').click()">📎 إرفاق</button><button class="secondary" onclick="show('camera')">📷 كاميرا</button><button onclick="runCycle()">🔄 تشغيل الدورة</button></div><input id="fileInput" type="file" accept="image/*,video/*,audio/*,.pdf,.txt" hidden onchange="uploadMedia(this.files[0])"></div></section>
+
+<section id="cycle" class="view"><div class="grid"><div class="card span8"><h2>🔄 الدورة المعرفية</h2><div class="tools" style="font-size:18px"><span class="badge">إدراك</span>→<span class="badge">فهم</span>→<span class="badge">ذاكرة</span>→<span class="badge">هدف</span>→<span class="badge">خطة</span>→<span class="badge">قرار</span>→<span class="badge">تنفيذ</span>→<span class="badge">ملاحظة</span>→<span class="badge">تعلم</span></div><pre id="cycleOut">اضغط تشغيل الدورة.</pre><button onclick="runCycle()">تشغيل الدورة الآن</button></div><div class="card span4"><h3>الحالة</h3><pre id="cycleState">—</pre></div></div></section>
+
+<section id="goals" class="view"><div class="grid"><div class="card span6"><h2>🎯 إضافة هدف</h2><input id="goalText" placeholder="مثلاً: بناء متجر..." style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px"><br><br><button onclick="addGoal()">إضافة الهدف</button></div><div class="card span6"><h2>📋 الأهداف</h2><div id="goalsList" class="list">—</div></div></div></section>
+
+<section id="memory" class="view"><div class="grid"><div class="card span6"><h2>🧠 الذاكرة</h2><div id="memoryList" class="list">—</div></div><div class="card span6"><h2>📚 تعلم جديد</h2><textarea id="lesson" placeholder="درس أو معلومة يجب أن يتذكرها العقل..." style="width:100%;min-height:120px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px"></textarea><br><button onclick="learn()">حفظ الدرس</button></div></div></section>
+
+<section id="media" class="view"><div class="grid"><div class="card span8"><h2>🖼️ مركز الوسائط</h2><p class="muted">صور، فيديو، صوت وملفات. ارفع الوسيط ليصبح جزءاً من سياق العقل.</p><input type="file" id="mediaPick" accept="image/*,video/*,audio/*,.pdf,.txt"><button onclick="uploadPicked()">رفع إلى العقل</button><div id="mediaResult"></div></div><div class="card span4"><h3>أدوات الصور والفيديو</h3><div class="list"><button onclick="alert('واجهة تحليل الصور جاهزة للربط بمزود Vision AI.')">👁️ تحليل صورة</button><button onclick="alert('واجهة توليد الصور جاهزة للربط بمزود Image AI.')">🎨 توليد صورة</button><button onclick="alert('واجهة الفيديو جاهزة للربط بمزود Video AI.')">🎬 إنشاء فيديو</button></div></div></div></section>
+
+<section id="camera" class="view"><div class="grid"><div class="card span8"><h2>📷 الكاميرا</h2><video id="cameraVideo" autoplay playsinline></video><canvas id="snap" hidden></canvas><div class="tools"><button onclick="openCamera()">تشغيل الكاميرا</button><button onclick="capture()">📸 التقاط</button><button class="secondary" onclick="stopCamera()">إيقاف</button></div><img id="shot" class="media" hidden></div><div class="card span4"><h3>ماذا يفعل العقل بالصورة؟</h3><p>التقاط → حفظ → إدخال إلى سياق الحوار → Vision AI → تحليل → قرار/أداة تالية.</p></div></div></section>
+
+<section id="video" class="view"><div class="card"><h2>🎬 استوديو الفيديو</h2><input type="file" accept="video/*" onchange="uploadMedia(this.files[0])"><p class="muted">رفع الفيديو متاح الآن. تحليل/توليد الفيديو يعتمد على موصل AI يتم تفعيله من AI Gateway.</p></div></section>
+
+<section id="voice" class="view"><div class="grid"><div class="card span6"><h2>🎙️ المحادثة الصوتية</h2><button onclick="startSpeech()">🎤 ابدأ الاستماع</button><button class="secondary" onclick="speechSynthesis.cancel()">⏹️ إيقاف الصوت</button><p id="speechText" class="panel">اضغط تحدث ثم تكلم.</p></div><div class="card span6"><h2>🔊 تحويل الرد إلى كلام</h2><p>يستخدم محرك الكلام المتاح في المتصفح حالياً، ويمكن ربط مزود صوت AI من صفحة AI Gateway.</p></div></div></section>
+
+<section id="ai" class="view"><div class="grid"><div class="card span8"><h2>🤖 AI Gateway</h2><p>طبقة موحدة تسمح للعقل باستخدام نماذج محادثة ورؤية وصوت وصور وفيديو دون ربط القلب بمزود واحد.</p><div class="list"><div class="item">💬 Language AI <span class="badge">Provider</span></div><div class="item">👁️ Vision AI <span class="badge">Provider</span></div><div class="item">🎙️ Speech AI <span class="badge">Provider</span></div><div class="item">🎨 Image AI <span class="badge">Provider</span></div><div class="item">🎬 Video AI <span class="badge">Provider</span></div></div></div><div class="card span4"><h3>🔐 المفاتيح والاتصال</h3><p class="muted">لا نضع مفاتيح API داخل الواجهة. تُضبط في بيئة الخادم/الأسرار.</p><button onclick="show('settings')">إعداد الموصلات</button></div></div></section>
+
+<section id="plugins" class="view"><div class="card"><h2>🔌 مدير المكونات الإضافية</h2><div id="pluginsList" class="list">تحميل...</div><p class="muted">المكونات الخارجية لا تحصل على صلاحيات التنفيذ تلقائياً؛ لكل مكون صلاحية وحدود.</p></div></section>
+
+<section id="tools" class="view"><div class="card"><h2>🛠️ مدير الأدوات</h2><div id="toolsList" class="list">تحميل...</div></div></section>
+
+<section id="agent" class="view"><div class="grid"><div class="card span6"><h2>⚙️ الوكيل Agent</h2><pre id="agentStatus">—</pre></div><div class="card span6"><h2>🔐 تنفيذ آمن</h2><p>التنفيذ الخارجي يحتاج موافقة صريحة، ويظل داخل الـ sandbox والأوامر المسموحة.</p><button onclick="loadAgent()">فحص الوكيل</button></div></div></section>
+
+<section id="selfImprovement" class="view">
+<div class="grid">
+<div class="card span8">
+<h2>🔄 مركز التطوير الذاتي</h2>
+<div class="stats">
+<div class="stat">الحالة<b id="siEnabled">—</b></div>
+<div class="stat">الوضع<b id="siMode">—</b></div>
+<div class="stat">النطاق<b id="siRoot">—</b></div>
+<div class="stat">الموافقة<b id="siApproval">—</b></div>
 </div>
+<br>
+<div class="panel">
+<h3>🎯 اطلب من العقل تطوير نفسه</h3>
+<input id="siObjective" placeholder="مثلاً: تحسين دورة القرار واختبارها" style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px">
+<br><br>
+<input id="siFiles" placeholder="الملفات (مفصولة بفاصلة) — مثال: brain_v12/brain/core.py,brain_v12/tests/test_core.py" style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px">
+<div class="tools">
+<button onclick="siPropose()">🧠 حلّل واقترح</button>
+<button class="secondary" onclick="siStatus()">🔄 تحديث الحالة</button>
+</div>
+</div>
+<br>
+<pre id="siOutput">لم تبدأ دورة تطوير بعد.</pre>
+</div>
+<div class="card span4">
+<h3>⚡ التحكم</h3>
+<div class="list">
+<button onclick="siProposeQuick()">🚀 فحص Brain V12 واقتراح تطوير</button>
+<button class="secondary" onclick="show('events')">📊 مشاهدة سجل التطوير</button>
+</div>
+<hr style="border-color:var(--line);border-width:1px 0 0">
+<p class="muted">هذه الواجهة تتحكم في محرك التطوير الذاتي الحالي. الكتابة الفعلية على المستودع ما زالت محكومة بحدود وصلاحيات واضحة.</p>
+</div>
+</div>
+</section><section id="events" class="view"><div class="card"><h2>📊 سجل الأحداث</h2><pre id="eventsList">—</pre></div></section>
 
-<!-- MOBILE CONTROLS -->
-<div id="joystickBase"><div id="joystickKnob"></div></div>
-<button id="jumpBtn">JUMP</button>
-
-<script type="module">
-import * as THREE from 'three';
-import * as CANNON from 'cannon-es';
-
-let scene, camera, renderer, world, clock;
-let ballBody, ballMesh;
-let platforms = [];
-let coins = [];
-let particles = [];
-let goalMesh, goalLight, goalBaseMesh, goalPos = new THREE.Vector3();
-let currentLevel = 0;
-let gameState = 'menu'; // menu, playing, levelComplete, final
-let keys = {};
-let joystick = {x:0,y:0};
-let cameraYaw = 0.6, cameraPitch = 0.35, cameraDistance = 11;
-let isDraggingCam = false, lastCamX = 0;
-let isGrounded = false, groundedBody = null;
-let lastSafePos = new CANNON.Vec3(0,4,0);
-let coinsCollected = 0;
-let startTime = 0;
-let totalCoins = 0, totalTime = 0;
-let audioCtx = null, soundOn = true;
-let lastTrail = 0;
-let decorative = [];
-
-const LEVELS = [
-  {
-    name:"BLOX HOP",
-    targetTime:28,
-    start:{x:0,y:4,z:0},
-    platforms:[
-      {x:0,y:0,z:0,w:9,h:1.2,d:9,color:0xffffff},
-      {x:0,y:0,z:-13,w:6,h:1,d:6,color:0xFF6B6B},
-      {x:0,y:0.6,z:-26,w:5,h:1,d:5,color:0x4ECDC4},
-      {x:6,y:1.2,z:-36,w:5,h:1,d:5,color:0xFFE66D},
-      {x:-5,y:1.8,z:-48,w:5,h:1,d:5,color:0xA8E6CF},
-      {x:0,y:2.6,z:-62,w:7,h:1.2,d:7,color:0xffffff},
-    ],
-    coins:[
-      {x:0,y:2,z:-6},{x:0,y:2,z:-13},{x:0,y:2.6,z:-26},{x:6,y:3.2,z:-36},{x:-5,y:3.8,z:-48}
-    ],
-    goal:{x:0,y:4.6,z:-62}
-  },
-  {
-    name:"SKY SERPENT",
-    targetTime:42,
-    start:{x:0,y:4,z:0},
-    platforms:[
-      {x:0,y:0,z:0,w:6,h:1,d:6,color:0xffffff},
-      {x:11,y:0,z:0,w:5,h:1,d:5,color:0xFF6B6B},
-      {x:11,y:0,z:-12,w:5,h:1,d:5,color:0xFFE66D},
-      {x:0,y:0.5,z:-12,w:5,h:1,d:5,color:0x4ECDC4},
-      {x:0,y:0.5,z:-24,w:4,h:1,d:4,color:0xffffff},
-      {x:8,y:1.8,z:-26,w:4,h:1,d:4,color:0xFF8A65, moving:{axis:'x', amp:5.5, speed:0.9}},
-      {x:-7,y:2.8,z:-34,w:5,h:1,d:5,color:0xA8E6CF},
-      {x:-7,y:3.8,z:-48,w:5,h:1,d:5,color:0xCE93D8},
-      {x:2,y:5,z:-52,w:7,h:1.2,d:7,color:0xffffff},
-    ],
-    coins:[
-      {x:11,y:2,z:0},{x:11,y:2,z:-12},{x:0,y:2.5,z:-12},{x:0,y:2.5,z:-24},{x:8,y:3.8,z:-26},{x:-7,y:4.8,z:-34},{x:-7,y:5.8,z:-48}
-    ],
-    goal:{x:2,y:7,z:-52}
-  },
-  {
-    name:"PLOX PEAKS",
-    targetTime:55,
-    start:{x:0,y:4,z:0},
-    platforms:[
-      {x:0,y:0,z:0,w:5,h:1,d:5,color:0xffffff},
-      {x:0,y:2.2,z:-11,w:3.2,h:1,d:3.2,color:0xFF6B6B},
-      {x:5,y:4.2,z:-15,w:3.2,h:1,d:3.2,color:0xFFE66D},
-      {x:11,y:6.2,z:-15,w:3.2,h:1,d:3.2,color:0x4ECDC4, moving:{axis:'z', amp:5, speed:1.0}},
-      {x:18,y:8.2,z:-15,w:4,h:1,d:4,color:0xA8E6CF},
-      {x:18,y:10.5,z:-26,w:3.2,h:1,d:3.2,color:0xFF8A65},
-      {x:8,y:12.5,z:-30,w:3.2,h:1,d:3.2,color:0xCE93D8, moving:{axis:'x', amp:4.5, speed:1.15}},
-      {x:0,y:14.8,z:-30,w:6,h:1.2,d:6,color:0xffffff},
-    ],
-    coins:[
-      {x:0,y:4.2,z:-11},{x:5,y:6.2,z:-15},{x:11,y:8.2,z:-15},{x:18,y:10.2,z:-15},{x:18,y:12.5,z:-26},{x:8,y:14.5,z:-30},{x:0,y:16.8,z:-30}
-    ],
-    goal:{x:0,y:16.8,z:-30}
-  }
-];
-
-function init(){
-  scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xA7DFFF, 28, 95);
-  scene.background = new THREE.Color(0x87CEEB);
-
-  camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 200);
-  camera.position.set(6,7,10);
-
-  renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  document.getElementById('canvas-container').appendChild(renderer.domElement);
-
-  // lights
-  const amb = new THREE.AmbientLight(0xffffff, 0.72);
-  scene.add(amb);
-  const dir = new THREE.DirectionalLight(0xffffff, 1.15);
-  dir.position.set(14,22,10);
-  dir.castShadow = true;
-  dir.shadow.mapSize.set(2048,2048);
-  dir.shadow.camera.left=-40; dir.shadow.camera.right=40; dir.shadow.camera.top=40; dir.shadow.camera.bottom=-40;
-  dir.shadow.camera.near=1; dir.shadow.camera.far=80;
-  dir.shadow.bias=-0.0004;
-  scene.add(dir);
-
-  // physics
-  world = new CANNON.World({gravity:new CANNON.Vec3(0,-20,0)});
-  world.broadphase = new CANNON.NaiveBroadphase();
-  world.solver.iterations = 12;
-  const ballMat = new CANNON.Material('ball');
-  const groundMat = new CANNON.Material('ground');
-  world.addContactMaterial(new CANNON.ContactMaterial(ballMat, groundMat, {friction:0.42, restitution:0.18}));
-  world._ballMat = ballMat; world._groundMat = groundMat;
-
-  clock = new THREE.Clock();
-
-  // ball
-  const ballGeo = new THREE.SphereGeometry(0.52, 32, 32);
-  const ballMatThree = new THREE.MeshStandardMaterial({color:0xFF4D5A, roughness:0.25, metalness:0.15, emissive:0x330000, emissiveIntensity:0.15});
-  ballMesh = new THREE.Mesh(ballGeo, ballMatThree);
-  ballMesh.castShadow = true; ballMesh.receiveShadow = true;
-  scene.add(ballMesh);
-
-  ballBody = new CANNON.Body({
-    mass:5,
-    shape:new CANNON.Sphere(0.52),
-    material: ballMat,
-    linearDamping:0.18,
-    angularDamping:0.18,
-    allowSleep:false
-  });
-  ballBody.position.set(0,4,0);
-  world.addBody(ballBody);
-
-  // decorative clouds / floating blox
-  for(let i=0;i<18;i++){
-    const s = 0.6 + Math.random()*1.6;
-    const g = new THREE.BoxGeometry(s,s,s);
-    const m = new THREE.MeshStandardMaterial({color: new THREE.Color().setHSL(Math.random()*0.15+0.05,0.6,0.85), roughness:0.9});
-    const mesh = new THREE.Mesh(g,m);
-    mesh.position.set((Math.random()-0.5)*90, -8 - Math.random()*18, (Math.random()-0.5)*120 -20);
-    mesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
-    mesh.castShadow=false; mesh.receiveShadow=true;
-    scene.add(mesh);
-    decorative.push({mesh, rotSpeed: (Math.random()-0.5)*0.6, float: Math.random()*Math.PI*2});
-  }
-  for(let i=0;i<12;i++){
-    const cloud = new THREE.Group();
-    const baseY = 18 + Math.random()*12;
-    for(let j=0;j<4;j++){
-      const sg = new THREE.SphereGeometry(1.2+Math.random()*1.4,12,10);
-      const sm = new THREE.MeshStandardMaterial({color:0xffffff, roughness:1, transparent:true, opacity:0.9});
-      const sMesh = new THREE.Mesh(sg, sm);
-      sMesh.position.set((Math.random()-0.5)*3, (Math.random()-0.5)*0.8, (Math.random()-0.5)*2);
-      cloud.add(sMesh);
-    }
-    cloud.position.set((Math.random()-0.5)*80, baseY, (Math.random()-0.5)*80 -30);
-    scene.add(cloud);
-    decorative.push({mesh:cloud, rotSpeed:0, float:Math.random()*6, isCloud:true, baseY});
-  }
-
-  // events
-  window.addEventListener('resize', onResize);
-  window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; if(e.code==='Space') keys[' ']=true; if(e.key==='Escape'&&gameState==='playing'){ showMenu(); } });
-  window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; if(e.code==='Space') keys[' ']=false; });
-  setupPointer();
-  setupJoystick();
-  setupUI();
-
-  createLevel(0);
-  animate();
-}
-
-function onResize(){
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-}
-
-function setupPointer(){
-  const el = renderer.domElement;
-  el.addEventListener('pointerdown', e=>{
-    if(e.target.closest('#joystickBase')||e.target.closest('#jumpBtn')) return;
-    isDraggingCam = true; lastCamX = e.clientX; el.setPointerCapture(e.pointerId);
-  });
-  el.addEventListener('pointermove', e=>{
-    if(!isDraggingCam) return;
-    const dx = e.clientX - lastCamX;
-    cameraYaw -= dx*0.0045;
-    lastCamX = e.clientX;
-  });
-  el.addEventListener('pointerup', ()=>{ isDraggingCam=false; });
-  el.addEventListener('wheel', e=>{
-    cameraDistance = THREE.MathUtils.clamp(cameraDistance + e.deltaY*0.01, 5, 18);
-  }, {passive:true});
-}
-
-function setupJoystick(){
-  const base = document.getElementById('joystickBase');
-  const knob = document.getElementById('joystickKnob');
-  let active=false, touchId=null, center={x:0,y:0}, maxR=44;
-  function updCenter(){ const r=base.getBoundingClientRect(); center.x=r.left+r.width/2; center.y=r.top+r.height/2; maxR=r.width/2-12; }
-  base.addEventListener('touchstart', e=>{
-    e.preventDefault(); updCenter(); active=true; const t=e.touches[0]; touchId=t.identifier;
-    handle(t.clientX,t.clientY);
-  },{passive:false});
-  base.addEventListener('pointerdown', e=>{ updCenter(); active=true; touchId='mouse'; handle(e.clientX,e.clientY); base.setPointerCapture(e.pointerId); });
-  window.addEventListener('touchmove', e=>{
-    if(!active) return; for(const t of e.touches){ if(t.identifier===touchId){ e.preventDefault(); handle(t.clientX,t.clientY); break; } }
-  },{passive:false});
-  window.addEventListener('pointermove', e=>{ if(!active||touchId!=='mouse') return; handle(e.clientX,e.clientY); });
-  function end(){ active=false; touchId=null; knob.style.transform='translate(-50%,-50%)'; joystick.x=0; joystick.y=0; }
-  window.addEventListener('touchend', e=>{ let still=false; for(const t of e.touches) if(t.identifier===touchId) still=true; if(!still) end(); });
-  window.addEventListener('pointerup', e=>{ if(touchId==='mouse') end(); });
-  function handle(cx,cy){
-    const dx=cx-center.x, dy=cy-center.y;
-    const dist=Math.hypot(dx,dy); const ang=Math.atan2(dy,dx);
-    const cd=Math.min(dist,maxR);
-    const nx=Math.cos(ang)*cd, ny=Math.sin(ang)*cd;
-    knob.style.transform=`translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
-    joystick.x = nx/maxR; joystick.y = -ny/maxR;
-  }
-
-  const jumpBtn=document.getElementById('jumpBtn');
-  const setJump = v=>{ keys[' ']=v; keys['space']=v; if(v) jumpBtn.classList.add('active'); else jumpBtn.classList.remove('active'); };
-  jumpBtn.addEventListener('touchstart', e=>{ e.preventDefault(); setJump(true); },{passive:false});
-  jumpBtn.addEventListener('touchend', e=>{ e.preventDefault(); setJump(false); },{passive:false});
-  jumpBtn.addEventListener('pointerdown', e=>{ setJump(true); });
-  window.addEventListener('pointerup', ()=> setJump(false));
-}
-
-function setupUI(){
-  document.getElementById('playBtn').onclick = ()=> startGame(currentLevel);
-  document.querySelectorAll('.levelPick').forEach(b=> b.onclick=()=>{ currentLevel=parseInt(b.dataset.level); startGame(currentLevel); });
-  document.getElementById('nextLevelBtn').onclick = ()=>{
-    if(currentLevel < LEVELS.length-1){ currentLevel++; startGame(currentLevel); }
-    else showFinal();
-  };
-  document.getElementById('lcMenuBtn').onclick = ()=> showMenu();
-  document.getElementById('finalRestartBtn').onclick = ()=>{ totalCoins=0; totalTime=0; currentLevel=0; showMenu(); };
-  document.getElementById('hudMenuBtn').onclick = ()=> showMenu();
-  document.getElementById('soundToggle').onclick = (e)=>{
-    soundOn=!soundOn; e.currentTarget.textContent = soundOn?'🔊':'🔇';
-    if(soundOn) ensureAudio();
-  };
-}
-
-function ensureAudio(){
-  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended') audioCtx.resume();
-}
-function playSound(type){
-  if(!soundOn) return;
-  ensureAudio();
-  const now = audioCtx.currentTime;
-  if(type==='coin'){
-    [0,0.12].forEach((d,i)=>{
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.type='sine'; o.frequency.setValueAtTime(i?1200:650, now+d); o.frequency.exponentialRampToValueAtTime(i?1600:1100, now+d+0.18);
-      g.gain.setValueAtTime(0.35, now+d); g.gain.exponentialRampToValueAtTime(0.001, now+d+0.28);
-      o.connect(g); g.connect(audioCtx.destination); o.start(now+d); o.stop(now+d+0.3);
-    });
-  } else if(type==='jump'){
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.frequency.setValueAtTime(180, now); o.frequency.linearRampToValueAtTime(520, now+0.16);
-    g.gain.setValueAtTime(0.45, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.22);
-    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+0.24);
-  } else if(type==='fall'){
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='sawtooth'; o.frequency.setValueAtTime(380, now); o.frequency.linearRampToValueAtTime(70, now+0.45);
-    g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.001, now+0.5);
-    o.connect(g); g.connect(audioCtx.destination); o.start(now); o.stop(now+0.55);
-  } else if(type==='win'){
-    [0,0.14,0.28,0.42].forEach((d,i)=>{
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-      o.frequency.setValueAtTime(300 + i*180, now+d);
-      g.gain.setValueAtTime(0.38, now+d); g.gain.exponentialRampToValueAtTime(0.001, now+d+0.5);
-      o.connect(g); g.connect(audioCtx.destination); o.start(now+d); o.stop(now+d+0.55);
-    });
-  }
-}
-
-function clearLevel(){
-  platforms.forEach(p=>{
-    if(p.body) world.removeBody(p.body);
-    if(p.mesh) scene.remove(p.mesh);
-  });
-  platforms=[];
-  coins.forEach(c=>{ scene.remove(c.mesh); if(c.light) scene.remove(c.light); });
-  coins=[];
-  particles.forEach(p=> scene.remove(p.mesh)); particles=[];
-  if(goalMesh) scene.remove(goalMesh);
-  if(goalLight) scene.remove(goalLight);
-  if(goalBaseMesh) scene.remove(goalBaseMesh);
-  goalMesh=null; goalLight=null; goalBaseMesh=null;
-}
-
-function createLevel(idx){
-  clearLevel();
-  const lvl = LEVELS[idx];
-  // platforms
-  lvl.platforms.forEach(pd=>{
-    const geo = new THREE.BoxGeometry(pd.w, pd.h, pd.d);
-    const mat = new THREE.MeshStandardMaterial({color: pd.color, roughness:0.78, metalness:0.05});
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(pd.x, pd.y, pd.z);
-    mesh.receiveShadow=true; mesh.castShadow=true;
-    // add edge highlight
-    const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({color:0x000000, transparent:true, opacity:0.18}));
-    mesh.add(edge);
-    scene.add(mesh);
-
-    const half = new CANNON.Vec3(pd.w/2, pd.h/2, pd.d/2);
-    const shape = new CANNON.Box(half);
-    const body = new CANNON.Body({mass:0, shape, material: world._groundMat, position:new CANNON.Vec3(pd.x,pd.y,pd.z)});
-    if(pd.moving){ body.type=CANNON.Body.KINEMATIC; }
-    world.addBody(body);
-    platforms.push({mesh, body, isMoving:!!pd.moving, moving:pd.moving, basePos:new CANNON.Vec3(pd.x,pd.y,pd.z), half});
-  });
-  // coins
-  lvl.coins.forEach(cd=>{
-    const geo = new THREE.OctahedronGeometry(0.42,0);
-    const mat = new THREE.MeshStandardMaterial({color:0xFFD93D, emissive:0xFFAA00, emissiveIntensity:0.35, metalness:0.2, roughness:0.35});
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(cd.x, cd.y, cd.z);
-    mesh.castShadow=true;
-    scene.add(mesh);
-    const light = new THREE.PointLight(0xFFD93D, 0.7, 4);
-    light.position.copy(mesh.position);
-    scene.add(light);
-    coins.push({mesh, light, pos:new THREE.Vector3(cd.x,cd.y,cd.z), collected:false, baseY:cd.y});
-  });
-  // goal
-  const g = lvl.goal;
-  goalPos.set(g.x,g.y,g.z);
-  const torusGeo = new THREE.TorusGeometry(1.25,0.28,16,48);
-  const torusMat = new THREE.MeshStandardMaterial({color:0x00FFB2, emissive:0x00FFB2, emissiveIntensity:0.7, roughness:0.3});
-  goalMesh = new THREE.Mesh(torusGeo, torusMat);
-  goalMesh.position.copy(goalPos);
-  goalMesh.castShadow=true;
-  scene.add(goalMesh);
-  goalLight = new THREE.PointLight(0x00FFB2, 2.2, 12);
-  goalLight.position.copy(goalPos);
-  scene.add(goalLight);
-  // ball reset
-  ballBody.position.set(lvl.start.x, lvl.start.y, lvl.start.z);
-  ballBody.velocity.set(0,0,0);
-  ballBody.angularVelocity.set(0,0,0);
-  lastSafePos.copy(ballBody.position);
-  coinsCollected=0;
-  // camera reset-ish
-  cameraYaw = 0.5; cameraDistance = 11;
-  updateHUD();
-}
-
-function startGame(idx){
-  currentLevel = idx;
-  createLevel(idx);
-  gameState='playing';
-  document.getElementById('menuScreen').classList.add('hidden');
-  document.getElementById('levelCompleteScreen').classList.add('hidden');
-  document.getElementById('levelCompleteScreen').classList.remove('flex');
-  document.getElementById('finalScreen').classList.add('hidden');
-  document.getElementById('finalScreen').classList.remove('flex');
-  document.getElementById('hud').classList.remove('hidden');
-  startTime = performance.now();
-  ensureAudio();
-}
-
-function showMenu(){
-  gameState='menu';
-  document.getElementById('menuScreen').classList.remove('hidden');
-  document.getElementById('hud').classList.add('hidden');
-  document.getElementById('levelCompleteScreen').classList.add('hidden');
-  document.getElementById('levelCompleteScreen').classList.remove('flex');
-  document.getElementById('finalScreen').classList.add('hidden');
-  document.getElementById('finalScreen').classList.remove('flex');
-}
-
-function showLevelComplete(){
-  gameState='levelComplete';
-  const elapsed = (performance.now()-startTime)/1000;
-  totalTime+=elapsed; totalCoins+=coinsCollected;
-  const lvl = LEVELS[currentLevel];
-  const stars = calcStars(coinsCollected, lvl.coins.length, elapsed, lvl.targetTime);
-  document.getElementById('lcTitle').textContent = stars===3?'PERFECT ROLL!': stars===2?'SICK ROLL!':'NICE ROLL!';
-  document.getElementById('lcTime').textContent = formatTime(elapsed);
-  document.getElementById('lcCoins').textContent = `${coinsCollected}/${lvl.coins.length}`;
-  const cont=document.getElementById('lcStars'); cont.innerHTML='';
-  for(let i=0;i<3;i++){ const d=document.createElement('div'); d.textContent=i<stars?'★':'☆'; d.className=`${i<stars?'text-[#111]':'text-black/20'} text-[38px] leading-none drop-shadow-sm`; cont.appendChild(d); }
-  document.getElementById('levelCompleteScreen').classList.remove('hidden');
-  document.getElementById('levelCompleteScreen').classList.add('flex');
-  document.getElementById('nextLevelBtn').textContent = currentLevel < LEVELS.length-1 ? 'NEXT →' : 'FINALE →';
-  playSound('win');
-  spawnConfetti(goalPos, 24);
-}
-
-function showFinal(){
-  gameState='final';
-  document.getElementById('levelCompleteScreen').classList.add('hidden');
-  document.getElementById('levelCompleteScreen').classList.remove('flex');
-  document.getElementById('finalScreen').classList.remove('hidden');
-  document.getElementById('finalScreen').classList.add('flex');
-  document.getElementById('finalCoins').textContent = `${totalCoins}`;
-  document.getElementById('finalTime').textContent = formatTime(totalTime);
-}
-
-function calcStars(collected,total,time,target){
-  let s=1;
-  if(collected===total) s++;
-  if(time <= target) s++;
-  if(collected===total && time <= target*0.75) s=3;
-  return Math.min(3,s);
-}
-function formatTime(sec){
-  const m=Math.floor(sec/60), s=Math.floor(sec%60);
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-function updateHUD(){
-  document.getElementById('hudLevelName').textContent = LEVELS[currentLevel].name;
-  document.getElementById('hudCoins').textContent = `${coinsCollected} / ${coins.length}`;
-}
-
-function spawnParticles(pos, color=0xFFD93D, count=10, speed=4){
-  for(let i=0;i<count;i++){
-    const geo = new THREE.TetrahedronGeometry(0.12+Math.random()*0.08,0);
-    const mat = new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.3, transparent:true, opacity:1});
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(pos);
-    scene.add(mesh);
-    const vel = new THREE.Vector3((Math.random()-0.5)*speed, Math.random()*speed*0.8+1, (Math.random()-0.5)*speed);
-    particles.push({mesh, vel, life:0.7, max:0.7});
-  }
-}
-function spawnConfetti(pos,count){
-  for(let i=0;i<count;i++){
-    const geo = new THREE.BoxGeometry(0.18,0.18,0.18);
-    const col = new THREE.Color().setHSL(Math.random(),0.9,0.6);
-    const mat = new THREE.MeshStandardMaterial({color:col, transparent:true, opacity:1});
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(pos);
-    scene.add(mesh);
-    const vel = new THREE.Vector3((Math.random()-0.5)*8, Math.random()*6+2, (Math.random()-0.5)*8);
-    particles.push({mesh, vel, life:1.2, max:1.2, rot:new THREE.Vector3(Math.random()*6,Math.random()*6,Math.random()*6)});
-  }
-}
-
-function updateGrounded(){
-  // raycast
-  const from = new CANNON.Vec3(ballBody.position.x, ballBody.position.y, ballBody.position.z);
-  const to = new CANNON.Vec3(from.x, from.y-1.25, from.z);
-  const res = new CANNON.RaycastResult();
-  let hit=false;
-  try{ hit = world.raycastClosest(from,to,{},res); }catch{}
-  if(hit && res.hasHit && res.body!==ballBody && res.distance<1.2){
-    isGrounded=true; groundedBody=res.body; return;
-  }
-  // fallback platform check
-  isGrounded=false; groundedBody=null;
-  const bp = ballBody.position;
-  for(const p of platforms){
-    if(!p.body) continue;
-    const bpos=p.body.position, h=p.half;
-    if(Math.abs(bp.x-bpos.x) <= h.x+0.35 && Math.abs(bp.z-bpos.z) <= h.z+0.35){
-      const top=bpos.y+h.y;
-      const dy=bp.y - top;
-      if(dy>=-0.25 && dy<=0.75 && ballBody.velocity.y < 1.5){
-        isGrounded=true; groundedBody=p.body; return;
-      }
-    }
-  }
-}
-
-function animate(){
-  requestAnimationFrame(animate);
-  const delta = Math.min(clock.getDelta(), 1/30);
-  const t = performance.now()*0.001;
-
-  // decorative anim
-  decorative.forEach(d=>{
-    if(d.isCloud){
-      d.mesh.position.y = d.baseY + Math.sin(t*0.4 + d.float)*0.8;
-      d.mesh.rotation.y += delta*0.05;
-    }else{
-      d.mesh.rotation.x += d.rotSpeed*delta;
-      d.mesh.rotation.y += d.rotSpeed*delta*0.7;
-      d.mesh.position.y += Math.sin(t*0.6 + d.float)*0.002;
-    }
-  });
-
-  if(gameState==='playing'){
-    // input
-    const forward = new THREE.Vector3();
-    forward.subVectors(ballMesh.position, camera.position); forward.y=0; forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
-
-    let ix=0, iz=0;
-    if(keys['w']||keys['arrowup']) iz+=1;
-    if(keys['s']||keys['arrowdown']) iz-=1;
-    if(keys['a']||keys['arrowleft']) ix-=1;
-    if(keys['d']||keys['arrowright']) ix+=1;
-    ix+=joystick.x; iz+=joystick.y;
-    const mag=Math.hypot(ix,iz);
-    if(mag>1){ ix/=mag; iz/=mag; }
-
-    const moveForce = 70;
-    const f = new THREE.Vector3().addScaledVector(forward, iz).addScaledVector(right, ix).multiplyScalar(moveForce);
-    ballBody.applyForce(new CANNON.Vec3(f.x,0,f.z), ballBody.position);
-
-    // jump
-    if((keys[' ']||keys['space']) && isGrounded){
-      ballBody.applyImpulse(new CANNON.Vec3(0,13.5,0), ballBody.position);
-      isGrounded=false;
-      playSound('jump');
-      spawnParticles(new THREE.Vector3(ballBody.position.x, ballBody.position.y-0.5, ballBody.position.z), 0xffffff, 6, 2.5);
-    }
-
-    // moving platforms update (before physics step)
-    platforms.forEach(p=>{
-      if(!p.isMoving) return;
-      const amp=p.moving.amp, spd=p.moving.speed, axis=p.moving.axis;
-      const off=Math.sin(t*spd)*amp;
-      const newPos=new CANNON.Vec3().copy(p.basePos);
-      if(axis==='x') newPos.x+=off;
-      if(axis==='z') newPos.z+=off;
-      if(axis==='y') newPos.y+=off;
-      const deltaPos=new CANNON.Vec3().copy(newPos).vsub(p.body.position);
-      const vel = delta>0.0001 ? new CANNON.Vec3().copy(deltaPos).scale(1/delta) : new CANNON.Vec3(0,0,0);
-      // if ball is on this platform, carry it
-      if(isGrounded && groundedBody===p.body){
-        ballBody.position.vadd(deltaPos, ballBody.position);
-      }
-      p.body.velocity.copy(vel);
-      p.body.position.copy(newPos);
-    });
-
-    world.step(1/60, delta, 4);
-    updateGrounded();
-
-    // update last safe pos
-    if(isGrounded && ballBody.velocity.length()<4){
-      lastSafePos.copy(ballBody.position);
-      lastSafePos.y+=0.6;
-    }
-
-    // sync meshes
-    ballMesh.position.set(ballBody.position.x, ballBody.position.y, ballBody.position.z);
-    ballMesh.quaternion.copy(ballBody.quaternion);
-    // manual rolling visual tweak
-    const v=ballBody.velocity;
-    const r=0.52;
-    if(v.length()>0.2){
-      ballBody.angularVelocity.x = -v.z / r;
-      ballBody.angularVelocity.z = v.x / r;
-    }
-
-    platforms.forEach(p=>{ if(p.body) p.mesh.position.set(p.body.position.x,p.body.position.y,p.body.position.z); });
-
-    // coins
-    coins.forEach(c=>{
-      if(c.collected) return;
-      c.mesh.rotation.y+=delta*2.2;
-      c.mesh.position.y = c.baseY + Math.sin(t*2 + c.pos.x)*0.22;
-      if(c.light) c.light.position.copy(c.mesh.position);
-      const d = ballMesh.position.distanceTo(c.mesh.position);
-      if(d<1.15){
-        c.collected=true;
-        c.mesh.visible=false;
-        if(c.light) c.light.intensity=0;
-        coinsCollected++;
-        updateHUD();
-        playSound('coin');
-        spawnParticles(c.mesh.position.clone(), 0xFFD93D, 10, 3.5);
-      }
-    });
-
-    // goal
-    if(goalMesh){
-      goalMesh.rotation.y+=delta*1.2;
-      goalMesh.position.y = goalPos.y + Math.sin(t*1.6)*0.18;
-      goalLight.position.copy(goalMesh.position);
-      goalLight.intensity = 2 + Math.sin(t*3)*0.4;
-      if(ballMesh.position.distanceTo(goalMesh.position) < 1.9){
-        showLevelComplete();
-      }
-    }
-
-    // fall check
-    if(ballBody.position.y < -18){
-      playSound('fall');
-      document.getElementById('canvas-container').classList.add('shake');
-      setTimeout(()=>document.getElementById('canvas-container').classList.remove('shake'),320);
-      ballBody.position.copy(lastSafePos);
-      ballBody.velocity.set(0,0,0);
-      ballBody.angularVelocity.set(0,0,0);
-      spawnParticles(new THREE.Vector3(ballBody.position.x, ballBody.position.y-0.5, ballBody.position.z), 0x888888, 12, 3);
-    }
-
-    // trail
-    if(ballBody.velocity.length()>2 && performance.now()-lastTrail>55){
-      lastTrail=performance.now();
-      const geo=new THREE.SphereGeometry(0.12,8,8);
-      const mat=new THREE.MeshStandardMaterial({color:0xFF4D5A, transparent:true, opacity:0.55});
-      const m=new THREE.Mesh(geo,mat);
-      m.position.copy(ballMesh.position);
-      scene.add(m);
-      particles.push({mesh:m, vel:new THREE.Vector3(0,0,0), life:0.45, max:0.45, isTrail:true});
-    }
-
-    // HUD timer
-    document.getElementById('hudTimer').textContent = formatTime((performance.now()-startTime)/1000);
-  }
-
-  // particles update
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i];
-    p.life-=delta;
-    if(p.life<=0){ scene.remove(p.mesh); particles.splice(i,1); continue; }
-    p.mesh.position.addScaledVector(p.vel, delta);
-    p.vel.y -= delta*9.8*0.6;
-    if(p.rot){ p.mesh.rotation.x+=p.rot.x*delta; p.mesh.rotation.y+=p.rot.y*delta; p.mesh.rotation.z+=p.rot.z*delta; }
-    if(p.mesh.material){ p.mesh.material.opacity = p.life / p.max; const s= p.isTrail ? (p.life/p.max) : 1; p.mesh.scale.setScalar(s); }
-  }
-
-  // camera follow
-  const target = ballMesh.position;
-  const yaw = cameraYaw;
-  const dist = cameraDistance;
-  const height = 4.2 + cameraPitch*3;
-  const camX = target.x + Math.sin(yaw)*dist;
-  const camZ = target.z + Math.cos(yaw)*dist;
-  const camY = target.y + height;
-  const desired = new THREE.Vector3(camX, camY, camZ);
-  camera.position.lerp(desired, 0.12);
-  camera.lookAt(target.x, target.y+0.6, target.z);
-
-  renderer.render(scene, camera);
-}
-
-init();
+<section id="settings" class="view"><div class="grid"><div class="card span6"><h2>⚙️ إعدادات النظام</h2><div class="list"><div class="item">🧠 Core <span class="badge">V12</span></div><div class="item">🔒 Execution <span class="badge">Approval + Sandbox</span></div><div class="item">📷 Camera <span class="badge">Browser Permission</span></div><div class="item">🎙️ Microphone <span class="badge">Browser Permission</span></div><div class="item">🤖 AI <span class="badge">Gateway</span></div></div></div><div class="card span6"><h2>🔌 الموصلات</h2><p>يمكن ربط مزودي AI والأدوات الخارجية عبر Plugins/Gateway. مفاتيح الخدمات تحفظ خارج الواجهة.</p></div></div></section>
+</main></div>
+<div id="modal" class="modal"><div class="box"><button class="secondary" onclick="closeModal()">إغلاق</button><pre id="modalText"></pre></div></div>
+<script>
+const $=id=>document.getElementById(id);let lastReply='',stream=null;
+function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));let b=document.querySelector('[data-view="'+id+'"]');if(b)$('title').textContent=b.textContent; if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='plugins'||id==='tools')loadCaps();if(id==='events')loadEvents();if(id==='agent')loadAgent();if(id==='cycle')loadState();if(id==='selfImprovement')siStatus();}
+async function api(url,opt){let r=await fetch(url,opt);return r.json()}
+async function refresh(){try{let [s,g,m,e]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events')]);$('connection').textContent='متصل';$('sState').textContent=s.status||'READY';$('sGoals').textContent=g.length;$('sMem').textContent=m.length;$('sEvents').textContent=e.length;$('homeState').textContent=JSON.stringify(s,null,2)}catch(e){$('connection').textContent='غير متصل'}}
+async function sendChat(){let q=$('q').value.trim();if(!q)return;addMsg(q,'user');$('q').value='';let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});lastReply=r.reply||JSON.stringify(r);addMsg(lastReply,'assistant');refresh()}
+function addMsg(t,c){let d=document.createElement('div');d.className='msg '+c;d.textContent=t;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight}
+async function runCycle(){let r=await api('/api/run',{method:'POST'});$('cycleOut').textContent=JSON.stringify(r,null,2);addMsg(JSON.stringify(r,null,2),'assistant');refresh()}
+async function loadState(){let s=await api('/api/state');$('cycleState').textContent=JSON.stringify(s,null,2)}
+async function loadGoals(){let g=await api('/api/goals');$('goalsList').innerHTML=g.map(x=>'<div class="item"><span>'+esc(x.text)+'</span><span class="badge">'+x.status+'</span></div>').join('')||'لا توجد أهداف'}
+async function addGoal(){let t=$('goalText').value.trim();if(!t)return;await api('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,priority:.8})});$('goalText').value='';loadGoals();refresh()}
+async function loadMemory(){let m=await api('/api/memory');$('memoryList').innerHTML=m.map(x=>'<div class="item"><span>'+esc(x.key)+'</span><span class="muted">'+esc(x.value)+'</span></div>').join('')||'لا توجد ذكريات'}
+async function learn(){let t=$('lesson').value.trim();if(!t)return;await api('/api/learn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lesson:t})});$('lesson').value='';loadMemory()}
+async function loadEvents(){let e=await api('/api/events');$('eventsList').textContent=JSON.stringify(e,null,2)}
+async function loadAgent(){let a=await api('/api/agent/status');$('agentStatus').textContent=JSON.stringify(a,null,2)}
+async function loadCaps(){let c=await api('/api/capabilities');$('pluginsList').innerHTML=c.plugins.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+' <span class="badge">'+x.permission+'</span></span><span class="'+(x.enabled?'ok':'muted')+'">'+(x.enabled?'مفعل':'غير مفعل')+'</span></div>').join('');$('toolsList').innerHTML=c.tools.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+'</span><span class="badge">'+x.risk+'</span></div>').join('')}
+async function siStatus(){try{let r=await api('/api/self-improvement/status');$('siEnabled').textContent=r.enabled?'متاح':'غير مفعّل';$('siMode').textContent=r.write_requires_explicit_approval?'مراقب':'مستقل';$('siRoot').textContent=(r.allowlisted_roots||[]).join(', ')||'—';$('siApproval').textContent=r.write_requires_explicit_approval?'مطلوبة للكتابة':'غير مطلوبة';$('siOutput').textContent=JSON.stringify(r,null,2)}catch(e){$('siOutput').textContent='تعذر قراءة حالة التطوير الذاتي: '+e.message}}
+async function siPropose(){let objective=$('siObjective').value.trim();let files=$('siFiles').value.split(',').map(x=>x.trim()).filter(Boolean);if(!objective)return alert('اكتب هدف التطوير أولاً.');if(!files.length)return alert('حدد ملفاً أو أكثر داخل brain_v12/.');$('siOutput').textContent='جاري فحص الملفات وبناء اقتراح...';try{let r=await api('/api/self-improvement/propose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({objective,files})});$('siOutput').textContent=JSON.stringify(r,null,2)}catch(e){$('siOutput').textContent='فشل الطلب: '+e.message}}
+function siProposeQuick(){$('siObjective').value='فحص Brain V12 واكتشاف أصغر تطوير قابل للاختبار';$('siFiles').value='brain_v12/brain/core.py,brain_v12/brain/self_improvement.py,brain_v12/tests/test_core.py,brain_v12/tests/test_self_improvement.py';siPropose()}
+async function uploadPicked(){let f=$('mediaPick').files[0];if(f)await uploadMedia(f)}
+async function uploadMedia(f){if(!f)return;let fd=new FormData();fd.append('file',f);let r=await api('/api/media/upload',{method:'POST',body:fd});$('mediaResult').innerHTML='<div class="panel">تم الاستلام: '+esc(r.filename)+'<br>'+esc(r.content_type||'')+'</div>';if(r.url&&r.content_type?.startsWith('image/')){$('mediaResult').innerHTML+='<img class="media" src="'+r.url+'">'}else if(r.url&&r.content_type?.startsWith('video/')){$('mediaResult').innerHTML+='<video class="media" controls src="'+r.url+'"></video>'}}
+async function openCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});$('cameraVideo').srcObject=stream}catch(e){alert('لم يتم السماح بالكاميرا: '+e.message)}}
+function stopCamera(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null}
+function capture(){let v=$('cameraVideo'),c=$('snap'),i=$('shot');if(!stream)return alert('شغل الكاميرا أولاً');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);i.src=c.toDataURL('image/jpeg',.9);i.hidden=false}
+function startSpeech(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert('التعرف الصوتي غير متاح في هذا المتصفح.');let r=new SR();r.lang='ar-JO';r.interimResults=false;r.onresult=e=>{$('q').value=e.results[0][0].transcript;$('speechText').textContent=e.results[0][0].transcript;show('chat');sendChat()};r.onerror=e=>{$('speechText').textContent='خطأ: '+e.error};r.start();$('speechText').textContent='أستمع...'}
+function speakLast(){if(!lastReply)return;let u=new SpeechSynthesisUtterance(lastReply);u.lang='ar-JO';speechSynthesis.speak(u)}
+function closeModal(){$('modal').classList.remove('show')}function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+refresh();setInterval(refresh,5000);
 </script>
-</body>
-</html>
+</body></html>
