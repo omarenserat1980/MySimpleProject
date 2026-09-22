@@ -1,0 +1,19 @@
+name: Brain V12
+on:
+  push:
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/brain-v12.yml"
+  pull_request:
+    paths:
+      - "brain_v12/**"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r brain_v12/requirements.txt
+      - run: python -m unittest discover -s brain_v12/tests -v
