@@ -7,6 +7,7 @@ from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
 from .brain.orchestrator import CognitiveOrchestrator
+from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
@@ -46,6 +47,10 @@ async def media_upload(file: UploadFile = File(...)):
         f.write(data)
     store.event("MEDIA_RECEIVED",{"filename":safe,"content_type":file.content_type,"size":len(data)})
     return {"ok":True,"filename":safe,"url":f"/media/{safe}","content_type":file.content_type,"size":len(data)}
+
+@app.get("/api/capabilities")
+def capabilities():
+    return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 
 @app.get("/health")
 def health():
