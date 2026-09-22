@@ -103,6 +103,16 @@ def add_goal(body:Goal):
 def cycle():
     return brain.think()
 
+@app.post("/api/run")
+def run_cycle():
+    decision=brain.think()
+    if decision.get("status") != "DECIDING":
+        return decision
+    objective=decision.get("current_goal","")
+    plan=builder.plan("brain_v12",objective)
+    store.event("PLAN_CREATED",plan)
+    return {"status":"PLANNED","decision":decision,"plan":plan}
+
 @app.post("/api/observe")
 def observe(body:Observe):
     return brain.observe(body.actual)
@@ -123,7 +133,14 @@ def agent_status():
 def agent_execute(body:Exec):
     if not body.approved:
         return {"ok":False,"error":"EXPLICIT_APPROVAL_REQUIRED"}
+    current=brain.snapshot()
+    current["status"]="ACTING"
+    store.set_state(current)
+    store.event("ACTION_STARTED",{"command":body.command})
     result=agent.execute(body.command,body.cwd,body.timeout)
+    current=brain.snapshot()
+    current.update({"status":"OBSERVING","last_action":body.command,"last_result":result})
+    store.set_state(current)
     store.event("AGENT_EXECUTION",{"command":body.command,"result":result})
     return result
 
