@@ -1,7 +1,8 @@
 """Bounded bridge from the cognitive brain to the local Agent.
 
-The brain may execute only registered, non-destructive terminal tasks. Tasks are
-represented as argv lists; no shell=True or shell strings are accepted.
+The brain can perform a broader set of workspace-safe terminal actions while
+the Agent remains authenticated and subject to its configured command policy.
+No shell=True is used.
 """
 import os
 from typing import Any
@@ -18,24 +19,18 @@ SAFE_ACTIONS = {
     "inspect": ["python", "-c", "print('Electronic Brain Agent inspection OK')"],
     "termux_pwd": ["pwd"],
     "termux_list": ["ls", "-la"],
+    "workspace_tree": ["find", ".", "-maxdepth", "2", "-type", "f"],
     "python_help": ["python", "-c", "print('Python execution bridge OK')"],
+    "pytest_collect": ["pytest", "--collect-only", "-q"],
 }
 
-def execute_action(action: str, state: dict[str, Any]) -> dict[str, Any]:
+def execute_action(action: str, state: dict[str, Any] | None = None) -> dict[str, Any]:
+    state = state or {}
     command = SAFE_ACTIONS.get(action)
     if command is None:
-        return {
-            "status": "PROPOSED",
-            "action": action,
-            "reason": "ACTION_NOT_REGISTERED",
-        }
-
+        return {"status": "PROPOSED", "action": action, "reason": "ACTION_NOT_REGISTERED"}
     if not AGENT_TOKEN:
-        return {
-            "status": "PROPOSED",
-            "action": action,
-            "reason": "AGENT_TOKEN_NOT_CONFIGURED",
-        }
+        return {"status": "PROPOSED", "action": action, "reason": "AGENT_TOKEN_NOT_CONFIGURED"}
 
     timeout = max(1, min(int(state.get("timeout", 30)), 60))
     try:
@@ -54,29 +49,15 @@ def execute_action(action: str, state: dict[str, Any]) -> dict[str, Any]:
             "result": data,
         }
     except Exception as exc:
-        return {
-            "status": "FAILED",
-            "action": action,
-            "command": command,
-            "error": str(exc),
-        }
+        return {"status": "FAILED", "action": action, "command": command, "error": str(exc)}
 
 
 def execute_task(actions: list[str], state: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Execute a bounded sequence and stop on the first failure."""
     state = state or {}
     results = []
-    for index, action in enumerate(actions):
+    for index, action in enumerate(actions[:8]):
         result = execute_action(action, state)
         results.append({"step": index + 1, **result})
         if result.get("status") != "EXECUTED":
-            return {
-                "status": "FAILED",
-                "completed_steps": index,
-                "results": results,
-            }
-    return {
-        "status": "COMPLETED",
-        "completed_steps": len(results),
-        "results": results,
-    }
+            return {"status": "FAILED", "completed_steps": index, "results": results}
+    return {"status": "COMPLETED", "completed_steps": len(results), "results": results}
