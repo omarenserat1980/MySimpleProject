@@ -8,6 +8,8 @@ import os
 from typing import Any
 import httpx
 
+from .wan_video import generate_video
+
 AGENT_URL = os.getenv("AGENT_URL", "http://127.0.0.1:9000").rstrip("/")
 AGENT_TOKEN = os.getenv("AGENT_TOKEN", "")
 AGENT_TIMEOUT = float(os.getenv("AGENT_TIMEOUT", "35"))
@@ -21,12 +23,19 @@ SAFE_ACTIONS = {
     "termux_list": ["ls", "-la"],
     "workspace_tree": ["find", ".", "-maxdepth", "2", "-type", "f"],
     "python_help": ["python", "-c", "print('Python execution bridge OK')"],
+    "video_generate": None,
     "pytest_collect": ["pytest", "--collect-only", "-q"],
 }
 
 def execute_action(action: str, state: dict[str, Any] | None = None) -> dict[str, Any]:
     state = state or {}
     command = SAFE_ACTIONS.get(action)
+    if action == "video_generate":
+        prompt = str(state.get("video_prompt") or state.get("objective") or "").strip()
+        if not prompt:
+            return {"status": "PROPOSED", "action": action, "reason": "VIDEO_PROMPT_REQUIRED"}
+        result = generate_video(prompt, state.get("video_size"))
+        return {"status": "EXECUTED" if result.get("status") == "QUEUED" else result.get("status", "FAILED"), "action": action, "result": result}
     if command is None:
         return {"status": "PROPOSED", "action": action, "reason": "ACTION_NOT_REGISTERED"}
     if not AGENT_TOKEN:
