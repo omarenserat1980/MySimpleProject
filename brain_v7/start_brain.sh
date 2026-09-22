@@ -32,16 +32,29 @@ export AGENT_TOKEN="$TOKEN"
 export AGENT_URL="http://127.0.0.1:9000"
 export AGENT_PORT="9000"
 export PORT="8000"
+export RELAY_ID="${RELAY_ID:-android-brain-01}"
 
 echo "Agent: $AGENT_URL"
 echo "Brain: http://127.0.0.1:8000"
+if [ -n "${RELAY_URL:-}" ] && [ -n "${RELAY_TOKEN:-}" ]; then
+  echo "Relay: $RELAY_URL ($RELAY_ID)"
+else
+  echo "Relay: disabled (set RELAY_URL and RELAY_TOKEN to enable)"
+fi
 echo "اضغط Ctrl+C لإيقاف العقل."
 
 python run_agent.py &
 AGENT_PID=$!
 
+RELAY_PID=""
+if [ -n "${RELAY_URL:-}" ] && [ -n "${RELAY_TOKEN:-}" ]; then
+  python -m braincore_v2.relay_client &
+  RELAY_PID=$!
+fi
+
 cleanup() {
   kill "$AGENT_PID" 2>/dev/null || true
+  if [ -n "$RELAY_PID" ]; then kill "$RELAY_PID" 2>/dev/null || true; fi
 }
 trap cleanup EXIT INT TERM
 
