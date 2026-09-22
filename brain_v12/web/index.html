@@ -20,7 +20,7 @@
 <button data-view="media">🖼️ الصور والملفات</button><button data-view="camera">📷 الكاميرا</button><button data-view="video">🎬 الفيديو</button><button data-view="voice">🎙️ الصوت</button><button data-view="ai">🤖 AI Gateway</button>
 </div>
 <div class="menuTitle">الأدوات والنظام</div><div class="nav">
-<button data-view="plugins">🔌 المكونات الإضافية</button><button data-view="tools">🛠️ الأدوات</button><button data-view="agent">⚙️ الوكيل والتنفيذ</button><button data-view="events">📊 سجل الأحداث</button><button data-view="settings">⚙️ الإعدادات</button>
+<button data-view="plugins">🔌 المكونات الإضافية</button><button data-view="tools">🛠️ الأدوات</button><button data-view="agent">⚙️ الوكيل والتنفيذ</button><button data-view="selfImprovement">🔄 التطوير الذاتي</button><button data-view="events">📊 سجل الأحداث</button><button data-view="settings">⚙️ الإعدادات</button>
 </div>
 </aside>
 <main class="main">
@@ -57,14 +57,48 @@
 
 <section id="agent" class="view"><div class="grid"><div class="card span6"><h2>⚙️ الوكيل Agent</h2><pre id="agentStatus">—</pre></div><div class="card span6"><h2>🔐 تنفيذ آمن</h2><p>التنفيذ الخارجي يحتاج موافقة صريحة، ويظل داخل الـ sandbox والأوامر المسموحة.</p><button onclick="loadAgent()">فحص الوكيل</button></div></div></section>
 
-<section id="events" class="view"><div class="card"><h2>📊 سجل الأحداث</h2><pre id="eventsList">—</pre></div></section>
+<section id="selfImprovement" class="view">
+<div class="grid">
+<div class="card span8">
+<h2>🔄 مركز التطوير الذاتي</h2>
+<div class="stats">
+<div class="stat">الحالة<b id="siEnabled">—</b></div>
+<div class="stat">الوضع<b id="siMode">—</b></div>
+<div class="stat">النطاق<b id="siRoot">—</b></div>
+<div class="stat">الموافقة<b id="siApproval">—</b></div>
+</div>
+<br>
+<div class="panel">
+<h3>🎯 اطلب من العقل تطوير نفسه</h3>
+<input id="siObjective" placeholder="مثلاً: تحسين دورة القرار واختبارها" style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px">
+<br><br>
+<input id="siFiles" placeholder="الملفات (مفصولة بفاصلة) — مثال: brain_v12/brain/core.py,brain_v12/tests/test_core.py" style="width:100%;padding:12px;background:#091524;color:white;border:1px solid var(--line);border-radius:10px">
+<div class="tools">
+<button onclick="siPropose()">🧠 حلّل واقترح</button>
+<button class="secondary" onclick="siStatus()">🔄 تحديث الحالة</button>
+</div>
+</div>
+<br>
+<pre id="siOutput">لم تبدأ دورة تطوير بعد.</pre>
+</div>
+<div class="card span4">
+<h3>⚡ التحكم</h3>
+<div class="list">
+<button onclick="siProposeQuick()">🚀 فحص Brain V12 واقتراح تطوير</button>
+<button class="secondary" onclick="show('events')">📊 مشاهدة سجل التطوير</button>
+</div>
+<hr style="border-color:var(--line);border-width:1px 0 0">
+<p class="muted">هذه الواجهة تتحكم في محرك التطوير الذاتي الحالي. الكتابة الفعلية على المستودع ما زالت محكومة بحدود وصلاحيات واضحة.</p>
+</div>
+</div>
+</section><section id="events" class="view"><div class="card"><h2>📊 سجل الأحداث</h2><pre id="eventsList">—</pre></div></section>
 
 <section id="settings" class="view"><div class="grid"><div class="card span6"><h2>⚙️ إعدادات النظام</h2><div class="list"><div class="item">🧠 Core <span class="badge">V12</span></div><div class="item">🔒 Execution <span class="badge">Approval + Sandbox</span></div><div class="item">📷 Camera <span class="badge">Browser Permission</span></div><div class="item">🎙️ Microphone <span class="badge">Browser Permission</span></div><div class="item">🤖 AI <span class="badge">Gateway</span></div></div></div><div class="card span6"><h2>🔌 الموصلات</h2><p>يمكن ربط مزودي AI والأدوات الخارجية عبر Plugins/Gateway. مفاتيح الخدمات تحفظ خارج الواجهة.</p></div></div></section>
 </main></div>
 <div id="modal" class="modal"><div class="box"><button class="secondary" onclick="closeModal()">إغلاق</button><pre id="modalText"></pre></div></div>
 <script>
 const $=id=>document.getElementById(id);let lastReply='',stream=null;
-function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));let b=document.querySelector('[data-view="'+id+'"]');if(b)$('title').textContent=b.textContent; if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='plugins'||id==='tools')loadCaps();if(id==='events')loadEvents();if(id==='agent')loadAgent();if(id==='cycle')loadState();}
+function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));let b=document.querySelector('[data-view="'+id+'"]');if(b)$('title').textContent=b.textContent; if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='plugins'||id==='tools')loadCaps();if(id==='events')loadEvents();if(id==='agent')loadAgent();if(id==='cycle')loadState();if(id==='selfImprovement')siStatus();}
 async function api(url,opt){let r=await fetch(url,opt);return r.json()}
 async function refresh(){try{let [s,g,m,e]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events')]);$('connection').textContent='متصل';$('sState').textContent=s.status||'READY';$('sGoals').textContent=g.length;$('sMem').textContent=m.length;$('sEvents').textContent=e.length;$('homeState').textContent=JSON.stringify(s,null,2)}catch(e){$('connection').textContent='غير متصل'}}
 async function sendChat(){let q=$('q').value.trim();if(!q)return;addMsg(q,'user');$('q').value='';let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});lastReply=r.reply||JSON.stringify(r);addMsg(lastReply,'assistant');refresh()}
@@ -78,6 +112,9 @@ async function learn(){let t=$('lesson').value.trim();if(!t)return;await api('/a
 async function loadEvents(){let e=await api('/api/events');$('eventsList').textContent=JSON.stringify(e,null,2)}
 async function loadAgent(){let a=await api('/api/agent/status');$('agentStatus').textContent=JSON.stringify(a,null,2)}
 async function loadCaps(){let c=await api('/api/capabilities');$('pluginsList').innerHTML=c.plugins.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+' <span class="badge">'+x.permission+'</span></span><span class="'+(x.enabled?'ok':'muted')+'">'+(x.enabled?'مفعل':'غير مفعل')+'</span></div>').join('');$('toolsList').innerHTML=c.tools.map(x=>'<div class="item"><span>'+x.icon+' '+x.name+'</span><span class="badge">'+x.risk+'</span></div>').join('')}
+async function siStatus(){try{let r=await api('/api/self-improvement/status');$('siEnabled').textContent=r.enabled?'متاح':'غير مفعّل';$('siMode').textContent=r.write_requires_explicit_approval?'مراقب':'مستقل';$('siRoot').textContent=(r.allowlisted_roots||[]).join(', ')||'—';$('siApproval').textContent=r.write_requires_explicit_approval?'مطلوبة للكتابة':'غير مطلوبة';$('siOutput').textContent=JSON.stringify(r,null,2)}catch(e){$('siOutput').textContent='تعذر قراءة حالة التطوير الذاتي: '+e.message}}
+async function siPropose(){let objective=$('siObjective').value.trim();let files=$('siFiles').value.split(',').map(x=>x.trim()).filter(Boolean);if(!objective)return alert('اكتب هدف التطوير أولاً.');if(!files.length)return alert('حدد ملفاً أو أكثر داخل brain_v12/.');$('siOutput').textContent='جاري فحص الملفات وبناء اقتراح...';try{let r=await api('/api/self-improvement/propose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({objective,files})});$('siOutput').textContent=JSON.stringify(r,null,2)}catch(e){$('siOutput').textContent='فشل الطلب: '+e.message}}
+function siProposeQuick(){$('siObjective').value='فحص Brain V12 واكتشاف أصغر تطوير قابل للاختبار';$('siFiles').value='brain_v12/brain/core.py,brain_v12/brain/self_improvement.py,brain_v12/tests/test_core.py,brain_v12/tests/test_self_improvement.py';siPropose()}
 async function uploadPicked(){let f=$('mediaPick').files[0];if(f)await uploadMedia(f)}
 async function uploadMedia(f){if(!f)return;let fd=new FormData();fd.append('file',f);let r=await api('/api/media/upload',{method:'POST',body:fd});$('mediaResult').innerHTML='<div class="panel">تم الاستلام: '+esc(r.filename)+'<br>'+esc(r.content_type||'')+'</div>';if(r.url&&r.content_type?.startsWith('image/')){$('mediaResult').innerHTML+='<img class="media" src="'+r.url+'">'}else if(r.url&&r.content_type?.startsWith('video/')){$('mediaResult').innerHTML+='<video class="media" controls src="'+r.url+'"></video>'}}
 async function openCamera(){try{stream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});$('cameraVideo').srcObject=stream}catch(e){alert('لم يتم السماح بالكاميرا: '+e.message)}}
