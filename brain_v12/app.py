@@ -11,15 +11,17 @@ from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
+from .brain.openai_provider import OpenAIProvider
 from .brain.plugin_manager import PluginManager
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
-cognitive=CognitiveLoop(store); ai=AIGateway(); plugins=PluginManager()
-for p in PLUGINS: plugins.register(p,p,p,"")
-app=FastAPI(title="Electronic Brain V12",version="12.1")
+cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
+for p in PLUGINS: plugins.register(p,p,[],[])
+
+app=FastAPI(title="Electronic Brain V12",version="12.2")
 
 class Chat(BaseModel): message:str
 class Goal(BaseModel): text:str; priority:float=0.5
@@ -41,11 +43,16 @@ async def media_upload(file:UploadFile=File(...)):
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/health")
-def health(): return {"ok":True,"brain":"V12","version":"12.1","systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway"]}
+def health(): return {"ok":True,"brain":"V12","version":"12.2","systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt"]}
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
 def messages(): return store.messages()
+
+def chatgpt_reply(message):
+    recent=store.messages()[-12:]
+    context="\n".join(f"{m.get('role','')}: {m.get('content','')}" for m in recent)
+    return openai_provider.respond(message,context)
 
 @app.post("/api/chat")
 def chat(body:Chat):
@@ -56,13 +63,21 @@ def chat(body:Chat):
     if not goal: store.add_goal(message,.8); goal=store.active_goal()
     loop=cognitive.run(goal["text"])
     selected=loop["decision"].get("selected",{})
-    reply=("تم تشغيل الحلقة المعرفية.\n"
-           f"الهدف: {goal['text']}\n"
-           f"الحالة: {loop['decision']['status']}\n"
-           f"القرار: {selected.get('action','انتظار/موافقة')}\n"
-           f"السبب: {loop['decision'].get('reason','—')}")
+
+    ai_result=chatgpt_reply(message)
+    if ai_result.get("ok"):
+        reply=ai_result["reply"]
+        source="chatgpt"
+    else:
+        reply=("تم تشغيل الحلقة المعرفية.\n"
+               f"الهدف: {goal['text']}\n"
+               f"الحالة: {loop['decision']['status']}\n"
+               f"القرار: {selected.get('action','انتظار/موافقة')}\n"
+               f"السبب: {loop['decision'].get('reason','—')}")
+        source="cognitive_fallback"
     store.add_message("assistant",reply)
-    return {"ok":True,"reply":reply,"cognitive":loop}
+    store.event("AI_RESPONSE",{"provider":source})
+    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
 
 @app.get("/api/memory")
 def memory(): return store.memories()
@@ -106,9 +121,14 @@ def revoke(body:Permission): return {"grants":cognitive.permissions.revoke(body.
 def permission_check(capabilities:list[str],approved:bool=False): return cognitive.permissions.check(capabilities,approved)
 
 @app.get("/api/ai/status")
-def ai_status(): return {"providers":ai.status(),"configured":False}
+def ai_status(): return {"providers":ai.status(),"openai":openai_provider.status()}
 @app.post("/api/ai/invoke")
 def ai_invoke(provider:str,modality:str,payload:dict): return ai.invoke(provider,modality,payload)
+@app.post("/api/ai/chat")
+def ai_chat(body:Chat):
+    result=chatgpt_reply(body.message.strip())
+    if result.get("ok"): store.add_message("assistant",result["reply"])
+    return result
 
 @app.get("/api/plugins")
 def plugin_status(): return plugins.status()
