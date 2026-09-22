@@ -1,5 +1,5 @@
 """Outcome-driven learning layer for the autonomous loop."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 @dataclass
@@ -20,12 +20,25 @@ class AdaptiveLearning:
         self.predictions: dict[str, Any] = {}
 
     @staticmethod
-    def error(expected: Any, actual: Any) -> float:
+    def _execution_success(actual: Any) -> bool:
+        return isinstance(actual, dict) and actual.get("status") == "EXECUTED"
+
+    @classmethod
+    def error(cls, expected: Any, actual: Any) -> float:
+        # Without an explicit expectation, successful execution is the expected outcome.
+        if expected is None:
+            return 0.0 if cls._execution_success(actual) else 1.0
+
         if expected == actual:
             return 0.0
+
         if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
             scale = max(1.0, abs(float(expected)))
             return min(1.0, abs(float(actual) - float(expected)) / scale)
+
+        if cls._execution_success(actual):
+            return 0.0
+
         return 1.0
 
     def learn(self, *, goal_id: str, action: str, expected: Any,
@@ -34,7 +47,14 @@ class AdaptiveLearning:
         reward = 1.0 - err
         old = self.action_values.get(action, 0.0)
         self.action_values[action] = old + 0.2 * (reward - old)
-        lesson = "success" if err == 0 else ("partial_success" if err < 0.5 else "needs_revision")
+
+        if err == 0:
+            lesson = "success"
+        elif err < 0.5:
+            lesson = "partial_success"
+        else:
+            lesson = "needs_revision"
+
         exp = Experience(goal_id, action, expected, actual, err, reward, lesson, cycle)
         self.experiences.append(exp)
         return exp
