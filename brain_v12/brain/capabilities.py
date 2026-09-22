@@ -15,6 +15,21 @@ CAPABILITIES = [
     {"id":"files","name":"الملفات","icon":"📁","category":"tools","status":"ready"},
     {"id":"memory","name":"الذاكرة","icon":"🧠","category":"cognitive","status":"ready"},
     {"id":"planner","name":"التخطيط والقرار","icon":"🎯","category":"cognitive","status":"ready"},
+    {"id":"flight","name":"الطيران والمحاكاة الجوية","icon":"✈️","category":"simulation","status":"safe"},
+    {"id":"robotics","name":"الروبوتات والتحكم","icon":"🤖","category":"engineering","status":"safe"},
+    {"id":"cybersecurity","name":"الأمن السيبراني الدفاعي","icon":"🛡️","category":"security","status":"safe"},
+    {"id":"ethical_hacking_lab","name":"مختبر الاختبار الأمني المصرح","icon":"🔐","category":"security","status":"sandbox"},
+    {"id":"network_diagnostics","name":"تشخيص الشبكات","icon":"🌐","category":"security","status":"safe"},
+    {"id":"digital_forensics","name":"التحليل الجنائي الرقمي","icon":"🔎","category":"security","status":"safe"},
+    {"id":"time_simulation","name":"محاكاة السفر عبر الزمن","icon":"⏳","category":"simulation","status":"simulation"},
+    {"id":"future_scenarios","name":"محاكاة السيناريوهات المستقبلية","icon":"🔮","category":"simulation","status":"simulation"},
+    {"id":"science_simulation","name":"المحاكاة العلمية","icon":"🧪","category":"science","status":"safe"},
+    {"id":"computer_vision","name":"الرؤية الحاسوبية","icon":"👁️","category":"ai","status":"provider"},
+    {"id":"multimodal_reasoning","name":"الاستدلال متعدد الوسائط","icon":"🧩","category":"ai","status":"provider"},
+    {"id":"automation","name":"الأتمتة وسير العمل","icon":"⚡","category":"tools","status":"sandbox"},
+    {"id":"data_analysis","name":"تحليل البيانات","icon":"📊","category":"tools","status":"ready"},
+    {"id":"translation","name":"الترجمة متعددة اللغات","icon":"🌍","category":"ai","status":"ready"},
+    {"id":"document_ai","name":"فهم المستندات","icon":"📄","category":"ai","status":"provider"},
 ]
 
 PLUGINS = [
