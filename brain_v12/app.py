@@ -105,17 +105,11 @@ def cycle():
 
 @app.post("/api/run")
 def run_cycle():
-    decision=brain.think()
-    if decision.get("status") != "DECIDING":
-        return decision
-    objective=decision.get("current_goal","")
-    plan=builder.plan("brain_v12",objective)
-    store.event("PLAN_CREATED",plan)
-    return {"status":"PLANNED","decision":decision,"plan":plan}
+    return orchestrator.run("brain_v12")
 
 @app.post("/api/observe")
 def observe(body:Observe):
-    return brain.observe(body.actual)
+    return orchestrator.observe_and_learn(body.actual)
 
 @app.post("/api/learn")
 def learn(body:Learn):
