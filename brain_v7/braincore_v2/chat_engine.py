@@ -1,8 +1,8 @@
-"""Arabic conversational layer for the Electronic Brain.
+"""Arabic intent and conversation layer for the Electronic Brain V8.3.
 
-V8.2 adds broader deterministic Arabic understanding without pretending to be an
-LLM. It classifies common conversational intents, keeps short-term context, and
-routes safe known actions through the cognitive orchestrator.
+This layer remains deterministic and local. It normalizes common Arabic variants,
+uses intent patterns instead of exact sentences, preserves short-term context,
+and routes only known safe actions to the cognitive orchestrator.
 """
 from collections import deque
 from typing import Any
@@ -15,36 +15,111 @@ class BrainChat:
         self.turns = 0
 
     @staticmethod
+    def _normalize(text: str) -> str:
+        t = text.strip().lower()
+        replacements = {
+            "أ": "ا", "إ": "ا", "آ": "ا",
+            "ى": "ي", "ة": "ه",
+            "ؤ": "و", "ئ": "ي",
+            "ـ": "",
+            "؟": " ", "?": " ", "!": " ", "،": " ", ",": " ",
+            "؛": " ", ";": " ", ":": " ",
+        }
+        for old, new in replacements.items():
+            t = t.replace(old, new)
+        return " ".join(t.split())
+
+    @staticmethod
     def _has_any(text: str, phrases: tuple[str, ...]) -> bool:
         return any(p in text for p in phrases)
 
     @classmethod
     def _intent(cls, text: str):
-        t = " ".join(text.strip().lower().split())
+        t = cls._normalize(text)
 
-        if cls._has_any(t, ("مرحبا", "السلام عليكم", "هلا", "اهلا", "أهلا", "صباح الخير", "مساء الخير")):
+        if cls._has_any(t, (
+            "مرحبا", "السلام عليكم", "هلا", "اهلا", "صباح الخير", "مساء الخير"
+        )):
             return "greeting", None
-        if cls._has_any(t, ("من أنت", "مين انت", "مين إنت", "ما أنت", "شو أنت", "ما هو العقل الإلكتروني")):
+
+        if cls._has_any(t, (
+            "من انت", "مين انت", "ما انت", "شو انت",
+            "ما هو العقل الالكتروني", "احكيلي عن نفسك"
+        )):
             return "identity", None
-        if cls._has_any(t, ("حالة النظام", "وضع النظام", "حالتك", "كيف حالك", "status")):
+
+        if cls._has_any(t, (
+            "حاله النظام", "وضع النظام", "حالتك", "كيف حالك",
+            "شو وضعك", "كيف وضعك", "status"
+        )):
             return "status", None
-        if cls._has_any(t, ("ماذا تستطيع", "شو بتقدر", "شو تستطيع", "قدراتك", "ماذا يمكنك", "شو ممكن تعمل")):
+
+        if cls._has_any(t, (
+            "ماذا تستطيع", "شو بتقدر", "شو تستطيع", "قدراتك",
+            "ماذا يمكنك", "شو ممكن تعمل", "ايش بتقدر تعمل"
+        )):
             return "capabilities", None
-        if cls._has_any(t, ("هل تستطيع تطوير نفسك", "تطور نفسك", "تطوير نفسك", "تطور حالك", "تحسن نفسك")):
+
+        if cls._has_any(t, (
+            "هل تستطيع تطوير نفسك", "تطور نفسك", "تطوير نفسك",
+            "تطور حالك", "تحسن نفسك", "تقدر تطور نفسك",
+            "كيف تطور نفسك"
+        )):
             return "self_improvement", None
-        if cls._has_any(t, ("ماذا ينقصك", "شو ناقصك", "ما الذي ينقصك", "نقاط ضعفك")):
+
+        if cls._has_any(t, (
+            "ماذا ينقصك", "شو ناقصك", "ما الذي ينقصك",
+            "نقاط ضعفك", "شو ناقص", "ما هي نواقصك"
+        )):
             return "gaps", None
-        if cls._has_any(t, ("ذاكرتك", "ماذا تتذكر", "شو بتتذكر", "ماذا حفظت")):
+
+        if cls._has_any(t, (
+            "ذاكرتك", "ماذا تتذكر", "شو بتتذكر",
+            "ماذا حفظت", "شو محفوظ بذاكرتك", "شو بتعرف عني"
+        )):
             return "memory", None
-        if cls._has_any(t, ("خطة التطوير", "كيف نطورك", "كيف أطورك", "ماذا أطلب من شات جي بي تي",
-                             "ماذا اطلب من شات جي تي بي", "شو أطلب من شات جي بي تي")):
+
+        # Flexible detection for requests about using ChatGPT to develop the brain.
+        has_ai = cls._has_any(t, (
+            "شات جي بي تي", "شات جيتي بي", "chatgpt",
+            "تشات جي بي تي", "شات جي تي بي"
+        ))
+        has_dev = cls._has_any(t, (
+            "اطلب", "اسال", "احكي", "اكتب", "اعطي",
+            "طور", "تطوير", "برومبت", "تعليمات"
+        ))
+        if (
+            cls._has_any(t, ("خطة التطوير", "كيف نطورك", "كيف اطورك"))
+            or (has_ai and has_dev)
+            or cls._has_any(t, ("ماذا اطلب لتطويرك", "شو اطلب لتطويرك",
+                                 "ماذا اطلب منك لتطويرك", "شو اطلب من شات"))
+        ):
             return "development_plan", None
+
+        # Contextual follow-up: if the previous user message was about development,
+        # short follow-ups such as "طيب شو اطلب؟" remain in that topic.
+        recent_users = []
+        for item in reversed(getattr(cls, "_context_history", [])):
+            if item.get("role") == "user":
+                recent_users.append(cls._normalize(item.get("content", "")))
+            if len(recent_users) >= 3:
+                break
+        if recent_users and cls._has_any(t, ("شو اطلب", "ماذا اطلب", "طيب شو", "كيف نبدأ")):
+            if any(cls._has_any(x, ("تطوير", "طور", "تطور", "شات جي بي تي", "نطور"))
+                   for x in recent_users):
+                return "development_plan", None
+
         if cls._has_any(t, ("بايثون", "python")):
             return "action", "python_version"
-        if cls._has_any(t, ("git status", "حالة git", "حالة المستودع", "المستودع")):
+
+        if cls._has_any(t, (
+            "git status", "حاله git", "حاله المستودع", "المستودع"
+        )):
             return "action", "git_status"
+
         if cls._has_any(t, ("افحص", "فحص", "تحقق", "inspect")):
             return "action", "inspect"
+
         return "conversation", None
 
     def _status_reply(self) -> tuple[str, dict[str, Any]]:
@@ -60,35 +135,47 @@ class BrainChat:
     def respond(self, text: str) -> dict[str, Any]:
         text = text.strip()
         if not text:
-            return {"status": "EMPTY", "reply": "احكيلي شو بدك أعمل.", "history": list(self.history)}
+            return {
+                "status": "EMPTY",
+                "reply": "احكيلي شو بدك أعمل.",
+                "history": list(self.history),
+            }
 
         self.turns += 1
         self.history.append({"role": "user", "content": text})
+
+        # Give intent classification access to the current short-term context.
+        type(self)._context_history = list(self.history)
         intent, action = self._intent(text)
 
         if intent == "greeting":
-            reply = "وعليكم السلام 👋 أنا العقل الإلكتروني. جاهز للحوار والتعلم والتنفيذ ضمن الصلاحيات المسموحة."
+            reply = (
+                "وعليكم السلام 👋 أنا العقل الإلكتروني. "
+                "جاهز للحوار والتعلم والتنفيذ ضمن الصلاحيات المسموحة."
+            )
             result = {"status": "CHAT", "intent": intent}
 
         elif intent == "identity":
             reply = (
-                "أنا العقل الإلكتروني الذي نبنيه في مشروعك. أعمل حاليًا محليًا عبر Python وFastAPI، "
-                "ولدي طبقات للأهداف والتخطيط والتنفيذ والتعلم والتحسين. لكنني لست نموذجًا لغويًا عامًا بعد."
+                "أنا العقل الإلكتروني الذي نبنيه في مشروعك. أعمل حاليًا محليًا عبر "
+                "Python وFastAPI، ولدي طبقات للأهداف والتخطيط والتنفيذ والتعلم والتحسين. "
+                "لكنني لست نموذجًا لغويًا عامًا بعد."
             )
             result = {"status": "CHAT", "intent": intent}
 
         elif intent == "capabilities":
             reply = (
-                "أستطيع حاليًا إدارة أهداف وخطط محدودة، تنفيذ أفعال مسموحة عبر الـAgent، "
-                "تسجيل التجارب والتعلم من نجاح التنفيذ أو فشله، وفحص حالتي. "
-                "أما الحوار الحر والفهم العام، فنحتاج لاحقًا إلى ربط نموذج لغوي حقيقي."
+                "أستطيع حاليًا إدارة أهداف وخطط محدودة، وتنفيذ أفعال مسموحة عبر الـAgent، "
+                "وتسجيل التجارب والتعلم من النتائج، وفحص حالتي. "
+                "أما الفهم الحر الواسع للحوار فيحتاج إلى نموذج لغوي حقيقي."
             )
             result = {"status": "CHAT", "intent": intent}
 
         elif intent == "self_improvement":
             reply = (
-                "نعم، أستطيع المشاركة في تطوير نفسي لكن بشكل مضبوط: أكتشف نقصًا، أقترح تحسينًا، "
-                "نختبره، نقيس النتيجة، ثم نحفظ الدرس. حاليًا لا أعدل كودي عشوائيًا من تلقاء نفسي."
+                "نعم، أستطيع المشاركة في تطوير نفسي بشكل مضبوط: أكتشف نقصًا، "
+                "أقترح تحسينًا، نختبره، نقيس النتيجة، ثم نحفظ الدرس. "
+                "حاليًا لا أعدل كودي عشوائيًا من تلقاء نفسي."
             )
             result = {"status": "CHAT", "intent": intent}
 
@@ -103,18 +190,19 @@ class BrainChat:
             recent = [x for x in self.history if x["role"] == "user"][-5:]
             topics = " | ".join(x["content"] for x in recent)
             reply = (
-                f"ذاكرتي الحالية قصيرة ومحدودة داخل جلسة التشغيل. أتذكر آخر الرسائل في هذه الجلسة، "
-                f"ومنها: {topics}. الذاكرة الدائمة لم تُبنَ بعد."
+                "ذاكرتي الحالية قصيرة ومحدودة داخل جلسة التشغيل. أتذكر آخر الرسائل "
+                f"في هذه الجلسة، ومنها: {topics}. الذاكرة الدائمة لم تُبنَ بعد."
             )
             result = {"status": "CHAT", "intent": intent, "recent_user_messages": recent}
 
         elif intent == "development_plan":
             reply = (
-                "اطلب من ChatGPT تطويري على مراحل: "
-                "1) محرك حوار عربي حقيقي، 2) ذاكرة طويلة المدى، "
-                "3) مخطط مهام متعدد الخطوات، 4) أدوات تنفيذ آمنة، "
-                "5) تقييم واختبارات تلقائية، 6) دورة تحسين ذاتي مقيدة مع سجل وتراجع. "
-                "وهذا بالضبط المسار الذي نستطيع تنفيذه الآن."
+                "اطلب من ChatGPT تطويري على مراحل، وليس تعديل الكود عشوائيًا. "
+                "ابدأ بهذا الطلب: «طوّر العقل الإلكتروني V8.3 ليصبح محرك حوار عربي "
+                "يفهم النية والسياق، ثم اربطه لاحقًا بنموذج لغوي حقيقي، مع ذاكرة طويلة "
+                "المدى، تخطيط متعدد الخطوات، أدوات تنفيذ آمنة، اختبارات تلقائية، "
+                "سجل للتغييرات، وتراجع عند الفشل». "
+                "بعد كل تعديل نختبره على الجهاز قبل الانتقال للمرحلة التالية."
             )
             result = {"status": "CHAT", "intent": intent}
 
@@ -143,9 +231,10 @@ class BrainChat:
 
         else:
             reply = (
-                "فهمت أنك تتحدث معي بشكل طبيعي. أستطيع الآن فهم مجموعة أوسع من الأسئلة عن هويتي "
-                "وقدراتي وتطويري وحالتي، لكنني ما زلت بلا نموذج لغوي عام؛ لذلك لن أخترع إجابة. "
-                "إذا أردت فهمًا أوسع للحوار، فالخطوة التالية هي ربط محرك لغوي حقيقي."
+                "أفهم أنك تتحدث معي بشكل طبيعي. أستطيع حاليًا فهم عدة نوايا عربية "
+                "والاحتفاظ بسياق قصير، لكنني ما زلت بلا نموذج لغوي عام. "
+                "إذا كان طلبك مهمة تنفيذية، اذكر الهدف بوضوح وسأحوله إلى فعل معروف "
+                "إذا كان ضمن الصلاحيات."
             )
             result = {"status": "CHAT", "intent": intent, "action": None}
 
