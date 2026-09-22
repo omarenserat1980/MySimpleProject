@@ -6,6 +6,7 @@ and routes only known safe actions to the cognitive orchestrator.
 """
 from collections import deque
 from typing import Any
+from .llm_provider import LLMProvider
 
 
 class BrainChat:
@@ -13,6 +14,7 @@ class BrainChat:
         self.orchestrator = orchestrator
         self.history = deque(maxlen=60)
         self.turns = 0
+        self.llm = LLMProvider()
 
     @staticmethod
     def _normalize(text: str) -> str:
@@ -230,13 +232,41 @@ class BrainChat:
             }
 
         else:
-            reply = (
-                "أفهم أنك تتحدث معي بشكل طبيعي. أستطيع حاليًا فهم عدة نوايا عربية "
-                "والاحتفاظ بسياق قصير، لكنني ما زلت بلا نموذج لغوي عام. "
-                "إذا كان طلبك مهمة تنفيذية، اذكر الهدف بوضوح وسأحوله إلى فعل معروف "
-                "إذا كان ضمن الصلاحيات."
-            )
-            result = {"status": "CHAT", "intent": intent, "action": None}
+            context = [
+                {"role": "system", "content": (
+                    "أنت طبقة الحوار في العقل الإلكتروني. أجب بالعربية بوضوح وباختصار. "
+                    "لا تدّع تنفيذ أفعال لم ينفذها النظام فعليًا. "
+                    "لا تمنح نفسك صلاحيات جديدة ولا تغيّر النظام من خلال الحوار."
+                )}
+            ]
+            for item in list(self.history)[-12:]:
+                context.append({
+                    "role": item["role"],
+                    "content": item["content"],
+                })
+
+            llm_reply = self.llm.reply(context)
+            if llm_reply:
+                reply = llm_reply
+                result = {
+                    "status": "LLM_CHAT",
+                    "intent": intent,
+                    "action": None,
+                    "llm": self.llm.status(),
+                }
+            else:
+                reply = (
+                    "أفهم أنك تتحدث معي بشكل طبيعي. أستطيع حاليًا فهم عدة نوايا عربية "
+                    "والاحتفاظ بسياق قصير، لكن محرك اللغة العام غير مهيأ أو غير متاح الآن. "
+                    "إذا كان طلبك مهمة تنفيذية، اذكر الهدف بوضوح وسأحوله إلى فعل معروف "
+                    "إذا كان ضمن الصلاحيات."
+                )
+                result = {
+                    "status": "CHAT",
+                    "intent": intent,
+                    "action": None,
+                    "llm": self.llm.status(),
+                }
 
         self.history.append({"role": "assistant", "content": reply})
         result["reply"] = reply
