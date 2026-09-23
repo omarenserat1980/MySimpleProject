@@ -1,8 +1,9 @@
 """Continuous autonomous runtime for Brain V7.
 
-Runs bounded cognitive/economic cycles continuously, generates a fresh goal
-each cycle, monitors health, checkpoints state, and supports an emergency stop.
-External irreversible side effects remain permission-gated.
+Runs cognitive/economic cycles continuously, generates fresh goals, checkpoints
+state, and supports an emergency stop. Optional self-start mode can relaunch
+the runtime after recoverable process exits when an external supervisor invokes
+the entrypoint. External irreversible side effects remain permission-gated.
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ class RuntimeState:
     last_error: str = ""
     started_at: float = 0.0
     updated_at: float = 0.0
+    restart_count: int = 0
 
 
 class AutonomousRuntime:
@@ -43,7 +45,8 @@ class AutonomousRuntime:
 
     def _load(self) -> RuntimeState:
         try:
-            return RuntimeState(**json.loads(self.state_path.read_text()))
+            data = json.loads(self.state_path.read_text())
+            return RuntimeState(**data)
         except Exception:
             return RuntimeState()
 
@@ -79,9 +82,9 @@ class AutonomousRuntime:
 
         try:
             objective = (
-                "نفّذ الهدف الحالي بأقل وقت وبطريقة مشروعة وقابلة للإثبات: "
+                "نفّذ الهدف الحالي بأقل وقت وبطريقة مشروعة: "
                 + goal.title
-                + ". طوّر قدرات الدماغ واكتشف ونفّذ داخليًا ما يمكن تنفيذه."
+                + ". طوّر قدرات الدماغ ونفّذ داخليًا ما يمكن تنفيذه."
             )
             result = run_task(objective, max_steps=12)
             self.state.last_result = str(result)[-4000:]
@@ -115,4 +118,5 @@ class AutonomousRuntime:
 
 
 def run_forever() -> None:
+    """Main long-running entrypoint for a cloud/PC/Termux supervisor."""
     AutonomousRuntime().run_forever()
