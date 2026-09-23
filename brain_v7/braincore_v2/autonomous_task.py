@@ -17,6 +17,7 @@ from .agent_executor import execute_action
 from .terminal_bridge import terminal_bridge
 from .revenue_engine import rank_opportunities, record_outcome
 from .self_development_engine import development_report, next_development
+from .solution_forge import forge
 
 MAX_STEPS = 12
 MAX_RUNTIME = 180
@@ -67,6 +68,8 @@ class AutonomousTask:
             return "video_generate"
         if ("مال" in t or "ربح" in t or "earning" in t or "revenue" in t) and "revenue_rank" not in done:
             return "revenue_rank"
+        if ("فكرة" in t or "حل" in t or "ابتكار" in t or "إبداع" in t or "idea" in t or "innov" in t) and "solution_forge" not in done:
+            return "solution_forge"
         if ("طور" in t or "تطوير" in t or "develop" in t or "علم" in t or "science" in t) and "self_develop" not in done:
             return "self_develop"
         if "python_version" not in done and ("python" in t or "بايثون" in t):
@@ -109,7 +112,13 @@ class AutonomousTask:
                 self.current["status"] = "COMPLETED"
                 break
 
-            if action == "revenue_rank":
+            if action == "solution_forge":
+                result = {
+                    "status": "EXECUTED",
+                    "action": action,
+                    "result": forge(objective),
+                }
+            elif action == "revenue_rank":
                 ranked = rank_opportunities()
                 selected = ranked[0] if ranked else None
                 result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "selected": selected, "profit": {"verified_profit_jod": 0.0, "status": "NO_VERIFIED_PAYMENT"}}}
