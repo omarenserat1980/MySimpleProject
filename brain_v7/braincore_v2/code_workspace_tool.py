@@ -146,6 +146,115 @@ class CodeWorkspaceTool:
             path = self._safe_path(relative)
             py_compile.compile(str(path), doraise=True)
 
+
+    def _manifest(self, paths: Iterable[str]) -> dict[str, str]:
+        manifest = {}
+        for relative in sorted(set(paths)):
+            path = self._safe_path(relative)
+            if path.exists() and path.is_file():
+                manifest[relative] = self._sha256(path.read_bytes())
+        return manifest
+
+    def checkpoint(self, paths: Iterable[str] = ()) -> dict:
+        """Create a restorable file snapshot with a tamper-evident manifest."""
+        import json
+        import time
+        requested = list(paths)
+        if not requested:
+            requested = [
+                str(p.relative_to(self.root))
+                for p in self.root.rglob("*")
+                if p.is_file() and self.backup_dir not in p.parents
+            ]
+        manifest = self._manifest(requested)
+        payload = json.dumps(manifest, sort_keys=True).encode("utf-8")
+        manifest_hash = self._sha256(payload)
+        checkpoint_id = "cp-" + manifest_hash[:16]
+        target = self.backup_dir / checkpoint_id
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "manifest.json").write_bytes(payload)
+        for relative in manifest:
+            source = self._safe_path(relative)
+            destination = target / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(source.read_bytes())
+        return {
+            "checkpoint_id": checkpoint_id,
+            "files": sorted(manifest),
+            "manifest_sha256": manifest_hash,
+            "created_at": time.time(),
+        }
+
+    def dry_run(self, changes: Iterable[CodeChange], *, validate_python: bool = True) -> dict:
+        """Preview and validate changes without modifying source files."""
+        changes = list(changes)
+        planned = self.plan(changes)
+        if validate_python:
+            import ast
+            for change in changes:
+                if change.path.endswith(".py"):
+                    ast.parse(change.content, filename=change.path)
+        return {"status": "VALID", "changes": planned, "writes": 0}
+
+    def diff(self, changes: Iterable[CodeChange]) -> list[dict]:
+        """Return unified diffs before applying changes."""
+        import difflib
+        output = []
+        for change in changes:
+            path = self._safe_path(change.path)
+            old = path.read_text(encoding="utf-8") if path.exists() else ""
+            lines = list(difflib.unified_diff(
+                old.splitlines(), change.content.splitlines(),
+                fromfile="a/" + change.path, tofile="b/" + change.path, lineterm=""
+            ))
+            output.append({"path": change.path, "changed": bool(lines), "diff": lines})
+        return output
+
+    def restore(self, checkpoint_id: str) -> list[ChangeResult]:
+        """Restore the files recorded by a checkpoint."""
+        import json
+        if not checkpoint_id.startswith("cp-") or "/" in checkpoint_id or "\\" in checkpoint_id:
+            raise ValueError("invalid checkpoint")
+        target = self.backup_dir / checkpoint_id
+        manifest_path = target / "manifest.json"
+        if not manifest_path.exists():
+            raise FileNotFoundError("checkpoint manifest not found")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        changes = []
+        for relative in manifest:
+            source = target / relative
+            changes.append(CodeChange(
+                relative,
+                source.read_text(encoding="utf-8"),
+                "checkpoint restore",
+            ))
+        return self.apply(changes)
+
+    def verify(self, paths: Iterable[str] = ()) -> dict:
+        """Verify readability and Python syntax without changing files."""
+        selected = list(paths)
+        if not selected:
+            selected = [
+                str(p.relative_to(self.root))
+                for p in self.root.rglob("*.py")
+                if self.backup_dir not in p.parents
+            ]
+        errors = []
+        checked = 0
+        for relative in selected:
+            try:
+                path = self._safe_path(relative)
+                if not path.exists():
+                    errors.append({"path": relative, "error": "missing"})
+                    continue
+                if relative.endswith(".py"):
+                    import ast
+                    ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+                checked += 1
+            except Exception as exc:
+                errors.append({"path": relative, "error": str(exc)})
+        return {"status": "PASS" if not errors else "FAIL", "checked": checked, "errors": errors}
+
     def snapshot(self) -> dict:
         return {
             "workspace": str(self.root),
