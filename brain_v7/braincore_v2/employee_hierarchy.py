@@ -23,6 +23,9 @@ class Employee:
     current_task_id: str | None = None
     completed_tasks: int = 0
     failed_tasks: int = 0
+    revenue_generated: float = 0.0
+    costs_attributed: float = 0.0
+    training_completed: int = 0
 
 
 @dataclass
