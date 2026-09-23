@@ -1,9 +1,10 @@
-"""Chained multimedia production pipeline with injected provider routing."""
+"""Chained multimedia production pipeline with verified job execution."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from typing import Any, Mapping
+from typing import Any
 
+from .media_job_runner import MediaJobRunner
 from .media_provider_registry import MediaProviderRegistry
 
 
@@ -50,6 +51,7 @@ def build_pipeline(objective: str, *, pipeline_id: str = "media-pipeline") -> Me
 class MediaProductionPipeline:
     def __init__(self, registry: MediaProviderRegistry | None = None):
         self.registry = registry or MediaProviderRegistry()
+        self.runner = MediaJobRunner(self.registry)
 
     def plan(self, objective: str) -> dict[str, Any]:
         return asdict(build_pipeline(objective))
@@ -60,6 +62,8 @@ class MediaProductionPipeline:
         *,
         authorized: bool = False,
         pipeline_id: str = "media-pipeline",
+        timeout_seconds: int = 3600,
+        poll_seconds: int = 5,
     ) -> dict[str, Any]:
         pipeline = build_pipeline(objective, pipeline_id=pipeline_id)
         if not authorized:
@@ -71,22 +75,26 @@ class MediaProductionPipeline:
 
         artifacts: dict[str, Any] = {}
         executed: list[str] = []
+
         for stage in pipeline.stages:
             dependencies = {
                 name: artifacts[name]
                 for name in stage.depends_on
                 if name in artifacts
             }
-            result = self.registry.submit(
+            result = self.runner.run(
                 kind=stage.kind,
                 prompt=stage.prompt,
                 output_format=stage.output_format,
                 options={"dependencies": dependencies},
+                authorized=True,
+                timeout_seconds=timeout_seconds,
+                poll_seconds=poll_seconds,
             )
             artifacts[stage.name] = result
             executed.append(stage.name)
 
-            if result["status"] in {"FAILED", "NO_PROVIDER"}:
+            if result.get("status") != "VERIFIED_COMPLETED":
                 return {
                     "status": "BLOCKED",
                     "failed_stage": stage.name,
@@ -97,11 +105,10 @@ class MediaProductionPipeline:
                 }
 
         return {
-            "status": "SUBMITTED",
+            "status": "VERIFIED_COMPLETED",
             "pipeline": asdict(pipeline),
             "artifacts": artifacts,
             "executed_stages": executed,
-            "verification_required": True,
         }
 
 
@@ -110,6 +117,8 @@ def snapshot() -> dict[str, Any]:
         "chain": ["IMAGE", "VOICE", "VIDEO", "DESIGN"],
         "dependency_aware": True,
         "provider_registry": True,
+        "job_polling": True,
+        "output_verification": True,
         "credentials_in_source": False,
         "external_publication": "permission_gated",
     }
