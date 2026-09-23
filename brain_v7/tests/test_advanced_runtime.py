@@ -11,3 +11,10 @@ def test_health_and_recovery():
     assert check()["healthy"] is True
     assert decide(True,True,True).promote is True
     assert decide(False,True,True).rollback is True
+
+
+def test_pipeline_metrics():
+    from brain_v7.braincore_v2.revenue_engine import opportunity_pipeline_summary
+    s=opportunity_pipeline_summary()
+    assert s["candidates"] >= 1
+    assert s["realized_profit_source"] == "verified_profit_summary"
