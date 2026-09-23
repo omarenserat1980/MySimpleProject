@@ -19,35 +19,36 @@ KEYWORDS = {
     "video": ("فيديو", "فيديوهات", "video", "reel", "short"),
     "audio": ("صوت", "تعليق صوتي", "voice", "audio", "tts"),
     "web": ("موقع", "ويب", "website", "web", "متجر"),
-    "app": ("تطبيق", "app", "android", "mobile"),
+    "app": ("تطبيق", "app", "android", "mobile", "ios"),
     "software": ("برنامج", "برمج", "كود", "software", "automation", "api"),
+    "design": ("تصميم", "design", "ui", "ux"),
 }
 
 
 def select_capabilities(objective: str) -> list[str]:
     text = objective.lower()
-    found = []
-    for capability, words in KEYWORDS.items():
-        if any(word in text for word in words):
-            found.append("web" if capability == "app" else capability)
+    found = [
+        capability
+        for capability, words in KEYWORDS.items()
+        if any(word in text for word in words)
+    ]
     if not found:
         found = ["software"]
-    # Preserve order and remove duplicates.
     return list(dict.fromkeys(found))
 
 
 def build_plan(objective: str) -> CapabilityPlan:
     capabilities = select_capabilities(objective)
     primary = capabilities[0]
-    stages = [
+    stages = (
         "UNDERSTAND",
         "PLAN",
         "CREATE_LOCAL_ARTIFACTS",
         "INTEGRATE_CAPABILITIES",
         "VERIFY_OUTPUT",
         "LEARN_AND_REPLAN",
-    ]
-    return CapabilityPlan(objective, primary, tuple(capabilities), tuple(stages))
+    )
+    return CapabilityPlan(objective, primary, tuple(capabilities), stages)
 
 
 def execution_plan(objective: str) -> dict[str, Any]:
@@ -69,6 +70,8 @@ def snapshot() -> dict[str, Any]:
     return {
         "automatic_selection": True,
         "local_pipeline": True,
-        "supported": sorted({"software", "web", "image", "audio", "video", "design"}),
+        "supported": sorted(
+            {"software", "web", "app", "image", "audio", "video", "design"}
+        ),
         "external_actions": "permission_gated",
     }
