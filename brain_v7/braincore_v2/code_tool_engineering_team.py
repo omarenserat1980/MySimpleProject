@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from time import time
 from typing import Any, Iterable
+import os
 import subprocess
 import sys
 
@@ -192,7 +193,8 @@ class CodeToolEngineeringTeam:
             "queue": [asdict(x) for x in self.queue[-50:]],
             "workspace": self.workspace.snapshot(),
             "github_executor": self.remote.snapshot(),
-            "automatic_remote_persistence": self.remote.configured,\n            "capability_status": self.capability_status(),
+            "automatic_remote_persistence": self.remote.configured,
+            "capability_status": self.capability_status(),
             "external_side_effects": False,
             "credential_storage": False,
             "money_movement": False,
