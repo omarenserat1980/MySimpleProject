@@ -23,6 +23,7 @@ from .employee_hierarchy import EmployeeHierarchy
 from .notifications import NotificationCenter
 from .workforce_evolution import WorkforceEvolutionEngine
 from .leadership_evolution import LeadershipEvolutionEngine
+from .advanced_talent import AdvancedTalentEngine
 
 
 @dataclass
@@ -66,6 +67,7 @@ class UnifiedBrain:
         self.notifications = NotificationCenter()
         self.workforce = WorkforceEvolutionEngine(self.organization, self.notifications)
         self.leadership = LeadershipEvolutionEngine(self.organization, self.notifications)
+        self.talent = AdvancedTalentEngine(self.organization)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -162,6 +164,9 @@ class UnifiedBrain:
             data={"objective": objective, "status": delegated.status},
         )
         evolution = self.workforce.evolve(objective)
+        for employee_id in list(self.organization.employees)[:10]:
+            self.talent.develop(employee_id)
+        talent_snapshot = self.talent.organization_snapshot()
         leadership = self.leadership.run()
 
         return {
@@ -181,6 +186,7 @@ class UnifiedBrain:
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
             "leadership": leadership,
+            "talent_development": talent_snapshot,
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -211,6 +217,7 @@ class UnifiedBrain:
             },
             "notifications": self.notifications.snapshot(),
             "leadership": self.leadership.snapshot(),
+            "talent_development": self.talent.organization_snapshot(),
         }
 
 
