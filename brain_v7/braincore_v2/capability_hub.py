@@ -5,6 +5,7 @@ from .multimedia_capability_hub import MultimediaHub
 from .software_factory import SUPPORTED_KINDS as SOFTWARE_KINDS
 from .web_app_factory import snapshot as web_snapshot
 from .app_factory import snapshot as app_snapshot
+from .media_production_pipeline import snapshot as media_pipeline_snapshot
 from .capability_orchestrator import execution_plan
 
 
@@ -17,6 +18,7 @@ class CapabilityHub:
         "audio": "multimedia_capability_hub",
         "video": "multimedia_capability_hub",
         "design": "multimedia_capability_hub",
+        "media_pipeline": "media_production_pipeline",
     }
 
     def __init__(self):
@@ -35,6 +37,9 @@ class CapabilityHub:
         if capability == "app":
             return {"status": "READY", "module": "app_factory",
                     "details": app_snapshot()}
+        if capability == "media_pipeline":
+            return {"status": "READY", "module": "media_production_pipeline",
+                    "details": media_pipeline_snapshot()}
         return {"status": "READY", "module": "multimedia_capability_hub",
                 "providers": self.media.available_providers(capability)}
 
@@ -46,6 +51,7 @@ class CapabilityHub:
             "capabilities": self.CAPABILITIES,
             "software": sorted(SOFTWARE_KINDS),
             "media": self.media.snapshot(),
+            "media_pipeline": media_pipeline_snapshot(),
             "web": web_snapshot(),
             "app": app_snapshot(),
             "automatic_orchestration": True,
