@@ -30,6 +30,7 @@ from .intelligence_center import IntelligenceCenter
 from .digital_state import DigitalState
 from .revenue_task_factory import RevenueTaskFactory
 from .revenue_challenge import RevenueChallenge
+from .external_work_gateway import ExternalWorkGateway
 
 
 @dataclass
@@ -80,6 +81,7 @@ class UnifiedBrain:
         self.digital_state = DigitalState()
         self.revenue_factory = RevenueTaskFactory()
         self.revenue_challenge = RevenueChallenge(self.organization)
+        self.external_work = ExternalWorkGateway(self.organization)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -171,6 +173,8 @@ class UnifiedBrain:
             task = self.organization.assign_task(item["objective"])
             revenue_assignments.append({"revenue_task": item, "employee_task": asdict(task)})
 
+        external_work_snapshot = self.external_work.snapshot()
+
         # The Brain delegates the current objective through the organization.
         delegated = self.organization.assign_task(objective)
         self.notifications.emit(
@@ -208,6 +212,7 @@ class UnifiedBrain:
             "delegated_task": asdict(delegated),
             "revenue_tasks": revenue_assignments,
             "revenue_challenge": self.revenue_challenge.progress(),
+            "external_work": external_work_snapshot,
             "organization": self.organization.snapshot(),
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
@@ -254,6 +259,7 @@ class UnifiedBrain:
             "digital_state": self.digital_state.snapshot(),
             "revenue_factory": self.revenue_factory.snapshot(),
             "revenue_challenge": self.revenue_challenge.snapshot(),
+            "external_work": self.external_work.snapshot(),
         }
 
 
