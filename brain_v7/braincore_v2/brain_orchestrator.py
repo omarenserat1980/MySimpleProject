@@ -25,6 +25,7 @@ from .workforce_evolution import WorkforceEvolutionEngine
 from .leadership_evolution import LeadershipEvolutionEngine
 from .advanced_talent import AdvancedTalentEngine
 from .cyber_immune import CyberImmuneSystem
+from .medical_unit import MedicalUnit
 
 
 @dataclass
@@ -70,6 +71,7 @@ class UnifiedBrain:
         self.leadership = LeadershipEvolutionEngine(self.organization, self.notifications)
         self.talent = AdvancedTalentEngine(self.organization)
         self.immune = CyberImmuneSystem(self.organization)
+        self.medical = MedicalUnit(self.immune)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -171,6 +173,7 @@ class UnifiedBrain:
             self.immune.scan_employee(self.organization.employees[employee_id])
         talent_snapshot = self.talent.organization_snapshot()
         immune_snapshot = self.immune.health()
+        medical_snapshot = self.medical.snapshot()
         leadership = self.leadership.run()
 
         return {
@@ -192,6 +195,7 @@ class UnifiedBrain:
             "leadership": leadership,
             "talent_development": talent_snapshot,
             "cyber_immune": immune_snapshot,
+            "medical_unit": medical_snapshot,
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -224,6 +228,7 @@ class UnifiedBrain:
             "leadership": self.leadership.snapshot(),
             "talent_development": self.talent.organization_snapshot(),
             "cyber_immune": self.immune.snapshot(),
+            "medical_unit": self.medical.snapshot(),
         }
 
 
