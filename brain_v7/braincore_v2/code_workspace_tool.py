@@ -44,10 +44,19 @@ class ChangeResult:
 class CodeWorkspaceTool:
     """Bounded source-code persistence and change executor."""
 
-    def __init__(self, root: str | Path | None = None, *, backup_dir: str = ".brain_backups") -> None:
+    def __init__(
+        self,
+        root: str | Path | None = None,
+        *,
+        backup_dir: str = ".brain_backups",
+        allowed_prefixes: Iterable[str] = (),
+    ) -> None:
         configured = root or os.getenv("BRAIN_CODE_ROOT") or os.getcwd()
         self.root = Path(configured).resolve()
         self.backup_dir = self.root / backup_dir
+        self.allowed_prefixes = tuple(
+            p.replace("\\", "/").strip("/")+ "/" for p in allowed_prefixes if p
+        )
         self.audit: list[ChangeResult] = []
 
     def _safe_path(self, relative: str) -> Path:
@@ -59,6 +68,9 @@ class CodeWorkspaceTool:
             raise PermissionError("protected credential file")
         if candidate == self.backup_dir or self.backup_dir in candidate.parents:
             raise PermissionError("backup area is not editable")
+        normalized = relative.replace("\\", "/").lstrip("/")
+        if self.allowed_prefixes and not any(normalized.startswith(prefix) for prefix in self.allowed_prefixes):
+            raise PermissionError("path is outside configured code allowlist")
         return candidate
 
     @staticmethod
@@ -261,6 +273,7 @@ class CodeWorkspaceTool:
             "backup_dir": str(self.backup_dir),
             "audit_entries": len(self.audit),
             "protected_files": sorted(PROTECTED_NAMES),
+            "allowed_prefixes": list(self.allowed_prefixes),
             "atomic_writes": True,
             "python_validation": True,
             "remote_push": False,
