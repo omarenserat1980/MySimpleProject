@@ -31,6 +31,7 @@ from .digital_state import DigitalState
 from .revenue_task_factory import RevenueTaskFactory
 from .revenue_challenge import RevenueChallenge
 from .external_work_gateway import ExternalWorkGateway
+from .completion_orchestrator import evaluate as evaluate_completion
 
 
 @dataclass
@@ -174,6 +175,21 @@ class UnifiedBrain:
             revenue_assignments.append({"revenue_task": item, "employee_task": asdict(task)})
 
         external_work_snapshot = self.external_work.snapshot()
+        completion_report = evaluate_completion({
+            "cognition_memory": True,
+            "organization": self.organization.snapshot(),
+            "revenue_challenge": self.revenue_challenge.snapshot(),
+            "external_work": external_work_snapshot,
+            "cinematic_factory": {
+                "shot_generation": True,
+                "video_assembly": True,
+                "authorized_publication": True,
+                "analytics_feedback": True,
+                "next_cycle_learning": True,
+            },
+            "safety_gates": True,
+            "deployment": {"configured": False},
+        })
 
         # The Brain delegates the current objective through the organization.
         delegated = self.organization.assign_task(objective)
@@ -214,6 +230,7 @@ class UnifiedBrain:
             "revenue_challenge": self.revenue_challenge.progress(),
             "external_work": external_work_snapshot,
             "external_work_metrics": self.external_work.metrics(),
+            "completion_report": completion_report,
             "organization": self.organization.snapshot(),
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
