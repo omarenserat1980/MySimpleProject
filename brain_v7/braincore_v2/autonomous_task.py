@@ -15,6 +15,7 @@ from typing import Any
 
 from .agent_executor import execute_action
 from .terminal_bridge import terminal_bridge
+from .revenue_engine import rank_opportunities, record_outcome
 
 MAX_STEPS = 12
 MAX_RUNTIME = 180
@@ -63,6 +64,8 @@ class AutonomousTask:
             return "git_status"
         if ("فيديو" in t or "video" in t or "wan" in t) and "video_generate" not in done:
             return "video_generate"
+        if ("مال" in t or "ربح" in t or "earning" in t or "revenue" in t) and "revenue_rank" not in done:
+            return "revenue_rank"
         if "python_version" not in done and ("python" in t or "بايثون" in t):
             return "python_version"
 
@@ -103,7 +106,11 @@ class AutonomousTask:
                 self.current["status"] = "COMPLETED"
                 break
 
-            result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
+            if action == "revenue_rank":
+                ranked = rank_opportunities()
+                result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "note": "Ranking is a decision aid; it is not proof of income."}}
+            else:
+                result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
             observation = {
                 "step": index,
                 "action": action,
@@ -115,6 +122,8 @@ class AutonomousTask:
 
             if result.get("status") == "EXECUTED":
                 completed.append(action)
+                if action == "revenue_rank" and steps:
+                    self.current["revenue_candidates"] = result.get("result", {}).get("opportunities", [])
                 # The second inspection is a final verification marker.
                 if action == "inspect" and "inspect" in completed and len(completed) > 1:
                     completed.append("final_verify")
