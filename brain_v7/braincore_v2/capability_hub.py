@@ -4,6 +4,7 @@ from __future__ import annotations
 from .multimedia_capability_hub import MultimediaHub
 from .software_factory import SUPPORTED_KINDS as SOFTWARE_KINDS
 from .web_app_factory import snapshot as web_snapshot
+from .capability_orchestrator import build_plan, execution_plan
 
 
 class CapabilityHub:
@@ -32,10 +33,14 @@ class CapabilityHub:
         return {"status": "READY", "module": "multimedia_capability_hub",
                 "providers": self.media.available_providers(capability)}
 
+    def plan(self, objective: str) -> dict:
+        return execution_plan(objective)
+
     def snapshot(self) -> dict:
         return {
             "capabilities": self.CAPABILITIES,
             "software": sorted(SOFTWARE_KINDS),
             "media": self.media.snapshot(),
             "web": web_snapshot(),
+            "automatic_orchestration": True,
         }
