@@ -58,3 +58,12 @@ def test_checkpoint_rejects_path_injection(tmp_path: Path):
     tool = CodeWorkspaceTool(tmp_path)
     with pytest.raises(ValueError):
         tool.restore("../cp-bad")
+
+
+def test_workspace_allowlist_blocks_other_source_tree(tmp_path: Path):
+    tool = CodeWorkspaceTool(tmp_path, allowed_prefixes=("brain_v7/",))
+    (tmp_path / "brain_v7").mkdir()
+    tool.apply([CodeChange("brain_v7/allowed.py", "VALUE = 1\n")])
+    assert tool.read("brain_v7/allowed.py") == "VALUE = 1\n"
+    with pytest.raises(PermissionError):
+        tool.read("other.py")
