@@ -33,6 +33,7 @@ from .revenue_challenge import RevenueChallenge
 from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
+from .operational_control_plane import OperationalControlPlane
 
 
 @dataclass
@@ -85,6 +86,7 @@ class UnifiedBrain:
         self.revenue_challenge = RevenueChallenge(self.organization)
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
+        self.control_plane = OperationalControlPlane()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -103,6 +105,7 @@ class UnifiedBrain:
         self.state.objective = objective
         self.state.status = "REASONING"
         self.state.updated_at = time()
+        self.control_plane.heartbeat("BRAIN-001", cycle=self.state.cycle, detail="reasoning_cycle_started")
 
         signal_list = list(signals)
         observation_list = list(observations)
@@ -237,6 +240,8 @@ class UnifiedBrain:
         intelligence_snapshot = self.intelligence.snapshot()
         state_snapshot = self.digital_state.dashboard()
         leadership = self.leadership.run()
+        control_plane = self.control_plane.snapshot()
+        self.control_plane.heartbeat("BRAIN-001", cycle=self.state.cycle, detail="reasoning_cycle_complete")
 
         return {
             "cycle": self.state.cycle,
@@ -272,6 +277,7 @@ class UnifiedBrain:
             "money_movement": False,
             "capability_hub": self.capabilities.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
+            "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
         }
 
@@ -306,6 +312,7 @@ class UnifiedBrain:
             "revenue_challenge": self.revenue_challenge.snapshot(),
             "external_work": self.external_work.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
+            "operational_control_plane": self.control_plane.snapshot(),
         }
 
 
