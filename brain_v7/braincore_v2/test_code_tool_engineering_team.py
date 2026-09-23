@@ -85,3 +85,27 @@ def test_capability_status_is_explicit_and_safe():
     assert status["shell_command_execution"] is False
     assert status["money_movement"] is False
     assert status["external_submission"] is False
+
+def test_remote_persistence_failure_restores_local_checkpoint(monkeypatch, tmp_path: Path):
+    org = EmployeeHierarchy()
+    workspace = CodeWorkspaceTool(tmp_path)
+    target = tmp_path / "brain_v7" / "test_sample.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+    team = CodeToolEngineeringTeam(org, workspace)
+    monkeypatch.setattr(team, "run_regression_tests", lambda: {"status": "PASS", "returncode": 0})
+    monkeypatch.setattr(team.remote, "configured", True, raising=False)
+
+    def fail_remote(*args, **kwargs):
+        raise RuntimeError("simulated remote failure")
+
+    monkeypatch.setattr(team.remote, "apply", fail_remote)
+    result = team.execute_autonomous_change(
+        [CodeChange("brain_v7/test_sample.py", "VALUE = 2\n")],
+        reason="remote failure safety",
+        commit_message="test: remote failure rollback",
+        remote=True,
+    )
+    assert result["status"] == "ROLLED_BACK"
+    assert result["remote_status"] == "REMOTE_FAILED"
+    assert target.read_text(encoding="utf-8") == "VALUE = 1\n"
