@@ -33,3 +33,28 @@ def test_workspace_rejects_escape_and_protected_files(tmp_path: Path):
         tool.read("../outside.py")
     with pytest.raises(PermissionError):
         tool.read(".env")
+
+
+def test_dry_run_diff_checkpoint_restore(tmp_path: Path):
+    tool = CodeWorkspaceTool(tmp_path)
+    tool.apply([CodeChange("app.py", "VALUE = 1\n")])
+    preview = tool.dry_run([CodeChange("app.py", "VALUE = 2\n")])
+    assert preview["status"] == "VALID"
+    assert preview["writes"] == 0
+    assert tool.read("app.py") == "VALUE = 1\n"
+    diff = tool.diff([CodeChange("app.py", "VALUE = 2\n")])
+    assert diff[0]["changed"] is True
+
+    checkpoint = tool.checkpoint(["app.py"])
+    tool.apply([CodeChange("app.py", "VALUE = 99\n")])
+    assert tool.read("app.py") == "VALUE = 99\n"
+    restored = tool.restore(checkpoint["checkpoint_id"])
+    assert restored[0].status == "APPLIED"
+    assert tool.read("app.py") == "VALUE = 1\n"
+    assert tool.verify(["app.py"])["status"] == "PASS"
+
+
+def test_checkpoint_rejects_path_injection(tmp_path: Path):
+    tool = CodeWorkspaceTool(tmp_path)
+    with pytest.raises(ValueError):
+        tool.restore("../cp-bad")
