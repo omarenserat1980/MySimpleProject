@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from time import time
 from typing import Any, Iterable
+import subprocess
+import sys
 
 from .code_workspace_tool import CodeChange, CodeWorkspaceTool
 from .employee_hierarchy import EmployeeHierarchy
@@ -100,6 +102,20 @@ class CodeToolEngineeringTeam:
     def verify(self, paths: Iterable[str] = ()) -> dict[str, Any]:
         return self.workspace.verify(paths)
 
+    def run_regression_tests(self) -> dict[str, Any]:
+        """Run the fixed project regression suite; never execute task-supplied shell text."""
+        command = [sys.executable, "-m", "pytest", "brain_v7", "-q"]
+        try:
+            completed = subprocess.run(command, cwd=str(self.workspace.root), capture_output=True, text=True, timeout=300, check=False)
+            return {
+                "status": "PASS" if completed.returncode == 0 else "FAIL",
+                "returncode": completed.returncode,
+                "command": command,
+                "stdout_tail": completed.stdout[-4000:],
+                "stderr_tail": completed.stderr[-4000:],
+            }
+        except Exception as exc:
+            return {"status": "FAIL", "returncode": -1, "command": command, "stdout_tail": "", "stderr_tail": str(exc)}
 
     def execute_autonomous_change(
         self,
@@ -114,6 +130,20 @@ class CodeToolEngineeringTeam:
         preview = self.validate_change(changes)
         checkpoint = self.workspace.checkpoint([c.path for c in changes])
         local_results = self.workspace.apply(changes, validate_python=True)
+        regression = self.run_regression_tests()
+        if regression["status"] != "PASS":
+            restored = self.workspace.restore(checkpoint["checkpoint_id"])
+            return {
+                "status": "ROLLED_BACK",
+                "reason": reason,
+                "preview": preview,
+                "checkpoint": checkpoint,
+                "local_results": [asdict(x) for x in local_results],
+                "regression": regression,
+                "restored": [asdict(x) for x in restored],
+                "remote_status": "NOT_COMMITTED",
+                "remote_results": [],
+            }
         remote_results = []
         remote_status = "NOT_REQUESTED"
         if remote:
@@ -128,6 +158,7 @@ class CodeToolEngineeringTeam:
             "preview": preview,
             "checkpoint": checkpoint,
             "local_results": [asdict(x) for x in local_results],
+            "regression": regression,
             "remote_status": remote_status,
             "remote_results": [asdict(x) for x in remote_results],
         }
