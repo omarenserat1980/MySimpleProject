@@ -22,6 +22,8 @@ KEYWORDS = {
     "app": ("تطبيق", "app", "android", "mobile", "ios"),
     "software": ("برنامج", "برمج", "كود", "software", "automation", "api"),
     "design": ("تصميم", "design", "ui", "ux"),
+    "cinematic": ("سينما", "سينمائي", "cinematic", "director", "فيلم"),
+    "cinematic_money": ("ربح", "كسب", "دخل", "money", "revenue", "youtube"),
 }
 
 
@@ -35,6 +37,10 @@ def select_capabilities(objective: str) -> list[str]:
     # A media-heavy objective gets the complete production chain.
     if len(set(found) & {"image", "audio", "video"}) >= 2:
         found.append("media_pipeline")
+    if "cinematic" in found or "cinematic_money" in found:
+        found.extend(["cinematic", "media_pipeline"])
+    if "youtube" in text or "يوتيوب" in text:
+        found.append("youtube")
     if not found:
         found = ["software"]
     return list(dict.fromkeys(found))
@@ -74,7 +80,7 @@ def snapshot() -> dict[str, Any]:
         "automatic_selection": True,
         "local_pipeline": True,
         "supported": sorted(
-            {"software", "web", "app", "image", "audio", "video", "design", "media_pipeline"}
+            {"software", "web", "app", "image", "audio", "video", "design", "media_pipeline", "cinematic", "cinematic_money", "youtube"}
         ),
         "external_actions": "permission_gated",
     }
