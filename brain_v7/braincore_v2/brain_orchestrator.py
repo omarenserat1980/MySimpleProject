@@ -42,6 +42,7 @@ from .meta_learning_controller import (
     recommend,
 )
 from .cognitive_ecosystem import ecosystem_snapshot
+from .capability_hub import CapabilityHub
 
 
 @dataclass
@@ -94,6 +95,7 @@ class UnifiedBrain:
         self.memory = {m.key: m for m in memory}
         self.relations = list(relations)
         self.strategy_history = list(strategy_history)
+        self.capabilities = CapabilityHub()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -204,6 +206,7 @@ class UnifiedBrain:
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
             "money_movement": False,
+            "capability_hub": self.capabilities.snapshot(),
             "requires_user_for_external_side_effects": True,
         }
 
@@ -220,6 +223,7 @@ class UnifiedBrain:
             "autonomous_internal_cycles": True,
             "external_side_effects": False,
             "permission_escalation": False,
+            "capability_hub": self.capabilities.snapshot(),
         }
 
 
