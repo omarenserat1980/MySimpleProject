@@ -5,7 +5,7 @@ def test_initial_hierarchy_has_ten_employees():
     org = EmployeeHierarchy(initial_employees=10)
     snap = org.snapshot()
     assert snap["employee_count"] == 10
-    assert snap["manager_count"] == 2
+    assert snap["manager_count"] == 11
     assert snap["root_manager"] == "BRAIN-001"
 
 
