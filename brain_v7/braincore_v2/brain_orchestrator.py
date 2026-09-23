@@ -38,6 +38,7 @@ from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
 from .cognitive_workforce import CognitiveWorkforce
 from .code_workspace_tool import CodeWorkspaceTool, CodeChange
+from .code_tool_engineering_team import CodeToolEngineeringTeam
 
 
 @dataclass
@@ -96,6 +97,7 @@ class UnifiedBrain:
         self.cognitive_workforce = CognitiveWorkforce()
         # Controlled self-development tool: source changes stay inside the configured workspace.
         self.code_workspace = CodeWorkspaceTool()
+        self.code_tool_team = CodeToolEngineeringTeam(self.organization, self.code_workspace)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -240,6 +242,7 @@ class UnifiedBrain:
         self.state.status = "READY_FOR_INTERNAL_DEVELOPMENT"
 
         capability_plan = self.capabilities.plan(objective)
+        code_tool_plan = self.code_tool_team.plan_cycle()
         code_workspace = self.code_workspace.snapshot()
 
         # Diversified revenue experiments: different employees receive different lawful paths.
@@ -342,6 +345,8 @@ class UnifiedBrain:
             "money_movement": False,
             "capability_hub": self.capabilities.snapshot(),
             "code_workspace": code_workspace,
+            "code_tool_engineering": self.code_tool_team.snapshot(),
+            "code_tool_plan": code_tool_plan,
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
@@ -386,6 +391,7 @@ class UnifiedBrain:
             "operational_control_plane": self.control_plane.snapshot(),
             "cognitive_workforce": self.cognitive_workforce.snapshot(),
             "code_workspace": self.code_workspace.snapshot(),
+            "code_tool_engineering": self.code_tool_team.snapshot(),
         }
 
 
