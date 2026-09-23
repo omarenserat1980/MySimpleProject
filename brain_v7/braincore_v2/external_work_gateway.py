@@ -14,6 +14,10 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from time import time
 from typing import Any, Iterable
+from .platform_adapters import PlatformAdapterRegistry
+from .work_queue import ExternalWorkQueue
+from .compliance_gate import ComplianceGate
+from .external_work_metrics import summarize as summarize_metrics
 
 
 class Platform(str, Enum):
@@ -98,6 +102,9 @@ class ExternalWorkGateway:
         self.audit_log: list[dict[str, Any]] = []
         self._opportunity_counter = 0
         self._order_counter = 0
+        self.adapters = PlatformAdapterRegistry()
+        self.queue = ExternalWorkQueue()
+        self.compliance = ComplianceGate()
 
     def _audit(self, event: str, **data: Any) -> None:
         self.audit_log.append({"timestamp": time(), "event": event, **data})
@@ -145,6 +152,7 @@ class ExternalWorkGateway:
         )
         self.opportunities[item.opportunity_id] = item
         self._audit("OPPORTUNITY_INGESTED", opportunity_id=item.opportunity_id, platform=platform)
+        self.queue.enqueue(item.opportunity_id, priority=0.5)
         return asdict(item)
 
     def _skill_score(self, employee: Any, opportunity: Opportunity) -> float:
@@ -239,6 +247,12 @@ class ExternalWorkGateway:
     def verified_revenue_jod(self) -> float:
         return round(sum(o.agreed_amount_jod for o in self.orders.values() if o.payment_verified), 2)
 
+    def evaluate_action(self, action: str, *, authorized: bool = False) -> dict[str, Any]:
+        return asdict(self.compliance.evaluate(action, authorized=authorized))
+
+    def metrics(self) -> dict[str, Any]:
+        return summarize_metrics(self.opportunities, self.orders, self.accounts)
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "accounts": [asdict(x) for x in self.accounts.values()],
@@ -249,4 +263,7 @@ class ExternalWorkGateway:
             "external_money_movement": False,
             "credentials_stored": False,
             "user_approval_required_for_submission": True,
+            "adapter_capabilities": self.adapters.capabilities(),
+            "queue": self.queue.snapshot(),
+            "metrics": self.metrics(),
         }
