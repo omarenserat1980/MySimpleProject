@@ -31,6 +31,23 @@ def evaluate_action(action: str, *, amount_jod: float=0.0, irreversible: bool=Fa
     if a in {"web_publish","send_message","create_lead","submit_job"}:
         return PolicyDecision(a,True,True,"MEDIUM","External side effect requires approval in this runtime.")
     return PolicyDecision(a,True,False,"LOW","Read-only or reversible computation.")
+def evaluate_authorized_action(action: str, *, user_authorized: bool = False) -> PolicyDecision:
+    """Evaluate a money-moving action after explicit user authorization.
+
+    Autonomous authority remains disabled. This path only permits the action
+    to proceed to the real provider when the caller proves that the user has
+    explicitly authorized the exact operation; provider confirmation is still
+    required before success is reported.
+    """
+    a = str(action).strip().lower()
+    if a in {"transfer_money", "withdraw_money"}:
+        if not user_authorized:
+            return PolicyDecision(a, False, True, "CRITICAL",
+                                  "Explicit user authorization is required.")
+        return PolicyDecision(a, True, False, "HIGH",
+                              "User-authorized provider execution; confirmation required.")
+    return evaluate_action(a)
+
 def append_audit(event: str, payload: dict[str,Any]) -> dict[str,Any]:
     AUDIT_PATH.parent.mkdir(parents=True,exist_ok=True)
     previous=""
