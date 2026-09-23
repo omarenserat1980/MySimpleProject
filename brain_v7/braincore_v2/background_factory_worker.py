@@ -8,7 +8,7 @@ import json, os, time
 from typing import Any
 from .cinematic_factory_controller import run_factory, FactoryConfig
 from .http_media_adapter import HttpShotRenderer, FfmpegVideoAssembler
-from .local_motion_renderer import LocalMotionRenderer
+from .cinematic_local_renderer import CinematicLocalRenderer
 from .youtube_api_client import YouTubeApiClient
 from .topic_sources import EnvTopicResearcher
 
@@ -20,7 +20,7 @@ def _truthy(name: str, default: str = "0") -> bool:
 def _build_renderer():
     if os.getenv("MEDIA_RENDER_URL", "").strip():
         return HttpShotRenderer()
-    return LocalMotionRenderer()
+    return CinematicLocalRenderer()
 
 
 def run_once() -> dict[str, Any]:
