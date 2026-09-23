@@ -21,7 +21,7 @@ from typing import Any, Protocol
 import hashlib
 import time
 from .payment_state_machine import transition
-from .governance import append_audit
+from .governance import append_audit, evaluate_authorized_action
 
 class PaymentProvider(Protocol):
     def submit_transfer(self, *, amount_jod: float, destination_ref: str,
@@ -116,6 +116,9 @@ class PaymentExecutionOrchestrator:
             raise RuntimeError("PAYMENT_PROVIDER_NOT_CONFIGURED")
         if not authorization or not authorization.strip():
             raise PermissionError("EXPLICIT_AUTHORIZATION_REQUIRED")
+        policy = evaluate_authorized_action("transfer_money", user_authorized=True)
+        if not policy.allowed:
+            raise PermissionError("GOVERNANCE_BLOCKED")
         if self.state != "APPROVAL_REQUIRED":
             raise RuntimeError(f"TRANSFER_NOT_READY:{self.state}")
 
