@@ -64,7 +64,7 @@ class AdaptiveLearningLoop:
         normalized = outcome.lower().strip()
         if normalized not in {"success", "failure", "unknown"}:
             normalized = "unknown"
-        reward = self._clamp(reward, -1.0, 1.0)
+        reward = max(-1.0, min(1.0, float(reward)))
         item = StrategyOutcome(
             cycle=cycle,
             objective=objective,
