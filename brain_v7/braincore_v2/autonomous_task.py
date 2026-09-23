@@ -16,6 +16,7 @@ from typing import Any
 from .agent_executor import execute_action
 from .terminal_bridge import terminal_bridge
 from .revenue_engine import rank_opportunities, record_outcome
+from .self_development_engine import development_report, next_development
 
 MAX_STEPS = 12
 MAX_RUNTIME = 180
@@ -66,6 +67,8 @@ class AutonomousTask:
             return "video_generate"
         if ("مال" in t or "ربح" in t or "earning" in t or "revenue" in t) and "revenue_rank" not in done:
             return "revenue_rank"
+        if ("طور" in t or "تطوير" in t or "develop" in t or "علم" in t or "science" in t) and "self_develop" not in done:
+            return "self_develop"
         if "python_version" not in done and ("python" in t or "بايثون" in t):
             return "python_version"
 
@@ -110,6 +113,9 @@ class AutonomousTask:
                 ranked = rank_opportunities()
                 selected = ranked[0] if ranked else None
                 result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "selected": selected, "profit": {"verified_profit_jod": 0.0, "status": "NO_VERIFIED_PAYMENT"}}}
+            elif action == "self_develop":
+                report = development_report()
+                result = {"status": "EXECUTED", "action": action, "result": report, "next_development": next_development()}
             else:
                 result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
             observation = {
