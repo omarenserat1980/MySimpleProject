@@ -149,8 +149,23 @@ class CodeToolEngineeringTeam:
         remote_status = "NOT_REQUESTED"
         if remote:
             if self.remote.configured:
-                remote_results = self.remote.apply(changes, message=commit_message)
-                remote_status = "COMMITTED"
+                try:
+                    remote_results = self.remote.apply(changes, message=commit_message)
+                    remote_status = "COMMITTED"
+                except Exception as exc:
+                    restored = self.workspace.restore(checkpoint["checkpoint_id"])
+                    return {
+                        "status": "ROLLED_BACK",
+                        "reason": reason,
+                        "preview": preview,
+                        "checkpoint": checkpoint,
+                        "local_results": [asdict(x) for x in local_results],
+                        "regression": regression,
+                        "remote_status": "REMOTE_FAILED",
+                        "remote_results": [],
+                        "restored": [asdict(x) for x in restored],
+                        "error": str(exc),
+                    }
             else:
                 remote_status = "REMOTE_NOT_CONFIGURED"
         return {
