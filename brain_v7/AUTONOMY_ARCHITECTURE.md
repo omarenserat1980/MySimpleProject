@@ -46,3 +46,6 @@ hidden background process inside ChatGPT.
 ## Recovery
 Keep CI tests enabled. On failure, stop promotion and preserve evidence. Use the
 STOP_BRAIN file to stop the worker.
+
+## CI status
+Repository-root GitHub Actions regression workflow is enabled for brain_v7 changes.
