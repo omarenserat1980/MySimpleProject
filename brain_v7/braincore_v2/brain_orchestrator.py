@@ -41,6 +41,7 @@ from .cognitive_workforce import CognitiveWorkforce
 from .code_workspace_tool import CodeWorkspaceTool, CodeChange
 from .code_tool_engineering_team import CodeToolEngineeringTeam
 from .code_tool_api import CodeTool
+from .code_evolution_controller import CodeEvolutionController
 from .remote_ai_gateway import RemoteAIGateway
 
 
@@ -102,6 +103,7 @@ class UnifiedBrain:
         self.code_workspace = CodeWorkspaceTool()
         self.code_tool_team = CodeToolEngineeringTeam(self.organization, self.code_workspace)
         self.code_tool = CodeTool(self.code_workspace, self.code_tool_team)
+        self.code_evolution = CodeEvolutionController(self.code_tool_team)
         self.remote_ai = RemoteAIGateway()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
@@ -357,6 +359,7 @@ class UnifiedBrain:
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_tool_plan": code_tool_plan,
             "code_tool": code_tool,
+            "code_evolution": self.code_evolution.snapshot(),
             "remote_ai": self.remote_ai.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
@@ -451,6 +454,7 @@ class UnifiedBrain:
             "cognitive_workforce": self.cognitive_workforce.snapshot(),
             "code_workspace": self.code_workspace.snapshot(),
             "code_tool_engineering": self.code_tool_team.snapshot(),
+            "code_evolution": self.code_evolution.snapshot(),
         }
 
 
