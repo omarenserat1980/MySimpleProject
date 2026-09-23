@@ -255,6 +255,7 @@ class UnifiedBrain:
         capability_plan = self.capabilities.plan(objective)
         code_tool_plan = self.code_tool_team.plan_cycle()
         code_workspace = self.code_workspace.snapshot()
+        youtube_pipeline = self.youtube_team.run_pipeline(objective)
         code_tool = self.code_tool.snapshot()
 
         # Diversified revenue experiments: different employees receive different lawful paths.
@@ -283,6 +284,7 @@ class UnifiedBrain:
             "code_tool": self.code_tool.snapshot(),
             "remote_ai": self.remote_ai.snapshot(),
             "youtube_team": self.youtube_team.snapshot(),
+            "youtube_pipeline": youtube_pipeline,
         })
 
         # The Brain delegates the current objective through the organization.
@@ -461,6 +463,7 @@ class UnifiedBrain:
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_evolution": self.code_evolution.snapshot(),
             "youtube_team": self.youtube_team.snapshot(),
+            "youtube_pipeline": youtube_pipeline,
         }
 
 
