@@ -28,6 +28,8 @@ from .cyber_immune import CyberImmuneSystem
 from .medical_unit import MedicalUnit
 from .intelligence_center import IntelligenceCenter
 from .digital_state import DigitalState
+from .revenue_task_factory import RevenueTaskFactory
+from .revenue_challenge import RevenueChallenge
 
 
 @dataclass
@@ -76,6 +78,8 @@ class UnifiedBrain:
         self.medical = MedicalUnit(self.immune)
         self.intelligence = IntelligenceCenter(self.notifications)
         self.digital_state = DigitalState()
+        self.revenue_factory = RevenueTaskFactory()
+        self.revenue_challenge = RevenueChallenge(self.organization)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -160,6 +164,13 @@ class UnifiedBrain:
 
         capability_plan = self.capabilities.plan(objective)
 
+        # Diversified revenue experiments: different employees receive different lawful paths.
+        revenue_tasks = self.revenue_factory.generate(count=8)
+        revenue_assignments = []
+        for item in revenue_tasks:
+            task = self.organization.assign_task(item["objective"])
+            revenue_assignments.append({"revenue_task": item, "employee_task": asdict(task)})
+
         # The Brain delegates the current objective through the organization.
         delegated = self.organization.assign_task(objective)
         self.notifications.emit(
@@ -195,6 +206,8 @@ class UnifiedBrain:
             "selected_internal_focus": self.state.focus,
             "capability_plan": capability_plan,
             "delegated_task": asdict(delegated),
+            "revenue_tasks": revenue_assignments,
+            "revenue_challenge": self.revenue_challenge.progress(),
             "organization": self.organization.snapshot(),
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
@@ -239,6 +252,8 @@ class UnifiedBrain:
             "medical_unit": self.medical.snapshot(),
             "intelligence_center": self.intelligence.snapshot(),
             "digital_state": self.digital_state.snapshot(),
+            "revenue_factory": self.revenue_factory.snapshot(),
+            "revenue_challenge": self.revenue_challenge.snapshot(),
         }
 
 
