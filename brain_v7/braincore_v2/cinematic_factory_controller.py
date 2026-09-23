@@ -12,7 +12,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Any, Protocol, Sequence
+import shutil
 import time
+from pathlib import Path
 
 from .cinematic_money_factory import ContentOpportunity, rank
 from .cinematic_director import CinematicPlan, build_plan, provider_prompts
@@ -177,6 +179,14 @@ def run_factory(
     if video_id and analytics_client:
         analytics = analytics_client.report(video_id=video_id)
 
+    cleanup = None
+    if publication.get("status") == "PUBLISHED":
+        cleanup = cleanup_cycle_files(
+            rendered_outputs=rendered["outputs"],
+            final_video_ref=video_ref,
+            keep_final=False,
+        )
+
     return {
         "status": "FACTORY_CYCLE_COMPLETE",
         "elapsed_s": round(time.time() - started, 2),
@@ -188,11 +198,58 @@ def run_factory(
         "assembly": assembled,
         "youtube": publication,
         "analytics": analytics,
+        "cleanup": cleanup,
         "learning_input": {
             "next_cycle_required": True,
             "use_verified_analytics": analytics is not None,
             "do_not_infer_revenue": True,
         },
+    }
+
+
+
+def cleanup_cycle_files(*, rendered_outputs: Sequence[dict[str, Any]], final_video_ref: str | None, keep_final: bool = False) -> dict[str, Any]:
+    """Delete only files created by the current factory cycle.
+
+    Cleanup happens only after a successful YouTube publication. The uploaded
+    YouTube copy remains the durable published artifact. Failed/unpublished
+    cycles are intentionally left untouched for diagnosis or retry.
+    """
+    candidates: list[Path] = []
+    for item in rendered_outputs:
+        ref = item.get("video_ref")
+        if ref and not str(ref).startswith(("http://", "https://")):
+            candidates.append(Path(str(ref)))
+    if final_video_ref and not str(final_video_ref).startswith(("http://", "https://")) and not keep_final:
+        candidates.append(Path(str(final_video_ref)))
+
+    removed_files = 0
+    removed_dirs = 0
+    errors: list[str] = []
+    parent_dirs: set[Path] = set()
+    for path in candidates:
+        try:
+            if path.is_file():
+                path.unlink()
+                removed_files += 1
+                parent_dirs.add(path.parent)
+        except OSError as exc:
+            errors.append(f"{path}: {exc}")
+
+    for directory in sorted(parent_dirs, key=lambda p: len(p.parts), reverse=True):
+        if directory.name.startswith("factory_"):
+            try:
+                if directory.exists() and not any(directory.iterdir()):
+                    directory.rmdir()
+                    removed_dirs += 1
+            except OSError as exc:
+                errors.append(f"{directory}: {exc}")
+
+    return {
+        "status": "CLEANUP_COMPLETE" if not errors else "CLEANUP_PARTIAL",
+        "removed_files": removed_files,
+        "removed_dirs": removed_dirs,
+        "errors": errors,
     }
 
 
