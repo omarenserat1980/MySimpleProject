@@ -34,6 +34,7 @@ from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 from .operational_control_plane import OperationalControlPlane
+from .operational_control_plane import OperationalControlPlane
 
 
 @dataclass
@@ -86,6 +87,7 @@ class UnifiedBrain:
         self.revenue_challenge = RevenueChallenge(self.organization)
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
+        self.control_plane = OperationalControlPlane()
         self.control_plane = OperationalControlPlane()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
