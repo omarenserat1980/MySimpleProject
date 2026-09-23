@@ -356,6 +356,29 @@ class UnifiedBrain:
             "requires_user_for_external_side_effects": True,
         }
 
+    def self_modify_code(
+        self,
+        changes: Iterable[CodeChange],
+        *,
+        reason: str,
+        commit_message: str,
+        remote: bool = True,
+    ) -> dict:
+        """Safely validate, checkpoint, test, and persist Brain source changes.
+
+        The coding tool is the execution boundary: paths are allowlisted, protected
+        credential files are rejected, Python is syntax-checked, the full regression
+        suite must pass before remote persistence, and failed validation restores the
+        last checkpoint. The GitHub token, when configured in the runtime, is never
+        exposed to the Brain or stored in source.
+        """
+        return self.code_tool_team.execute_autonomous_change(
+            changes,
+            reason=reason,
+            commit_message=commit_message,
+            remote=remote,
+        )
+
     def _bottleneck(self) -> str:
         snapshot = ecosystem_snapshot()
         return snapshot["layers"][0]["name"] if snapshot.get("layers") else "COGNITIVE_REASONING"
