@@ -7,6 +7,7 @@ commitments and irreversible side effects remain permission-gated.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+import json
 from time import time
 from typing import Any, Iterable, Mapping
 
@@ -39,6 +40,7 @@ from .operational_control_plane import OperationalControlPlane
 from .cognitive_workforce import CognitiveWorkforce
 from .code_workspace_tool import CodeWorkspaceTool, CodeChange
 from .code_tool_engineering_team import CodeToolEngineeringTeam
+from .remote_ai_gateway import RemoteAIGateway
 
 
 @dataclass
@@ -98,6 +100,7 @@ class UnifiedBrain:
         # Controlled self-development tool: source changes stay inside the configured workspace.
         self.code_workspace = CodeWorkspaceTool()
         self.code_tool_team = CodeToolEngineeringTeam(self.organization, self.code_workspace)
+        self.remote_ai = RemoteAIGateway()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -268,6 +271,7 @@ class UnifiedBrain:
             "safety_gates": True,
             "deployment": {"configured": False},
             "code_tool_engineering": self.code_tool_team.snapshot(),
+            "remote_ai": self.remote_ai.snapshot(),
         })
 
         # The Brain delegates the current objective through the organization.
@@ -348,6 +352,7 @@ class UnifiedBrain:
             "code_workspace": code_workspace,
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_tool_plan": code_tool_plan,
+            "remote_ai": self.remote_ai.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
@@ -355,6 +360,31 @@ class UnifiedBrain:
             "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
         }
+
+
+    def remote_reason(self, instruction: str, *, context: Mapping[str, Any] | None = None) -> dict:
+        """Ask the configured remote model for analysis without granting it side effects."""
+        result = self.remote_ai.ask(instruction, context=dict(context or {}))
+        return {"status": result.status, "text": result.text, "model": result.model, "error": result.error}
+
+    def self_modify_code_from_remote(self, objective: str, files: Mapping[str, str], *,
+                                     commit_message: str, remote: bool = True) -> dict:
+        """Use remote AI only to propose code; local gates decide whether it is applied."""
+        proposal = self.remote_ai.code_change_plan(objective, dict(files))
+        if proposal.status != "OK":
+            return {"status": proposal.status, "proposal": {"error": proposal.error, "model": proposal.model}}
+        try:
+            payload = json.loads(proposal.text)
+            raw_changes = payload.get("changes", [])
+            changes = [
+                CodeChange(str(x["path"]), str(x["content"]), str(x.get("reason", "remote proposal")))
+                for x in raw_changes
+            ]
+        except (ValueError, TypeError, KeyError) as exc:
+            return {"status": "INVALID_REMOTE_PROPOSAL", "error": str(exc)}
+        if not changes:
+            return {"status": "NO_CHANGES_PROPOSED"}
+        return self.self_modify_code(changes, reason=objective, commit_message=commit_message, remote=remote)
 
     def self_modify_code(
         self,
