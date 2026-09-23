@@ -1,15 +1,8 @@
 """Unified Brain V7 orchestrator.
 
-Coordinates the existing cognitive ecosystem into one bounded decision cycle:
-observe -> remember -> reason -> compare -> simulate -> prioritize -> develop
--> verify -> learn -> repeat.
-
-It can choose internal development work without asking the user each cycle.
-External publication, money movement, credential access, legal commitments and
-irreversible side effects remain explicitly gated by the existing governance
-layer.
-
-This is an orchestration engine, not a claim of superhuman intelligence.
+Coordinates bounded cognition and automatic capability planning. External
+publication, money movement, credentials, legal commitments and irreversible
+side effects remain permission-gated.
 """
 from __future__ import annotations
 
@@ -19,28 +12,11 @@ from typing import Any, Iterable, Mapping
 
 from .adaptive_priority_engine import PrioritySignal, rank_signals
 from .cognitive_meta_controller import decide
-from .cognitive_world_model import (
-    Hypothesis,
-    Observation,
-    update_many,
-    rank_hypotheses,
-)
-from .hierarchical_cognitive_architecture import (
-    Signal,
-    cognitive_cycle,
-)
-from .long_term_cognitive_memory import (
-    MemoryNode,
-    MemoryObservation,
-    Relation,
-    consolidate,
-    infer,
-)
+from .cognitive_world_model import Hypothesis, Observation, update_many, rank_hypotheses
+from .hierarchical_cognitive_architecture import Signal, cognitive_cycle
+from .long_term_cognitive_memory import MemoryNode, MemoryObservation, Relation, consolidate, infer
 from .cognitive_mesh import run_mesh
-from .meta_learning_controller import (
-    StrategyObservation,
-    recommend,
-)
+from .meta_learning_controller import StrategyObservation, recommend
 from .cognitive_ecosystem import ecosystem_snapshot
 from .capability_hub import CapabilityHub
 
@@ -57,31 +33,15 @@ class BrainState:
 
 
 class UnifiedBrain:
-    """Bounded autonomous internal coordinator."""
-
     SAFE_INTERNAL_ACTIONS = {
-        "observe",
-        "remember",
-        "reason",
-        "simulate",
-        "prioritize",
-        "develop",
-        "verify_local",
-        "learn",
-        "replan",
+        "observe", "remember", "reason", "simulate", "prioritize",
+        "develop", "verify_local", "learn", "replan",
     }
 
     BLOCKED_AUTONOMOUS_ACTIONS = {
-        "transfer_money",
-        "withdraw_money",
-        "borrow_money",
-        "trade_real_money",
-        "open_bank_account",
-        "sign_contract",
-        "publish_irreversible_legal_statement",
-        "delete_repository",
-        "rotate_credentials",
-        "read_secret",
+        "transfer_money", "withdraw_money", "borrow_money", "trade_real_money",
+        "open_bank_account", "sign_contract", "publish_irreversible_legal_statement",
+        "delete_repository", "rotate_credentials", "read_secret",
     }
 
     def __init__(
@@ -119,17 +79,10 @@ class UnifiedBrain:
         observation_list = list(observations)
         hypothesis_list = list(hypotheses)
 
-        # 1) Persistent memory
         self._observe(observation_list)
 
-        # 2) Hierarchical reasoning
-        hierarchy = cognitive_cycle(
-            signal_list,
-            causal_links=causal_links,
-            plans=plans,
-        )
+        hierarchy = cognitive_cycle(signal_list, causal_links=causal_links, plans=plans)
 
-        # 3) Parallel specialist reasoning
         mesh = run_mesh(
             objective,
             evidence=(
@@ -138,20 +91,21 @@ class UnifiedBrain:
             ),
         )
 
-        # 4) World-model update
-        world = update_many(hypothesis_list, [
-            Observation(
-                hypothesis_key=o.key,
-                outcome=o.outcome,
-                reliability=o.reliability,
-                source=o.source,
-            )
-            for o in observation_list
-            if o.key
-        ])
+        world = update_many(
+            hypothesis_list,
+            [
+                Observation(
+                    hypothesis_key=o.key,
+                    outcome=o.outcome,
+                    reliability=o.reliability,
+                    source=o.source,
+                )
+                for o in observation_list
+                if o.key
+            ],
+        )
         ranked_world = rank_hypotheses(world)
 
-        # 5) Adaptive priority
         priority_signals = []
         for item in hierarchy.get("alternatives", []):
             priority_signals.append(PrioritySignal(
@@ -168,19 +122,14 @@ class UnifiedBrain:
             ))
         priorities = rank_signals(priority_signals) if priority_signals else []
 
-        # 6) Meta-learning chooses a reasoning mode, not a permission level.
         meta = recommend(self.strategy_history)
-
-        # 7) Meta-controller integrates the adaptive signals.
         decision = decide(
             priority_signals,
             capability_gaps=[self._bottleneck()],
         ) if priority_signals else {"status": "NO_SIGNAL"}
 
-        # 8) Recurrent memory inference.
         memory_inference = infer(self.memory, self.relations, iterations=3)
 
-        # 9) Choose only bounded internal development.
         focus = (
             decision.get("objective")
             or meta["decision"].get("selected", {}).get("mode")
@@ -189,19 +138,21 @@ class UnifiedBrain:
         self.state.focus = str(focus)
         self.state.status = "READY_FOR_INTERNAL_DEVELOPMENT"
 
+        # Automatic capability selection is now part of every cognitive cycle.
+        capability_plan = self.capabilities.plan(objective)
+
         return {
             "cycle": self.state.cycle,
             "objective": objective,
             "hierarchical_reasoning": hierarchy,
             "cognitive_mesh": mesh,
-            "world_model": {
-                "hypotheses": [asdict(x) for x in ranked_world],
-            },
+            "world_model": {"hypotheses": [asdict(x) for x in ranked_world]},
             "adaptive_priority": priorities,
             "meta_learning": meta,
             "meta_decision": decision,
             "long_term_inference": memory_inference,
             "selected_internal_focus": self.state.focus,
+            "capability_plan": capability_plan,
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
