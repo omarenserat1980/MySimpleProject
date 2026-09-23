@@ -37,6 +37,7 @@ from .adaptive_learning_loop import AdaptiveLearningLoop
 from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
 from .cognitive_workforce import CognitiveWorkforce
+from .code_workspace_tool import CodeWorkspaceTool, CodeChange
 
 
 @dataclass
@@ -93,6 +94,8 @@ class UnifiedBrain:
         self.quality_controller = ReasoningQualityController()
         self.control_plane = OperationalControlPlane()
         self.cognitive_workforce = CognitiveWorkforce()
+        # Controlled self-development tool: source changes stay inside the configured workspace.
+        self.code_workspace = CodeWorkspaceTool()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -237,6 +240,7 @@ class UnifiedBrain:
         self.state.status = "READY_FOR_INTERNAL_DEVELOPMENT"
 
         capability_plan = self.capabilities.plan(objective)
+        code_workspace = self.code_workspace.snapshot()
 
         # Diversified revenue experiments: different employees receive different lawful paths.
         revenue_tasks = self.revenue_factory.generate(count=8)
@@ -337,6 +341,7 @@ class UnifiedBrain:
             "external_side_effects": False,
             "money_movement": False,
             "capability_hub": self.capabilities.snapshot(),
+            "code_workspace": code_workspace,
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
@@ -380,6 +385,7 @@ class UnifiedBrain:
             "reasoning_quality_controller": self.quality_controller.snapshot(),
             "operational_control_plane": self.control_plane.snapshot(),
             "cognitive_workforce": self.cognitive_workforce.snapshot(),
+            "code_workspace": self.code_workspace.snapshot(),
         }
 
 
