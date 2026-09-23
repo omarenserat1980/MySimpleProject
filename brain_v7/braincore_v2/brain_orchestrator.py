@@ -51,7 +51,7 @@ class UnifiedBrain:
         memory: Iterable[MemoryNode] = (),
         relations: Iterable[Relation] = (),
         strategy_history: Iterable[StrategyObservation] = (),
-        initial_employees: int = 10,
+        initial_employees: int | None = None,
     ) -> None:
         self.state = BrainState(started_at=time())
         self.memory = {m.key: m for m in memory}
