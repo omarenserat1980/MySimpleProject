@@ -13,6 +13,7 @@ Stages:
 7. analytics/learning
 8. security and safety
 9. deployment readiness
+10. coding-tool self-development
 """
 from __future__ import annotations
 
@@ -40,6 +41,7 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("S7", "ANALYTICS_LEARNING"),
     ("S8", "SECURITY_SAFETY"),
     ("S9", "DEPLOYMENT_READINESS"),
+    ("S10", "CODE_TOOL_SELF_DEVELOPMENT"),
 )
 
 
@@ -119,7 +121,14 @@ def evaluate(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             ("worker configuration", "health checks", "scheduled loop"),
             () if deployment.get("configured") else ("deployment_not_observed",),
             "Verify the deployed worker from provider logs before calling it live.",
+        ),        StageResult(
+            "S10", "CODE_TOOL_SELF_DEVELOPMENT",
+            "PASS" if snapshot.get("code_tool_engineering") else "BLOCKED",
+            ("dedicated_team", "safe_workspace", "atomic_changes", "syntax_validation", "checkpoints", "rollback"),
+            () if snapshot.get("code_tool_engineering") else ("code_tool_team_not_observed",),
+            "Continue the dedicated coding team loop; only apply validated changes inside the configured workspace.",
         ),
+
     ]
 
     live = tuple(r.stage_id for r in results if r.status == "LIVE")
