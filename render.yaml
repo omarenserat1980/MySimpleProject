@@ -19,6 +19,12 @@ services:
         value: "60"
       - key: STOP_BRAIN
         value: "0"
+      - key: BRAIN_GITHUB_REPOSITORY
+        value: "omarenserat1980/MySimpleProject"
+      - key: BRAIN_GITHUB_BRANCH
+        value: "main"
+      - key: GITHUB_TOKEN
+        sync: false
 
   - type: worker
     name: brain-v7-autonomous
@@ -38,6 +44,12 @@ services:
       - key: STOP_BRAIN
         value: "0"
       # Configure these as Render Secrets/Environment Variables before enabling production.
+      - key: BRAIN_GITHUB_REPOSITORY
+        value: "omarenserat1980/MySimpleProject"
+      - key: BRAIN_GITHUB_BRANCH
+        value: "main"
+      - key: GITHUB_TOKEN
+        sync: false
       - key: FACTORY_TOPICS_JSON
         sync: false
       - key: MEDIA_RENDER_URL
