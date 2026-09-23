@@ -14,7 +14,6 @@ import sys
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
-from .autonomous_task import run as run_task
 from .health_monitor import check as health_check
 from .continuous_goal_engine import next_goal
 from .worker_health import WorkerHealthRegistry
@@ -90,6 +89,9 @@ class AutonomousRuntime:
         self._save()
 
         try:
+            # Lazy-load the task engine so a single module/import regression is
+            # reported as a recoverable runtime error instead of killing Render.
+            from .autonomous_task import run as run_task
             objective = (
                 "نفّذ الهدف الحالي بأقل وقت وبطريقة مشروعة: "
                 + goal.title
@@ -120,7 +122,17 @@ class AutonomousRuntime:
         self._save()
 
         while not self.stop_requested():
-            self.run_cycle()
+            try:
+                self.run_cycle()
+            except Exception as exc:
+                self.state.last_error = repr(exc)
+                self.state.status = "RECOVERABLE_ERROR"
+                self._save()
+                self._heartbeat("ERROR", repr(exc))
+                # Keep the Render worker alive long enough for the next cycle
+                # to retry after transient imports, network failures, or I/O errors.
+                if not self.stop_requested():
+                    time.sleep(min(max(self.sleep_seconds, 5), 120))
             if not self.stop_requested():
                 time.sleep(self.sleep_seconds)
 
