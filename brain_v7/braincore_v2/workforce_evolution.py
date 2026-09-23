@@ -31,8 +31,7 @@ class WorkforceEvolutionEngine:
         self.max_active_workers = max_active_workers
         self.max_new_per_cycle = max_new_per_cycle
 
-    @staticmethod
-    def assign_training(self, employee_id: str) -> dict:
+        def assign_training(self, employee_id: str) -> dict:
         """Route employees through dedicated trainers before independent work."""
         employee = self.organization.employees.get(employee_id)
         if employee is None:
@@ -51,6 +50,7 @@ class WorkforceEvolutionEngine:
             "trainer_id": trainer.employee_id if trainer else None,
         }
 
+    @staticmethod
     def performance_score(employee: Employee) -> float:
         total = employee.completed_tasks + employee.failed_tasks
         if total == 0:
@@ -58,6 +58,30 @@ class WorkforceEvolutionEngine:
         success = employee.completed_tasks / total
         experience = min(employee.completed_tasks / 20.0, 1.0)
         return round((success * 0.75) + (experience * 0.25), 4)
+
+    @staticmethod
+    def financial_score(employee: Employee) -> float:
+        """Score realized net value, normalized to a bounded 0..1 contribution."""
+        net = max(0.0, employee.revenue_generated - employee.costs_attributed)
+        if net <= 0:
+            return 0.0
+        return round(net / (net + 1000.0), 4)
+
+    def promotion_score(self, employee: Employee) -> float:
+        """Promotion score: financial value has the largest single weight."""
+        performance = self.performance_score(employee)
+        financial = self.financial_score(employee)
+        total = employee.completed_tasks + employee.failed_tasks
+        quality = employee.completed_tasks / total if total else 0.0
+        learning = min(employee.training_completed / 10.0, 1.0)
+        return round(
+            financial * 0.35
+            + performance * 0.25
+            + learning * 0.15
+            + quality * 0.15
+            + min(len(set(employee.skills)) / 8.0, 1.0) * 0.10,
+            4,
+        )
 
     def _active_workers(self) -> int:
         return sum(e.status != "RETIRED" for e in self.organization.employees.values())
@@ -92,7 +116,7 @@ class WorkforceEvolutionEngine:
             if employee.status == "RETIRED":
                 continue
             total = employee.completed_tasks + employee.failed_tasks
-            score = self.performance_score(employee)
+            score = self.promotion_score(employee)
             if total >= 5 and score >= 0.90 and employee.title not in {
                 "Senior Specialist", "Team Supervisor", "Department Manager"
             }:
@@ -104,7 +128,7 @@ class WorkforceEvolutionEngine:
                     recipient_id=employee.manager_id,
                     message=f"{employee.employee_id} promoted after sustained strong performance",
                     priority="NORMAL",
-                    data={"performance_score": score, "completed_tasks": employee.completed_tasks},
+                    data={"promotion_score": score, "financial_score": self.financial_score(employee), "completed_tasks": employee.completed_tasks, "net_value": round(employee.revenue_generated - employee.costs_attributed, 2)},
                 )
         return promoted
 
