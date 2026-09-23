@@ -1,7 +1,8 @@
 """Long-running cinematic factory worker.
 
 All real external work is opt-in through environment configuration.
-No credentials are stored in source.
+No credentials are stored in source. The worker emits auditable heartbeats
+to stdout so Render logs can show liveness without exposing secrets.
 """
 from __future__ import annotations
 import json, os, time
@@ -12,10 +13,19 @@ from .cinematic_local_renderer import CinematicLocalRenderer
 from .youtube_api_client import YouTubeApiClient
 from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
 from .topic_sources import EnvTopicResearcher
+from .worker_health import WorkerHealthRegistry
+
+HEALTH = WorkerHealthRegistry(stale_after_s=180)
+WORKER_ID = os.getenv("WORKER_ID", "brain-v7-autonomous")
 
 
 def _truthy(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _heartbeat(status: str, cycle: int, detail: str = "") -> None:
+    beat = HEALTH.beat(WORKER_ID, status=status, cycle=cycle, detail=detail)
+    print(json.dumps({"event": "WORKER_HEARTBEAT", **beat}, ensure_ascii=False, default=str), flush=True)
 
 
 def _build_renderer():
@@ -24,7 +34,8 @@ def _build_renderer():
     return CinematicLocalRenderer()
 
 
-def run_once() -> dict[str, Any]:
+def run_once(cycle: int = 0) -> dict[str, Any]:
+    _heartbeat("HEALTHY", cycle, "starting_factory_cycle")
     cfg = FactoryConfig(
         audience=os.getenv("FACTORY_AUDIENCE", "Arabic-speaking YouTube audience"),
         target_duration_s=max(30, min(600, int(os.getenv("FACTORY_DURATION_SECONDS", "60")))),
@@ -49,17 +60,21 @@ def run_once() -> dict[str, Any]:
         description=os.getenv("YOUTUBE_DESCRIPTION", ""),
         tags=[x.strip() for x in os.getenv("YOUTUBE_TAGS", "سينما,محتوى عربي,YouTube").split(",") if x.strip()],
     )
-    print(json.dumps(result, ensure_ascii=False, default=str))
+    _heartbeat("HEALTHY", cycle, str(result.get("status", "cycle_complete")))
+    print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
     return result
 
 
 def run_forever() -> None:
     interval = max(60, int(os.getenv("FACTORY_INTERVAL_SECONDS", "21600")))
+    cycle = 0
     while not _truthy("STOP_BRAIN"):
+        cycle += 1
         try:
-            run_once()
+            run_once(cycle)
         except Exception as exc:
-            print(json.dumps({"status": "FACTORY_ERROR", "error": repr(exc)}, ensure_ascii=False))
+            _heartbeat("ERROR", cycle, repr(exc))
+            print(json.dumps({"status": "FACTORY_ERROR", "error": repr(exc)}, ensure_ascii=False), flush=True)
         time.sleep(interval)
 
 
