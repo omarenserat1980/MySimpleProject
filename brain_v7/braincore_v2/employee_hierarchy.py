@@ -319,6 +319,52 @@ class EmployeeHierarchy:
         task.escalation_path = task.escalation_path + [task.manager_id]
         return task
 
+    def ensure_team(
+        self,
+        *,
+        department_id: str,
+        name: str,
+        manager_id: str,
+        manager_title: str,
+        roles: tuple[tuple[str, tuple[str, ...]], ...],
+        goal: str,
+    ) -> dict[str, Any]:
+        """Idempotently create a named specialist team under the Brain."""
+        if department_id not in self.departments:
+            self.departments[department_id] = Department(department_id, name, manager_id)
+        if manager_id not in self.managers:
+            self.managers[manager_id] = Manager(
+                manager_id, manager_title, self.ROOT_ID, department_id
+            )
+        existing_titles = {
+            self.employees[e].title
+            for e in self.managers[manager_id].employee_ids
+            if e in self.employees
+        }
+        created: list[Employee] = []
+        for title, skills in roles:
+            if title in existing_titles:
+                continue
+            employee = Employee(
+                employee_id=self._next_employee_id(),
+                title=title,
+                department_id=department_id,
+                manager_id=manager_id,
+                skills=skills,
+                goals=[goal],
+                development_plan=["plan", "produce", "review", "measure", "improve"],
+            )
+            self.employees[employee.employee_id] = employee
+            self.managers[manager_id].employee_ids.append(employee.employee_id)
+            created.append(employee)
+        return {
+            "department_id": department_id,
+            "manager_id": manager_id,
+            "employee_ids": list(self.managers[manager_id].employee_ids),
+            "created": [asdict(e) for e in created],
+            "goal": goal,
+        }
+
     def ensure_specialized_team(
         self,
         *,
