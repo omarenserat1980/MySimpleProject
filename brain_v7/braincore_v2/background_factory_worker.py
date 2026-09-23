@@ -14,6 +14,7 @@ from .youtube_api_client import YouTubeApiClient
 from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
 from .topic_sources import EnvTopicResearcher
 from .worker_health import WorkerHealthRegistry
+from .youtube_channel_control import YouTubeChannelControl
 
 HEALTH = WorkerHealthRegistry(stale_after_s=180)
 WORKER_ID = os.getenv("WORKER_ID", "brain-v7-autonomous")
@@ -48,6 +49,8 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     assembler = FfmpegVideoAssembler()
     yt = YouTubeApiClient() if os.getenv("YOUTUBE_REFRESH_TOKEN") else None
     analytics = YouTubeDataAnalyticsClient() if yt else None
+    channel_control = YouTubeChannelControl() if yt else None
+    channel_snapshot = channel_control.channel() if channel_control else {"status": "YOUTUBE_NOT_CONFIGURED"}
     result = run_factory(
         researcher=researcher,
         renderer=renderer,
@@ -60,6 +63,7 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
         description=os.getenv("YOUTUBE_DESCRIPTION", ""),
         tags=[x.strip() for x in os.getenv("YOUTUBE_TAGS", "سينما,محتوى عربي,YouTube").split(",") if x.strip()],
     )
+    result["youtube_channel"] = channel_snapshot
     _heartbeat("HEALTHY", cycle, str(result.get("status", "cycle_complete")))
     print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
     return result
