@@ -8,6 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any
 
+from .cinematic_director import build_plan as build_cinematic_plan
+from .media_production_pipeline import MediaProductionPipeline
+from .youtube_publisher import prepare_package
+
 
 @dataclass(frozen=True)
 class ContentOpportunity:
@@ -68,6 +72,35 @@ def build_factory_plan(objective: str, opportunities: list[ContentOpportunity] |
             "After publication, ingest verified analytics and payment data; "
             "never infer revenue from views alone."
         ),
+    }
+
+
+def prepare_production(objective: str, *, title: str | None = None,
+                       description: str = "", tags: list[str] | None = None,
+                       duration_s: int = 60) -> dict[str, Any]:
+    """Create the complete local production package without publishing."""
+    director = build_cinematic_plan(objective, duration_s=duration_s)
+    pipeline = MediaProductionPipeline().plan(objective)
+    yt_title = title or objective[:90]
+    yt = prepare_package(
+        yt_title,
+        description or f"فيديو سينمائي عن: {objective}",
+        tags or ["سينما", "محتوى عربي", "YouTube"],
+        privacy="private",
+    )
+    return {
+        "status": "PRODUCTION_PACKAGE_READY",
+        "economic_goal": "maximize verified long-term revenue, not guaranteed revenue",
+        "director": {
+            "plan_id": director.plan_id,
+            "scenes": len(director.scenes),
+            "shots": sum(len(s.shots) for s in director.scenes),
+            "monetization_routes": list(director.monetization_routes),
+        },
+        "media_pipeline": pipeline,
+        "youtube": yt,
+        "external_publication": False,
+        "payment_execution": False,
     }
 
 
