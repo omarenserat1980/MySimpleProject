@@ -10,6 +10,8 @@ from .capability_orchestrator import execution_plan
 from .cinematic_director import snapshot as cinematic_director_snapshot
 from .cinematic_money_factory import snapshot as cinematic_money_snapshot
 from .youtube_publisher import snapshot as youtube_snapshot
+from .cinematic_factory_controller import snapshot as factory_snapshot
+from .youtube_analytics_learning import snapshot as analytics_snapshot
 
 
 class CapabilityHub:
@@ -25,6 +27,8 @@ class CapabilityHub:
         "cinematic": "cinematic_director",
         "cinematic_money": "cinematic_money_factory",
         "youtube": "youtube_publisher",
+        "cinematic_factory": "cinematic_factory_controller",
+        "youtube_analytics": "youtube_analytics_learning",
     }
 
     def __init__(self):
@@ -55,6 +59,12 @@ class CapabilityHub:
         if capability == "youtube":
             return {"status": "READY", "module": "youtube_publisher",
                     "details": youtube_snapshot()}
+        if capability == "cinematic_factory":
+            return {"status": "READY", "module": "cinematic_factory_controller",
+                    "details": factory_snapshot()}
+        if capability == "youtube_analytics":
+            return {"status": "READY", "module": "youtube_analytics_learning",
+                    "details": analytics_snapshot()}
         return {"status": "READY", "module": "multimedia_capability_hub",
                 "providers": self.media.available_providers(capability)}
 
@@ -70,6 +80,8 @@ class CapabilityHub:
             "cinematic": cinematic_director_snapshot(),
             "cinematic_money": cinematic_money_snapshot(),
             "youtube": youtube_snapshot(),
+            "cinematic_factory": factory_snapshot(),
+            "youtube_analytics": analytics_snapshot(),
             "web": web_snapshot(),
             "app": app_snapshot(),
             "automatic_orchestration": True,
