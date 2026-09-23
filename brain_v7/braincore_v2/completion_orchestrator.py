@@ -14,6 +14,7 @@ Stages:
 8. security and safety
 9. deployment readiness
 10. coding-tool self-development
+11. continuous self-improvement
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("S8", "SECURITY_SAFETY"),
     ("S9", "DEPLOYMENT_READINESS"),
     ("S10", "CODE_TOOL_SELF_DEVELOPMENT"),
+    ("S11", "CONTINUOUS_SELF_IMPROVEMENT"),
 )
 
 
