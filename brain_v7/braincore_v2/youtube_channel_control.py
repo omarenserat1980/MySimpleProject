@@ -32,7 +32,9 @@ class YouTubeChannelControl:
             r.raise_for_status()
             return {"status":"VIDEOS_RECEIVED","items":r.json().get("items",[])}
 
-    def update_video(self, video_id, title=None, description=None, tags=None, privacy=None):
+    def update_video(self, video_id, title=None, description=None, tags=None, privacy=None, *, authorized=False):
+        if not authorized:
+            return {"status": "AUTHORIZATION_REQUIRED", "video_id": video_id}
         with httpx.Client(timeout=self.timeout) as c:
             old=c.get(self.base+"/videos",params={"part":"snippet,status","id":video_id},headers=self._headers())
             old.raise_for_status()
