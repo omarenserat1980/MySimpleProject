@@ -28,6 +28,11 @@ class PaymentProvider(Protocol):
                         reason: str, idempotency_key: str) -> dict[str, Any]:
         ...
 
+class AuthorizationVerifier(Protocol):
+    def verify(self, *, intent: "TransferIntent", authorization: str) -> bool:
+        """Verify an authorization proof produced by the trusted user-facing layer."""
+        ...
+
 @dataclass(frozen=True)
 class TransferIntent:
     amount_jod: float
@@ -86,8 +91,10 @@ def reason_about_transfer(*, amount_jod: float, destination_ref: str, reason: st
 
 class PaymentExecutionOrchestrator:
     """Stateful, idempotent execution gate for one transfer intent."""
-    def __init__(self, provider: PaymentProvider | None = None) -> None:
+    def __init__(self, provider: PaymentProvider | None = None,
+                 authorization_verifier: AuthorizationVerifier | None = None) -> None:
         self.provider = provider
+        self.authorization_verifier = authorization_verifier
         self.state = "CREATED"
         self.last_result: dict[str, Any] | None = None
 
@@ -116,6 +123,10 @@ class PaymentExecutionOrchestrator:
             raise RuntimeError("PAYMENT_PROVIDER_NOT_CONFIGURED")
         if not authorization or not authorization.strip():
             raise PermissionError("EXPLICIT_AUTHORIZATION_REQUIRED")
+        if self.authorization_verifier is None:
+            raise PermissionError("AUTHORIZATION_VERIFIER_NOT_CONFIGURED")
+        if not self.authorization_verifier.verify(intent=intent, authorization=authorization):
+            raise PermissionError("AUTHORIZATION_INVALID")
         policy = evaluate_authorized_action("transfer_money", user_authorized=True)
         if not policy.allowed:
             raise PermissionError("GOVERNANCE_BLOCKED")
