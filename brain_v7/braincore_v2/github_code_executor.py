@@ -1,13 +1,9 @@
 """Bounded GitHub-backed code executor for the Electronic Brain.
 
-This adapter lets a deployed Brain persist approved source changes directly to
-its configured GitHub repository. The token is read only from the runtime
-environment and is never stored, logged, or returned. It only updates existing
-or new UTF-8 text files under an allowlisted source prefix; deletes, credential
-files, force pushes, branch rewrites, and arbitrary API calls are forbidden.
-
-The local CodeWorkspaceTool remains the first validation layer. This module is
-the remote persistence layer, not a general shell or Git client.
+The adapter persists validated source changes to one configured repository.
+Secrets are read only from the runtime environment and are never stored,
+logged, or returned. Multi-file persistence uses one atomic Git commit so a
+successful remote operation never leaves a half-written change set.
 """
 from __future__ import annotations
 
@@ -104,6 +100,7 @@ class GitHubCodeExecutor:
         )
 
     def apply(self, changes: Iterable[CodeChange], *, message: str) -> list[GitHubWriteResult]:
+        """Persist a change set as one Git commit."""
         changes = list(changes)
         if not changes:
             return []
@@ -112,39 +109,78 @@ class GitHubCodeExecutor:
         if not message.strip():
             raise ValueError("commit message is required")
 
-        results: list[GitHubWriteResult] = []
-        for change in changes:
-            safe = self._safe_path(change.path)
-            current_sha = ""
-            try:
-                current = self.inspect(safe)
-                current_sha = current.get("sha", "")
-            except RuntimeError as exc:
-                if "GitHub API 404" not in str(exc):
-                    raise
+        safe_changes = [(self._safe_path(c.path), c) for c in changes]
 
-            encoded = base64.b64encode(change.content.encode("utf-8")).decode("ascii")
-            payload = {
-                "message": message[:120],
-                "content": encoded,
-                "branch": self.branch,
-            }
-            if current_sha:
-                payload["sha"] = current_sha
+        # Resolve the branch tip and its base tree.
+        ref = self._request(
+            "GET",
+            f"/repos/{self.repository}/git/ref/heads/{self.branch}",
+        )
+        parent_sha = ref["object"]["sha"]
+        parent_commit = self._request(
+            "GET",
+            f"/repos/{self.repository}/git/commits/{parent_sha}",
+        )
+        base_tree = parent_commit["tree"]["sha"]
 
-            result = self._request(
-                "PUT",
-                f"/repos/{self.repository}/contents/{safe}",
-                payload,
+        tree_items = []
+        content_shas = {}
+        for safe, change in safe_changes:
+            blob = self._request(
+                "POST",
+                f"/repos/{self.repository}/git/blobs",
+                {
+                    "content": base64.b64encode(change.content.encode("utf-8")).decode("ascii"),
+                    "encoding": "base64",
+                },
             )
-            item = GitHubWriteResult(
+            blob_sha = blob["sha"]
+            content_shas[safe] = blob_sha
+            tree_items.append({
+                "path": safe,
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob_sha,
+            })
+
+        tree = self._request(
+            "POST",
+            f"/repos/{self.repository}/git/trees",
+            {"base_tree": base_tree, "tree": tree_items},
+        )
+        commit = self._request(
+            "POST",
+            f"/repos/{self.repository}/git/commits",
+            {
+                "message": message[:120],
+                "tree": tree["sha"],
+                "parents": [parent_sha],
+            },
+        )
+        commit_sha = commit["sha"]
+
+        # Fast-forward only: never force-rewrite the branch.
+        current_ref = self._request(
+            "GET",
+            f"/repos/{self.repository}/git/ref/heads/{self.branch}",
+        )
+        if current_ref["object"]["sha"] != parent_sha:
+            raise RuntimeError("GitHub branch changed during write; refusing non-fast-forward update")
+        self._request(
+            "PATCH",
+            f"/repos/{self.repository}/git/refs/heads/{self.branch}",
+            {"sha": commit_sha, "force": False},
+        )
+
+        results = [
+            GitHubWriteResult(
                 path=safe,
                 status="COMMITTED",
-                commit_sha=result.get("commit", {}).get("sha", ""),
-                content_sha=result.get("content", {}).get("sha", ""),
+                commit_sha=commit_sha,
+                content_sha=content_shas[safe],
             )
-            results.append(item)
-
+            for safe, _ in safe_changes
+        ]
         self.audit.extend(results)
         return results
 
@@ -159,5 +195,7 @@ class GitHubCodeExecutor:
             "delete_supported": False,
             "force_push_supported": False,
             "arbitrary_api_supported": False,
+            "atomic_multi_file_commit": True,
+            "fast_forward_only": True,
             "audit": [asdict(x) for x in self.audit[-20:]],
         }
