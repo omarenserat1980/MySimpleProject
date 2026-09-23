@@ -12,11 +12,13 @@ from .cinematic_money_factory import snapshot as cinematic_money_snapshot
 from .youtube_publisher import snapshot as youtube_snapshot
 from .cinematic_factory_controller import snapshot as factory_snapshot
 from .youtube_analytics_learning import snapshot as analytics_snapshot
+from .code_workspace_tool import CodeWorkspaceTool
 
 
 class CapabilityHub:
     CAPABILITIES = {
         "software": "software_factory",
+        "code_workspace": "code_workspace_tool",
         "web": "web_app_factory",
         "app": "app_factory",
         "image": "multimedia_capability_hub",
@@ -33,11 +35,15 @@ class CapabilityHub:
 
     def __init__(self):
         self.media = MultimediaHub()
+        self.code_workspace = CodeWorkspaceTool()
 
     def route(self, capability: str) -> dict:
         capability = capability.lower().strip()
         if capability not in self.CAPABILITIES:
             return {"status": "UNSUPPORTED_CAPABILITY", "capability": capability}
+        if capability == "code_workspace":
+            return {"status": "READY", "module": "code_workspace_tool",
+                    "details": self.code_workspace.snapshot()}
         if capability == "software":
             return {"status": "READY", "module": "software_factory",
                     "kinds": sorted(SOFTWARE_KINDS)}
@@ -85,4 +91,5 @@ class CapabilityHub:
             "web": web_snapshot(),
             "app": app_snapshot(),
             "automatic_orchestration": True,
+            "code_workspace": self.code_workspace.snapshot(),
         }
