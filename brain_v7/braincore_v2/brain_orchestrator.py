@@ -22,6 +22,7 @@ from .capability_hub import CapabilityHub
 from .employee_hierarchy import EmployeeHierarchy
 from .notifications import NotificationCenter
 from .workforce_evolution import WorkforceEvolutionEngine
+from .leadership_evolution import LeadershipEvolutionEngine
 
 
 @dataclass
@@ -64,6 +65,7 @@ class UnifiedBrain:
         self.organization = EmployeeHierarchy(initial_employees=initial_employees)
         self.notifications = NotificationCenter()
         self.workforce = WorkforceEvolutionEngine(self.organization, self.notifications)
+        self.leadership = LeadershipEvolutionEngine(self.organization, self.notifications)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -160,6 +162,7 @@ class UnifiedBrain:
             data={"objective": objective, "status": delegated.status},
         )
         evolution = self.workforce.evolve(objective)
+        leadership = self.leadership.run()
 
         return {
             "cycle": self.state.cycle,
@@ -177,6 +180,7 @@ class UnifiedBrain:
             "organization": self.organization.snapshot(),
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
+            "leadership": leadership,
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -206,6 +210,7 @@ class UnifiedBrain:
                 "max_new_per_cycle": self.workforce.max_new_per_cycle,
             },
             "notifications": self.notifications.snapshot(),
+            "leadership": self.leadership.snapshot(),
         }
 
 
