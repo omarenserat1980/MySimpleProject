@@ -10,12 +10,14 @@ from __future__ import annotations
 import json
 import os
 import time
+import sys
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
 from .autonomous_task import run as run_task
 from .health_monitor import check as health_check
 from .continuous_goal_engine import next_goal
+from .worker_health import WorkerHealthRegistry
 
 
 @dataclass
@@ -42,6 +44,8 @@ class AutonomousRuntime:
                    else os.getenv("BRAIN_SLEEP_SECONDS", "60"))
         )
         self.state = self._load()
+        self.health = WorkerHealthRegistry(stale_after_s=180)
+        self.worker_id = os.getenv("WORKER_ID", "brain-v7-core")
 
     def _load(self) -> RuntimeState:
         try:
@@ -61,7 +65,12 @@ class AutonomousRuntime:
             "1", "true", "yes"
         }
 
+    def _heartbeat(self, status: str, detail: str = "") -> None:
+        beat = self.health.beat(self.worker_id, status=status, cycle=self.state.cycle, detail=detail)
+        print(json.dumps({"event": "WORKER_HEARTBEAT", **beat}, ensure_ascii=False), flush=True)
+
     def run_cycle(self) -> dict:
+        self._heartbeat("HEALTHY", "cycle_start")
         if self.stop_requested():
             self.state.status = "STOP_REQUESTED"
             self._save()
@@ -91,6 +100,7 @@ class AutonomousRuntime:
             self.state.last_error = ""
             self.state.status = "CYCLE_COMPLETE"
             self._save()
+            self._heartbeat("HEALTHY", "cycle_complete")
             return {
                 "status": self.state.status,
                 "cycle": self.state.cycle,
@@ -101,6 +111,7 @@ class AutonomousRuntime:
             self.state.last_error = repr(exc)
             self.state.status = "RECOVERABLE_ERROR"
             self._save()
+            self._heartbeat("ERROR", repr(exc))
             return {"status": self.state.status, "error": repr(exc)}
 
     def run_forever(self) -> None:
