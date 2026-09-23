@@ -67,3 +67,19 @@ def test_workspace_allowlist_blocks_other_source_tree(tmp_path: Path):
     assert tool.read("brain_v7/allowed.py") == "VALUE = 1\n"
     with pytest.raises(PermissionError):
         tool.read("other.py")
+
+
+def test_code_tool_api_exposes_save_and_restore(tmp_path: Path):
+    from brain_v7.braincore_v2.code_tool_api import CodeTool
+    from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
+    from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
+
+    workspace = CodeWorkspaceTool(tmp_path)
+    team = CodeToolEngineeringTeam(EmployeeHierarchy(initial_employees=0), workspace)
+    api = CodeTool(workspace, team)
+    api.execute([CodeChange("brain_v7/api_test.py", "VALUE = 1\\n")], reason="test", commit_message="test: seed", persist_to_github=False)
+    checkpoint = api.save_checkpoint(["brain_v7/api_test.py"])
+    api.execute([CodeChange("brain_v7/api_test.py", "VALUE = 2\\n")], reason="test", commit_message="test: update", persist_to_github=False)
+    restored = api.restore_checkpoint(checkpoint["checkpoint_id"])
+    assert restored["status"] == "RESTORED"
+    assert workspace.read("brain_v7/api_test.py") == "VALUE = 1\\n"
