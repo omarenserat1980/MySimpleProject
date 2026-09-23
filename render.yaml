@@ -32,9 +32,9 @@ services:
       - key: FACTORY_INTERVAL_SECONDS
         value: "21600"
       - key: FACTORY_ALLOW_PRODUCTION
-        value: "0"
+        value: "1"
       - key: FACTORY_ALLOW_YOUTUBE_PUBLISH
-        value: "0"
+        value: "1"
       - key: STOP_BRAIN
         value: "0"
       # Configure these as Render Secrets/Environment Variables before enabling production.
@@ -50,3 +50,9 @@ services:
         sync: false
       - key: YOUTUBE_REFRESH_TOKEN
         sync: false
+      - key: YOUTUBE_PRIVACY
+        value: "public"
+      - key: FACTORY_DURATION_SECONDS
+        value: "60"
+      - key: FACTORY_MIN_QUALITY
+        value: "0.82"
