@@ -87,6 +87,31 @@ class WorkforceEvolutionEngine:
                 )
         return promoted
 
+    def _replace_retired(self, retired_ids: list[str]) -> list[Employee]:
+        """Maintain workforce continuity by replacing retired workers."""
+        created: list[Employee] = []
+        for retired_id in retired_ids[: self.max_new_per_cycle]:
+            retired = self.organization.employees.get(retired_id)
+            if retired is None:
+                continue
+            replacement = self.organization.add_employees(
+                1,
+                department_id=retired.department_id,
+                title=f"Replacement {retired.title}",
+                skills=tuple(retired.skills) or ("general",),
+            )
+            created.extend(replacement)
+            for employee in replacement:
+                self.notifications.emit(
+                    "EMPLOYEE_REPLACED",
+                    sender_id="BRAIN-001",
+                    recipient_id=employee.manager_id,
+                    message=f"Created {employee.employee_id} to replace retired {retired_id}",
+                    priority="HIGH",
+                    data={"retired_employee": retired_id, "skills": list(employee.skills)},
+                )
+        return created
+
     def _create_capacity(self, objective: str) -> list[Employee]:
         if self._active_workers() >= self.max_active_workers:
             return []
@@ -142,9 +167,13 @@ class WorkforceEvolutionEngine:
     def evolve(self, objective: str) -> dict[str, Any]:
         retired = self._retire_weak()
         promoted = self._promote_proven()
-        created = self._create_capacity(objective)
+        replacements = self._replace_retired(retired)
+        created = list(replacements)
+        if not replacements:
+            created.extend(self._create_capacity(objective))
         return {
             "created": [asdict(e) for e in created],
+            "replacement_count": len(replacements),
             "promoted": promoted,
             "retired": retired,
             "active_workers": self._active_workers(),
