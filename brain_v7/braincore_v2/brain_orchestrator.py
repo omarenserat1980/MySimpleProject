@@ -104,6 +104,9 @@ class UnifiedBrain:
         hypotheses: Iterable[Hypothesis] = (),
         causal_links: Iterable[Any] = (),
         plans: Mapping[str, Mapping[str, float]] | None = None,
+        outcome: str = "unknown",
+        reward: float = 0.0,
+        outcome_evidence: str = "",
     ) -> dict:
         self.state.cycle += 1
         self.state.objective = objective
@@ -269,13 +272,19 @@ class UnifiedBrain:
         control_plane = self.control_plane.snapshot()
         # Record only observable internal outcome signals. A cycle without an
         # explicit completion/failure result remains UNKNOWN; no success is invented.
+        normalized_outcome = str(outcome).lower().strip()
+        if normalized_outcome not in {"success", "failure", "unknown"}:
+            normalized_outcome = "unknown"
+        evidence = outcome_evidence
+        if normalized_outcome == "unknown" and not evidence:
+            evidence = "cycle_completed_without_external_success_evidence"
         self.adaptive_learning.record_outcome(
             cycle=self.state.cycle,
             objective=objective,
             strategy=str(focus),
-            outcome="unknown",
-            reward=0.0,
-            evidence="cycle_completed_without_external_success_evidence",
+            outcome=normalized_outcome,
+            reward=float(reward),
+            evidence=evidence,
         )
         self.control_plane.heartbeat("BRAIN-001", cycle=self.state.cycle, detail="reasoning_cycle_complete")
 
@@ -316,6 +325,7 @@ class UnifiedBrain:
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
+            "outcome": {"status": normalized_outcome, "reward": float(reward), "evidence": evidence},
             "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
         }
