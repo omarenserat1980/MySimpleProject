@@ -149,8 +149,24 @@ class PaymentExecutionOrchestrator:
             append_audit("payment_failed", self.last_result)
             return self.last_result
 
-        provider_reference = str(result.get("provider_reference", "")).strip()
-        provider_status = str(result.get("status", "")).upper()
+        # Normalize both dict-style production adapters and TransferResult objects.
+        if hasattr(result, "provider_reference"):
+            provider_reference = str(result.provider_reference or "").strip()
+            provider_status = str(result.status or "").upper()
+            provider_amount = getattr(result, "amount_jod", None)
+        else:
+            provider_reference = str(result.get("provider_reference", "")).strip()
+            provider_status = str(result.get("status", "")).upper()
+            provider_amount = result.get("amount_jod")
+        if provider_amount is not None and round(float(provider_amount), 2) != round(intent.amount_jod, 2):
+            self.state = "FAILED"
+            self.last_result = {
+                "status": "FAILED", "state": self.state,
+                "error": "PROVIDER_AMOUNT_MISMATCH",
+                "request_id": intent.request_id,
+            }
+            append_audit("payment_failed", self.last_result)
+            return self.last_result
         if not provider_reference:
             self.state = "FAILED"
             self.last_result = {"status": "FAILED", "state": self.state,
