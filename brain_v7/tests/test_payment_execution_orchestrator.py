@@ -53,7 +53,7 @@ def test_real_provider_submission_is_truthful_and_idempotency_key_is_bound():
 
 def test_provider_confirmation_allows_confirmed_state():
     provider = FakeProvider(status="CONFIRMED")
-    brain = PaymentExecutionOrchestrator(provider)
+    brain = PaymentExecutionOrchestrator(provider, FakeVerifier())
     readiness = brain.readiness(**ready_args())
     intent = TransferIntent(100.0, "wallet:verified", "authorized payout", readiness["request_id"])
     result = brain.execute_authorized(intent=intent, authorization="USER_APPROVED_EXACT_REQUEST")
