@@ -30,3 +30,15 @@ Fiverr, Freelancer, Mostaql, Khamsat, and LinkedIn.
 - Revenue is not counted until payment evidence is supplied.
 
 This system increases operational capability but does not guarantee income.
+
+## V1.1 additions
+
+- Platform adapter registry for six configured platforms.
+- Priority queue with retry/failure states.
+- Compliance gate for blocked and approval-required actions.
+- Evidence-based operational metrics.
+- Adapter capabilities are explicit; unsupported actions remain disabled.
+
+The adapters are intentionally API-neutral. They do not pretend that a
+platform integration exists when an official API/OAuth connection has not been
+configured.
