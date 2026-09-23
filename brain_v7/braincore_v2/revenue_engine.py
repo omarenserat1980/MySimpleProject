@@ -101,3 +101,20 @@ def choose_next_opportunity(items: list[Opportunity] | None = None) -> dict[str,
     """Choose the highest-scoring candidate without claiming it is profitable."""
     ranked = rank_opportunities(items)
     return ranked[0] if ranked else None
+
+
+def opportunity_financial_view(item: Opportunity, direct_cost_jod: float = 0.0) -> dict[str, Any]:
+    """Apply unit-economics metrics before an opportunity is selected."""
+    from .financial_intelligence import score_unit_economics
+    return score_unit_economics(item.expected_jod, direct_cost_jod, item.effort_hours)
+
+
+def rank_with_financials(items: list[Opportunity] | None = None,
+                         direct_cost_jod: float = 0.0) -> list[dict[str, Any]]:
+    from .financial_intelligence import score_unit_economics
+    ranked = rank_opportunities(items)
+    for row in ranked:
+        row["financial"] = score_unit_economics(
+            row["expected_jod"], direct_cost_jod, row["effort_hours"]
+        )
+    return ranked
