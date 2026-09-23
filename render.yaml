@@ -25,6 +25,12 @@ services:
         value: "main"
       - key: GITHUB_TOKEN
         sync: false
+      - key: OPENAI_BASE_URL
+        value: "https://api.openai.com/v1"
+      - key: BRAIN_REMOTE_MODEL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
 
   - type: worker
     name: brain-v7-autonomous
