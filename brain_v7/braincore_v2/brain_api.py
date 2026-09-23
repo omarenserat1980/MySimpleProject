@@ -9,6 +9,7 @@ or direct money movement.
 from __future__ import annotations
 
 from dataclasses import asdict
+import os
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -21,7 +22,10 @@ from .employee_hierarchy import EmployeeHierarchy
 
 router = APIRouter(prefix="/api/brain", tags=["brain-code"])
 access = AccessController()
-_workspace = CodeWorkspaceTool()
+_workspace = CodeWorkspaceTool(
+    root=os.getenv("BRAIN_CODE_ROOT") or os.getcwd(),
+    allowed_prefixes=("brain_v7/",),
+)
 _team = CodeToolEngineeringTeam(EmployeeHierarchy(initial_employees=0), _workspace)
 
 
