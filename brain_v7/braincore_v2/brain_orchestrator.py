@@ -27,6 +27,7 @@ from .advanced_talent import AdvancedTalentEngine
 from .cyber_immune import CyberImmuneSystem
 from .medical_unit import MedicalUnit
 from .intelligence_center import IntelligenceCenter
+from .digital_state import DigitalState
 
 
 @dataclass
@@ -74,6 +75,7 @@ class UnifiedBrain:
         self.immune = CyberImmuneSystem(self.organization)
         self.medical = MedicalUnit(self.immune)
         self.intelligence = IntelligenceCenter(self.notifications)
+        self.digital_state = DigitalState()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -177,6 +179,7 @@ class UnifiedBrain:
         immune_snapshot = self.immune.health()
         medical_snapshot = self.medical.snapshot()
         intelligence_snapshot = self.intelligence.snapshot()
+        state_snapshot = self.digital_state.dashboard()
         leadership = self.leadership.run()
 
         return {
@@ -200,6 +203,7 @@ class UnifiedBrain:
             "cyber_immune": immune_snapshot,
             "medical_unit": medical_snapshot,
             "intelligence_center": intelligence_snapshot,
+            "digital_state": state_snapshot,
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -234,6 +238,7 @@ class UnifiedBrain:
             "cyber_immune": self.immune.snapshot(),
             "medical_unit": self.medical.snapshot(),
             "intelligence_center": self.intelligence.snapshot(),
+            "digital_state": self.digital_state.snapshot(),
         }
 
 
