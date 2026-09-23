@@ -18,6 +18,8 @@ from .terminal_bridge import terminal_bridge
 from .revenue_engine import rank_opportunities, record_outcome
 from .self_development_engine import development_report, next_development
 from .solution_forge import forge
+from .brain_orchestrator import UnifiedBrain
+from .job_lifecycle import JobLifecycle
 
 MAX_STEPS = 12
 MAX_RUNTIME = 180
@@ -27,6 +29,8 @@ JOURNAL_PATH = Path(os.getenv("BRAIN_TASK_JOURNAL", "task_journal.json"))
 class AutonomousTask:
     def __init__(self) -> None:
         self.current: dict[str, Any] = {"status": "IDLE"}
+        self.brain = UnifiedBrain()
+        self.jobs = JobLifecycle()
         self._load_last()
 
     def _load_last(self) -> None:
@@ -94,6 +98,14 @@ class AutonomousTask:
             "started_at": time.time(),
             "steps": steps,
         }
+        job = self.jobs.create(objective)
+        self.jobs.transition(job.job_id, "RUNNING")
+        # The organizational brain interprets the goal and delegates work to
+        # software workers before the bounded action loop proceeds.
+        cognitive_result = self.brain.cycle(objective)
+        self.current["brain_cycle"] = cognitive_result.get("cycle")
+        self.current["selected_strategy"] = cognitive_result.get("adaptive_reasoning", {}).get("selected_strategy")
+        self.current["employee_delegation"] = cognitive_result.get("delegated_task")
         self._save()
 
         for index in range(1, max(1, min(int(max_steps), MAX_STEPS)) + 1):
@@ -171,8 +183,13 @@ class AutonomousTask:
 
         if self.current.get("status") == "RUNNING":
             self.current["status"] = "STEP_LIMIT"
+        if self.current.get("status") == "COMPLETED":
+            self.jobs.transition(job.job_id, "COMPLETED", result={"steps": len(steps)})
+        elif self.current.get("status") in {"FAILED", "TIMEOUT", "STEP_LIMIT"}:
+            self.jobs.transition(job.job_id, "FAILED", result={"status": self.current.get("status")})
         self.current["completed_steps"] = len(steps)
         self.current["completed_actions"] = completed
+        self.current["job"] = self.jobs.snapshot()
         self.current["duration_seconds"] = round(time.time() - started, 3)
         self.current["finished_at"] = time.time()
         self._save()
