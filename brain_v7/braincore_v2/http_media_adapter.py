@@ -51,7 +51,7 @@ class FfmpegVideoAssembler:
             manifest=work/"concat.txt"
             manifest.write_text("".join(f"file '{p.as_posix()}'\n" for p in files),encoding="utf-8")
             out=work/"final.mp4"
-            subprocess.run([self.ffmpeg,"-y","-f","concat","-safe","0","-i",str(manifest),"-c","copy",str(out)],check=True,capture_output=True,text=True)
+            subprocess.run([self.ffmpeg,"-y","-f","concat","-safe","0","-i",str(manifest),"-c:v","libx264","-preset",os.getenv("LOCAL_FFMPEG_PRESET","veryfast"),"-crf","27","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],check=True,capture_output=True,text=True)
             return {"status":"ASSEMBLED","video_ref":str(out),"shot_count":len(files)}
         except Exception as exc:
             return {"status":"ASSEMBLY_BLOCKED","reason":repr(exc)}
