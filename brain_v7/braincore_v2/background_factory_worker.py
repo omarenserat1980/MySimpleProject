@@ -10,6 +10,7 @@ from .cinematic_factory_controller import run_factory, FactoryConfig
 from .http_media_adapter import HttpShotRenderer, FfmpegVideoAssembler
 from .cinematic_local_renderer import CinematicLocalRenderer
 from .youtube_api_client import YouTubeApiClient
+from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
 from .topic_sources import EnvTopicResearcher
 
 
@@ -35,12 +36,14 @@ def run_once() -> dict[str, Any]:
     renderer = _build_renderer()
     assembler = FfmpegVideoAssembler()
     yt = YouTubeApiClient() if os.getenv("YOUTUBE_REFRESH_TOKEN") else None
+    analytics = YouTubeDataAnalyticsClient() if yt else None
     result = run_factory(
         researcher=researcher,
         renderer=renderer,
         assembler=assembler,
         config=cfg,
         youtube_client=yt,
+        analytics_client=analytics,
         authorized_production=_truthy("FACTORY_ALLOW_PRODUCTION"),
         authorized_publish=_truthy("FACTORY_ALLOW_YOUTUBE_PUBLISH"),
         description=os.getenv("YOUTUBE_DESCRIPTION", ""),
