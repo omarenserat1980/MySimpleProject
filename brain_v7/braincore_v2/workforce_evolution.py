@@ -209,6 +209,50 @@ class WorkforceEvolutionEngine:
             )
         return created
 
+    def competitive_review(self) -> dict[str, Any]:
+        """Review every employee for hiring fit, promotion, retention, or retirement."""
+        rows = []
+        for employee in self.organization.employees.values():
+            if employee.status == "RETIRED":
+                continue
+            total = employee.completed_tasks + employee.failed_tasks
+            performance = self.performance_score(employee)
+            financial = self.financial_score(employee)
+            promotion = self.promotion_score(employee)
+            rows.append({
+                "employee_id": employee.employee_id,
+                "title": employee.title,
+                "department_id": employee.department_id,
+                "status": employee.status,
+                "tasks": total,
+                "performance_score": performance,
+                "financial_score": financial,
+                "promotion_score": promotion,
+                "net_value": round(employee.revenue_generated - employee.costs_attributed, 2),
+                "decision": (
+                    "RETIRE"
+                    if total >= 8 and performance < 0.35
+                    else "PROMOTE"
+                    if total >= 5 and promotion >= 0.90
+                    else "RETAIN_AND_TRAIN"
+                    if total < 5 or employee.training_completed < 1
+                    else "RETAIN"
+                ),
+            })
+        rows.sort(key=lambda x: (-x["promotion_score"], -x["financial_score"], x["employee_id"]))
+        return {
+            "total_reviewed": len(rows),
+            "ranking": rows,
+            "top_candidate": rows[0] if rows else None,
+            "decisions": {
+                "promote": sum(x["decision"] == "PROMOTE" for x in rows),
+                "retain": sum(x["decision"] == "RETAIN" for x in rows),
+                "retain_and_train": sum(x["decision"] == "RETAIN_AND_TRAIN" for x in rows),
+                "retire": sum(x["decision"] == "RETIRE" for x in rows),
+            },
+            "note": "Hiring replacements are triggered when RETIRE decisions are applied; this review itself is non-destructive.",
+        }
+
     def evolve(self, objective: str) -> dict[str, Any]:
         retired = self._retire_weak()
         promoted = self._promote_proven()
