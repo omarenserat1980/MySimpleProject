@@ -33,7 +33,7 @@ from .revenue_challenge import RevenueChallenge
 from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
-from .operational_control_plane import OperationalControlPlane
+from .adaptive_learning_loop import AdaptiveLearningLoop
 from .operational_control_plane import OperationalControlPlane
 
 
@@ -87,7 +87,7 @@ class UnifiedBrain:
         self.revenue_challenge = RevenueChallenge(self.organization)
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
-        self.control_plane = OperationalControlPlane()
+        self.adaptive_learning = AdaptiveLearningLoop()
         self.control_plane = OperationalControlPlane()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
@@ -185,8 +185,19 @@ class UnifiedBrain:
 
         memory_inference = infer(self.memory, self.relations, iterations=3)
 
+        candidate_strategies = [
+            reasoning.selected_strategy,
+            *[h.label for h in reasoning.hypotheses],
+            decision.get("objective", ""),
+            meta["decision"].get("selected", {}).get("mode", ""),
+            self._bottleneck(),
+        ]
+        learning_recommendation = self.adaptive_learning.recommend(candidate_strategies)
+        learned_focus = learning_recommendation.get("selected")
         focus = (
-            reasoning.selected_strategy
+            learned_focus
+            if learned_focus and learning_recommendation.get("confidence", 0.0) >= 0.55
+            else reasoning.selected_strategy
             if reasoning.confidence >= 0.55
             else decision.get("objective")
             or meta["decision"].get("selected", {}).get("mode")
@@ -243,6 +254,16 @@ class UnifiedBrain:
         state_snapshot = self.digital_state.dashboard()
         leadership = self.leadership.run()
         control_plane = self.control_plane.snapshot()
+        # Record only observable internal outcome signals. A cycle without an
+        # explicit completion/failure result remains UNKNOWN; no success is invented.
+        self.adaptive_learning.record_outcome(
+            cycle=self.state.cycle,
+            objective=objective,
+            strategy=str(focus),
+            outcome="unknown",
+            reward=0.0,
+            evidence="cycle_completed_without_external_success_evidence",
+        )
         self.control_plane.heartbeat("BRAIN-001", cycle=self.state.cycle, detail="reasoning_cycle_complete")
 
         return {
@@ -279,6 +300,8 @@ class UnifiedBrain:
             "money_movement": False,
             "capability_hub": self.capabilities.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
+            "adaptive_learning": self.adaptive_learning.snapshot(),
+            "learning_recommendation": learning_recommendation,
             "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
         }
@@ -314,6 +337,7 @@ class UnifiedBrain:
             "revenue_challenge": self.revenue_challenge.snapshot(),
             "external_work": self.external_work.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
+            "adaptive_learning": self.adaptive_learning.snapshot(),
             "operational_control_plane": self.control_plane.snapshot(),
         }
 
