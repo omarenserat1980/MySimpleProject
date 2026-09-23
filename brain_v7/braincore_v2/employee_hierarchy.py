@@ -26,6 +26,13 @@ class Employee:
     revenue_generated: float = 0.0
     costs_attributed: float = 0.0
     training_completed: int = 0
+    competency_scores: dict[str, float] = field(default_factory=dict)
+    goals: list[str] = field(default_factory=list)
+    development_plan: list[str] = field(default_factory=list)
+    last_review_at: float | None = None
+    attendance_score: float = 1.0
+    collaboration_score: float = 0.5
+    wellbeing_flag: bool = False
 
 
 @dataclass
