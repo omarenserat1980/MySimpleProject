@@ -213,6 +213,7 @@ class UnifiedBrain:
             "revenue_tasks": revenue_assignments,
             "revenue_challenge": self.revenue_challenge.progress(),
             "external_work": external_work_snapshot,
+            "external_work_metrics": self.external_work.metrics(),
             "organization": self.organization.snapshot(),
             "workforce_evolution": evolution,
             "notifications": self.notifications.snapshot(),
