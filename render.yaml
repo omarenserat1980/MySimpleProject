@@ -8,6 +8,40 @@ services:
     healthCheckPath: /health
 
 
+  - type: web
+    name: brain-v7-api
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r brain_v7/requirements.txt
+    startCommand: uvicorn brain_v7.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BRAIN_API_AUTH
+        value: "true"
+      - key: BRAIN_CODE_WRITE_ENABLED
+        value: "false"
+      - key: BRAIN_CODE_GITHUB_PUBLISH_ENABLED
+        value: "false"
+      - key: BRAIN_CODE_ROOT
+        value: "/app"
+      - key: BRAIN_API_KEY
+        sync: false
+      - key: BRAIN_API_SCOPES
+        value: "brain:read,code:read,code:preview,code:verify,code:checkpoint,code:restore"
+      - key: BRAIN_GITHUB_REPOSITORY
+        value: "omarenserat1980/MySimpleProject"
+      - key: BRAIN_GITHUB_BRANCH
+        value: "main"
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: "https://api.openai.com/v1"
+      - key: BRAIN_REMOTE_MODEL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
   - type: worker
     name: brain-v7-core
     runtime: docker
