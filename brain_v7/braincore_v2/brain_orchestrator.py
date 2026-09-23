@@ -43,6 +43,7 @@ from .code_tool_engineering_team import CodeToolEngineeringTeam
 from .code_tool_api import CodeTool
 from .code_evolution_controller import CodeEvolutionController
 from .remote_ai_gateway import RemoteAIGateway
+from .youtube_team import YouTubeTeam
 
 
 @dataclass
@@ -106,6 +107,8 @@ class UnifiedBrain:
         self.code_tool = CodeTool(self.code_workspace, self.code_tool_team)
         self.code_evolution = CodeEvolutionController(self.code_tool_team)
         self.remote_ai = RemoteAIGateway()
+        # Dedicated twenty-person YouTube production department.
+        self.youtube_team = YouTubeTeam(self.organization)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -279,6 +282,7 @@ class UnifiedBrain:
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_tool": self.code_tool.snapshot(),
             "remote_ai": self.remote_ai.snapshot(),
+            "youtube_team": self.youtube_team.snapshot(),
         })
 
         # The Brain delegates the current objective through the organization.
@@ -456,6 +460,7 @@ class UnifiedBrain:
             "code_workspace": self.code_workspace.snapshot(),
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_evolution": self.code_evolution.snapshot(),
+            "youtube_team": self.youtube_team.snapshot(),
         }
 
 
