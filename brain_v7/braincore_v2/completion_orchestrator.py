@@ -130,7 +130,13 @@ def evaluate(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             () if snapshot.get("code_tool_engineering") else ("code_tool_team_not_observed",),
             "Continue the dedicated coding team loop; only apply validated changes inside the configured workspace.",
         ),
-
+        StageResult(
+            "S11", "CONTINUOUS_SELF_IMPROVEMENT",
+            "PASS" if snapshot.get("code_evolution") else "BLOCKED",
+            ("queued_jobs", "validated_apply", "regression_gate", "rollback", "remote_persistence_audit"),
+            () if snapshot.get("code_evolution") else ("code_evolution_not_observed",),
+            "Feed only validated source changes into the code-evolution controller.",
+        ),
     ]
 
     live = tuple(r.stage_id for r in results if r.status == "LIVE")
