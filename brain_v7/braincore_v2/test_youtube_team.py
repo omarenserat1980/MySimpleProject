@@ -19,3 +19,14 @@ def test_youtube_team_is_idempotent():
     assert first["employee_ids"] if "employee_ids" in first else True
     assert second["employee_count"] == 20
     assert org.departments["DEPT-YOUTUBE"].manager_id == "MGR-YOUTUBE"
+
+
+def test_youtube_pipeline_creates_staged_plan_without_publishing():
+    org = EmployeeHierarchy()
+    team = YouTubeTeam(org)
+    plan = team.run_pipeline("إنشاء فيديو تعليمي عربي")
+    assert plan["status"] == "PIPELINE_PLANNED"
+    assert len(plan["tasks"]) == 20
+    assert len(plan["stages"]) == 8
+    assert plan["publication"]["status"] == "AUTHORIZATION_REQUIRED"
+    assert plan["publication"]["credentials_managed_by_brain"] is False
