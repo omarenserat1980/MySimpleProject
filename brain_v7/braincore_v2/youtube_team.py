@@ -77,6 +77,31 @@ class YouTubeTeam:
             })
         return tasks
 
+    def run_pipeline(self, objective: str) -> dict[str, Any]:
+        """Run the internal twenty-role pipeline as a staged, auditable plan.
+
+        Employees may prepare and review work automatically. External publication
+        remains a separate authorization gate.
+        """
+        tasks = self.assign_content_pipeline(objective)
+        stages = [
+            ("strategy", ["YouTube Executive Producer", "Channel Strategist"]),
+            ("research", ["Topic Researcher", "Trend Analyst"]),
+            ("creative", ["Script Writer", "Story Editor", "Title Specialist", "Thumbnail Designer"]),
+            ("production", ["Cinematic Director", "Video Producer", "Video Editor", "Motion Graphics Designer", "Audio Engineer", "Voiceover Specialist"]),
+            ("distribution", ["SEO Specialist", "Community Manager", "Shorts Producer"]),
+            ("qa", ["Quality Assurance Reviewer"]),
+            ("analytics", ["Analytics Scientist"]),
+            ("release", ["Publishing Operations Coordinator"]),
+        ]
+        return {
+            "status": "PIPELINE_PLANNED",
+            "objective": objective,
+            "tasks": tasks,
+            "stages": [{"stage": n, "roles": roles, "external_side_effects": False} for n, roles in stages],
+            "publication": {"status": "AUTHORIZATION_REQUIRED", "credentials_managed_by_brain": False, "money_movement": False},
+        }
+
     def snapshot(self) -> dict[str, Any]:
         employees = [
             self.organization.employees[eid]
