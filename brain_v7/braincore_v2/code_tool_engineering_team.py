@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 from .code_workspace_tool import CodeChange, CodeWorkspaceTool
 from .employee_hierarchy import EmployeeHierarchy
+from .github_code_executor import GitHubCodeExecutor
 
 
 @dataclass
@@ -33,6 +34,7 @@ class CodeToolEngineeringTeam:
     def __init__(self, organization: EmployeeHierarchy, workspace: CodeWorkspaceTool) -> None:
         self.organization = organization
         self.workspace = workspace
+        self.remote = GitHubCodeExecutor()
         self.team = organization.ensure_specialized_team(department_id=self.TEAM_DEPARTMENT)
         self.queue: list[CodingImprovement] = []
         self.cycles = 0
@@ -98,6 +100,38 @@ class CodeToolEngineeringTeam:
     def verify(self, paths: Iterable[str] = ()) -> dict[str, Any]:
         return self.workspace.verify(paths)
 
+
+    def execute_autonomous_change(
+        self,
+        changes: Iterable[CodeChange],
+        *,
+        reason: str,
+        commit_message: str,
+        remote: bool = True,
+    ) -> dict[str, Any]:
+        """Validate, checkpoint, apply locally, then optionally persist to GitHub."""
+        changes = list(changes)
+        preview = self.validate_change(changes)
+        checkpoint = self.workspace.checkpoint([c.path for c in changes])
+        local_results = self.workspace.apply(changes, validate_python=True)
+        remote_results = []
+        remote_status = "NOT_REQUESTED"
+        if remote:
+            if self.remote.configured:
+                remote_results = self.remote.apply(changes, message=commit_message)
+                remote_status = "COMMITTED"
+            else:
+                remote_status = "REMOTE_NOT_CONFIGURED"
+        return {
+            "status": "APPLIED_LOCALLY",
+            "reason": reason,
+            "preview": preview,
+            "checkpoint": checkpoint,
+            "local_results": [asdict(x) for x in local_results],
+            "remote_status": remote_status,
+            "remote_results": [asdict(x) for x in remote_results],
+        }
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "specialization": self.TEAM_TITLE,
@@ -109,6 +143,8 @@ class CodeToolEngineeringTeam:
             "cycles": self.cycles,
             "queue": [asdict(x) for x in self.queue[-50:]],
             "workspace": self.workspace.snapshot(),
+            "github_executor": self.remote.snapshot(),
+            "automatic_remote_persistence": self.remote.configured,
             "external_side_effects": False,
             "credential_storage": False,
             "money_movement": False,
