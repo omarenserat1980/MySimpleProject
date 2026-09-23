@@ -1,8 +1,8 @@
 """Unified Brain V7 orchestrator.
 
-Coordinates bounded cognition and automatic capability planning. External
-publication, money movement, credentials, legal commitments and irreversible
-side effects remain permission-gated.
+Coordinates bounded cognition, capability planning, and a scalable management
+hierarchy. External publication, money movement, credentials, legal
+commitments and irreversible side effects remain permission-gated.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from .cognitive_mesh import run_mesh
 from .meta_learning_controller import StrategyObservation, recommend
 from .cognitive_ecosystem import ecosystem_snapshot
 from .capability_hub import CapabilityHub
+from .employee_hierarchy import EmployeeHierarchy
 
 
 @dataclass
@@ -35,7 +36,7 @@ class BrainState:
 class UnifiedBrain:
     SAFE_INTERNAL_ACTIONS = {
         "observe", "remember", "reason", "simulate", "prioritize",
-        "develop", "verify_local", "learn", "replan",
+        "develop", "verify_local", "learn", "replan", "delegate",
     }
 
     BLOCKED_AUTONOMOUS_ACTIONS = {
@@ -50,12 +51,15 @@ class UnifiedBrain:
         memory: Iterable[MemoryNode] = (),
         relations: Iterable[Relation] = (),
         strategy_history: Iterable[StrategyObservation] = (),
+        initial_employees: int = 10,
     ) -> None:
         self.state = BrainState(started_at=time())
         self.memory = {m.key: m for m in memory}
         self.relations = list(relations)
         self.strategy_history = list(strategy_history)
         self.capabilities = CapabilityHub()
+        # Organizational layer: one Brain -> managers -> departments -> employees.
+        self.organization = EmployeeHierarchy(initial_employees=initial_employees)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -138,8 +142,10 @@ class UnifiedBrain:
         self.state.focus = str(focus)
         self.state.status = "READY_FOR_INTERNAL_DEVELOPMENT"
 
-        # Automatic capability selection is now part of every cognitive cycle.
         capability_plan = self.capabilities.plan(objective)
+
+        # The Brain delegates the current objective through the organization.
+        delegated = self.organization.assign_task(objective)
 
         return {
             "cycle": self.state.cycle,
@@ -153,6 +159,8 @@ class UnifiedBrain:
             "long_term_inference": memory_inference,
             "selected_internal_focus": self.state.focus,
             "capability_plan": capability_plan,
+            "delegated_task": asdict(delegated),
+            "organization": self.organization.snapshot(),
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -175,6 +183,7 @@ class UnifiedBrain:
             "external_side_effects": False,
             "permission_escalation": False,
             "capability_hub": self.capabilities.snapshot(),
+            "organization": self.organization.snapshot(),
         }
 
 
