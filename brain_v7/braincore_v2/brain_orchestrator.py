@@ -35,6 +35,7 @@ from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 from .adaptive_learning_loop import AdaptiveLearningLoop
+from .continuous_self_improvement import ContinuousSelfImprovement
 from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
 from .cognitive_workforce import CognitiveWorkforce
@@ -95,6 +96,7 @@ class UnifiedBrain:
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
         self.adaptive_learning = AdaptiveLearningLoop()
+        self.self_improvement = ContinuousSelfImprovement()
         self.quality_controller = ReasoningQualityController()
         self.control_plane = OperationalControlPlane()
         self.cognitive_workforce = CognitiveWorkforce()
@@ -248,6 +250,17 @@ class UnifiedBrain:
 
         capability_plan = self.capabilities.plan(objective)
         code_tool_plan = self.code_tool_team.plan_cycle()
+        self_improvement_plan = self.self_improvement.plan(
+            objective=objective,
+            recommendations=quality.recommendations,
+            quality=quality.overall,
+            failures=0,
+            evidence=[
+                f"reasoning_quality={quality.overall:.3f}",
+                f"contradictions={len(reasoning.contradictions)}",
+                f"alternatives={len(reasoning.hypotheses)}",
+            ],
+        )
         code_workspace = self.code_workspace.snapshot()
         code_tool = self.code_tool.snapshot()
 
@@ -361,6 +374,8 @@ class UnifiedBrain:
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
+            "self_improvement": self.self_improvement.snapshot(),
+            "self_improvement_plan": self_improvement_plan,
             "outcome": {"status": normalized_outcome, "reward": float(reward), "evidence": evidence},
             "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
@@ -446,6 +461,7 @@ class UnifiedBrain:
             "external_work": self.external_work.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
+            "self_improvement": self.self_improvement.snapshot(),
             "reasoning_quality_controller": self.quality_controller.snapshot(),
             "operational_control_plane": self.control_plane.snapshot(),
             "cognitive_workforce": self.cognitive_workforce.snapshot(),
