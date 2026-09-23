@@ -8,11 +8,20 @@ import json, os, time
 from typing import Any
 from .cinematic_factory_controller import run_factory, FactoryConfig
 from .http_media_adapter import HttpShotRenderer, FfmpegVideoAssembler
+from .local_motion_renderer import LocalMotionRenderer
 from .youtube_api_client import YouTubeApiClient
 from .topic_sources import EnvTopicResearcher
 
+
 def _truthy(name: str, default: str = "0") -> bool:
-    return os.getenv(name, default).strip().lower() in {"1","true","yes","on"}
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_renderer():
+    if os.getenv("MEDIA_RENDER_URL", "").strip():
+        return HttpShotRenderer()
+    return LocalMotionRenderer()
+
 
 def run_once() -> dict[str, Any]:
     cfg = FactoryConfig(
@@ -23,7 +32,7 @@ def run_once() -> dict[str, Any]:
         publish_privacy=os.getenv("YOUTUBE_PRIVACY", "private"),
     )
     researcher = EnvTopicResearcher()
-    renderer = HttpShotRenderer()
+    renderer = _build_renderer()
     assembler = FfmpegVideoAssembler()
     yt = YouTubeApiClient() if os.getenv("YOUTUBE_REFRESH_TOKEN") else None
     result = run_factory(
@@ -40,14 +49,16 @@ def run_once() -> dict[str, Any]:
     print(json.dumps(result, ensure_ascii=False, default=str))
     return result
 
+
 def run_forever() -> None:
-    interval=max(60, int(os.getenv("FACTORY_INTERVAL_SECONDS", "21600")))
+    interval = max(60, int(os.getenv("FACTORY_INTERVAL_SECONDS", "21600")))
     while not _truthy("STOP_BRAIN"):
         try:
             run_once()
         except Exception as exc:
-            print(json.dumps({"status":"FACTORY_ERROR","error":repr(exc)}, ensure_ascii=False))
+            print(json.dumps({"status": "FACTORY_ERROR", "error": repr(exc)}, ensure_ascii=False))
         time.sleep(interval)
+
 
 if __name__ == "__main__":
     run_forever()
