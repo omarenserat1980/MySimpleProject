@@ -91,3 +91,79 @@ class HRManagementEngine:
                 for e in active
             ),
         }
+
+
+class TalentDevelopmentEngine:
+    """Continuous evidence-based talent lifecycle orchestration."""
+
+    LEARNING_PATHS = (
+        "core_competencies", "role_skills", "communication",
+        "problem_solving", "quality", "security", "financial_awareness",
+        "knowledge_sharing", "leadership", "innovation",
+    )
+
+    def __init__(self, organization: EmployeeHierarchy) -> None:
+        self.organization = organization
+
+    def employee_profile(self, employee_id: str) -> dict[str, Any]:
+        e = self.organization.employees[employee_id]
+        return {
+            "employee_id": e.employee_id,
+            "role": e.title,
+            "department_id": e.department_id,
+            "competencies": dict(e.competency_scores),
+            "goals": list(e.goals),
+            "development_plan": list(e.development_plan),
+            "training_completed": e.training_completed,
+            "performance_history": {
+                "completed_tasks": e.completed_tasks,
+                "failed_tasks": e.failed_tasks,
+                "net_value": round(e.revenue_generated - e.costs_attributed, 2),
+                "collaboration": e.collaboration_score,
+            },
+        }
+
+    def continuous_development_cycle(self, employee_id: str) -> dict[str, Any]:
+        e = self.organization.employees[employee_id]
+        gaps = [k for k, v in e.competency_scores.items() if v < 70]
+        if not e.competency_scores:
+            gaps = list(self.LEARNING_PATHS[:4])
+        e.development_plan = [f"Develop: {g}" for g in gaps]
+        return {
+            "employee_id": employee_id,
+            "training_required": bool(e.development_plan),
+            "development_plan": list(e.development_plan),
+            "next_review": "after_training_and_real_task",
+        }
+
+    def team_capability_gaps(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for e in self.organization.employees.values():
+            if e.status == "RETIRED":
+                continue
+            for skill, score in e.competency_scores.items():
+                if score < 60:
+                    result.setdefault(e.department_id, []).append(skill)
+        return result
+
+    def succession_pipeline(self) -> list[dict[str, Any]]:
+        candidates = []
+        for e in self.organization.employees.values():
+            if e.status == "RETIRED":
+                continue
+            total = e.completed_tasks + e.failed_tasks
+            success = e.completed_tasks / total if total else 0.0
+            net = max(0.0, e.revenue_generated - e.costs_attributed)
+            candidates.append({
+                "employee_id": e.employee_id,
+                "role": e.title,
+                "readiness": round(
+                    success * 0.35
+                    + min(e.completed_tasks / 50, 1) * 0.20
+                    + min(net / (net + 1000), 1) * 0.25
+                    + e.collaboration_score * 0.10
+                    + min(e.training_completed / 10, 1) * 0.10,
+                    4,
+                ),
+            })
+        return sorted(candidates, key=lambda x: (-x["readiness"], x["employee_id"]))
