@@ -49,7 +49,16 @@ class LeadershipEvolutionEngine:
         success = employee.completed_tasks / total
         experience = min(employee.completed_tasks / 50.0, 1.0)
         breadth = min(len(set(employee.skills)) / 8.0, 1.0)
-        return round(success * 0.55 + experience * 0.20 + breadth * 0.10 + (success * experience) * 0.15, 4)
+        net = max(0.0, employee.revenue_generated - employee.costs_attributed)
+        financial = net / (net + 1000.0) if net > 0 else 0.0
+        return round(
+            financial * 0.35
+            + success * 0.30
+            + experience * 0.15
+            + breadth * 0.10
+            + (success * experience) * 0.10,
+            4,
+        )
 
     def leaderboard(self) -> list[dict[str, Any]]:
         rows = []
