@@ -40,6 +40,15 @@ DOMAINS = [
     Domain("science", "science", 4, "source-backed knowledge tests"),
     Domain("engineering", "engineering", 4, "calculation/simulation tests"),
     Domain("law_compliance", "governance", 2, "jurisdiction-specific primary sources"),
+    Domain("risk_management", "finance", 2, "scenario tests + risk controls"),
+    Domain("accounting", "finance", 2, "reconciliation tests + source-backed rules"),
+    Domain("data_analysis", "technology", 2, "data validation + statistical tests"),
+    Domain("machine_learning", "technology", 3, "benchmark tests + reproducible experiments"),
+    Domain("ai_engineering", "technology", 2, "integration tests + evals"),
+    Domain("autonomous_systems", "technology", 1, "bounded-agent tests + safety checks"),
+    Domain("operations", "commerce", 2, "workflow tests + measurable outcomes"),
+    Domain("marketing", "commerce", 2, "experiment metrics + attribution evidence"),
+    Domain("sales", "commerce", 2, "lead-to-payment evidence"),
     Domain("communication", "humanities", 4, "quality tests"),
 ]
 
