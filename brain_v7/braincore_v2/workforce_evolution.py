@@ -16,6 +16,8 @@ from .notifications import NotificationCenter
 
 
 class WorkforceEvolutionEngine:
+    TRAINING_REQUIRED = "TRAINING_REQUIRED"
+
     def __init__(
         self,
         organization: EmployeeHierarchy,
@@ -30,6 +32,25 @@ class WorkforceEvolutionEngine:
         self.max_new_per_cycle = max_new_per_cycle
 
     @staticmethod
+    def assign_training(self, employee_id: str) -> dict:
+        """Route employees through dedicated trainers before independent work."""
+        employee = self.organization.employees.get(employee_id)
+        if employee is None:
+            return {"status": "NOT_FOUND", "employee_id": employee_id}
+        trainers = [
+            e for e in self.organization.employees.values()
+            if e.department_id == "DEPT-010"
+            and ("Learning" in e.title or "Development" in e.title or "Trainer" in e.title)
+            and e.status != "RETIRED"
+        ]
+        trainer = sorted(trainers, key=lambda e: (-len(e.completed_tasks), e.employee_id))[0] if trainers else None
+        employee.status = self.TRAINING_REQUIRED
+        return {
+            "status": self.TRAINING_REQUIRED,
+            "employee_id": employee_id,
+            "trainer_id": trainer.employee_id if trainer else None,
+        }
+
     def performance_score(employee: Employee) -> float:
         total = employee.completed_tasks + employee.failed_tasks
         if total == 0:
