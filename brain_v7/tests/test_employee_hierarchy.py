@@ -31,3 +31,12 @@ def test_completion_returns_employee_to_available():
     employee = org.employees[task.assigned_to]
     assert employee.status == "AVAILABLE"
     assert employee.completed_tasks == 1
+
+
+def test_full_staffing_plan_has_64_workers_below_brain():
+    org = EmployeeHierarchy()
+    summary = org.staffing_summary()
+    assert summary["departments"] == 11
+    assert summary["department_managers"] == 11
+    assert summary["specialist_employees"] == 53
+    assert summary["total_ai_workers_below_brain"] == 64
