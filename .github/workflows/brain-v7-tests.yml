@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "brain_v7/**"
+  workflow_dispatch:
   pull_request:
     paths:
       - "brain_v7/**"
@@ -19,6 +20,11 @@ jobs:
       - name: Install dependencies
         working-directory: brain_v7
         run: python -m pip install -r requirements.txt
+      - name: Compile Brain V7 Python sources
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        working-directory: brain_v7
+        run: python -m compileall -q .
       - name: Run regression tests
         env:
           PYTHONPATH: ${{ github.workspace }}
