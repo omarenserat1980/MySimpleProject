@@ -267,6 +267,7 @@ class UnifiedBrain:
             },
             "safety_gates": True,
             "deployment": {"configured": False},
+            "code_tool_engineering": self.code_tool_team.snapshot(),
         })
 
         # The Brain delegates the current objective through the organization.
