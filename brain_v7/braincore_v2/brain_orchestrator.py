@@ -20,6 +20,8 @@ from .meta_learning_controller import StrategyObservation, recommend
 from .cognitive_ecosystem import ecosystem_snapshot
 from .capability_hub import CapabilityHub
 from .employee_hierarchy import EmployeeHierarchy
+from .notifications import NotificationCenter
+from .workforce_evolution import WorkforceEvolutionEngine
 
 
 @dataclass
@@ -60,6 +62,8 @@ class UnifiedBrain:
         self.capabilities = CapabilityHub()
         # Organizational layer: one Brain -> managers -> departments -> employees.
         self.organization = EmployeeHierarchy(initial_employees=initial_employees)
+        self.notifications = NotificationCenter()
+        self.workforce = WorkforceEvolutionEngine(self.organization, self.notifications)
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -146,6 +150,16 @@ class UnifiedBrain:
 
         # The Brain delegates the current objective through the organization.
         delegated = self.organization.assign_task(objective)
+        self.notifications.emit(
+            "TASK_ASSIGNED",
+            sender_id="BRAIN-001",
+            recipient_id=delegated.assigned_to or delegated.manager_id or "BRAIN-001",
+            message=f"Task {delegated.task_id} assigned for objective",
+            priority="NORMAL",
+            task_id=delegated.task_id,
+            data={"objective": objective, "status": delegated.status},
+        )
+        evolution = self.workforce.evolve(objective)
 
         return {
             "cycle": self.state.cycle,
@@ -161,6 +175,8 @@ class UnifiedBrain:
             "capability_plan": capability_plan,
             "delegated_task": asdict(delegated),
             "organization": self.organization.snapshot(),
+            "workforce_evolution": evolution,
+            "notifications": self.notifications.snapshot(),
             "allowed_next_actions": sorted(self.SAFE_INTERNAL_ACTIONS),
             "blocked_autonomous_actions": sorted(self.BLOCKED_AUTONOMOUS_ACTIONS),
             "external_side_effects": False,
@@ -184,6 +200,12 @@ class UnifiedBrain:
             "permission_escalation": False,
             "capability_hub": self.capabilities.snapshot(),
             "organization": self.organization.snapshot(),
+            "workforce_evolution": {
+                "continuous_evolution": True,
+                "max_active_workers": self.workforce.max_active_workers,
+                "max_new_per_cycle": self.workforce.max_new_per_cycle,
+            },
+            "notifications": self.notifications.snapshot(),
         }
 
 
