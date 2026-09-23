@@ -79,3 +79,25 @@ def record_outcome(name: str, status: str, amount_jod: float = 0.0, note: str = 
     except Exception:
         pass
     return entry
+
+
+def verified_profit_summary() -> dict[str, Any]:
+    """Return only financially verified outcomes."""
+    try:
+        data = json.loads(LEDGER_PATH.read_text(encoding="utf-8")) if LEDGER_PATH.is_file() else []
+    except Exception:
+        data = []
+    verified = [
+        x for x in data
+        if isinstance(x, dict)
+        and str(x.get("status", "")).upper() in {"PAID", "VERIFIED_PAID"}
+        and float(x.get("amount_jod", 0) or 0) > 0
+    ]
+    total = round(sum(float(x.get("amount_jod", 0) or 0) for x in verified), 2)
+    return {"verified_count": len(verified), "verified_profit_jod": total, "records": verified}
+
+
+def choose_next_opportunity(items: list[Opportunity] | None = None) -> dict[str, Any] | None:
+    """Choose the highest-scoring candidate without claiming it is profitable."""
+    ranked = rank_opportunities(items)
+    return ranked[0] if ranked else None
