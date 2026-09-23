@@ -1,4 +1,4 @@
-"""Chained multimedia production pipeline with verified job execution."""
+"""Chained multimedia production pipeline with quality orchestration."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -6,6 +6,7 @@ from typing import Any
 
 from .media_job_runner import MediaJobRunner
 from .media_provider_registry import MediaProviderRegistry
+from .media_quality_orchestrator import build_creative_brief, acceptance_gate
 
 
 @dataclass(frozen=True)
@@ -32,16 +33,16 @@ def build_pipeline(objective: str, *, pipeline_id: str = "media-pipeline") -> Me
         pipeline_id=pipeline_id,
         objective=objective,
         stages=(
-            MediaStage("IMAGE", "image", f"Create the main visual for: {objective}", "png"),
-            MediaStage("VOICE", "audio", f"Create Arabic voice narration for: {objective}", "mp3"),
+            MediaStage("IMAGE", "image", f"Create the cinematic master visual for: {objective}", "png"),
+            MediaStage("VOICE", "audio", f"Create consistent Arabic cinematic narration for: {objective}", "mp3"),
             MediaStage(
                 "VIDEO", "video",
-                f"Create a short video combining the visual and narration for: {objective}",
+                f"Create a cinematic short using the master visual and narration for: {objective}",
                 "mp4", ("IMAGE", "VOICE"),
             ),
             MediaStage(
                 "DESIGN", "design",
-                f"Create a final promotional design package for: {objective}",
+                f"Create the final cinematic promotional design package for: {objective}",
                 "png", ("IMAGE", "VIDEO"),
             ),
         ),
@@ -54,7 +55,11 @@ class MediaProductionPipeline:
         self.runner = MediaJobRunner(self.registry)
 
     def plan(self, objective: str) -> dict[str, Any]:
-        return asdict(build_pipeline(objective))
+        pipeline = build_pipeline(objective)
+        return {
+            "pipeline": asdict(pipeline),
+            "creative_brief": build_creative_brief(objective),
+        }
 
     def execute(
         self,
@@ -64,6 +69,8 @@ class MediaProductionPipeline:
         pipeline_id: str = "media-pipeline",
         timeout_seconds: int = 3600,
         poll_seconds: int = 5,
+        quality_scores: dict[str, dict[str, float]] | None = None,
+        minimum_quality: float = 0.82,
     ) -> dict[str, Any]:
         pipeline = build_pipeline(objective, pipeline_id=pipeline_id)
         if not authorized:
@@ -75,13 +82,10 @@ class MediaProductionPipeline:
 
         artifacts: dict[str, Any] = {}
         executed: list[str] = []
+        quality_scores = quality_scores or {}
 
         for stage in pipeline.stages:
-            dependencies = {
-                name: artifacts[name]
-                for name in stage.depends_on
-                if name in artifacts
-            }
+            dependencies = {name: artifacts[name] for name in stage.depends_on if name in artifacts}
             result = self.runner.run(
                 kind=stage.kind,
                 prompt=stage.prompt,
@@ -91,9 +95,6 @@ class MediaProductionPipeline:
                 timeout_seconds=timeout_seconds,
                 poll_seconds=poll_seconds,
             )
-            artifacts[stage.name] = result
-            executed.append(stage.name)
-
             if result.get("status") != "VERIFIED_COMPLETED":
                 return {
                     "status": "BLOCKED",
@@ -104,9 +105,28 @@ class MediaProductionPipeline:
                     "executed_stages": executed,
                 }
 
+            gate = acceptance_gate(
+                quality_scores.get(stage.name, {}),
+                minimum=minimum_quality,
+            )
+            result["quality_gate"] = gate
+            artifacts[stage.name] = result
+            executed.append(stage.name)
+
+            if not gate["accepted"]:
+                return {
+                    "status": "REFINE_REQUIRED",
+                    "failed_stage": stage.name,
+                    "reason": "QUALITY_GATE",
+                    "pipeline": asdict(pipeline),
+                    "artifacts": artifacts,
+                    "executed_stages": executed,
+                }
+
         return {
-            "status": "VERIFIED_COMPLETED",
+            "status": "VERIFIED_QUALITY",
             "pipeline": asdict(pipeline),
+            "creative_brief": build_creative_brief(objective),
             "artifacts": artifacts,
             "executed_stages": executed,
         }
@@ -119,6 +139,8 @@ def snapshot() -> dict[str, Any]:
         "provider_registry": True,
         "job_polling": True,
         "output_verification": True,
+        "quality_gate": True,
+        "cinematic_continuity": True,
         "credentials_in_source": False,
         "external_publication": "permission_gated",
     }
