@@ -100,7 +100,8 @@ class UnifiedBrain:
         self.control_plane = OperationalControlPlane()
         self.cognitive_workforce = CognitiveWorkforce()
         # Controlled self-development tool: source changes stay inside the configured workspace.
-        self.code_workspace = CodeWorkspaceTool()
+        # Confine autonomous source editing to the Brain code tree.
+        self.code_workspace = CodeWorkspaceTool(allowed_prefixes=("brain_v7/",))
         self.code_tool_team = CodeToolEngineeringTeam(self.organization, self.code_workspace)
         self.code_tool = CodeTool(self.code_workspace, self.code_tool_team)
         self.code_evolution = CodeEvolutionController(self.code_tool_team)
