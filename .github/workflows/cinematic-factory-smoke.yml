@@ -1,0 +1,34 @@
+name: cinematic-factory-smoke
+
+on:
+  push:
+    paths:
+      - "brain_v7/**"
+      - "render.yaml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r brain_v7/requirements.txt
+      - name: Compile cinematic modules
+        run: python -m compileall -q brain_v7/braincore_v2
+      - name: Run focused tests
+        run: |
+          python - <<'PY'
+          from brain_v7.braincore_v2.cinematic_story_engine import build_story
+          from brain_v7.braincore_v2.cinematic_director import build_plan
+          from brain_v7.braincore_v2.cinematic_quality_gate import inspect_video
+          assert build_story("اختبار سينمائي")["story_id"]
+          assert len(build_plan("اختبار سينمائي").scenes) == 4
+          assert inspect_video("/missing/file.mp4")["status"] == "FAILED"
+          print("cinematic smoke: OK")
+          PY
+      - name: Check FFmpeg
+        run: ffmpeg -version | head -n 1
