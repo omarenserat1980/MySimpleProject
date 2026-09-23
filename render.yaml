@@ -16,5 +16,24 @@ services:
     envVars:
       - key: BRAIN_SLEEP_SECONDS
         value: "60"
+      - key: FACTORY_INTERVAL_SECONDS
+        value: "21600"
+      - key: FACTORY_ALLOW_PRODUCTION
+        value: "0"
+      - key: FACTORY_ALLOW_YOUTUBE_PUBLISH
+        value: "0"
       - key: STOP_BRAIN
         value: "0"
+      # Configure these as Render Secrets/Environment Variables before enabling production.
+      - key: FACTORY_TOPICS_JSON
+        sync: false
+      - key: MEDIA_RENDER_URL
+        sync: false
+      - key: MEDIA_RENDER_API_KEY
+        sync: false
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REFRESH_TOKEN
+        sync: false
