@@ -17,6 +17,8 @@ import time
 from .cinematic_money_factory import ContentOpportunity, rank
 from .cinematic_director import CinematicPlan, build_plan, provider_prompts
 from .youtube_publisher import YouTubePackage, prepare_package, publish
+from .cinematic_story_engine import build_story
+from .cinematic_quality_gate import inspect_video
 
 
 class TopicResearcher(Protocol):
@@ -120,6 +122,7 @@ def run_factory(
 
     objective = topic["selected"]["opportunity"]["objective"]
     production = build_production(objective, config)
+    story = build_story(objective, audience=config.audience)
     plan = production["plan"]
 
     if not authorized_production:
@@ -127,6 +130,7 @@ def run_factory(
             "status": "PRODUCTION_AUTHORIZATION_REQUIRED",
             "topic": topic,
             "plan": asdict(plan),
+            "story": story,
             "shot_prompts": production["shot_prompts"],
         }
 
@@ -142,6 +146,17 @@ def run_factory(
             "topic": topic,
             "render": rendered,
             "assembly": assembled,
+        }
+
+    quality = inspect_video(video_ref)
+    if quality.get("status") != "ACCEPTED":
+        return {
+            "status": "QUALITY_GATE_BLOCKED",
+            "topic": topic,
+            "story": story,
+            "render": rendered,
+            "assembly": assembled,
+            "quality": quality,
         }
 
     yt = prepare_package(
@@ -167,6 +182,8 @@ def run_factory(
         "elapsed_s": round(time.time() - started, 2),
         "topic": topic,
         "plan": asdict(plan),
+        "story": story,
+        "quality": quality,
         "rendered_shots": len(rendered["outputs"]),
         "assembly": assembled,
         "youtube": publication,
