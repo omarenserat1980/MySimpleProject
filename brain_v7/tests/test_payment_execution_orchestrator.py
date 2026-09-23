@@ -3,6 +3,10 @@ from brain_v7.braincore_v2.payment_execution_orchestrator import (
     PaymentExecutionOrchestrator, TransferIntent, reason_about_transfer,
 )
 
+class FakeVerifier:
+    def verify(self, *, intent, authorization):
+        return authorization == "USER_APPROVED_EXACT_REQUEST" and intent.request_id
+
 class FakeProvider:
     def __init__(self, status="PENDING"):
         self.status = status
@@ -26,7 +30,7 @@ def test_reasoning_never_claims_transfer_without_provider():
 
 def test_ready_requires_explicit_authorization():
     provider = FakeProvider()
-    brain = PaymentExecutionOrchestrator(provider)
+    brain = PaymentExecutionOrchestrator(provider, FakeVerifier())
     readiness = brain.readiness(**ready_args())
     assert readiness["status"] == "READY_FOR_AUTHORIZATION"
     intent = TransferIntent(100.0, "wallet:verified", "authorized payout", readiness["request_id"])
@@ -39,7 +43,7 @@ def test_ready_requires_explicit_authorization():
 
 def test_real_provider_submission_is_truthful_and_idempotency_key_is_bound():
     provider = FakeProvider()
-    brain = PaymentExecutionOrchestrator(provider)
+    brain = PaymentExecutionOrchestrator(provider, FakeVerifier())
     readiness = brain.readiness(**ready_args())
     intent = TransferIntent(100.0, "wallet:verified", "authorized payout", readiness["request_id"])
     result = brain.execute_authorized(intent=intent, authorization="USER_APPROVED_EXACT_REQUEST")
@@ -58,7 +62,7 @@ def test_provider_confirmation_allows_confirmed_state():
 
 def test_failed_precondition_blocks_readiness():
     provider = FakeProvider()
-    brain = PaymentExecutionOrchestrator(provider)
+    brain = PaymentExecutionOrchestrator(provider, FakeVerifier())
     args = ready_args()
     args["destination_verified"] = False
     result = brain.readiness(**args)
