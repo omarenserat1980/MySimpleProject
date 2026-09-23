@@ -32,6 +32,7 @@ from .revenue_task_factory import RevenueTaskFactory
 from .revenue_challenge import RevenueChallenge
 from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
+from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 
 
 @dataclass
@@ -83,6 +84,7 @@ class UnifiedBrain:
         self.revenue_factory = RevenueTaskFactory()
         self.revenue_challenge = RevenueChallenge(self.organization)
         self.external_work = ExternalWorkGateway(self.organization)
+        self.reasoning_engine = AdaptiveReasoningEngine()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -107,6 +109,27 @@ class UnifiedBrain:
         hypothesis_list = list(hypotheses)
 
         self._observe(observation_list)
+
+        # Dedicated understanding/reasoning/flexibility layer. It competes
+        # multiple interpretations before the older planners choose actions.
+        reasoning = self.reasoning_engine.reason(
+            objective,
+            context={
+                "cycle": self.state.cycle,
+                "memory_nodes": len(self.memory),
+                "signals": len(signal_list),
+            },
+            evidence=[
+                f"signal:{s.name}" for s in signal_list if getattr(s, "name", None)
+            ],
+            observations=[
+                {
+                    "statement": getattr(o, "outcome", ""),
+                    "polarity": "support" if getattr(o, "reliability", 0.0) >= 0.5 else "against",
+                }
+                for o in observation_list
+            ],
+        )
 
         hierarchy = cognitive_cycle(signal_list, causal_links=causal_links, plans=plans)
 
@@ -158,7 +181,9 @@ class UnifiedBrain:
         memory_inference = infer(self.memory, self.relations, iterations=3)
 
         focus = (
-            decision.get("objective")
+            reasoning.selected_strategy
+            if reasoning.confidence >= 0.55
+            else decision.get("objective")
             or meta["decision"].get("selected", {}).get("mode")
             or self._bottleneck()
         )
@@ -216,6 +241,7 @@ class UnifiedBrain:
         return {
             "cycle": self.state.cycle,
             "objective": objective,
+            "adaptive_reasoning": asdict(reasoning),
             "hierarchical_reasoning": hierarchy,
             "cognitive_mesh": mesh,
             "world_model": {"hypotheses": [asdict(x) for x in ranked_world]},
@@ -245,6 +271,7 @@ class UnifiedBrain:
             "external_side_effects": False,
             "money_movement": False,
             "capability_hub": self.capabilities.snapshot(),
+            "reasoning_engine": self.reasoning_engine.snapshot(),
             "requires_user_for_external_side_effects": True,
         }
 
@@ -278,6 +305,7 @@ class UnifiedBrain:
             "revenue_factory": self.revenue_factory.snapshot(),
             "revenue_challenge": self.revenue_challenge.snapshot(),
             "external_work": self.external_work.snapshot(),
+            "reasoning_engine": self.reasoning_engine.snapshot(),
         }
 
 
