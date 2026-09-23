@@ -45,6 +45,10 @@ class CinematicLocalRenderer:
             "drawbox=x=0:y='H*0.70':w=W:h='H*0.30':color=black@0.72:t=fill,"
             "drawbox=x='W*(0.10+0.05*sin(T/4))':y='H*0.18':w='W*0.55':h='H*0.02':color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
+            # Autonomous camera movement: slow push-in plus horizontal/vertical drift.
+            # Deterministic FFmpeg expressions keep this CPU-friendly and asset-free.
+            "scale=1472:828:flags=lanczos,"
+            "crop=1280:720:x=96+48*sin(T/4):y=54+27*cos(T/5),"
             "vignette=PI/4,"
             "format=yuv420p,"
             f"drawtext=fontcolor=white:fontsize=38:x=(w-text_w)/2:y=h-110:text='{text.replace(chr(39), chr(92)+chr(39))}'"
