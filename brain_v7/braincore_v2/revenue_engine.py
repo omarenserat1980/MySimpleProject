@@ -81,7 +81,16 @@ def record_outcome(name: str, status: str, amount_jod: float = 0.0, note: str = 
     return entry
 
 
-def opportunity_pipeline_summary() -> dict:\n    """Summarize opportunity count and expected value; not realized income."""\n    rows=rank_with_financials()\n    return {"candidates":len(rows),"expected_jod_total":round(sum(float(x.get("expected_jod",0)) for x in rows),2),"realized_profit_source":"verified_profit_summary"}\n\ndef verified_profit_summary() -> dict[str, Any]:
+def opportunity_pipeline_summary() -> dict:
+    """Summarize opportunity count and expected value; not realized income."""
+    rows = rank_with_financials()
+    return {
+        "candidates": len(rows),
+        "expected_jod_total": round(sum(float(x.get("expected_jod", 0)) for x in rows), 2),
+        "realized_profit_source": "verified_profit_summary",
+    }
+
+def verified_profit_summary() -> dict[str, Any]:
     """Return only financially verified outcomes."""
     try:
         data = json.loads(LEDGER_PATH.read_text(encoding="utf-8")) if LEDGER_PATH.is_file() else []
