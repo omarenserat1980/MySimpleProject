@@ -11,6 +11,7 @@ from .autonomous_development_supervisor import plan_next as plan_development
 from .revenue_engine import rank_with_financials
 from .economic_controller import evaluate
 from .governance import evaluate_action,append_audit,policy_snapshot
+from .solution_forge import forge
 
 @dataclass(frozen=True)
 class ControlPlan:
@@ -36,13 +37,13 @@ def build_plan(objective:str="increase verified earning capability")->dict[str,A
         )
         economic_frontier.append(evaluate(opportunity).__dict__)
 
-    actions=["inspect","pytest_collect","workspace_tree","git_status","revenue_rank","self_develop"]
+    actions=["inspect","pytest_collect","workspace_tree","git_status","revenue_rank","solution_forge","self_develop"]
     safe=[]; blocked=[]
     for action in actions:
         d=evaluate_action(action)
         (safe if d.allowed else blocked).append(action)
 
     plan=ControlPlan(str(objective),dev,candidates,economic_frontier,safe,blocked)
-    result={"plan":asdict(plan),"capabilities":capability_summary(),"policy":policy_snapshot()}
+    result={"plan":asdict(plan),"creative_frontier":forge(objective),"capabilities":capability_summary(),"policy":policy_snapshot()}
     append_audit("control_plan",result)
     return result
