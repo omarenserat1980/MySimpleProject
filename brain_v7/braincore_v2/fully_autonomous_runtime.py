@@ -1,11 +1,8 @@
 """Continuous autonomous runtime for Brain V7.
 
-Runs the internal cognitive/economic loop continuously with bounded cycles,
-health checks, checkpointing, recovery, and an emergency stop file.
-
-It can autonomously research, plan, create, validate, package and learn.
-External irreversible side effects remain permission-gated by the existing
-governance/payment layers; this module never bypasses them.
+Runs bounded cognitive/economic cycles continuously, generates a fresh goal
+each cycle, monitors health, checkpoints state, and supports an emergency stop.
+External irreversible side effects remain permission-gated.
 """
 from __future__ import annotations
 
@@ -17,12 +14,15 @@ from dataclasses import dataclass, asdict
 
 from .autonomous_task import run as run_task
 from .health_monitor import check as health_check
+from .continuous_goal_engine import next_goal
 
 
 @dataclass
 class RuntimeState:
     cycle: int = 0
     status: str = "STOPPED"
+    current_goal_id: str = ""
+    current_goal: str = ""
     last_result: str = ""
     last_error: str = ""
     started_at: float = 0.0
@@ -71,20 +71,29 @@ class AutonomousRuntime:
             return {"status": self.state.status, "health": health}
 
         self.state.cycle += 1
+        goal = next_goal(self.state.cycle)
+        self.state.current_goal_id = goal.goal_id
+        self.state.current_goal = goal.title
         self.state.status = "RUNNING"
         self._save()
 
         try:
-            result = run_task(
-                "طوّر قدرات الدماغ واكتشف ونفّذ داخليًا فرص ربح مشروعة قابلة للإثبات",
-                max_steps=12,
+            objective = (
+                "نفّذ الهدف الحالي بأقل وقت وبطريقة مشروعة وقابلة للإثبات: "
+                + goal.title
+                + ". طوّر قدرات الدماغ واكتشف ونفّذ داخليًا ما يمكن تنفيذه."
             )
+            result = run_task(objective, max_steps=12)
             self.state.last_result = str(result)[-4000:]
             self.state.last_error = ""
             self.state.status = "CYCLE_COMPLETE"
             self._save()
-            return {"status": self.state.status, "cycle": self.state.cycle,
-                    "result": result}
+            return {
+                "status": self.state.status,
+                "cycle": self.state.cycle,
+                "goal": asdict(goal),
+                "result": result,
+            }
         except Exception as exc:
             self.state.last_error = repr(exc)
             self.state.status = "RECOVERABLE_ERROR"
