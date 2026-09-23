@@ -31,3 +31,15 @@ def test_recommendation_keeps_alternatives():
     result = loop.replan(["DIRECT", "DECOMPOSE", "EXPERIMENT"], reason="new evidence")
     assert result["selected"] in {"DIRECT", "DECOMPOSE", "EXPERIMENT"}
     assert len(result["alternatives"]) == 2
+
+def test_negative_reward_is_preserved_in_mean_reward():
+    loop = AdaptiveLearningLoop()
+    stats = loop.record_outcome(
+        cycle=1,
+        objective="x",
+        strategy="DIRECT",
+        outcome="failure",
+        reward=-1.0,
+        evidence="explicit failure",
+    )
+    assert stats.mean_reward < 0
