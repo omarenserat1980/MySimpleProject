@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from brain_v7.braincore_v2.code_workspace_tool import CodeChange
@@ -25,10 +23,18 @@ def test_executor_rejects_unsafe_paths(monkeypatch):
         executor._safe_path("README.md")
 
 
-def test_executor_builds_safe_snapshot(monkeypatch):
+def test_executor_builds_safe_atomic_snapshot(monkeypatch):
     monkeypatch.setenv("GITHUB_TOKEN", "test-secret")
     executor = GitHubCodeExecutor(repository="omarenserat1980/MySimpleProject")
     snap = executor.snapshot()
     assert snap["configured"] is True
     assert snap["credential_storage"] is False
     assert snap["token_exposed"] is False
+    assert snap["atomic_multi_file_commit"] is True
+    assert snap["fast_forward_only"] is True
+
+
+def test_executor_safe_path_allows_source_files(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "test-secret")
+    executor = GitHubCodeExecutor(repository="omarenserat1980/MySimpleProject")
+    assert executor._safe_path("brain_v7/braincore_v2/example.py") == "brain_v7/braincore_v2/example.py"
