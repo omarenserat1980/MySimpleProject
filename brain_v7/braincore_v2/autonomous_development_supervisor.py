@@ -14,6 +14,7 @@ from .capability_registry import capability_summary
 
 STATE_PATH = Path(os.getenv("BRAIN_DEV_SUPERVISOR_STATE", "development_supervisor.json"))
 MAX_ITERATIONS = 8
+PROTECTED_DOMAINS = frozenset({"banking","crypto","stocks","law_compliance"})
 
 @dataclass(frozen=True)
 class DevelopmentTask:
@@ -45,6 +46,11 @@ def plan_next() -> dict[str, Any]:
         evidence=d["evidence_required"],
     )
     return {"status":"PLANNED","task":asdict(task),"capability_summary":capability_summary()["counts"]}
+
+def task_is_safe(task: dict[str, Any]) -> bool:
+    """Only permit bounded capability-building tasks; sensitive domains require evidence."""
+    domain=str(task.get("domain",""))
+    return domain not in PROTECTED_DOMAINS or bool(str(task.get("evidence","")).strip())
 
 def record_attempt(task_id: str, passed: bool, evidence: str="") -> dict[str, Any]:
     data=_load()
