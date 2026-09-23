@@ -36,6 +36,7 @@ from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 from .adaptive_learning_loop import AdaptiveLearningLoop
 from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
+from .cognitive_workforce import CognitiveWorkforce
 
 
 @dataclass
@@ -91,6 +92,7 @@ class UnifiedBrain:
         self.adaptive_learning = AdaptiveLearningLoop()
         self.quality_controller = ReasoningQualityController()
         self.control_plane = OperationalControlPlane()
+        self.cognitive_workforce = CognitiveWorkforce()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
         self.memory = consolidate(self.memory.values(), observations)
@@ -189,6 +191,18 @@ class UnifiedBrain:
         ) if priority_signals else {"status": "NO_SIGNAL"}
 
         memory_inference = infer(self.memory, self.relations, iterations=3)
+
+        specialist_proposals = []
+        for index, hypothesis in enumerate(reasoning.hypotheses[:6], start=1):
+            specialist_proposals.append({
+                "employee_id": f"COG-{index:03d}",
+                "role": hypothesis.label,
+                "proposal": hypothesis.interpretation.text,
+                "confidence": hypothesis.confidence,
+                "evidence": len(hypothesis.evidence_for),
+                "reversible": hypothesis.reversibility,
+            })
+        cognitive_workforce = self.cognitive_workforce.review(objective, specialist_proposals)
 
         quality = self.quality_controller.evaluate(
             understanding_confidence=reasoning.interpretation.confidence,
@@ -293,6 +307,7 @@ class UnifiedBrain:
             "objective": objective,
             "adaptive_reasoning": asdict(reasoning),
             "reasoning_quality": asdict(quality),
+            "cognitive_workforce": cognitive_workforce,
             "hierarchical_reasoning": hierarchy,
             "cognitive_mesh": mesh,
             "world_model": {"hypotheses": [asdict(x) for x in ranked_world]},
@@ -364,6 +379,7 @@ class UnifiedBrain:
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "reasoning_quality_controller": self.quality_controller.snapshot(),
             "operational_control_plane": self.control_plane.snapshot(),
+            "cognitive_workforce": self.cognitive_workforce.snapshot(),
         }
 
 
