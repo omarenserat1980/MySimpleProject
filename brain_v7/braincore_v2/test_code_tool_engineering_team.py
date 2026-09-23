@@ -70,3 +70,18 @@ def test_autonomous_change_rolls_back_and_does_not_commit_on_failure(monkeypatch
     assert result["status"] == "ROLLED_BACK"
     assert target.read_text(encoding="utf-8") == "VALUE = 1\n"
     assert commits == []
+
+
+def test_capability_status_is_explicit_and_safe():
+    org = EmployeeHierarchy()
+    workspace = CodeWorkspaceTool(Path.cwd())
+    team = CodeToolEngineeringTeam(org, workspace)
+    status = team.capability_status()
+    assert status["inspect_source"] is True
+    assert status["save_source"] is True
+    assert status["atomic_local_changes"] is True
+    assert status["checkpoint_and_rollback"] is True
+    assert status["credential_storage"] is False
+    assert status["shell_command_execution"] is False
+    assert status["money_movement"] is False
+    assert status["external_submission"] is False
