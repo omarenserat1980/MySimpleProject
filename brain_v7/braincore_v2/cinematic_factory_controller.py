@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Any, Protocol, Sequence
-import shutil
 import time
 from pathlib import Path
 
