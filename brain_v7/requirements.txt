@@ -2,3 +2,4 @@ fastapi==0.99.1
 pydantic==1.10.26
 uvicorn==0.29.0
 httpx==0.28.1
+pytest==8.4.2
