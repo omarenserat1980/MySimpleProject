@@ -177,6 +177,7 @@ class CodeWorkspaceTool:
                 str(p.relative_to(self.root))
                 for p in self.root.rglob("*")
                 if p.is_file() and self.backup_dir not in p.parents
+                and (not self.allowed_prefixes or any(str(p.relative_to(self.root)).replace('\\\\','/').startswith(prefix) for prefix in self.allowed_prefixes))
             ]
         manifest = self._manifest(requested)
         payload = json.dumps(manifest, sort_keys=True).encode("utf-8")
@@ -250,6 +251,7 @@ class CodeWorkspaceTool:
                 str(p.relative_to(self.root))
                 for p in self.root.rglob("*.py")
                 if self.backup_dir not in p.parents
+                and (not self.allowed_prefixes or any(str(p.relative_to(self.root)).replace('\\\\','/').startswith(prefix) for prefix in self.allowed_prefixes))
             ]
         errors = []
         checked = 0
