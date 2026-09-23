@@ -108,7 +108,8 @@ class AutonomousTask:
 
             if action == "revenue_rank":
                 ranked = rank_opportunities()
-                result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "note": "Ranking is a decision aid; it is not proof of income."}}
+                selected = ranked[0] if ranked else None
+                result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "selected": selected, "profit": {"verified_profit_jod": 0.0, "status": "NO_VERIFIED_PAYMENT"}}}
             else:
                 result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
             observation = {
