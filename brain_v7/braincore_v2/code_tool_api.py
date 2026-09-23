@@ -54,6 +54,35 @@ class CodeTool:
             remote=persist_to_github,
         )
 
+    def save_checkpoint(self, paths: Iterable[str] = ()) -> dict:
+        """Persist a restorable, tamper-evident snapshot of source files."""
+        return self.workspace.checkpoint(paths)
+
+    def restore_checkpoint(self, checkpoint_id: str) -> dict:
+        """Restore a previously saved source checkpoint through the same validation gate."""
+        results = self.workspace.restore(checkpoint_id)
+        return {
+            "status": "RESTORED",
+            "checkpoint_id": checkpoint_id,
+            "results": [asdict(x) for x in results],
+        }
+
+    def save_and_execute(
+        self,
+        changes: Iterable[CodeChange],
+        *,
+        reason: str,
+        commit_message: str,
+        persist_to_github: bool = True,
+    ) -> dict:
+        """Checkpoint, validate, apply, test, and optionally persist a code change set."""
+        return self.execute(
+            changes,
+            reason=reason,
+            commit_message=commit_message,
+            persist_to_github=persist_to_github,
+        )
+
     def verify(self, paths: Iterable[str] = ()) -> dict:
         return self.workspace.verify(paths)
 
