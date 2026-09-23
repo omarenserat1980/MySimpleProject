@@ -49,3 +49,6 @@ STOP_BRAIN file to stop the worker.
 
 ## CI status
 Repository-root GitHub Actions regression workflow is enabled for brain_v7 changes.
+
+## Validation note
+CI dependency includes pytest; future promotion requires a green regression run.
