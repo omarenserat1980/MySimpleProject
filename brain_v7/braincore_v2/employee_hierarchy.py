@@ -319,6 +319,63 @@ class EmployeeHierarchy:
         task.escalation_path = task.escalation_path + [task.manager_id]
         return task
 
+    def ensure_specialized_team(
+        self,
+        *,
+        department_id: str = "DEPT-CODE-TOOL",
+        name: str = "CODE_TOOL_ENGINEERING",
+        roles: tuple[tuple[str, tuple[str, ...]], ...] = (
+            ("Code Tool Architect", ("code_tool_architecture", "python", "design")),
+            ("Code Tool Developer", ("code_tool_development", "python", "refactoring")),
+            ("Code Tool Test Engineer", ("testing", "pytest", "verification")),
+            ("Code Tool Safety Engineer", ("sandbox", "permissions", "rollback")),
+            ("Code Tool Repository Engineer", ("repository", "versioning", "snapshots")),
+            ("Code Tool Automation Engineer", ("automation", "workflows", "orchestration")),
+            ("Code Tool Performance Engineer", ("performance", "profiling", "optimization")),
+            ("Code Tool QA Reviewer", ("quality", "review", "regression")),
+        ),
+    ) -> dict[str, Any]:
+        """Create the permanent team dedicated exclusively to the Brain's coding tool.
+
+        This team is a software-development workforce layer. It has no extra
+        financial, credential, legal, or external-publication permissions.
+        Calling the method repeatedly is idempotent.
+        """
+        if department_id not in self.departments:
+            manager_id = "MGR-CODE-TOOL"
+            self.departments[department_id] = Department(department_id, name, manager_id)
+            self.managers[manager_id] = Manager(
+                manager_id,
+                "Code Tool Engineering Manager",
+                self.ROOT_ID,
+                department_id,
+            )
+        manager_id = self.departments[department_id].manager_id
+        existing_titles = {self.employees[e].title for e in self.managers[manager_id].employee_ids}
+        created: list[Employee] = []
+        for title, skills in roles:
+            if title in existing_titles:
+                continue
+            employee = Employee(
+                employee_id=self._next_employee_id(),
+                title=title,
+                department_id=department_id,
+                manager_id=manager_id,
+                skills=skills,
+                goals=["improve the Brain coding tool safely and continuously"],
+                development_plan=["review", "test", "measure", "refine"],
+            )
+            self.employees[employee.employee_id] = employee
+            self.managers[manager_id].employee_ids.append(employee.employee_id)
+            created.append(employee)
+        return {
+            "department_id": department_id,
+            "manager_id": manager_id,
+            "employee_ids": list(self.managers[manager_id].employee_ids),
+            "created": [asdict(e) for e in created],
+            "specialization": "BRAIN_CODE_TOOL_ONLY",
+        }
+
     def staffing_summary(self) -> dict[str, Any]:
         specialists = len(self.employees)
         managers = len(self.managers)
