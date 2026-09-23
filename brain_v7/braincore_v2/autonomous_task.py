@@ -52,8 +52,6 @@ class AutonomousTask:
     def _next_action(objective: str, completed: list[str], observations: list[dict[str, Any]]) -> str | None:
         t = objective.lower()
         done = set(completed)
-
-        # Always establish the execution context first.
         if "inspect" not in done:
             return "inspect"
         if "termux_pwd" not in done:
@@ -74,9 +72,6 @@ class AutonomousTask:
             return "self_develop"
         if "python_version" not in done and ("python" in t or "بايثون" in t):
             return "python_version"
-
-        # After the requested observations, use the registered inspection
-        # action once more as a final verification pass.
         if "final_verify" not in done:
             return "inspect"
         return None
@@ -113,20 +108,39 @@ class AutonomousTask:
                 break
 
             if action == "solution_forge":
-                result = {
-                    "status": "EXECUTED",
-                    "action": action,
-                    "result": forge(objective),
-                }
+                result = {"status": "EXECUTED", "action": action, "result": forge(objective)}
             elif action == "revenue_rank":
                 ranked = rank_opportunities()
                 selected = ranked[0] if ranked else None
-                result = {"status": "EXECUTED", "action": action, "result": {"opportunities": ranked, "selected": selected, "profit": {"verified_profit_jod": 0.0, "status": "NO_VERIFIED_PAYMENT"}}}
+                result = {
+                    "status": "EXECUTED",
+                    "action": action,
+                    "result": {
+                        "opportunities": ranked,
+                        "selected": selected,
+                        "profit": {
+                            "verified_profit_jod": 0.0,
+                            "status": "NO_VERIFIED_PAYMENT",
+                        },
+                    },
+                }
             elif action == "self_develop":
-                report = development_report()
-                result = {"status": "EXECUTED", "action": action, "result": report, "next_development": next_development()}
+                result = {
+                    "status": "EXECUTED",
+                    "action": action,
+                    "result": development_report(),
+                    "next_development": next_development(),
+                }
             else:
-                result = execute_action(action, {"timeout": max(1, min(int(timeout), 60)), "objective": objective, "video_prompt": objective})
+                result = execute_action(
+                    action,
+                    {
+                        "timeout": max(1, min(int(timeout), 60)),
+                        "objective": objective,
+                        "video_prompt": objective,
+                    },
+                )
+
             observation = {
                 "step": index,
                 "action": action,
@@ -138,10 +152,9 @@ class AutonomousTask:
 
             if result.get("status") == "EXECUTED":
                 completed.append(action)
-                if action == "revenue_rank" and steps:
+                if action == "revenue_rank":
                     self.current["revenue_candidates"] = result.get("result", {}).get("opportunities", [])
-                # The second inspection is a final verification marker.
-                if action == "inspect" and "inspect" in completed and len(completed) > 1:
+                if action == "inspect" and completed.count("inspect") > 1:
                     completed.append("final_verify")
             else:
                 self.current["status"] = "FAILED"
@@ -170,3 +183,12 @@ class AutonomousTask:
 
 
 autonomous_task = AutonomousTask()
+
+
+def run(objective: str, *, max_steps: int = MAX_STEPS, timeout: int = 30) -> dict[str, Any]:
+    """Stable module-level entrypoint used by the continuous cloud runtime."""
+    return autonomous_task.run(
+        objective=objective,
+        timeout=timeout,
+        max_steps=max_steps,
+    )
