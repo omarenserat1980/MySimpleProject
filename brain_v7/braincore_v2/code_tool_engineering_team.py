@@ -163,6 +163,23 @@ class CodeToolEngineeringTeam:
             "remote_results": [asdict(x) for x in remote_results],
         }
 
+    def capability_status(self) -> dict[str, Any]:
+        """Expose exactly what the coding tool can do in the current runtime."""
+        return {
+            "inspect_source": True,
+            "save_source": True,
+            "atomic_local_changes": True,
+            "python_syntax_validation": True,
+            "regression_testing": True,
+            "checkpoint_and_rollback": True,
+            "github_persistence_configured": self.remote.configured,
+            "remote_ai_code_proposals_configured": bool(os.getenv("BRAIN_REMOTE_MODEL") and os.getenv("OPENAI_API_KEY")),
+            "credential_storage": False,
+            "shell_command_execution": False,
+            "money_movement": False,
+            "external_submission": False,
+        }
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "specialization": self.TEAM_TITLE,
@@ -175,7 +192,7 @@ class CodeToolEngineeringTeam:
             "queue": [asdict(x) for x in self.queue[-50:]],
             "workspace": self.workspace.snapshot(),
             "github_executor": self.remote.snapshot(),
-            "automatic_remote_persistence": self.remote.configured,
+            "automatic_remote_persistence": self.remote.configured,\n            "capability_status": self.capability_status(),
             "external_side_effects": False,
             "credential_storage": False,
             "money_movement": False,
