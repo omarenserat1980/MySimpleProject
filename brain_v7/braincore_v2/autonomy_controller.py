@@ -12,6 +12,7 @@ from .revenue_engine import rank_with_financials
 from .economic_controller import evaluate
 from .governance import evaluate_action,append_audit,policy_snapshot
 from .solution_forge import forge
+from .payment_execution_orchestrator import reason_about_transfer
 
 @dataclass(frozen=True)
 class ControlPlan:
@@ -44,6 +45,15 @@ def build_plan(objective:str="increase verified earning capability")->dict[str,A
         (safe if d.allowed else blocked).append(action)
 
     plan=ControlPlan(str(objective),dev,candidates,economic_frontier,safe,blocked)
-    result={"plan":asdict(plan),"creative_frontier":forge(objective),"capabilities":capability_summary(),"policy":policy_snapshot()}
+    payment_capability=reason_about_transfer(
+        amount_jod=100.0, destination_ref="UNSET", reason="requested transfer",
+        funds_available_jod=None, destination_verified=False, risk_clear=False,
+        compliance_clear=False, daily_remaining_jod=None, provider_ready=False,
+    )
+    result={
+        "plan":asdict(plan), "creative_frontier":forge(objective),
+        "capabilities":capability_summary(), "policy":policy_snapshot(),
+        "payment_capability":asdict(payment_capability),
+    }
     append_audit("control_plan",result)
     return result
