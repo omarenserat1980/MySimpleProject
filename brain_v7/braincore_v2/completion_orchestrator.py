@@ -165,4 +165,5 @@ def build_default_readiness_snapshot() -> dict[str, Any]:
         "safety_gates": True,
         "deployment": {"configured": True},
         "code_tool_engineering": {"employee_count": 8, "continuous_improvement": True},
+        "self_improvement": {"continuous_loop": True, "enabled": True},
     }
