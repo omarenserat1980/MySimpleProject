@@ -34,6 +34,7 @@ from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 from .adaptive_learning_loop import AdaptiveLearningLoop
+from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
 
 
@@ -88,6 +89,7 @@ class UnifiedBrain:
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
         self.adaptive_learning = AdaptiveLearningLoop()
+        self.quality_controller = ReasoningQualityController()
         self.control_plane = OperationalControlPlane()
 
     def _observe(self, observations: Iterable[MemoryObservation]) -> None:
@@ -185,6 +187,17 @@ class UnifiedBrain:
 
         memory_inference = infer(self.memory, self.relations, iterations=3)
 
+        quality = self.quality_controller.evaluate(
+            understanding_confidence=reasoning.interpretation.confidence,
+            evidence_count=len(reasoning.interpretation.entities) + len(observation_list),
+            contradiction_count=len(reasoning.contradictions),
+            alternative_count=len(reasoning.hypotheses),
+            reversibility=max(
+                (h.reversibility for h in reasoning.hypotheses),
+                default=0.0,
+            ),
+        )
+
         candidate_strategies = [
             reasoning.selected_strategy,
             *[h.label for h in reasoning.hypotheses],
@@ -270,6 +283,7 @@ class UnifiedBrain:
             "cycle": self.state.cycle,
             "objective": objective,
             "adaptive_reasoning": asdict(reasoning),
+            "reasoning_quality": asdict(quality),
             "hierarchical_reasoning": hierarchy,
             "cognitive_mesh": mesh,
             "world_model": {"hypotheses": [asdict(x) for x in ranked_world]},
@@ -338,6 +352,7 @@ class UnifiedBrain:
             "external_work": self.external_work.snapshot(),
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
+            "reasoning_quality_controller": self.quality_controller.snapshot(),
             "operational_control_plane": self.control_plane.snapshot(),
         }
 
