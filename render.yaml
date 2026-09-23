@@ -6,3 +6,15 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+
+  - type: worker
+    name: brain-v7-autonomous
+    runtime: docker
+    dockerfilePath: ./brain_v7/Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      - key: BRAIN_SLEEP_SECONDS
+        value: "60"
+      - key: STOP_BRAIN
+        value: "0"
