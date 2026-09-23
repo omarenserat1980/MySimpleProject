@@ -1,0 +1,19 @@
+services:
+  brain-worker:
+    build:
+      context: ..
+      dockerfile: brain_v7/Dockerfile
+    container_name: electronic-brain-worker
+    restart: unless-stopped
+    environment:
+      BRAIN_SLEEP_SECONDS: "60"
+      STOP_BRAIN: "0"
+    volumes:
+      - brain_state:/app/runtime
+    command:
+      - python
+      - -c
+      - from brain_v7.braincore_v2.fully_autonomous_runtime import run_forever; run_forever()
+
+volumes:
+  brain_state:
