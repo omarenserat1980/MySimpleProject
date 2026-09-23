@@ -32,6 +32,9 @@ def select_capabilities(objective: str) -> list[str]:
         for capability, words in KEYWORDS.items()
         if any(word in text for word in words)
     ]
+    # A media-heavy objective gets the complete production chain.
+    if len(set(found) & {"image", "audio", "video"}) >= 2:
+        found.append("media_pipeline")
     if not found:
         found = ["software"]
     return list(dict.fromkeys(found))
@@ -71,7 +74,7 @@ def snapshot() -> dict[str, Any]:
         "automatic_selection": True,
         "local_pipeline": True,
         "supported": sorted(
-            {"software", "web", "app", "image", "audio", "video", "design"}
+            {"software", "web", "app", "image", "audio", "video", "design", "media_pipeline"}
         ),
         "external_actions": "permission_gated",
     }
