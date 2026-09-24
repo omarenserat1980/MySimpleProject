@@ -234,18 +234,33 @@ class IncomeEngine:
                 continue
             fit_score, fit_matches = self._fit_score(title, requirements, str(item.get("category") or "FREELANCE_JOB"))
             history = list((existing or {}).get("data", {}).get("research_history", []))
-            history.append({"retrieved_at": retrieved_at, "title": title[:300], "score": fit_score})
+            previous_title = str((existing or {}).get("title") or (existing or {}).get("data", {}).get("title") or "")
+            previous_req = str((existing or {}).get("data", {}).get("requirements") or "")
+            changed = bool(existing) and (previous_title != title or previous_req != requirements)
+            lifecycle = "UPDATED" if changed else ("UNCHANGED" if existing else "NEW")
+            history.append({"retrieved_at": retrieved_at, "title": title[:300], "score": fit_score, "lifecycle": lifecycle})
             history = history[-10:]
             record = {"opportunity_id":"LIVE-"+fingerprint,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":canonical_url,
                       "evidence":f"مصدر حي: {source_text}; retrieved_at={retrieved_at}; هذه فرصة معلنة وليست إيرادًا.","requirements":requirements[:4000],"budget":budget,
                       "posted_at":item.get("posted_at"),"retrieved_at":retrieved_at,"source_kind":"LIVE_OPPORTUNITY","status":"DISCOVERY",
-                      "score":fit_score,"fit_matches":fit_matches,"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
+                      "score":fit_score,"fit_matches":fit_matches,"lifecycle":lifecycle,"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
                       "owner_role":"Opportunity Researcher","discovered_at":time(),"run":self.run_count,
                       "research_history":history,
                       "verification_rule":"لا يُحتسب أي دخل إلا بدليل قبول ثم دفع مستلم قابل للمطابقة."}
             self.store.upsert_income_opportunity(record); accepted.append(record)
         self.store.event("LIVE_INCOME_OPPORTUNITIES_INGESTED", {"run":self.run_count,"accepted":len(accepted),"received":len(results or []),"external_execution":False})
         return accepted
+
+    def lifecycle_report(self, limit: int = 100) -> dict[str, Any]:
+        rows = self.store.income_opportunities(limit)
+        counts = {"NEW": 0, "UPDATED": 0, "UNCHANGED": 0, "STALE": 0, "UNKNOWN": 0}
+        for row in rows:
+            data = row.get("data") or {}
+            lifecycle = str(data.get("lifecycle") or "UNKNOWN")
+            if lifecycle not in counts:
+                lifecycle = "UNKNOWN"
+            counts[lifecycle] += 1
+        return {"ok": True, "counts": counts, "opportunities": rows}
 
     def prioritize(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.store.income_opportunities(limit)
