@@ -250,6 +250,25 @@ def agent_gateway_task(request:Request, body:DeviceTask):
 def agent_gateway_result(task_id:str):
     return device_bridge.result(task_id)
 
+
+@app.post("/api/agent-gateway/smoke-test")
+def agent_gateway_smoke_test(request:Request):
+    require_control_key(request)
+    created = device_bridge.enqueue("python_version", {})
+    if not created.get("ok"):
+        return created
+    task_id = created["task"]["task_id"]
+    store.event("AGENT_GATEWAY_SMOKE_TEST_CREATED", {"task_id": task_id})
+    return {
+        "ok": True,
+        "status": "QUEUED",
+        "task_id": task_id,
+        "next": [
+            f"/api/agent-gateway/result/{task_id}",
+            f"/api/agent-gateway/verify/{task_id}",
+        ],
+    }
+
 @app.get("/api/agent-gateway/verify/{task_id}")
 def agent_gateway_verify(task_id:str):
     verification = device_bridge.verify_result(task_id)
