@@ -104,7 +104,9 @@ class FreelanceAgent:
 
     def analyze(self, opportunity: dict[str, Any]) -> dict[str, Any]:
         text = self._text(opportunity)
-        quality_ok = (bool(str(opportunity.get("source_url") or opportunity.get("url") or "").strip())\n                      and bool(str(opportunity.get("evidence") or "").strip())\n                      and len(str(opportunity.get("title") or "").strip()) >= 8)
+        quality_ok = (bool(str(opportunity.get("source_url") or opportunity.get("url") or "").strip())
+                      and bool(str(opportunity.get("evidence") or "").strip())
+                      and len(str(opportunity.get("title") or "").strip()) >= 8)
         matched = []
         categories = []
         for category, words in KEYWORDS.items():
