@@ -166,7 +166,7 @@ class ExternalWorkGateway:
         opportunity = self.opportunities[opportunity_id]
         candidates = [
             e for e in self.organization.employees.values()
-            if getattr(e, "status", "ACTIVE") == "ACTIVE"
+            if getattr(e, "status", "ACTIVE") in {"ACTIVE", "AVAILABLE", "BUSY", "TRAINING_REQUIRED"}
         ]
         if not candidates:
             raise RuntimeError("No active employees available.")
