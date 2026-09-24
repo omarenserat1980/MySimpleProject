@@ -132,8 +132,14 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify"}.get(action)
-        tool_result=self.execute_tool(tool_id,{"title":task_title} if tool_id=="tasks.create" else {"path":"brain_v12/app.py"} if tool_id=="code.inspect" else {}) if tool_id else None
+        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
+        tool_params = (
+            {"title":task_title} if tool_id=="tasks.create"
+            else {"path":"brain_v12/app.py"} if tool_id=="code.inspect"
+            else {"task":"status","params":{}} if tool_id=="device.enqueue"
+            else {}
+        )
+        tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
         if action in {"observe","plan"} and tool_result and tool_result.get("ok"):
             self.tasks.update(task["id"],"COMPLETED")
             execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"تم اختيار أداة آمنة وتنفيذها ثم إكمال المهمة.","run_id":run_id}
