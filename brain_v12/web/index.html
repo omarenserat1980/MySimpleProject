@@ -193,6 +193,6 @@ async function loadIncomeMission(){
   $('incomeNext').textContent=(m.next_actions||[]).join(' • ')||'المراقبة والبحث مستمران.';
  }catch(e){$('incomeMissionStatus').textContent='تعذر التحديث';}
 }
-refresh();loadTools();pollCognitive();setInterval(refresh,5000);setInterval(pollCognitive,2000);
+refresh();loadTools();loadIncomeMission();pollCognitive();setInterval(refresh,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);
 </script>
 </body></html>
