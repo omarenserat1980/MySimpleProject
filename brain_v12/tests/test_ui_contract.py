@@ -28,6 +28,20 @@ class HumanInterfaceContractTests(unittest.TestCase):
     def test_human_command_input_exists(self):
         self.assertIn("قل للعقل ما تريد", self.html)
 
+    def test_inline_handlers_reference_existing_functions(self):
+        funcs = set(re.findall(r'function\\s+([A-Za-z_$][\\w$]*)\\s*\\(', self.html))
+        handlers = re.findall(r'onclick=["\\']([^"\\']+)["\\']', self.html)
+        allowed = {"show", "selectAIMode", "evolveBrain", "speakLast", "clearChat", "quick",
+                   "toggleVoice", "sendChat", "requestMic", "requestCamera", "stopCamera",
+                   "capture", "uploadFile", "runCycle", "addGoal", "learn", "checkPermissions",
+                   "loadWorkforce", "loadIncome", "loadEvents", "clearChatGPT", "sendChatGPT",
+                   "quickChatGPT", "uploadAny", "loadCaps", "loadAgent", "loadAI", "loadEvolve",
+                   "openCommandPalette", "closeCommandPalette", "filterCommands"}
+        for handler in handlers:
+            name = re.match(r'([A-Za-z_$][\\w$]*)\\s*\\(', handler)
+            if name and name.group(1) in allowed:
+                self.assertIn(name.group(1), funcs, handler)
+
     def test_readiness_and_overview_are_wired(self):
         self.assertIn("/api/system/overview", self.html)
         self.assertIn("/api/system/readiness", self.html)
