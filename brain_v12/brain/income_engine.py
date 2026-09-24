@@ -85,6 +85,66 @@ class IncomeEngine:
             "action": "اختبار عرض خدمة واحد واضح بسعر معلن وشروط تسليم محددة.",
             "cost": 0,
         },
+        {
+            "category": "WEBSITE_SETUP", "title": "إعداد صفحة هبوط عربية للأعمال",
+            "source_url": "https://mostaql.com/", "evidence": "قناة بحث عن مشاريع؛ ليست عملية بيع بحد ذاتها.",
+            "owner_role": "Web Builder", "action": "استهداف طلبات صفحات الهبوط والمواقع التعريفية الصغيرة.", "cost": 0,
+        },
+        {
+            "category": "SEO", "title": "تحسين ظهور موقع محلي في البحث",
+            "source_url": "https://khamsat.com/", "evidence": "قناة خدمات؛ يلزم طلب وقبول ودفع موثق.",
+            "owner_role": "SEO Specialist", "action": "تجهيز خدمة تدقيق SEO وإصلاحات أساسية للأعمال الصغيرة.", "cost": 0,
+        },
+        {
+            "category": "PRODUCT_LISTING", "title": "كتابة ووصف منتجات للمتاجر",
+            "source_url": "https://www.upwork.com/nx/search/jobs/", "evidence": "قناة بحث عن وظائف؛ لا تعني وجود عميل أو دفع.",
+            "owner_role": "Content Specialist", "action": "البحث عن مهام إدخال ووصف المنتجات العربية.", "cost": 0,
+        },
+        {
+            "category": "ARABIC_CONTENT", "title": "كتابة محتوى عربي قصير",
+            "source_url": "https://mostaql.com/", "evidence": "مشاريع العمل الحر تحتاج تحققًا من الطلب والميزانية.",
+            "owner_role": "Arabic Content Specialist", "action": "البحث عن مهام كتابة وصف وإعلانات ومنشورات عربية.", "cost": 0,
+        },
+        {
+            "category": "TRANSLATION", "title": "ترجمة عربية/إنجليزية لمحتوى قصير",
+            "source_url": "https://www.upwork.com/nx/search/jobs/", "evidence": "قناة بحث؛ لا تُحسب فرصة مدفوعة إلا بعد قبول العميل.",
+            "owner_role": "Arabic Translation Specialist", "action": "البحث عن نصوص قصيرة مناسبة للقدرة المتاحة.", "cost": 0,
+        },
+        {
+            "category": "DATA_ENTRY", "title": "إدخال وتنظيم بيانات",
+            "source_url": "https://www.upwork.com/nx/search/jobs/", "evidence": "قناة وظائف؛ التقديم لا يثبت الدخل.",
+            "owner_role": "Data Specialist", "action": "استهداف مهام صغيرة قابلة للتسليم والمراجعة.", "cost": 0,
+        },
+        {
+            "category": "SOCIAL_MEDIA", "title": "إعداد منشورات وصفحات أعمال",
+            "source_url": "https://khamsat.com/", "evidence": "خدمة محتملة؛ البيع والدفع يحتاجان إثباتًا منفصلًا.",
+            "owner_role": "Social Media Specialist", "action": "تجهيز باقة منشورات بسيطة للأعمال المحلية.", "cost": 0,
+        },
+        {
+            "category": "E_COMMERCE", "title": "تهيئة متجر إلكتروني بسيط",
+            "source_url": "https://mostaql.com/", "evidence": "قناة مشاريع؛ يجب التحقق من المشروع قبل التقديم.",
+            "owner_role": "E-commerce Specialist", "action": "البحث عن متاجر تحتاج إعدادًا أو تحسينًا محدودًا.", "cost": 0,
+        },
+        {
+            "category": "AUTOMATION", "title": "أتمتة مهام إدارية صغيرة",
+            "source_url": "https://www.upwork.com/nx/search/jobs/", "evidence": "قناة وظائف؛ لا يوجد دخل مثبت قبل قبول ودفع.",
+            "owner_role": "Automation Specialist", "action": "البحث عن مهام أتمتة بسيطة يمكن اختبارها قبل التسليم.", "cost": 0,
+        },
+        {
+            "category": "VIDEO_EDITING", "title": "مونتاج فيديوهات قصيرة وإعلانات",
+            "source_url": "https://khamsat.com/", "evidence": "خدمة رقمية محتملة؛ يجب التحقق من الطلب والبيع والدفع.",
+            "owner_role": "Video Editor", "action": "استهداف فيديوهات قصيرة وإعلانات منتجات.", "cost": 0,
+        },
+        {
+            "category": "PRESENTATIONS", "title": "تصميم عروض تقديمية عربية",
+            "source_url": "https://www.upwork.com/nx/search/jobs/", "evidence": "قناة بحث عن أعمال؛ ليست مبيعات مؤكدة.",
+            "owner_role": "Presentation Designer", "action": "البحث عن عروض صغيرة يمكن إنتاجها بسرعة.", "cost": 0,
+        },
+        {
+            "category": "DOCUMENT_FORMATTING", "title": "تنسيق مستندات وتقارير",
+            "source_url": "https://mostaql.com/", "evidence": "مشاريع محتملة تحتاج قبولًا ودفعًا موثقًا.",
+            "owner_role": "Document Specialist", "action": "استهداف أعمال تنسيق مستندات عربية وجداول وتقارير.", "cost": 0,
+        },
     )
 
     def __init__(self, store):
@@ -104,7 +164,7 @@ class IncomeEngine:
         }.get(item.get("category"), 0.5)
         return base
 
-    def discover(self, limit: int = 8) -> list[dict[str, Any]]:
+    def discover(self, limit: int = 20) -> list[dict[str, Any]]:
         self.run_count += 1
         chosen = self.CHANNELS[: max(1, min(int(limit), len(self.CHANNELS)))]
         created = []
