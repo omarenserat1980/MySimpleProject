@@ -28,6 +28,7 @@ from .brain.control_auth import require_control_key
 from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
+from .brain.income_lifecycle import IncomeLifecycle
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -62,6 +63,7 @@ secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
+income_lifecycle=IncomeLifecycle(store)
 try:
     store.purge_non_live_income_opportunities()
 except Exception as exc:
@@ -221,7 +223,7 @@ def income_search_plan():
 @app.get("/api/income/opportunities")
 def income_opportunities(limit:int=20):
     engine=workforce.income_engine
-    return {"ok":True,"summary":engine.snapshot(),"items":engine.prioritize(max(1,min(limit,100)))}
+    return {"ok":True,"summary":engine.snapshot(),"items":engine.prioritize(max(1,min(limit,100))),"lifecycle":income_lifecycle.summary()}
 
 
 @app.post("/api/income/discover")
@@ -242,6 +244,48 @@ def render_monitor_status():
     return {"ok":True,"deploy_monitor":render_deploy_monitor.status(),"log_monitor":render_monitor.status()}
 
 
+class IncomeLifecycleRequest(BaseModel):
+    opportunity_id:str
+    notes:str=""
+
+
+class IncomePrepareRequest(BaseModel):
+    opportunity_id:str
+    proposal:str=""
+
+
+class IncomeExternalEvidence(BaseModel):
+    opportunity_id:str
+    status:str
+    evidence:str
+
+
+@app.get("/api/income/lifecycle")
+def income_lifecycle_status():
+    return {"ok":True,"lifecycle":income_lifecycle.summary()}
+
+
+@app.post("/api/income/qualify")
+def income_qualify(request:Request, body:IncomeLifecycleRequest):
+    require_control_key(request)
+    return income_lifecycle.qualify(body.opportunity_id, body.notes)
+
+
+@app.post("/api/income/prepare")
+def income_prepare(request:Request, body:IncomePrepareRequest):
+    require_control_key(request)
+    return income_lifecycle.prepare(body.opportunity_id, body.proposal)
+
+
+@app.post("/api/income/external-evidence")
+def income_external_evidence(request:Request, body:IncomeExternalEvidence):
+    require_control_key(request)
+    allowed={"SUBMITTED","CLIENT_RESPONDED","ACCEPTED","DELIVERING","COMPLETED"}
+    if body.status not in allowed:
+        return {"ok":False,"status":"INVALID_EXTERNAL_STATUS","allowed":sorted(allowed)}
+    return income_lifecycle.record_external(body.opportunity_id, body.status, body.evidence)
+
+
 class IncomeVerification(BaseModel):
     opportunity_id:str
     amount_jod:float
@@ -251,7 +295,17 @@ class IncomeVerification(BaseModel):
 @app.post("/api/income/verify")
 def income_verify(request:Request, body:IncomeVerification):
     require_control_key(request)
-    return workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence)
+    row=income_lifecycle._find(body.opportunity_id)
+    if not row:
+        return {"ok":False,"status":"NOT_FOUND"}
+    if str(row.get("status")) not in ("COMPLETED", "PAYMENT_VERIFIED"):
+        return {"ok":False,"status":"DELIVERY_NOT_VERIFIED","current":row.get("status"),
+                "reason":"يجب إثبات القبول/التنفيذ/التسليم قبل تسجيل الدفع."}
+    result=workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence)
+    if result.get("ok"):
+        income_lifecycle._save(row,status="PAYMENT_VERIFIED",payment_evidence=body.evidence[:4000],
+                               payment_verified_at=income_lifecycle._now())
+    return result
 
 
 @app.get("/api/workforce/report")
