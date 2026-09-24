@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from brain.income_engine import IncomeEngine
+from brain_v12.brain.income_engine import IncomeEngine
 
 
 class _Store:
