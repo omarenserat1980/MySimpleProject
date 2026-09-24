@@ -53,6 +53,7 @@ def handle_render_incident(incident):
 
 render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
 render_deploy_monitor=RenderDeployMonitor(store)
+secret_control=SecretControlPlane()
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
     plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
