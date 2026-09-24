@@ -8,6 +8,16 @@ from uuid import uuid4
 class CognitiveLoop:
     """Traceable V12 cognitive pipeline. Exposes high-level state, never private chain-of-thought."""
     STAGES=["PERCEIVE","UNDERSTAND","MEMORY","ANALYZE","PLAN","DECIDE","EXECUTE","VERIFY","LEARN"]
+    TOOL_CATALOG=[
+        {"id":"memory.read","name":"قراءة الذاكرة","risk":"low","permission":None},
+        {"id":"state.read","name":"قراءة حالة العقل","risk":"low","permission":None},
+        {"id":"tasks.create","name":"إنشاء مهمة","risk":"low","permission":None},
+        {"id":"tasks.complete","name":"إكمال مهمة","risk":"low","permission":None},
+        {"id":"code.inspect","name":"فحص الكود","risk":"low","permission":"developer"},
+        {"id":"code.verify","name":"التحقق من الكود","risk":"low","permission":"developer"},
+        {"id":"code.apply","name":"تعديل الكود","risk":"high","permission":"developer_approval"},
+        {"id":"agent.execute","name":"تنفيذ معزول","risk":"high","permission":"agent_approval"},
+    ]
 
     def __init__(self,store):
         self.store=store
@@ -28,6 +38,30 @@ class CognitiveLoop:
         })
         self.store.set_state(current)
         return current
+
+    def tool_catalog(self):
+        return self.TOOL_CATALOG
+
+    def execute_tool(self,tool_id,params=None,approved=False):
+        params=params or {}
+        item=next((x for x in self.TOOL_CATALOG if x["id"]==tool_id),None)
+        self.events.publish("TOOL_SELECTED",{"tool":tool_id,"approved":approved})
+        if not item:
+            result={"ok":False,"status":"UNKNOWN_TOOL","tool":tool_id}
+        elif item["permission"] and (item["permission"] not in self.permissions.grants or (item["risk"]=="high" and not approved)):
+            result={"ok":False,"status":"WAITING_PERMISSION","tool":tool_id,"permission":item["permission"]}
+        elif tool_id=="memory.read":
+            result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.store.memories()[:int(params.get("limit",12))]}
+        elif tool_id=="state.read":
+            result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.store.state()}
+        elif tool_id=="tasks.create":
+            result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.create(str(params.get("title","مهمة جديدة")))}
+        elif tool_id=="tasks.complete":
+            result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.update(str(params.get("task_id")),"COMPLETED")}
+        else:
+            result={"ok":False,"status":"DELEGATED","tool":tool_id,"reason":"الأداة تحتاج المسار المخصص لها."}
+        self.events.publish("TOOL_RESULT",result)
+        return result
 
     def run(self,goal):
         goal=(goal or "").strip()
@@ -64,9 +98,11 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        if action in {"observe","plan"}:
+        tool_id="memory.read" if action=="observe" else "tasks.create" if action=="plan" else None
+        tool_result=self.execute_tool(tool_id,{"title":task_title} if tool_id=="tasks.create" else {}) if tool_id else None
+        if action in {"observe","plan"} and tool_result and tool_result.get("ok"):
             self.tasks.update(task["id"],"COMPLETED")
-            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"result":"تم تنفيذ خطوة داخلية آمنة: إنشاء المهمة وإكمالها والتحقق من حالتها.","run_id":run_id}
+            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"تم اختيار أداة آمنة وتنفيذها ثم إكمال المهمة.","run_id":run_id}
             self.events.publish("EXECUTION_COMPLETED",execution)
         else:
             self.tasks.update(task["id"],"PENDING")
@@ -99,6 +135,6 @@ class CognitiveLoop:
             "execution":execution,
             "verification":verification,
             "learning":{"status":"RECORDED","lesson":lesson},
-            "world":self.world.snapshot(),
+            "tool_result":tool_result,\n            "world":self.world.snapshot(),
             "tasks":self.tasks.snapshot()
         }
