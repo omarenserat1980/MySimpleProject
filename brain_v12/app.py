@@ -29,7 +29,13 @@ code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
 code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
-for p in PLUGINS:\n    plugin_id=p.get("id") if isinstance(p,dict) else str(p)\n    plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)\n    plugin_permission=p.get("permission") if isinstance(p,dict) else None\n    registered=plugins.register(plugin_id,plugin_name,"1.0",[],[plugin_permission] if plugin_permission else [])\n    if isinstance(p,dict) and p.get("enabled"):\n        plugins.enable(plugin_id)
+for p in PLUGINS:
+    plugin_id=p.get("id") if isinstance(p,dict) else str(p)
+    plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
+    plugin_permission=p.get("permission") if isinstance(p,dict) else None
+    registered=plugins.register(plugin_id,plugin_name,"1.0",[],[plugin_permission] if plugin_permission else [])
+    if isinstance(p,dict) and p.get("enabled"):
+        plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.4")
 app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
