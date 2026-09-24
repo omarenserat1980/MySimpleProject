@@ -7,8 +7,8 @@ from brain_v12.brain.memory import MemoryStore
 
 class DeviceBridgeTests(unittest.TestCase):
     def setUp(self):
-        self.old = os.environ.get("V12_AGENT_KEY")
-        os.environ["V12_AGENT_KEY"] = "test-device-key"
+        self.old = os.environ.get("TERMUX_AGENT_KEY")
+        os.environ["TERMUX_AGENT_KEY"] = "test-device-key"
         self.tmp = tempfile.NamedTemporaryFile(delete=False)
         self.tmp.close()
         self.store = MemoryStore(self.tmp.name)
@@ -17,13 +17,17 @@ class DeviceBridgeTests(unittest.TestCase):
 
     def tearDown(self):
         if self.old is None:
-            os.environ.pop("V12_AGENT_KEY", None)
+            os.environ.pop("TERMUX_AGENT_KEY", None)
         else:
-            os.environ["V12_AGENT_KEY"] = self.old
+            os.environ["TERMUX_AGENT_KEY"] = self.old
         try:
             os.unlink(self.tmp.name)
         except FileNotFoundError:
             pass
+
+    def test_authentication(self):
+        self.assertTrue(self.bridge.authenticate("test-device-key"))
+        self.assertFalse(self.bridge.authenticate("wrong-key"))
 
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
