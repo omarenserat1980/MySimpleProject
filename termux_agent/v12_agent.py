@@ -5,15 +5,27 @@ import os
 import platform
 import subprocess
 import time
-import requests
+import json
+import urllib.parse
+import urllib.request
 
 BRAIN_URL = os.environ["BRAIN_URL"].rstrip("/")
 AGENT_KEY = os.environ["TERMUX_AGENT_KEY"]
 AGENT_ID = os.getenv("TERMUX_AGENT_ID", "android-termux-v12")
 POLL_SECONDS = max(1, int(os.getenv("TERMUX_POLL_SECONDS", "2")))
 
-def headers():
-    return {"X-V12-Agent-Key": AGENT_KEY}
+def request(method, path, payload=None, params=None):
+    url = f"{BRAIN_URL}{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    data = None
+    hdrs = {"X-V12-Agent-Key": AGENT_KEY}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        hdrs["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 def execute(task, params):
     if task == "python_version":
@@ -53,14 +65,7 @@ def main():
     print(f"[V12-Agent] READY id={AGENT_ID}")
     while True:
         try:
-            r = requests.get(
-                f"{BRAIN_URL}/api/device/poll",
-                params={"agent_id": AGENT_ID},
-                headers=headers(),
-                timeout=30,
-            )
-            r.raise_for_status()
-            payload = r.json()
+            payload = request("GET", "/api/device/poll", params={"agent_id": AGENT_ID})
             task = payload.get("task")
             if not task:
                 time.sleep(POLL_SECONDS)
@@ -82,13 +87,7 @@ def main():
                 "result": result,
                 "error": error,
             }
-            rr = requests.post(
-                f"{BRAIN_URL}/api/device/report",
-                json=report,
-                headers=headers(),
-                timeout=30,
-            )
-            rr.raise_for_status()
+            request("POST", "/api/device/report", payload=report)
             print(f"[V12-Agent] REPORTED {task_id} ok={ok}")
         except KeyboardInterrupt:
             print("\n[V12-Agent] STOPPED")
