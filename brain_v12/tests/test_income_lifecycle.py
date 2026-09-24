@@ -67,6 +67,11 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.life.prepare("LIVE-test")
         self.assertEqual(self.store.rows[0]["status"],"READY_TO_APPLY")
 
+    def test_cannot_skip_lifecycle_stage(self):
+        skipped=self.life.record_external("LIVE-test","PAYMENT_VERIFIED","payment receipt #1")
+        self.assertFalse(skipped["ok"])
+        self.assertEqual(skipped["status"],"INVALID_SKIPPED_TRANSITION")
+
 
 if __name__=="__main__":
     unittest.main()
