@@ -12,6 +12,8 @@ services:
     envVars:
       - key: BRAIN_RENDER_MONITOR_ENABLED
         value: "true"
+      - key: BRAIN_V12_VERSION
+        value: "12.6"
       - key: RENDER_LOG_POLL_SECONDS
         value: "60"
       - key: RENDER_SERVICE_ID
