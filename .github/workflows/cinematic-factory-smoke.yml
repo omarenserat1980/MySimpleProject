@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "brain_v7/**"
+      - "brain_v12/**"
       - "render.yaml"
   workflow_dispatch:
 
