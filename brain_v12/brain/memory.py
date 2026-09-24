@@ -197,8 +197,8 @@ class MemoryStore:
         with self.connect() as con:
             row=con.execute("""SELECT COUNT(*) total,
                                       COALESCE(SUM(verified_amount_jod),0) verified,
-                                      SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END) active,
-                                      SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END) verified_count
+                                      COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
+                                      COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
                                FROM income_opportunities""").fetchone()
         return dict(row)
 
