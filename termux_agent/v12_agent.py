@@ -15,6 +15,8 @@ AGENT_ID = os.getenv("TERMUX_AGENT_ID", "android-termux-v12")
 MAX_TASKS_PER_RUN = max(1, int(os.getenv("TERMUX_MAX_TASKS_PER_RUN", "100")))
 STOP_ON_ERROR = os.getenv("TERMUX_STOP_ON_ERROR", "false").lower() == "true"
 POLL_SECONDS = max(1, int(os.getenv("TERMUX_POLL_SECONDS", "2")))
+HEARTBEAT_SECONDS = max(5, int(os.getenv("TERMUX_HEARTBEAT_SECONDS", "10")))
+
 
 def request(method, path, payload=None, params=None):
     url = f"{BRAIN_URL}{path}"
@@ -66,8 +68,14 @@ def execute(task, params):
 def main():
     print(f"[V12-Agent] READY id={AGENT_ID}")
     completed = 0
+    last_heartbeat = 0.0
     while completed < MAX_TASKS_PER_RUN:
         try:
+            now = time.time()
+            if now - last_heartbeat >= HEARTBEAT_SECONDS:
+                request("POST", "/api/device/heartbeat", payload={"agent_id": AGENT_ID})
+                last_heartbeat = now
+                print("[V12-Agent] HEARTBEAT")
             payload = request("GET", "/api/device/poll", params={"agent_id": AGENT_ID})
             task = payload.get("task")
             if not task:
