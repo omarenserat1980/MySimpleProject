@@ -33,6 +33,7 @@ from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
+from .brain.youtube_oauth import YouTubeOAuth
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -67,6 +68,7 @@ secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
+youtube_oauth=YouTubeOAuth(store)
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
@@ -141,6 +143,19 @@ async def media_upload(file:UploadFile=File(...)):
 def youtube_cinematic_validate(body: CinematicReleaseIn, request: Request):
     require_control_key(request)
     return workforce.youtube_publisher.validate_release(body.title, body.media_path, body.description, body.tags)
+
+@app.get("/api/youtube/oauth/status")
+def youtube_oauth_status():
+    return youtube_oauth.snapshot()
+
+@app.get("/api/youtube/oauth/start")
+def youtube_oauth_start(request: Request):
+    require_control_key(request)
+    return youtube_oauth.start()
+
+@app.get("/api/youtube/oauth/callback")
+def youtube_oauth_callback(code: str = "", state: str = ""):
+    return youtube_oauth.callback(code, state)
 
 @app.get("/api/youtube/status")
 def youtube_status():
