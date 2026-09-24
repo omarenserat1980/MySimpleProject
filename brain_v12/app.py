@@ -193,6 +193,18 @@ def system_diagnostics():
 def start_background_services():
     if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","false").lower()=="true" and render_monitor.configured:
         render_monitor.start()
+    # Safe internal workforce heartbeat: audit/coordinate work periodically.
+    # It never publishes externally, moves money, or bypasses control-plane gates.
+    if os.getenv("BRAIN_WORKFORCE_ENABLED","true").lower()=="true":
+        def workforce_loop():
+            import time
+            while True:
+                time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
+                try:
+                    workforce.dispatch("scheduled_heartbeat", include_revenue=False)
+                except Exception as exc:
+                    store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
+        threading.Thread(target=workforce_loop, daemon=True).start()
 
 @app.get("/api/state")
 def state(): return brain.snapshot()
