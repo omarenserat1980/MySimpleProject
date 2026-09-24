@@ -285,6 +285,42 @@ def system_overview():
         ],
     }
 
+@app.get("/api/system/readiness")
+def system_readiness():
+    """Machine-readable readiness summary for the human interface and deployment checks."""
+    checks = []
+    def check(name, ok, detail=""):
+        checks.append({"name": name, "ok": bool(ok), "detail": detail})
+
+    try:
+        check("memory", store.state() is not None, "Memory store is readable")
+    except Exception as exc:
+        check("memory", False, str(exc))
+    try:
+        tool_count = len(cognitive.tool_catalog())
+        check("tools", tool_count > 0, f"{tool_count} tools")
+    except Exception as exc:
+        check("tools", False, str(exc))
+    try:
+        check("decision", len(cognitive.decisions.generate("readiness check")) > 0, "Decision engine responds")
+    except Exception as exc:
+        check("decision", False, str(exc))
+    try:
+        code = code_workspace.snapshot()
+        check("code_workspace", bool(code), "Code workspace snapshot available")
+    except Exception as exc:
+        check("code_workspace", False, str(exc))
+
+    passed = sum(1 for item in checks if item["ok"])
+    return {
+        "ok": passed == len(checks),
+        "status": "READY" if passed == len(checks) else "DEGRADED",
+        "passed": passed,
+        "total": len(checks),
+        "checks": checks,
+        "deployment": deploy_identity(),
+    }
+
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     checks=[]
