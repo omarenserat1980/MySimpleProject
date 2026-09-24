@@ -6,6 +6,18 @@ services:
     buildCommand: pip install -r brain_v12/requirements.txt
     startCommand: uvicorn brain_v12.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BRAIN_RENDER_MONITOR_ENABLED
+        value: "true"
+      - key: RENDER_LOG_POLL_SECONDS
+        value: "60"
+      - key: RENDER_SERVICE_ID
+        value: "srv-dapmmp0473hc73c9ceog"
+      - key: RENDER_API_KEY
+        sync: false
+      - key: RENDER_OWNER_ID
+        sync: false
 
 
   - type: web
