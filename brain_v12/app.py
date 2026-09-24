@@ -322,7 +322,8 @@ def code_audit(): return code_workspace.snapshot()
 def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
 @app.post("/api/tools/execute")
 def tools_execute(request:Request,tool_id:str,params:dict|None=None,approved:bool=False):
-    require_control_key(request) return cognitive.execute_tool(tool_id,params or {},approved)
+    require_control_key(request)
+    return cognitive.execute_tool(tool_id,params or {},approved)
 @app.get("/api/cognitive/history/{run_id}")
 def cognitive_history(run_id:str): return {"ok":True,"run_id":run_id,"events":store.events_for_run(run_id,200)}
 
