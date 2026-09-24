@@ -30,7 +30,7 @@ class LeadershipEvolutionEngine:
         organization: EmployeeHierarchy,
         notifications: NotificationCenter,
         *,
-        succession_threshold: float = 0.92,
+        succession_threshold: float = 0.40,
         minimum_tasks: int = 12,
         minimum_margin: float = 0.05,
     ) -> None:
