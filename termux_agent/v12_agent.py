@@ -31,6 +31,9 @@ def request(method, path, payload=None, params=None):
     with urllib.request.urlopen(req, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
 
+REQUEST_TIMEOUT = 30
+
+
 def execute(task, params):
     if task == "python_version":
         p = subprocess.run(["python", "--version"], capture_output=True, text=True, timeout=20)
