@@ -73,7 +73,11 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     )
     result["youtube_oauth"] = oauth_snapshot
     result["youtube_channel"] = channel_snapshot
-    _heartbeat("HEALTHY", cycle, str(result.get("status", "cycle_complete")))
+    final_status = "DEGRADED" if oauth_snapshot.get("status") == "OAUTH_INVALID" else "HEALTHY"
+    final_detail = str(result.get("status", "cycle_complete"))
+    if oauth_snapshot.get("status") == "OAUTH_INVALID":
+        final_detail = f"{final_detail};youtube_oauth={oauth_snapshot.get('code', 'invalid')}"
+    _heartbeat(final_status, cycle, final_detail)
     print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
     return result
 
