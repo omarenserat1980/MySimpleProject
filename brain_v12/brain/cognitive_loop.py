@@ -149,6 +149,7 @@ class CognitiveLoop:
             "execution":execution,
             "verification":verification,
             "learning":{"status":"RECORDED","lesson":lesson},
-            "tool_result":tool_result,\n            "world":self.world.snapshot(),
+            "tool_result":tool_result,
+            "world":self.world.snapshot(),
             "tasks":self.tasks.snapshot()
         }
