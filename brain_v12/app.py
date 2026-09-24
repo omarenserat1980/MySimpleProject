@@ -201,6 +201,14 @@ def device_enqueue(request:Request, body:DeviceTask):
     return result
 
 
+@app.post("/api/device/heartbeat")
+def device_heartbeat(request: Request):
+    agent_id = request.headers.get("X-V12-Agent-Id") or "android-termux-v12"
+    if not require_device_agent(request):
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
+    return device_bridge.heartbeat(agent_id)
+
+
 @app.get("/api/device/poll")
 def device_poll(request:Request, agent_id:str):
     require_device_agent(request)
