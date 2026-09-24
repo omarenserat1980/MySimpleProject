@@ -32,3 +32,9 @@ Keep `TERMUX_AGENT_KEY` out of source control and chat messages.
 After the agent is running, the Brain control endpoint can enqueue `python_version`. The Agent claims it, executes `python --version`, reports the result, and Brain verifies the stored result.
 
 Allowed initial tasks: `status`, `python_version`, `termux_path`, `platform`.
+
+
+### V12 heartbeat
+The Termux agent sends an authenticated heartbeat every 10 seconds by default.
+Set `TERMUX_HEARTBEAT_SECONDS` to change the interval. Brain diagnostics expose persistent
+agent last-seen information and online state.
