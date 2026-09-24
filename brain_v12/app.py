@@ -257,6 +257,12 @@ def health():
         "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"),
         "systems": ["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"],
     }
+@app.get("/api/deploy/diagnostics")
+def deploy_diagnostics():
+    expected = os.getenv("RENDER_GIT_COMMIT", "")
+    actual = DEPLOY_COMMIT
+    return {"ok": True, "version": APP_VERSION, "actual_commit": actual, "render_git_commit": expected or None, "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"), "repository": os.getenv("RENDER_GIT_REPO_SLUG", "unknown"), "marker": os.getenv("PRERENDER_BUILD_MARKER", "unset")}
+
 @app.get("/api/deploy/verify")
 def deploy_verify():
     expected = os.getenv("RENDER_GIT_COMMIT", "")
