@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from time import time
 from typing import Any
+from datetime import datetime, timezone
 import hashlib
+import re
 
 
 class IncomeEngine:
@@ -165,31 +167,41 @@ class IncomeEngine:
         return base
 
     def discover(self, limit: int = 20) -> list[dict[str, Any]]:
+        """Return research channels only; never store a channel as a live opportunity."""
         self.run_count += 1
-        chosen = self.CHANNELS[: max(1, min(int(limit), len(self.CHANNELS)))]
-        created = []
-        for item in chosen:
-            oid = "INC-" + hashlib.sha1((item["category"]+"|"+item["title"]).encode("utf-8")).hexdigest()[:12]
-            record = {
-                **item,
-                "opportunity_id": oid,
-                "score": self._score(item),
-                "status": "DISCOVERY",
-                "verification_status": "UNVERIFIED",
-                "verified_amount_jod": 0.0,
-                "expected_value_jod": None,
-                "discovered_at": time(),
-                "run": self.run_count,
-                "verification_rule": "لا يُحتسب أي دخل إلا بدليل طلب/معاملة ودفع مستلم قابل للمطابقة.",
-            }
-            self.store.upsert_income_opportunity(record)
-            created.append(record)
-        self.store.event("INCOME_OPPORTUNITIES_DISCOVERED", {
-            "run": self.run_count, "count": len(created),
-            "verified_revenue_jod": 0.0,
-            "external_execution": False,
-        })
-        return created
+        channels = [dict(x, source_kind="SEARCH_CHANNEL") for x in self.CHANNELS[: max(1, min(int(limit), len(self.CHANNELS)))]]
+        self.store.event("INCOME_SEARCH_PLAN_CREATED", {"run": self.run_count, "channels": len(channels), "persisted_as_opportunities": False})
+        return channels
+
+    @staticmethod
+    def _freshness(retrieved_at: str, max_age_hours: float) -> bool:
+        try:
+            dt = datetime.fromisoformat(str(retrieved_at).replace("Z", "+00:00"))
+            if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+            return (datetime.now(timezone.utc) - dt).total_seconds() <= max_age_hours * 3600
+        except Exception:
+            return False
+
+    def ingest_live_opportunities(self, results: list[dict[str, Any]], max_age_hours: float = 72) -> list[dict[str, Any]]:
+        """Persist only evidence-backed, fresh, externally discovered job/project records."""
+        accepted = []; self.run_count += 1
+        for raw in results or []:
+            item = dict(raw or {})
+            title = str(item.get("title") or "").strip(); url = str(item.get("url") or item.get("source_url") or "").strip()
+            retrieved_at = str(item.get("retrieved_at") or "").strip(); requirements = str(item.get("requirements") or "").strip(); budget = item.get("budget")
+            if not title or not url.startswith(("http://","https://")) or not retrieved_at or not self._freshness(retrieved_at, max_age_hours): continue
+            if not requirements and budget in (None, ""): continue
+            source_text = re.sub(r"\\s+", " ", str(item.get("source") or url))[:300]
+            fingerprint = hashlib.sha1((url + "|" + title).encode("utf-8")).hexdigest()[:12]
+            record = {"opportunity_id":"LIVE-"+fingerprint,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":url,
+                      "evidence":f"مصدر حي: {source_text}; retrieved_at={retrieved_at}; هذه فرصة معلنة وليست إيرادًا.","requirements":requirements[:4000],"budget":budget,
+                      "posted_at":item.get("posted_at"),"retrieved_at":retrieved_at,"source_kind":"LIVE_OPPORTUNITY","status":"DISCOVERY",
+                      "score":float(item.get("score",0.6) or 0.6),"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
+                      "owner_role":"Opportunity Researcher","discovered_at":time(),"run":self.run_count,
+                      "verification_rule":"لا يُحتسب أي دخل إلا بدليل قبول ثم دفع مستلم قابل للمطابقة."}
+            self.store.upsert_income_opportunity(record); accepted.append(record)
+        self.store.event("LIVE_INCOME_OPPORTUNITIES_INGESTED", {"run":self.run_count,"accepted":len(accepted),"received":len(results or []),"external_execution":False})
+        return accepted
 
     def prioritize(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.store.income_opportunities(limit)
