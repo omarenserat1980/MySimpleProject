@@ -71,7 +71,7 @@ def reason_about_transfer(*, amount_jod: float, destination_ref: str, reason: st
                         else "FAIL_OR_UNKNOWN"),
         "provider": "PASS" if provider_ready else "FAIL",
     }
-    hard_fail = any(v == "FAIL" for v in checks.values())
+    hard_fail = any(v == "FAIL" for key, v in checks.items() if key != "provider")
     unknown = any(v == "FAIL_OR_UNKNOWN" for v in checks.values())
     if hard_fail:
         return CognitiveDecision("BLOCKED", "CREATED", "DO_NOT_SUBMIT", True,
