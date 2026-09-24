@@ -47,6 +47,18 @@ class MemoryStore:
               id INTEGER PRIMARY KEY CHECK(id=1),
               data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS incidents(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              fingerprint TEXT UNIQUE NOT NULL,
+              severity TEXT NOT NULL,
+              status TEXT NOT NULL,
+              message TEXT NOT NULL,
+              service_id TEXT,
+              first_seen TEXT NOT NULL,
+              last_seen TEXT NOT NULL,
+              occurrences INTEGER NOT NULL DEFAULT 1,
+              data TEXT NOT NULL
+            );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
 
@@ -117,6 +129,45 @@ class MemoryStore:
             if payload.get("run_id")==run_id: out.append(dict(row))
             if len(out)>=limit: break
         return out
+
+    def monitor_state(self):
+        for item in self.memories():
+            if item.get("key")=="render.monitor.state":
+                try:
+                    return json.loads(item.get("value") or "{}")
+                except Exception:
+                    return {}
+        return {}
+
+    def set_monitor_state(self,data):
+        self.save_memory("render.monitor.state",json.dumps(data,ensure_ascii=False))
+
+    def upsert_incident(self,incident):
+        with self.connect() as con:
+            row=con.execute("SELECT * FROM incidents WHERE fingerprint=?",(incident["fingerprint"],)).fetchone()
+            if row:
+                con.execute("""UPDATE incidents
+                               SET severity=?,status=?,message=?,service_id=?,last_seen=?,occurrences=occurrences+1,data=?
+                               WHERE fingerprint=?""",
+                            (incident["severity"],incident.get("status","OPEN"),incident["message"],
+                             incident.get("service_id"),incident["timestamp"],
+                             json.dumps(incident,ensure_ascii=False),incident["fingerprint"]))
+                con.commit()
+                updated=con.execute("SELECT * FROM incidents WHERE fingerprint=?",(incident["fingerprint"],)).fetchone()
+                return {**dict(updated),"new":False}
+            con.execute("""INSERT INTO incidents
+                           (fingerprint,severity,status,message,service_id,first_seen,last_seen,occurrences,data)
+                           VALUES(?,?,?,?,?,?,?,?,?)""",
+                        (incident["fingerprint"],incident["severity"],incident.get("status","OPEN"),
+                         incident["message"],incident.get("service_id"),incident["timestamp"],incident["timestamp"],
+                         1,json.dumps(incident,ensure_ascii=False)))
+            con.commit()
+            created=con.execute("SELECT * FROM incidents WHERE fingerprint=?",(incident["fingerprint"],)).fetchone()
+            return {**dict(created),"new":True}
+
+    def incidents(self,limit=50):
+        with self.connect() as con:
+            return [dict(x) for x in con.execute("SELECT * FROM incidents ORDER BY last_seen DESC,id DESC LIMIT ?",(limit,)).fetchall()]
 
     def events(self,limit=50):
         with self.connect() as con:
