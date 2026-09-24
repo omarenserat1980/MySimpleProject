@@ -137,6 +137,11 @@ async def media_upload(file:UploadFile=File(...)):
     store.event("MEDIA_RECEIVED",{"filename":safe,"content_type":file.content_type,"size":len(data)})
     return {"ok":True,"filename":safe,"url":f"/media/{safe}","content_type":file.content_type,"size":len(data)}
 
+@app.post("/api/youtube/cinematic/validate")
+def youtube_cinematic_validate(body: CinematicReleaseIn, request: Request):
+    require_control_key(request)
+    return workforce.youtube_publisher.validate_release(body.title, body.media_path, body.description, body.tags)
+
 @app.get("/api/youtube/status")
 def youtube_status():
     return workforce.youtube_publisher.snapshot()
