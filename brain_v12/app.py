@@ -248,7 +248,15 @@ def workforce_health():
     return workforce.health()
 
 @app.get("/health")
-def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
+def health():
+    return {
+        "ok": True,
+        "brain": "V12",
+        "version": APP_VERSION,
+        "commit": DEPLOY_COMMIT,
+        "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"),
+        "systems": ["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"],
+    }
 @app.get("/api/deploy/identity")
 def deploy_identity():
     return {
