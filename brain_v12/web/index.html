@@ -132,6 +132,11 @@
   </div>
 
   <div class="card">
+   <div class="sectionTitle"><h3>⚠️ ما يحتاج انتباه الإنسان</h3><span class="badge" id="ovAttentionBadge">—</span></div>
+   <div id="ovAttention" class="humanRules"><div class="humanItem">جاري القراءة…</div></div>
+  </div>
+
+  <div class="card">
    <div class="sectionTitle"><h3>📋 قواعد الفهم والتصرف</h3><span class="badge">شفافة</span></div>
    <div id="ovRules" class="humanRules"></div>
   </div>
@@ -285,6 +290,10 @@ async function loadSystemOverview(){
     '<div class="humanItem"><b>الكود:</b> '+esc(eng.code?.status||'—')+'</div>'+
     '<div class="humanItem"><b>مراقبة Render:</b> '+esc(eng.render_monitor?.configured?'مفعلة':'غير مهيأة')+'</div>'+
     '<div class="humanItem"><b>صلاحيات التغيير:</b> محمية بالموافقة الصريحة</div>';
+  const attention=h.attention||[];
+  $('ovAttentionBadge').textContent=attention.length?attention.length+' نقطة':'لا توجد نقاط حرجة';
+  $('ovAttentionBadge').className='badge '+(attention.length?'':'good');
+  $('ovAttention').innerHTML=attention.length?attention.map(x=>'<div class="humanItem"><b>'+esc(x.level||'ATTENTION')+':</b> '+esc(x.text||'')+'</div>').join(''):'<div class="humanItem"><b>✓</b> لا توجد نقاط تتطلب تدخلاً فورياً.</div>';
   $('ovRules').innerHTML=(o.human_readable_rules||[]).map(x=>'<div class="humanItem">✓ '+esc(x)+'</div>').join('');
   $('overviewUpdated').textContent=new Date().toLocaleTimeString('ar-JO');
  }catch(e){
