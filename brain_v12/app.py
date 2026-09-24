@@ -31,6 +31,7 @@ code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
 code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
+cognitive.code_tool=code_tool
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
     plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
