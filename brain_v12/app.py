@@ -96,9 +96,11 @@ def state(): return brain.snapshot()
 @app.get("/api/messages")
 def messages(): return store.messages()
 
-def chatgpt_reply(message):
+def chatgpt_reply(message,cognitive_context=None):
     recent=store.messages()[-12:]
     context="\n".join(f"{m.get('role','')}: {m.get('content','')}" for m in recent)
+    if cognitive_context:
+        context += "\n\n[HIGH_LEVEL_COGNITIVE_STATE]\n" + str(cognitive_context)
     return openai_provider.respond(message,context)
 
 @app.post("/api/chat")
@@ -111,7 +113,7 @@ def chat(body:Chat):
     loop=cognitive.run(goal["text"])
     selected=loop["decision"].get("selected",{})
 
-    ai_result=chatgpt_reply(message)
+    ai_result=chatgpt_reply(message,{"run_id":loop.get("run_id"),"decision":selected.get("action"),"execution":loop.get("execution"),"verification":loop.get("verification"),"learning":loop.get("learning")})
     if ai_result.get("ok"):
         reply=ai_result["reply"]
         source="chatgpt"
