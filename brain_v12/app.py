@@ -24,6 +24,7 @@ from .brain.render_monitor import RenderLogMonitor
 from .brain.render_deploy_monitor import RenderDeployMonitor
 from .brain.secret_control import SecretControlPlane
 from .brain.control_auth import require_control_key
+from .brain.workforce_control import WorkforceControl
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -55,6 +56,8 @@ def handle_render_incident(incident):
 render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
 render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
+workforce=WorkforceControl(store)
+workforce.dispatch("startup")
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
     plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
@@ -165,6 +168,15 @@ def monitor_start(request:Request):
 def monitor_stop(request:Request):
     require_control_key(request)
     return render_monitor.stop()
+
+@app.get("/api/workforce/report")
+def workforce_report():
+    return workforce.report()
+
+@app.post("/api/workforce/dispatch")
+def workforce_dispatch(request:Request):
+    require_control_key(request)
+    return workforce.dispatch("manual_control_plane")
 
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
