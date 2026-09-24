@@ -92,6 +92,10 @@ for p in PLUGINS:
 
 APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.6")
 DEPLOY_COMMIT=os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("RENDER_GIT_BRANCH","unknown")
+DEPLOY_REPOSITORY=os.getenv("RENDER_GIT_REPO_SLUG","unknown")
+DEPLOY_SERVICE_ID=os.getenv("RENDER_SERVICE_ID","unknown")
+RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
 
 @app.middleware("http")
@@ -247,39 +251,46 @@ def freelance_payment_verified(body:dict):
 def workforce_health():
     return workforce.health()
 
+def _deployment_snapshot():
+    expected = os.getenv("RENDER_GIT_COMMIT", "")
+    return {
+        "version": APP_VERSION,
+        "commit": DEPLOY_COMMIT,
+        "render_git_commit": expected or None,
+        "branch": DEPLOY_BRANCH,
+        "repository": DEPLOY_REPOSITORY,
+        "service_id": DEPLOY_SERVICE_ID,
+        "instance": RUNTIME_INSTANCE,
+        "converged": bool(DEPLOY_COMMIT and expected and DEPLOY_COMMIT == expected),
+    }
+
 @app.get("/health")
 def health():
+    deployment = _deployment_snapshot()
     return {
         "ok": True,
         "brain": "V12",
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"),
+        "branch": DEPLOY_BRANCH,
+        "deployment": deployment,
         "systems": ["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"],
     }
 @app.get("/api/deploy/diagnostics")
 def deploy_diagnostics():
-    expected = os.getenv("RENDER_GIT_COMMIT", "")
-    actual = DEPLOY_COMMIT
-    return {"ok": True, "version": APP_VERSION, "actual_commit": actual, "render_git_commit": expected or None, "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"), "repository": os.getenv("RENDER_GIT_REPO_SLUG", "unknown"), "marker": os.getenv("PRERENDER_BUILD_MARKER", "unset")}
+    snapshot = _deployment_snapshot()
+    snapshot["marker"] = os.getenv("PRERENDER_BUILD_MARKER", "unset")
+    return {"ok": snapshot["converged"], **snapshot}
 
 @app.get("/api/deploy/verify")
 def deploy_verify():
-    expected = os.getenv("RENDER_GIT_COMMIT", "")
-    actual = DEPLOY_COMMIT
-    return {"ok": bool(actual and expected and actual == expected), "actual_commit": actual, "render_git_commit": expected or None}
+    snapshot = _deployment_snapshot()
+    return {"ok": snapshot["converged"], "actual_commit": snapshot["commit"], "render_git_commit": snapshot["render_git_commit"], "instance": snapshot["instance"]}
 
 @app.get("/api/deploy/identity")
 def deploy_identity():
-    return {
-        "ok": True,
-        "brain": "V12",
-        "version": APP_VERSION,
-        "commit": DEPLOY_COMMIT,
-        "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"),
-        "repository": os.getenv("RENDER_GIT_REPO_SLUG", "unknown"),
-        "service_id": os.getenv("RENDER_SERVICE_ID", "unknown"),
-    }
+    snapshot = _deployment_snapshot()
+    return {"ok": snapshot["converged"], "brain": "V12", **snapshot}
 
 @app.get("/api/system/connection")
 def system_connection():
