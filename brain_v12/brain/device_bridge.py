@@ -122,6 +122,7 @@ class DeviceBridge:
                 "last_seen": item["last_seen"],
                 "age_seconds": round(age, 2),
                 "online": age <= ttl,
+                "state": "ONLINE" if age <= ttl else HEARTBEAT_STALE,
             })
         return {
             "ttl_seconds": ttl,
