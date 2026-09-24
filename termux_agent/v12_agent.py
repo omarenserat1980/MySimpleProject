@@ -12,6 +12,8 @@ import urllib.request
 BRAIN_URL = os.environ["BRAIN_URL"].rstrip("/")
 AGENT_KEY = os.environ["TERMUX_AGENT_KEY"]
 AGENT_ID = os.getenv("TERMUX_AGENT_ID", "android-termux-v12")
+MAX_TASKS_PER_RUN = max(1, int(os.getenv("TERMUX_MAX_TASKS_PER_RUN", "100")))
+STOP_ON_ERROR = os.getenv("TERMUX_STOP_ON_ERROR", "false").lower() == "true"
 POLL_SECONDS = max(1, int(os.getenv("TERMUX_POLL_SECONDS", "2")))
 
 def request(method, path, payload=None, params=None):
@@ -63,7 +65,8 @@ def execute(task, params):
 
 def main():
     print(f"[V12-Agent] READY id={AGENT_ID}")
-    while True:
+    completed = 0
+    while completed < MAX_TASKS_PER_RUN:
         try:
             payload = request("GET", "/api/device/poll", params={"agent_id": AGENT_ID})
             task = payload.get("task")
@@ -89,6 +92,10 @@ def main():
             }
             request("POST", "/api/device/report", payload=report)
             print(f"[V12-Agent] REPORTED {task_id} ok={ok}")
+            completed += 1
+            if STOP_ON_ERROR and not ok:
+                print("[V12-Agent] STOP_ON_ERROR=1")
+                return
         except KeyboardInterrupt:
             print("\n[V12-Agent] STOPPED")
             return
@@ -98,3 +105,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
