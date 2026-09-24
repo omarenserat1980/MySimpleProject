@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 import re
 import httpx
+from urllib.parse import urljoin
 
 
 class _Links(HTMLParser):
@@ -20,7 +21,7 @@ class _Links(HTMLParser):
         if self.href is not None: self.buf.append(data)
     def handle_endtag(self, tag):
         if tag.lower()=="a" and self.href is not None:
-            text=re.sub(r"\\s+"," "," ".join(self.buf)).strip()
+            text=re.sub(r"\s+"," "," ".join(self.buf)).strip()
             if text and self.href: self.items.append((self.href,text[:500]))
             self.href=None; self.buf=[]
 
@@ -48,14 +49,11 @@ class LiveOpportunityResearcher:
             if any(x in low for x in ("login","sign up","register","privacy","cookie","home","categories","search jobs")): continue
             if not any(x in href.lower() for x in ("/jobs/","/project/","/projects/","/freelance-jobs/apply/")): continue
             if href.startswith("/"):
-                if "freelancer.com" in url: href="https://www.freelancer.com"+href
-                elif "aitrainer.work" in url: href="https://www.aitrainer.work"+href
-                elif "upwork.com" in url: href="https://www.upwork.com"+href
-                else: href="https://mostaql.com"+href
+                href=urljoin(url, href)
             if not href.startswith("http") or href in seen: continue
             seen.add(href)
             out.append({"title":title,"url":href,"source":source,"retrieved_at":now,
-                        "requirements":f"تفاصيل المتطلبات موجودة في الإعلان الأصلي: {href}","category":"FREELANCE_JOB","score":0.7})
+                        "requirements":f"تفاصيل المتطلبات موجودة في الإعلان الأصلي: {href}","evidence":f"Public listing link extracted from {url}: {href}","category":"FREELANCE_JOB","score":0.7})
             if len(out)>=30: break
         return out
     def run_once(self):
