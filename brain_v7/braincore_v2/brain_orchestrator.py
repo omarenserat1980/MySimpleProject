@@ -463,7 +463,7 @@ class UnifiedBrain:
             "code_tool_engineering": self.code_tool_team.snapshot(),
             "code_evolution": self.code_evolution.snapshot(),
             "youtube_team": self.youtube_team.snapshot(),
-            "youtube_pipeline": youtube_pipeline,
+            "youtube_pipeline": self.youtube_team.snapshot(),
         }
 
 
