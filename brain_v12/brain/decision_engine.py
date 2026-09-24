@@ -22,12 +22,15 @@ class DecisionEngine:
     def generate(self,goal):
         text=(goal or "").lower()
         code=any(x in text for x in ("كود","برمج","ملف","github","github","code","تطوير","إصلاح"))
+        device=any(x in text for x in ("termux","redmi","هاتف","جهاز","موبايل","جوال","android","device","agent"))
         memory=any(x in text for x in ("ذاكرة","تذكر","memory","سجل"))
         options=[
             asdict(Candidate("observe","قراءة وفهم الحالة","بيانات قابلة للتحقق","low",[],True,["goal"],.82,
                              "memory.read" if memory else "state.read")),
             asdict(Candidate("plan","بناء خطة متعددة الخطوات","خطة قابلة للتحقق","low",[],True,["goal"],.80,"tasks.create")),
         ]
+        if device:
+            options.insert(0,asdict(Candidate("device","تنفيذ مهمة آمنة على الجهاز","نتيجة موثقة من Termux","medium",["device_agent"],True,["goal","device_result"],.92,"device.enqueue")))
         if code:
             options.insert(0,asdict(Candidate("inspect_code","فحص الكود المستهدف","صورة فعلية عن الكود الحالي","low",[],True,["goal","code"],.88,"code.inspect")))
             options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",[],True,["code"],.84,"code.verify")))
