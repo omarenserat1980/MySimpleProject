@@ -6,9 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 UI = ROOT / "web" / "index.html"
 
 EXPECTED_VIEWS = {
-    "home","overview","chat","thinking","goals","memory","permissions",
-    "vision","voice","video","chatgpt","ai","tools","agent","evolve",
-    "workforce","events",
+    "home", "overview", "chat", "thinking", "goals", "memory", "permissions",
+    "vision", "voice", "video", "chatgpt", "ai", "tools", "agent", "evolve",
+    "workforce", "events",
 }
 
 class HumanInterfaceContractTests(unittest.TestCase):
@@ -29,16 +29,18 @@ class HumanInterfaceContractTests(unittest.TestCase):
         self.assertIn("قل للعقل ما تريد", self.html)
 
     def test_inline_handlers_reference_existing_functions(self):
-        funcs = set(re.findall(r'function\\s+([A-Za-z_$][\\w$]*)\\s*\\(', self.html))
-        handlers = re.findall(r'onclick=["\\']([^"\\']+)["\\']', self.html)
-        allowed = {"show", "selectAIMode", "evolveBrain", "speakLast", "clearChat", "quick",
-                   "toggleVoice", "sendChat", "requestMic", "requestCamera", "stopCamera",
-                   "capture", "uploadFile", "runCycle", "addGoal", "learn", "checkPermissions",
-                   "loadWorkforce", "loadIncome", "loadEvents", "clearChatGPT", "sendChatGPT",
-                   "quickChatGPT", "uploadAny", "loadCaps", "loadAgent", "loadAI", "loadEvolve",
-                   "openCommandPalette", "closeCommandPalette", "filterCommands"}
+        funcs = set(re.findall(r'function\s+([A-Za-z_$][\w$]*)\s*\(', self.html))
+        handlers = re.findall(r"""onclick=["']([^"']+)["']""", self.html)
+        allowed = {
+            "show", "selectAIMode", "evolveBrain", "speakLast", "clearChat", "quick",
+            "toggleVoice", "sendChat", "requestMic", "requestCamera", "stopCamera",
+            "capture", "uploadFile", "runCycle", "addGoal", "learn", "checkPermissions",
+            "loadWorkforce", "loadIncome", "loadEvents", "clearChatGPT", "sendChatGPT",
+            "quickChatGPT", "uploadAny", "loadCaps", "loadAgent", "loadAI", "loadEvolve",
+            "openCommandPalette", "closeCommandPalette", "filterCommands"
+        }
         for handler in handlers:
-            name = re.match(r'([A-Za-z_$][\\w$]*)\\s*\\(', handler)
+            name = re.match(r'([A-Za-z_$][\w$]*)\s*\(', handler)
             if name and name.group(1) in allowed:
                 self.assertIn(name.group(1), funcs, handler)
 
