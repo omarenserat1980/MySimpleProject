@@ -40,6 +40,14 @@ class DeviceBridge:
         item = self.store.device_task_claim(agent_id)
         return {"ok": True, "task": item, "status": "IDLE" if item is None else "CLAIMED"}
 
+    def heartbeat(self, agent_id):
+        if not agent_id:
+            return {"ok": False, "status": "AGENT_ID_REQUIRED"}
+        now = time.time()
+        self._last_seen = now
+        self.store.device_agent_touch(agent_id, now)
+        return {"ok": True, "agent_id": agent_id, "last_seen": now}
+
     def report(self, task_id, agent_id, ok, result=None, error=""):
         status = self.store.device_task_report(task_id, agent_id, ok, result or {}, error)
         if status is None:
