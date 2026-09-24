@@ -43,7 +43,7 @@ class CognitiveLoop:
     def tool_catalog(self):
         return self.TOOL_CATALOG
 
-    def execute_tool(self,tool_id,params=None,approved=False):
+    def execute_tool(self,tool_id,params=None,approved=False,_retry=False):
         params=params or {}
         item=next((x for x in self.TOOL_CATALOG if x["id"]==tool_id),None)
         self.events.publish("TOOL_SELECTED",{"tool":tool_id,"approved":approved})
@@ -72,6 +72,9 @@ class CognitiveLoop:
         else:
             result={"ok":False,"status":"DELEGATED","tool":tool_id,"reason":"الأداة تحتاج المسار المخصص لها."}
         self.events.publish("TOOL_RESULT",result)
+        if not result.get("ok") and not _retry and item and item.get("risk")=="low":
+            self.events.publish("TOOL_RETRY",{"tool":tool_id,"reason":"safe_tool_failure","attempt":2})
+            return self.execute_tool(tool_id,params,approved,True)
         return result
 
     def run(self,goal):
