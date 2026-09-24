@@ -95,7 +95,7 @@ class MiningEngine:
             "candidates": results,
             "order": [x["algorithm"] for x in ranked],
             "ranking_basis": "net_jod_per_day_from_supplied_inputs",
-            "warning": "هذا ترتيب حسابي للمدخلات المقدمة وليس توصية استثمارية أو توقعًا للسوق.",
+            "warning": "هذا ترتيب حسابي للمدخلات المقدمة وليس not a recommendation؛ وليس توصية استثمارية أو توقعًا للسوق.",
         }
 
     def snapshot(self) -> dict[str, Any]:
