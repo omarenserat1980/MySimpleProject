@@ -365,6 +365,12 @@ def start_background_services():
         render_monitor.start()
     # Safe internal workforce heartbeat: audit/coordinate work periodically.
     # It never publishes externally, moves money, or bypasses control-plane gates.
+    # Seed the income board with a broader set of auditable opportunity channels.
+    # This is internal bookkeeping only: it does not contact clients, submit offers, or move money.
+    try:
+        income_strategy.income_engine.discover(20)
+    except Exception as exc:
+        store.event("INCOME_DISCOVERY_SEED_FAILED", {"error": str(exc)[:1000]})
     if os.getenv("BRAIN_WORKFORCE_ENABLED","true").lower()=="true":
         def workforce_loop():
             import time
