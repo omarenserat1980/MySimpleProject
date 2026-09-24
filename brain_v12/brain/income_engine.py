@@ -226,7 +226,7 @@ class IncomeEngine:
             canonical_url = self._canonical_url(url)
             if not canonical_url:
                 continue
-            source_text = re.sub(r"\\s+", " ", str(item.get("source") or canonical_url))[:300]
+            source_text = re.sub(r"\s+", " ", str(item.get("source") or canonical_url))[:300]
             fingerprint = hashlib.sha1(canonical_url.encode("utf-8")).hexdigest()[:12]
             existing = next((x for x in self.store.income_opportunities(500)
                              if x.get("opportunity_id") == "LIVE-" + fingerprint), None)
@@ -236,7 +236,24 @@ class IncomeEngine:
             history = list((existing or {}).get("data", {}).get("research_history", []))
             previous_title = str((existing or {}).get("title") or (existing or {}).get("data", {}).get("title") or "")
             previous_req = str((existing or {}).get("data", {}).get("requirements") or "")
-            changed = bool(existing) and (previous_title != title or previous_req != requirements)
+            previous_budget = (existing or {}).get("data", {}).get("budget")
+            previous_posted = (existing or {}).get("data", {}).get("posted_at")
+            content_payload = {
+                "title": title,
+                "requirements": requirements,
+                "budget": budget,
+                "posted_at": item.get("posted_at"),
+            }
+            content_hash = hashlib.sha256(
+                repr(sorted(content_payload.items())).encode("utf-8")
+            ).hexdigest()[:16]
+            previous_hash = str((existing or {}).get("data", {}).get("content_hash") or "")
+            changed = bool(existing) and (
+                previous_hash != content_hash
+                if previous_hash
+                else (previous_title != title or previous_req != requirements
+                      or previous_budget != budget or previous_posted != item.get("posted_at"))
+            )
             lifecycle = "UPDATED" if changed else ("UNCHANGED" if existing else "NEW")
             history.append({"retrieved_at": retrieved_at, "title": title[:300], "score": fit_score, "lifecycle": lifecycle})
             history = history[-10:]
@@ -245,11 +262,42 @@ class IncomeEngine:
                       "posted_at":item.get("posted_at"),"retrieved_at":retrieved_at,"source_kind":"LIVE_OPPORTUNITY","status":"DISCOVERY",
                       "score":fit_score,"fit_matches":fit_matches,"lifecycle":lifecycle,"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
                       "owner_role":"Opportunity Researcher","discovered_at":time(),"run":self.run_count,
-                      "research_history":history,
+                      "research_history":history,"content_hash":content_hash,
                       "verification_rule":"لا يُحتسب أي دخل إلا بدليل قبول ثم دفع مستلم قابل للمطابقة."}
             self.store.upsert_income_opportunity(record); accepted.append(record)
         self.store.event("LIVE_INCOME_OPPORTUNITIES_INGESTED", {"run":self.run_count,"accepted":len(accepted),"received":len(results or []),"external_execution":False})
         return accepted
+
+    def refresh_lifecycle(self, max_age_hours: float = 72, limit: int = 500) -> dict[str, Any]:
+        """Mark stale live opportunities without overwriting verified/completed income."""
+        now = datetime.now(timezone.utc)
+        rows = self.store.income_opportunities(max(1, min(int(limit), 500)))
+        stale = 0
+        checked = 0
+        for row in rows:
+            data = dict(row.get("data") or {})
+            if data.get("source_kind") != "LIVE_OPPORTUNITY":
+                continue
+            checked += 1
+            lifecycle = str(data.get("lifecycle") or "UNKNOWN")
+            if lifecycle == "STALE":
+                stale += 1
+                continue
+            if data.get("verification_status") == "VERIFIED" or str(data.get("status")) in {"COMPLETED", "PAYMENT_VERIFIED"}:
+                continue
+            retrieved_at = str(data.get("retrieved_at") or "")
+            if not retrieved_at or not self._freshness(retrieved_at, max_age_hours):
+                data["lifecycle"] = "STALE"
+                data["status"] = "STALE"
+                data["stale_at"] = now.isoformat()
+                data["stale_after_hours"] = max_age_hours
+                self.store.upsert_income_opportunity(data)
+                self.store.event("INCOME_OPPORTUNITY_STALE", {
+                    "opportunity_id": data.get("opportunity_id"),
+                    "max_age_hours": max_age_hours,
+                })
+                stale += 1
+        return {"ok": True, "checked": checked, "stale": stale, "max_age_hours": max_age_hours}
 
     def lifecycle_report(self, limit: int = 100) -> dict[str, Any]:
         rows = self.store.income_opportunities(limit)
