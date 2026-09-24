@@ -67,7 +67,7 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
-device_bridge=DeviceBridge()
+device_bridge=DeviceBridge(store)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -216,6 +216,10 @@ def device_report(request:Request, body:DeviceReport):
     result=device_bridge.report(body.task_id, body.agent_id, body.ok, body.result, body.error)
     store.event("DEVICE_TASK_RESULT", {"task_id": body.task_id, "agent_id": body.agent_id, "ok": body.ok})
     return result
+
+@app.get("/api/device/result/{task_id}")
+def device_result(task_id:str):
+    return device_bridge.result(task_id)
 
 
 @app.get("/api/system/status")
