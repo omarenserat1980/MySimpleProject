@@ -136,6 +136,58 @@ class MemoryStore:
             con.execute("UPDATE goals SET status=? WHERE id=?",(status,gid))
             con.commit()
 
+    def upsert_income_opportunity(self, opportunity):
+        import json
+        from datetime import datetime, timezone
+        now_iso=datetime.now(timezone.utc).isoformat()
+        data=dict(opportunity)
+        oid=data["opportunity_id"]
+        with self.connect() as con:
+            row=con.execute("SELECT id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
+            if row:
+                con.execute("""UPDATE income_opportunities
+                               SET category=?,title=?,source_url=?,evidence=?,status=?,score=?,
+                                   expected_value_jod=?,verified_amount_jod=?,verification_status=?,
+                                   owner_role=?,updated_at=?,data=? WHERE opportunity_id=?""",
+                            (data.get("category",""),data.get("title",""),data.get("source_url"),
+                             data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
+                             data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
+                             data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
+                             now_iso,json.dumps(data,ensure_ascii=False),oid))
+            else:
+                con.execute("""INSERT INTO income_opportunities
+                               (opportunity_id,category,title,source_url,evidence,status,score,
+                                expected_value_jod,verified_amount_jod,verification_status,owner_role,
+                                created_at,updated_at,data)
+                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (oid,data.get("category",""),data.get("title",""),data.get("source_url"),
+                             data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
+                             data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
+                             data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
+                             now_iso,now_iso,json.dumps(data,ensure_ascii=False)))
+            con.commit()
+
+    def income_opportunities(self, limit=100):
+        with self.connect() as con:
+            rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",
+                             (max(1,min(int(limit),500)),)).fetchall()
+        out=[]
+        for row in rows:
+            item=dict(row)
+            try: item["data"]=json.loads(item["data"])
+            except Exception: pass
+            out.append(item)
+        return out
+
+    def income_summary(self):
+        with self.connect() as con:
+            row=con.execute("""SELECT COUNT(*) total,
+                                      COALESCE(SUM(verified_amount_jod),0) verified,
+                                      SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END) active,
+                                      SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END) verified_count
+                               FROM income_opportunities""").fetchone()
+        return dict(row)
+
     def events_for_run(self,run_id,limit=100):
         with self.connect() as con:
             rows=con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(max(limit,1000),)).fetchall()
