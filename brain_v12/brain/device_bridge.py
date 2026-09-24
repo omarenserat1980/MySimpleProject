@@ -130,6 +130,12 @@ class DeviceBridge:
             "agents": agents,
         }
 
+    def heartbeat_age_seconds(self, agent_id):
+        for item in self.store.device_agents():
+            if item["agent_id"] == agent_id:
+                return max(0.0, time.time() - float(item["last_seen"]))
+        return None
+
     def status(self):
         counts = self.store.device_task_counts()
         return {
