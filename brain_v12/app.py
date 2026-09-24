@@ -222,6 +222,45 @@ def device_result(task_id:str):
     return device_bridge.result(task_id)
 
 
+@app.get("/api/agent-gateway/status")
+def agent_gateway_status():
+    return {
+        "ok": True,
+        "gateway": "Brain V12 ↔ Termux",
+        "configured": device_bridge.configured(),
+        "transport": "HTTPS polling",
+        "authentication": "X-V12-Agent-Key",
+        "allowed_tasks": sorted(device_bridge.ALLOWED_TASKS),
+        "bridge": device_bridge.status(),
+    }
+
+@app.post("/api/agent-gateway/task")
+def agent_gateway_task(request:Request, body:DeviceTask):
+    """Brain-side gateway: enqueue one allowlisted task for the authenticated Termux agent."""
+    require_control_key(request)
+    result = device_bridge.enqueue(body.task, body.params)
+    store.event("AGENT_GATEWAY_TASK_CREATED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "task": body.task,
+        "status": result.get("status"),
+    })
+    return result
+
+@app.get("/api/agent-gateway/result/{task_id}")
+def agent_gateway_result(task_id:str):
+    return device_bridge.result(task_id)
+
+@app.get("/api/agent-gateway/verify/{task_id}")
+def agent_gateway_verify(task_id:str):
+    verification = device_bridge.verify_result(task_id)
+    store.event("AGENT_GATEWAY_VERIFICATION", {
+        "task_id": task_id,
+        "verified": verification.get("verified", False),
+        "status": verification.get("status"),
+    })
+    return verification
+
+
 @app.get("/api/system/status")
 def system_status():
     state=store.state()
