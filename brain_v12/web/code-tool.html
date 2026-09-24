@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🧠 Code Tool — أداة عقلية لحفظ وتعديل الكود</title>
+<style>
+:root{--bg:#07101d;--p:#0e1a2b;--p2:#13243a;--line:#263b55;--txt:#edf5ff;--muted:#9db0c7;--a:#4da3ff;--ok:#37d39a;--warn:#ffc857;--bad:#ff647c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#07101d,#0d1b2d);color:var(--txt);font-family:system-ui,sans-serif}.wrap{max-width:1500px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.card{background:rgba(14,26,43,.96);border:1px solid var(--line);border-radius:16px;padding:15px;margin:12px 0}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.s8{grid-column:span 8}.s4{grid-column:span 4}.s12{grid-column:span 12}input,textarea{width:100%;background:#091524;color:white;border:1px solid var(--line);border-radius:10px;padding:10px}textarea{min-height:260px;direction:ltr;text-align:left;font-family:ui-monospace,monospace}button{border:0;border-radius:10px;padding:10px 14px;background:var(--a);color:white;cursor:pointer;margin:4px}button.secondary{background:#1c3049}.row{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-block;padding:4px 8px;border-radius:20px;background:#203b56;font-size:12px}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}pre{white-space:pre-wrap;overflow:auto;max-height:520px;background:#091524;border-radius:10px;padding:12px;direction:ltr;text-align:left}.small{font-size:12px;color:var(--muted)}h1{margin:0}.danger{background:#8f3046}@media(max-width:900px){.s8,.s4{grid-column:span 12}}
+</style></head>
+<body><div class="wrap">
+<div class="top"><div><h1>🧠 أداة الكود للعقل</h1><div class="small">Inspect → Preview → Checkpoint → Validate → Apply → Test → GitHub</div></div><a href="/" style="color:#fff">← مركز العقل</a></div>
+<div class="card"><b>الحالة:</b> <span id="status">جاري الفحص...</span><div class="row"><span class="badge">لا تخزين أسرار</span><span class="badge">لا أوامر Shell</span><span class="badge">Rollback</span><span class="badge">Python validation</span><span class="badge">GitHub persistence عند الإعداد</span></div></div>
+<div class="grid">
+<section class="card s4"><h2>🔎 فحص ملف</h2><input id="path" value="brain_v7/braincore_v2/brain_orchestrator.py"><button onclick="inspect()">قراءة الكود</button><button class="secondary" onclick="verify()">تحقق</button><button class="secondary" onclick="checkpoint()">حفظ نقطة استرجاع</button><pre id="inspectOut">—</pre></section>
+<section class="card s8"><h2>✏️ محرر التغيير</h2><input id="reason" placeholder="سبب التغيير"><input id="commit" value="brain: controlled code change" style="margin-top:7px"><textarea id="code" placeholder="ضع المحتوى الكامل للملف المراد تغييره هنا..."></textarea><div class="row"><button onclick="preview()">👁️ معاينة Diff</button><button onclick="apply()">🧠 تنفيذ التغيير</button><label class="badge"><input id="approve" type="checkbox" style="width:auto"> موافقة صريحة</label><label class="badge"><input id="persist" type="checkbox" checked style="width:auto"> حفظ GitHub إن كان مهيأً</label></div></section>
+<section class="card s12"><h2>📋 نتيجة العملية</h2><pre id="out">—</pre></section>
+</div></div>
+<script>
+const $=x=>document.getElementById(x);
+async function api(u,o){const r=await fetch(u,o);return r.json()}
+async function load(){try{const s=await api('/api/code/status');$('status').innerHTML='<span class="ok">متاح</span> • '+s.employee_count+' موظفاً متخصصاً • GitHub: '+(s.github_executor?.configured?'مهيأ':'غير مهيأ');$('out').textContent=JSON.stringify(s,null,2)}catch(e){$('status').innerHTML='<span class="bad">غير متاح</span> '+e.message}}
+async function inspect(){const p=$('path').value.trim();const r=await api('/api/code/inspect?path='+encodeURIComponent(p),{method:'POST'});if(r.content!==undefined)$('code').value=r.content;$('inspectOut').textContent=JSON.stringify(r,null,2)}
+function changes(){return [{path:$('path').value.trim(),content:$('code').value,reason:$('reason').value}]}
+async function preview(){const r=await api('/api/code/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:changes(),reason:$('reason').value})});$('out').textContent=JSON.stringify(r,null,2)}
+async function checkpoint(){const r=await api('/api/code/checkpoint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[$('path').value.trim()]})});$('out').textContent=JSON.stringify(r,null,2)}
+async function verify(){const r=await api('/api/code/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[$('path').value.trim()]})});$('out').textContent=JSON.stringify(r,null,2)}
+async function apply(){if(!$('approve').checked){$('out').textContent='الموافقة الصريحة مطلوبة قبل التنفيذ.';return}const r=await api('/api/code/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:changes(),reason:$('reason').value,commit_message:$('commit').value,approved:true,persist_to_github:$('persist').checked})});$('out').textContent=JSON.stringify(r,null,2);load()}
+load()
+</script></body></html>
