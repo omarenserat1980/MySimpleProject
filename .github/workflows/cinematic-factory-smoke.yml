@@ -17,8 +17,12 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r brain_v7/requirements.txt
-      - name: Compile cinematic modules
-        run: python -m compileall -q brain_v7/braincore_v2
+      - name: Compile Brain V7 and V12 modules
+        run: |
+          python -m compileall -q brain_v7/braincore_v2
+          python -m compileall -q brain_v12
+      - name: Run Brain V12 tests
+        run: python -m unittest discover -s brain_v12/tests -v
       - name: Run focused tests
         run: |
           python - <<'PY'
