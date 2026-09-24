@@ -87,6 +87,10 @@ async def media_upload(file:UploadFile=File(...)):
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/health")
 def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
+@app.get("/api/system/status")
+def system_status():
+    return {"ok":True,"status":"ONLINE","brain":"V12","version":APP_VERSION}
+
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
