@@ -16,6 +16,10 @@ from braincore_v2.api_bridge import router as autonomous_router
 from braincore_v2.brain_api import router as brain_code_router
 
 DB_PATH = os.getenv("BRAIN_DB", "brain_v7.db")
+_MEMORY_URI = "file:brain_v7_shared_memory?mode=memory&cache=shared"
+_MEMORY_KEEPALIVE = sqlite3.connect(_MEMORY_URI, uri=True, check_same_thread=False) if DB_PATH == ":memory:" else None
+if _MEMORY_KEEPALIVE is not None:
+    _MEMORY_KEEPALIVE.row_factory = sqlite3.Row
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-5")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
@@ -54,7 +58,7 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 def db():
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(_MEMORY_URI if DB_PATH == ":memory:" else DB_PATH, uri=(DB_PATH == ":memory:"), check_same_thread=False)
     con.row_factory = sqlite3.Row
     return con
 
