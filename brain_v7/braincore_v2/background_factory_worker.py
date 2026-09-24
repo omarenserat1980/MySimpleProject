@@ -50,7 +50,15 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     yt = YouTubeApiClient() if os.getenv("YOUTUBE_REFRESH_TOKEN") else None
     analytics = YouTubeDataAnalyticsClient() if yt else None
     channel_control = YouTubeChannelControl() if yt else None
-    channel_snapshot = channel_control.channel() if channel_control else {"status": "YOUTUBE_NOT_CONFIGURED"}
+    oauth_snapshot = {"status": "YOUTUBE_NOT_CONFIGURED"}
+    if yt:
+        oauth_snapshot = yt.validate()
+        if oauth_snapshot.get("status") != "OAUTH_VALID":
+            _heartbeat("DEGRADED", cycle, f"youtube_oauth={oauth_snapshot.get("code", "invalid")}")
+            yt = None
+            analytics = None
+            channel_control = None
+    channel_snapshot = channel_control.channel() if channel_control else oauth_snapshot
     result = run_factory(
         researcher=researcher,
         renderer=renderer,
@@ -63,6 +71,7 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
         description=os.getenv("YOUTUBE_DESCRIPTION", ""),
         tags=[x.strip() for x in os.getenv("YOUTUBE_TAGS", "سينما,محتوى عربي,YouTube").split(",") if x.strip()],
     )
+    result["youtube_oauth"] = oauth_snapshot
     result["youtube_channel"] = channel_snapshot
     _heartbeat("HEALTHY", cycle, str(result.get("status", "cycle_complete")))
     print(json.dumps(result, ensure_ascii=False, default=str), flush=True)
