@@ -242,4 +242,5 @@ class IncomeEngine:
 
     def verified_total(self):
         """Return only revenue explicitly recorded as verified by the engine ledger."""
-        return 0.0
+        summary = self.store.income_summary()
+        return float(summary.get("verified", 0) or 0)
