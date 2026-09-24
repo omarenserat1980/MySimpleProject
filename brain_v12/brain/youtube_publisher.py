@@ -71,4 +71,6 @@ class YouTubePublisher:
     def snapshot(self) -> dict[str, Any]:
         return {"ok": True, "external_publishing": "AUTHORIZATION_REQUIRED",
                 "credentials_stored_by_brain": False,
-                "money_movement": False}
+                "money_movement": False,
+                "supported_privacy": ["private", "unlisted", "public"],
+                "verified_publications": 0}
