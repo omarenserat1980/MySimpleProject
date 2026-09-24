@@ -92,7 +92,21 @@ def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools
 def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
 @app.get("/api/system/status")
 def system_status():
-    return {"ok":True,"status":"ONLINE","brain":"V12","version":APP_VERSION}
+    state=store.state()
+    return {"ok":True,"status":"ONLINE" if state.get("status")!="ERROR" else "DEGRADED","brain":"V12","version":APP_VERSION,
+            "stage":state.get("cognitive_stage","READY"),"run_id":state.get("cognitive_trace",{}).get("run_id"),
+            "tools":len(cognitive.tool_catalog()),"memory_items":len(store.memories()),"event_count":len(store.events(1000))}
+
+@app.get("/api/system/diagnostics")
+def system_diagnostics():
+    checks=[]
+    try: checks.append({"name":"memory","ok":bool(store.state() is not None)})
+    except Exception as exc: checks.append({"name":"memory","ok":False,"error":str(exc)})
+    try: checks.append({"name":"code_workspace","ok":code_tool.verify([]).get("status")=="PASS"})
+    except Exception as exc: checks.append({"name":"code_workspace","ok":False,"error":str(exc)})
+    checks.append({"name":"tool_router","ok":len(cognitive.tool_catalog())>0})
+    checks.append({"name":"decision_engine","ok":len(cognitive.decisions.generate("system diagnostics"))>0})
+    return {"ok":all(x["ok"] for x in checks),"checks":checks,"timestamp":__import__("time").time()}
 
 @app.get("/api/state")
 def state(): return brain.snapshot()
