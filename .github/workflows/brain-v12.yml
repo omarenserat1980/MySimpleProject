@@ -30,8 +30,8 @@ jobs:
           RENDER_URL: https://electronic-brain-v12-gwwg.onrender.com
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 30); do
-            echo "Render verification attempt $attempt/30"
+          for attempt in $(seq 1 45); do
+            echo "Render verification attempt $attempt/45"
             health=$(curl -fsS --max-time 20 "$RENDER_URL/health" || true)
             identity=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/identity" || true)
             echo "health=$health"
@@ -42,6 +42,12 @@ jobs:
               echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
               curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
               curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
+              problem=$(curl -fsS --max-time 20 -X POST "$RENDER_URL/api/problem/solve" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "goal=deployment verification" || true)
+              echo "problem_solver=$problem"
+              if ! printf "%s" "$problem" | jq -e ".external_action == \"NOT_CLAIMED\"" >/dev/null 2>&1; then
+                echo "Problem Solver endpoint is not responding with the expected V12 contract." >&2
+                exit 1
+              fi
               echo "Required V12 APIs are live."
               exit 0
             fi
