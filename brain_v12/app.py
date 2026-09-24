@@ -29,6 +29,7 @@ from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
+from .brain.problem_solver import ProblemSolver
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -64,6 +65,7 @@ workforce=WorkforceControl(store)
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
+problem_solver=ProblemSolver(cognitive)
 try:
     store.purge_non_live_income_opportunities()
 except Exception as exc:
@@ -533,6 +535,12 @@ def add_goal(body:Goal): return {"id":store.add_goal(body.text,body.priority)}
 def cycle(): return brain.think()
 @app.post("/api/cognitive/run")
 def cognitive_run(goal:str): return cognitive.run(goal)
+
+@app.post("/api/problem/solve")
+def problem_solve(goal:str):
+    """Run the bounded multi-solution problem-solving pipeline with verification and learning."""
+    return problem_solver.solve(goal)
+
 @app.get("/api/decision/history")
 def decision_history(): return cognitive.decisions.history[-100:]
 @app.get("/api/world")
