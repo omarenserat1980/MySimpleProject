@@ -88,6 +88,15 @@ class DeviceBridge:
                 "last_agent_seen": self._last_seen,
             }
 
+    def wait_result(self, task_id: str, timeout: float = 20.0) -> dict:
+        deadline = time.time() + max(0.1, timeout)
+        while time.time() < deadline:
+            result = self.result(task_id)
+            if result.get("ok"):
+                return result
+            time.sleep(0.5)
+        return {"ok": False, "status": "RESULT_TIMEOUT", "task_id": task_id}
+
     def result(self, task_id: str) -> dict:
         with self._lock:
             item = self._results.get(task_id)
