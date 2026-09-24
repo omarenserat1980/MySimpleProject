@@ -245,6 +245,12 @@ def system_overview():
             "goal": (store.active_goal() or {}).get("text"),
             "decision": state.get("cognitive_trace", {}).get("decision"),
             "next": income.get("next_actions", [])[:4],
+            "attention": [
+                *([{"level": "ATTENTION", "text": "مراقبة Render غير مهيأة داخل الخدمة الحالية؛ قراءة الحالة المباشرة تحتاج أسرار Render الصحيحة."}] if not render_monitor.configured else []),
+                *([{"level": "ATTENTION", "text": "مراقب النشر غير مهيأ؛ لذلك لا يستطيع العقل تنفيذ مراقبة نشر Render من داخل الخدمة."}] if not render_deploy_monitor.configured else []),
+                *([{"level": "LIMITATION", "text": "البحث الخارجي ليس مفعلاً كأداة داخلية؛ فرص الدخل المسجلة هي سجلات مؤهلة وليست دخلاً."}] if not any((p.get("id") == "browser" and p.get("enabled")) for p in PLUGINS if isinstance(p, dict)) else []),
+                *([{"level": "NORMAL", "text": "التطوير الذاتي الكتابي مغلق افتراضياً ويظل محمياً بالموافقة الصريحة."}] if not self_improver.status().get("enabled") else []),
+            ],
         },
         "architecture": {
             "core": ["الإدراك", "الذاكرة", "التفكير", "القرار", "التنفيذ", "التحقق", "التعلم"],
