@@ -130,6 +130,9 @@ class DeviceBridge:
             "agents": agents,
         }
 
+    def queued_tasks(self):
+        return self.store.device_task_counts()
+
     def heartbeat_age_seconds(self, agent_id):
         for item in self.store.device_agents():
             if item["agent_id"] == agent_id:
