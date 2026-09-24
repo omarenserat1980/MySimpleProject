@@ -231,7 +231,8 @@ def agent_gateway_diagnostics():
         "gateway": "READY" if bridge.get("configured") else "NOT_CONFIGURED",
         "transport": "HTTPS polling",
         "authentication": "X-V12-Agent-Key",
-        "agent_seen": bridge.get("last_agent_seen") is not None,
+        "agent_seen": bool(bridge.get("agents", {}).get("online")),
+        "agents": bridge.get("agents", {}),
         "queues": {
             "queued": bridge.get("queued", 0),
             "pending": bridge.get("pending", 0),
