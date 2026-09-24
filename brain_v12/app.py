@@ -22,6 +22,7 @@ from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from .brain.code_agent import BrainCodeAgent
 from .brain.render_monitor import RenderLogMonitor
 from .brain.render_deploy_monitor import RenderDeployMonitor
+from .brain.secret_control import SecretControlPlane
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
