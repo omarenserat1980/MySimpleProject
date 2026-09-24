@@ -39,7 +39,7 @@ class ReasoningQualityController:
         alternative_count: int,
         reversibility: float,
     ) -> QualityReport:
-        evidence_coverage = self._clamp(evidence_count / max(1, alternative_count))
+        evidence_coverage = self._clamp(evidence_count / max(3, alternative_count))
         contradiction_rate = self._clamp(
             contradiction_count / max(1, evidence_count + contradiction_count)
         )
