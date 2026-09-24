@@ -76,6 +76,18 @@ class MemoryStore:
               occurrences INTEGER NOT NULL DEFAULT 1,
               data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS device_tasks(
+              task_id TEXT PRIMARY KEY,
+              task TEXT NOT NULL,
+              params TEXT NOT NULL,
+              status TEXT NOT NULL,
+              agent_id TEXT,
+              created_at TEXT NOT NULL,
+              claimed_at TEXT,
+              completed_at TEXT,
+              result TEXT NOT NULL DEFAULT '{}',
+              error TEXT NOT NULL DEFAULT ''
+            );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
 
@@ -255,3 +267,49 @@ class MemoryStore:
     def events(self,limit=50):
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(limit,)).fetchall()]
+
+    def device_task_create(self, task_id, task, params, created_at):
+        with self.connect() as con:
+            con.execute("INSERT INTO device_tasks(task_id,task,params,status,created_at) VALUES(?,?,?,?,?)",
+                        (task_id,task,json.dumps(params or {},ensure_ascii=False),"QUEUED",str(created_at)))
+            con.commit()
+
+    def device_task_claim(self, agent_id):
+        with self.connect() as con:
+            row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
+            if not row: return None
+            t=dict(row); claimed=now()
+            con.execute("UPDATE device_tasks SET status='CLAIMED',agent_id=?,claimed_at=? WHERE task_id=?",
+                        (agent_id,claimed,t["task_id"]))
+            con.commit()
+        t["status"]="CLAIMED"; t["agent_id"]=agent_id; t["claimed_at"]=claimed
+        try: t["params"]=json.loads(t["params"])
+        except Exception: t["params"]={}
+        return t
+
+    def device_task_report(self, task_id, agent_id, ok, result, error):
+        with self.connect() as con:
+            row=con.execute("SELECT agent_id FROM device_tasks WHERE task_id=?",(task_id,)).fetchone()
+            if not row: return None
+            if row["agent_id"] != agent_id: return "AGENT_MISMATCH"
+            status="COMPLETED" if ok else "FAILED"
+            con.execute("UPDATE device_tasks SET status=?,completed_at=?,result=?,error=? WHERE task_id=?",
+                        (status,now(),json.dumps(result or {},ensure_ascii=False),(error or "")[:1000],task_id))
+            con.commit()
+            return status
+
+    def device_task_get(self, task_id):
+        with self.connect() as con:
+            row=con.execute("SELECT * FROM device_tasks WHERE task_id=?",(task_id,)).fetchone()
+        if not row: return None
+        t=dict(row)
+        try: t["params"]=json.loads(t["params"])
+        except Exception: t["params"]={}
+        try: t["result"]=json.loads(t["result"])
+        except Exception: t["result"]={}
+        return t
+
+    def device_task_counts(self):
+        with self.connect() as con:
+            rows=con.execute("SELECT status,COUNT(*) n FROM device_tasks GROUP BY status").fetchall()
+        return {r["status"]:r["n"] for r in rows}
