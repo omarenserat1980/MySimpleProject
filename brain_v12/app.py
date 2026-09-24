@@ -31,6 +31,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.mining_engine import MiningEngine
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -63,6 +64,7 @@ render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
 render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
+mining=MiningEngine()
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
@@ -135,6 +137,28 @@ async def media_upload(file:UploadFile=File(...)):
 
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
+@app.get("/api/mining/status")
+def mining_status():
+    """Return mining capability state without claiming live profitability."""
+    return mining.snapshot()
+
+@app.post("/api/mining/analyze")
+def mining_analyze(body:dict):
+    try:
+        return mining.analyze(body)
+    except (TypeError, ValueError) as exc:
+        return {"ok":False,"status":"INVALID_INPUT","error":str(exc)}
+
+@app.post("/api/mining/compare")
+def mining_compare(body:dict):
+    try:
+        candidates=body.get("candidates", [])
+        if not isinstance(candidates, list) or not candidates:
+            return {"ok":False,"status":"INVALID_INPUT","error":"CANDIDATES_REQUIRED"}
+        return mining.compare(candidates)
+    except (TypeError, ValueError) as exc:
+        return {"ok":False,"status":"INVALID_INPUT","error":str(exc)}
+
 @app.get("/api/workforce/health")
 def workforce_health():
     return workforce.health()
