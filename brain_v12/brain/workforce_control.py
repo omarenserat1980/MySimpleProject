@@ -134,6 +134,9 @@ class WorkforceControl:
         })
         return self.last_dispatch
 
+    def validate_cinematic_release(self, title: str, description: str = "", media_path: str = "", tags: list[str] | None = None) -> dict[str, Any]:
+        return self.youtube_publisher.validate_release(title, media_path, description, tags)
+
     def prepare_cinematic_release(self, title: str, description: str = "", media_path: str = "", tags: list[str] | None = None, privacy: str = "private") -> dict[str, Any]:
         pipeline = self.youtube.run_pipeline(f"إنتاج فيديو سينمائي أصلي: {title}")
         release = self.youtube_publisher.prepare_cinematic_release(title, description, media_path, tags, privacy)
