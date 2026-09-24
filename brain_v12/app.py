@@ -184,6 +184,12 @@ def device_agent_status(request: Request):
         return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
     return JSONResponse(device_bridge.agent_status())
 
+@app.get("/api/device/queue")
+def device_queue(request: Request):
+    if not require_device_agent(request):
+        return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
+    return JSONResponse({"ok": True, "counts": device_bridge.queued_tasks()})
+
 @app.get("/api/device/status")
 def device_status():
     return device_bridge.status()
