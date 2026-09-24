@@ -47,6 +47,23 @@ class MemoryStore:
               id INTEGER PRIMARY KEY CHECK(id=1),
               data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS income_opportunities(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              opportunity_id TEXT UNIQUE NOT NULL,
+              category TEXT NOT NULL,
+              title TEXT NOT NULL,
+              source_url TEXT,
+              evidence TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'DISCOVERY',
+              score REAL NOT NULL DEFAULT 0,
+              expected_value_jod REAL,
+              verified_amount_jod REAL NOT NULL DEFAULT 0,
+              verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+              owner_role TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              data TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS incidents(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fingerprint TEXT UNIQUE NOT NULL,
