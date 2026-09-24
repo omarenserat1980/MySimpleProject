@@ -44,7 +44,7 @@
   <div class="brand"><div class="brain">🧠</div><h1>العقل الإلكتروني</h1><p>V12 • مركز الإدراك والقرار والتنفيذ</p></div>
   <div class="navTitle">العقل</div><div class="nav">
     <button class="active" data-view="home">⌂ الرئيسية</button>
-    <button data-view="overview">◉ فهم النظام</button>
+    <button type="button" data-view="overview" onclick="show('overview')">◉ فهم النظام</button>
     <button data-view="chat">◉ المحادثة</button>
     <button data-view="thinking">⟳ الدورة المعرفية</button>
     <button data-view="goals">◎ الأهداف والخطط</button>
@@ -263,6 +263,7 @@ const $=id=>document.getElementById(id);let stream=null,recognition=null,lastRep
 const titles={home:['مركز العقل','الإدراك • التفكير • القرار • التنفيذ • التعلم'],chat:['المحادثة','حوار مباشر مع العقل الإلكتروني'],thinking:['الدورة المعرفية','كيف ينتقل العقل من الإدراك إلى القرار؟'],goals:['الأهداف والخطط','ما الذي يحاول العقل إنجازه؟'],memory:['الذاكرة والتعلم','ما الذي يعرفه العقل وما الذي تعلمه؟'],permissions:['الصلاحيات والأجهزة','الميكروفون والكاميرا وإدراك العالم'],vision:['الكاميرا والصور','إدخال العالم المرئي إلى العقل'],voice:['الصوت','التحدث والاستماع'],video:['الفيديو','الوسائط المتحركة'],ai:['AI Gateway','طبقة الذكاء الخارجية'],tools:['الأدوات','قدرات العقل التنفيذية'],agent:['الوكيل','التنفيذ المنضبط'],evolve:['التطوير الذاتي','تحسين النظام مع الحواجز اللازمة'],workforce:['موظفو العقل','المهام • الإنجازات • YouTube • السينما • المواقع • فرص الدخل'],events:['سجل النشاط','ما الذي حدث داخل العقل؟'],chatgpt:['ChatGPT','محادثة ChatGPT من داخل التطبيق']};
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(titles[id]){$('pageTitle').textContent=titles[id][0];$('pageSub').textContent=titles[id][1]}if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='events')loadEvents();if(id==='workforce')loadWorkforce();if(id==='thinking')loadState();if(id==='tools')loadCaps();if(id==='agent')loadAgent();if(id==='ai')loadAI();if(id==='evolve')loadEvolve();if(id==='permissions')checkPermissions();if(id==='chatgpt')loadChatGPTStatus()}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+document.addEventListener('click',function(e){const b=e.target.closest('[data-view]');if(b){e.preventDefault();show(b.dataset.view)}});
 async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
 async function loadSystemOverview(){
