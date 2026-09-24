@@ -4,6 +4,7 @@ on:
     paths:
       - "brain_v12/**"
       - ".github/workflows/brain-v12.yml"
+      - "render.yaml"
   pull_request:
     paths:
       - "brain_v12/**"
