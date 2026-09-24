@@ -1,4 +1,4 @@
-"""Continuous evidence-gated evolution planner through generation 10,000.
+"""Continuous evidence-gated evolution planner through generation 10,000 (100 by default).
 
 Generations are engineering milestones, not claims of consciousness. Every
 promotion requires explicit evidence. External side effects and financial
@@ -43,7 +43,7 @@ PHASES = (
 )
 
 
-def evolution_plan(start: int = 1, end: int = 10000) -> list[dict]:
+def evolution_plan(start: int = 1, end: int = 100) -> list[dict]:
     if not (1 <= start <= end <= 10000):
         raise ValueError("generation range must be within 1..10000")
     return [
@@ -80,12 +80,12 @@ def verify_progress(generation: int, passed: bool, evidence: str = "") -> dict:
 
 
 def snapshot(completed: Iterable[int] = ()) -> dict:
-    done = sorted({int(x) for x in completed if 1 <= int(x) <= 10000})
+    done = sorted({int(x) for x in completed if 1 <= int(x) <= 100})
     return {
-        "target": 10000,
+        "target": 100,
         "completed": done,
         "completed_count": len(done),
-        "remaining": 10000 - len(done),
+        "remaining": max(0, 100 - len(done)),
         "continuous_mode": True,
         "requires_evidence": True,
         "autonomous_side_effects": False,
