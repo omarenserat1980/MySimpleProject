@@ -58,7 +58,7 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
-APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.4")
+APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.5")
 app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
 
 @app.middleware("http")
