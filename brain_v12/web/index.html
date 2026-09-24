@@ -267,8 +267,11 @@ async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Erro
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
 async function loadSystemOverview(){
  try{
-  const o=await api('/api/system/overview');
+  const [o,rdy]=await Promise.all([api('/api/system/overview'),api('/api/system/readiness')]);
   const h=o.human||{}, op=o.operation||{}, eng=o.engineering||{};
+  $('ovReadiness').textContent=rdy.ok?'جاهز':'يحتاج مراجعة';
+  $('ovReadiness').className='badge '+(rdy.ok?'good':'bad');
+  $('ovReadinessDetail').textContent=(rdy.passed||0)+' / '+(rdy.total||0)+' فحوص ناجحة • '+(rdy.status||'UNKNOWN');
   $('overviewStatus').textContent=o.ok?'مقروءة من النظام':'تعذر القراءة';
   $('overviewStatus').className='badge '+(o.ok?'good':'bad');
   $('humanHeadline').textContent=h.headline||'—';
@@ -374,6 +377,24 @@ async function loadIncomeMission(){
 refresh();loadTools();loadIncomeMission();loadSystemOverview();pollCognitive();setInterval(refresh,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
 
 const brainCommands=[['ابدأ محادثة','افتح واجهة الحوار','chat'],['الدورة المعرفية','راقب دورة الإدراك والقرار','thinking'],['الأهداف والخطط','إدارة أهداف العقل','goals'],['موظفو العقل','مراقبة الوكلاء والمهام','workforce'],['الأدوات','عرض الأدوات والصلاحيات','tools'],['الدخل','عرض مهمة أول 10 د.أ','workforce'],['الذاكرة','عرض الذاكرة والتعلم','memory']];
+function navigateByHumanIntent(intent=''){
+ const q=String(intent||'').trim().toLowerCase();
+ if(!q){show('home');return;}
+ const routes=[
+  [['دخل','مال','إيراد','فرص','ربح'],'workforce'],
+  [['ذاكرة','تعلم','تذكر'],'memory'],
+  [['موظف','فريق','مهام','وكلاء'],'workforce'],
+  [['أداة','صلاح','إذن','مسموح'],'tools'],
+  [['تفكير','قرار','تحليل','دورة'],'thinking'],
+  [['هدف','خطة','خطط'],'goals'],
+  [['كاميرا','صورة','رؤية'],'vision'],
+  [['صوت','ميكروفون','تحدث'],'voice'],
+  [['تطوير','كود','برمجة'],'evolve'],
+  [['chatgpt','شات جي بي تي'],'chatgpt']
+ ];
+ for(const [words,target] of routes){if(words.some(w=>q.includes(w))){show(target);return;}}
+ show('home');
+}
 function openCommandPalette(q=''){const p=$('commandPalette');p.classList.add('open');$('commandInput').value=q;filterCommands(q);setTimeout(()=>$('commandInput').focus(),30)}
 function closeCommandPalette(){$('commandPalette').classList.remove('open')}
 function filterCommands(q=''){const z=q.trim().toLowerCase();$('commandList').innerHTML=brainCommands.filter(x=>!z||x[0].toLowerCase().includes(z)||x[1].toLowerCase().includes(z)).map(x=>'<div class="commandItem" onclick="show(\''+x[2]+'\');closeCommandPalette()"><div><b>'+esc(x[0])+'</b><br><small>'+esc(x[1])+'</small></div><span class="shortcut">Enter</span></div>').join('')||'<div class="note" style="padding:15px">لا توجد نتيجة.</div>'}
