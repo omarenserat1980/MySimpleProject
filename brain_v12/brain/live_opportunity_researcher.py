@@ -27,6 +27,10 @@ class _Links(HTMLParser):
 
 class LiveOpportunityResearcher:
     SOURCES = (
+        ("Mostaql Programming", "https://mostaql.com/projects/skill/برمجة"),
+        ("Mostaql Python", "https://mostaql.com/projects/skill/python?page=1"),
+        ("Mostaql API", "https://mostaql.com/projects/skill/API"),
+        ("Upwork WhatsApp API", "https://www.upwork.com/freelance-jobs/whatsapp-api/"),
         ("Freelancer WordPress", "https://www.freelancer.com/jobs/wordpress"),
         ("AI Trainer Arabic", "https://www.aitrainer.work/jobs/arabic"),
     )
@@ -42,8 +46,12 @@ class LiveOpportunityResearcher:
             low=title.lower()
             if len(title)<8 or len(title)>300: continue
             if any(x in low for x in ("login","sign up","register","privacy","cookie","home","categories","search jobs")): continue
-            if not any(x in href.lower() for x in ("/jobs/","/project/","/projects/")): continue
-            if href.startswith("/"): href="https://www.freelancer.com"+href if "freelancer.com" in url else "https://www.aitrainer.work"+href
+            if not any(x in href.lower() for x in ("/jobs/","/project/","/projects/","/freelance-jobs/apply/")): continue
+            if href.startswith("/"):
+                if "freelancer.com" in url: href="https://www.freelancer.com"+href
+                elif "aitrainer.work" in url: href="https://www.aitrainer.work"+href
+                elif "upwork.com" in url: href="https://www.upwork.com"+href
+                else: href="https://mostaql.com"+href
             if not href.startswith("http") or href in seen: continue
             seen.add(href)
             out.append({"title":title,"url":href,"source":source,"retrieved_at":now,
