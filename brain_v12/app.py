@@ -168,6 +168,12 @@ def system_connection():
         "checks": checks,
     }
 
+@app.get("/api/device/agent-status")
+def device_agent_status(request: Request):
+    if not require_device_agent(request):
+        return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
+    return JSONResponse(device_bridge.agent_status())
+
 @app.get("/api/device/status")
 def device_status():
     return device_bridge.status()
