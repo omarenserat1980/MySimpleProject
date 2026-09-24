@@ -43,7 +43,8 @@ def next_high_leverage(mastered: set[str] | None = None) -> dict[str, Any] | Non
     ready=[r for r in rows if r["ready"]]
     if not ready:
         return None
-    return max(ready, key=lambda r: (float(r["value_weight"]), r["name"]))
+    ready_names = {r["name"] for r in ready}
+    return next((r for r in rows if r["name"] in ready_names and r["ready"] and float(r["value_weight"]) == max(float(x["value_weight"]) for x in ready)), None)
 
 def learning_frontier(mastered: set[str] | None = None) -> list[dict[str, Any]]:
     return [r for r in graph_status(mastered)["capabilities"] if r["status"] in {"READY","BLOCKED"}]
