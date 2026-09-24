@@ -368,7 +368,8 @@ def grant(request:Request, body:Permission):
     return {"grants":cognitive.permissions.grant(body.capability)}
 @app.post("/api/permissions/revoke")
 def revoke(request:Request, body:Permission):
-    require_control_key(request) return {"grants":cognitive.permissions.revoke(body.capability)}
+    require_control_key(request)
+    return {"grants":cognitive.permissions.revoke(body.capability)}
 @app.post("/api/permissions/check")
 def permission_check(capabilities:list[str],approved:bool=False): return cognitive.permissions.check(capabilities,approved)
 
