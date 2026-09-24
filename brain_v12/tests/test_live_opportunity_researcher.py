@@ -10,6 +10,7 @@ class LiveOpportunityResearcherTests(unittest.TestCase):
         self.assertIn("Mostaql Python", names)
         self.assertIn("Mostaql API", names)
         self.assertIn("Upwork WhatsApp API", names)
+        self.assertIn("AI Trainer Arabic", names)
 
     def test_extract_accepts_absolute_and_relative_listing_links(self):
         researcher = LiveOpportunityResearcher(None, None)
