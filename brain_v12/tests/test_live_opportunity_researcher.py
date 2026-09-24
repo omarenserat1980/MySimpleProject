@@ -1,6 +1,6 @@
 import unittest
 
-from brain.live_opportunity_researcher import LiveOpportunityResearcher
+from brain_v12.brain.live_opportunity_researcher import LiveOpportunityResearcher
 
 
 class LiveOpportunityResearcherTests(unittest.TestCase):
