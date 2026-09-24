@@ -38,7 +38,7 @@ class GitHubCodeExecutor:
         token_env: str = "GITHUB_TOKEN",
         allowed_prefix: str = "brain_v7/",
     ) -> None:
-        self.repository = repository or os.getenv("BRAIN_GITHUB_REPOSITORY", "")
+        self.repository = repository or os.getenv("BRAIN_GITHUB_REPOSITORY", "omarenserat1980/MySimpleProject")
         self.branch = branch or os.getenv("BRAIN_GITHUB_BRANCH", "main")
         self.token_env = token_env
         self.allowed_prefix = allowed_prefix.rstrip("/") + "/"
