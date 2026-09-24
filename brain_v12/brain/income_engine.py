@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from time import time
 from typing import Any
-from uuid import uuid4
+import hashlib
 
 
 class IncomeEngine:
@@ -109,7 +109,7 @@ class IncomeEngine:
         chosen = self.CHANNELS[: max(1, min(int(limit), len(self.CHANNELS)))]
         created = []
         for item in chosen:
-            oid = "INC-" + uuid4().hex[:12]
+            oid = "INC-" + hashlib.sha1((item["category"]+"|"+item["title"]).encode("utf-8")).hexdigest()[:12]
             record = {
                 **item,
                 "opportunity_id": oid,
