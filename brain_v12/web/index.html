@@ -74,7 +74,7 @@
 <div class="workspaceBar" id="modernWorkspaceBar">
  <button class="active">⌂ مساحة العقل</button><button onclick="show('chat')">💬 الحوار</button><button onclick="show('thinking')">◌ التفكير</button><button onclick="show('workforce')">👥 الوكلاء</button><button onclick="show('tools')">⚒ الأدوات</button>
  <div class="workspaceSearch"><span>⌕</span><input id="globalSearch" placeholder="ابحث أو نفّذ أمراً…  Ctrl/⌘ K" onkeydown="if(event.key==='Enter')openCommandPalette(this.value)"></div>
- <div class="statusCluster"><i class="statusDot"></i><small>V12 مباشر</small></div>
+ <div class="statusCluster" id="connectionStatus" title="حالة الاتصال"><i class="statusDot"></i><small id="connectionText">جاري فحص الاتصال…</small></div>
 </div>
 <div class="aiControlRail" id="aiControlRail">
  <div class="aiMode primaryMode active" onclick="selectAIMode(this,'وكيل مستقل')"><b>🧠 وكيل مستقل</b><small>يخطط ويراقب ويتحقق ضمن الصلاحيات</small></div>
@@ -300,7 +300,9 @@ async function api(url,opt={}){
  if(!r.ok)throw new Error('HTTP '+r.status);
  return r.json();
 }
-function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
+function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}async function checkBrainConnection(){const el=$('connectionStatus'),label=$('connectionText');try{const r=await api('/api/system/connection');const connected=Boolean(r.connected&&navigator.onLine!==false);el.classList.toggle('online',connected);el.classList.toggle('offline',!connected);label.textContent=connected?'في اتصال':'مفيش اتصال';el.title=connected?'الاتصال مع العقل V12 يعمل':'لا يوجد اتصال فعّال مع العقل V12';if($('humanConnection'))$('humanConnection').textContent=connected?'في اتصال':'مفيش اتصال';return connected}catch(e){el.classList.remove('online');el.classList.add('offline');label.textContent='مفيش اتصال';el.title='تعذر الاتصال بالعقل V12';if($('humanConnection'))$('humanConnection').textContent='مفيش اتصال';return false;}}
+window.addEventListener('online',checkBrainConnection);window.addEventListener('offline',checkBrainConnection);
+
 async function loadSystemOverview(){
  try{
   const [o,rdy]=await Promise.all([api('/api/system/overview'),api('/api/system/readiness')]);
@@ -410,7 +412,7 @@ async function loadIncomeMission(){
   $('incomeNext').textContent=(m.next_actions||[]).join(' • ')||'المراقبة والبحث مستمران.';
  }catch(e){$('incomeMissionStatus').textContent='تعذر التحديث';}
 }
-refresh();loadTools();loadIncomeMission();loadSystemOverview();pollCognitive();setInterval(refresh,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
+refresh();loadTools();loadIncomeMission();loadSystemOverview();checkBrainConnection();pollCognitive();setInterval(refresh,5000);setInterval(checkBrainConnection,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
 
 const brainCommands=[['ابدأ محادثة','افتح واجهة الحوار','chat'],['الدورة المعرفية','راقب دورة الإدراك والقرار','thinking'],['الأهداف والخطط','إدارة أهداف العقل','goals'],['موظفو العقل','مراقبة الوكلاء والمهام','workforce'],['الأدوات','عرض الأدوات والصلاحيات','tools'],['الدخل','عرض مهمة أول 10 د.أ','workforce'],['الذاكرة','عرض الذاكرة والتعلم','memory']];
 function navigateByHumanIntent(intent=''){
