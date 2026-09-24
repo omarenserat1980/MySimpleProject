@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>العقل الإلكتروني — الواجهة المستقلة</title>
+<style>
+:root{--bg:#212121;--side:#171717;--panel:#2b2b2b;--panel2:#303030;--line:#444;--txt:#ececec;--muted:#aaa;--accent:#10a37f;--danger:#ef4444}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer;color:var(--txt);border:0}.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:280px;background:var(--side);display:flex;flex-direction:column;padding:10px;gap:8px;border-left:1px solid #333}
+.new{background:transparent;border:1px solid #444;border-radius:10px;text-align:right;padding:11px}.new:hover,.nav button:hover,.nav .active{background:#2a2a2a}
+.nav{display:grid;gap:3px}.nav button{background:transparent;text-align:right;border-radius:8px;padding:10px;color:#ddd}.nav button span{margin-left:8px}
+.section{font-size:12px;color:#777;padding:12px 9px 4px}.history{flex:1;overflow:auto}.history button{width:100%;background:transparent;text-align:right;border-radius:7px;padding:8px;color:#bbb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account{border-top:1px solid #333;padding-top:10px}.main{flex:1;min-width:0;display:flex;flex-direction:column}.header{height:58px;border-bottom:1px solid #333;display:flex;align-items:center;justify-content:space-between;padding:0 18px}.brand{font-weight:700}.header select{background:#2b2b2b;color:#eee;border:1px solid #444;border-radius:8px;padding:7px}.content{flex:1;overflow:auto}.chat{max-width:900px;margin:auto;padding:30px 20px 140px}.welcome{text-align:center;margin:10vh 0 8vh}.welcome h1{font-size:30px}.msg{display:flex;gap:14px;margin:22px 0;line-height:1.7}.avatar{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:#444;flex:none}.msg.user .avatar{background:#555}.msg.assistant .avatar{background:var(--accent)}.bubble{white-space:pre-wrap;overflow-wrap:anywhere;flex:1}.composerWrap{position:fixed;bottom:0;right:280px;left:0;background:linear-gradient(transparent,var(--bg) 30%);padding:22px 20px}.composer{max-width:900px;margin:auto;background:#303030;border:1px solid #555;border-radius:16px;padding:10px;box-shadow:0 4px 20px #0005}.composer textarea{width:100%;border:0;outline:0;resize:none;background:transparent;color:white;min-height:44px;max-height:180px}.bar{display:flex;align-items:center;justify-content:space-between}.actions{display:flex;gap:5px}.icon{background:transparent;border-radius:8px;padding:8px;font-size:18px}.icon:hover{background:#444}.send{background:#eee;color:#111;border-radius:9px;padding:8px 12px}.send:disabled{opacity:.4}.panel{max-width:1000px;margin:25px auto;padding:20px}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{background:#2a2a2a;border:1px solid #444;border-radius:12px;padding:15px}.card h3{margin-top:0}.code{direction:ltr;text-align:left;font-family:ui-monospace,monospace;background:#111;border:1px solid #444;border-radius:10px;padding:12px;min-height:250px;width:100%;color:#ddd}.hidden{display:none}.modal{position:fixed;inset:0;background:#0009;display:none;place-items:center;padding:20px;z-index:10}.modal.show{display:grid}.modalBox{background:#242424;border:1px solid #555;border-radius:14px;width:min(900px,100%);max-height:90vh;overflow:auto;padding:18px}.row{display:flex;gap:8px;flex-wrap:wrap}.primary{background:var(--accent);padding:9px 14px;border-radius:9px}.secondary{background:#3a3a3a;padding:9px 14px;border-radius:9px}.danger{background:var(--danger);padding:9px 14px;border-radius:9px}@media(max-width:800px){.sidebar{width:68px;padding:7px}.sidebar .label,.sidebar .section,.history,.account .label{display:none}.new{text-align:center}.nav button{text-align:center}.composerWrap{right:68px}.cards{grid-template-columns:1fr}.chat{padding-left:12px;padding-right:12px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<button class="new" onclick="newChat()">＋ <span class="label">محادثة جديدة</span></button>
+<div class="nav">
+<button class="active" data-page="chat">💬 <span class="label">المحادثة</span></button>
+<button data-page="projects">📁 <span class="label">المشاريع</span></button>
+<button data-page="files">📎 <span class="label">الملفات والوسائط</span></button>
+<button data-page="code">💻 <span class="label">برمجة العقل</span></button>
+<button data-page="memory">🧠 <span class="label">الذاكرة</span></button>
+<button data-page="tools">🛠️ <span class="label">الأدوات</span></button>
+</div>
+<div class="section">المحادثات الأخيرة</div><div id="history" class="history"></div>
+<div class="account"><button class="new" onclick="location.href='/'">⚙️ <span class="label">مركز التحكم الكامل</span></button></div>
+</aside>
+<main class="main">
+<header class="header"><div class="brand">🧠 العقل الإلكتروني</div><div><select id="model"><option>Brain Auto</option><option>Brain Reasoning</option><option>Brain Code</option><option>Brain Media</option></select></div></header>
+<div class="content">
+<section id="chatPage" class="page">
+<div class="chat" id="chat">
+<div class="welcome"><h1>كيف أستطيع مساعدتك؟</h1><p style="color:#aaa">واجهة مستقلة للعقل: حوار، ملفات، أدوات، ذاكرة، مشاريع وبرمجة.</p></div>
+</div></section>
+<section id="projectsPage" class="page hidden"><div class="panel"><h2>📁 مشاريع العقل</h2><div class="cards">
+<div class="card"><h3>Electronic Brain V12</h3><p>النواة الحالية وواجهة التحكم.</p><button class="primary" onclick="location.href='/'">فتح</button></div>
+<div class="card"><h3>Brain V7 Core</h3><p>الاستدلال، الموظفون، العمل الخارجي، السلامة.</p><button class="secondary" onclick="openCode('brain_v7/braincore_v2/brain_orchestrator.py')">فتح الكود</button></div>
+<div class="card"><h3>Code Workspace</h3><p>حفظ، معاينة، تحقق، نقطة استرجاع وتطبيق تغييرات.</p><button class="secondary" onclick="page('code')">فتح</button></div>
+</div></div></section>
+<section id="filesPage" class="page hidden"><div class="panel"><h2>📎 الملفات والوسائط</h2><input id="file" type="file" accept="image/*,video/*,audio/*,.pdf,.txt"><button class="primary" onclick="upload()">رفع إلى العقل</button><div id="fileOut" class="card" style="margin-top:15px">—</div></div></section>
+<section id="codePage" class="page hidden"><div class="panel"><h2>💻 برمجة العقل</h2><p style="color:#aaa">العقل يستطيع قراءة الكود، حفظ نقطة استرجاع، معاينة الفرق، التحقق، وتطبيق التغييرات عبر أداة الكود المقيدة.</p><div class="row"><input id="codePath" style="flex:1;background:#303030;color:white;border:1px solid #555;border-radius:8px;padding:10px" value="brain_v7/braincore_v2/brain_orchestrator.py"><button class="secondary" onclick="inspectCode()">قراءة</button><button class="secondary" onclick="verifyCode()">تحقق</button><button class="secondary" onclick="checkpoint()">نقطة استرجاع</button></div><textarea id="codeEditor" class="code" style="margin-top:10px"></textarea><div class="row"><button class="secondary" onclick="previewCode()">معاينة Diff</button><button class="primary" onclick="applyCode()">تنفيذ وحفظ</button><label style="padding:9px"><input id="approve" type="checkbox"> موافقة صريحة</label><label style="padding:9px"><input id="persist" type="checkbox" checked> GitHub عند توفره</label></div><pre id="codeOut" style="white-space:pre-wrap;background:#111;padding:12px;border-radius:10px;margin-top:12px">—</pre></div></section>
+<section id="memoryPage" class="page hidden"><div class="panel"><h2>🧠 الذاكرة</h2><div id="memoryOut">جاري التحميل...</div></div></section>
+<section id="toolsPage" class="page hidden"><div class="panel"><h2>🛠️ الأدوات</h2><div id="toolsOut">جاري التحميل...</div></div></section>
+</div>
+<div class="composerWrap" id="composerWrap"><div class="composer"><textarea id="input" placeholder="اكتب رسالة إلى العقل..." rows="1"></textarea><div class="bar"><div class="actions"><button class="icon" title="إرفاق" onclick="page('files')">＋</button><button class="icon" title="صوت" onclick="voice()">🎙️</button><button class="icon" title="كاميرا" onclick="location.href='/'">📷</button></div><button class="send" id="send" onclick="send()">↑</button></div></div></div>
+</main></div>
+<div id="modal" class="modal"><div class="modalBox"><button class="secondary" onclick="closeModal()">إغلاق</button><pre id="modalOut"></pre></div></div>
+<script>
+const $=id=>document.getElementById(id);let current=[];
+function page(name){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$(name+'Page').classList.remove('hidden');$('composerWrap').style.display=name==='chat'?'block':'none';document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='memory')loadMemory();if(name==='tools')loadTools()}
+function add(role,text){let d=document.createElement('div');d.className='msg '+role;d.innerHTML='<div class="avatar">'+(role==='user'?'أنت':'🧠')+'</div><div class="bubble"></div>';d.querySelector('.bubble').textContent=text;$('chat').append(d);$('chat').scrollTop=$('chat').scrollHeight}
+async function api(u,o){let r=await fetch(u,o);return r.json()}
+async function send(){let q=$('input').value.trim();if(!q)return;$('send').disabled=true;add('user',q);$('input').value='';try{let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});add('assistant',r.reply||JSON.stringify(r,null,2));saveHistory(q)}catch(e){add('assistant','حدث خطأ: '+e.message)}$('send').disabled=false}
+function newChat(){current=[];$('chat').innerHTML='<div class="welcome"><h1>كيف أستطيع مساعدتك؟</h1><p style="color:#aaa">محادثة جديدة مع العقل الإلكتروني.</p></div>';$('input').focus()}
+function saveHistory(t){let h=JSON.parse(localStorage.getItem('brain_history')||'[]');h.unshift(t);localStorage.setItem('brain_history',JSON.stringify(h.slice(0,30)));loadHistory()}
+function loadHistory(){let h=JSON.parse(localStorage.getItem('brain_history')||'[]');$('history').innerHTML=h.map(x=>'<button title="'+esc(x)+'" onclick="document.getElementById(\'input\').value='+JSON.stringify(x)+'">'+esc(x)+'</button>').join('')}
+async function upload(){let f=$('file').files[0];if(!f)return;let fd=new FormData();fd.append('file',f);let r=await api('/api/media/upload',{method:'POST',body:fd});$('fileOut').textContent=JSON.stringify(r,null,2)}
+async function inspectCode(){let p=$('codePath').value;let r=await api('/api/code/inspect?path='+encodeURIComponent(p),{method:'POST'});$('codeEditor').value=r.content||'';$('codeOut').textContent=JSON.stringify(r,null,2)}
+async function verifyCode(){let r=await api('/api/code/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[$('codePath').value]})});$('codeOut').textContent=JSON.stringify(r,null,2)}
+async function checkpoint(){let r=await api('/api/code/checkpoint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths:[$('codePath').value]})});$('codeOut').textContent=JSON.stringify(r,null,2)}
+async function previewCode(){let c=[{path:$('codePath').value,content:$('codeEditor').value,reason:'Brain UI code change'}];let r=await api('/api/code/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:c})});$('codeOut').textContent=JSON.stringify(r,null,2)}
+async function applyCode(){if(!$('approve').checked){$('codeOut').textContent='الموافقة الصريحة مطلوبة قبل تطبيق التغيير.';return}let c=[{path:$('codePath').value,content:$('codeEditor').value,reason:'Brain UI code change'}];let r=await api('/api/code/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:c,reason:'Brain UI controlled code change',commit_message:'brain: code change from independent brain UI',approved:true,persist_to_github:$('persist').checked})});$('codeOut').textContent=JSON.stringify(r,null,2)}
+async function loadMemory(){let r=await api('/api/memory');$('memoryOut').innerHTML=(r||[]).map(x=>'<div class="card"><b>'+esc(x.key)+'</b><div>'+esc(x.value)+'</div></div>').join('')||'لا توجد ذاكرة'}
+async function loadTools(){let r=await api('/api/capabilities');$('toolsOut').innerHTML='<div class="cards">'+(r.tools||[]).map(x=>'<div class="card"><h3>'+esc(x.name||'أداة')+'</h3><p>'+esc(x.description||'')+'</p><span style="color:#aaa">'+esc(x.risk||'')+'</span></div>').join('')+'</div>'}
+function openCode(p){page('code');$('codePath').value=p;inspectCode()}
+function voice(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert('التعرف الصوتي غير متاح في هذا المتصفح.');let r=new SR();r.lang='ar-JO';r.onresult=e=>{$('input').value=e.results[0][0].transcript;send()};r.start()}
+function closeModal(){$('modal').classList.remove('show')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>page(b.dataset.page));
+$('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+loadHistory();
+</script></body></html>
