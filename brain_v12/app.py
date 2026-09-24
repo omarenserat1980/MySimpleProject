@@ -20,6 +20,7 @@ from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineering
 from brain_v7.braincore_v2.code_tool_api import CodeTool
 from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from .brain.code_agent import BrainCodeAgent
+from .brain.render_monitor import RenderLogMonitor
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -32,6 +33,23 @@ code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
 code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 cognitive.code_tool=code_tool
+
+def handle_render_incident(incident):
+    message=f"Render incident {incident.get('fingerprint')}: {incident.get('message','')[:500]}"
+    store.event("RENDER_INCIDENT_DETECTED", {
+        "fingerprint":incident.get("fingerprint"),
+        "severity":incident.get("severity"),
+        "message":incident.get("message","")[:1000],
+        "service_id":incident.get("service_id"),
+    })
+    try:
+        existing=[g for g in store.goals() if g.get("text")==message and g.get("status") in ("PENDING","IN_PROGRESS")]
+        if not existing:
+            store.add_goal(message,1.0)
+    except Exception as exc:
+        store.event("RENDER_INCIDENT_GOAL_ERROR", {"error":str(exc)})
+
+render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
     plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
@@ -97,6 +115,28 @@ def system_status():
             "stage":state.get("cognitive_stage","READY"),"run_id":state.get("cognitive_trace",{}).get("run_id"),
             "tools":len(cognitive.tool_catalog()),"memory_items":len(store.memories()),"event_count":len(store.events(1000))}
 
+@app.get("/api/monitor/status")
+def monitor_status():
+    return {"ok":True,"monitor":render_monitor.status(),"incidents":store.incidents(20)}
+
+@app.get("/api/monitor/incidents")
+def monitor_incidents(limit:int=50):
+    return {"ok":True,"incidents":store.incidents(max(1,min(limit,200)))}
+
+@app.post("/api/monitor/run-once")
+def monitor_run_once():
+    return render_monitor.poll_once()
+
+@app.post("/api/monitor/start")
+def monitor_start():
+    if not render_monitor.configured:
+        return {"ok":False,"status":"NOT_CONFIGURED","required":["RENDER_API_KEY","RENDER_OWNER_ID","RENDER_SERVICE_ID"]}
+    return render_monitor.start()
+
+@app.post("/api/monitor/stop")
+def monitor_stop():
+    return render_monitor.stop()
+
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     checks=[]
@@ -107,6 +147,11 @@ def system_diagnostics():
     checks.append({"name":"tool_router","ok":len(cognitive.tool_catalog())>0})
     checks.append({"name":"decision_engine","ok":len(cognitive.decisions.generate("system diagnostics"))>0})
     return {"ok":all(x["ok"] for x in checks),"checks":checks,"timestamp":__import__("time").time()}
+
+@app.on_event("startup")
+def start_background_services():
+    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","false").lower()=="true" and render_monitor.configured:
+        render_monitor.start()
 
 @app.get("/api/state")
 def state(): return brain.snapshot()
