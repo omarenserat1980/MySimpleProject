@@ -31,7 +31,7 @@ class WorkforceEvolutionEngine:
         self.max_active_workers = max_active_workers
         self.max_new_per_cycle = max_new_per_cycle
 
-        def assign_training(self, employee_id: str) -> dict:
+    def assign_training(self, employee_id: str) -> dict:
         """Route employees through dedicated trainers before independent work."""
         employee = self.organization.employees.get(employee_id)
         if employee is None:
