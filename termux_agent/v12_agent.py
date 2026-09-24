@@ -73,7 +73,10 @@ def main():
         try:
             now = time.time()
             if now - last_heartbeat >= HEARTBEAT_SECONDS:
-                request("POST", "/api/device/heartbeat", payload={"agent_id": AGENT_ID})
+                try:
+                    request("POST", "/api/device/heartbeat", payload={"agent_id": AGENT_ID})
+                except Exception as heartbeat_error:
+                    print(f"[V12-Agent] HEARTBEAT_FAILURE: {heartbeat_error}")
                 last_heartbeat = now
                 print("[V12-Agent] HEARTBEAT")
             payload = request("GET", "/api/device/poll", params={"agent_id": AGENT_ID})
