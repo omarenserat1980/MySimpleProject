@@ -105,7 +105,7 @@ def recommend(
     exploration_budget: float = 0.20,
 ) -> dict:
     stats = learn(history)
-    decision = choose_strategy(stats, minimum_exploration=exploration_budget)
+    decision = choose_strategy(stats.values(), minimum_exploration=exploration_budget)
     return {
         "decision": decision,
         "memory": [asdict(s) for s in stats.values()],
