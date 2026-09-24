@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
+<meta name="brain-v12-ui" content="12.6-navigation-hardened">
 <title>العقل الإلكتروني V12</title>
 <style>
 :root{--bg:#050b14;--panel:#0b1422;--panel2:#101d2e;--line:#20334a;--text:#edf6ff;--muted:#91a5bc;--cyan:#55d6ff;--green:#43e0a1;--purple:#a78bfa;--red:#ff6b81;--gold:#ffd166}
@@ -292,7 +293,13 @@ document.addEventListener('click',function(e){
  e.preventDefault();
  show(b.dataset.view);
 });
-async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+async function api(url,opt={}){
+ const method=String(opt.method||'GET').toUpperCase();
+ const freshUrl=method==='GET'?(url+(url.includes('?')?'&':'?')+'_v12='+Date.now()):url;
+ const r=await fetch(freshUrl,{...opt,cache:'no-store'});
+ if(!r.ok)throw new Error('HTTP '+r.status);
+ return r.json();
+}
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
 async function loadSystemOverview(){
  try{
