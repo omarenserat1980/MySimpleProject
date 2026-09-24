@@ -62,7 +62,8 @@ class IncomeLifecycle:
         target_index = self.ORDER.index(target)
         if target_index < current_index:
             return {"ok": False, "status": "INVALID_BACKWARD_TRANSITION", "current": current, "target": target}
-        if target_index > current_index + 1:
+        allowed_skip = current == "SUBMITTED" and target == "ACCEPTED"
+        if target_index > current_index + 1 and not allowed_skip:
             return {"ok": False, "status": "INVALID_SKIPPED_TRANSITION", "current": current, "target": target}
         if target in self.EXTERNAL_EVIDENCE and not str(evidence).strip():
             return {"ok": False, "status": "EVIDENCE_REQUIRED", "required": self.EXTERNAL_EVIDENCE[target]}
