@@ -39,6 +39,7 @@ class DeviceBridge:
             return {"ok": False, "status": "AGENT_ID_REQUIRED"}
         self._last_seen = time.time()
         self.store.device_agent_touch(agent_id, self._last_seen)
+        self.store.device_task_requeue_stale(max_age_seconds=int(os.getenv("TERMUX_TASK_STALE_SECONDS", "120")))
         item = self.store.device_task_claim(agent_id)
         return {"ok": True, "task": item, "status": "IDLE" if item is None else "CLAIMED"}
 
@@ -129,6 +130,10 @@ class DeviceBridge:
             "online": any(x["online"] for x in agents),
             "agents": agents,
         }
+
+    def requeue_stale(self, max_age_seconds=120):
+        ids = self.store.device_task_requeue_stale(max_age_seconds)
+        return {"ok": True, "requeued": len(ids), "task_ids": ids}
 
     def queued_tasks(self):
         return self.store.device_task_counts()
