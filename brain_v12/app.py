@@ -252,6 +252,33 @@ def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
 @app.post("/api/tools/execute")
 def tools_execute(tool_id:str,params:dict|None=None,approved:bool=False): return cognitive.execute_tool(tool_id,params or {},approved)
 
+@app.get("/api/cognitive/history/{run_id}")
+def cognitive_history(run_id:str):
+    return {"ok":True,"run_id":run_id,"events":store.events_for_run(run_id,200)}
+
+class EvolutionIn(BaseModel):
+    objective:str
+    files:list[str]=[]
+    approved:bool=False
+    persist_to_github:bool=True
+    commit_message:str="brain: controlled autonomous improvement"
+
+@app.post("/api/cognitive/evolve")
+def cognitive_evolve(body:EvolutionIn):
+    if not body.files:
+        return {"ok":False,"status":"NO_FILES","message":"حدد الملفات التي يسمح للعقل بتطويرها."}
+    checkpoint=code_tool.save_checkpoint(body.files)
+    plan=brain_code_agent.plan(body.objective,body.files)
+    public=brain_code_agent.public_plan(plan)
+    if plan.get("status")!="PLAN_READY":
+        return {"ok":True,"status":"PLAN_ONLY","checkpoint":checkpoint,"plan":public}
+    if not body.approved:
+        return {"ok":True,"status":"WAITING_APPROVAL","checkpoint":checkpoint,"plan":public,"next":"approval_required_for_write"}
+    execution=brain_code_agent.execute_plan(plan,approved=True,commit_message=body.commit_message,persist_to_github=body.persist_to_github)
+    verification=code_tool.verify(body.files)
+    store.event("COGNITIVE_EVOLUTION",{"objective":body.objective,"files":body.files,"execution":execution.get("status"),"verification":verification.get("status")})
+    return {"ok":execution.get("status") not in {"EXECUTION_FAILED"},"status":"EVOLUTION_COMPLETE","checkpoint":checkpoint,"plan":public,"execution":execution,"verification":verification}
+
 @app.get("/api/cognitive/live")
 def cognitive_live():
     s=store.state(); ev=store.events(40); trace=s.get("cognitive_trace",{}) if isinstance(s,dict) else {}
