@@ -89,7 +89,24 @@ class YouTubeOAuth:
                            client_id=cid,client_secret=secret,scopes=SCOPES)
 
     def snapshot(self) -> dict[str, Any]:
-        return {"ok":True,"configured":self.configured(),
-                "authorized":bool(self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN")),
-                "scope":"youtube.upload",
-                "credentials_in_logs":False}
+        client_configured = bool(os.getenv("YOUTUBE_CLIENT_ID") and os.getenv("YOUTUBE_CLIENT_SECRET"))
+        redirect_configured = bool(self.redirect_uri())
+        encryption_configured = bool(os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY"))
+        authorized = bool(self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN"))
+        return {
+            "ok": True,
+            "configured": self.configured(),
+            "ready_to_start": client_configured and redirect_configured,
+            "ready_to_store_token": encryption_configured,
+            "authorized": authorized,
+            "scope": "youtube.upload",
+            "credentials_in_logs": False,
+            "missing_env": [
+                key for key, present in (
+                    ("YOUTUBE_CLIENT_ID", client_configured),
+                    ("YOUTUBE_CLIENT_SECRET", bool(os.getenv("YOUTUBE_CLIENT_SECRET"))),
+                    ("YOUTUBE_OAUTH_REDIRECT_URI", redirect_configured),
+                    ("YOUTUBE_TOKEN_ENCRYPTION_KEY", encryption_configured),
+                ) if not present
+            ],
+        }
