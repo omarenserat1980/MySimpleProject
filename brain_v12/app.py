@@ -387,10 +387,12 @@ def ai_chat(body:Chat):
 def plugin_status(): return plugins.status()
 @app.post("/api/plugins/{plugin_id}/enable")
 def plugin_enable(request:Request, plugin_id:str):
-    require_control_key(request) return plugins.enable(plugin_id)
+    require_control_key(request)
+    return plugins.enable(plugin_id)
 @app.post("/api/plugins/{plugin_id}/disable")
 def plugin_disable(request:Request, plugin_id:str):
-    require_control_key(request) return plugins.disable(plugin_id)
+    require_control_key(request)
+    return plugins.disable(plugin_id)
 
 @app.get("/api/agent/status")
 def agent_status(): return agent.status()
