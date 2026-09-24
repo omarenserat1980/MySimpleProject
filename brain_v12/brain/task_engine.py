@@ -6,6 +6,12 @@ class TaskEngine:
     def ready(self):
         done={k for k,v in self.tasks.items() if v["status"]=="COMPLETED"}
         return [v for v in self.tasks.values() if v["status"]=="PENDING" and all(d in done for d in v["depends_on"])]
+    def fail(self,task_id,error="TASK_FAILED"):
+        if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
+        self.tasks[task_id]["status"]="FAILED"
+        self.tasks[task_id]["error"]=error
+        return self.tasks[task_id]
+
     def update(self,task_id,status):
         if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
         self.tasks[task_id]["status"]=status
