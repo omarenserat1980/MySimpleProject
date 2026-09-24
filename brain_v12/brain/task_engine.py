@@ -12,6 +12,16 @@ class TaskEngine:
         self.tasks[task_id]["error"]=error
         return self.tasks[task_id]
 
+    def retry(self,task_id,max_attempts=3):
+        if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
+        task=self.tasks[task_id]
+        if task["status"] != "FAILED": return {"ok":False,"error":"TASK_NOT_FAILED"}
+        if task["attempts"] >= max(1,int(max_attempts)):
+            return {"ok":False,"error":"RETRY_LIMIT_REACHED","task":task}
+        task["status"]="PENDING"
+        task["error"]=""
+        return {"ok":True,"task":task}
+
     def update(self,task_id,status):
         if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
         self.tasks[task_id]["status"]=status
