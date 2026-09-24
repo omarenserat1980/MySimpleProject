@@ -40,6 +40,10 @@ class HumanInterfaceContractTests(unittest.TestCase):
         self.assertNotIn("document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view))", self.html)
         self.assertIn("button[data-view]", self.html)
 
+    def test_api_gets_are_cache_busted(self):
+        self.assertIn("cache:'no-store'", self.html)
+        self.assertIn("_v12=", self.html)
+
     def test_human_command_input_exists(self):
         self.assertIn("قل للعقل ما تريد", self.html)
 
