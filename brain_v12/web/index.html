@@ -86,7 +86,8 @@
  <div class="humanOverview">
   <div class="humanLead">
    <div class="card">
-    <div class="sectionTitle"><h3>🧠 فهم النظام بلغة الإنسان</h3><span class="badge" id="overviewStatus">جاري القراءة…</span></div>
+    <div class="sectionTitle"><h3>🧠 فهم النظام بلغة الإنسان</h3><div class="tools"><span class="badge" id="overviewStatus">جاري القراءة…</span><span class="badge" id="ovReadiness">فحص الجاهزية…</span></div></div>
+    <div id="ovReadinessDetail" class="note">جاري فحص مكوّنات النظام…</div>
     <div class="humanNow" id="humanHeadline">أقرأ حالة العقل ومكوّناته الآن…</div>
     <div class="humanExplain" id="humanExplain">هذه الصفحة تحول الحالة التقنية إلى معنى واضح: ماذا يحدث الآن، ماذا يعرف النظام، ما الذي يستطيع فعله، وما الخطوة التالية.</div>
     <div class="thinkingNow"><span id="humanStage">المرحلة: —</span><span id="humanGoal">الهدف: —</span><span id="humanDecision">القرار: —</span></div>
@@ -261,9 +262,36 @@
 <script>
 const $=id=>document.getElementById(id);let stream=null,recognition=null,lastReply='',voiceBusy=false;let liveTimer=null;const cognitiveStages=['PERCEIVE','UNDERSTAND','MEMORY','ANALYZE','PLAN','DECIDE','EXECUTE','VERIFY','LEARN'];
 const titles={home:['مركز العقل','الإدراك • التفكير • القرار • التنفيذ • التعلم'],chat:['المحادثة','حوار مباشر مع العقل الإلكتروني'],thinking:['الدورة المعرفية','كيف ينتقل العقل من الإدراك إلى القرار؟'],goals:['الأهداف والخطط','ما الذي يحاول العقل إنجازه؟'],memory:['الذاكرة والتعلم','ما الذي يعرفه العقل وما الذي تعلمه؟'],permissions:['الصلاحيات والأجهزة','الميكروفون والكاميرا وإدراك العالم'],vision:['الكاميرا والصور','إدخال العالم المرئي إلى العقل'],voice:['الصوت','التحدث والاستماع'],video:['الفيديو','الوسائط المتحركة'],ai:['AI Gateway','طبقة الذكاء الخارجية'],tools:['الأدوات','قدرات العقل التنفيذية'],agent:['الوكيل','التنفيذ المنضبط'],evolve:['التطوير الذاتي','تحسين النظام مع الحواجز اللازمة'],workforce:['موظفو العقل','المهام • الإنجازات • YouTube • السينما • المواقع • فرص الدخل'],events:['سجل النشاط','ما الذي حدث داخل العقل؟'],chatgpt:['ChatGPT','محادثة ChatGPT من داخل التطبيق']};
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(titles[id]){$('pageTitle').textContent=titles[id][0];$('pageSub').textContent=titles[id][1]}if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='events')loadEvents();if(id==='workforce')loadWorkforce();if(id==='thinking')loadState();if(id==='tools')loadCaps();if(id==='agent')loadAgent();if(id==='ai')loadAI();if(id==='evolve')loadEvolve();if(id==='permissions')checkPermissions();if(id==='chatgpt')loadChatGPTStatus()}
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
-document.addEventListener('click',function(e){const b=e.target.closest('[data-view]');if(b){e.preventDefault();show(b.dataset.view)}});
+function show(id){
+ const target=$(id);
+ if(!target || !target.classList.contains('view')){
+  console.warn('V12 navigation target not found:',id);
+  toast('الواجهة المطلوبة غير موجودة: '+id);
+  return false;
+ }
+ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+ target.classList.add('active');
+ document.querySelectorAll('.nav button[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===id));
+ if(titles[id]){$('pageTitle').textContent=titles[id][0];$('pageSub').textContent=titles[id][1]}
+ if(id==='goals')loadGoals();
+ if(id==='memory')loadMemory();
+ if(id==='events')loadEvents();
+ if(id==='workforce')loadWorkforce();
+ if(id==='thinking')loadState();
+ if(id==='tools')loadCaps();
+ if(id==='agent')loadAgent();
+ if(id==='ai')loadAI();
+ if(id==='evolve')loadEvolve();
+ if(id==='permissions')checkPermissions();
+ if(id==='chatgpt')loadChatGPTStatus();
+ return true;
+}
+document.addEventListener('click',function(e){
+ const b=e.target.closest('button[data-view]');
+ if(!b)return;
+ e.preventDefault();
+ show(b.dataset.view);
+});
 async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
 async function loadSystemOverview(){
@@ -339,7 +367,7 @@ function capture(){if(!stream)return toast('شغل الكاميرا أولاً')
 async function checkPermissions(){if(!navigator.permissions)return;for(const [name,id] of [['microphone','micStatus'],['camera','camStatus']])try{const p=await navigator.permissions.query({name});$(id).textContent=p.state==='granted'?'مسموح':p.state==='denied'?'مرفوض':'يحتاج سماح';$(id).className='badge '+(p.state==='granted'?'good':p.state==='denied'?'bad':'')}catch(e){}}
 async function uploadFile(){const f=$('filePick').files[0];if(f)await uploadAny(f)}
 async function uploadAny(f){if(!f)return;const fd=new FormData();fd.append('file',f);try{const r=await api('/api/media/upload',{method:'POST',body:fd});$('fileResult').textContent='تم إدخال '+r.filename+' إلى مركز الوسائط.';toast('تم رفع الملف')}catch(e){toast('فشل رفع الملف')}}
-async function runCycle(){setThinking(true);$('mindNow').textContent='تشغيل الدورة المعرفية الحقيقية...';if(!liveTimer)liveTimer=setInterval(pollCognitive,350);try{await api('/api/cognitive/start?goal='+encodeURIComponent($('goalInput')?.value||'brain_v12'),{method:'POST'});let result=null;for(let i=0;i<80;i++){await new Promise(x=>setTimeout(x,250));const live=await api('/api/cognitive/live');renderConsole(live.state,live.events);updateCognitiveUI(live.state);if(live.result){result=live.result;break}}const s=result||{};$('cycleOut').textContent=JSON.stringify(s,null,2);$('mindDecision').textContent=s.decision?.selected?.action||s.decision?.status||'تمت الدورة';$('mindGoal').textContent=s.goal||'—';$('mindVerify').textContent=s.verification?.evidence||'تم التحقق';$('execAction').textContent=s.execution?.result||'تمت المعالجة';$('execBadge').textContent=s.execution?.status||'—';$('execBadge').className='badge '+(s.execution?.status==='COMPLETED'?'good':'');$('verifyBadge').textContent=s.verification?.status||'—';$('verifyText').textContent=s.verification?.evidence||'—';$('learnBadge').textContent=s.learning?.status||'—';$('learnText').textContent='تم تسجيل نتيجة الدورة كخبرة قابلة للمتابعة.';loadState();refresh()}catch(e){$('cycleOut').textContent=e.message;$('mindNow').textContent='فشلت الدورة'}finally{setThinking(false);pollCognitive();if(liveTimer){clearInterval(liveTimer);liveTimer=null}}}
+async function runCycle(){setThinking(true);$('mindNow').textContent='تشغيل الدورة المعرفية الحقيقية...';if(!liveTimer)liveTimer=setInterval(pollCognitive,350);try{const goal=$('goalText')?.value?.trim()||'brain_v12';await api('/api/cognitive/start?goal='+encodeURIComponent(goal),{method:'POST'});let result=null;for(let i=0;i<80;i++){await new Promise(x=>setTimeout(x,250));const live=await api('/api/cognitive/live');renderConsole(live.state,live.events);updateCognitiveUI(live.state);if(live.result){result=live.result;break}}const s=result||{};$('cycleOut').textContent=JSON.stringify(s,null,2);$('mindDecision').textContent=s.decision?.selected?.action||s.decision?.status||'تمت الدورة';$('mindGoal').textContent=s.goal||'—';$('mindVerify').textContent=s.verification?.evidence||'تم التحقق';$('execAction').textContent=s.execution?.result||'تمت المعالجة';$('execBadge').textContent=s.execution?.status||'—';$('execBadge').className='badge '+(s.execution?.status==='COMPLETED'?'good':'');$('verifyBadge').textContent=s.verification?.status||'—';$('verifyText').textContent=s.verification?.evidence||'—';$('learnBadge').textContent=s.learning?.status||'—';$('learnText').textContent='تم تسجيل نتيجة الدورة كخبرة قابلة للمتابعة.';loadState();refresh()}catch(e){$('cycleOut').textContent=e.message;$('mindNow').textContent='فشلت الدورة'}finally{setThinking(false);pollCognitive();if(liveTimer){clearInterval(liveTimer);liveTimer=null}}}
 
 async function evolveBrain(approved){const objective=$('evolveObjective')?.value?.trim();const files=($('evolveFiles')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);if(!objective||!files.length){$('evolveOut').textContent='أدخل هدف التطوير والملفات المسموحة.';return}try{const r=await api('/api/cognitive/evolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({objective,files,approved,persist_to_github:true})});$('evolveOut').textContent=JSON.stringify(r,null,2);loadState();refresh()}catch(e){$('evolveOut').textContent=e.message}}
 async function loadState(){try{const s=await api('/api/state');$('stateOut').textContent=JSON.stringify(s,null,2);if(s.cognitive_stage){$('mindNow').textContent='العقل الآن: '+s.cognitive_stage;document.querySelectorAll('.stage').forEach((x,i)=>x.classList.toggle('live',i===Math.min(s.cognitive_stage_index||0,6)))}}catch(e){}}
