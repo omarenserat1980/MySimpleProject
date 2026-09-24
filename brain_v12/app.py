@@ -27,6 +27,7 @@ from .brain.secret_control import SecretControlPlane
 from .brain.control_auth import require_control_key
 from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
+from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -60,6 +61,11 @@ render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
 income_strategy=IncomeStrategy(workforce.income_engine)
+live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
+try:
+    store.purge_non_live_income_opportunities()
+except Exception as exc:
+    store.event("INCOME_LEGACY_PURGE_FAILED", {"error": str(exc)[:1000]})
 workforce.dispatch("startup")
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
@@ -221,8 +227,19 @@ def income_opportunities(limit:int=20):
 @app.post("/api/income/discover")
 def income_discover(request:Request):
     require_control_key(request)
-    items=workforce.income_engine.discover(8)
-    return {"ok":True,"count":len(items),"items":items,"verified_revenue_jod":workforce.income_engine.snapshot().get("verified_revenue_jod",0.0)}
+    channels=workforce.income_engine.discover(20)
+    result=live_income_researcher.run_once()
+    return {"ok":result.get("ok",False),"channels_available":len(channels),"live_search":result,
+            "summary":workforce.income_engine.snapshot()}
+
+@app.post("/api/income/live-search")
+def income_live_search(request:Request):
+    require_control_key(request)
+    return live_income_researcher.run_once()
+
+@app.get("/api/render/monitor")
+def render_monitor_status():
+    return {"ok":True,"deploy_monitor":render_deploy_monitor.status(),"log_monitor":render_monitor.status()}
 
 
 class IncomeVerification(BaseModel):
@@ -361,25 +378,42 @@ def system_diagnostics():
 
 @app.on_event("startup")
 def start_background_services():
-    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","false").lower()=="true" and render_monitor.configured:
+    # Render API logs/deploys use secrets when configured; public health/identity never do.
+    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","true").lower()=="true":
+        try:
+            render_deploy_monitor.poll_public_once()
+        except Exception as exc:
+            store.event("RENDER_PUBLIC_MONITOR_START_FAILED", {"error": str(exc)[:1000]})
+        def render_public_loop():
+            import time
+            while True:
+                time.sleep(max(30, int(os.getenv("RENDER_PUBLIC_POLL_SECONDS", "60"))))
+                try: render_deploy_monitor.poll_public_once()
+                except Exception as exc: store.event("RENDER_PUBLIC_MONITOR_FAILED", {"error": str(exc)[:1000]})
+        threading.Thread(target=render_public_loop, daemon=True).start()
+    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","true").lower()=="true" and render_monitor.configured:
         render_monitor.start()
-    # Safe internal workforce heartbeat: audit/coordinate work periodically.
-    # It never publishes externally, moves money, or bypasses control-plane gates.
-    # Seed the income board with a broader set of auditable opportunity channels.
-    # This is internal bookkeeping only: it does not contact clients, submit offers, or move money.
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
-        store.event("INCOME_DISCOVERY_SEED_FAILED", {"error": str(exc)[:1000]})
+        store.event("INCOME_DISCOVERY_PLAN_FAILED", {"error": str(exc)[:1000]})
+    if os.getenv("BRAIN_LIVE_INCOME_SEARCH_ENABLED","true").lower()=="true":
+        try: live_income_researcher.run_once()
+        except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
+        def live_income_loop():
+            import time
+            while True:
+                time.sleep(max(900, int(os.getenv("BRAIN_LIVE_INCOME_SEARCH_INTERVAL_SECONDS", "1800"))))
+                try: live_income_researcher.run_once()
+                except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
+        threading.Thread(target=live_income_loop, daemon=True).start()
     if os.getenv("BRAIN_WORKFORCE_ENABLED","true").lower()=="true":
         def workforce_loop():
             import time
             while True:
                 time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
-                try:
-                    workforce.dispatch("scheduled_heartbeat", include_revenue=True)
-                except Exception as exc:
-                    store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
+                try: workforce.dispatch("scheduled_heartbeat", include_revenue=True)
+                except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
         threading.Thread(target=workforce_loop, daemon=True).start()
 
 @app.get("/api/state")
