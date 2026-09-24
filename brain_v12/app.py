@@ -505,6 +505,12 @@ def income_lifecycle_report(limit:int=100):
     return workforce.income_engine.lifecycle_report(max(1,min(limit,500)))
 
 
+@app.post("/api/income/research-run")
+def income_research_run(request: Request):
+    require_control_key(request)
+    return workforce.live_opportunity_researcher.run_once()
+
+
 @app.post("/api/income/lifecycle-refresh")
 def income_lifecycle_refresh(request:Request, max_age_hours:float=72, limit:int=500):
     require_control_key(request)
