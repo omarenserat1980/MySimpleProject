@@ -135,24 +135,38 @@ class RenderLogMonitor:
         start_ts = float(state.get("cursor_time") or (now_ts - max(self.poll_seconds * 2, 120)))
         end_ts = now_ts
         try:
-            data = self._fetch_logs(start_ts, end_ts)
-            items = data.get("logs") or data.get("items") or data.get("data") or []
             seen = 0
             incidents = []
             latest_time = state.get("last_log_time")
-            for item in items:
-                seen += 1
-                log_time = self._log_time(item)
-                latest_time = log_time
-                incident = self._incident(item)
-                if incident:
-                    stored = self.store.upsert_incident(incident)
-                    incidents.append(stored)
-                    if stored.get("new") and self.incident_callback:
-                        try:
-                            self.incident_callback(stored)
-                        except Exception as callback_error:
-                            self.store.event("RENDER_MONITOR_CALLBACK_ERROR", {"error": str(callback_error)})
+            page_start, page_end = start_ts, end_ts
+
+            # Render paginates by timestamp. Follow the cursor for a bounded
+            # number of pages so a burst of logs cannot create an unbounded poll.
+            for _ in range(5):
+                data = self._fetch_logs(page_start, page_end)
+                items = data.get("logs") or data.get("items") or data.get("data") or []
+                for item in items:
+                    seen += 1
+                    log_time = self._log_time(item)
+                    latest_time = log_time
+                    incident = self._incident(item)
+                    if incident:
+                        stored = self.store.upsert_incident(incident)
+                        incidents.append(stored)
+                        if stored.get("new") and self.incident_callback:
+                            try:
+                                self.incident_callback(stored)
+                            except Exception as callback_error:
+                                self.store.event("RENDER_MONITOR_CALLBACK_ERROR", {"error": str(callback_error)})
+
+                if not data.get("hasMore"):
+                    break
+                next_start = data.get("nextStartTime")
+                next_end = data.get("nextEndTime")
+                if next_start is None or next_end is None:
+                    break
+                page_start, page_end = next_start, next_end
+
             new_state = {
                 "last_poll": time.time(),
                 "last_error": None,
