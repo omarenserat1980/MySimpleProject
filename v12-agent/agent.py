@@ -6,6 +6,7 @@ import platform
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 
 BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://electronic-brain-v12-gwwg.onrender.com").rstrip("/")
 AGENT_ID = os.getenv("V12_AGENT_ID", "redmi3-01")
@@ -52,7 +53,7 @@ def main():
     print("Agent:", AGENT_ID)
     while True:
         try:
-            polled = request("GET", "/api/device/poll?agent_id=" + urllib.parse.quote(AGENT_ID), key=key)
+            polled = request("GET", "/api/device/poll?agent_id=" + urllib.parse.quote(AGENT_ID, safe=""), key=key)
             task = polled.get("task")
             if task:
                 task_id = task["task_id"]
