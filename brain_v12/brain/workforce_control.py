@@ -126,6 +126,23 @@ class WorkforceControl:
         })
         return self.last_dispatch
 
+    def health(self) -> dict[str, Any]:
+        report = self.report()
+        revenue = report["revenue"]["income_engine"]
+        return {
+            "ok": True,
+            "dispatch_count": self.dispatch_count,
+            "employees": report["staffing"],
+            "departments": report["departments"],
+            "verified_revenue_jod": float(revenue.get("verified_revenue_jod", 0) or 0),
+            "live_opportunities": int(revenue.get("total", 0) or 0),
+            "external_execution": {
+                "youtube": "AUTHORIZATION_REQUIRED",
+                "cinematic": "AUTHORIZATION_REQUIRED",
+                "website": "NOT_EXECUTED",
+            },
+        }
+
     def report(self) -> dict[str, Any]:
         employees = list(self.organization.employees.values())
         completed = sum(e.completed_tasks for e in employees)
