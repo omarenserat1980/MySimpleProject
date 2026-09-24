@@ -135,6 +135,10 @@ async def media_upload(file:UploadFile=File(...)):
 
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
+@app.get("/api/workforce/health")
+def workforce_health():
+    return workforce.health()
+
 @app.get("/health")
 def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
 @app.get("/api/deploy/identity")
