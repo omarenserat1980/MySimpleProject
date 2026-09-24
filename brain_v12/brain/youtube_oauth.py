@@ -30,10 +30,14 @@ class YouTubeOAuth:
         self.store.event("YOUTUBE_REFRESH_TOKEN_STORED", {"token_ciphertext": f.encrypt(token.encode()).decode()})
 
     def _load_refresh_token(self):
-        for name,payload in reversed(getattr(self.store,"events",lambda:[])()):
-            if name=="YOUTUBE_REFRESH_TOKEN_STORED":
-                try: return self._fernet().decrypt(payload["token_ciphertext"].encode()).decode()
-                except Exception: return None
+        import json
+        for row in self.store.events(200):
+            if row.get("kind")=="YOUTUBE_REFRESH_TOKEN_STORED":
+                try:
+                    payload=json.loads(row.get("payload","{}"))
+                    return self._fernet().decrypt(payload["token_ciphertext"].encode()).decode()
+                except Exception:
+                    return None
         return None
 
     def configured(self) -> bool:
