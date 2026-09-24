@@ -2,7 +2,7 @@ from .decision_engine import DecisionEngine
 from .event_bus import EventBus
 from .permissions import PermissionGate
 from .task_engine import TaskEngine
-from .world_model import WorldModel
+from .world_model import WorldModel\nfrom uuid import uuid4
 
 class CognitiveLoop:
     """
@@ -37,52 +37,52 @@ class CognitiveLoop:
         self._state("PERCEIVE",goal=goal)
         self.events.publish("PERCEIVE",{"goal":goal})
 
-        self._state("UNDERSTAND",goal=goal)
-        self.events.publish("UNDERSTAND",{"goal":goal,"summary":"تحديد المطلوب والنتيجة المتوقعة"})
+        self._state("UNDERSTAND",goal=goal,run_id=run_id)
+        self.events.publish("UNDERSTAND",{"goal":goal,"summary":"تحديد المطلوب والنتيجة المتوقعة","run_id":run_id})
 
-        self._state("MEMORY",goal=goal)
+        self._state("MEMORY",goal=goal,run_id=run_id)
         memories=self.store.memories()[-12:]
-        self.events.publish("MEMORY_RECALL",{"count":len(memories)})
+        self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
 
-        self._state("ANALYZE",goal=goal)
+        self._state("ANALYZE",goal=goal,run_id=run_id)
         options=self.decisions.generate(goal)
-        self.events.publish("ANALYZE",{"options_count":len(options)})
+        self.events.publish("ANALYZE",{"options_count":len(options),"run_id":run_id})
 
-        self._state("PLAN",goal=goal)
-        self.events.publish("PLAN_CREATED",{"steps":["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"]})
+        self._state("PLAN",goal=goal,run_id=run_id)
+        self.events.publish("PLAN_CREATED",{"steps":["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"],"run_id":run_id})
 
-        self._state("DECIDE",goal=goal)
+        self._state("DECIDE",goal=goal,run_id=run_id)
         decision=self.decisions.choose(goal,options,self.permissions.grants)
-        self.events.publish("DECISION_MADE",decision)
+        decision["run_id"]=run_id\n        self.events.publish("DECISION_MADE",decision)
 
         selected=decision.get("selected",{})
         action=selected.get("id","observe") if isinstance(selected,dict) else "observe"
 
-        self._state("EXECUTE",goal=goal)
+        self._state("EXECUTE",goal=goal,run_id=run_id)
         task_title=selected.get("action", "تحليل الهدف") if isinstance(selected,dict) else "تحليل الهدف"
         task=self.tasks.create(task_title)
         self.tasks.update(task["id"],"RUNNING")
-        self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title})
+        self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
         if action in {"observe","plan"}:
             self.tasks.update(task["id"],"COMPLETED")
             execution={"status":"COMPLETED","action":action,"task_id":task["id"],"result":"تم تنفيذ خطوة داخلية آمنة: إنشاء المهمة وإكمالها والتحقق من حالتها."}
-            self.events.publish("EXECUTION_COMPLETED",execution)
+            execution["run_id"]=run_id\n            self.events.publish("EXECUTION_COMPLETED",execution)
         else:
             self.tasks.update(task["id"],"PENDING")
             execution={"status":"WAITING_PERMISSION","action":action,"task_id":task["id"],"result":"الخطوة تحتاج صلاحية أو أداة تنفيذ خارجية."}
-            self.events.publish("EXECUTION_WAITING_PERMISSION",execution)
+            execution["run_id"]=run_id\n            self.events.publish("EXECUTION_WAITING_PERMISSION",execution)
 
-        self._state("VERIFY",goal=goal,task_id=task["id"])
+        self._state("VERIFY",goal=goal,run_id=run_id,task_id=task["id"])
         verified_task=next((x for x in self.tasks.snapshot()["tasks"] if x["id"]==task["id"]),None)
         verification={"status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" else "PENDING","task_status":verified_task["status"] if verified_task else "UNKNOWN","evidence":"تم فحص حالة المهمة بعد التنفيذ الداخلي."}
-        self.events.publish("VERIFIED",verification)
+        verification["run_id"]=run_id\n        self.events.publish("VERIFIED",verification)
 
-        self._state("LEARN",status="READY",goal=goal)
-        self.events.publish("LEARNING_RECORDED",{"lesson":"تم تنفيذ خطوة داخلية آمنة والتحقق من نتيجتها."})
+        self._state("LEARN",status="READY",goal=goal,run_id=run_id)
+        lesson="تم تنفيذ خطوة داخلية آمنة والتحقق من نتيجتها." if execution.get("status")=="COMPLETED" else "تم تسجيل أن الخطوة تحتاج صلاحية قبل التنفيذ."\n        self.store.save_memory("cognitive.last_verified_run",f"{run_id} | {lesson}")\n        self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
 
         return {
-            "goal":goal,
+            "run_id":run_id,\n            "goal":goal,
             "stages":self.STAGES,
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
