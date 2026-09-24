@@ -30,6 +30,7 @@ from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
+from .brain.device_bridge import DeviceBridge
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -66,6 +67,8 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
+device_bridge=DeviceBridge()
+cognitive.device_bridge=device_bridge
 try:
     store.purge_non_live_income_opportunities()
 except Exception as exc:
@@ -162,6 +165,56 @@ def system_connection():
         "version": APP_VERSION,
         "checks": checks,
     }
+
+@app.get("/api/device/status")
+def device_status():
+    return device_bridge.status()
+
+
+class DeviceTask(BaseModel):
+    task:str
+    params:dict={}
+
+
+class DeviceReport(BaseModel):
+    task_id:str
+    agent_id:str
+    ok:bool
+    result:dict={}
+    error:str=""
+
+
+def require_device_agent(request:Request) -> None:
+    supplied=request.headers.get("X-V12-Agent-Key","")
+    if not device_bridge.authenticate(supplied):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="DEVICE_AGENT_AUTH_REQUIRED")
+
+
+@app.post("/api/device/enqueue")
+def device_enqueue(request:Request, body:DeviceTask):
+    require_control_key(request)
+    result=device_bridge.enqueue(body.task, body.params)
+    store.event("DEVICE_TASK_QUEUED", {"task": body.task, "status": result.get("status"), "task_id": result.get("task",{}).get("task_id")})
+    return result
+
+
+@app.get("/api/device/poll")
+def device_poll(request:Request, agent_id:str):
+    require_device_agent(request)
+    result=device_bridge.poll(agent_id)
+    if result.get("task"):
+        store.event("DEVICE_TASK_CLAIMED", {"task_id": result["task"]["task_id"], "agent_id": agent_id})
+    return result
+
+
+@app.post("/api/device/report")
+def device_report(request:Request, body:DeviceReport):
+    require_device_agent(request)
+    result=device_bridge.report(body.task_id, body.agent_id, body.ok, body.result, body.error)
+    store.event("DEVICE_TASK_RESULT", {"task_id": body.task_id, "agent_id": body.agent_id, "ok": body.ok})
+    return result
+
 
 @app.get("/api/system/status")
 def system_status():
