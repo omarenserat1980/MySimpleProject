@@ -17,6 +17,7 @@ from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeCha
 from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
 from brain_v7.braincore_v2.code_tool_api import CodeTool
 from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
+from .brain.code_agent import BrainCodeAgent
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -27,6 +28,7 @@ code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, ".."))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/",))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
 code_tool=CodeTool(code_workspace, code_team)
+brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 for p in PLUGINS: plugins.register(p,p,[],[])
 
 app=FastAPI(title="Electronic Brain V12",version="12.2")
@@ -121,6 +123,36 @@ def observe(body:Observe): return orchestrator.observe_and_learn(body.actual)
 def learn(body:Learn): return brain.learn(body.lesson)
 @app.get("/api/events")
 def events(): return store.events()
+
+@app.post("/api/code/brain-plan")
+def code_brain_plan(body:BrainCodePlanIn):
+    try:
+        plan=brain_code_agent.plan(body.objective,body.files)
+        return brain_code_agent.public_plan(plan)
+    except Exception as exc:
+        return {"status":"PLAN_FAILED","error":str(exc)}
+
+@app.post("/api/code/brain-apply")
+def code_brain_apply(body:BrainCodeApplyIn):
+    try:
+        plan=brain_code_agent.plan(body.objective,body.files)
+        public=brain_code_agent.public_plan(plan)
+        if plan.get("status") != "PLAN_READY":
+            return public
+        result=brain_code_agent.execute_plan(
+            plan,
+            approved=body.approved,
+            commit_message=body.commit_message,
+            persist_to_github=body.persist_to_github,
+        )
+        store.event("BRAIN_CODE_EVOLUTION", {
+            "status":result.get("status"),
+            "objective":body.objective,
+            "files":body.files,
+        })
+        return {"plan":public,"execution":result}
+    except Exception as exc:
+        return {"status":"EXECUTION_FAILED","error":str(exc)}
 
 @app.get("/api/code/status")
 def code_status(): return code_team.snapshot()
