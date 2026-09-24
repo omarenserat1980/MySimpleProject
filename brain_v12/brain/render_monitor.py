@@ -40,7 +40,26 @@ class RenderLogMonitor:
 
     @property
     def configured(self):
-        return bool(self.api_key and self.owner_id and self.service_id)
+        # ownerId can be supplied explicitly, but Render exposes it on the
+        # service object too. This lets the monitor recover it automatically
+        # when a worker has the API key + target service but no owner secret.
+        return bool(self.api_key and self.service_id)
+
+    def _resolve_owner_id(self):
+        if self.owner_id:
+            return self.owner_id
+        response = httpx.get(
+            f"{self.base_url}/services/{self.service_id}",
+            headers=self._headers(),
+            timeout=20,
+        )
+        response.raise_for_status()
+        data = response.json()
+        owner_id = data.get("ownerId") or data.get("owner_id")
+        if not owner_id:
+            raise RuntimeError("Render service response did not include ownerId")
+        self.owner_id = str(owner_id)
+        return self.owner_id
 
     def status(self):
         state = self.store.monitor_state()
@@ -62,7 +81,7 @@ class RenderLogMonitor:
 
     def _params(self, start_time, end_time):
         return {
-            "ownerId": self.owner_id,
+            "ownerId": self._resolve_owner_id(),
             "resource": self.service_id,
             "startTime": start_time,
             "endTime": end_time,
@@ -126,8 +145,8 @@ class RenderLogMonitor:
 
     def poll_once(self):
         if not self.configured:
-            result = {"ok": False, "status": "NOT_CONFIGURED", "required": ["RENDER_API_KEY", "RENDER_OWNER_ID", "RENDER_SERVICE_ID"]}
-            self.store.set_monitor_state({"last_poll": time.time(), "last_error": "Render monitor is not configured"})
+            result = {"ok": False, "status": "NOT_CONFIGURED", "required": ["RENDER_API_KEY", "RENDER_SERVICE_ID"]}
+            self.store.set_monitor_state({"last_poll": time.time(), "last_error": "Render monitor requires RENDER_API_KEY and RENDER_SERVICE_ID"})
             return result
 
         state = self.store.monitor_state()
@@ -178,6 +197,18 @@ class RenderLogMonitor:
             self.store.set_monitor_state(new_state)
             self.store.event("RENDER_LOG_POLL", {"logs": seen, "incidents": len(incidents), "service_id": self.service_id})
             return {"ok": True, "status": "COMPLETED", "logs_seen": seen, "incidents": incidents}
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            status = "AUTH_FAILED" if status_code in {401, 403} else "API_ERROR"
+            error = f"Render API HTTP {status_code}: {exc.response.text[:500]}" if exc.response is not None else str(exc)
+            self.store.set_monitor_state({
+                **state,
+                "last_poll": time.time(),
+                "last_error": error,
+                "cursor_time": end_ts,
+            })
+            self.store.event("RENDER_LOG_POLL_FAILED", {"error": error, "status": status, "service_id": self.service_id})
+            return {"ok": False, "status": status, "error": error}
         except Exception as exc:
             self.store.set_monitor_state({
                 **state,
