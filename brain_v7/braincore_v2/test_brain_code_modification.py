@@ -18,7 +18,7 @@ def test_brain_exposes_bounded_self_modification(tmp_path: Path, monkeypatch):
         remote=False,
     )
     assert result["status"] == "APPLIED_LOCALLY"
-    assert brain.code_workspace.read("brain_v7/demo.py") == "VALUE = 42\\n"
+    assert brain.code_workspace.read("brain_v7/demo.py") == "VALUE = 42\n"
     assert result["regression"]["status"] == "PASS"
 
 
@@ -38,4 +38,4 @@ def test_brain_self_modification_rolls_back_on_regression_failure(tmp_path: Path
         remote=False,
     )
     assert result["status"] == "ROLLED_BACK"
-    assert target.read_text(encoding="utf-8") == "VALUE = 1\\n"
+    assert target.read_text(encoding="utf-8") == "VALUE = 1\n"
