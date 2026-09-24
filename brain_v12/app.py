@@ -105,6 +105,8 @@ class CodePaths(BaseModel): paths:list[str]=[]
 async def media_upload(file:UploadFile=File(...)):
     media_dir=os.path.join(ROOT,"web","media"); os.makedirs(media_dir,exist_ok=True)
     safe=os.path.basename(file.filename or "upload.bin"); target=os.path.join(media_dir,safe); data=await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        return {"ok":False,"error":"MEDIA_TOO_LARGE","max_bytes":20 * 1024 * 1024}
     with open(target,"wb") as f: f.write(data)
     store.event("MEDIA_RECEIVED",{"filename":safe,"content_type":file.content_type,"size":len(data)})
     return {"ok":True,"filename":safe,"url":f"/media/{safe}","content_type":file.content_type,"size":len(data)}
@@ -153,13 +155,15 @@ def monitor_run_once():
     return render_monitor.poll_once()
 
 @app.post("/api/monitor/start")
-def monitor_start():
+def monitor_start(request:Request):
+    require_control_key(request)
     if not render_monitor.configured:
         return {"ok":False,"status":"NOT_CONFIGURED","required":["RENDER_API_KEY","RENDER_OWNER_ID","RENDER_SERVICE_ID"]}
     return render_monitor.start()
 
 @app.post("/api/monitor/stop")
-def monitor_stop():
+def monitor_stop(request:Request):
+    require_control_key(request)
     return render_monitor.stop()
 
 @app.get("/api/system/diagnostics")
