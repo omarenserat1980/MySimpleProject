@@ -25,6 +25,7 @@ from .brain.render_deploy_monitor import RenderDeployMonitor
 from .brain.secret_control import SecretControlPlane
 from .brain.control_auth import require_control_key
 from .brain.workforce_control import WorkforceControl
+from .brain.income_strategy import IncomeStrategy
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -57,6 +58,7 @@ render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
 render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
+income_strategy=IncomeStrategy(workforce.income_engine)
 workforce.dispatch("startup")
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
@@ -174,6 +176,14 @@ def monitor_stop(request:Request):
     require_control_key(request)
     return render_monitor.stop()
 
+@app.get("/api/income/mission")
+def income_mission():
+    return income_strategy.mission()
+
+@app.get("/api/income/search-plan")
+def income_search_plan():
+    return income_strategy.search_plan()
+
 @app.get("/api/income/opportunities")
 def income_opportunities(limit:int=20):
     engine=workforce.income_engine
@@ -231,7 +241,7 @@ def start_background_services():
             while True:
                 time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
                 try:
-                    workforce.dispatch("scheduled_heartbeat", include_revenue=False)
+                    workforce.dispatch("scheduled_heartbeat", include_revenue=True)
                 except Exception as exc:
                     store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
         threading.Thread(target=workforce_loop, daemon=True).start()
