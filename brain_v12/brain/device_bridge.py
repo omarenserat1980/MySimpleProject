@@ -3,6 +3,8 @@ from __future__ import annotations
 import hmac, os, time
 from uuid import uuid4
 
+AGENT_KEY_ENV = "TERMUX_AGENT_KEY"
+
 class DeviceBridge:
     ALLOWED_TASKS={"status":{}, "python_version":{}, "termux_path":{}, "platform":{}}
 
@@ -10,10 +12,10 @@ class DeviceBridge:
         self.store=store
         self._last_seen=None
 
-    def configured(self): return bool(os.getenv("V12_AGENT_KEY",""))
+    def configured(self): return bool(os.getenv(AGENT_KEY_ENV,""))
 
     def authenticate(self, supplied):
-        expected=os.getenv("V12_AGENT_KEY","")
+        expected=os.getenv(AGENT_KEY_ENV,"")
         return bool(expected and supplied and hmac.compare_digest(supplied,expected))
 
     def enqueue(self, task, params=None):
@@ -49,6 +51,7 @@ class DeviceBridge:
 
     def status(self):
         counts=self.store.device_task_counts()
-        return {"ok":True,"configured":self.configured(),"queued":counts.get("QUEUED",0),
-                "pending":counts.get("CLAIMED",0),"completed":counts.get("COMPLETED",0),
-                "failed":counts.get("FAILED",0),"last_agent_seen":self._last_seen}
+        return {"ok":True,"configured":self.configured(),"auth_env":AGENT_KEY_ENV,
+                "queued":counts.get("QUEUED",0),"pending":counts.get("CLAIMED",0),
+                "completed":counts.get("COMPLETED",0),"failed":counts.get("FAILED",0),
+                "last_agent_seen":self._last_seen}
