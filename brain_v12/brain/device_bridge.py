@@ -5,6 +5,8 @@ from uuid import uuid4
 
 AGENT_KEY_ENV = "TERMUX_AGENT_KEY"
 
+HEARTBEAT_STALE = "STALE"
+
 class DeviceBridge:
     ALLOWED_TASKS = {"status": {}, "python_version": {}, "termux_path": {}, "platform": {}}
 
