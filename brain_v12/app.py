@@ -137,6 +137,36 @@ async def media_upload(file:UploadFile=File(...)):
     store.event("MEDIA_RECEIVED",{"filename":safe,"content_type":file.content_type,"size":len(data)})
     return {"ok":True,"filename":safe,"url":f"/media/{safe}","content_type":file.content_type,"size":len(data)}
 
+@app.get("/api/youtube/status")
+def youtube_status():
+    return workforce.youtube_publisher.snapshot()
+
+class CinematicReleaseIn(BaseModel):
+    title: str
+    description: str = ""
+    media_path: str = ""
+    tags: list[str] = []
+    privacy: str = "private"
+
+@app.post("/api/youtube/cinematic/prepare")
+def youtube_cinematic_prepare(body: CinematicReleaseIn):
+    require_control_key
+    return workforce.prepare_cinematic_release(body.title, body.description, body.media_path, body.tags, body.privacy)
+
+@app.post("/api/youtube/release/authorize")
+def youtube_release_authorize(body: dict, request: Request):
+    require_control_key(request)
+    return workforce.youtube_publisher.authorize(str(body.get("release_id", "")))
+
+@app.post("/api/youtube/release/record-published")
+def youtube_release_record_published(body: dict, request: Request):
+    require_control_key(request)
+    return workforce.youtube_publisher.record_published(
+        str(body.get("release_id", "")),
+        str(body.get("published_url", "")),
+        str(body.get("evidence", "")),
+    )
+
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/api/mining/status")
