@@ -1,7 +1,7 @@
 import os
 import threading
 from uuid import uuid4
-from fastapi import FastAPI, UploadFile, File, Response
+from fastapi import FastAPI, UploadFile, File, Response, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -23,6 +23,7 @@ from .brain.code_agent import BrainCodeAgent
 from .brain.render_monitor import RenderLogMonitor
 from .brain.render_deploy_monitor import RenderDeployMonitor
 from .brain.secret_control import SecretControlPlane
+from .brain.control_auth import require_control_key
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -276,7 +277,8 @@ def code_brain_plan(body:BrainCodePlanIn):
         return {"status":"PLAN_FAILED","error":str(exc)}
 
 @app.post("/api/code/brain-apply")
-def code_brain_apply(body:BrainCodeApplyIn):
+def code_brain_apply(request:Request, body:BrainCodeApplyIn):
+    require_control_key(request)
     try:
         plan=brain_code_agent.plan(body.objective,body.files)
         public=brain_code_agent.public_plan(plan)
@@ -301,7 +303,8 @@ def code_checkpoint(body:CodePaths): return code_tool.save_checkpoint(body.paths
 @app.post("/api/code/verify")
 def code_verify(body:CodePaths): return code_tool.verify(body.paths)
 @app.post("/api/code/apply")
-def code_apply(body:CodeChanges):
+def code_apply(request:Request, body:CodeChanges):
+    require_control_key(request)
     if not body.approved:
         return {"ok":False,"status":"EXPLICIT_APPROVAL_REQUIRED","message":"الموافقة الصريحة مطلوبة قبل الكتابة أو الحفظ البعيد."}
     changes=[CodeChange(x.path,x.content,x.reason) for x in body.changes]
@@ -314,7 +317,8 @@ def code_audit(): return code_workspace.snapshot()
 @app.get("/api/tools")
 def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
 @app.post("/api/tools/execute")
-def tools_execute(tool_id:str,params:dict|None=None,approved:bool=False): return cognitive.execute_tool(tool_id,params or {},approved)
+def tools_execute(request:Request,tool_id:str,params:dict|None=None,approved:bool=False):
+    require_control_key(request) return cognitive.execute_tool(tool_id,params or {},approved)
 @app.get("/api/cognitive/history/{run_id}")
 def cognitive_history(run_id:str): return {"ok":True,"run_id":run_id,"events":store.events_for_run(run_id,200)}
 
@@ -326,7 +330,8 @@ class EvolutionIn(BaseModel):
     commit_message:str="brain: controlled autonomous improvement"
 
 @app.post("/api/cognitive/evolve")
-def cognitive_evolve(body:EvolutionIn):
+def cognitive_evolve(request:Request, body:EvolutionIn):
+    require_control_key(request)
     if not body.files:
         return {"ok":False,"status":"NO_FILES","message":"حدد الملفات التي يسمح للعقل بتطويرها."}
     checkpoint=code_tool.save_checkpoint(body.files)
@@ -353,9 +358,11 @@ def task(title:str,parent_id:str|None=None,depends_on:list[str]=[]): return cogn
 @app.get("/api/permissions")
 def permissions(): return {"grants":sorted(cognitive.permissions.grants)}
 @app.post("/api/permissions/grant")
-def grant(body:Permission): return {"grants":cognitive.permissions.grant(body.capability)}
+def grant(request:Request, body:Permission):
+    require_control_key(request) return {"grants":cognitive.permissions.grant(body.capability)}
 @app.post("/api/permissions/revoke")
-def revoke(body:Permission): return {"grants":cognitive.permissions.revoke(body.capability)}
+def revoke(request:Request, body:Permission):
+    require_control_key(request) return {"grants":cognitive.permissions.revoke(body.capability)}
 @app.post("/api/permissions/check")
 def permission_check(capabilities:list[str],approved:bool=False): return cognitive.permissions.check(capabilities,approved)
 
@@ -372,9 +379,11 @@ def ai_chat(body:Chat):
 @app.get("/api/plugins")
 def plugin_status(): return plugins.status()
 @app.post("/api/plugins/{plugin_id}/enable")
-def plugin_enable(plugin_id:str): return plugins.enable(plugin_id)
+def plugin_enable(request:Request, plugin_id:str):
+    require_control_key(request) return plugins.enable(plugin_id)
 @app.post("/api/plugins/{plugin_id}/disable")
-def plugin_disable(plugin_id:str): return plugins.disable(plugin_id)
+def plugin_disable(request:Request, plugin_id:str):
+    require_control_key(request) return plugins.disable(plugin_id)
 
 @app.get("/api/agent/status")
 def agent_status(): return agent.status()
@@ -384,12 +393,14 @@ def self_improvement_status(): return self_improver.status()
 def self_improvement_propose(body:Improve):
     result=self_improver.propose(body.objective,body.files); store.event("SELF_IMPROVEMENT_PROPOSAL",result); return result
 @app.post("/api/self-improvement/record-approval")
-def self_improvement_record_approval(body:Improve):
+def self_improvement_record_approval(request:Request, body:Improve):
+    require_control_key(request)
     store.event("SELF_IMPROVEMENT_APPROVAL",{"objective":body.objective,"files":body.files})
     return {"ok":True,"approved":True,"note":"Approval recorded; repository writes remain explicitly gated."}
 
 @app.post("/api/agent/execute")
-def agent_execute(body:Exec):
+def agent_execute(request:Request, body:Exec):
+    require_control_key(request)
     if not body.approved: return {"ok":False,"error":"EXPLICIT_APPROVAL_REQUIRED"}
     current=brain.snapshot(); current["status"]="ACTING"; store.set_state(current)
     store.event("ACTION_STARTED",{"command":body.command})
