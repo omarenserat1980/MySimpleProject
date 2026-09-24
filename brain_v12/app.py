@@ -222,6 +222,25 @@ def device_result(task_id:str):
     return device_bridge.result(task_id)
 
 
+@app.get("/api/agent-gateway/diagnostics")
+def agent_gateway_diagnostics():
+    bridge=device_bridge.status()
+    return {
+        "ok": True,
+        "brain": "V12",
+        "gateway": "READY" if bridge.get("configured") else "NOT_CONFIGURED",
+        "transport": "HTTPS polling",
+        "authentication": "X-V12-Agent-Key",
+        "agent_seen": bridge.get("last_agent_seen") is not None,
+        "queues": {
+            "queued": bridge.get("queued", 0),
+            "pending": bridge.get("pending", 0),
+            "completed": bridge.get("completed", 0),
+            "failed": bridge.get("failed", 0),
+        },
+        "allowed_tasks": sorted(device_bridge.ALLOWED_TASKS),
+    }
+
 @app.get("/api/agent-gateway/status")
 def agent_gateway_status():
     return {
