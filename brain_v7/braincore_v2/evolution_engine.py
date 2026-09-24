@@ -1,6 +1,6 @@
 """Continuous evidence-gated evolution planner through generation 10,000 (100 by default).
 
-Generations are engineering milestones, not claims of consciousness. Every
+Generations are engineering milestones, not claims of consciousness. The default regression horizon is the full 1..10000 plan. Every
 promotion requires explicit evidence. External side effects and financial
 authority remain disabled.
 """
