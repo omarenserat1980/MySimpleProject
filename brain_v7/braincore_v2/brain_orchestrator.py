@@ -284,7 +284,7 @@ class UnifiedBrain:
             "code_tool": self.code_tool.snapshot(),
             "remote_ai": self.remote_ai.snapshot(),
             "youtube_team": self.youtube_team.snapshot(),
-            "youtube_pipeline": youtube_pipeline,
+            "youtube_pipeline": self.youtube_team.snapshot(),
         })
 
         # The Brain delegates the current objective through the organization.
