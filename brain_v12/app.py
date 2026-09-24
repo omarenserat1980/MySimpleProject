@@ -31,7 +31,26 @@ code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 for p in PLUGINS: plugins.register(p,p,[],[])
 
-APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.4")\napp=FastAPI(title="Electronic Brain V12",version=APP_VERSION)\n\n@app.middleware("http")\nasync def no_cache(request, call_next):\n    response=await call_next(request)\n    response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"\n    response.headers["Pragma"]="no-cache"\n    return response
+APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.4")
+app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
+
+@app.middleware("http")
+async def no_cache(request, call_next):
+    response=await call_next(request)
+    response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"]="no-cache"
+    return response
+
+class BrainCodePlanIn(BaseModel):
+    objective:str
+    files:list[str]=[]
+
+class BrainCodeApplyIn(BaseModel):
+    objective:str
+    files:list[str]=[]
+    approved:bool=False
+    commit_message:str="brain: validated self-improvement"
+    persist_to_github:bool=True
 
 class Chat(BaseModel): message:str
 class Goal(BaseModel): text:str; priority:float=0.5
@@ -61,7 +80,7 @@ async def media_upload(file:UploadFile=File(...)):
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/health")
-def health(): return {"ok":True,"brain":"V12","version":"12.3","systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
+def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
