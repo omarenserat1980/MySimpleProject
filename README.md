@@ -12,3 +12,23 @@
 Perceive → Understand → Memory → Goal → Plan → Decide → Act → Observe → Learn
 
 تمت إزالة ملفات مشروع المضخة من جذر المشروع حتى لا تبقى واجهة أو تشغيلات خاصة بالمضخات ضمن المشروع الحالي.
+
+## Brain V12 ↔ Termux Agent Gateway
+
+The gateway uses HTTPS polling with an allowlist and shared secret. The initial smoke test is `python_version`.
+
+### Termux
+```bash
+cd ~/MySimpleProject
+export BRAIN_URL="https://electronic-brain-v12-gwwg.onrender.com"
+export TERMUX_AGENT_KEY='YOUR_SECRET'
+export TERMUX_AGENT_ID="android-termux-v12"
+bash termux_agent/run_agent.sh
+```
+
+Keep `TERMUX_AGENT_KEY` out of source control and chat messages.
+
+### Smoke test
+After the agent is running, the Brain control endpoint can enqueue `python_version`. The Agent claims it, executes `python --version`, reports the result, and Brain verifies the stored result.
+
+Allowed initial tasks: `status`, `python_version`, `termux_path`, `platform`.
