@@ -10,6 +10,7 @@ import os
 from typing import Any
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+from cryptography.fernet import Fernet
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 SESSION = {}
@@ -17,6 +18,23 @@ SESSION = {}
 class YouTubeOAuth:
     def __init__(self, store):
         self.store = store
+
+    def _fernet(self):
+        key=os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY")
+        if not key: return None
+        return Fernet(key.encode())
+
+    def _save_refresh_token(self, token: str):
+        f=self._fernet()
+        if not f: raise RuntimeError("YOUTUBE_TOKEN_ENCRYPTION_KEY is required")
+        self.store.event("YOUTUBE_REFRESH_TOKEN_STORED", {"token_ciphertext": f.encrypt(token.encode()).decode()})
+
+    def _load_refresh_token(self):
+        for name,payload in reversed(getattr(self.store,"events",lambda:[])()):
+            if name=="YOUTUBE_REFRESH_TOKEN_STORED":
+                try: return self._fernet().decrypt(payload["token_ciphertext"].encode()).decode()
+                except Exception: return None
+        return None
 
     def configured(self) -> bool:
         return bool(os.getenv("YOUTUBE_CLIENT_ID") and os.getenv("YOUTUBE_CLIENT_SECRET"))
@@ -53,13 +71,12 @@ class YouTubeOAuth:
         creds=flow.credentials
         if not creds.refresh_token:
             return {"ok":False,"status":"NO_REFRESH_TOKEN","reason":"Google did not return offline authorization"}
-        os.environ["YOUTUBE_ACCESS_TOKEN"]=creds.token or ""
-        os.environ["YOUTUBE_REFRESH_TOKEN"]=creds.refresh_token
+        self._save_refresh_token(creds.refresh_token)
         self.store.event("YOUTUBE_OAUTH_AUTHORIZED",{"scopes":list(creds.scopes or SCOPES)})
         return {"ok":True,"status":"AUTHORIZED","scopes":list(creds.scopes or SCOPES)}
 
     def credentials(self) -> Credentials | None:
-        refresh=os.getenv("YOUTUBE_REFRESH_TOKEN")
+        refresh=self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN")
         cid=os.getenv("YOUTUBE_CLIENT_ID")
         secret=os.getenv("YOUTUBE_CLIENT_SECRET")
         if not (refresh and cid and secret):
@@ -69,6 +86,6 @@ class YouTubeOAuth:
 
     def snapshot(self) -> dict[str, Any]:
         return {"ok":True,"configured":self.configured(),
-                "authorized":bool(os.getenv("YOUTUBE_REFRESH_TOKEN")),
+                "authorized":bool(self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN")),
                 "scope":"youtube.upload",
                 "credentials_in_logs":False}
