@@ -111,7 +111,7 @@ class RemoteAIGateway:
             "configured": self.configured,
             "base_url": self.base_url,
             "model": self.model,
-            "api_key_env": self.api_key_env,
+            "credential_configured": bool(os.getenv(self.api_key_env)),
             "secret_exposed": False,
             "calls": self.calls,
             "last_status": self.last_status,
