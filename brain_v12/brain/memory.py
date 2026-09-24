@@ -316,6 +316,25 @@ class MemoryStore:
         except Exception: t["params"]={}
         return t
 
+    def device_task_requeue_stale(self, max_age_seconds=120):
+        """Return stale CLAIMED tasks to QUEUED so a lost agent cannot deadlock the queue."""
+        import time
+        age_limit=max(5, float(max_age_seconds))
+        cutoff=time.time() - age_limit
+        with self.connect() as con:
+            rows=con.execute("SELECT task_id,claimed_at FROM device_tasks WHERE status='CLAIMED'").fetchall()
+            stale=[]
+            for row in rows:
+                try:
+                    age=time.time() - float(row["claimed_at"])
+                except (TypeError,ValueError):
+                    continue
+                if age > age_limit:
+                    changed=con.execute("UPDATE device_tasks SET status='QUEUED',agent_id=NULL,claimed_at=NULL WHERE task_id=? AND status='CLAIMED'",(row["task_id"],)).rowcount
+                    if changed: stale.append(row["task_id"])
+            con.commit()
+        return stale
+
     def device_task_report(self, task_id, agent_id, ok, result, error):
         with self.connect() as con:
             row=con.execute("SELECT agent_id FROM device_tasks WHERE task_id=?",(task_id,)).fetchone()
