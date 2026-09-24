@@ -88,6 +88,10 @@ class MemoryStore:
               result TEXT NOT NULL DEFAULT '{}',
               error TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS device_agents(
+              agent_id TEXT PRIMARY KEY,
+              last_seen REAL NOT NULL
+            );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
 
@@ -267,6 +271,22 @@ class MemoryStore:
     def events(self,limit=50):
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(limit,)).fetchall()]
+
+    def device_agent_touch(self, agent_id, seen_at=None):
+        import time
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO device_agents(agent_id,last_seen) VALUES(?,?) "
+                "ON CONFLICT(agent_id) DO UPDATE SET last_seen=excluded.last_seen",
+                (agent_id, float(seen_at if seen_at is not None else time.time()))
+            )
+            con.commit()
+
+    def device_agents(self):
+        with self.connect() as con:
+            return [dict(x) for x in con.execute(
+                "SELECT agent_id,last_seen FROM device_agents ORDER BY last_seen DESC"
+            ).fetchall()]
 
     def device_task_create(self, task_id, task, params, created_at):
         with self.connect() as con:
