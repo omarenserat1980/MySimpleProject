@@ -50,6 +50,23 @@
  <div class="metrics">
   <div class="metric"><small>الحالة</small><b id="mState">—</b></div><div class="metric"><small>الأهداف</small><b id="mGoals">0</b></div><div class="metric"><small>الذاكرة</small><b id="mMemory">0</b></div><div class="metric"><small>النشاط</small><b id="mEvents">0</b></div>
  </div>
+ <div class="card" style="margin-top:14px" id="incomeMissionPanel">
+  <div class="sectionTitle"><h3>💰 أولوية الدخل — أول 10 د.أ</h3><span class="badge" id="incomeMissionStatus">مراقبة مستمرة</span></div>
+  <div class="metrics">
+   <div class="metric"><small>الدخل المثبت</small><b id="incomeVerified">0 د.أ</b></div>
+   <div class="metric"><small>الهدف</small><b id="incomeTarget">10 د.أ</b></div>
+   <div class="metric"><small>المتبقي</small><b id="incomeGap">10 د.أ</b></div>
+   <div class="metric"><small>الفرص</small><b id="incomeOpportunities">0</b></div>
+  </div>
+  <div class="mindPanel">
+   <div class="mindStep"><small>المرحلة الحالية</small><b id="incomeStage">DISCOVER • البحث</b></div>
+   <div class="mindStep"><small>آخر فحص</small><b id="incomeLastCheck">—</b></div>
+   <div class="mindStep"><small>الفرصة النشطة</small><b id="incomeActive">جاري البحث عن فرصة مؤهلة</b></div>
+   <div class="mindStep"><small>قاعدة التحقق</small><b id="incomeRule">لا يُحتسب أي دخل دون إثبات دفع قابل للمطابقة</b></div>
+  </div>
+  <div class="progressTrack"><div id="incomeProgress" class="progressBar"></div></div>
+  <div class="note" id="incomeNext">المسار: بحث → تأهيل → تجهيز → تقديم → تنفيذ → تحقق → تعلم.</div>
+ </div>
  <div class="commandDeck"><div class="card liveCard"><div class="sectionTitle"><h3>⚡ التنفيذ الآن</h3><span class="badge" id="execBadge">خامل</span></div><b id="execAction">لا توجد مهمة تنفيذية</b><div class="progressTrack"><div id="execProgress" class="progressBar"></div></div></div><div class="card liveCard"><div class="sectionTitle"><h3>✓ التحقق</h3><span class="badge" id="verifyBadge">انتظار</span></div><div id="verifyText" class="note">لا توجد نتيجة للتحقق.</div></div><div class="card liveCard"><div class="sectionTitle"><h3>📚 التعلم</h3><span class="badge" id="learnBadge">جاهز</span></div><div id="learnText" class="note">سيتعلم العقل من نتيجة الدورة.</div></div></div><div class="card" style="margin-top:14px"><div class="sectionTitle"><h3>🧠 لوحة وعي العقل</h3><span class="badge" id="mindMode">مراقبة مباشرة</span></div><div class="mindPanel"><div class="mindStep"><small>الآن</small><b id="mindNow">بانتظار طلبك</b></div><div class="mindStep"><small>آخر قرار</small><b id="mindDecision">لا يوجد بعد</b></div><div class="mindStep"><small>هدف العقل</small><b id="mindGoal">لا يوجد هدف نشط</b></div><div class="mindStep"><small>التحقق</small><b id="mindVerify">بانتظار عملية يمكن التحقق منها</b></div></div><div class="thinkingNow"><span class="live">👁 إدراك</span><span>🔎 تحليل</span><span>◈ ذاكرة</span><span>🧠 تفكير</span><span>🎯 قرار</span><span>⚡ تنفيذ</span><span>✓ تحقق</span><span>📚 تعلم</span></div><div class="trace" id="trace"><i>PERCEIVE</i><i>UNDERSTAND</i><i>MEMORY</i><i>ANALYZE</i><i>PLAN</i><i>DECIDE</i><i>EXECUTE</i><i>VERIFY</i><i>LEARN</i></div></div><div class="card" style="margin-top:14px"><div class="sectionTitle"><h3>🧰 منظومة أدوات العقل</h3><span class="badge" id="toolCount">—</span></div><div id="toolGrid" class="toolGrid"></div></div><div class="card" style="margin-top:14px"><div class="sectionTitle"><h3>🧬 مختبر التطوير الذاتي</h3><span class="badge">CHECKPOINT • VERIFY</span></div><div style="display:grid;gap:8px"><input id="evolveObjective" class="input" placeholder="هدف التطوير: مثال تحسين مراقبة الأدوات"><input id="evolveFiles" class="input" placeholder="الملفات المسموحة، مفصولة بفواصل: brain_v12/app.py, brain_v12/brain/cognitive_loop.py"><button class="btn primary" onclick="evolveBrain(false)">تحليل وتجهيز التغيير</button><button class="btn" onclick="evolveBrain(true)">تنفيذ بعد الموافقة الصريحة</button><pre id="evolveOut" class="codebox">لم يبدأ مختبر التطوير.</pre></div></div><div class="cognitiveConsole"><div class="card"><div class="sectionTitle"><h3>🧭 مسار الدورة الحقيقي</h3><span class="badge" id="runBadge">لا توجد دورة</span></div><div id="consoleStages" class="consoleList"></div></div><div class="card"><div class="sectionTitle"><h3>🛰️ مراقبة التنفيذ</h3><span class="runId" id="runId">—</span></div><div class="toolResult" id="liveResult">العقل بانتظار مهمة.</div><div class="progressTrack"><div id="liveProgress" class="progressBar"></div></div></div><div class="card"><div class="sectionTitle"><h3>📡 الأحداث الحية</h3><span class="badge">آخر 25</span></div><div id="liveEvents" class="eventStream"></div></div></div><div class="card" style="margin-top:14px"><div class="sectionTitle"><h3>آخر نشاط</h3><button onclick="show('events')">عرض الكل</button></div><div id="homeEvents" class="log"></div></div>
 </section>
 
@@ -160,6 +177,22 @@ async function loadAgent(){try{$('agentOut').textContent=JSON.stringify(await ap
 async function loadAI(){try{$('aiStatus').innerHTML='<pre>'+esc(JSON.stringify(await api('/api/ai/status'),null,2))+'</pre>'}catch(e){}}
 async function loadEvolve(){try{$('evolveOut').textContent=JSON.stringify(await api('/api/self-improvement/status'),null,2)}catch(e){}}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+async function loadIncomeMission(){
+ try{
+  const [m,o]=await Promise.all([api('/api/income/mission'),api('/api/income/opportunities')]);
+  const s=o.summary||{}, items=o.items||[], target=Number(m.target_jod||10), verified=Number(m.verified_revenue_jod||s.verified||0), gap=Math.max(0,target-verified);
+  $('incomeVerified').textContent=verified.toFixed(2)+' د.أ'; $('incomeTarget').textContent=target.toFixed(2)+' د.أ'; $('incomeGap').textContent=gap.toFixed(2)+' د.أ';
+  $('incomeOpportunities').textContent=String(s.total||items.length||0);
+  $('incomeProgress').style.width=Math.min(100,(verified/target)*100)+'%';
+  $('incomeMissionStatus').textContent=verified>=target?'تم بلوغ الهدف':'مراقبة مستمرة';
+  $('incomeMissionStatus').className='badge '+(verified>=target?'good':'');
+  const stage=(m.stages&&m.stages[0])||{}; $('incomeStage').textContent=(m.current_stage||stage.id||'DISCOVER')+' • '+(stage.label||'البحث');
+  $('incomeLastCheck').textContent=new Date().toLocaleString('ar-JO');
+  const active=items.find(x=>String(x.status||'').toUpperCase()!=='VERIFIED');
+  $('incomeActive').textContent=active?active.title:'لا توجد فرصة نشطة حاليًا';
+  $('incomeNext').textContent=(m.next_actions||[]).join(' • ')||'المراقبة والبحث مستمران.';
+ }catch(e){$('incomeMissionStatus').textContent='تعذر التحديث';}
+}
 refresh();loadTools();pollCognitive();setInterval(refresh,5000);setInterval(pollCognitive,2000);
 </script>
 </body></html>
