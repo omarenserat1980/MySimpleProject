@@ -28,10 +28,10 @@ def request(method, path, payload=None, params=None):
         data = json.dumps(payload).encode("utf-8")
         hdrs["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
-    with urllib.request.urlopen(req, timeout=30) as response:
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
         return json.loads(response.read().decode("utf-8"))
 
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = max(5, int(os.getenv("TERMUX_REQUEST_TIMEOUT", "30")))
 
 
 def execute(task, params):
