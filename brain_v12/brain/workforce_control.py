@@ -145,6 +145,7 @@ class WorkforceControl:
         return {
             "ok": True,
             "dispatch_count": self.dispatch_count,
+            "youtube": self.youtube_publisher.snapshot(),
             "employees": report["staffing"],
             "departments": report["departments"],
             "verified_revenue_jod": float(revenue.get("verified_revenue_jod", 0) or 0),
