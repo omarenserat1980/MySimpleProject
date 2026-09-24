@@ -43,3 +43,22 @@ agent last-seen information and online state.
 Agent status endpoint: `GET /api/device/agent-status` (authenticated with `X-V12-Agent-Key`). It reports ONLINE/STALE state and heartbeat age.
 
 - Per-agent status: `GET /api/device/agent-status/{agent_id}` returns heartbeat age, TTL, and ONLINE/STALE state.
+
+
+## Mining Economics
+أضيفت طبقة **Mining Economics** للعقل V12 للتحليل الحسابي فقط، دون تشغيل تعدين أو شراء أجهزة أو ربط محافظ.
+
+### ما الذي تحسبه؟
+- استهلاك الكهرباء اليومي بالكيلوواط-ساعة.
+- تكلفة الكهرباء بالدينار الأردني.
+- عمولة مجمع التعدين والتكاليف اليومية الأخرى.
+- صافي الإيراد الحسابي يوميًا ولفترة 30 يومًا.
+- تكلفة الجهاز وفترة استرداد رأس المال عندما تكون المدخلات موجبة.
+- مقارنة عدة إعدادات على أساس صافي الناتج المحسوب من المدخلات.
+
+### واجهة API
+- GET /api/mining/status
+- POST /api/mining/analyze
+- POST /api/mining/compare
+
+**حدود مهمة:** النتائج ليست بيانات سوق حية، ولا تُسجل كدخل محقق. أي ربح فعلي يبقى صفرًا حتى يوجد دليل دفع قابل للمطابقة في نظام الإيرادات.
