@@ -7,6 +7,7 @@ runtime through environment variables and token material is kept out of logs.
 from __future__ import annotations
 import json
 import os
+import time
 from typing import Any
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -14,6 +15,7 @@ from cryptography.fernet import Fernet
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 SESSION = {}
+STATE_TTL_SECONDS = 600
 
 class YouTubeOAuth:
     def __init__(self, store):
@@ -63,19 +65,25 @@ class YouTubeOAuth:
         flow=Flow.from_client_config(self._client_config(),scopes=SCOPES,
                                      redirect_uri=self.redirect_uri())
         url,state=flow.authorization_url(access_type="offline",include_granted_scopes="true",prompt="consent")
-        SESSION[state]=flow
+        SESSION[state]=(time.time(), flow)
         self.store.event("YOUTUBE_OAUTH_STARTED",{"state_hash":state[:12]})
         return {"ok":True,"status":"AUTHORIZATION_REQUIRED","authorization_url":url}
 
     def callback(self, code: str, state: str) -> dict[str, Any]:
-        flow=SESSION.pop(state,None)
-        if not flow:
+        entry=SESSION.pop(state,None)
+        if not entry:
             return {"ok":False,"status":"INVALID_OR_EXPIRED_OAUTH_STATE"}
-        flow.fetch_token(code=code)
-        creds=flow.credentials
-        if not creds.refresh_token:
-            return {"ok":False,"status":"NO_REFRESH_TOKEN","reason":"Google did not return offline authorization"}
-        self._save_refresh_token(creds.refresh_token)
+        created_at, flow = entry
+        if time.time() - created_at > STATE_TTL_SECONDS:
+            return {"ok":False,"status":"INVALID_OR_EXPIRED_OAUTH_STATE"}
+        try:
+            flow.fetch_token(code=code)
+            creds=flow.credentials
+            if not creds.refresh_token:
+                return {"ok":False,"status":"NO_REFRESH_TOKEN","reason":"Google did not return offline authorization"}
+            self._save_refresh_token(creds.refresh_token)
+        except Exception as exc:
+            return {"ok":False,"status":"OAUTH_CALLBACK_FAILED","error":str(exc)[:300]}
         self.store.event("YOUTUBE_OAUTH_AUTHORIZED",{"scopes":list(creds.scopes or SCOPES)})
         return {"ok":True,"status":"AUTHORIZED","scopes":list(creds.scopes or SCOPES)}
 
