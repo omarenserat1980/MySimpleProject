@@ -275,12 +275,21 @@ class MemoryStore:
             con.commit()
 
     def device_task_claim(self, agent_id):
+        # Serialize claimers so two polling requests cannot claim the same task.
         with self.connect() as con:
+            con.execute("BEGIN IMMEDIATE")
             row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
-            if not row: return None
+            if not row:
+                con.commit()
+                return None
             t=dict(row); claimed=now()
-            con.execute("UPDATE device_tasks SET status='CLAIMED',agent_id=?,claimed_at=? WHERE task_id=?",
-                        (agent_id,claimed,t["task_id"]))
+            updated=con.execute(
+                "UPDATE device_tasks SET status='CLAIMED',agent_id=?,claimed_at=? WHERE task_id=? AND status='QUEUED'",
+                (agent_id,claimed,t["task_id"])
+            ).rowcount
+            if updated != 1:
+                con.rollback()
+                return None
             con.commit()
         t["status"]="CLAIMED"; t["agent_id"]=agent_id; t["claimed_at"]=claimed
         try: t["params"]=json.loads(t["params"])
