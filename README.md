@@ -41,3 +41,5 @@ agent last-seen information and online state.
 
 
 Agent status endpoint: `GET /api/device/agent-status` (authenticated with `X-V12-Agent-Key`). It reports ONLINE/STALE state and heartbeat age.
+
+- Per-agent status: `GET /api/device/agent-status/{agent_id}` returns heartbeat age, TTL, and ONLINE/STALE state.
