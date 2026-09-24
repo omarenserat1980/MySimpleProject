@@ -56,3 +56,4 @@ jobs:
           done
           echo "Render did not converge to GitHub commit $EXPECTED_COMMIT within the verification window." >&2
           exit 1
+          exit 1
