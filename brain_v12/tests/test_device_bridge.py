@@ -46,6 +46,18 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "TASK_NOT_ALLOWED")
 
+    def test_requeues_stale_claim(self):
+        queued = self.bridge.enqueue("status")
+        task_id = queued["task"]["task_id"]
+        polled = self.bridge.poll("android-test")
+        self.assertEqual(polled["task"]["task_id"], task_id)
+        with self.store.connect() as con:
+            con.execute("UPDATE device_tasks SET claimed_at=? WHERE task_id=?", ("1", task_id))
+            con.commit()
+        result = self.bridge.requeue_stale(5)
+        self.assertEqual(result["requeued"], 1)
+        self.assertEqual(self.store.device_task_get(task_id)["status"], "QUEUED")
+
 
 if __name__ == "__main__":
     unittest.main()
