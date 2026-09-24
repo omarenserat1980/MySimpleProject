@@ -38,3 +38,6 @@ Allowed initial tasks: `status`, `python_version`, `termux_path`, `platform`.
 The Termux agent sends an authenticated heartbeat every 10 seconds by default.
 Set `TERMUX_HEARTBEAT_SECONDS` to change the interval. Brain diagnostics expose persistent
 agent last-seen information and online state.
+
+
+Agent status endpoint: `GET /api/device/agent-status` (authenticated with `X-V12-Agent-Key`). It reports ONLINE/STALE state and heartbeat age.
