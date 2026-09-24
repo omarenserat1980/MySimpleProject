@@ -140,21 +140,23 @@ class CognitiveLoop:
             else {}
         )
         tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
-        if action in {"observe","plan"} and tool_result and tool_result.get("ok"):
+        device_success = bool(action == "device" and tool_result and tool_result.get("ok") and tool_result.get("status") == "COMPLETED" and isinstance(tool_result.get("result"), dict))
+        if (action in {"observe","plan"} and tool_result and tool_result.get("ok")) or device_success:
             self.tasks.update(task["id"],"COMPLETED")
-            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"تم اختيار أداة آمنة وتنفيذها ثم إكمال المهمة.","run_id":run_id}
+            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"تم تنفيذ الخطوة الآمنة واستلام النتيجة.","run_id":run_id}
             self.events.publish("EXECUTION_COMPLETED",execution)
         else:
             self.tasks.update(task["id"],"PENDING")
-            execution={"status":"WAITING_PERMISSION","action":action,"task_id":task["id"],"result":"الخطوة تحتاج صلاحية أو أداة تنفيذ خارجية.","run_id":run_id}
-            self.events.publish("EXECUTION_WAITING_PERMISSION",execution)
+            execution={"status":"WAITING_PERMISSION" if tool_result and tool_result.get("status")=="WAITING_PERMISSION" else "FAILED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"لم تكتمل الخطوة.","run_id":run_id}
+            self.events.publish("EXECUTION_WAITING_PERMISSION" if execution["status"]=="WAITING_PERMISSION" else "EXECUTION_FAILED",execution)
 
         self._state("VERIFY",goal=goal,run_id=run_id,task_id=task["id"])
         verified_task=next((x for x in self.tasks.snapshot()["tasks"] if x["id"]==task["id"]),None)
         verification={
-            "status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" else "PENDING",
+            "status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" and (action!="device" or device_success) else "PENDING",
             "task_status":verified_task["status"] if verified_task else "UNKNOWN",
-            "evidence":"تم فحص حالة المهمة بعد التنفيذ الداخلي.",
+            "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else "تم فحص حالة المهمة بعد التنفيذ الداخلي.",
+            "result_verified":bool(action!="device" or device_success),
             "run_id":run_id
         }
         self.events.publish("VERIFIED",verification)
