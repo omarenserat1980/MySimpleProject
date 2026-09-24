@@ -54,7 +54,7 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     if yt:
         oauth_snapshot = yt.validate()
         if oauth_snapshot.get("status") != "OAUTH_VALID":
-            _heartbeat("DEGRADED", cycle, f"youtube_oauth={oauth_snapshot.get("code", "invalid")}")
+            _heartbeat("DEGRADED", cycle, f"youtube_oauth={oauth_snapshot.get('code', 'invalid')}")
             yt = None
             analytics = None
             channel_control = None
