@@ -52,7 +52,7 @@ class BrainCodeAgent:
             "Return ONLY valid JSON with keys explanation and changes. "
             "changes must be an array of objects with path, content, reason. "
             "Return complete replacement file content, not a patch. "
-            "Only modify files under brain_v7/. Do not create credentials, secrets, "
+            "Only modify files under brain_v7/ or brain_v12/. Do not create credentials, secrets, "
             "shell commands, destructive operations, or network calls. "
             "Prefer the smallest testable change. Never claim that a change was applied."
         )
