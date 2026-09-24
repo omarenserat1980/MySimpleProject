@@ -15,6 +15,7 @@ class CognitiveLoop:
         {"id":"tasks.complete","name":"إكمال مهمة","risk":"low","permission":None},
         {"id":"code.inspect","name":"فحص الكود","risk":"low","permission":"developer"},
         {"id":"code.verify","name":"التحقق من الكود","risk":"low","permission":"developer"},
+        {"id":"device.enqueue","name":"إرسال مهمة إلى Termux","risk":"medium","permission":"device_agent"},
         {"id":"code.apply","name":"تعديل الكود","risk":"high","permission":"developer_approval"},
         {"id":"agent.execute","name":"تنفيذ معزول","risk":"high","permission":"agent_approval"},
     ]
@@ -69,6 +70,12 @@ class CognitiveLoop:
                 result={"ok":False,"status":"UNAVAILABLE","tool":tool_id}
             else:
                 result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.code_tool.verify(params.get("paths",[]))}
+        elif tool_id=="device.enqueue":
+            bridge = getattr(self, "device_bridge", None)
+            if not bridge:
+                result={"ok":False,"status":"UNAVAILABLE","tool":tool_id}
+            else:
+                result=bridge.enqueue(str(params.get("task","status")), params.get("params",{}))
         else:
             result={"ok":False,"status":"DELEGATED","tool":tool_id,"reason":"الأداة تحتاج المسار المخصص لها."}
         self.events.publish("TOOL_RESULT",result)
