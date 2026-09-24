@@ -213,7 +213,7 @@ class UnifiedBrain:
             specialist_proposals.append({
                 "employee_id": f"COG-{index:03d}",
                 "role": hypothesis.label,
-                "proposal": hypothesis.interpretation.text,
+                "proposal": hypothesis.interpretation,
                 "confidence": hypothesis.confidence,
                 "evidence": len(hypothesis.evidence_for),
                 "reversible": hypothesis.reversibility,
