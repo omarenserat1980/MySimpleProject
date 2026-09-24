@@ -107,6 +107,17 @@ class MemoryStore:
             con.execute("UPDATE goals SET status=? WHERE id=?",(status,gid))
             con.commit()
 
+    def events_for_run(self,run_id,limit=100):
+        with self.connect() as con:
+            rows=con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(max(limit,1000),)).fetchall()
+        out=[]
+        for row in rows:
+            try: payload=json.loads(row["payload"])
+            except Exception: payload={}
+            if payload.get("run_id")==run_id: out.append(dict(row))
+            if len(out)>=limit: break
+        return out
+
     def events(self,limit=50):
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(limit,)).fetchall()]
