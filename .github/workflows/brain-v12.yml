@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "brain_v12/**"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,3 +18,34 @@ jobs:
           python-version: "3.11"
       - run: python -m pip install -r brain_v12/requirements.txt
       - run: python -m unittest discover -s brain_v12/tests -v
+
+  verify-render:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render to deploy this commit
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          RENDER_URL: https://electronic-brain-v12-gwwg.onrender.com
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            echo "Render verification attempt $attempt/30"
+            health=$(curl -fsS --max-time 20 "$RENDER_URL/health" || true)
+            identity=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/identity" || true)
+            echo "health=$health"
+            echo "identity=$identity"
+            version=$(printf '%s' "$health" | jq -r '.version // empty' 2>/dev/null || true)
+            commit=$(printf '%s' "$identity" | jq -r '.commit // empty' 2>/dev/null || true)
+            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "12.6" ]; then
+              echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
+              curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
+              curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
+              echo "Required V12 APIs are live."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Render did not converge to GitHub commit $EXPECTED_COMMIT within the verification window." >&2
+          exit 1
