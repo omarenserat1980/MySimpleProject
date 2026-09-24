@@ -277,6 +277,7 @@ def system_overview():
     self_improvement = self_improver.status()
     deploy = render_deploy_monitor.status()
     monitor = render_monitor.status()
+    public_render = deploy.get("public_health", {})
     identity = deploy_identity()
 
     return {
@@ -290,9 +291,8 @@ def system_overview():
             "decision": state.get("cognitive_trace", {}).get("decision"),
             "next": income.get("next_actions", [])[:4],
             "attention": [
-                *([{"level": "ATTENTION", "text": "مراقبة Render غير مهيأة داخل الخدمة الحالية؛ قراءة الحالة المباشرة تحتاج أسرار Render الصحيحة."}] if not render_monitor.configured else []),
-                *([{"level": "ATTENTION", "text": "مراقب النشر غير مهيأ؛ لذلك لا يستطيع العقل تنفيذ مراقبة نشر Render من داخل الخدمة."}] if not render_deploy_monitor.configured else []),
-                *([{"level": "LIMITATION", "text": "البحث الخارجي ليس مفعلاً كأداة داخلية؛ فرص الدخل المسجلة هي سجلات مؤهلة وليست دخلاً."}] if not any((p.get("id") == "browser" and p.get("enabled")) for p in PLUGINS if isinstance(p, dict)) else []),
+                *([{"level": "NORMAL", "text": "مراقبة Render العامة تعمل من داخل العقل عبر /health و/deploy/identity؛ مراقبة السجلات وعمليات النشر التفصيلية تحتاج RENDER_API_KEY."}] if public_render.get("ok") else [{"level": "ATTENTION", "text": "مراقبة Render العامة غير متاحة حاليًا."}]),
+                *([{"level": "NORMAL", "text": "محرك البحث الحي مفعّل ويقبل فقط إعلانات حديثة ذات رابط ودليل زمني؛ لا تُحسب كإيراد."}] if os.getenv("BRAIN_LIVE_INCOME_SEARCH_ENABLED","true").lower()=="true" else [{"level": "ATTENTION", "text": "البحث الحي عن فرص الدخل متوقف."}]),
                 *([{"level": "NORMAL", "text": "التطوير الذاتي الكتابي مغلق افتراضياً ويظل محمياً بالموافقة الصريحة."}] if not self_improver.status().get("enabled") else []),
             ],
         },
