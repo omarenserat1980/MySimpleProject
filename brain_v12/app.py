@@ -1,4 +1,6 @@
 import os
+import threading
+from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -137,7 +139,8 @@ def chat(body:Chat):
         "execution": "لم يُنفذ إجراء خارجي" if source == "chatgpt" else "تم تشغيل الحلقة المعرفية",
         "verification": "الرد الذكي لا يعني أن إجراءً خارجياً تم تنفيذه؛ التنفيذ يحتاج نتيجة موثقة."
     }
-    cognitive_summary["run_id"]=loop.get("run_id")\n    cognitive_summary["execution_result"]=loop.get("execution",{})\n    cognitive_summary["verification_result"]=loop.get("verification",{})\n    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"cognitive_summary":cognitive_summary,"run_id":loop.get("run_id"),"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
+    cognitive_summary["run_id"]=loop.get("run_id")
+    cognitive_summary["execution_result"]=loop.get("execution",{})\n    cognitive_summary["verification_result"]=loop.get("verification",{})\n    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"cognitive_summary":cognitive_summary,"run_id":loop.get("run_id"),"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
 
 @app.get("/api/memory")
 def memory(): return store.memories()
@@ -158,7 +161,19 @@ def world(): return cognitive.world.snapshot()
 @app.post("/api/world/fact")
 def world_fact(key:str,value:str,source:str="user",confidence:float=.8): return cognitive.world.set_fact(key,value,source,confidence)
 @app.post("/api/run")
-def run_cycle(): return orchestrator.run("brain_v12")
+def run_cycle(goal:str="brain_v12"): return cognitive.run(goal)
+
+@app.post("/api/cognitive/start")
+def cognitive_start(goal:str="brain_v12"):
+    run_id=str(uuid4())
+    def worker():
+        try:
+            cognitive.run(goal,run_id=run_id)
+        except Exception as exc:
+            state=store.state(); state.update({"status":"ERROR","cognitive_stage":"ERROR","cognitive_trace":{"run_id":run_id,"error":str(exc)}}); store.set_state(state)
+            store.event("COGNITIVE_RUN_FAILED",{"run_id":run_id,"error":str(exc)})
+    threading.Thread(target=worker,daemon=True).start()
+    return {"ok":True,"run_id":run_id,"status":"STARTED"}
 @app.post("/api/observe")
 def observe(body:Observe): return orchestrator.observe_and_learn(body.actual)
 @app.post("/api/learn")
@@ -229,6 +244,17 @@ def code_apply(body:CodeChanges):
 
 @app.get("/api/code/audit")
 def code_audit(): return code_workspace.snapshot()
+
+@app.get("/api/tools")
+def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
+
+@app.post("/api/tools/execute")
+def tools_execute(tool_id:str,params:dict|None=None,approved:bool=False): return cognitive.execute_tool(tool_id,params or {},approved)
+
+@app.get("/api/cognitive/live")
+def cognitive_live():
+    s=store.state(); ev=store.events(40); trace=s.get("cognitive_trace",{}) if isinstance(s,dict) else {}
+    return {"ok":True,"state":s,"run_id":trace.get("run_id"),"result":s.get("cognitive_result"),"stage":s.get("cognitive_stage","READY"),"stage_index":s.get("cognitive_stage_index",-1),"total":s.get("cognitive_total",len(cognitive.STAGES)),"trace":trace,"events":ev,"tasks":cognitive.tasks.snapshot()}
 
 @app.get("/api/tasks")
 def tasks(): return cognitive.tasks.snapshot()
