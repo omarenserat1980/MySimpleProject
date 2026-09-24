@@ -4,16 +4,39 @@ import time
 from .brain.memory import MemoryStore
 from .brain.render_monitor import RenderLogMonitor
 from .brain.render_deploy_monitor import RenderDeployMonitor
+from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool
 
 
 def on_incident(incident):
+    severity = incident.get("severity", "")
     print(
         "RENDER_INCIDENT",
-        incident.get("severity"),
+        severity,
         incident.get("fingerprint"),
         incident.get("message", "")[:1000],
         flush=True,
     )
+
+    # Read-only audit on new ERROR/CRITICAL incidents. Never changes source code.
+    if severity in {"ERROR", "CRITICAL"}:
+        try:
+            workspace = CodeWorkspaceTool(
+                root=os.getenv(
+                    "BRAIN_CODE_ROOT",
+                    os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+                ),
+                allowed_prefixes=("brain_v7/", "brain_v12/"),
+            )
+            audit = workspace.verify([])
+            print(
+                "RENDER_CODE_AUDIT",
+                audit.get("status"),
+                "checked=" + str(audit.get("checked", 0)),
+                "errors=" + str(audit.get("errors", []))[:3000],
+                flush=True,
+            )
+        except Exception as exc:
+            print("RENDER_CODE_AUDIT_FAILED", str(exc)[:2000], flush=True)
 
 
 def main():
