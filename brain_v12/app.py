@@ -124,7 +124,18 @@ def chat(body:Chat):
         source="cognitive_fallback"
     store.add_message("assistant",reply)
     store.event("AI_RESPONSE",{"provider":source})
-    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
+    decision = loop.get("decision", {}) if isinstance(loop, dict) else {}
+    selected = decision.get("selected", {}) if isinstance(decision, dict) else {}
+    cognitive_summary = {
+        "understood": message,
+        "goal": goal.get("text") if isinstance(goal, dict) else message,
+        "analysis_status": decision.get("status", "ANALYZING"),
+        "decision": selected.get("action", "تحديد الخطوة التالية"),
+        "decision_reason": decision.get("reason", "تمت مراجعة الهدف والسياق المتاح."),
+        "execution": "لم يُنفذ إجراء خارجي" if source == "chatgpt" else "تم تشغيل الحلقة المعرفية",
+        "verification": "الرد الذكي لا يعني أن إجراءً خارجياً تم تنفيذه؛ التنفيذ يحتاج نتيجة موثقة."
+    }
+    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"cognitive_summary":cognitive_summary,"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
 
 @app.get("/api/memory")
 def memory(): return store.memories()
