@@ -104,6 +104,7 @@ class FreelanceAgent:
 
     def analyze(self, opportunity: dict[str, Any]) -> dict[str, Any]:
         text = self._text(opportunity)
+        quality_ok = bool(str(opportunity.get("source_url") or opportunity.get("url") or "").strip()) and bool(str(opportunity.get("evidence") or "").strip()) and len(str(opportunity.get("title") or "").strip()) >= 8)
         matched = []
         categories = []
         for category, words in KEYWORDS.items():
@@ -118,13 +119,16 @@ class FreelanceAgent:
         if any(x in text for x in ("urgent", "عاجل", "today", "اليوم")):
             score -= 5
         score = max(0, score)
+        if not quality_ok:
+            score = min(score, 40)
         return {
             "ok": True,
             "fit_score": score,
+            "quality_ok": quality_ok,
             "categories": categories or ["general"],
             "matched_terms": sorted(set(matched)),
             "matched_skills": skill_hits,
-            "recommendation": "PREPARE_OFFER" if score >= 55 else "REVIEW_MANUALLY",
+            "recommendation": "PREPARE_OFFER" if score >= 55 and quality_ok else "REVIEW_MANUALLY",
             "reason": "تقييم ملاءمة فني فقط؛ ليس توقعًا للقبول أو الربح.",
         }
 
