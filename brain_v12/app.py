@@ -200,7 +200,9 @@ def chat(body:Chat):
         "verification": "الرد الذكي لا يعني أن إجراءً خارجياً تم تنفيذه؛ التنفيذ يحتاج نتيجة موثقة."
     }
     cognitive_summary["run_id"]=loop.get("run_id")
-    cognitive_summary["execution_result"]=loop.get("execution",{})\n    cognitive_summary["verification_result"]=loop.get("verification",{})\n    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"cognitive_summary":cognitive_summary,"run_id":loop.get("run_id"),"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
+    cognitive_summary["execution_result"]=loop.get("execution",{})
+    cognitive_summary["verification_result"]=loop.get("verification",{})
+    return {"ok":True,"reply":reply,"provider":source,"cognitive":loop,"cognitive_summary":cognitive_summary,"run_id":loop.get("run_id"),"ai":ai_result if not ai_result.get("ok") else {"ok":True,"provider":"openai","model":openai_provider.model}}
 
 @app.get("/api/memory")
 def memory(): return store.memories()
