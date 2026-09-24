@@ -267,7 +267,7 @@ def deploy_diagnostics():
 def deploy_verify():
     expected = os.getenv("RENDER_GIT_COMMIT", "")
     actual = DEPLOY_COMMIT
-    return {"ok": bool(actual and (not expected or actual == expected)), "actual_commit": actual, "render_git_commit": expected or None}
+    return {"ok": bool(actual and expected and actual == expected), "actual_commit": actual, "render_git_commit": expected or None}
 
 @app.get("/api/deploy/identity")
 def deploy_identity():
