@@ -17,8 +17,8 @@ class HumanInterfaceContractTests(unittest.TestCase):
         cls.html = UI.read_text(encoding="utf-8")
 
     def test_all_human_views_exist(self):
-        found = set(re.findall(r'<[^>]+id=["\']([^"\']+)["\'][^>]*class=["\'][^"\']*\\bview\\b[^"\']*["\'][^>]*>', self.html))
-        found |= set(re.findall(r'<[^>]+class=["\'][^"\']*\\bview\\b[^"\']*["\'][^>]*id=["\']([^"\']+)["\'][^>]*>', self.html))
+        found = set(re.findall(r'<[^>]+id=["\']([^"\']+)["\'][^>]*class=["\'][^"\']*\bview\b[^"\']*["\'][^>]*>', self.html))
+        found |= set(re.findall(r'<[^>]+class=["\'][^"\']*\bview\b[^"\']*["\'][^>]*id=["\']([^"\']+)["\'][^>]*>', self.html))
         self.assertEqual(EXPECTED_VIEWS, found)
 
     def test_navigation_points_to_existing_views(self):
