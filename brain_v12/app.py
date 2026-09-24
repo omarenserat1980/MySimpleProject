@@ -69,6 +69,8 @@ income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
 device_bridge=DeviceBridge()
 cognitive.device_bridge=device_bridge
+if device_bridge.configured():
+    cognitive.permissions.grant("device_agent")
 try:
     store.purge_non_live_income_opportunities()
 except Exception as exc:
