@@ -4,10 +4,11 @@ services:
     runtime: python
     rootDir: .
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     buildCommand: pip install -r brain_v12/requirements.txt
     startCommand: uvicorn brain_v12.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: BRAIN_RENDER_MONITOR_ENABLED
         value: "true"
