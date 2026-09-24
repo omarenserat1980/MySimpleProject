@@ -58,7 +58,7 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
-APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.5")
+APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.6")
 app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
 
 @app.middleware("http")
@@ -258,64 +258,41 @@ def code_brain_apply(body:BrainCodeApplyIn):
         public=brain_code_agent.public_plan(plan)
         if plan.get("status") != "PLAN_READY":
             return public
-        result=brain_code_agent.execute_plan(
-            plan,
-            approved=body.approved,
-            commit_message=body.commit_message,
-            persist_to_github=body.persist_to_github,
-        )
-        store.event("BRAIN_CODE_EVOLUTION", {
-            "status":result.get("status"),
-            "objective":body.objective,
-            "files":body.files,
-        })
+        result=brain_code_agent.execute_plan(plan,approved=body.approved,commit_message=body.commit_message,persist_to_github=body.persist_to_github)
+        store.event("BRAIN_CODE_EVOLUTION",{"status":result.get("status"),"objective":body.objective,"files":body.files})
         return {"plan":public,"execution":result}
     except Exception as exc:
         return {"status":"EXECUTION_FAILED","error":str(exc)}
 
 @app.get("/api/code/status")
 def code_status(): return code_team.snapshot()
-
 @app.post("/api/code/inspect")
 def code_inspect(path:str): return code_tool.inspect(path)
-
 @app.post("/api/code/preview")
 def code_preview(body:CodeChanges):
     changes=[CodeChange(x.path,x.content,x.reason) for x in body.changes]
     return code_tool.preview(changes)
-
 @app.post("/api/code/checkpoint")
 def code_checkpoint(body:CodePaths): return code_tool.save_checkpoint(body.paths)
-
 @app.post("/api/code/verify")
 def code_verify(body:CodePaths): return code_tool.verify(body.paths)
-
 @app.post("/api/code/apply")
 def code_apply(body:CodeChanges):
     if not body.approved:
         return {"ok":False,"status":"EXPLICIT_APPROVAL_REQUIRED","message":"الموافقة الصريحة مطلوبة قبل الكتابة أو الحفظ البعيد."}
     changes=[CodeChange(x.path,x.content,x.reason) for x in body.changes]
-    result=code_tool.save_and_execute(
-        changes,
-        reason=body.reason or "controlled code change from Brain interface",
-        commit_message=body.commit_message,
-        persist_to_github=body.persist_to_github,
-    )
-    store.event("CODE_TOOL_EXECUTION", {"status":result.get("status"),"remote_status":result.get("remote_status"),"paths":[x.path for x in changes]})
+    result=code_tool.save_and_execute(changes,reason=body.reason or "controlled code change from Brain interface",commit_message=body.commit_message,persist_to_github=body.persist_to_github)
+    store.event("CODE_TOOL_EXECUTION",{"status":result.get("status"),"remote_status":result.get("remote_status"),"paths":[x.path for x in changes]})
     return result
 
 @app.get("/api/code/audit")
 def code_audit(): return code_workspace.snapshot()
-
 @app.get("/api/tools")
 def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
-
 @app.post("/api/tools/execute")
 def tools_execute(tool_id:str,params:dict|None=None,approved:bool=False): return cognitive.execute_tool(tool_id,params or {},approved)
-
 @app.get("/api/cognitive/history/{run_id}")
-def cognitive_history(run_id:str):
-    return {"ok":True,"run_id":run_id,"events":store.events_for_run(run_id,200)}
+def cognitive_history(run_id:str): return {"ok":True,"run_id":run_id,"events":store.events_for_run(run_id,200)}
 
 class EvolutionIn(BaseModel):
     objective:str
@@ -349,7 +326,6 @@ def cognitive_live():
 def tasks(): return cognitive.tasks.snapshot()
 @app.post("/api/tasks")
 def task(title:str,parent_id:str|None=None,depends_on:list[str]=[]): return cognitive.tasks.create(title,parent_id,depends_on)
-
 @app.get("/api/permissions")
 def permissions(): return {"grants":sorted(cognitive.permissions.grants)}
 @app.post("/api/permissions/grant")
