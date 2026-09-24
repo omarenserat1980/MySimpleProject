@@ -1,4 +1,4 @@
-name: Brain V12 Web UI
+name: Brain V12 Web UI Check
 on:
   push:
     branches: ["main"]
@@ -9,27 +9,22 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
-concurrency:
-  group: pages
-  cancel-in-progress: true
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Prepare site
         run: |
           rm -rf _site
           mkdir -p _site
+          test -s brain_v12/web/index.html
           cp brain_v12/web/index.html _site/index.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+          grep -q '<html' _site/index.html
+          grep -q 'العقل الإلكتروني' _site/index.html
+      - name: Upload validated UI artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: brain-v12-web-ui
           path: _site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          if-no-files-found: error
