@@ -36,11 +36,14 @@ jobs:
             echo "Render verification attempt $attempt/45"
             health=$(curl -fsS --max-time 20 "$RENDER_URL/health" || true)
             identity=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/identity" || true)
+            verify=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/verify" || true)
             echo "health=$health"
             echo "identity=$identity"
+            echo "verify=$verify"
             version=$(printf '%s' "$health" | jq -r '.version // empty' 2>/dev/null || true)
             commit=$(printf '%s' "$identity" | jq -r '.commit // empty' 2>/dev/null || true)
-            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "12.6" ]; then
+            verified=$(printf '%s' "$verify" | jq -r '.ok // false' 2>/dev/null || true)
+            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "12.6" ] && [ "$verified" = "true" ]; then
               echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
               curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
               curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
@@ -56,5 +59,4 @@ jobs:
             sleep 20
           done
           echo "Render did not converge to GitHub commit $EXPECTED_COMMIT within the verification window." >&2
-          exit 1
           exit 1
