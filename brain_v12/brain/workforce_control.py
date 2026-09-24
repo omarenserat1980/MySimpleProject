@@ -18,6 +18,7 @@ from .income_strategy import IncomeStrategy
 from .mining_engine import MiningEngine
 from .freelance_agent import FreelanceAgent
 from .live_opportunity_researcher import LiveOpportunityResearcher
+from .youtube_publisher import YouTubePublisher
 
 
 WEBSITE_ROLES = (
@@ -51,6 +52,7 @@ class WorkforceControl:
         self.mining = MiningEngine()
         self.freelance = FreelanceAgent(store)
         self.live_opportunity_researcher = LiveOpportunityResearcher(self.income_engine, store)
+        self.youtube_publisher = YouTubePublisher(store)
         self.website = self.organization.ensure_team(
             department_id="DEPT-WEB-OPS", name="WEB_PLATFORM_OPERATIONS",
             manager_id="MGR-WEB-OPS", manager_title="Web Platforms Manager",
@@ -131,6 +133,11 @@ class WorkforceControl:
             "task_count": len(results), "include_revenue": include_revenue, "external_actions": "NONE",
         })
         return self.last_dispatch
+
+    def prepare_cinematic_release(self, title: str, description: str = "", media_path: str = "", tags: list[str] | None = None, privacy: str = "private") -> dict[str, Any]:
+        pipeline = self.youtube.run_pipeline(f"إنتاج فيديو سينمائي أصلي: {title}")
+        release = self.youtube_publisher.prepare_cinematic_release(title, description, media_path, tags, privacy)
+        return {"ok": True, "pipeline": pipeline, "release": release}
 
     def health(self) -> dict[str, Any]:
         report = self.report()
