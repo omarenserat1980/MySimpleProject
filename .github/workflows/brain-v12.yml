@@ -42,7 +42,7 @@ jobs:
               echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
               curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
               curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
-              problem=$(curl -fsS --max-time 20 -X POST "$RENDER_URL/api/problem/solve" -H "Content-Type: application/x-www-form-urlencoded" --data-urlencode "goal=deployment verification" || true)
+              problem=$(curl -fsS --max-time 20 -X POST "$RENDER_URL/api/problem/solve?goal=deployment%20verification" || true)
               echo "problem_solver=$problem"
               if ! printf "%s" "$problem" | jq -e ".external_action == \"NOT_CLAIMED\"" >/dev/null 2>&1; then
                 echo "Problem Solver endpoint is not responding with the expected V12 contract." >&2
