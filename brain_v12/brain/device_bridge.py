@@ -36,6 +36,7 @@ class DeviceBridge:
         if not agent_id:
             return {"ok": False, "status": "AGENT_ID_REQUIRED"}
         self._last_seen = time.time()
+        self.store.device_agent_touch(agent_id, self._last_seen)
         item = self.store.device_task_claim(agent_id)
         return {"ok": True, "task": item, "status": "IDLE" if item is None else "CLAIMED"}
 
@@ -100,6 +101,24 @@ class DeviceBridge:
             time.sleep(.5)
         return {"ok": False, "status": "RESULT_TIMEOUT", "task_id": task_id}
 
+    def agent_status(self):
+        ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
+        now = time.time()
+        agents = []
+        for item in self.store.device_agents():
+            age = max(0.0, now - float(item.get("last_seen", 0)))
+            agents.append({
+                "agent_id": item["agent_id"],
+                "last_seen": item["last_seen"],
+                "age_seconds": round(age, 2),
+                "online": age <= ttl,
+            })
+        return {
+            "ttl_seconds": ttl,
+            "online": any(x["online"] for x in agents),
+            "agents": agents,
+        }
+
     def status(self):
         counts = self.store.device_task_counts()
         return {
@@ -111,4 +130,5 @@ class DeviceBridge:
             "completed": counts.get("COMPLETED", 0),
             "failed": counts.get("FAILED", 0),
             "last_agent_seen": self._last_seen,
+            "agents": self.agent_status(),
         }
