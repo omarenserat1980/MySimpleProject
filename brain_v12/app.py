@@ -21,6 +21,7 @@ from brain_v7.braincore_v2.code_tool_api import CodeTool
 from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from .brain.code_agent import BrainCodeAgent
 from .brain.render_monitor import RenderLogMonitor
+from .brain.render_deploy_monitor import RenderDeployMonitor
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -50,6 +51,7 @@ def handle_render_incident(incident):
         store.event("RENDER_INCIDENT_GOAL_ERROR", {"error":str(exc)})
 
 render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
+render_deploy_monitor=RenderDeployMonitor(store)
 for p in PLUGINS:
     plugin_id=p.get("id") if isinstance(p,dict) else str(p)
     plugin_name=p.get("name",plugin_id) if isinstance(p,dict) else str(p)
@@ -118,6 +120,14 @@ def system_status():
 @app.get("/api/monitor/status")
 def monitor_status():
     return {"ok":True,"monitor":render_monitor.status(),"incidents":store.incidents(20)}
+
+@app.get("/api/deploy/status")
+def deploy_status():
+    return {"ok":True,"supervisor":render_deploy_monitor.status()}
+
+@app.post("/api/deploy/run-once")
+def deploy_run_once():
+    return render_deploy_monitor.poll_once()
 
 @app.get("/api/monitor/incidents")
 def monitor_incidents(limit:int=50):
