@@ -13,12 +13,20 @@ from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
 from .brain.openai_provider import OpenAIProvider
 from .brain.plugin_manager import PluginManager
+from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
+from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
+from brain_v7.braincore_v2.code_tool_api import CodeTool
+from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
+code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
+code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/",))
+code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
+code_tool=CodeTool(code_workspace, code_team)
 for p in PLUGINS: plugins.register(p,p,[],[])
 
 app=FastAPI(title="Electronic Brain V12",version="12.2")
@@ -31,6 +39,14 @@ class Learn(BaseModel): lesson:str
 class Exec(BaseModel): command:list[str]; cwd:str="."; timeout:int=30; approved:bool=False
 class Improve(BaseModel): objective:str; files:list[str]=[]
 class Permission(BaseModel): capability:str
+class CodeChangeIn(BaseModel): path:str; content:str; reason:str=""
+class CodeChanges(BaseModel):
+    changes:list[CodeChangeIn]
+    reason:str=""
+    commit_message:str="brain: controlled code change"
+    approved:bool=False
+    persist_to_github:bool=True
+class CodePaths(BaseModel): paths:list[str]=[]
 
 @app.post("/api/media/upload")
 async def media_upload(file:UploadFile=File(...)):
@@ -105,6 +121,40 @@ def observe(body:Observe): return orchestrator.observe_and_learn(body.actual)
 def learn(body:Learn): return brain.learn(body.lesson)
 @app.get("/api/events")
 def events(): return store.events()
+
+@app.get("/api/code/status")
+def code_status(): return code_team.snapshot()
+
+@app.post("/api/code/inspect")
+def code_inspect(path:str): return code_tool.inspect(path)
+
+@app.post("/api/code/preview")
+def code_preview(body:CodeChanges):
+    changes=[CodeChange(x.path,x.content,x.reason) for x in body.changes]
+    return code_tool.preview(changes)
+
+@app.post("/api/code/checkpoint")
+def code_checkpoint(body:CodePaths): return code_tool.save_checkpoint(body.paths)
+
+@app.post("/api/code/verify")
+def code_verify(body:CodePaths): return code_tool.verify(body.paths)
+
+@app.post("/api/code/apply")
+def code_apply(body:CodeChanges):
+    if not body.approved:
+        return {"ok":False,"status":"EXPLICIT_APPROVAL_REQUIRED","message":"الموافقة الصريحة مطلوبة قبل الكتابة أو الحفظ البعيد."}
+    changes=[CodeChange(x.path,x.content,x.reason) for x in body.changes]
+    result=code_tool.save_and_execute(
+        changes,
+        reason=body.reason or "controlled code change from Brain interface",
+        commit_message=body.commit_message,
+        persist_to_github=body.persist_to_github,
+    )
+    store.event("CODE_TOOL_EXECUTION", {"status":result.get("status"),"remote_status":result.get("remote_status"),"paths":[x.path for x in changes]})
+    return result
+
+@app.get("/api/code/audit")
+def code_audit(): return code_workspace.snapshot()
 
 @app.get("/api/tasks")
 def tasks(): return cognitive.tasks.snapshot()
