@@ -21,6 +21,7 @@ class RenderDeployMonitor:
         self.api_key = api_key or os.getenv("RENDER_API_KEY", "")
         self.poll_seconds = int(poll_seconds or os.getenv("RENDER_DEPLOY_POLL_SECONDS", os.getenv("RENDER_LOG_POLL_SECONDS", "60")))
         self.base_url = os.getenv("RENDER_API_BASE", "https://api.render.com/v1").rstrip("/")
+        self.public_url = os.getenv("RENDER_PUBLIC_URL", "https://electronic-brain-v12-gwwg.onrender.com").rstrip("/")
 
     @property
     def configured(self):
@@ -70,6 +71,24 @@ class RenderDeployMonitor:
             "reason": item.get("reason"),
             "service_id": self.service_id,
         }
+
+    def poll_public_once(self):
+        """Verify the deployed service from inside the brain without requiring Render secrets."""
+        try:
+            health = httpx.get(f"{self.public_url}/health", timeout=15).json()
+            identity = httpx.get(f"{self.public_url}/api/deploy/identity", timeout=15).json()
+            state = self.store.monitor_state()
+            state.update({"public_last_poll": time.time(), "public_error": None, "public_ok": bool(health.get("ok")),
+                          "public_version": health.get("version"), "public_commit": identity.get("commit"),
+                          "public_service_id": identity.get("service_id")})
+            self.store.set_monitor_state(state)
+            self.store.event("RENDER_PUBLIC_HEALTH_CHECK", {"ok": state["public_ok"], "commit": state["public_commit"], "version": state["public_version"]})
+            return {"ok": state["public_ok"], "status": "HEALTHY" if state["public_ok"] else "UNHEALTHY",
+                    "version": state["public_version"], "commit": state["public_commit"], "service_id": state["public_service_id"]}
+        except Exception as exc:
+            state=self.store.monitor_state(); state.update({"public_last_poll":time.time(),"public_error":str(exc)[:1000],"public_ok":False}); self.store.set_monitor_state(state)
+            self.store.event("RENDER_PUBLIC_HEALTH_FAILED", {"error":str(exc)[:1000]})
+            return {"ok":False,"status":"PUBLIC_HEALTH_FAILED","error":str(exc)}
 
     def poll_once(self):
         if not self.configured:
@@ -129,4 +148,7 @@ class RenderDeployMonitor:
                 "updated_at": state.get("deploy_updated_at"),
             },
             "action_policy": "OBSERVE_ONLY",
+            "public_health": {"ok": state.get("public_ok"), "last_poll": state.get("public_last_poll"),
+                              "version": state.get("public_version"), "commit": state.get("public_commit"),
+                              "service_id": state.get("public_service_id"), "error": state.get("public_error")},
         }
