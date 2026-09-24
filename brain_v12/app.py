@@ -149,8 +149,8 @@ class CinematicReleaseIn(BaseModel):
     privacy: str = "private"
 
 @app.post("/api/youtube/cinematic/prepare")
-def youtube_cinematic_prepare(body: CinematicReleaseIn):
-    require_control_key
+def youtube_cinematic_prepare(body: CinematicReleaseIn, request: Request):
+    require_control_key(request)
     return workforce.prepare_cinematic_release(body.title, body.description, body.media_path, body.tags, body.privacy)
 
 @app.post("/api/youtube/release/authorize")
