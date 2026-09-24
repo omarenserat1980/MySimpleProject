@@ -75,7 +75,20 @@ class CognitiveLoop:
             if not bridge:
                 result={"ok":False,"status":"UNAVAILABLE","tool":tool_id}
             else:
-                result=bridge.enqueue(str(params.get("task","status")), params.get("params",{}))
+                queued=bridge.enqueue(str(params.get("task","status")), params.get("params",{}))
+                if not queued.get("ok"):
+                    result=queued
+                else:
+                    task_id=queued["task"]["task_id"]
+                    completed=bridge.wait_result(task_id, float(params.get("timeout", 20)))
+                    result={
+                        "ok": bool(completed.get("ok")),
+                        "status": completed.get("task",{}).get("status", completed.get("status", "RESULT_TIMEOUT")),
+                        "tool": tool_id,
+                        "task": queued["task"],
+                        "result": completed.get("task",{}).get("result", {}),
+                        "error": completed.get("task",{}).get("error", ""),
+                    }
         else:
             result={"ok":False,"status":"DELEGATED","tool":tool_id,"reason":"الأداة تحتاج المسار المخصص لها."}
         self.events.publish("TOOL_RESULT",result)
