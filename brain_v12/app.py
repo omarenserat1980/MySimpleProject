@@ -168,6 +168,16 @@ def system_connection():
         "checks": checks,
     }
 
+@app.get("/api/device/agent-status/{agent_id}")
+def device_agent_status_by_id(agent_id: str, request: Request):
+    if not require_device_agent(request):
+        return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
+    age = device_bridge.heartbeat_age_seconds(agent_id)
+    if age is None:
+        return JSONResponse({"ok": False, "status": "AGENT_NOT_FOUND", "agent_id": agent_id}, status_code=404)
+    ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
+    return JSONResponse({"ok": True, "agent_id": agent_id, "age_seconds": round(age, 2), "ttl_seconds": ttl, "online": age <= ttl, "state": "ONLINE" if age <= ttl else "STALE"})
+
 @app.get("/api/device/agent-status")
 def device_agent_status(request: Request):
     if not require_device_agent(request):
