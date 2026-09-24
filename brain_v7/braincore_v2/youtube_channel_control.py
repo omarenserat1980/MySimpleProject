@@ -7,14 +7,19 @@ from .youtube_api_client import YouTubeApiClient
 
 class YouTubeChannelControl:
     def __init__(self) -> None:
-        self.api = YouTubeApiClient()
+        configured = bool(os.getenv("YOUTUBE_CLIENT_ID") and os.getenv("YOUTUBE_CLIENT_SECRET") and os.getenv("YOUTUBE_REFRESH_TOKEN"))
+        self.api = YouTubeApiClient() if configured else None
         self.base = "https://www.googleapis.com/youtube/v3"
         self.timeout = float(os.getenv("YOUTUBE_API_TIMEOUT_SECONDS", "60"))
 
     def _headers(self):
+        if self.api is None:
+            raise RuntimeError("YOUTUBE_NOT_CONFIGURED")
         return {"Authorization": "Bearer " + self.api._access_token()}
 
     def channel(self):
+        if self.api is None:
+            return {"status": "NOT_CONFIGURED"}
         with httpx.Client(timeout=self.timeout) as c:
             r=c.get(self.base+"/channels", params={"part":"snippet,statistics,contentDetails,status","mine":"true"}, headers=self._headers())
             r.raise_for_status()
