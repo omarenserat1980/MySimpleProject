@@ -10,6 +10,16 @@
 <body><div class="wrap">
 <div class="top"><div><h1>🧠 أداة الكود للعقل</h1><div class="small">Inspect → Preview → Checkpoint → Validate → Apply → Test → GitHub</div></div><a href="/" style="color:#fff">← مركز العقل</a></div>
 <div class="card"><b>الحالة:</b> <span id="status">جاري الفحص...</span><div class="row"><span class="badge">لا تخزين أسرار</span><span class="badge">لا أوامر Shell</span><span class="badge">Rollback</span><span class="badge">Python validation</span><span class="badge">GitHub persistence عند الإعداد</span></div></div>
+<div class="card">
+<h2>🧠 اجعل العقل يقترح التعديل</h2>
+<p class="small">العقل يقرأ الملفات المحددة، يبني اقتراحاً برمجياً، يعرض الـDiff، ثم لا يكتب إلا بعد الموافقة الصريحة.</p>
+<input id="brainObjective" placeholder="مثال: حسّن إدارة الذاكرة وأضف اختباراً لها">
+<input id="brainFiles" value="brain_v7/braincore_v2/brain_orchestrator.py" style="margin-top:7px">
+<div class="row">
+<button onclick="brainPlan()">🧠 تحليل واقتراح</button>
+<button onclick="brainApply()">⚙️ اقتراح ثم تنفيذ</button>
+</div>
+</div>
 <div class="grid">
 <section class="card s4"><h2>🔎 فحص ملف</h2><input id="path" value="brain_v7/braincore_v2/brain_orchestrator.py"><button onclick="inspect()">قراءة الكود</button><button class="secondary" onclick="verify()">تحقق</button><button class="secondary" onclick="checkpoint()">حفظ نقطة استرجاع</button><pre id="inspectOut">—</pre></section>
 <section class="card s8"><h2>✏️ محرر التغيير</h2><input id="reason" placeholder="سبب التغيير"><input id="commit" value="brain: controlled code change" style="margin-top:7px"><textarea id="code" placeholder="ضع المحتوى الكامل للملف المراد تغييره هنا..."></textarea><div class="row"><button onclick="preview()">👁️ معاينة Diff</button><button onclick="apply()">🧠 تنفيذ التغيير</button><label class="badge"><input id="approve" type="checkbox" style="width:auto"> موافقة صريحة</label><label class="badge"><input id="persist" type="checkbox" checked style="width:auto"> حفظ GitHub إن كان مهيأً</label></div></section>
@@ -18,6 +28,17 @@
 <script>
 const $=x=>document.getElementById(x);
 async function api(u,o){const r=await fetch(u,o);return r.json()}
+async function brainRequest(applyIt){
+  const objective=$('brainObjective').value.trim();
+  const files=$('brainFiles').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!objective||!files.length){$('out').textContent='اكتب الهدف والملفات أولاً.';return}
+  const payload={objective,files,approved:applyIt,persist_to_github:$('persist').checked,commit_message:$('commit').value};
+  const endpoint=applyIt?'/api/code/brain-apply':'/api/code/brain-plan';
+  const r=await api(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  $('out').textContent=JSON.stringify(r,null,2);
+}
+async function brainPlan(){await brainRequest(false)}
+async function brainApply(){if(!confirm('سيطلب العقل اقتراحاً ثم ينفذ التغيير عبر أداة الكود إذا اجتاز التحقق. هل تريد المتابعة؟'))return;await brainRequest(true)}
 async function load(){try{const s=await api('/api/code/status');$('status').innerHTML='<span class="ok">متاح</span> • '+s.employee_count+' موظفاً متخصصاً • GitHub: '+(s.github_executor?.configured?'مهيأ':'غير مهيأ');$('out').textContent=JSON.stringify(s,null,2)}catch(e){$('status').innerHTML='<span class="bad">غير متاح</span> '+e.message}}
 async function inspect(){const p=$('path').value.trim();const r=await api('/api/code/inspect?path='+encodeURIComponent(p),{method:'POST'});if(r.content!==undefined)$('code').value=r.content;$('inspectOut').textContent=JSON.stringify(r,null,2)}
 function changes(){return [{path:$('path').value.trim(),content:$('code').value,reason:$('reason').value}]}
