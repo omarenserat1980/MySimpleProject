@@ -34,6 +34,15 @@ services:
         sync: false
       - key: BRAIN_CONTROL_KEY
         sync: false
+      # YouTube OAuth secrets are supplied in Render; never commit their values.
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: YOUTUBE_TOKEN_ENCRYPTION_KEY
+        sync: false
 
 
   - type: worker
