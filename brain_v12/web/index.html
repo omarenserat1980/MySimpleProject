@@ -24,7 +24,7 @@
 </div>
 </aside>
 <main class="main">
-<header class="top"><div><h1 id="title">الرئيسية</h1><span class="muted">منصة واحدة للحوار، الإدراك، التخطيط، الأدوات والوسائط</span></div><div class="status"><span class="dot">●</span> <span id="connection">جاري الفحص</span></div></header>
+<header class="top"><div><h1 id="title">الرئيسية</h1><span class="muted">منصة واحدة للحوار، الإدراك، التخطيط، الأدوات والوسائط</span></div><div class="status"><span class="dot">●</span> <span id="connection">جاري الفحص</span> <span id="buildVersion" class="badge">V12</span></div></header>
 
 <section id="home" class="view active">
 <div class="stats"><div class="stat">الحالة<b id="sState">—</b></div><div class="stat">الأهداف<b id="sGoals">0</b></div><div class="stat">الذاكرة<b id="sMem">0</b></div><div class="stat">الأحداث<b id="sEvents">0</b></div></div>
@@ -100,7 +100,16 @@
 const $=id=>document.getElementById(id);let lastReply='',stream=null;
 function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===id));let b=document.querySelector('[data-view="'+id+'"]');if(b)$('title').textContent=b.textContent; if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='plugins'||id==='tools')loadCaps();if(id==='events')loadEvents();if(id==='agent')loadAgent();if(id==='cycle')loadState();if(id==='selfImprovement')siStatus();}
 async function api(url,opt){let r=await fetch(url,opt);return r.json()}
-async function refresh(){try{let [s,g,m,e]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events')]);$('connection').textContent='متصل';$('sState').textContent=s.status||'READY';$('sGoals').textContent=g.length;$('sMem').textContent=m.length;$('sEvents').textContent=e.length;$('homeState').textContent=JSON.stringify(s,null,2)}catch(e){$('connection').textContent='غير متصل'}}
+let lastServerVersion='';
+async function refresh(){try{
+  let [s,g,m,e,sys]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events'),api('/api/system/status')]);
+  $('connection').textContent='متصل';
+  $('buildVersion').textContent=sys.version||'V12';
+  $('sState').textContent=s.status||'READY';$('sGoals').textContent=g.length;$('sMem').textContent=m.length;$('sEvents').textContent=e.length;
+  $('homeState').textContent=JSON.stringify({state:s,system:sys},null,2);
+  if(lastServerVersion && sys.version && sys.version!==lastServerVersion){location.reload();}
+  lastServerVersion=sys.version||lastServerVersion;
+}catch(e){$('connection').textContent='غير متصل';$('buildVersion').textContent='—'}}
 async function sendChat(){let q=$('q').value.trim();if(!q)return;addMsg(q,'user');$('q').value='';let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});lastReply=r.reply||JSON.stringify(r);addMsg(lastReply,'assistant');refresh()}
 function addMsg(t,c){let d=document.createElement('div');d.className='msg '+c;d.textContent=t;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight}
 async function runCycle(){let r=await api('/api/run',{method:'POST'});$('cycleOut').textContent=JSON.stringify(r,null,2);addMsg(JSON.stringify(r,null,2),'assistant');refresh()}
@@ -124,6 +133,6 @@ function startSpeech(){let SR=window.SpeechRecognition||window.webkitSpeechRecog
 function speakLast(){if(!lastReply)return;let u=new SpeechSynthesisUtterance(lastReply);u.lang='ar-JO';speechSynthesis.speak(u)}
 function closeModal(){$('modal').classList.remove('show')}function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
-refresh();setInterval(refresh,5000);
+refresh();setInterval(refresh,3000);
 </script>
 </body></html>
