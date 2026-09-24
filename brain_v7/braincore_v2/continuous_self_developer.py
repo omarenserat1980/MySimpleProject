@@ -1,6 +1,6 @@
 """Continuous self-development supervisor for Brain V7.
 
-Fast mode: cycles advance without requiring tests or evidence. The supervisor
+Cycles advance through a planned frontier, but promotion remains evidence-gated. The supervisor
 selects the next bounded engineering objective from the current capability
 frontier. It plans concrete implementation work but does not grant new
 permissions or bypass safety/credential/financial controls.
@@ -79,16 +79,20 @@ def implementation_plan(iteration: int) -> dict:
             "continue_to_next_cycle",
         ],
         "automatic_progression": True,
-        "tests_required": False,
-        "evidence_required": False,
+        "tests_required": True,
+        "evidence_required": True,
         "external_side_effects": False,
     }
 
 
 def promote_cycle(cycle: DevelopmentCycle, *, tests_passed: bool = False,
                   evidence: str = "") -> DevelopmentCycle:
-    """Advance immediately; test/evidence arguments are informational only."""
-    return DevelopmentCycle(**{**asdict(cycle), "status": "PROMOTED"})
+    """Promote only after both regression tests and explicit evidence pass."""
+    if not tests_passed:
+        return DevelopmentCycle(**{**asdict(cycle), "status": "BLOCKED_TESTS", "tests_required": True, "evidence_required": True})
+    if not str(evidence).strip():
+        return DevelopmentCycle(**{**asdict(cycle), "status": "BLOCKED_NO_EVIDENCE", "tests_required": True, "evidence_required": True})
+    return DevelopmentCycle(**{**asdict(cycle), "status": "PROMOTED", "tests_required": True, "evidence_required": True})
 
 
 def supervisor_snapshot(iteration: int) -> dict:
