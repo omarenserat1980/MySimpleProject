@@ -63,7 +63,7 @@ class WorkforceControl:
         completed = self.organization.complete_task(task.task_id, success=True, result=result)
         return asdict(completed)
 
-    def dispatch(self, trigger: str = "scheduled") -> dict[str, Any]:
+    def dispatch(self, trigger: str = "scheduled", *, include_revenue: bool = True) -> dict[str, Any]:
         self.dispatch_count += 1
         results = []
 
@@ -92,9 +92,9 @@ class WorkforceControl:
             "DEPT-WEB-OPS",
             {"kind":"web_platforms","status":"AUDITED","external_side_effects":False},
         ))
-        revenue_tasks = self.revenue.generate(8)
+        revenue_tasks = self.revenue.generate(8) if include_revenue else []
         results.append(self._task(
-            "توليد وتجهيز تجارب فرص دخل قانونية قابلة للتحقق دون ادعاء أرباح.",
+            "تدقيق فرص الدخل القانونية وتجهيز التجارب القابلة للتحقق دون ادعاء أرباح.",
             "DEPT-003",
             {"kind":"revenue_opportunities","status":"PLANNED","count":len(revenue_tasks),
              "verified_revenue_jod":0.0,"payment_verification_required":True},
@@ -106,7 +106,7 @@ class WorkforceControl:
         }
         self.store.event("WORKFORCE_DISPATCH", {
             "dispatch_number": self.dispatch_count, "trigger": trigger,
-            "task_count": len(results), "external_actions": "NONE",
+            "task_count": len(results), "include_revenue": include_revenue, "external_actions": "NONE",
         })
         return self.last_dispatch
 
