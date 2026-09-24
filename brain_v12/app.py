@@ -251,7 +251,15 @@ def workforce_health():
 def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
 @app.get("/api/deploy/identity")
 def deploy_identity():
-    return {"ok":True,"brain":"V12","version":APP_VERSION,"commit":DEPLOY_COMMIT,"service_id":os.getenv("RENDER_SERVICE_ID","unknown")}
+    return {
+        "ok": True,
+        "brain": "V12",
+        "version": APP_VERSION,
+        "commit": DEPLOY_COMMIT,
+        "branch": os.getenv("RENDER_GIT_BRANCH", "unknown"),
+        "repository": os.getenv("RENDER_GIT_REPO_SLUG", "unknown"),
+        "service_id": os.getenv("RENDER_SERVICE_ID", "unknown"),
+    }
 
 @app.get("/api/system/connection")
 def system_connection():
