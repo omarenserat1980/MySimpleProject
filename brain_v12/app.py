@@ -500,6 +500,11 @@ class IncomeExternalEvidence(BaseModel):
     evidence:str
 
 
+@app.get("/api/income/lifecycle-report")
+def income_lifecycle_report(limit:int=100):
+    return workforce.income_engine.lifecycle_report(max(1,min(limit,500)))
+
+
 @app.get("/api/income/lifecycle")
 def income_lifecycle_status():
     return {"ok":True,"lifecycle":income_lifecycle.summary()}
