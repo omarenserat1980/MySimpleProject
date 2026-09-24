@@ -22,6 +22,8 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: BRAIN_CONTROL_KEY
+        sync: false
 
 
   - type: worker
