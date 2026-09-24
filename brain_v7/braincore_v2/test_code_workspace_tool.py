@@ -69,17 +69,31 @@ def test_workspace_allowlist_blocks_other_source_tree(tmp_path: Path):
         tool.read("other.py")
 
 
-def test_code_tool_api_exposes_save_and_restore(tmp_path: Path):
+def test_code_tool_api_exposes_save_and_restore(tmp_path: Path, monkeypatch):
     from brain_v7.braincore_v2.code_tool_api import CodeTool
     from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
     from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 
     workspace = CodeWorkspaceTool(tmp_path)
     team = CodeToolEngineeringTeam(EmployeeHierarchy(initial_employees=0), workspace)
+    monkeypatch.setattr(team, "run_regression_tests", lambda: {"status": "PASS", "returncode": 0})
     api = CodeTool(workspace, team)
-    api.execute([CodeChange("brain_v7/api_test.py", "VALUE = 1\\n")], reason="test", commit_message="test: seed", persist_to_github=False)
+
+    applied = api.execute(
+        [CodeChange("brain_v7/api_test.py", "VALUE = 1\n")],
+        reason="test",
+        commit_message="test: seed",
+        persist_to_github=False,
+    )
+    assert applied["status"] == "APPLIED_LOCALLY"
+
     checkpoint = api.save_checkpoint(["brain_v7/api_test.py"])
-    api.execute([CodeChange("brain_v7/api_test.py", "VALUE = 2\\n")], reason="test", commit_message="test: update", persist_to_github=False)
+    api.execute(
+        [CodeChange("brain_v7/api_test.py", "VALUE = 2\n")],
+        reason="test",
+        commit_message="test: update",
+        persist_to_github=False,
+    )
     restored = api.restore_checkpoint(checkpoint["checkpoint_id"])
     assert restored["status"] == "RESTORED"
-    assert workspace.read("brain_v7/api_test.py") == "VALUE = 1\\n"
+    assert workspace.read("brain_v7/api_test.py") == "VALUE = 1\n"
