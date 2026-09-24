@@ -126,6 +126,33 @@ def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["
 def deploy_identity():
     return {"ok":True,"brain":"V12","version":APP_VERSION,"commit":DEPLOY_COMMIT,"service_id":os.getenv("RENDER_SERVICE_ID","unknown")}
 
+@app.get("/api/system/connection")
+def system_connection():
+    checks = []
+    def check(name, ok, detail):
+        checks.append({"name":name,"ok":bool(ok),"detail":detail})
+    check("server", True, "خادم العقل V12 يستجيب")
+    try:
+        state = store.state()
+        check("memory", isinstance(state, dict), "الذاكرة قابلة للقراءة")
+    except Exception as exc:
+        check("memory", False, "تعذر قراءة الذاكرة: " + str(exc)[:180])
+    try:
+        tool_count = len(cognitive.tool_catalog())
+        check("tools", tool_count >= 0, f"{tool_count} أدوات متاحة")
+    except Exception as exc:
+        check("tools", False, "تعذر قراءة الأدوات: " + str(exc)[:180])
+    online = all(x["ok"] for x in checks)
+    return {
+        "ok": online,
+        "connected": online,
+        "status": "CONNECTED" if online else "DISCONNECTED",
+        "label_ar": "في اتصال" if online else "مفيش اتصال",
+        "brain": "V12",
+        "version": APP_VERSION,
+        "checks": checks,
+    }
+
 @app.get("/api/system/status")
 def system_status():
     state=store.state()
