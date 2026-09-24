@@ -67,6 +67,7 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.6")
+DEPLOY_COMMIT=os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
 app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
 
 @app.middleware("http")
@@ -118,6 +119,10 @@ async def media_upload(file:UploadFile=File(...)):
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/health")
 def health(): return {"ok":True,"brain":"V12","version":APP_VERSION,"systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
+@app.get("/api/deploy/identity")
+def deploy_identity():
+    return {"ok":True,"brain":"V12","version":APP_VERSION,"commit":DEPLOY_COMMIT,"service_id":os.getenv("RENDER_SERVICE_ID","unknown")}
+
 @app.get("/api/system/status")
 def system_status():
     state=store.state()
