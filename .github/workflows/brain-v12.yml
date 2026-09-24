@@ -37,9 +37,11 @@ jobs:
             health=$(curl -fsS --max-time 20 "$RENDER_URL/health" || true)
             identity=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/identity" || true)
             verify=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/verify" || true)
+            diagnostics=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/diagnostics" || true)
             echo "health=$health"
             echo "identity=$identity"
             echo "verify=$verify"
+            echo "diagnostics=$diagnostics"
             version=$(printf '%s' "$health" | jq -r '.version // empty' 2>/dev/null || true)
             commit=$(printf '%s' "$identity" | jq -r '.commit // empty' 2>/dev/null || true)
             verified=$(printf '%s' "$verify" | jq -r '.ok // false' 2>/dev/null || true)
