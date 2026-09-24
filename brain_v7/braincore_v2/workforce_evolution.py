@@ -117,7 +117,7 @@ class WorkforceEvolutionEngine:
                 continue
             total = employee.completed_tasks + employee.failed_tasks
             score = self.promotion_score(employee)
-            if total >= 5 and score >= 0.90 and employee.title not in {
+            if total >= 5 and score >= 0.55 and employee.title not in {
                 "Senior Specialist", "Team Supervisor", "Department Manager"
             }:
                 employee.title = f"Senior {employee.title}"
