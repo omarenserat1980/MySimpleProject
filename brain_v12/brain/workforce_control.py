@@ -14,6 +14,7 @@ from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from brain_v7.braincore_v2.youtube_team import YouTubeTeam
 from brain_v7.braincore_v2.revenue_task_factory import RevenueTaskFactory
 from .income_engine import IncomeEngine
+from .income_strategy import IncomeStrategy
 
 
 WEBSITE_ROLES = (
@@ -43,6 +44,7 @@ class WorkforceControl:
         self.youtube = YouTubeTeam(self.organization)
         self.revenue = RevenueTaskFactory()
         self.income_engine = IncomeEngine(store)
+        self.income_strategy = IncomeStrategy(self.income_engine)
         self.website = self.organization.ensure_team(
             department_id="DEPT-WEB-OPS", name="WEB_PLATFORM_OPERATIONS",
             manager_id="MGR-WEB-OPS", manager_title="Web Platforms Manager",
@@ -69,6 +71,17 @@ class WorkforceControl:
         self.dispatch_count += 1
         results = []
 
+        income_mission = self.income_strategy.mission()
+        income_opportunities = self.income_engine.discover(8) if include_revenue else []
+        results.append(self._task(
+            "أولوية الدخل: البحث والتأهيل وتجهيز أول فرصة قابلة للتحقق بقيمة 10 JOD دون إنفاق مقدم.",
+            "DEPT-003",
+            {"kind":"income_first_mission","status":"ACTIVE","mission":income_mission["mission"],
+             "target_jod":income_mission["target_jod"],
+             "verified_revenue_jod":income_mission["verified_revenue_jod"],
+             "discovered_opportunities":len(income_opportunities),
+             "external_side_effects":False},
+        ))
         results.append(self._task(
             "استشفاء النظام: تدقيق أخطاء Render/CI وتوزيع نتائج الفحص على فرق الجودة والهندسة.",
             "DEPT-009",
@@ -94,7 +107,6 @@ class WorkforceControl:
             "DEPT-WEB-OPS",
             {"kind":"web_platforms","status":"AUDITED","external_side_effects":False},
         ))
-        income_opportunities = self.income_engine.discover(8) if include_revenue else []
         revenue_tasks = self.revenue.generate(8) if include_revenue else []
         results.append(self._task(
             "تدقيق فرص الدخل القانونية وتجهيز التجارب القابلة للتحقق دون ادعاء أرباح.",
@@ -135,7 +147,8 @@ class WorkforceControl:
             "youtube": self.youtube.snapshot(),
             "cinematic": {"employee_count": len(self.cinematic["employee_ids"]), "team": self.cinematic},
             "web_platforms": {"employee_count": len(self.website["employee_ids"]), "team": self.website},
-            "revenue": {**self.revenue.snapshot(), "income_engine": self.income_engine.snapshot()},
+            "revenue": {**self.revenue.snapshot(), "income_engine": self.income_engine.snapshot(),
+                        "income_strategy": self.income_strategy.mission()},
             "last_dispatch": self.last_dispatch,
             "work_totals": {"completed_internal_tasks": completed, "failed_internal_tasks": failed},
             "external_status": {
