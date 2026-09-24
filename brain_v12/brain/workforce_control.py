@@ -16,6 +16,7 @@ from brain_v7.braincore_v2.revenue_task_factory import RevenueTaskFactory
 from .income_engine import IncomeEngine
 from .income_strategy import IncomeStrategy
 from .mining_engine import MiningEngine
+from .freelance_agent import FreelanceAgent
 
 
 WEBSITE_ROLES = (
@@ -47,6 +48,7 @@ class WorkforceControl:
         self.income_engine = IncomeEngine(store)
         self.income_strategy = IncomeStrategy(self.income_engine)
         self.mining = MiningEngine()
+        self.freelance = FreelanceAgent(store)
         self.website = self.organization.ensure_team(
             department_id="DEPT-WEB-OPS", name="WEB_PLATFORM_OPERATIONS",
             manager_id="MGR-WEB-OPS", manager_title="Web Platforms Manager",
@@ -139,6 +141,7 @@ class WorkforceControl:
             "verified_revenue_jod": float(revenue.get("verified_revenue_jod", 0) or 0),
             "live_opportunities": int(revenue.get("total", 0) or 0),
             "mining": self.mining.snapshot(),
+            "freelance": self.freelance.snapshot(),
             "external_execution": {
                 "youtube": "AUTHORIZATION_REQUIRED",
                 "cinematic": "AUTHORIZATION_REQUIRED",
@@ -170,6 +173,7 @@ class WorkforceControl:
             "revenue": {**self.revenue.snapshot(), "income_engine": self.income_engine.snapshot(),
                         "income_strategy": self.income_strategy.mission()},
             "mining": self.mining.snapshot(),
+            "freelance": self.freelance.snapshot(),
             "last_dispatch": self.last_dispatch,
             "work_totals": {"completed_internal_tasks": completed, "failed_internal_tasks": failed},
             "external_status": {
