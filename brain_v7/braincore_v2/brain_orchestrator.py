@@ -35,6 +35,7 @@ from .external_work_gateway import ExternalWorkGateway
 from .completion_orchestrator import evaluate as evaluate_completion
 from .adaptive_reasoning_engine import AdaptiveReasoningEngine
 from .adaptive_learning_loop import AdaptiveLearningLoop
+from .continuous_self_improvement import ContinuousSelfImprovement
 from .reasoning_quality_controller import ReasoningQualityController
 from .operational_control_plane import OperationalControlPlane
 from .cognitive_workforce import CognitiveWorkforce
@@ -97,6 +98,7 @@ class UnifiedBrain:
         self.external_work = ExternalWorkGateway(self.organization)
         self.reasoning_engine = AdaptiveReasoningEngine()
         self.adaptive_learning = AdaptiveLearningLoop()
+        self.self_improvement = ContinuousSelfImprovement()
         self.quality_controller = ReasoningQualityController()
         self.control_plane = OperationalControlPlane()
         self.cognitive_workforce = CognitiveWorkforce()
@@ -239,6 +241,13 @@ class UnifiedBrain:
             self._bottleneck(),
         ]
         learning_recommendation = self.adaptive_learning.recommend(candidate_strategies)
+        self_improvement_plan = self.self_improvement.plan(
+            objective=objective,
+            recommendations=quality.recommendations,
+            quality=quality.overall,
+            failures=len(reasoning.contradictions),
+            evidence=[f"quality:{quality.overall:.3f}", f"confidence:{reasoning.confidence:.3f}"],
+        )
         learned_focus = learning_recommendation.get("selected")
         focus = (
             learned_focus
@@ -371,6 +380,8 @@ class UnifiedBrain:
             "reasoning_engine": self.reasoning_engine.snapshot(),
             "adaptive_learning": self.adaptive_learning.snapshot(),
             "learning_recommendation": learning_recommendation,
+            "self_improvement_plan": self_improvement_plan,
+            "self_improvement": self.self_improvement.snapshot(),
             "outcome": {"status": normalized_outcome, "reward": float(reward), "evidence": evidence},
             "operational_control_plane": control_plane,
             "requires_user_for_external_side_effects": True,
