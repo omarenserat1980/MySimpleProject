@@ -31,7 +31,7 @@ code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 for p in PLUGINS: plugins.register(p,p,[],[])
 
-app=FastAPI(title="Electronic Brain V12",version="12.2")
+app=FastAPI(title="Electronic Brain V12",version="12.3")
 
 class Chat(BaseModel): message:str
 class Goal(BaseModel): text:str; priority:float=0.5
@@ -61,7 +61,7 @@ async def media_upload(file:UploadFile=File(...)):
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
 @app.get("/health")
-def health(): return {"ok":True,"brain":"V12","version":"12.2","systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt"]}
+def health(): return {"ok":True,"brain":"V12","version":"12.3","systems":["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"]}
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
