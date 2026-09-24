@@ -58,8 +58,12 @@ class IncomeLifecycle:
         current = str(row.get("status") or "DISCOVERY")
         if target not in self.ORDER:
             return {"ok": False, "status": "INVALID_TARGET"}
-        if self.ORDER.index(target) < self.ORDER.index(current):
+        current_index = self.ORDER.index(current)
+        target_index = self.ORDER.index(target)
+        if target_index < current_index:
             return {"ok": False, "status": "INVALID_BACKWARD_TRANSITION", "current": current, "target": target}
+        if target_index > current_index + 1:
+            return {"ok": False, "status": "INVALID_SKIPPED_TRANSITION", "current": current, "target": target}
         if target in self.EXTERNAL_EVIDENCE and not str(evidence).strip():
             return {"ok": False, "status": "EVIDENCE_REQUIRED", "required": self.EXTERNAL_EVIDENCE[target]}
         data = self._save(row, status=target)
