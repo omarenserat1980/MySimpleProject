@@ -7,6 +7,7 @@ set -euo pipefail
 export TERMUX_AGENT_ID="${TERMUX_AGENT_ID:-android-termux-v12}"
 export TERMUX_POLL_SECONDS="${TERMUX_POLL_SECONDS:-2}"
 export TERMUX_MAX_TASKS_PER_RUN="${TERMUX_MAX_TASKS_PER_RUN:-100}"
+export TERMUX_HEARTBEAT_SECONDS="${TERMUX_HEARTBEAT_SECONDS:-10}"
 
 echo "[V12-Agent] preflight"
 python --version
