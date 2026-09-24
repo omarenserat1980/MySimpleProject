@@ -364,7 +364,8 @@ def task(title:str,parent_id:str|None=None,depends_on:list[str]=[]): return cogn
 def permissions(): return {"grants":sorted(cognitive.permissions.grants)}
 @app.post("/api/permissions/grant")
 def grant(request:Request, body:Permission):
-    require_control_key(request) return {"grants":cognitive.permissions.grant(body.capability)}
+    require_control_key(request)
+    return {"grants":cognitive.permissions.grant(body.capability)}
 @app.post("/api/permissions/revoke")
 def revoke(request:Request, body:Permission):
     require_control_key(request) return {"grants":cognitive.permissions.revoke(body.capability)}
