@@ -169,6 +169,31 @@ def monitor_stop(request:Request):
     require_control_key(request)
     return render_monitor.stop()
 
+@app.get("/api/income/opportunities")
+def income_opportunities(limit:int=20):
+    engine=workforce.income_engine
+    return {"ok":True,"summary":engine.snapshot(),"items":engine.prioritize(max(1,min(limit,100)))}
+
+
+@app.post("/api/income/discover")
+def income_discover(request:Request):
+    require_control_key(request)
+    items=workforce.income_engine.discover(8)
+    return {"ok":True,"count":len(items),"items":items,"verified_revenue_jod":workforce.income_engine.snapshot().get("verified_revenue_jod",0.0)}
+
+
+class IncomeVerification(BaseModel):
+    opportunity_id:str
+    amount_jod:float
+    evidence:str
+
+
+@app.post("/api/income/verify")
+def income_verify(request:Request, body:IncomeVerification):
+    require_control_key(request)
+    return workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence)
+
+
 @app.get("/api/workforce/report")
 def workforce_report():
     return workforce.report()
