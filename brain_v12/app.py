@@ -119,11 +119,13 @@ def system_status():
 
 @app.get("/api/monitor/status")
 def monitor_status():
-    return {"ok":True,"monitor":render_monitor.status(),"incidents":store.incidents(20)}
+    live = render_monitor.poll_once() if render_monitor.configured else None
+    return {"ok":True,"monitor":render_monitor.status(),"live_poll":live,"incidents":store.incidents(20)}
 
 @app.get("/api/deploy/status")
 def deploy_status():
-    return {"ok":True,"supervisor":render_deploy_monitor.status()}
+    live = render_deploy_monitor.poll_once() if render_deploy_monitor.configured else None
+    return {"ok":True,"supervisor":render_deploy_monitor.status(),"live_poll":live}
 
 @app.post("/api/deploy/run-once")
 def deploy_run_once():
