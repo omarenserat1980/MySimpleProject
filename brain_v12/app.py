@@ -32,6 +32,7 @@ from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.mining_engine import MiningEngine
+from .brain.freelance_agent import FreelanceAgent
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -65,6 +66,7 @@ render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
 mining=MiningEngine()
+freelance=FreelanceAgent(store)
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
@@ -158,6 +160,38 @@ def mining_compare(body:dict):
         return mining.compare(candidates)
     except (TypeError, ValueError) as exc:
         return {"ok":False,"status":"INVALID_INPUT","error":str(exc)}
+
+@app.get("/api/freelance/profile")
+def freelance_profile():
+    return freelance.profile_snapshot()
+
+@app.get("/api/freelance/status")
+def freelance_status():
+    return freelance.snapshot()
+
+@app.post("/api/freelance/analyze")
+def freelance_analyze(body:dict):
+    return freelance.analyze(body)
+
+@app.post("/api/freelance/prepare-offer")
+def freelance_prepare_offer(body:dict):
+    return freelance.prepare_offer(body)
+
+@app.post("/api/freelance/application-status")
+def freelance_application_status(body:dict):
+    return freelance.record_application(
+        str(body.get("opportunity_id", "")),
+        str(body.get("status", "")),
+        str(body.get("evidence", "")),
+    )
+
+@app.post("/api/freelance/payment-verified")
+def freelance_payment_verified(body:dict):
+    return freelance.record_verified_payment(
+        str(body.get("opportunity_id", "")),
+        float(body.get("amount_jod", 0) or 0),
+        str(body.get("evidence", "")),
+    )
 
 @app.get("/api/workforce/health")
 def workforce_health():
