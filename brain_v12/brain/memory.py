@@ -167,6 +167,20 @@ class MemoryStore:
                              now_iso,now_iso,json.dumps(data,ensure_ascii=False)))
             con.commit()
 
+    def purge_non_live_income_opportunities(self):
+        """Remove legacy channel-only records; live records must carry source_kind=LIVE_OPPORTUNITY."""
+        with self.connect() as con:
+            rows=con.execute("SELECT opportunity_id,data FROM income_opportunities").fetchall()
+            removed=0
+            for row in rows:
+                try: data=json.loads(row["data"])
+                except Exception: data={}
+                if data.get("source_kind") != "LIVE_OPPORTUNITY":
+                    con.execute("DELETE FROM income_opportunities WHERE opportunity_id=?",(row["opportunity_id"],)); removed += 1
+            con.commit()
+        if removed: self.event("INCOME_LEGACY_CHANNELS_PURGED", {"removed":removed})
+        return removed
+
     def income_opportunities(self, limit=100):
         with self.connect() as con:
             rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",
