@@ -44,6 +44,10 @@ class YouTubePublisher:
         self.store.event("YOUTUBE_CINEMATIC_RELEASE_PREPARED", package)
         return package
 
+    def validate_release(self, title: str, media_path: str, description: str = "", tags: list[str] | None = None) -> dict[str, Any]:
+        checks = {"title": bool(title.strip()), "media_path": bool(media_path.strip()), "description": len(description.strip()) <= 5000, "tags": len(tags or []) <= 30}
+        return {"ok": all(checks.values()), "checks": checks, "status": "VALID" if all(checks.values()) else "INVALID"}
+
     def authorize(self, release_id: str) -> dict[str, Any]:
         self.store.event("YOUTUBE_RELEASE_AUTHORIZATION_REQUESTED",
                          {"release_id": release_id, "status": "HUMAN_AUTHORIZATION_REQUIRED"})
