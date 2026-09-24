@@ -119,6 +119,16 @@ def system_status():
             "stage":state.get("cognitive_stage","READY"),"run_id":state.get("cognitive_trace",{}).get("run_id"),
             "tools":len(cognitive.tool_catalog()),"memory_items":len(store.memories()),"event_count":len(store.events(1000))}
 
+@app.get("/api/security/secrets/status")
+def security_secrets_status():
+    return secret_control.status()
+
+
+@app.post("/api/security/secrets/plan")
+def security_secrets_plan(names:list[str]|None=None):
+    return secret_control.plan(names)
+
+
 @app.get("/api/monitor/status")
 def monitor_status():
     live = render_monitor.poll_once() if render_monitor.configured else None
