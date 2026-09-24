@@ -184,6 +184,15 @@ def device_agent_status(request: Request):
         return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
     return JSONResponse(device_bridge.agent_status())
 
+@app.post("/api/device/requeue-stale")
+def device_requeue_stale(request:Request):
+    require_control_key(request)
+    max_age=max(5, int(os.getenv("TERMUX_TASK_STALE_SECONDS", "120")))
+    result=device_bridge.requeue_stale(max_age)
+    store.event("DEVICE_STALE_TASKS_REQUEUED", result)
+    return {**result, "max_age_seconds": max_age}
+
+
 @app.get("/api/device/queue")
 def device_queue(request: Request):
     if not require_device_agent(request):
