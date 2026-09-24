@@ -157,6 +157,25 @@ def youtube_oauth_start(request: Request):
     require_control_key(request)
     return youtube_oauth.start()
 
+@app.get("/api/youtube/oauth/readiness")
+def youtube_oauth_readiness():
+    snapshot = youtube_oauth.snapshot()
+    return {
+        "ok": True,
+        "configured": snapshot.get("configured", False),
+        "ready_to_start": snapshot.get("ready_to_start", False),
+        "ready_to_store_token": snapshot.get("ready_to_store_token", False),
+        "authorized": snapshot.get("authorized", False),
+        "next_step": (
+            "AUTHORIZED" if snapshot.get("authorized")
+            else "AUTHORIZE_GOOGLE" if snapshot.get("ready_to_start")
+            else "CONFIGURE_RENDER_OAUTH_SECRETS"
+        ),
+        "scope": snapshot.get("scope", "youtube.upload"),
+        "credentials_in_logs": False,
+        "missing_env": snapshot.get("missing_env", []),
+    }
+
 @app.get("/api/youtube/oauth/callback")
 def youtube_oauth_callback(code: str = "", state: str = ""):
     return youtube_oauth.callback(code, state)
