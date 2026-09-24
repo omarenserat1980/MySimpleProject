@@ -75,3 +75,7 @@ class IncomeLifecycleTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+    # Lifecycle tracking is implemented by IncomeEngine; this test file
+    # intentionally keeps the existing IncomeLifecycle regression coverage.
