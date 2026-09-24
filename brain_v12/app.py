@@ -218,6 +218,66 @@ def workforce_dispatch(request:Request):
     require_control_key(request)
     return workforce.dispatch("manual_control_plane")
 
+@app.get("/api/system/overview")
+def system_overview():
+    """Read-only, human-oriented map of the live Brain V12 architecture and operating state."""
+    state = store.state()
+    income = income_strategy.mission()
+    workforce_report = workforce.report()
+    code = code_workspace.snapshot()
+    permissions = {"grants": sorted(cognitive.permissions.grants)}
+    ai_status_value = {"providers": ai.status(), "openai": openai_provider.status()}
+    plugin_status_value = plugins.status()
+    agent_status_value = agent.status()
+    self_improvement = self_improver.status()
+    deploy = render_deploy_monitor.status()
+    monitor = render_monitor.status()
+    identity = deploy_identity()
+
+    return {
+        "ok": True,
+        "generated_at": __import__("time").time(),
+        "human": {
+            "headline": "العقل الإلكتروني V12 يعمل كمنظومة إدراك وقرار وتنفيذ وتحقق، مع صلاحيات واضحة.",
+            "now": state.get("cognitive_stage", "READY"),
+            "status": state.get("status", "READY"),
+            "goal": (store.active_goal() or {}).get("text"),
+            "decision": state.get("cognitive_trace", {}).get("decision"),
+            "next": income.get("next_actions", [])[:4],
+        },
+        "architecture": {
+            "core": ["الإدراك", "الذاكرة", "التفكير", "القرار", "التنفيذ", "التحقق", "التعلم"],
+            "subsystems": ["Cognitive Loop", "Memory", "Decision", "Tasks", "Permissions", "AI Gateway",
+                           "ChatGPT", "Brain Code Agent", "Code Tool", "Workforce", "Income", "Render Monitor"],
+            "tools_count": len(cognitive.tool_catalog()),
+            "memory_count": len(store.memories()),
+            "event_count": len(store.events(1000)),
+        },
+        "operation": {
+            "cognitive": cognitive_live(),
+            "workforce": workforce_report,
+            "income": income,
+            "permissions": permissions,
+            "ai": ai_status_value,
+            "plugins": plugin_status_value,
+            "agent": agent_status_value,
+            "self_improvement": self_improvement,
+        },
+        "engineering": {
+            "code": code,
+            "deployment": identity,
+            "deploy_monitor": deploy,
+            "render_monitor": monitor,
+        },
+        "human_readable_rules": [
+            "العقل يشرح ما فهمه قبل أن يقرر عندما تتوفر بيانات كافية.",
+            "الفرصة ليست دخلاً؛ لا يُحسب المال إلا بدليل دفع قابل للمطابقة.",
+            "التغيير البرمجي يمر بالفحص والنسخ الاحتياطي والتحقق، والكتابة البعيدة محمية بالموافقة.",
+            "النشر الخارجي والتحويلات المالية لا تُعرض كمنجزة ما لم توجد نتيجة موثقة وصلاحية فعلية.",
+            "الواجهة تعرض الحالة والسبب والخطوة التالية بدلاً من إغراق الإنسان بالتفاصيل الداخلية.",
+        ],
+    }
+
 @app.get("/api/system/diagnostics")
 def system_diagnostics():
     checks=[]
