@@ -47,7 +47,14 @@ def main():
     interval = max(monitor.poll_seconds, 10)
     while True:
         result = monitor.poll_once()
+        public_result = deploy_monitor.poll_public_once()
         deploy_result = deploy_monitor.poll_once()
+        print(
+            "RENDER_PUBLIC",
+            public_result.get("status"),
+            public_result.get("commit",""),
+            flush=True,
+        )
         print(
             "RENDER_DEPLOY",
             deploy_result.get("status"),
