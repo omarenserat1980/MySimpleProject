@@ -382,6 +382,6 @@ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLower
 </script>
 
 <div class="commandPalette" id="commandPalette" onclick="if(event.target===this)closeCommandPalette()">
- <div class="commandBox"><input class="commandInput" id="commandInput" placeholder="اكتب أمراً أو ابحث في النظام..." oninput="filterCommands(this.value)" onkeydown="if(event.key==='Escape')closeCommandPalette()">
+ <div class="commandBox"><input class="commandInput" id="commandInput" placeholder="قل للعقل ما تريد..." oninput="filterCommands(this.value)" onkeydown="if(event.key==='Enter'){navigateByHumanIntent(this.value);closeCommandPalette()}if(event.key==='Escape')closeCommandPalette()">
  <div class="commandList" id="commandList"></div></div>
 </div></body></html>
