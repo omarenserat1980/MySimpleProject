@@ -156,7 +156,10 @@ class CodeWorkspaceTool:
             if not relative.endswith(".py"):
                 continue
             path = self._safe_path(relative)
-            py_compile.compile(str(path), doraise=True)
+            try:
+                py_compile.compile(str(path), doraise=True)
+            except py_compile.PyCompileError as exc:
+                raise SyntaxError(str(exc)) from exc
 
 
     def _manifest(self, paths: Iterable[str]) -> dict[str, str]:
