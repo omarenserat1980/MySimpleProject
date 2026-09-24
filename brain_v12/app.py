@@ -280,6 +280,12 @@ def health():
 def deploy_diagnostics():
     snapshot = _deployment_snapshot()
     snapshot["marker"] = os.getenv("PRERENDER_BUILD_MARKER", "unset")
+    snapshot["oauth_env"] = {
+        "client_id": bool(os.getenv("YOUTUBE_CLIENT_ID")),
+        "client_secret": bool(os.getenv("YOUTUBE_CLIENT_SECRET")),
+        "redirect_uri": bool(os.getenv("YOUTUBE_OAUTH_REDIRECT_URI")),
+        "token_encryption_key": bool(os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY")),
+    }
     return {"ok": snapshot["converged"], **snapshot}
 
 @app.get("/api/deploy/verify")
