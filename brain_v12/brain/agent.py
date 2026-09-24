@@ -10,7 +10,7 @@ class Agent:
         self.allowed=set(filter(None,os.getenv("AGENT_COMMANDS","python,python3,pytest,git").split(",")))
 
     def status(self):
-        return {"ok":True,"platform":platform.platform(),"sandbox":str(self.sandbox),"allowed_commands":sorted(self.allowed)}
+        return {"ok":True, "command_count": len(self.allowed),"platform":platform.platform(),"sandbox":str(self.sandbox),"allowed_commands":sorted(self.allowed)}
 
     def execute(self,command,cwd=".",timeout=30):
         if not command or command[0] not in self.allowed:
