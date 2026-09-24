@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>العقل الإلكتروني — واجهة المحادثة</title>
+<style>
+:root{--bg:#212121;--panel:#171717;--panel2:#2a2a2a;--line:#3a3a3a;--text:#ececec;--muted:#a7a7a7;--accent:#10a37f;--user:#2f2f2f}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden}
+button,input,textarea{font:inherit}button{cursor:pointer;color:inherit}
+.app{height:100%;display:flex}.sidebar{width:280px;background:#171717;display:flex;flex-direction:column;border-left:1px solid #303030;transition:.2s}
+.brand{padding:15px 14px;display:flex;align-items:center;gap:10px;font-weight:700}.logo{width:30px;height:30px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:white}
+.new{margin:0 12px 10px;border:1px solid #444;background:transparent;border-radius:9px;padding:10px;text-align:right}.nav{padding:4px 10px}.nav button{width:100%;border:0;background:transparent;padding:9px;border-radius:8px;text-align:right}.nav button:hover,.chat:hover{background:#252525}.section{font-size:12px;color:#888;padding:15px 14px 6px}.chats{overflow:auto;flex:1;padding:0 10px}.chat{padding:9px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}.bottom{border-top:1px solid #303030;padding:10px}.profile{display:flex;align-items:center;gap:9px;padding:8px;border-radius:8px}.avatar{width:32px;height:32px;border-radius:50%;background:#555;display:grid;place-items:center}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}.topbar{height:58px;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid #303030;background:rgba(33,33,33,.92)}.topbar .title{font-weight:650}.model{border:0;background:transparent;padding:7px 10px;border-radius:8px}.model:hover{background:#2b2b2b}.status{margin-right:auto;color:#8ed9c4;font-size:12px}.content{flex:1;overflow:auto}.welcome{max-width:850px;margin:14vh auto 0;padding:20px;text-align:center}.welcome h1{font-size:34px;margin:0 0 28px}.quick{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;text-align:right}.quick button{background:transparent;border:1px solid #3a3a3a;border-radius:12px;padding:14px}.quick button:hover{background:#2a2a2a}.messages{max-width:900px;margin:auto;padding:28px 18px 150px}.msg{display:flex;gap:14px;padding:22px 0}.msg.user{background:var(--user);border-radius:14px;padding:16px;margin:8px 0}.role{width:32px;flex:0 0 32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:14px}.role.brain{background:var(--accent)}.role.user{background:#666}.bubble{white-space:pre-wrap;line-height:1.75;flex:1;min-width:0}.composer{position:fixed;bottom:0;left:280px;right:0;background:linear-gradient(transparent,var(--bg) 28%);padding:34px 18px 18px}.composebox{max-width:900px;margin:auto;background:#2f2f2f;border:1px solid #4a4a4a;border-radius:16px;padding:8px 10px;box-shadow:0 4px 30px #0006}.compose-row{display:flex;align-items:end;gap:8px}.attach,.send,.tool{border:0;background:transparent;border-radius:10px;padding:9px}.attach:hover,.tool:hover{background:#454545}.send{background:#eee;color:#111;width:38px;height:38px;border-radius:50%;font-weight:800}.send:disabled{opacity:.4}.composebox textarea{width:100%;background:transparent;border:0;outline:0;color:white;resize:none;max-height:180px;padding:7px;line-height:1.5}.hint{text-align:center;color:#777;font-size:11px;padding-top:7px}
+.drawer{position:fixed;top:0;bottom:0;right:-390px;width:390px;background:#181818;border-left:1px solid #333;z-index:5;transition:.25s;padding:18px;overflow:auto}.drawer.open{right:0}.drawer h2{margin-top:0}.close{float:left;background:transparent;border:0;font-size:22px}.card{background:#232323;border:1px solid #383838;border-radius:12px;padding:12px;margin:10px 0}.field{display:grid;gap:6px;margin:10px 0}.field input,.field textarea,.field select{background:#111;border:1px solid #444;color:white;border-radius:8px;padding:9px}.primary{background:var(--accent);border:0;border-radius:8px;padding:9px 13px}.danger{background:#8b2f2f;border:0;border-radius:8px;padding:9px}
+.code-editor{width:100%;min-height:240px;background:#0e0e0e;color:#d7f5e9;border:1px solid #444;border-radius:8px;padding:12px;direction:ltr;text-align:left;font-family:ui-monospace,Consolas,monospace}
+#toast{position:fixed;bottom:90px;right:20px;background:#333;padding:10px 14px;border-radius:9px;display:none}
+@media(max-width:800px){.sidebar{width:72px}.sidebar .label,.sidebar .chats,.sidebar .section,.sidebar .profile span{display:none}.brand{justify-content:center}.new{font-size:0}.new:after{content:"+";font-size:20px}.composer{left:72px}.quick{grid-template-columns:1fr}.welcome h1{font-size:27px}}
+</style></head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><div class="logo">ع</div><span class="label">العقل الإلكتروني</span></div>
+<button class="new" onclick="newChat()">＋ محادثة جديدة</button>
+<div class="nav">
+<button onclick="openDrawer('search')">⌕ <span class="label">البحث في المحادثات</span></button>
+<button onclick="openDrawer('projects')">▣ <span class="label">المشاريع</span></button>
+<button onclick="openDrawer('library')">▤ <span class="label">المكتبة</span></button>
+<button onclick="openDrawer('code')">⌘ <span class="label">استوديو الكود</span></button>
+<button onclick="openDrawer('settings')">⚙ <span class="label">الإعدادات</span></button>
+</div>
+<div class="section label">المحادثات</div><div id="chats" class="chats"></div>
+<div class="bottom"><div class="profile"><div class="avatar">ع</div><span class="label">المستخدم</span></div></div>
+</aside>
+<main class="main">
+<header class="topbar"><button class="model" onclick="cycleModel()">العقل الإلكتروني ▾</button><span class="title" id="modelName">وضع التفكير</span><span class="status" id="status">● جاهز</span></header>
+<div id="content" class="content"><div id="welcome" class="welcome"><h1>كيف أستطيع مساعدتك اليوم؟</h1><div class="quick">
+<button onclick="promptUse('حلّل هذا الهدف وابنِ خطة تنفيذ خطوة بخطوة')">🧠 تحليل وتخطيط<br><small>فهم الهدف وبناء خطة</small></button>
+<button onclick="promptUse('افحص المشروع وابحث عن التحسينات البرمجية الممكنة')">⌘ هندسة الكود<br><small>فحص وتطوير الكود</small></button>
+<button onclick="promptUse('أنشئ مهمة جديدة للفريق وحدد الموظف المناسب لها')">👥 إدارة الفريق<br><small>تفويض ومتابعة</small></button>
+<button onclick="promptUse('اقترح تجربة مشروعة قابلة للقياس لزيادة الإيرادات')">◈ فرص العمل<br><small>تجارب دخل مشروعة</small></button>
+</div></div><div id="messages" class="messages"></div></div>
+</main></div>
+<div class="composer"><div class="composebox"><div class="compose-row">
+<button class="attach" title="ملف" onclick="openDrawer('files')">＋</button><textarea id="input" rows="1" placeholder="أرسل رسالة إلى العقل..." oninput="autoGrow(this)" onkeydown="keySend(event)"></textarea><button class="send" id="send" onclick="send()">↑</button>
+</div><div class="hint">العقل مستقل عن ChatGPT. تنفيذ تغييرات الكود يمر عبر التحقق والصلاحيات والحفظ.</div></div></div>
+<div id="drawer" class="drawer"><button class="close" onclick="closeDrawer()">×</button><div id="drawerBody"></div></div><div id="toast"></div>
+<script>
+const state={api:localStorage.BRAIN_API||'',model:0,chats:JSON.parse(localStorage.BRAIN_CHATS||'[]')};
+const models=['وضع التفكير','وضع سريع','وضع البحث','وضع البرمجة','وضع المدير'];
+function apiUrl(p){return state.api.replace(/\/$/,'')+p}
+async function api(p,opt={}){const r=await fetch(apiUrl(p),opt);if(!r.ok)throw Error(await r.text());return r.json()}
+function toast(t){const x=document.getElementById('toast');x.textContent=t;x.style.display='block';setTimeout(()=>x.style.display='none',2500)}
+function renderChats(){document.getElementById('chats').innerHTML=state.chats.slice().reverse().map((c,i)=>'<div class="chat" onclick="loadChat('+i+')">'+escapeHtml(c.title)+'</div>').join('')}
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function addMsg(role,text){document.getElementById('welcome').style.display='none';const d=document.createElement('div');d.className='msg '+role;d.innerHTML='<div class="role '+role+'">'+(role==='brain'?'ع':'أنت')+'</div><div class="bubble"></div>';d.querySelector('.bubble').textContent=text;document.getElementById('messages').appendChild(d);document.getElementById('content').scrollTop=999999}
+function newChat(){document.getElementById('messages').innerHTML='';document.getElementById('welcome').style.display='block';document.getElementById('input').focus()}
+function promptUse(t){document.getElementById('input').value=t;autoGrow(document.getElementById('input'));document.getElementById('input').focus()}
+function autoGrow(x){x.style.height='auto';x.style.height=Math.min(x.scrollHeight,180)+'px'}
+function keySend(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}
+async function send(){const x=document.getElementById('input'),m=x.value.trim();if(!m)return;addMsg('user',m);x.value='';autoGrow(x);document.getElementById('send').disabled=true;document.getElementById('status').textContent='● يعمل...';try{let r;try{r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})})}catch(_){r={reply:'واجهة المستخدم جاهزة. اربط BRAIN_API بعنوان خدمة العقل الخلفية لتفعيل المحادثة.'}}addMsg('brain',r.reply||JSON.stringify(r));state.chats.push({title:m.slice(0,48)});localStorage.BRAIN_CHATS=JSON.stringify(state.chats);renderChats()}catch(e){addMsg('brain','حدث خطأ: '+e.message)}finally{document.getElementById('send').disabled=false;document.getElementById('status').textContent='● جاهز'}}
+function cycleModel(){state.model=(state.model+1)%models.length;document.getElementById('modelName').textContent=models[state.model]}
+function openDrawer(kind){const d=document.getElementById('drawer'),b=document.getElementById('drawerBody');d.classList.add('open');const common='<h2>'+({search:'البحث',projects:'المشاريع',library:'المكتبة',code:'استوديو الكود',settings:'الإعدادات',files:'الملفات'}[kind]||kind)+'</h2>';
+if(kind==='settings')b.innerHTML=common+'<div class="card"><div class="field"><label>عنوان Backend</label><input id="api" value="'+escapeHtml(state.api)+'" placeholder="https://..."></div><button class="primary" onclick="saveApi()">حفظ الاتصال</button></div><div class="card">هذه الواجهة منفصلة عن ChatGPT وتعمل كواجهة مستقلة للعقل الإلكتروني.</div>';
+else if(kind==='code')b.innerHTML=common+'<div class="card"><p>أداة حفظ وتغيير الكود: قراءة → معاينة → تحقق → نقطة حفظ → تطبيق. النشر إلى GitHub يبقى خلف صلاحيات مستقلة.</p><div class="field"><label>مسار الملف</label><input id="codePath" placeholder="brain_v7/braincore_v2/example.py"></div><div class="field"><label>الكود الجديد</label><textarea id="codeContent" class="code-editor" placeholder="# ضع التعديل هنا"></textarea></div><button class="primary" onclick="previewCode()">معاينة والتحقق</button><pre id="codeResult"></pre></div>';
+else if(kind==='projects')b.innerHTML=common+'<div class="card">مشروع العقل الإلكتروني</div><div class="card">وحدات: التفكير · الذاكرة · الموظفون · الكود · الإعلام · الإيرادات · الحوكمة</div>';
+else if(kind==='library')b.innerHTML=common+'<div class="card">المكتبة مخصصة للملفات والنتائج التي يقرر النظام حفظها.</div>';
+else if(kind==='files')b.innerHTML=common+'<div class="card">يمكن ربط رفع الملفات لاحقاً عبر API الملفات مع فحص النوع والحجم والصلاحيات.</div>';
+else b.innerHTML=common+'<div class="field"><input placeholder="ابحث في محادثات العقل..." oninput="searchChats(this.value)"></div><div id="searchResults"></div>';
+}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open')}
+function saveApi(){state.api=document.getElementById('api').value.trim().replace(/\/$/,'');localStorage.BRAIN_API=state.api;toast('تم حفظ عنوان العقل');closeDrawer()}
+async function previewCode(){const p=document.getElementById('codePath').value.trim(),c=document.getElementById('codeContent').value;const out=document.getElementById('codeResult');if(!p||!c)return;try{const r=await api('/api/brain/code/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:[{path:p,content:c,reason:'UI code change'}],persist_to_github:false,commit_message:'Brain UI code change'})});out.textContent=JSON.stringify(r,null,2)}catch(e){out.textContent='التحقق يحتاج BRAIN_API ومفتاح الصلاحيات: '+e.message}}
+function searchChats(q){const a=state.chats.filter(c=>c.title.toLowerCase().includes(q.toLowerCase()));document.getElementById('searchResults').innerHTML=a.map(c=>'<div class="card">'+escapeHtml(c.title)+'</div>').join('')}
+renderChats();
+</script></body></html>
