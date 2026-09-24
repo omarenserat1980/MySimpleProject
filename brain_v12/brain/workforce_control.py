@@ -17,6 +17,7 @@ from .income_engine import IncomeEngine
 from .income_strategy import IncomeStrategy
 from .mining_engine import MiningEngine
 from .freelance_agent import FreelanceAgent
+from .live_opportunity_researcher import LiveOpportunityResearcher
 
 
 WEBSITE_ROLES = (
@@ -49,6 +50,7 @@ class WorkforceControl:
         self.income_strategy = IncomeStrategy(self.income_engine)
         self.mining = MiningEngine()
         self.freelance = FreelanceAgent(store)
+        self.live_opportunity_researcher = LiveOpportunityResearcher(self.income_engine, store)
         self.website = self.organization.ensure_team(
             department_id="DEPT-WEB-OPS", name="WEB_PLATFORM_OPERATIONS",
             manager_id="MGR-WEB-OPS", manager_title="Web Platforms Manager",
