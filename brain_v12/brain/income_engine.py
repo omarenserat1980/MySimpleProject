@@ -11,6 +11,7 @@ from typing import Any
 from datetime import datetime, timezone
 import hashlib
 import re
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 
 class IncomeEngine:
@@ -174,6 +175,37 @@ class IncomeEngine:
         return channels
 
     @staticmethod
+    def _canonical_url(url: str) -> str:
+        parts = urlsplit(str(url).strip())
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            return ""
+        query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+                 if not k.lower().startswith("utm_") and k.lower() not in {"fbclid", "gclid", "ref"}]
+        path = parts.path.rstrip("/") or "/"
+        return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""))
+
+    @staticmethod
+    def _fit_score(title: str, requirements: str, category: str) -> tuple[float, list[str]]:
+        text = f"{title} {requirements} {category}".lower()
+        groups = {
+            "web": ("website", "web", "wordpress", "html", "css", "javascript", "موقع", "ويب"),
+            "python": ("python", "fastapi", "django", "flask"),
+            "dotnet": (".net", "asp.net", "c#", "csharp", "dotnet"),
+            "api": ("api", "rest", "integration", "ربط", "واجهة"),
+            "automation": ("automation", "automate", "أتمتة"),
+            "ecommerce": ("ecommerce", "shopify", "woocommerce", "متجر", "products"),
+            "arabic": ("arabic", "عربي", "العربية"),
+            "data": ("data entry", "excel", "إدخال بيانات"),
+        }
+        hits = [name for name, words in groups.items() if any(w in text for w in words)]
+        score = min(100.0, 20.0 + len(hits) * 11.0)
+        if any(x in text for x in ("senior", "5+ years", "5 years", "خبير 5", "خبرة 5")):
+            score -= 15
+        if any(x in text for x in ("urgent", "عاجل", "today", "اليوم")):
+            score -= 5
+        return max(0.0, score), hits
+
+    @staticmethod
     def _freshness(retrieved_at: str, max_age_hours: float) -> bool:
         try:
             dt = datetime.fromisoformat(str(retrieved_at).replace("Z", "+00:00"))
@@ -191,13 +223,25 @@ class IncomeEngine:
             retrieved_at = str(item.get("retrieved_at") or "").strip(); requirements = str(item.get("requirements") or "").strip(); budget = item.get("budget")
             if not title or not url.startswith(("http://","https://")) or not retrieved_at or not self._freshness(retrieved_at, max_age_hours): continue
             if not requirements and budget in (None, ""): continue
-            source_text = re.sub(r"\\s+", " ", str(item.get("source") or url))[:300]
-            fingerprint = hashlib.sha1((url + "|" + title).encode("utf-8")).hexdigest()[:12]
-            record = {"opportunity_id":"LIVE-"+fingerprint,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":url,
+            canonical_url = self._canonical_url(url)
+            if not canonical_url:
+                continue
+            source_text = re.sub(r"\\s+", " ", str(item.get("source") or canonical_url))[:300]
+            fingerprint = hashlib.sha1(canonical_url.encode("utf-8")).hexdigest()[:12]
+            existing = next((x for x in self.store.income_opportunities(500)
+                             if x.get("opportunity_id") == "LIVE-" + fingerprint), None)
+            if existing and existing.get("data", {}).get("retrieved_at") == retrieved_at:
+                continue
+            fit_score, fit_matches = self._fit_score(title, requirements, str(item.get("category") or "FREELANCE_JOB"))
+            history = list((existing or {}).get("data", {}).get("research_history", []))
+            history.append({"retrieved_at": retrieved_at, "title": title[:300], "score": fit_score})
+            history = history[-10:]
+            record = {"opportunity_id":"LIVE-"+fingerprint,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":canonical_url,
                       "evidence":f"مصدر حي: {source_text}; retrieved_at={retrieved_at}; هذه فرصة معلنة وليست إيرادًا.","requirements":requirements[:4000],"budget":budget,
                       "posted_at":item.get("posted_at"),"retrieved_at":retrieved_at,"source_kind":"LIVE_OPPORTUNITY","status":"DISCOVERY",
-                      "score":float(item.get("score",0.6) or 0.6),"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
+                      "score":fit_score,"fit_matches":fit_matches,"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
                       "owner_role":"Opportunity Researcher","discovered_at":time(),"run":self.run_count,
+                      "research_history":history,
                       "verification_rule":"لا يُحتسب أي دخل إلا بدليل قبول ثم دفع مستلم قابل للمطابقة."}
             self.store.upsert_income_opportunity(record); accepted.append(record)
         self.store.event("LIVE_INCOME_OPPORTUNITIES_INGESTED", {"run":self.run_count,"accepted":len(accepted),"received":len(results or []),"external_execution":False})
