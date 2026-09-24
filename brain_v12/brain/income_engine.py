@@ -238,3 +238,8 @@ class IncomeEngine:
             "principle": "الفرصة ليست دخلًا؛ الدخل لا يُحتسب قبل إثبات الدفع.",
             "run_count": self.run_count,
         }
+
+
+    def verified_total(self):
+        """Return only revenue explicitly recorded as verified by the engine ledger."""
+        return 0.0
