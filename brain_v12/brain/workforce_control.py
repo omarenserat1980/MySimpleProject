@@ -13,6 +13,7 @@ from typing import Any
 from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from brain_v7.braincore_v2.youtube_team import YouTubeTeam
 from brain_v7.braincore_v2.revenue_task_factory import RevenueTaskFactory
+from .income_engine import IncomeEngine
 
 
 WEBSITE_ROLES = (
@@ -41,6 +42,7 @@ class WorkforceControl:
         self.organization = EmployeeHierarchy()
         self.youtube = YouTubeTeam(self.organization)
         self.revenue = RevenueTaskFactory()
+        self.income_engine = IncomeEngine(store)
         self.website = self.organization.ensure_team(
             department_id="DEPT-WEB-OPS", name="WEB_PLATFORM_OPERATIONS",
             manager_id="MGR-WEB-OPS", manager_title="Web Platforms Manager",
@@ -92,16 +94,18 @@ class WorkforceControl:
             "DEPT-WEB-OPS",
             {"kind":"web_platforms","status":"AUDITED","external_side_effects":False},
         ))
+        income_opportunities = self.income_engine.discover(8) if include_revenue else []
         revenue_tasks = self.revenue.generate(8) if include_revenue else []
         results.append(self._task(
             "تدقيق فرص الدخل القانونية وتجهيز التجارب القابلة للتحقق دون ادعاء أرباح.",
             "DEPT-003",
-            {"kind":"revenue_opportunities","status":"PLANNED","count":len(revenue_tasks),
-             "verified_revenue_jod":0.0,"payment_verification_required":True},
+            {"kind":"revenue_opportunities","status":"PLANNED","count":len(revenue_tasks), "discovered_opportunities":len(income_opportunities),
+             "verified_revenue_jod":self.income_engine.snapshot().get("verified_revenue_jod",0.0),
+             "payment_verification_required":True},
         ))
         self.last_dispatch = {
             "timestamp": time(), "trigger": trigger, "dispatch_number": self.dispatch_count,
-            "tasks": results, "revenue_tasks": revenue_tasks,
+            "tasks": results, "revenue_tasks": revenue_tasks, "income_opportunities": income_opportunities,
             "external_actions": "NONE",
         }
         self.store.event("WORKFORCE_DISPATCH", {
@@ -131,14 +135,14 @@ class WorkforceControl:
             "youtube": self.youtube.snapshot(),
             "cinematic": {"employee_count": len(self.cinematic["employee_ids"]), "team": self.cinematic},
             "web_platforms": {"employee_count": len(self.website["employee_ids"]), "team": self.website},
-            "revenue": self.revenue.snapshot(),
+            "revenue": {**self.revenue.snapshot(), "income_engine": self.income_engine.snapshot()},
             "last_dispatch": self.last_dispatch,
             "work_totals": {"completed_internal_tasks": completed, "failed_internal_tasks": failed},
             "external_status": {
                 "youtube_publication": "AUTHORIZATION_REQUIRED",
                 "cinematic_publication": "AUTHORIZATION_REQUIRED",
                 "website_external_changes": "NOT_EXECUTED",
-                "verified_revenue_jod": 0.0,
+                "verified_revenue_jod": self.income_engine.snapshot().get("verified_revenue_jod",0.0),
                 "note": "لا يتم احتساب مال أو نشر خارجي دون نتيجة موثقة وصلاحية فعلية.",
             },
         }
