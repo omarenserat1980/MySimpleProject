@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -25,13 +25,13 @@ brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
-code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/",))
+code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
 code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 for p in PLUGINS: plugins.register(p,p,[],[])
 
-app=FastAPI(title="Electronic Brain V12",version="12.3")
+APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.4")\napp=FastAPI(title="Electronic Brain V12",version=APP_VERSION)\n\n@app.middleware("http")\nasync def no_cache(request, call_next):\n    response=await call_next(request)\n    response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"\n    response.headers["Pragma"]="no-cache"\n    return response
 
 class Chat(BaseModel): message:str
 class Goal(BaseModel): text:str; priority:float=0.5
