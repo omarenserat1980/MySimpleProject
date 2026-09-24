@@ -14,6 +14,26 @@
 .workspaceBar{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px;background:#07111ddd;border:1px solid var(--border);border-radius:16px;backdrop-filter:blur(20px);position:sticky;top:8px;z-index:20}.workspaceBar button{padding:8px 12px;border-radius:10px;background:transparent;border-color:transparent;color:#a9bbce;font-size:12px}.workspaceBar button:hover,.workspaceBar button.active{background:#ffffff0b;color:#fff;border-color:#ffffff12}.workspaceSearch{flex:1;max-width:520px;position:relative}.workspaceSearch input{width:100%;background:#050b14;border:1px solid var(--border);border-radius:11px;color:#fff;padding:9px 38px 9px 12px;outline:none}.workspaceSearch span{position:absolute;right:12px;top:8px;color:#7891a8}.statusCluster{margin-right:auto;display:flex;gap:6px;align-items:center}.statusDot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
 .aiControlRail{display:grid;grid-template-columns:1.2fr repeat(4,1fr);gap:8px;margin-top:14px}.aiMode{padding:12px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(145deg,#0d1928,#08111d);cursor:pointer;transition:.2s}.aiMode:hover,.aiMode.active{border-color:#55d6ff55;box-shadow:0 0 18px #55d6ff12;transform:translateY(-1px)}.aiMode b{display:block;font-size:12px}.aiMode small{color:#8198ad}.aiMode.primaryMode{background:linear-gradient(145deg,#12314a,#171b38)}
 .agentWorkspace{display:grid;grid-template-columns:1fr 280px;gap:12px;margin-top:14px}.agentCanvas{min-height:210px;background:radial-gradient(circle at 50% 35%,#163b5520,transparent 50%),#07111d;border:1px solid var(--border);border-radius:18px;padding:16px;position:relative;overflow:hidden}.agentCanvas:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff05 1px,transparent 1px),linear-gradient(90deg,#ffffff05 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,#000,transparent)}.agentHeader{position:relative;display:flex;justify-content:space-between;align-items:center}.agentFlow{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:22px}.flowNode{padding:12px;border:1px solid #ffffff10;background:#0b1827dd;border-radius:13px}.flowNode span{font-size:20px}.flowNode b{display:block;margin-top:5px;font-size:11px}.flowNode small{color:#7189a0}.inspector{border:1px solid var(--border);background:#08121f;border-radius:18px;padding:15px}.inspector h4{margin:0 0 10px}.inspectorRow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #ffffff09;font-size:11px}.inspectorRow span{color:#8298ad}.commandPalette{position:fixed;inset:0;background:#0008;backdrop-filter:blur(7px);display:none;place-items:start center;padding-top:13vh;z-index:100}.commandPalette.open{display:grid}.commandBox{width:min(720px,92vw);background:#0b1625;border:1px solid #ffffff20;border-radius:20px;box-shadow:0 30px 100px #0009;overflow:hidden}.commandInput{width:100%;padding:17px 19px;background:transparent;border:0;border-bottom:1px solid #ffffff10;color:#fff;font-size:16px;outline:none}.commandList{max-height:420px;overflow:auto;padding:8px}.commandItem{padding:12px 14px;border-radius:11px;display:flex;justify-content:space-between;cursor:pointer}.commandItem:hover{background:#ffffff0b}.commandItem small{color:#718ba2}.shortcut{padding:2px 7px;border:1px solid #ffffff15;border-radius:6px;color:#7f96aa;font-size:10px}
+.humanOverview{display:grid;gap:14px}
+.humanLead{display:grid;grid-template-columns:1.4fr .8fr;gap:12px}
+.humanNow{font-size:20px;line-height:1.7;margin:5px 0 0}
+.humanExplain{font-size:13px;line-height:1.9;color:#a9bdd0}
+.humanGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.humanCard{background:#08131f;border:1px solid var(--border);border-radius:16px;padding:14px;min-height:120px}
+.humanCard h4{margin:0 0 8px;font-size:13px}
+.humanCard .value{font-size:18px;font-weight:700}
+.humanCard small{color:#7f96aa;line-height:1.6}
+.humanList{display:grid;gap:7px;margin-top:8px}
+.humanItem{padding:9px 10px;border:1px solid #ffffff09;border-radius:10px;background:#07111d;font-size:12px}
+.humanItem b{color:#dff5ff}
+.systemMap{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.mapNode{padding:11px;border:1px solid #ffffff10;border-radius:12px;background:#0a1725;text-align:center}
+.mapNode span{font-size:20px;display:block}
+.mapNode b{font-size:11px;display:block;margin-top:4px}
+.mapNode small{font-size:10px;color:#718aa1}
+.humanRules{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(max-width:900px){.humanLead{grid-template-columns:1fr}.humanGrid{grid-template-columns:repeat(2,1fr)}.systemMap{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.humanGrid,.humanRules{grid-template-columns:1fr}.systemMap{grid-template-columns:1fr}}
 @media(max-width:900px){.aiControlRail{grid-template-columns:repeat(2,1fr)}.agentWorkspace{grid-template-columns:1fr}.workspaceSearch{max-width:none}.statusCluster{display:none}.agentFlow{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:650px){.workspaceBar{position:relative;flex-wrap:wrap}.workspaceSearch{order:3;flex-basis:100%}.aiControlRail{grid-template-columns:1fr}.agentFlow{grid-template-columns:1fr}}
 </style>
@@ -24,6 +44,7 @@
   <div class="brand"><div class="brain">🧠</div><h1>العقل الإلكتروني</h1><p>V12 • مركز الإدراك والقرار والتنفيذ</p></div>
   <div class="navTitle">العقل</div><div class="nav">
     <button class="active" data-view="home">⌂ الرئيسية</button>
+    <button data-view="overview">◉ فهم النظام</button>
     <button data-view="chat">◉ المحادثة</button>
     <button data-view="thinking">⟳ الدورة المعرفية</button>
     <button data-view="goals">◎ الأهداف والخطط</button>
@@ -61,6 +82,62 @@
  <div class="aiMode" onclick="selectAIMode(this,'دخل')"><b>💰 الدخل</b><small>فرص → تأهيل → تحقق</small></div>
  <div class="aiMode" onclick="selectAIMode(this,'إبداع')"><b>✦ إبداع</b><small>نصوص وصور وفيديو وأفكار</small></div>
 </div>
+<section id="overview" class="view">
+ <div class="humanOverview">
+  <div class="humanLead">
+   <div class="card">
+    <div class="sectionTitle"><h3>🧠 فهم النظام بلغة الإنسان</h3><span class="badge" id="overviewStatus">جاري القراءة…</span></div>
+    <div class="humanNow" id="humanHeadline">أقرأ حالة العقل ومكوّناته الآن…</div>
+    <div class="humanExplain" id="humanExplain">هذه الصفحة تحول الحالة التقنية إلى معنى واضح: ماذا يحدث الآن، ماذا يعرف النظام، ما الذي يستطيع فعله، وما الخطوة التالية.</div>
+    <div class="thinkingNow"><span id="humanStage">المرحلة: —</span><span id="humanGoal">الهدف: —</span><span id="humanDecision">القرار: —</span></div>
+   </div>
+   <div class="card">
+    <div class="sectionTitle"><h3>الحالة في لحظة واحدة</h3><span class="badge" id="overviewUpdated">—</span></div>
+    <div class="humanList">
+     <div class="humanItem"><b>الاتصال:</b> <span id="humanConnection">—</span></div>
+     <div class="humanItem"><b>الكود:</b> <span id="humanCode">—</span></div>
+     <div class="humanItem"><b>النشر:</b> <span id="humanDeploy">—</span></div>
+     <div class="humanItem"><b>الدخل المثبت:</b> <span id="humanIncome">—</span></div>
+    </div>
+   </div>
+  </div>
+
+  <div class="humanGrid">
+   <div class="humanCard"><h4>👁 ماذا يدرك؟</h4><div class="value" id="ovPerception">—</div><small>آخر حالة إدراك ودورة معرفية.</small></div>
+   <div class="humanCard"><h4>🧠 ماذا يفكر؟</h4><div class="value" id="ovThinking">—</div><small>المرحلة الحالية والقرار المسجل.</small></div>
+   <div class="humanCard"><h4>⚡ ماذا ينفذ؟</h4><div class="value" id="ovExecution">—</div><small>التنفيذ الخارجي يبقى واضحاً ومفصولاً عن التخطيط.</small></div>
+   <div class="humanCard"><h4>🔐 ما المسموح؟</h4><div class="value" id="ovPermissions">—</div><small>الصلاحيات الفعلية الممنوحة حالياً.</small></div>
+   <div class="humanCard"><h4>🛠 ما الأدوات؟</h4><div class="value" id="ovTools">—</div><small>الأدوات التي يعرفها النظام ومساراتها.</small></div>
+   <div class="humanCard"><h4>📚 ماذا يتعلم؟</h4><div class="value" id="ovLearning">—</div><small>الذاكرة والأحداث وخط التعلم.</small></div>
+  </div>
+
+  <div class="card">
+   <div class="sectionTitle"><h3>🗺 خريطة العقل</h3><span class="badge">من الداخل إلى الإنسان</span></div>
+   <div class="systemMap">
+    <div class="mapNode"><span>👁</span><b>الإدراك</b><small>يفهم المدخلات</small></div>
+    <div class="mapNode"><span>🗂</span><b>الذاكرة</b><small>يحفظ السياق والخبرة</small></div>
+    <div class="mapNode"><span>🧠</span><b>التفكير</b><small>يحلل البدائل</small></div>
+    <div class="mapNode"><span>🎯</span><b>القرار</b><small>يختار الخطوة</small></div>
+    <div class="mapNode"><span>⚒</span><b>الأدوات</b><small>ينفذ ضمن الصلاحيات</small></div>
+    <div class="mapNode"><span>✓</span><b>التحقق</b><small>يفحص النتيجة</small></div>
+    <div class="mapNode"><span>📖</span><b>التعلم</b><small>يحدث الخبرة</small></div>
+    <div class="mapNode"><span>👥</span><b>الفرق</b><small>توزع العمل الداخلي</small></div>
+   </div>
+  </div>
+
+  <div class="humanGrid">
+   <div class="card"><h3>💰 ما الذي يلاحقه الآن؟</h3><div id="ovIncomeList" class="humanList"><div class="humanItem">جاري القراءة…</div></div></div>
+   <div class="card"><h3>👥 حالة الفرق</h3><div id="ovWorkforce" class="humanList"><div class="humanItem">جاري القراءة…</div></div></div>
+   <div class="card"><h3>🧪 حالة الهندسة</h3><div id="ovEngineering" class="humanList"><div class="humanItem">جاري القراءة…</div></div></div>
+  </div>
+
+  <div class="card">
+   <div class="sectionTitle"><h3>📋 قواعد الفهم والتصرف</h3><span class="badge">شفافة</span></div>
+   <div id="ovRules" class="humanRules"></div>
+  </div>
+ </div>
+</section>
+
 <section id="home" class="view active">
  <div class="hero">
   <div class="card brainHero"><div class="rings"></div><div class="brainOrb"></div><div class="heroText"><h3>العقل في حالة استعداد</h3><p id="brainState">أنت تتحدث مع العقل مباشرة. اطرح سؤالاً أو أعطه مهمة.</p></div></div>
@@ -173,6 +250,48 @@ function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remo
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
+async function loadSystemOverview(){
+ try{
+  const o=await api('/api/system/overview');
+  const h=o.human||{}, op=o.operation||{}, eng=o.engineering||{};
+  $('overviewStatus').textContent=o.ok?'مقروءة من النظام':'تعذر القراءة';
+  $('overviewStatus').className='badge '+(o.ok?'good':'bad');
+  $('humanHeadline').textContent=h.headline||'—';
+  $('humanExplain').textContent='الحالة الحالية: '+(h.status||'—')+' • النظام يحول الحالة الداخلية إلى معلومات مفهومة للإنسان دون إخفاء القيود.';
+  $('humanStage').textContent='المرحلة: '+(h.now||'—');
+  $('humanGoal').textContent='الهدف: '+(h.goal||'لا يوجد هدف نشط');
+  $('humanDecision').textContent='القرار: '+(h.decision||'لا يوجد قرار مسجل');
+  $('humanConnection').textContent='V12 • '+(eng.deployment?.commit&&eng.deployment.commit!=='unknown'?'نسخة منشورة معروفة':'هوية النشر غير معروفة');
+  $('humanCode').textContent=(eng.code?.status||'—')+' • '+(eng.code?.allowed_prefixes||[]).join(', ');
+  $('humanDeploy').textContent=(eng.deploy_monitor?.configured?'مراقب النشر مهيأ':'مراقب النشر غير مهيأ');
+  $('humanIncome').textContent=(op.income?.verified_revenue_jod||0)+' د.أ مثبت';
+  $('ovPerception').textContent=(h.now||'جاهز');
+  $('ovThinking').textContent=(h.decision||'مراقبة وتحليل');
+  $('ovExecution').textContent=(op.cognitive?.state?.status||'READY')+' • '+((op.cognitive?.tasks?.total)||0)+' مهام';
+  $('ovPermissions').textContent=((op.permissions?.grants||[]).length)+' صلاحية ممنوحة';
+  $('ovTools').textContent=(o.architecture?.tools_count||0)+' أداة';
+  $('ovLearning').textContent=(o.architecture?.memory_count||0)+' ذاكرة • '+(o.architecture?.event_count||0)+' حدث';
+  const stages=op.income?.stages||[]; const next=(h.next||[]).slice(0,4);
+  $('ovIncomeList').innerHTML='<div class="humanItem"><b>المهمة:</b> '+esc(op.income?.mission||'FIRST_VERIFIED_10_JOD')+'</div>'+
+    '<div class="humanItem"><b>المرحلة:</b> '+esc(op.income?.current_stage||'DISCOVER')+'</div>'+
+    '<div class="humanItem"><b>المتبقي:</b> '+esc(op.income?.gap_jod||0)+' د.أ</div>'+
+    next.map(x=>'<div class="humanItem">→ '+esc(x)+'</div>').join('');
+  const wf=op.workforce||{};
+  $('ovWorkforce').innerHTML='<div class="humanItem"><b>الموظفون:</b> '+esc(wf.staffing?.specialist_employees||0)+'</div>'+
+    '<div class="humanItem"><b>الأقسام:</b> '+esc(Object.keys(wf.departments||{}).length)+'</div>'+
+    '<div class="humanItem"><b>مهام داخلية مكتملة:</b> '+esc(wf.work_totals?.completed_internal_tasks||0)+'</div>'+
+    '<div class="humanItem"><b>النشر الخارجي:</b> '+esc(wf.external_status?.youtube_publication||'AUTHORIZATION_REQUIRED')+'</div>';
+  $('ovEngineering').innerHTML='<div class="humanItem"><b>الهوية:</b> '+esc(eng.deployment?.version||'V12')+'</div>'+
+    '<div class="humanItem"><b>الكود:</b> '+esc(eng.code?.status||'—')+'</div>'+
+    '<div class="humanItem"><b>مراقبة Render:</b> '+esc(eng.render_monitor?.configured?'مفعلة':'غير مهيأة')+'</div>'+
+    '<div class="humanItem"><b>صلاحيات التغيير:</b> محمية بالموافقة الصريحة</div>';
+  $('ovRules').innerHTML=(o.human_readable_rules||[]).map(x=>'<div class="humanItem">✓ '+esc(x)+'</div>').join('');
+  $('overviewUpdated').textContent=new Date().toLocaleTimeString('ar-JO');
+ }catch(e){
+  $('overviewStatus').textContent='تعذر القراءة';$('overviewStatus').className='badge bad';
+  $('humanExplain').textContent='تعذر قراءة لوحة الفهم: '+e.message;
+ }
+}
 async function refresh(){try{const [s,g,m,e,sys]=await Promise.all([api('/api/state'),api('/api/goals'),api('/api/memory'),api('/api/events'),api('/api/system/status')]);updateCognitiveUI(s);renderConsole(s,e);$('conn').className='connection online';$('conn').querySelector('span').textContent='العقل متصل';$('mState').textContent=s.status||'READY';$('mGoals').textContent=g.length;$('mMemory').textContent=m.length;$('mEvents').textContent=e.length;$('brainState').textContent='V12 متصل • الإصدار '+(sys.version||'12.4')+' • الدورة المعرفية تعمل فعلياً';$('homeEvents').innerHTML=e.slice(-6).reverse().map(x=>'<div class="logItem"><b>'+esc(x.type||'EVENT')+'</b><br><small>'+esc(JSON.stringify(x.data||{}))+'</small></div>').join('')||'<div class="note">لا توجد أحداث بعد.</div>'}catch(e){$('conn').className='connection offline';$('conn').querySelector('span').textContent='غير متصل'}}
 async function loadChatGPTStatus(){try{const r=await api('/api/ai/status');const o=r.openai||{};$('chatgptModel').textContent='النموذج: '+(o.model||'OpenAI')+' • '+(o.configured?'متصل':'غير مُعد')}catch(e){$('chatgptModel').textContent='تعذر فحص اتصال ChatGPT'}}
 function addChatGPTMsg(t,c){$('emptyChatGPT')?.remove();const d=document.createElement('div');d.className='bubble '+c;d.innerHTML='<div class="who">'+(c==='user'?'أنت':'🤖 ChatGPT')+'</div>'+esc(t);$('chatgptMessages').append(d);$('chatgptMessages').scrollTop=$('chatgptMessages').scrollHeight}
@@ -233,7 +352,7 @@ async function loadIncomeMission(){
   $('incomeNext').textContent=(m.next_actions||[]).join(' • ')||'المراقبة والبحث مستمران.';
  }catch(e){$('incomeMissionStatus').textContent='تعذر التحديث';}
 }
-refresh();loadTools();loadIncomeMission();pollCognitive();setInterval(refresh,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);
+refresh();loadTools();loadIncomeMission();loadSystemOverview();pollCognitive();setInterval(refresh,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
 
 const brainCommands=[['ابدأ محادثة','افتح واجهة الحوار','chat'],['الدورة المعرفية','راقب دورة الإدراك والقرار','thinking'],['الأهداف والخطط','إدارة أهداف العقل','goals'],['موظفو العقل','مراقبة الوكلاء والمهام','workforce'],['الأدوات','عرض الأدوات والصلاحيات','tools'],['الدخل','عرض مهمة أول 10 د.أ','workforce'],['الذاكرة','عرض الذاكرة والتعلم','memory']];
 function openCommandPalette(q=''){const p=$('commandPalette');p.classList.add('open');$('commandInput').value=q;filterCommands(q);setTimeout(()=>$('commandInput').focus(),30)}
