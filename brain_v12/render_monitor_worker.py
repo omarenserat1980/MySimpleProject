@@ -3,6 +3,7 @@ import time
 
 from .brain.memory import MemoryStore
 from .brain.render_monitor import RenderLogMonitor
+from .brain.render_deploy_monitor import RenderDeployMonitor
 
 
 def on_incident(incident):
@@ -19,9 +20,17 @@ def main():
     store = MemoryStore(os.getenv("BRAIN_DB", "brain_v12_monitor.db"))
     store.init()
     monitor = RenderLogMonitor(store, incident_callback=on_incident)
+    deploy_monitor = RenderDeployMonitor(store)
     interval = max(monitor.poll_seconds, 10)
     while True:
         result = monitor.poll_once()
+        deploy_result = deploy_monitor.poll_once()
+        print(
+            "RENDER_DEPLOY",
+            deploy_result.get("status"),
+            (deploy_result.get("latest") or {}).get("status", ""),
+            flush=True,
+        )
         print(
             "RENDER_MONITOR",
             result.get("status"),
