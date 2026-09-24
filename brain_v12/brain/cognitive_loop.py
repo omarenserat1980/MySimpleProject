@@ -57,17 +57,29 @@ class CognitiveLoop:
 
         selected=decision.get("selected",{})
         action=selected.get("id","observe") if isinstance(selected,dict) else "observe"
-        execution={"status":"NOT_EXECUTED","action":action,"reason":"execution requires an explicit tool action"}
 
         self._state("EXECUTE",goal=goal)
-        self.events.publish("EXECUTION_SKIPPED",execution)
+        task_title=selected.get("action", "تحليل الهدف") if isinstance(selected,dict) else "تحليل الهدف"
+        task=self.tasks.create(task_title)
+        self.tasks.update(task["id"],"RUNNING")
+        self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title})
 
-        self._state("VERIFY",goal=goal)
-        verification={"status":"VERIFIED","evidence":"تم التحقق من اكتمال مراحل الإدراك والتحليل والقرار؛ لم يُنفذ إجراء خارجي."}
+        if action in {"observe","plan"}:
+            self.tasks.update(task["id"],"COMPLETED")
+            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"result":"تم تنفيذ خطوة داخلية آمنة: إنشاء المهمة وإكمالها والتحقق من حالتها."}
+            self.events.publish("EXECUTION_COMPLETED",execution)
+        else:
+            self.tasks.update(task["id"],"PENDING")
+            execution={"status":"WAITING_PERMISSION","action":action,"task_id":task["id"],"result":"الخطوة تحتاج صلاحية أو أداة تنفيذ خارجية."}
+            self.events.publish("EXECUTION_WAITING_PERMISSION",execution)
+
+        self._state("VERIFY",goal=goal,task_id=task["id"])
+        verified_task=next((x for x in self.tasks.snapshot()["tasks"] if x["id"]==task["id"]),None)
+        verification={"status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" else "PENDING","task_status":verified_task["status"] if verified_task else "UNKNOWN","evidence":"تم فحص حالة المهمة بعد التنفيذ الداخلي."}
         self.events.publish("VERIFIED",verification)
 
         self._state("LEARN",status="READY",goal=goal)
-        self.events.publish("LEARNING_RECORDED",{"lesson":"تم تشغيل دورة معرفية كاملة دون تنفيذ خارجي غير مصرح."})
+        self.events.publish("LEARNING_RECORDED",{"lesson":"تم تنفيذ خطوة داخلية آمنة والتحقق من نتيجتها."})
 
         return {
             "goal":goal,
