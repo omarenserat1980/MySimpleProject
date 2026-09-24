@@ -34,7 +34,7 @@
     <button data-view="agent">⚙ الوكيل</button>
     <button data-view="evolve">↻ التطوير الذاتي</button>
     <button onclick="location.href='/code-tool.html'">⌘ أداة الكود</button>
-    <button data-view="events">▤ سجل النشاط</button>
+    <button data-view="workforce">👥 موظفو العقل</button><button data-view="events">▤ سجل النشاط</button>
   </div>
 </aside>
 <main class="main">
@@ -94,13 +94,25 @@
 <section id="tools" class="view"><div class="card"><h3>⚒ أدوات العقل</h3><div id="toolsList" class="log">تحميل...</div></div></section>
 <section id="agent" class="view"><div class="card"><h3>⚙ الوكيل والتنفيذ</h3><pre id="agentOut">—</pre></div></section>
 <section id="evolve" class="view"><div class="card"><h3>↻ التطوير الذاتي</h3><p class="note">يقترح العقل التطويرات، بينما تبقى الكتابة والتنفيذ البعيدان محكومين بالموافقات والصلاحيات.</p><pre id="evolveOut">—</pre></div></section>
+<section id="workforce" class="view">
+ <div class="card"><div class="sectionTitle"><div><h3>👥 مركز موظفي العقل</h3><p class="note">توزيع تلقائي للمهام الداخلية، متابعة الإنجاز، وفصل واضح بين العمل الداخلي والنشر أو المال الخارجي.</p></div><div class="tools"><button onclick="loadWorkforce()">تحديث التقرير</button></div></div>
+ <div class="metrics" id="workforceMetrics"></div>
+ </div>
+ <div class="grid" style="margin-top:14px">
+  <div class="card"><div class="sectionTitle"><h3>📋 آخر توزيع مهام</h3><span class="badge" id="wfDispatch">—</span></div><div id="wfTasks" class="log">تحميل...</div></div>
+  <div class="card"><div class="sectionTitle"><h3>🎬 YouTube والسينما</h3></div><div id="wfMedia" class="log">تحميل...</div></div>
+  <div class="card"><div class="sectionTitle"><h3>🌐 المواقع وفرص الدخل</h3></div><div id="wfRevenue" class="log">تحميل...</div></div>
+  <div class="card full"><div class="sectionTitle"><h3>🏢 إنجازات الأقسام</h3></div><div id="wfDepartments" class="grid"></div></div>
+ </div>
+</section>
+
 <section id="events" class="view"><div class="card"><div class="sectionTitle"><h3>▤ سجل نشاط العقل</h3><button onclick="loadEvents()">تحديث</button></div><div id="eventsList" class="log">—</div></div></section>
 </main></div>
 <div id="toast" class="toast"></div>
 <script>
 const $=id=>document.getElementById(id);let stream=null,recognition=null,lastReply='',voiceBusy=false;let liveTimer=null;const cognitiveStages=['PERCEIVE','UNDERSTAND','MEMORY','ANALYZE','PLAN','DECIDE','EXECUTE','VERIFY','LEARN'];
-const titles={home:['مركز العقل','الإدراك • التفكير • القرار • التنفيذ • التعلم'],chat:['المحادثة','حوار مباشر مع العقل الإلكتروني'],thinking:['الدورة المعرفية','كيف ينتقل العقل من الإدراك إلى القرار؟'],goals:['الأهداف والخطط','ما الذي يحاول العقل إنجازه؟'],memory:['الذاكرة والتعلم','ما الذي يعرفه العقل وما الذي تعلمه؟'],permissions:['الصلاحيات والأجهزة','الميكروفون والكاميرا وإدراك العالم'],vision:['الكاميرا والصور','إدخال العالم المرئي إلى العقل'],voice:['الصوت','التحدث والاستماع'],video:['الفيديو','الوسائط المتحركة'],ai:['AI Gateway','طبقة الذكاء الخارجية'],tools:['الأدوات','قدرات العقل التنفيذية'],agent:['الوكيل','التنفيذ المنضبط'],evolve:['التطوير الذاتي','تحسين النظام مع الحواجز اللازمة'],events:['سجل النشاط','ما الذي حدث داخل العقل؟'],chatgpt:['ChatGPT','محادثة ChatGPT من داخل التطبيق']};
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(titles[id]){$('pageTitle').textContent=titles[id][0];$('pageSub').textContent=titles[id][1]}if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='events')loadEvents();if(id==='thinking')loadState();if(id==='tools')loadCaps();if(id==='agent')loadAgent();if(id==='ai')loadAI();if(id==='evolve')loadEvolve();if(id==='permissions')checkPermissions();if(id==='chatgpt')loadChatGPTStatus()}
+const titles={home:['مركز العقل','الإدراك • التفكير • القرار • التنفيذ • التعلم'],chat:['المحادثة','حوار مباشر مع العقل الإلكتروني'],thinking:['الدورة المعرفية','كيف ينتقل العقل من الإدراك إلى القرار؟'],goals:['الأهداف والخطط','ما الذي يحاول العقل إنجازه؟'],memory:['الذاكرة والتعلم','ما الذي يعرفه العقل وما الذي تعلمه؟'],permissions:['الصلاحيات والأجهزة','الميكروفون والكاميرا وإدراك العالم'],vision:['الكاميرا والصور','إدخال العالم المرئي إلى العقل'],voice:['الصوت','التحدث والاستماع'],video:['الفيديو','الوسائط المتحركة'],ai:['AI Gateway','طبقة الذكاء الخارجية'],tools:['الأدوات','قدرات العقل التنفيذية'],agent:['الوكيل','التنفيذ المنضبط'],evolve:['التطوير الذاتي','تحسين النظام مع الحواجز اللازمة'],workforce:['موظفو العقل','المهام • الإنجازات • YouTube • السينما • المواقع • فرص الدخل'],events:['سجل النشاط','ما الذي حدث داخل العقل؟'],chatgpt:['ChatGPT','محادثة ChatGPT من داخل التطبيق']};
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===id));if(titles[id]){$('pageTitle').textContent=titles[id][0];$('pageSub').textContent=titles[id][1]}if(id==='goals')loadGoals();if(id==='memory')loadMemory();if(id==='events')loadEvents();if(id==='workforce')loadWorkforce();if(id==='thinking')loadState();if(id==='tools')loadCaps();if(id==='agent')loadAgent();if(id==='ai')loadAI();if(id==='evolve')loadEvolve();if(id==='permissions')checkPermissions();if(id==='chatgpt')loadChatGPTStatus()}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 async function api(url,opt){const r=await fetch(url,opt);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 function toast(t){$('toast').textContent=t;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),3000)}
@@ -136,6 +148,12 @@ async function loadGoals(){try{const g=await api('/api/goals');$('goalsList').in
 async function addGoal(){const text=$('goalText').value.trim();if(!text)return;await api('/api/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,priority:.8})});$('goalText').value='';loadGoals();refresh()}
 async function loadMemory(){try{const m=await api('/api/memory');$('memoryList').innerHTML=m.map(x=>'<div class="logItem"><b>'+esc(x.key)+'</b><br><span class="note">'+esc(x.value)+'</span></div>').join('')||'<p class="note">الذاكرة فارغة.</p>'}catch(e){}}
 async function learn(){const lesson=$('lesson').value.trim();if(!lesson)return;await api('/api/learn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lesson})});$('lesson').value='';loadMemory();refresh()}
+async function loadWorkforce(){try{const r=await api('/api/workforce/report');const s=r.staffing||{};$('workforceMetrics').innerHTML='<div class="metric"><small>الموظفون</small><b>'+esc(s.specialist_employees||0)+'</b></div><div class="metric"><small>المديرون</small><b>'+esc(s.department_managers||0)+'</b></div><div class="metric"><small>مهام داخلية مكتملة</small><b>'+esc(r.work_totals?.completed_internal_tasks||0)+'</b></div><div class="metric"><small>إيراد موثّق</small><b>'+esc(r.external_status?.verified_revenue_jod||0)+' د.أ</b></div>';
+$('wfDispatch').textContent='توزيع #'+esc(r.dispatch_count||0);
+$('wfTasks').innerHTML=(r.last_dispatch?.tasks||[]).map(t=>'<div class="logItem"><b>'+esc(t.objective)+'</b><br><span class="badge good">'+esc(t.status)+'</span> <small>'+esc(t.assigned_to||'')+'</small></div>').join('')||'<p class="note">لا توجد مهام موزعة بعد.</p>';
+$('wfMedia').innerHTML='<div class="logItem"><b>YouTube</b><br>الفريق: '+esc(r.youtube?.employee_count||0)+' موظف<br><span class="badge">'+esc(r.external_status?.youtube_publication||'AUTHORIZATION_REQUIRED')+'</span></div><div class="logItem"><b>المصنع السينمائي</b><br>الفريق: '+esc(r.cinematic?.employee_count||0)+' موظف<br><span class="badge">'+esc(r.external_status?.cinematic_publication||'AUTHORIZATION_REQUIRED')+'</span></div>';
+$('wfRevenue').innerHTML='<div class="logItem"><b>المواقع والمنصات</b><br>'+esc(r.web_platforms?.employee_count||0)+' موظف يعملون على التدقيق والتحسين والفرص.</div><div class="logItem"><b>فرص الدخل</b><br>'+esc(r.revenue?.task_count||0)+' تجارب مسجلة<br><span class="badge">الإيراد الموثق: 0 د.أ</span></div>';
+$('wfDepartments').innerHTML=Object.values(r.departments||{}).map(d=>'<div class="card"><b>'+esc(d.name)+'</b><br><small>الموظفون: '+esc(d.employees)+' • مكتمل: '+esc(d.completed_tasks)+' • فشل: '+esc(d.failed_tasks)+' • مشغول: '+esc(d.busy)+'</small></div>').join('');}catch(e){$('wfTasks').textContent='تعذر تحميل التقرير: '+e.message}}
 async function loadEvents(){try{const e=await api('/api/events');$('eventsList').innerHTML=e.slice().reverse().map(x=>'<div class="logItem"><b>'+esc(x.type||'EVENT')+'</b><br><small>'+esc(JSON.stringify(x.data||{}))+'</small></div>').join('')}catch(e){}}
 async function loadCaps(){try{const c=await api('/api/capabilities');$('toolsList').innerHTML=(c.tools||[]).map(x=>'<div class="logItem"><b>'+esc(x.name)+'</b> <span class="badge">'+esc(x.risk)+'</span><br><small>'+esc(x.permission||'')+'</small></div>').join('')}catch(e){}}
 async function loadAgent(){try{$('agentOut').textContent=JSON.stringify(await api('/api/agent/status'),null,2)}catch(e){}}
