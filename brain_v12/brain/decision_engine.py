@@ -29,8 +29,8 @@ class DecisionEngine:
             asdict(Candidate("plan","بناء خطة متعددة الخطوات","خطة قابلة للتحقق","low",[],True,["goal"],.80,"tasks.create")),
         ]
         if code:
-            options.insert(0,asdict(Candidate("inspect_code","فحص الكود المستهدف","صورة فعلية عن الكود الحالي","low",["developer"],True,["goal","code"],.88,"code.inspect")))
-            options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",["developer"],True,["code"],.84,"code.verify")))
+            options.insert(0,asdict(Candidate("inspect_code","فحص الكود المستهدف","صورة فعلية عن الكود الحالي","low",[],True,["goal","code"],.88,"code.inspect")))
+            options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",[],True,["code"],.84,"code.verify")))
             options.append(asdict(Candidate("apply_code","تطبيق تحسين برمجي","تغيير قابل للتراجع مع تحقق","high",["developer_approval"],True,["code","approval"],.65,"code.apply")))
         options.append(asdict(Candidate("act","تنفيذ خطوة حساسة","نتيجة خارجية قابلة للتحقق","high",["agent_approval"],True,["goal","approval"],.55,"agent.execute")))
         return options
