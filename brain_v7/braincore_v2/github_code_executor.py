@@ -44,10 +44,17 @@ class GitHubCodeExecutor:
         self.allowed_prefix = allowed_prefix.rstrip("/") + "/"
         self.base_url = "https://api.github.com"
         self.audit: list[GitHubWriteResult] = []
+        self._configured_override: bool | None = None
 
     @property
     def configured(self) -> bool:
+        if self._configured_override is not None:
+            return self._configured_override
         return bool(self.repository and os.getenv(self.token_env))
+
+    @configured.setter
+    def configured(self, value: bool) -> None:
+        self._configured_override = bool(value)
 
     def _token(self) -> str:
         token = os.getenv(self.token_env, "")
