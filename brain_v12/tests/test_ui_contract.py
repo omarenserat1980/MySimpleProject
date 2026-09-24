@@ -70,3 +70,10 @@ class HumanInterfaceContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_connection_status_ui_contract(self):
+        ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', self.html))
+        self.assertIn("connectionStatus", ids)
+        self.assertIn("connectionText", ids)
+        self.assertIn("checkBrainConnection", self.html)
+        self.assertIn("/api/system/connection", self.html)
