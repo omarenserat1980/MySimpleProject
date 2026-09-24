@@ -24,6 +24,21 @@ class HumanInterfaceContractTests(unittest.TestCase):
     def test_navigation_points_to_existing_views(self):
         nav = set(re.findall(r'data-view=["\']([^"\']+)["\']', self.html))
         self.assertTrue(EXPECTED_VIEWS.issubset(nav))
+        self.assertTrue(nav.issubset(EXPECTED_VIEWS))
+
+    def test_all_javascript_dom_references_exist(self):
+        ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', self.html))
+        refs = set(re.findall(r'\$\(["\']([^"\']+)["\']\)', self.html))
+        self.assertEqual(set(), refs - ids)
+
+    def test_overview_and_cycle_required_elements_exist(self):
+        ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', self.html))
+        for required in {"ovReadiness", "ovReadinessDetail", "goalText", "runBadge", "cycleOut"}:
+            self.assertIn(required, ids)
+
+    def test_nav_binding_does_not_override_non_navigation_buttons(self):
+        self.assertNotIn("document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view))", self.html)
+        self.assertIn("button[data-view]", self.html)
 
     def test_human_command_input_exists(self):
         self.assertIn("قل للعقل ما تريد", self.html)
