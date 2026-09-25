@@ -33,7 +33,7 @@ jobs:
           [2:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.0006,1.09)':d=300:s=1920x1080:fps=30[v2];
           [v0][v1]xfade=transition=fade:duration=1:offset=9[v01];
           [v01][v2]xfade=transition=fade:duration=1:offset=19[v];
-          [v][3:a]copy[outv][outa]" -map "[outv]" -map "[outa]" -t 30 -r 30 -shortest -c:v libx264 -pix_fmt yuv420p -b:v 6M -c:a aac -b:a 128k cinematic_output/part_01.mp4
+          " -map "[outv]" -map 3:a -t 30 -r 30 -shortest -c:v libx264 -pix_fmt yuv420p -b:v 6M -c:a aac -b:a 128k cinematic_output/part_01.mp4
       - name: Verify
         run: |
           ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height -of json cinematic_output/part_01.mp4
