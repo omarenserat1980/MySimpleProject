@@ -1,4 +1,4 @@
-# V12 HUMAN-READABLE UI INTEGRATION
+# V13 HUMAN-READABLE UI INTEGRATION
 import os
 import threading
 from uuid import uuid4
@@ -90,13 +90,13 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
-APP_VERSION=os.getenv("BRAIN_V12_VERSION","12.6")
+APP_VERSION=os.getenv("BRAIN_V13_VERSION","12.6")
 DEPLOY_COMMIT=os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
 DEPLOY_BRANCH=os.getenv("RENDER_GIT_BRANCH","unknown")
 DEPLOY_REPOSITORY=os.getenv("RENDER_GIT_REPO_SLUG","unknown")
 DEPLOY_SERVICE_ID=os.getenv("RENDER_SERVICE_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
-app=FastAPI(title="Electronic Brain V12",version=APP_VERSION)
+app=FastAPI(title="Electronic Brain V13",version=APP_VERSION)
 
 @app.middleware("http")
 async def no_cache(request, call_next):
@@ -289,7 +289,7 @@ def health():
     deployment = _deployment_snapshot()
     return {
         "ok": True,
-        "brain": "V12",
+        "brain": "V13",
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
         "branch": DEPLOY_BRANCH,
@@ -316,7 +316,7 @@ def deploy_verify():
 @app.get("/api/deploy/identity")
 def deploy_identity():
     snapshot = _deployment_snapshot()
-    return {"ok": snapshot["converged"], "brain": "V12", **snapshot}
+    return {"ok": snapshot["converged"], "brain": "V13", **snapshot}
 
 @app.get("/api/system/connection")
 def system_connection():
@@ -340,7 +340,7 @@ def system_connection():
         "connected": online,
         "status": "CONNECTED" if online else "DISCONNECTED",
         "label_ar": "في اتصال" if online else "مفيش اتصال",
-        "brain": "V12",
+        "brain": "V13",
         "version": APP_VERSION,
         "checks": checks,
     }
@@ -443,7 +443,7 @@ def agent_gateway_diagnostics():
     bridge=device_bridge.status()
     return {
         "ok": True,
-        "brain": "V12",
+        "brain": "V13",
         "gateway": "READY" if bridge.get("configured") else "NOT_CONFIGURED",
         "transport": "HTTPS polling",
         "authentication": "X-V12-Agent-Key",
@@ -462,7 +462,7 @@ def agent_gateway_diagnostics():
 def agent_gateway_status():
     return {
         "ok": True,
-        "gateway": "Brain V12 ↔ Termux",
+        "gateway": "Brain V13 ↔ Termux",
         "configured": device_bridge.configured(),
         "transport": "HTTPS polling",
         "authentication": "X-V12-Agent-Key",
@@ -921,10 +921,10 @@ def world(): return cognitive.world.snapshot()
 @app.post("/api/world/fact")
 def world_fact(key:str,value:str,source:str="user",confidence:float=.8): return cognitive.world.set_fact(key,value,source,confidence)
 @app.post("/api/run")
-def run_cycle(goal:str="brain_v12"): return cognitive.run(goal)
+def run_cycle(goal:str="brain_v13"): return cognitive.run(goal)
 
 @app.post("/api/cognitive/start")
-def cognitive_start(goal:str="brain_v12"):
+def cognitive_start(goal:str="brain_v13"):
     run_id=str(uuid4())
     def worker():
         try:
