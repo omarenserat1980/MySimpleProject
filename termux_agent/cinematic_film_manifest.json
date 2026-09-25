@@ -1,0 +1,14 @@
+{
+  "film_id": "EB-CINEMATIC-30M-60X30",
+  "title": "Electronic Brain — 30 Minute Cinematic Film",
+  "runtime_seconds": 1800,
+  "segment_duration_seconds": 30,
+  "parts": [
+    {
+      "part": 1,
+      "title": "Part 01",
+      "description": "Sequential cinematic story — Part 01",
+      "source": "media/part_01_source.mp4"
+    }
+  ]
+}
