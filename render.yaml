@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: electronic-brain-v12
+    name: electronic-brain-v13
     runtime: python
     rootDir: .
     branch: main
@@ -12,10 +12,10 @@ services:
     envVars:
       - key: BRAIN_RENDER_MONITOR_ENABLED
         value: "true"
-      - key: BRAIN_V12_VERSION
-        value: "12.6"
+      - key: BRAIN_V13_VERSION
+        value: "13.0"
       - key: PRERENDER_BUILD_MARKER
-        value: "v12-main-deploy"
+        value: "v13-main-deploy"
       - key: TERMUX_AGENT_KEY
         sync: false
       - key: RENDER_LOG_POLL_SECONDS
@@ -27,7 +27,7 @@ services:
       - key: RENDER_OWNER_ID
         sync: false
       - key: RENDER_PUBLIC_URL
-        value: "https://electronic-brain-v12-gwwg.onrender.com"
+        value: "https://electronic-brain-v13-gwwg.onrender.com"
       - key: BRAIN_LIVE_INCOME_SEARCH_ENABLED
         value: "true"
       - key: BRAIN_LIVE_INCOME_SEARCH_INTERVAL_SECONDS
@@ -48,7 +48,7 @@ services:
 
 
   - type: worker
-    name: electronic-brain-v12-render-monitor
+    name: electronic-brain-v13-render-monitor
     runtime: python
     rootDir: .
     branch: main
