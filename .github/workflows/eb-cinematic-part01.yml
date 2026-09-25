@@ -1,0 +1,46 @@
+name: EB Cinematic Part 01
+
+on:
+  push:
+    paths:
+      - ".github/workflows/eb-cinematic-part01.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Download public-domain images
+        run: |
+          mkdir -p cinematic_assets/01 cinematic_output
+          curl -L --fail "https://commons.wikimedia.org/wiki/Special:FilePath/Sunrise%20over%20the%20garden.jpg" -o cinematic_assets/01/01.jpg
+          curl -L --fail "https://commons.wikimedia.org/wiki/Special:FilePath/Morning%20sunrise%20in%20the%20woods.jpg" -o cinematic_assets/01/02.jpg
+          curl -L --fail "https://commons.wikimedia.org/wiki/Special:FilePath/Sunrise%20in%20canyon.jpg" -o cinematic_assets/01/03.jpg
+      - name: Create cinematic ambient audio
+        run: |
+          ffmpeg -y -f lavfi -i "sine=frequency=110:duration=30" -f lavfi -i "sine=frequency=220:duration=30" -f lavfi -i "sine=frequency=330:duration=30" -filter_complex "[0:a]volume=0.10[a];[1:a]volume=0.06[b];[2:a]volume=0.03[c];[a][b][c]amix=inputs=3:duration=longest,afade=t=in:st=0:d=3,afade=t=out:st=27:d=3" -c:a aac -b:a 128k cinematic_assets/01/audio.m4a
+      - name: Assemble 30-second video with FFmpeg
+        run: |
+          ffmpeg -y -loop 1 -i cinematic_assets/01/01.jpg -loop 1 -i cinematic_assets/01/02.jpg -loop 1 -i cinematic_assets/01/03.jpg -i cinematic_assets/01/audio.m4a -filter_complex "
+          [0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.0007,1.10)':d=300:s=1920x1080:fps=30[v0];
+          [1:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.0005,1.08)':d=300:s=1920x1080:fps=30[v1];
+          [2:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,zoompan=z='min(zoom+0.0006,1.09)':d=300:s=1920x1080:fps=30[v2];
+          [v0][v1]xfade=transition=fade:duration=1:offset=9[v01];
+          [v01][v2]xfade=transition=fade:duration=1:offset=19[v];
+          [v][3:a]shortest=1[outv][outa]" -map "[outv]" -map "[outa]" -t 30 -r 30 -c:v libx264 -pix_fmt yuv420p -b:v 6M -c:a aac -b:a 128k cinematic_output/part_01.mp4
+      - name: Verify
+        run: |
+          ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height -of json cinematic_output/part_01.mp4
+      - name: Commit generated video
+        run: |
+          git config user.name "Electronic Brain"
+          git config user.email "actions@github.com"
+          git add cinematic_assets/01 cinematic_output/part_01.mp4
+          git commit -m "generate cinematic part 01 from public-domain images and FFmpeg audio" || true
+          git push
