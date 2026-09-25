@@ -58,6 +58,10 @@ def execute(task, params):
             "python": platform.python_version(),
         }, ""
 
+    if task == "cinematic_factory_run":
+        p = subprocess.run(["python", "termux_agent/cinematic_factory.py"], capture_output=True, text=True, timeout=24 * 60 * 60)
+        return p.returncode == 0, {"stdout": p.stdout[-8000:], "stderr": p.stderr[-4000:], "returncode": p.returncode}, "" if p.returncode == 0 else "CINEMATIC_FACTORY_FAILED"
+
     if task == "status":
         return True, {
             "agent_id": AGENT_ID,
