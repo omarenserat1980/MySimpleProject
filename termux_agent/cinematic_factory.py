@@ -144,6 +144,18 @@ def publish(part: dict[str, Any], video: Path) -> dict[str, Any]:
     return {"ok": p.returncode==0, "status": "PUBLISHED" if p.returncode==0 else "PUBLISH_FAILED",
             "stdout":p.stdout[-2000:], "stderr":p.stderr[-2000:]}
 
+def cleanup_part(part_key: str, final: Path) -> None:
+    """Free phone storage only after a confirmed publication."""
+    import shutil
+    if final.exists():
+        final.unlink()
+    asset_dir = IMAGE_AUDIO_ROOT / part_key
+    if asset_dir.exists():
+        shutil.rmtree(asset_dir)
+    if OUT.exists():
+        for p in OUT.glob("factory_*"):
+            if p.is_dir():
+                shutil.rmtree(p, ignore_errors=True)
 def main() -> int:
     manifest=load_json(MANIFEST, {})
     parts=manifest.get("parts", [])
@@ -180,7 +192,11 @@ def main() -> int:
                 if not pub.get("ok"):
                     print(json.dumps({"part":expected,"status":"VERIFIED_NOT_PUBLISHED","detail":pub},ensure_ascii=False))
                     return 2
-            print(json.dumps({"part":expected,"status":"PUBLISHED"},ensure_ascii=False))
+                cleanup_part(key, final)
+                rec["cleaned_after_publish"] = True
+                state["parts"][key]=rec
+                save_json(STATE,state)
+            print(json.dumps({"part":expected,"status":"PUBLISHED_AND_CLEANED"},ensure_ascii=False))
         except Exception as exc:
             rec.update({"verified":False,"error":str(exc)})
             state["parts"][key]=rec
