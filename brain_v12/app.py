@@ -1,4 +1,4 @@
-# V13 HUMAN-READABLE UI INTEGRATION
+# V14 HUMAN-READABLE UI INTEGRATION
 import os
 import threading
 from uuid import uuid4
@@ -90,13 +90,13 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
-APP_VERSION=os.getenv("BRAIN_V13_VERSION","12.6")
+APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
 DEPLOY_COMMIT=os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
 DEPLOY_BRANCH=os.getenv("RENDER_GIT_BRANCH","unknown")
 DEPLOY_REPOSITORY=os.getenv("RENDER_GIT_REPO_SLUG","unknown")
 DEPLOY_SERVICE_ID=os.getenv("RENDER_SERVICE_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
-app=FastAPI(title="Electronic Brain V13",version=APP_VERSION)
+app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 
 @app.middleware("http")
 async def no_cache(request, call_next):
