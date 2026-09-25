@@ -1,9 +1,10 @@
 """Authenticated, allowlisted, persistent bridge between Brain V12 and a Termux device agent."""
 from __future__ import annotations
-import hmac, os, time
+import hashlib, hmac, os, time
 from uuid import uuid4
 
 AGENT_KEY_ENV = "TERMUX_AGENT_KEY"
+AGENT_KEY_SHA256_ENV = "TERMUX_AGENT_KEY_SHA256"
 
 HEARTBEAT_STALE = "STALE"
 
@@ -15,11 +16,22 @@ class DeviceBridge:
         self._last_seen = None
 
     def configured(self):
-        return bool(os.getenv(AGENT_KEY_ENV, ""))
+        return bool(os.getenv(AGENT_KEY_ENV, "") or os.getenv(AGENT_KEY_SHA256_ENV, ""))
 
     def authenticate(self, supplied):
+        if not supplied:
+            return False
+
         expected = os.getenv(AGENT_KEY_ENV, "")
-        return bool(expected and supplied and hmac.compare_digest(supplied, expected))
+        if expected and hmac.compare_digest(supplied, expected):
+            return True
+
+        expected_hash = os.getenv(AGENT_KEY_SHA256_ENV, "").strip().lower()
+        if not expected_hash:
+            return False
+
+        supplied_hash = hashlib.sha256(supplied.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(supplied_hash, expected_hash)
 
     def enqueue(self, task, params=None):
         if task not in self.ALLOWED_TASKS:
