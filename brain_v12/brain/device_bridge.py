@@ -18,6 +18,13 @@ class DeviceBridge:
     def configured(self):
         return bool(os.getenv(AGENT_KEY_ENV, "") or os.getenv(AGENT_KEY_SHA256_ENV, ""))
 
+    def auth_mode(self):
+        if os.getenv(AGENT_KEY_ENV, ""):
+            return "DIRECT_KEY"
+        if os.getenv(AGENT_KEY_SHA256_ENV, ""):
+            return "SHA256_KEY"
+        return "NOT_CONFIGURED"
+
     def authenticate(self, supplied):
         if not supplied:
             return False
@@ -162,6 +169,7 @@ class DeviceBridge:
             "ok": True,
             "configured": self.configured(),
             "auth_env": AGENT_KEY_ENV,
+            "auth_mode": self.auth_mode(),
             "queued": counts.get("QUEUED", 0),
             "pending": counts.get("CLAIMED", 0),
             "completed": counts.get("COMPLETED", 0),
