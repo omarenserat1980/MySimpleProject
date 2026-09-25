@@ -19,6 +19,7 @@ STATE = ROOT / os.getenv("CINEMATIC_STATE", "cinematic_factory_state.json")
 MANIFEST = ROOT / os.getenv("CINEMATIC_MANIFEST", "cinematic_film_manifest.json")
 OUT = ROOT / os.getenv("CINEMATIC_OUTPUT_DIR", "cinematic_output")
 RENDER_CMD = os.getenv("VIDEO_RENDER_COMMAND", "").strip()
+IMAGE_AUDIO_ROOT = ROOT / os.getenv("IMAGE_AUDIO_ROOT", "cinematic_assets")
 PUBLISH_CMD = os.getenv("PUBLISH_COMMAND", "").strip()
 
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
@@ -69,7 +70,49 @@ def normalize(src: Path, dst: Path) -> None:
     if p.returncode:
         raise RuntimeError(p.stderr[-2000:])
 
+def render_image_audio_scene(part: dict[str, Any], raw: Path) -> None:
+    """Build a 30s scene from still images plus audio using FFmpeg only."""
+    key = f"{int(part['part']):02d}"
+    asset_dir = (IMAGE_AUDIO_ROOT / key).resolve()
+    if not asset_dir.is_dir():
+        raise RuntimeError(f"IMAGE_AUDIO_ASSETS_MISSING: part={key}")
+    images = sorted(p for p in asset_dir.iterdir() if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"})
+    audio = sorted(p for p in asset_dir.iterdir() if p.suffix.lower() in {".mp3", ".wav", ".m4a", ".aac", ".ogg"})
+    if not images or not audio:
+        raise RuntimeError(f"IMAGE_AUDIO_ASSETS_MISSING: part={key} images={len(images)} audio={len(audio)}")
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=raw.parent, prefix=f"ia_{key}_") as td:
+        td = Path(td)
+        if len(images) == 1:
+            vf = ("scale=1920:1080:force_original_aspect_ratio=decrease,"
+                  "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
+                  "zoompan=z='min(zoom+0.0008,1.12)':d=900:s=1920x1080:fps=30")
+            cmd = ["ffmpeg","-y","-loop","1","-i",str(images[0]),"-i",str(audio[0]),"-t","30",
+                   "-vf",vf,"-r","30","-c:v","libx264","-pix_fmt","yuv420p",
+                   "-c:a","aac","-ar","48000","-b:a","192k","-shortest",str(raw)]
+        else:
+            duration = 30.0 / len(images)
+            concat = td / "images.txt"
+            lines = []
+            for img in images:
+                lines.extend([f"file '{img.as_posix()}'", f"duration {duration:.6f}"])
+            lines.append(f"file '{images[-1].as_posix()}'")
+            concat.write_text("\n".join(lines), encoding="utf-8")
+            cmd = ["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-i",str(audio[0]),"-t","30",
+                   "-vf","scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30",
+                   "-c:v","libx264","-pix_fmt","yuv420p","-c:a","aac","-ar","48000","-b:a","192k","-shortest",str(raw)]
+        p = run(cmd, 900)
+        if p.returncode:
+            raise RuntimeError(p.stderr[-3000:])
+
 def render_scene(part: dict[str, Any], raw: Path) -> None:
+    if os.getenv("IMAGE_AUDIO_MODE","1").lower() in {"1","true","yes","on"}:
+        try:
+            render_image_audio_scene(part, raw)
+            return
+        except RuntimeError as exc:
+            if "IMAGE_AUDIO_ASSETS_MISSING" not in str(exc):
+                raise
     source=part.get("source")
     if source:
         src=(ROOT / source).resolve()
@@ -79,7 +122,7 @@ def render_scene(part: dict[str, Any], raw: Path) -> None:
         raw.write_bytes(src.read_bytes())
         return
     if not RENDER_CMD:
-        raise RuntimeError("VIDEO_RENDER_COMMAND is not configured")
+        raise RuntimeError("IMAGE_AUDIO_ASSETS_MISSING and VIDEO_RENDER_COMMAND is not configured")
     env=os.environ.copy()
     env["SCENE_JSON"]=json.dumps(part, ensure_ascii=False)
     env["OUTPUT_VIDEO"]=str(raw)
