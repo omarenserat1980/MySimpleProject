@@ -412,7 +412,16 @@ async function loadIncomeMission(){
   $('incomeNext').textContent=(m.next_actions||[]).join(' • ')||'المراقبة والبحث مستمران.';
  }catch(e){$('incomeMissionStatus').textContent='تعذر التحديث';}
 }
-refresh();loadTools();loadIncomeMission();loadSystemOverview();checkBrainConnection();pollCognitive();setInterval(refresh,5000);setInterval(checkBrainConnection,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
+refresh();loadTools();loadIncomeMission();loadSystemOverview();checkBrainConnection();pollCognitive();
+function bootDirectConversation(){
+  show('chat');
+  const messages=$('messages');
+  if(messages && messages.querySelector('#emptyChat')){
+    $('emptyChat').innerHTML='<div style="font-size:48px">🧠</div><h3>أنا العقل الإلكتروني</h3><p>أنا ظاهر أمامك الآن. اكتب لي أو اضغط 🎤 وتحدث معي.</p>';
+  }
+}
+setTimeout(bootDirectConversation,350);
+setInterval(refresh,5000);setInterval(checkBrainConnection,5000);setInterval(loadIncomeMission,10000);setInterval(pollCognitive,2000);setInterval(loadSystemOverview,10000);
 
 const brainCommands=[['ابدأ محادثة','افتح واجهة الحوار','chat'],['الدورة المعرفية','راقب دورة الإدراك والقرار','thinking'],['الأهداف والخطط','إدارة أهداف العقل','goals'],['موظفو العقل','مراقبة الوكلاء والمهام','workforce'],['الأدوات','عرض الأدوات والصلاحيات','tools'],['الدخل','عرض مهمة أول 10 د.أ','workforce'],['الذاكرة','عرض الذاكرة والتعلم','memory']];
 function navigateByHumanIntent(intent=''){
