@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""V12 Termux Agent: poll Brain Gateway, execute allowlisted smoke-test tasks, report results."""
+"""V12 Termux Agent for Electronic Brain.
+
+GitHub is the control-plane contract. Runtime execution remains provider-agnostic:
+the cinematic factory delegates generation/publishing to authenticated runtime
+commands and verifies every produced artifact before advancing.
+"""
 from __future__ import annotations
 import os
 import platform
@@ -8,6 +13,7 @@ import time
 import json
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 BRAIN_URL = os.environ["BRAIN_URL"].rstrip("/")
 AGENT_KEY = os.environ["TERMUX_AGENT_KEY"]
@@ -16,7 +22,8 @@ MAX_TASKS_PER_RUN = max(1, int(os.getenv("TERMUX_MAX_TASKS_PER_RUN", "100")))
 STOP_ON_ERROR = os.getenv("TERMUX_STOP_ON_ERROR", "false").lower() == "true"
 POLL_SECONDS = max(1, int(os.getenv("TERMUX_POLL_SECONDS", "2")))
 HEARTBEAT_SECONDS = max(5, int(os.getenv("TERMUX_HEARTBEAT_SECONDS", "10")))
-
+REQUEST_TIMEOUT = max(5, int(os.getenv("TERMUX_REQUEST_TIMEOUT", "30")))
+ROOT = Path(__file__).resolve().parent.parent
 
 def request(method, path, payload=None, params=None):
     url = f"{BRAIN_URL}{path}"
@@ -31,44 +38,31 @@ def request(method, path, payload=None, params=None):
     with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
         return json.loads(response.read().decode("utf-8"))
 
-REQUEST_TIMEOUT = max(5, int(os.getenv("TERMUX_REQUEST_TIMEOUT", "30")))
-
-
 def execute(task, params):
     if task == "python_version":
         p = subprocess.run(["python", "--version"], capture_output=True, text=True, timeout=20)
         output = (p.stdout or p.stderr).strip()
-        return p.returncode == 0, {
-            "stdout": output,
-            "stderr": (p.stderr or "").strip(),
-            "returncode": p.returncode,
-        }, ""
+        return p.returncode == 0, {"stdout": output, "stderr": (p.stderr or "").strip(), "returncode": p.returncode}, ""
 
     if task == "termux_path":
         p = subprocess.run(["pwd"], capture_output=True, text=True, timeout=10)
-        return p.returncode == 0, {
-            "stdout": p.stdout.strip(),
-            "stderr": p.stderr.strip(),
-            "returncode": p.returncode,
-        }, ""
+        return p.returncode == 0, {"stdout": p.stdout.strip(), "stderr": p.stderr.strip(), "returncode": p.returncode}, ""
 
     if task == "platform":
-        return True, {
-            "platform": platform.platform(),
-            "python": platform.python_version(),
-        }, ""
+        return True, {"platform": platform.platform(), "python": platform.python_version()}, ""
 
     if task == "cinematic_factory_run":
-        p = subprocess.run(["python", "termux_agent/cinematic_factory.py"], capture_output=True, text=True, timeout=24 * 60 * 60)
-        return p.returncode == 0, {"stdout": p.stdout[-8000:], "stderr": p.stderr[-4000:], "returncode": p.returncode}, "" if p.returncode == 0 else "CINEMATIC_FACTORY_FAILED"
+        script = ROOT / "termux_agent" / "cinematic_factory.py"
+        p = subprocess.run(["python", str(script)], cwd=str(ROOT), capture_output=True,
+                           text=True, timeout=24 * 60 * 60)
+        return p.returncode == 0, {
+            "stdout": p.stdout[-8000:], "stderr": p.stderr[-4000:], "returncode": p.returncode,
+            "root": str(ROOT),
+        }, "" if p.returncode == 0 else "CINEMATIC_FACTORY_FAILED"
 
     if task == "status":
-        return True, {
-            "agent_id": AGENT_ID,
-            "platform": platform.platform(),
-            "python": platform.python_version(),
-            "status": "READY",
-        }, ""
+        return True, {"agent_id": AGENT_ID, "platform": platform.platform(),
+                      "python": platform.python_version(), "status": "READY"}, ""
 
     return False, {}, "TASK_NOT_ALLOWED"
 
@@ -91,23 +85,15 @@ def main():
             if not task:
                 time.sleep(POLL_SECONDS)
                 continue
-
             task_id = task["task_id"]
             task_name = task["task"]
             print(f"[V12-Agent] CLAIMED {task_id} {task_name}")
-
             try:
                 ok, result, error = execute(task_name, task.get("params", {}))
             except Exception as exc:
                 ok, result, error = False, {}, f"{type(exc).__name__}: {exc}"
-
-            report = {
-                "task_id": task_id,
-                "agent_id": AGENT_ID,
-                "ok": ok,
-                "result": result,
-                "error": error,
-            }
+            report = {"task_id": task_id, "agent_id": AGENT_ID, "ok": ok,
+                      "result": result, "error": error}
             request("POST", "/api/device/report", payload=report)
             print(f"[V12-Agent] REPORTED {task_id} ok={ok}")
             completed += 1
@@ -123,4 +109,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
