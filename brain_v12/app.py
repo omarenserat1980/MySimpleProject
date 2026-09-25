@@ -153,8 +153,9 @@ def youtube_oauth_status():
     return youtube_oauth.snapshot()
 
 @app.get("/api/youtube/oauth/start")
-def youtube_oauth_start(request: Request):
-    require_control_key(request)
+def youtube_oauth_start():
+    # OAuth start is intentionally public: it only creates a short-lived state and redirects the user to Google.
+    # The callback remains state-bound and the token is stored encrypted.
     return youtube_oauth.start()
 
 @app.get("/api/youtube/oauth/readiness")
