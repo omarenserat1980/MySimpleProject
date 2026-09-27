@@ -13,6 +13,7 @@ import time
 from typing import Any, Protocol
 import httpx
 
+from .benchmark_router import benchmark_snapshot, choose_backend, load_state, record_observation, save_state
 from .speed_optimizer import apply_speed_policy, speed_policy
 
 
@@ -75,6 +76,7 @@ class ComfyUIBackend:
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 payload = {"prompt": self._workflow(shot), "client_id": self.client_id}
+                started = time.monotonic()
                 queued = client.post(self.base_url + "/prompt", json=payload)
                 queued.raise_for_status()
                 data = queued.json()
@@ -99,12 +101,16 @@ class ComfyUIBackend:
                             "prompt_id": prompt_id,
                             "provider_result": item,
                             "shot_id": shot.get("shot_id"),
+                            "_generation_latency_s": time.monotonic() - started,
                         }
                     if item.get("status", {}).get("status_str") == "error":
-                        return {"status": "PROVIDER_FAILED", "provider_result": item, "prompt_id": prompt_id}
-                return {"status": "PROVIDER_TIMEOUT", "prompt_id": prompt_id}
+                        return {"status": "PROVIDER_FAILED", "provider_result": item, "prompt_id": prompt_id,
+                                "_generation_latency_s": time.monotonic() - started}
+                return {"status": "PROVIDER_TIMEOUT", "prompt_id": prompt_id,
+                        "_generation_latency_s": time.monotonic() - started}
         except Exception as exc:
             return {"status": "PROVIDER_ERROR", "error": repr(exc), "provider": "comfyui"}
+
 
     @staticmethod
     def _find_media(outputs: dict[str, Any]) -> str | None:
@@ -117,44 +123,80 @@ class ComfyUIBackend:
 
 
 class ModelRouter:
-    """Select a backend without changing the film plan."""
+    """Select a backend using measured per-role performance when possible."""
 
     def __init__(self, fallback: MediaBackend) -> None:
         self.fallback = fallback
         self.comfy = ComfyUIBackend()
         self.requested = os.getenv("FACTORY_MODEL", "auto").strip().lower()
+        self.benchmark_state = load_state()
 
     def snapshot(self) -> dict[str, Any]:
         return {
-            "version": 2,
+            "version": 3,
             "requested": self.requested,
             "comfyui_configured": self.comfy.configured(),
             "workflow_families": [k for k,v in self.comfy.workflow_by_family.items() if v],
             "profiles": PROFILES,
-            "routing": "shot route -> speed profile -> configured backend -> fallback",
+            "routing": "shot route -> benchmark -> speed profile -> configured backend -> fallback",
             "speed_policy": speed_policy(),
+            "benchmark": benchmark_snapshot(),
         }
 
-    def _profile(self, shot: dict[str, Any]) -> str:
+    def _candidates(self, shot: dict[str, Any]) -> list[str]:
+        configured = [k for k, raw in self.comfy.workflow_by_family.items() if raw]
+        if self.comfy.workflow_json:
+            configured = configured or ["comfyui"]
         requested = str(shot.get("model_family") or (shot.get("generation") or {}).get("backend_preference") or self.requested)
         if requested in PROFILES and requested != "auto":
-            return requested
-        for candidate in ("wan", "ltx", "hunyuan", "comfyui"):
-            if self.comfy.configured():
-                return candidate
-        return "fallback"
+            return [requested]
+        return configured or ["fallback"]
+
+    def _profile(self, shot: dict[str, Any]) -> str:
+        candidates = self._candidates(shot)
+        if len(candidates) == 1:
+            return candidates[0]
+        return choose_backend(
+            shot,
+            candidates,
+            quality_floor=float(os.getenv("FACTORY_BENCHMARK_QUALITY_FLOOR", "0.82")),
+            state=self.benchmark_state,
+        )
 
     def render(self, *, shot: dict[str, Any], authorized: bool = False) -> dict[str, Any]:
         family = self._profile(shot)
-        enriched = dict(shot)
-        enriched["model_family"] = family
-        enriched = apply_speed_policy(enriched)
+        enriched = apply_speed_policy({**shot, "model_family": family})
         enriched["router_snapshot"] = self.snapshot()
+        started = time.monotonic()
         if self.comfy.configured():
             result = self.comfy.render(shot=enriched, authorized=authorized)
+            latency = float(result.pop("_generation_latency_s", time.monotonic() - started))
             if result.get("status") == "VERIFIED_COMPLETED":
                 result["router"] = {"selected": family, "fallback_used": False}
+                self._record(family, enriched, result, latency)
                 return result
+        else:
+            result = {"status": "COMFYUI_NOT_CONFIGURED"}
+            latency = time.monotonic() - started
         result = self.fallback.render(shot=enriched, authorized=authorized)
         result["router"] = {"selected": family, "fallback_used": True}
         return result
+
+    def _record(self, family: str, shot: dict[str, Any], result: dict[str, Any], latency: float) -> None:
+        vision = result.get("vision_qc") if isinstance(result.get("vision_qc"), dict) else {}
+        qc = vision.get("score")
+        if qc is None:
+            provider = result.get("provider_result")
+            if isinstance(provider, dict):
+                maybe = provider.get("quality_score")
+                qc = maybe if isinstance(maybe, (int, float)) else None
+        record_observation(
+            self.benchmark_state,
+            shot,
+            family,
+            latency_s=max(0.001, latency),
+            success=result.get("status") == "VERIFIED_COMPLETED",
+            quality_score=float(qc) if isinstance(qc, (int, float)) else None,
+            qc_score=float(qc) if isinstance(qc, (int, float)) else None,
+        )
+        save_state(self.benchmark_state)
