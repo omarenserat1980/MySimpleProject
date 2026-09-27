@@ -2,13 +2,14 @@
 
 All real external work is opt-in through environment configuration.
 No credentials are stored in source. The worker emits auditable heartbeats
-to stdout so Render logs can show liveness without exposing secrets.
+to stdout so factory logs can show liveness without exposing secrets.
 """
 from __future__ import annotations
 import json, os, time
 from typing import Any
 from .cinematic_factory_controller import run_factory, FactoryConfig
-from .http_media_adapter import HttpShotRenderer, FfmpegVideoAssembler
+from .http_media_adapter import FfmpegVideoAssembler
+from .brain_media_adapter import BrainMediaProvider
 from .cinematic_local_renderer import CinematicLocalRenderer
 from .youtube_api_client import YouTubeApiClient
 from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
@@ -30,8 +31,8 @@ def _heartbeat(status: str, cycle: int, detail: str = "") -> None:
 
 
 def _build_renderer():
-    if os.getenv("MEDIA_RENDER_URL", "").strip():
-        return HttpShotRenderer()
+    if os.getenv("MEDIA_PROVIDER_URL", "").strip():
+        return BrainMediaProvider()
     return CinematicLocalRenderer()
 
 
