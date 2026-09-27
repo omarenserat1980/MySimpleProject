@@ -30,6 +30,8 @@ def build_pipeline(objective: str, *, pipeline_id: str = "media-pipeline") -> Me
     objective = objective.strip()
     if not objective:
         raise ValueError("objective must not be empty")
+    cinematic = build_cinematic_plan(objective)
+    shot_prompts = cinematic_prompts(cinematic)
     return MediaPipeline(
         pipeline_id=pipeline_id,
         objective=objective,
@@ -38,7 +40,8 @@ def build_pipeline(objective: str, *, pipeline_id: str = "media-pipeline") -> Me
             MediaStage("VOICE", "audio", f"Create consistent Arabic cinematic narration for: {objective}", "mp3"),
             MediaStage(
                 "VIDEO", "video",
-                f"Create a cinematic short using the master visual, narration and shot plan for: {objective}. Shot plan: {shot_prompts}",
+                f"Create a cinematic short using the master visual, narration, sound design and shot plan for: {objective}. "
+                f"Preserve character/world identity and temporal continuity. Shot plan: {shot_prompts}",
                 "mp4", ("IMAGE", "VOICE"),
             ),
             MediaStage(
