@@ -26,6 +26,11 @@ jobs:
       FACTORY_DURATION_SECONDS: ${{ inputs.duration }}
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
+      FAL_KEY: ${{ secrets.FAL_KEY }}
+      FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
+      FAL_SHOT_DURATION: "5"
+      FAL_GENERATE_AUDIO: "0"
+      FACTORY_OUTPUT_DIR: "cinematic_output"
       MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
       MEDIA_PROVIDER_TIMEOUT_SECONDS: "900"
       MEDIA_PROVIDER_POLL_SECONDS: "8"
@@ -55,6 +60,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
+          pip install fal-client
 
       - name: Run Electronic Brain Cinematic Factory
         run: |
