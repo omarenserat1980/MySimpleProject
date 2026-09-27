@@ -50,9 +50,9 @@ class BrainMediaProvider:
                 "prompt":prompt,
                 "duration":duration,
                 "generate_audio":generate_audio,
-                "shot_type":"customize",
+                "shot_type":"intelligent",
                 "aspect_ratio":shot.get("aspect_ratio","16:9"),
-                "negative_prompt":shot.get("negative_prompt","blur, distort, low quality, black frames, blank screen"),
+                "negative_prompt":shot.get("negative_prompt","blur, distort, low quality, black frames, blank screen, empty scene"),
             }})
             video=((result or {}).get("video") or {})
             ref=video.get("url")
