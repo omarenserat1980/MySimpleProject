@@ -46,6 +46,7 @@ from .brain_media_adapter import FactoryState
 from .speed_optimizer import speed_policy, apply_speed_policy
 from .take_budget import take_budget
 from .production_speed_optimizer import speed_plan
+from .throughput_metrics import measure, snapshot as throughput_snapshot
 
 
 class TopicResearcher(Protocol):
@@ -150,10 +151,12 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
         budget = take_budget(shot)
         attempts_allowed = min(max_retries + 1, int(budget["max_takes"]))
         for attempt in range(attempts_allowed):
-            result = renderer.render(shot=shot, authorized=authorized)
+            with measure("generation", path=Path(state_path).with_name("factory_throughput.json")):
+                result = renderer.render(shot=shot, authorized=authorized)
             if result.get("status") in {"COMPLETED", "VERIFIED_COMPLETED"}:
                 result["attempt"] = attempt + 1
-                qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
+                with measure("visual_qc", path=Path(state_path).with_name("factory_throughput.json")):
+                    qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
                 result["visual_qc"] = qc
                 result["audio_qc"] = evaluate_audio_evidence(shot, result, audio_memory.context())
                 result["research_qc"] = evaluate_research_gate(shot, result, research_ledger.items)
@@ -165,6 +168,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                     result["film_qc"]["status"] = "REPAIR"
                     result["film_qc"].setdefault("issues", []).append("research_gate_blocked")
                 result["repair_plan"] = build_repairs(result["film_qc"], shot)
+                result["throughput"] = throughput_snapshot(Path(state_path).with_name("factory_throughput.json"))
                 result["take_budget"] = budget
                 self_improvement.observe(shot_id, result)
                 audio_memory.update(shot_id, {"voice_prompt": shot.get("voice_prompt"), "sound_design_prompt": shot.get("sound_design_prompt"), "qc": result["audio_qc"]})
@@ -202,11 +206,11 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     outputs.sort(key=lambda x: str(x.get("shot_id", "")))
     diagnostics = diagnose({"status": "SHOTS_BLOCKED" if failures else "VERIFIED_COMPLETED", "visual_qc": outputs[-1].get("visual_qc") if outputs else {}, "film_qc": outputs[-1].get("film_qc") if outputs else {}})
     if failures:
-        manifest = {"version": 5, "status": "SHOTS_BLOCKED", "speed_plan": throughput_plan, "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
+        manifest = {"version": 5, "status": "SHOTS_BLOCKED", "speed_plan": throughput_plan, "throughput_metrics": throughput_snapshot(Path(state_path).with_name("factory_throughput.json")), "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
         Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return {"status": "SHOTS_BLOCKED", "failed_shot": failures[0]["shot_id"], "outputs": outputs, "skipped": skipped, "failures": failures, "manifest": manifest}
 
-    manifest = {"version": 6, "status": "SHOTS_RENDERED", "speed_plan": throughput_plan, "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
+    manifest = {"version": 6, "status": "SHOTS_RENDERED", "speed_plan": throughput_plan, "throughput_metrics": throughput_snapshot(Path(state_path).with_name("factory_throughput.json")), "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
