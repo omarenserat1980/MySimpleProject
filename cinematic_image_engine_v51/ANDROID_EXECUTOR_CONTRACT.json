@@ -1,0 +1,17 @@
+{
+  "name": "Electronic Brain Android Executor Contract",
+  "version": "1.0",
+  "input": {
+    "argv": "array<string>",
+    "cwd": "string"
+  },
+  "output": {
+    "exit_code": "integer",
+    "stdout": "string",
+    "stderr": "string"
+  },
+  "environment": {
+    "EB_EXECUTOR_MODE": "auto|direct|bridge",
+    "EB_EXECUTOR_COMMAND": "command template containing {payload} or {argv}"
+  }
+}
