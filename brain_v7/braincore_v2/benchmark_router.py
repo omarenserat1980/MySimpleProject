@@ -121,7 +121,10 @@ def choose_backend(
         if samples < 2:
             # Exploration: try unknown/under-sampled candidates before locking in.
             score = 1000.0 - samples
-        elif quality is not None and float(quality) < quality_floor:
+        elif quality is None:
+            # No measured QC means the backend has not demonstrated the quality floor.
+            score = -500.0 - samples
+        elif float(quality) < quality_floor:
             score = -1000.0 + float(quality)
         else:
             latency = max(0.001, float(item.get("ewma_latency_s") or 9999.0))
