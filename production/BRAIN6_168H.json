@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "campaign": "BRAIN6_168H",
-  "started_epoch": 1790542200,
+  "started_epoch": 1790531685,
   "duration_seconds": 604800,
   "chunk_seconds": 21600,
   "free_only": true,
