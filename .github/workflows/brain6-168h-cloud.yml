@@ -14,6 +14,7 @@ on:
     paths:
       - "production/BRAIN6_168H.json"
       - "brain6_cpp/**"
+      - "brain6_cs/**"
       - ".github/workflows/brain6-168h-cloud.yml"
 
 permissions:
@@ -52,10 +53,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       - name: Setup C++ toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y g++
+          sudo apt-get install -y g++ ffmpeg
 
       - name: Read 168H campaign state
         id: state
@@ -81,21 +87,21 @@ jobs:
               raise SystemExit("CAMPAIGN_COMPLETE")
           PY
 
-      - name: Install FFmpeg
-        if: steps.state.outputs.remaining != ''
-        run: |
-          sudo apt-get install -y ffmpeg
-
       - name: Install factory dependencies
         if: steps.state.outputs.remaining != ''
         run: |
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
 
-      - name: Build Brain 6 C++ orchestrator
+      - name: Build C++ core
         if: steps.state.outputs.remaining != ''
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -pedantic brain6_cpp/main.cpp -o brain6_cpp/brain6
+
+      - name: Build C# supervisor
+        if: steps.state.outputs.remaining != ''
+        run: |
+          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore
 
       - name: Restore latest successful factory state
         if: steps.state.outputs.remaining != ''
@@ -109,13 +115,14 @@ jobs:
             if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
           fi
 
-      - name: Run Brain 6 through C++
+      - name: Run Brain 6 C# -> C++ -> Python
         if: steps.state.outputs.remaining != ''
         run: |
           set -o pipefail
-          ./brain6_cpp/brain6 | tee brain6_slice_result.json
+          export BRAIN6_CPP_BINARY="$GITHUB_WORKSPACE/brain6_cpp/brain6"
+          dotnet run --project brain6_cs/Brain6.csproj -c Release --no-build | tee brain6_slice_result.json
 
-      - name: Verify output
+      - name: Final media QC
         if: success()
         run: |
           test -f cinematic_output/final.mp4
@@ -145,5 +152,6 @@ jobs:
             cinematic_manifest.json
             cinematic_project_manifest.json
             brain6_slice_result.json
+            brain6_cs/checkpoint.json
           if-no-files-found: ignore
           retention-days: 30
