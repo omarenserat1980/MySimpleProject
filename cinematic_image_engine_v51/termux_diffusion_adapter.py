@@ -22,7 +22,10 @@ class TermuxDiffusionAdapter:
             '--steps', str(self.steps), '-t', str(self.threads),
             '-o', str(output)
         ]
-        subprocess.run(cmd, check=True)
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or 'termux-diffusion failed').strip()
+            raise RuntimeError(f'termux-diffusion exit={proc.returncode}: {detail[-4000:]}')
         if not output.is_file() or output.stat().st_size == 0:
             raise RuntimeError('Invalid generated image')
         return output
