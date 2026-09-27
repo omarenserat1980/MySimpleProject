@@ -115,17 +115,17 @@ class BrainMediaProvider:
         try:
             client=self._client
             r=client.post(self.url,json=payload,headers=self._headers())
-                r.raise_for_status()
-                data=r.json()
-                ref=data.get("video_ref") or data.get("output_url") or data.get("media_url")
-                status=str(data.get("status","")).upper()
-                if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
-                    vision=self._vision_qc_fal(ref,shot)
-                    return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
-                job_id=data.get("job_id") or data.get("id")
-                if not job_id:
-                    return {"status":"SUBMISSION_UNVERIFIED","provider_result":data}
-                for _ in range(self.max_polls):
+            r.raise_for_status()
+            data=r.json()
+            ref=data.get("video_ref") or data.get("output_url") or data.get("media_url")
+            status=str(data.get("status","")).upper()
+            if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
+                vision=self._vision_qc_fal(ref,shot)
+                return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
+            job_id=data.get("job_id") or data.get("id")
+            if not job_id:
+                return {"status":"SUBMISSION_UNVERIFIED","provider_result":data}
+            for _ in range(self.max_polls):
                     time.sleep(self.poll)
                     p=client.post(self.url,json={"operation":"status","job_id":job_id},
                                   headers=self._headers())
