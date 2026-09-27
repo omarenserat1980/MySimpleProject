@@ -81,6 +81,8 @@ jobs:
           name: cinematic-factory-state
           path: |
             .factory_state.json
+          task_stack.json
+          world_state.json
             cinematic_manifest.json
             cinematic_project_manifest.json
             factory_result.json
