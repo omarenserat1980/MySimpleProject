@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any, Protocol, Sequence
 import time
+import json
+import os
 from pathlib import Path
 
 from .cinematic_money_factory import ContentOpportunity, rank
@@ -83,35 +85,37 @@ def build_production(objective: str, config: FactoryConfig) -> dict[str, Any]:
     }
 
 
-def render_shots(
-    renderer: ShotRenderer,
-    shot_prompts: Sequence[dict[str, Any]],
-    *,
-    authorized: bool = False,
-    state_path: str = ".factory_state.json",
-) -> dict[str, Any]:
+def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]], *, authorized: bool = False, state_path: str = ".factory_state.json") -> dict[str, Any]:
     state = FactoryState(state_path)
     outputs = []
     skipped = 0
-    for index, shot in enumerate(shot_prompts, 1):
+    max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
+    for index, original in enumerate(shot_prompts, 1):
+        shot = dict(original)
         shot_id = str(shot.get("shot_id") or f"shot_{index:04d}")
         cached = state.verified(shot_id)
         if cached:
-            outputs.append(cached)
-            skipped += 1
-            continue
-        result = renderer.render(shot=shot, authorized=authorized)
-        state.save(shot_id, result)
-        if result.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
-            return {
-                "status": "SHOTS_BLOCKED",
-                "failed_shot": shot_id,
-                "outputs": outputs,
-                "skipped": skipped,
-                "reason": result,
-            }
+            outputs.append(cached); skipped += 1; continue
+        shot["continuity_dna"] = {
+            "continuity_key": shot.get("continuity_key", ""),
+            "identity_lock": "preserve subject appearance, wardrobe, proportions and visual identity",
+            "world_lock": "preserve geography, time of day, weather, architecture and color language",
+            "camera_lock": "preserve lens, framing and motivated camera movement",
+        }
+        result = None
+        for attempt in range(max_retries + 1):
+            result = renderer.render(shot=shot, authorized=authorized)
+            if result.get("status") in {"COMPLETED", "VERIFIED_COMPLETED"}:
+                result["attempt"] = attempt + 1
+                break
+            shot["retry_context"] = f"Previous attempt failed: {result.get('status')}. Improve validity and prompt adherence."
+        state.save(shot_id, result or {"status": "PROVIDER_ERROR"})
+        if not result or result.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
+            return {"status": "SHOTS_BLOCKED", "failed_shot": shot_id, "outputs": outputs, "skipped": skipped, "reason": result}
         outputs.append(result)
-    return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped}
+    manifest = {"version": 2, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
+    Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
 
 def run_factory(
@@ -147,7 +151,7 @@ def run_factory(
             "shot_prompts": production["shot_prompts"],
         }
 
-    rendered = render_shots(renderer, production["shot_prompts"], authorized=True)
+    rendered = render_shots(renderer, production["shot_prompts"], authorized=True, state_path=os.getenv("FACTORY_STATE_PATH", ".factory_state.json"))
     if rendered["status"] != "SHOTS_RENDERED":
         return {"status": rendered["status"], "topic": topic, "render": rendered}
 
@@ -206,6 +210,8 @@ def run_factory(
         "story": story,
         "quality": quality,
         "rendered_shots": len(rendered["outputs"]),
+        "skipped_verified_shots": rendered.get("skipped", 0),
+        "manifest": rendered.get("manifest"),
         "assembly": assembled,
         "youtube": publication,
         "analytics": analytics,
