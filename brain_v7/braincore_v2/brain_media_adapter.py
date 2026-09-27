@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 import httpx
 
+try:
+    import fal_client
+except Exception:
+    fal_client = None
+
 class BrainMediaProvider:
     def __init__(self) -> None:
         self.url=os.getenv("MEDIA_PROVIDER_URL","").strip()
@@ -20,9 +25,35 @@ class BrainMediaProvider:
     def _headers(self):
         return {"Authorization": f"Bearer {self.key}"} if self.key else {}
 
+    def _render_fal(self, shot: dict[str, Any]) -> dict[str, Any]:
+        if fal_client is None:
+            return {"status":"FAL_CLIENT_MISSING"}
+        model=os.getenv("FAL_MODEL","fal-ai/kling-video/v3/pro/text-to-video")
+        duration=str(os.getenv("FAL_SHOT_DURATION","5"))
+        generate_audio=os.getenv("FAL_GENERATE_AUDIO","0").strip().lower() in {"1","true","yes","on"}
+        try:
+            result=fal_client.subscribe(model, arguments={"input":{
+                "prompt":shot.get("visual_prompt",""),
+                "duration":duration,
+                "generate_audio":generate_audio,
+                "shot_type":"customize",
+            }})
+            video=((result or {}).get("video") or {})
+            ref=video.get("url")
+            if not ref:
+                return {"status":"SUBMISSION_UNVERIFIED","provider_result":result}
+            return {"status":"VERIFIED_COMPLETED","video_ref":ref,
+                    "provider_result":result,"shot_id":shot.get("shot_id"),
+                    "provider":"fal","model":model}
+        except Exception as exc:
+            return {"status":"PROVIDER_ERROR","error":repr(exc),"shot_id":shot.get("shot_id"),
+                    "provider":"fal","model":model}
+
     def render(self, *, shot: dict[str, Any], authorized: bool=False) -> dict[str, Any]:
         if not authorized:
             return {"status":"AUTHORIZATION_REQUIRED"}
+        if os.getenv("FAL_KEY","").strip():
+            return self._render_fal(shot)
         if not self.url:
             return {"status":"MEDIA_PROVIDER_NOT_CONFIGURED"}
         payload={"operation":"generate","shot":shot,
