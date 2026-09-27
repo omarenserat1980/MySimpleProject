@@ -43,6 +43,7 @@ from .self_improvement import SelfImprovement
 from .production_diagnostics import diagnose
 from .mastering_qc import evaluate_master
 from .brain_media_adapter import FactoryState
+from .speed_optimizer import speed_policy, apply_speed_policy
 
 
 class TopicResearcher(Protocol):
@@ -116,7 +117,8 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     self_improvement = SelfImprovement(Path(state_path).with_name("production_policy.json").as_posix())
     require_audio_evidence = os.getenv("FACTORY_REQUIRE_AUDIO_EVIDENCE", "0").lower() in {"1", "true", "yes", "on"}
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
-    speed = speed_policy()\n    concurrency = speed["concurrency"]
+    speed = speed_policy()
+    concurrency = speed["concurrency"]
     lock = threading.Lock()
     pending, outputs, failures = [], [], []
     skipped = 0
