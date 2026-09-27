@@ -141,6 +141,7 @@ def run_factory(
     production = build_production(objective, config)
     story = build_story(objective, audience=config.audience)
     plan = production["plan"]
+    Path(os.getenv("FACTORY_PROJECT_MANIFEST", "cinematic_project_manifest.json")).write_text(\n        json.dumps({"plan": asdict(plan), "story": story, "shot_prompts": production["shot_prompts"], "created_at": time.time()}, ensure_ascii=False, indent=2, default=str),\n        encoding="utf-8",\n    )
 
     if not authorized_production:
         return {
