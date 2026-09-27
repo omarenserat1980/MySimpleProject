@@ -9,6 +9,21 @@ import json
 def evaluate_master(video_ref: str | None, expected_shots: int, *, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     checks = {"video_present": bool(video_ref), "shot_count": expected_shots > 0,
               "manifest_consistent": bool(manifest)}
+    # A technically valid MP4 is not enough: every production shot must carry
+    # explicit provenance from a real generation backend.
+    shots = (manifest or {}).get("shots") or []
+    real_providers = {"fal", "comfyui", "media_provider"}
+    providers = {
+        str(item.get("provider") or "").strip().lower()
+        for item in shots
+        if isinstance(item, dict)
+    }
+    non_real = [
+        str(item.get("shot_id") or "unknown")
+        for item in shots
+        if str(item.get("provider") or "").strip().lower() not in real_providers
+    ]
+    checks["real_media_provenance"] = bool(shots) and not non_real and providers.issubset(real_providers)
     evidence: dict[str, Any] = {}
     if video_ref and not str(video_ref).startswith(("http://", "https://")) and Path(str(video_ref)).is_file():
         try:
@@ -31,4 +46,5 @@ def evaluate_master(video_ref: str | None, expected_shots: int, *, manifest: dic
     checks.setdefault("audio_stream", True)
     checks["ffprobe"] = checks.get("ffprobe", True)
     status = "VERIFIED" if all(checks.values()) else "REPAIR"
-    return {"status": status, "checks": checks, "evidence": evidence}
+    return {"status": status, "checks": checks, "evidence": evidence,
+            "providers": sorted(providers), "non_real_shots": non_real}
