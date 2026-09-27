@@ -77,7 +77,8 @@ jobs:
       BRAIN_MAX_ITERATIONS: "1000000"
       BRAIN_MAX_RUNTIME_SECONDS: "300"
       FACTORY_REQUIRE_REAL_MEDIA: "1"
-      FACTORY_ALLOW_LOCAL_FALLBACK: "0"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "1"
+      FACTORY_EMERGENCY_LOCAL_FALLBACK: "1"
       # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
       # This fixes 401 Requires authentication without storing a PAT in the repository.
       GITHUB_TOKEN: ${{ github.token }}
