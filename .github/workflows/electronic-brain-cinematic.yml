@@ -67,6 +67,9 @@ jobs:
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
           pip install fal-client
 
+      - name: Validate cinematic brain modules
+        run: python -m compileall -q brain_v7/braincore_v2
+
       - name: Run Electronic Brain Cinematic Factory
         run: |
           python -m brain_v7.braincore_v2.background_factory_worker | tee factory_result.json
