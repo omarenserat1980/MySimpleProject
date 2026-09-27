@@ -175,6 +175,7 @@ class ModelRouter:
                 result["router"] = {"selected": family, "fallback_used": False}
                 self._record(family, enriched, result, latency)
                 return result
+            self._record(family, enriched, result, latency)
         else:
             result = {"status": "COMFYUI_NOT_CONFIGURED"}
             latency = time.monotonic() - started
