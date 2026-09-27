@@ -13,6 +13,8 @@ on:
   push:
     paths:
       - "production/BRAIN6_168H.json"
+      - "brain6_cpp/**"
+      - ".github/workflows/brain6-168h-cloud.yml"
 
 permissions:
   contents: write
@@ -45,6 +47,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup C++ toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++
+
       - name: Read 168H campaign state
         id: state
         shell: bash
@@ -69,16 +81,9 @@ jobs:
               raise SystemExit("CAMPAIGN_COMPLETE")
           PY
 
-      - name: Setup Python
-        if: steps.state.outputs.remaining != ''
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install FFmpeg
         if: steps.state.outputs.remaining != ''
         run: |
-          sudo apt-get update
           sudo apt-get install -y ffmpeg
 
       - name: Install factory dependencies
@@ -86,6 +91,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
+
+      - name: Build Brain 6 C++ orchestrator
+        if: steps.state.outputs.remaining != ''
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -pedantic brain6_cpp/main.cpp -o brain6_cpp/brain6
 
       - name: Restore latest successful factory state
         if: steps.state.outputs.remaining != ''
@@ -99,11 +109,11 @@ jobs:
             if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
           fi
 
-      - name: Run Brain 6 cloud slice
+      - name: Run Brain 6 through C++
         if: steps.state.outputs.remaining != ''
         run: |
           set -o pipefail
-          python -m brain_v7.braincore_v2.background_factory_worker | tee brain6_slice_result.json
+          ./brain6_cpp/brain6 | tee brain6_slice_result.json
 
       - name: Verify output
         if: success()
