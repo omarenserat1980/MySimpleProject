@@ -9,7 +9,7 @@ from .cinematic_bible import build_bibles
 class Shot:
     shot_id:str; scene_id:str; duration_s:float; purpose:str; action:str; framing:str; lens:str
     camera_move:str; composition:str; lighting:str; color_grade:str; continuity_key:str
-    visual_prompt:str; audio_prompt:str; transition:str
+    visual_prompt:str; audio_prompt:str; transition:str; negative_prompt:str; image_reference_prompt:str; sound_design_prompt:str; voice_prompt:str
 
 @dataclass(frozen=True)
 class Scene:
@@ -26,11 +26,23 @@ def _id(text:str)->str: return sha256(text.encode("utf-8")).hexdigest()[:12]
 
 def _shot(scene,n,duration,purpose,action,framing,lens,move,composition,lighting,grade,continuity,objective,transition,character_dna,world_dna):
     sid=f"{scene}-S{n:02d}"
-    visual=(f"Cinematic shot {sid}. {action}. Objective: {objective}. {framing}, {lens}, {move}, {composition}, "
+    visual=(f"Cinematic master shot {sid}. {action}. Objective: {objective}. {framing}, {lens}, {move}, {composition}. "
             f"{lighting}, {grade}. CHARACTER DNA: {character_dna}. WORLD DNA: {world_dna}. "
-            f"Maintain continuity key {continuity}. Photorealistic cinematic motion, natural anatomy, stable identity, no visual drift.")
-    audio=f"Arabic cinematic sound for {sid}: narration aligned to action, natural ambience, coherent music motif, clean dialogue."
-    return Shot(sid,scene,duration,purpose,action,framing,lens,move,composition,lighting,grade,continuity,visual,audio,transition)
+            f"Continuity key: {continuity}. Photorealistic feature-film cinematography, physically plausible motion, "
+            f"natural anatomy, stable facial identity, stable wardrobe, coherent geometry, realistic skin texture, "
+            f"real lens depth-of-field, motivated shadows, cinematic exposure, temporal consistency, no visual drift.")
+    audio=(f"Arabic cinematic soundscape for {sid}: emotionally appropriate natural ambience, synchronized Foley, "
+           f"clean dialogue/narration, subtle room tone, coherent recurring music motif, realistic perspective and dynamics.")
+    negative=("cartoon, plastic skin, wax face, deformed hands, extra fingers, duplicate person, identity drift, "
+              "warped geometry, floating objects, broken perspective, flicker, jitter, temporal morphing, oversharpening, "
+              "crushed blacks, clipped highlights, artificial HDR, text artifacts, watermark, logo")
+    image_ref=(f"MASTER REFERENCE for {sid}: preserve the same protagonist face, hair, age, body proportions, wardrobe, "
+               f"hero prop and world geometry across all shots; use the established character/world bible as identity anchors.")
+    sound=(f"Foley and ambience must follow on-screen action in {sid}; maintain the same acoustic environment and "
+           f"music motif established by previous shots; dialogue remains intelligible without sounding synthetic.")
+    voice=("Arabic natural human cinematic narration/dialogue; preserve one stable speaker identity, age, accent, "
+           "emotion and microphone character across the film; match pacing to the action.")
+    return Shot(sid,scene,duration,purpose,action,framing,lens,move,composition,lighting,grade,continuity,visual,audio,transition,negative,image_ref,sound,voice)
 
 def build_plan(objective:str,*,commercial_goal:str="YouTube revenue",audience:str="Arabic-speaking general audience",duration_s:int=60)->CinematicPlan:
     objective=objective.strip()
@@ -56,7 +68,9 @@ def build_plan(objective:str,*,commercial_goal:str="YouTube revenue",audience:st
         scenes.append(Scene(sid,title,purpose,"same coherent cinematic world",("Primary Subject",),
                             ("hero prop","persistent environment"),"motivated cinematic key + soft fill + practicals",
                             "consistent cinematic grade",tuple(shots)))
-    quality={"prompt_alignment":.90,"visual_quality":.90,"audio_quality":.88,"cinematic_coherence":.94,"brand_fit":.88,"technical_validity":.95}
+    quality={"prompt_alignment":.94,"visual_quality":.94,"audio_quality":.92,"cinematic_coherence":.96,
+             "character_consistency":.95,"world_consistency":.95,"motion_realism":.93,
+             "lighting_realism":.93,"dialogue_clarity":.92,"technical_validity":.98}
     return CinematicPlan(f"cin-{_id(objective+str(duration_s))}",objective,commercial_goal,audience,
         "Open with an immediate visual question, conflict or striking result; establish curiosity before explanation.",
         tuple(scenes),{"characters":c,"world":w,"shot_grammar":"12-shot minimum: establish -> perform -> insert across four acts",
@@ -68,7 +82,12 @@ def provider_prompts(plan:CinematicPlan)->list[dict[str,Any]]:
     return [{"shot_id":s.shot_id,"scene_id":s.scene_id,"visual_prompt":s.visual_prompt,"audio_prompt":s.audio_prompt,
              "continuity_key":s.continuity_key,"duration_s":s.duration_s,"purpose":s.purpose,"framing":s.framing,
              "lens":s.lens,"camera_move":s.camera_move,"transition":s.transition,
-             "character_bible":plan.character_bible,"world_bible":plan.world_bible}
+             "character_bible":plan.character_bible,"world_bible":plan.world_bible,
+             "negative_prompt":s.negative_prompt,"image_reference_prompt":s.image_reference_prompt,
+             "sound_design_prompt":s.sound_design_prompt,"voice_prompt":s.voice_prompt,
+             "quality_targets":plan.quality_targets,
+             "production_rules":{"photorealism":true,"identity_consistency":true,"world_consistency":true,
+                                 "temporal_consistency":true,"audio_sync":true,"no_text_artifacts":true}}
             for scene in plan.scenes for s in scene.shots]
 
 def refine_plan(plan:CinematicPlan,feedback:dict[str,float])->dict[str,Any]:
