@@ -261,10 +261,12 @@ def run_factory(
     if rendered["status"] != "SHOTS_RENDERED":
         return {"status": rendered["status"], "topic": topic, "render": rendered}
 
-    final_qc = evaluate_final_film(rendered["manifest"], rendered["outputs"])
+    with measure("final_film_qc", path=Path(os.getenv("FACTORY_STATE_PATH", ".factory_state.json")).with_name("factory_throughput.json")):
+        final_qc = evaluate_final_film(rendered["manifest"], rendered["outputs"])
     if final_qc.get("status") != "VERIFIED":
         return {"status":"FINAL_FILM_QC_BLOCKED","topic":topic,"render":rendered,"final_qc":final_qc,"dispatch":dispatch_preview}
-    assembled = assembler.assemble(outputs=rendered["outputs"], plan=plan)
+    with measure("assembly", path=Path(os.getenv("FACTORY_STATE_PATH", ".factory_state.json")).with_name("factory_throughput.json")):
+        assembled = assembler.assemble(outputs=rendered["outputs"], plan=plan)
     video_ref = assembled.get("video_ref")
     if not video_ref:
         return {
@@ -274,8 +276,9 @@ def run_factory(
             "assembly": assembled,
         }
 
-    quality = inspect_video(video_ref)
-    mastering = evaluate_master(video_ref, len(rendered["outputs"]), manifest=rendered.get("manifest"))
+    with measure("master_qc", path=Path(os.getenv("FACTORY_STATE_PATH", ".factory_state.json")).with_name("factory_throughput.json")):
+        quality = inspect_video(video_ref)
+        mastering = evaluate_master(video_ref, len(rendered["outputs"]), manifest=rendered.get("manifest"))
     if quality.get("status") != "ACCEPTED" or mastering.get("status") != "VERIFIED":
         return {
             "status": "QUALITY_GATE_BLOCKED",
@@ -329,6 +332,7 @@ def run_factory(
         "assembly": assembled,
         "youtube": publication,
         "analytics": analytics,
+        "throughput_metrics": throughput_snapshot(Path(os.getenv("FACTORY_STATE_PATH", ".factory_state.json")).with_name("factory_throughput.json")),
         "cleanup": cleanup,
         "learning_input": {
             "next_cycle_required": True,
