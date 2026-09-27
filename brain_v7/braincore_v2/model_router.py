@@ -13,6 +13,8 @@ import time
 from typing import Any, Protocol
 import httpx
 
+from .speed_optimizer import apply_speed_policy, speed_policy
+
 
 class MediaBackend(Protocol):
     def render(self, *, shot: dict[str, Any], authorized: bool = False) -> dict[str, Any]: ...
@@ -48,7 +50,11 @@ class ComfyUIBackend:
             "SOUND_DESIGN_PROMPT": shot.get("sound_design_prompt", ""),
             "VOICE_PROMPT": shot.get("voice_prompt", ""),
             "SHOT_ID": shot.get("shot_id", ""),
-            "DURATION": shot.get("duration_s", 5),\n            "INFERENCE_PROFILE": (shot.get("generation") or {}).get("inference_profile", "production"),\n            "SAMPLING_STEPS": (shot.get("generation") or {}).get("sampling_steps", 20),\n            "QUANTIZATION": (shot.get("generation") or {}).get("quantization", "bf16"),\n            "ATTENTION": (shot.get("generation") or {}).get("attention", "default"),
+            "DURATION": shot.get("duration_s", 5),
+            "INFERENCE_PROFILE": (shot.get("generation") or {}).get("inference_profile", "production"),
+            "SAMPLING_STEPS": (shot.get("generation") or {}).get("sampling_steps", 20),
+            "QUANTIZATION": (shot.get("generation") or {}).get("quantization", "bf16"),
+            "ATTENTION": (shot.get("generation") or {}).get("attention", "default"),
         }
         encoded = json.dumps(workflow, ensure_ascii=False)
         for key, value in replacements.items():
@@ -114,11 +120,12 @@ class ModelRouter:
 
     def snapshot(self) -> dict[str, Any]:
         return {
-            "version": 1,
+            "version": 2,
             "requested": self.requested,
             "comfyui_configured": self.comfy.configured(),
             "profiles": PROFILES,
-            "routing": "auto -> configured backend -> existing provider fallback",
+            "routing": "shot route -> speed profile -> configured backend -> fallback",
+            "speed_policy": speed_policy(),
         }
 
     def _profile(self, shot: dict[str, Any]) -> str:
@@ -134,6 +141,7 @@ class ModelRouter:
         family = self._profile(shot)
         enriched = dict(shot)
         enriched["model_family"] = family
+        enriched = apply_speed_policy(enriched)
         enriched["router_snapshot"] = self.snapshot()
         if self.comfy.configured():
             result = self.comfy.render(shot=enriched, authorized=authorized)
