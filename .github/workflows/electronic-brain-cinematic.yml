@@ -127,12 +127,31 @@ jobs:
           set -o pipefail
           python -m brain_v7.braincore_v2.background_factory_worker | tee factory_result.json
 
-      - name: Verify final film artifact
+      - name: Verify final film artifact and content
         if: success()
         run: |
+          set -euo pipefail
           test -f cinematic_output/final.mp4
           test -s cinematic_output/final.mp4
-          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 cinematic_output/final.mp4
+          ffprobe -v error -show_entries format=duration,size:stream=codec_type,codec_name,width,height -of json cinematic_output/final.mp4 > final_probe.json
+          python - <<'PY'
+          import json, subprocess
+          p="cinematic_output/final.mp4"
+          data=json.load(open("final_probe.json"))
+          duration=float(data["format"].get("duration") or 0)
+          streams=data.get("streams") or []
+          video=next((s for s in streams if s.get("codec_type")=="video"),None)
+          audio=next((s for s in streams if s.get("codec_type")=="audio"),None)
+          if not video or not audio or duration < 1 or video.get("width",0)<640 or video.get("height",0)<360):
+              raise SystemExit("FINAL_QC_FAILED: missing valid video/audio content")
+          r=subprocess.run(["ffmpeg","-v","info","-i",p,"-vf","blackdetect=d=0.5:pix_th=0.98","-an","-f","null","-"],capture_output=True,text=True,timeout=180)
+          import re
+          black=sum(float(x) for x in re.findall(r"black_duration:([0-9.]+)",r.stderr or ""))
+          ratio=black/duration
+          print(f"duration={duration:.2f}s black_ratio={ratio:.3f}")
+          if ratio >= 0.90:
+              raise SystemExit("FINAL_QC_FAILED: final.mp4 is effectively black/empty")
+          PY
 
       - name: Save resumable checkpoint
         if: always()
