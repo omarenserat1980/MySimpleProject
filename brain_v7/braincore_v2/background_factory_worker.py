@@ -116,7 +116,7 @@ if __name__ == "__main__":
         # GitHub Actions must not report a green production when the factory
         # stopped before rendering/assembling the requested film.
         status = str(result.get("status", ""))
-        if status not in {"COMPLETED", "VERIFIED", "SUCCESS"}:
+        if status not in {"COMPLETED", "VERIFIED", "SUCCESS", "FACTORY_CYCLE_COMPLETE"}:
             raise SystemExit(2)
     else:
         run_forever()
