@@ -45,6 +45,7 @@ from .mastering_qc import evaluate_master
 from .brain_media_adapter import FactoryState
 from .speed_optimizer import speed_policy, apply_speed_policy
 from .take_budget import take_budget
+from .production_speed_optimizer import speed_plan
 
 
 class TopicResearcher(Protocol):
@@ -120,6 +121,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
     speed = speed_policy()
     concurrency = speed["concurrency"]
+    throughput_plan = speed_plan(list(shot_prompts), max_concurrency=concurrency)
     lock = threading.Lock()
     pending, outputs, failures = [], [], []
     skipped = 0
@@ -200,11 +202,11 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     outputs.sort(key=lambda x: str(x.get("shot_id", "")))
     diagnostics = diagnose({"status": "SHOTS_BLOCKED" if failures else "VERIFIED_COMPLETED", "visual_qc": outputs[-1].get("visual_qc") if outputs else {}, "film_qc": outputs[-1].get("film_qc") if outputs else {}})
     if failures:
-        manifest = {"version": 5, "status": "SHOTS_BLOCKED", "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
+        manifest = {"version": 5, "status": "SHOTS_BLOCKED", "speed_plan": throughput_plan, "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
         Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return {"status": "SHOTS_BLOCKED", "failed_shot": failures[0]["shot_id"], "outputs": outputs, "skipped": skipped, "failures": failures, "manifest": manifest}
 
-    manifest = {"version": 6, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
+    manifest = {"version": 6, "status": "SHOTS_RENDERED", "speed_plan": throughput_plan, "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
