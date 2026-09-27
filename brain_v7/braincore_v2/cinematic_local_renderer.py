@@ -6,6 +6,7 @@ and generated ambient audio. Heavy AI rendering remains optional.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,50 @@ class CinematicLocalRenderer:
         self.output_dir = Path(output_dir or os.getenv("LOCAL_MEDIA_DIR", "/tmp/brain_media"))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.ffmpeg = os.getenv("FFMPEG_BIN", "ffmpeg")
+
+    def _local_visual_qc(self, path: Path, expected_duration: int) -> dict[str, Any]:
+        """Objective local proxy: container, streams, resolution, duration and size.
+
+        It is deliberately named a proxy, not a semantic vision score. If a
+        real vision provider is configured, its score remains authoritative.
+        """
+        probe = [
+            self.ffmpeg, "-v", "error", "-show_entries",
+            "format=duration,size:stream=codec_type,width,height",
+            "-of", "json", str(path),
+        ]
+        p = subprocess.run(probe, capture_output=True, text=True, timeout=30, check=False)
+        if p.returncode != 0:
+            return {"status": "FAIL", "score": 0.0, "evidence": "local_visual_proxy",
+                    "issues": ["ffprobe_failed"]}
+        try:
+            data = json.loads(p.stdout or "{}")
+            streams = data.get("streams") or []
+            fmt = data.get("format") or {}
+            video = next((s for s in streams if s.get("codec_type") == "video"), None)
+            audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
+            duration = float(fmt.get("duration") or 0.0)
+            size = int(float(fmt.get("size") or 0))
+            checks = {
+                "video_stream": video is not None,
+                "audio_stream": audio is not None,
+                "hd_1280x720": bool(video and int(video.get("width") or 0) >= 1280 and int(video.get("height") or 0) >= 720),
+                "duration": duration >= max(2.0, min(expected_duration, 3)),
+                "nontrivial_size": size >= 1024,
+            }
+            score = sum(checks.values()) / len(checks)
+            status = "PASS" if all(checks.values()) else "FAIL"
+            return {
+                "status": status,
+                "score": round(score, 3),
+                "evidence": "local_visual_proxy",
+                "checks": checks,
+                "duration_s": duration,
+                "size_bytes": size,
+            }
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return {"status": "FAIL", "score": 0.0, "evidence": "local_visual_proxy",
+                    "issues": ["invalid_ffprobe_json"]}
 
     def render(self, *, shot: dict[str, Any], authorized: bool = False) -> dict[str, Any]:
         if not authorized:
@@ -74,10 +119,12 @@ class CinematicLocalRenderer:
             return {"status": "RENDER_FAILED", "error": repr(exc)}
         if p.returncode != 0 or not out.is_file() or out.stat().st_size < 1024:
             return {"status": "RENDER_FAILED", "error": p.stderr[-3000:]}
+        local_qc = self._local_visual_qc(out, duration)
         return {
             "status": "VERIFIED_COMPLETED",
             "shot_id": shot_id,
             "video_ref": str(out),
             "duration_s": duration,
             "renderer": "local_ffmpeg_cinematic",
+            "local_visual_qc": local_qc,
         }
