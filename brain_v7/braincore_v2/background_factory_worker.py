@@ -13,7 +13,6 @@ from typing import Any
 from .cinematic_factory_controller import run_factory, FactoryConfig
 from .http_media_adapter import FfmpegVideoAssembler
 from .brain_media_adapter import BrainMediaProvider
-from .cinematic_local_renderer import CinematicLocalRenderer
 from .cinema_engine_v6 import CinemaEngineV6
 from .cinema_manifest import write_manifest
 from .model_router import ModelRouter
@@ -37,9 +36,22 @@ def _heartbeat(status: str, cycle: int, detail: str = "") -> None:
 
 
 def _build_renderer():
-    fallback = BrainMediaProvider() if (
-        os.getenv("MEDIA_PROVIDER_URL", "").strip() or os.getenv("FAL_KEY", "").strip()
-    ) else CinematicLocalRenderer()
+    # Production must never silently downgrade to the FFmpeg-only local renderer.
+    # A missing real media backend is a hard configuration error.
+    has_real_provider = bool(
+        os.getenv("FAL_KEY", "").strip()
+        or os.getenv("MEDIA_PROVIDER_URL", "").strip()
+        or os.getenv("COMFYUI_URL", "").strip()
+    )
+    allow_local = _truthy("FACTORY_ALLOW_LOCAL_FALLBACK", "0") and not _truthy(
+        "FACTORY_ALLOW_PRODUCTION", "0"
+    )
+    if not has_real_provider and not allow_local:
+        raise RuntimeError(
+            "REAL_MEDIA_PROVIDER_REQUIRED: configure FAL_KEY, MEDIA_PROVIDER_URL, "
+            "or COMFYUI_URL; local FFmpeg fallback is disabled for production."
+        )
+    fallback = BrainMediaProvider()
     if _truthy("FACTORY_MODEL_ROUTER", "1"):
         return ModelRouter(fallback)
     return fallback
