@@ -29,6 +29,8 @@ from .cinematic_story_engine import build_story
 from .story_architect import build_story as build_executable_story, export_story
 from .film_memory import FilmMemory
 from .film_qc import evaluate_film_evidence
+from .repair_planner import build_repairs
+from .production_memory import ProductionMemory
 from .cinematic_quality_gate import inspect_video
 from .brain_media_adapter import FactoryState
 
@@ -98,6 +100,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     state = FactoryState(state_path)
     ledger = ContinuityLedger(Path(state_path).with_name("continuity_ledger.json").as_posix())
     memory = FilmMemory(Path(state_path).with_name("film_memory.json").as_posix())
+    production_memory = ProductionMemory(Path(state_path).parent.as_posix())
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
     concurrency = max(1, min(8, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3"))))
     lock = threading.Lock()
@@ -131,6 +134,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
                 result["visual_qc"] = qc
                 result["film_qc"] = evaluate_film_evidence(shot, result, memory.snapshot())
+                result["repair_plan"] = build_repairs(result["film_qc"], shot)
                 if qc["status"] == "VERIFIED" and result["film_qc"]["status"] == "VERIFIED":
                     ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt + 1)
                     result["status"] = "VERIFIED_COMPLETED"
@@ -150,7 +154,8 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
             shot_id, result = future.result()
             if result.get("status") == "VERIFIED_COMPLETED":
                 with lock:
-                    memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
+                    memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
+                    production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
                 outputs.append(result)
             else:
                 failures.append({"shot_id": shot_id, "result": result})
@@ -339,6 +344,9 @@ def snapshot() -> dict[str, Any]:
         "film_dsl": True,
         "story_architecture": True,
         "persistent_film_memory": True,
+        "persistent_world_state": True,
+        "targeted_repair_planner": True,
+        "evidence_feedback_to_next_shot": True,
         "multi_dimensional_qc": True,
         "research_ledger": True,
         "closed_loop_repair": True,
