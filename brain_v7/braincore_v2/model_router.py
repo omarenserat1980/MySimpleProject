@@ -34,15 +34,21 @@ class ComfyUIBackend:
         self.base_url = os.getenv("COMFYUI_URL", "").rstrip("/")
         self.client_id = os.getenv("COMFYUI_CLIENT_ID", "electronic-brain")
         self.workflow_json = os.getenv("COMFYUI_WORKFLOW_JSON", "")
+        self.workflow_by_family = {
+            family: os.getenv(f"COMFYUI_WORKFLOW_{family.upper()}", "")
+            for family in ("wan", "ltx", "hunyuan", "comfyui")
+        }
         self.timeout = float(os.getenv("COMFYUI_TIMEOUT_SECONDS", "900"))
         self.poll = float(os.getenv("COMFYUI_POLL_SECONDS", "3"))
         self.max_polls = max(1, int(os.getenv("COMFYUI_MAX_POLLS", "300")))
 
     def configured(self) -> bool:
-        return bool(self.base_url and self.workflow_json)
+        return bool(self.base_url and (self.workflow_json or any(self.workflow_by_family.values())))
 
     def _workflow(self, shot: dict[str, Any]) -> dict[str, Any]:
-        workflow = json.loads(self.workflow_json)
+        family = str(shot.get("model_family") or "").lower()
+        raw = self.workflow_by_family.get(family) or self.workflow_json
+        workflow = json.loads(raw)
         replacements = {
             "PROMPT": shot.get("visual_prompt", ""),
             "NEGATIVE_PROMPT": shot.get("negative_prompt", ""),
@@ -123,6 +129,7 @@ class ModelRouter:
             "version": 2,
             "requested": self.requested,
             "comfyui_configured": self.comfy.configured(),
+            "workflow_families": [k for k,v in self.comfy.workflow_by_family.items() if v],
             "profiles": PROFILES,
             "routing": "shot route -> speed profile -> configured backend -> fallback",
             "speed_policy": speed_policy(),
