@@ -57,6 +57,7 @@ jobs:
       FACTORY_RENDER_CONCURRENCY: "12"
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
+      BRAIN_MAX_ITERATIONS: "1000"
       FACTORY_REQUIRE_REAL_MEDIA: "1"
       FACTORY_ALLOW_LOCAL_FALLBACK: "0"
       # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
