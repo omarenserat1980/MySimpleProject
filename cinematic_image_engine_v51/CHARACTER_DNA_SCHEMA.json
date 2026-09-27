@@ -1,0 +1,14 @@
+{
+  "character_id": "CHAR_0001",
+  "identity": {"face": {}, "body": {}, "age_range": "", "hair": "", "eyes": ""},
+  "wardrobe": {},
+  "expressions": [],
+  "references": {
+    "front": "",
+    "three_quarter": "",
+    "side": "",
+    "full_body": "",
+    "expression": "",
+    "wardrobe": ""
+  }
+}
