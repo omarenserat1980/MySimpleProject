@@ -22,6 +22,12 @@ permissions:
   contents: read
   actions: read
 
+# Never let two cinematic production runs compete for the same provider,
+# checkpoint, or output directory.
+concurrency:
+  group: electronic-brain-cinematic-production
+  cancel-in-progress: true
+
 jobs:
   cinematic-factory:
     runs-on: ubuntu-latest
@@ -45,8 +51,8 @@ jobs:
       MEDIA_PROVIDER_POLL_SECONDS: "4"
       MEDIA_PROVIDER_MAX_POLLS: "120"
       FACTORY_SPEED_MODE: "max"
-      FACTORY_MAX_CONCURRENCY: "24"
-      FACTORY_RENDER_CONCURRENCY: "24"
+      FACTORY_MAX_CONCURRENCY: "12"
+      FACTORY_RENDER_CONCURRENCY: "12"
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
     steps:
@@ -58,7 +64,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set +e
-          run_id="$(gh run list --workflow electronic-brain-cinematic.yml --status completed --limit 5 --json databaseId --jq '.[0].databaseId')"
+          run_id="$(gh run list --workflow electronic-brain-cinematic.yml --status success --limit 5 --json databaseId --jq '.[0].databaseId')"
           if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
             gh run download "$run_id" --name cinematic-factory-state --dir .factory_resume || true
             if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
