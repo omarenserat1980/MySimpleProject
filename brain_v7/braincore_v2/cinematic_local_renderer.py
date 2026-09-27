@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -24,22 +25,19 @@ class CinematicLocalRenderer:
         self.output_dir = Path(output_dir or os.getenv("LOCAL_MEDIA_DIR", "/tmp/brain_media"))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.ffmpeg = os.getenv("FFMPEG_BIN", "ffmpeg")
+        self.ffprobe = os.getenv("FFPROBE_BIN") or shutil.which("ffprobe") or "ffprobe"
 
     def _local_visual_qc(self, path: Path, expected_duration: int) -> dict[str, Any]:
-        """Objective local proxy: container, streams, resolution, duration and size.
-
-        It is deliberately named a proxy, not a semantic vision score. If a
-        real vision provider is configured, its score remains authoritative.
-        """
+        """Objective local proxy: container, streams, resolution, duration and size."""
         probe = [
-            self.ffmpeg, "-v", "error", "-show_entries",
+            self.ffprobe, "-v", "error", "-show_entries",
             "format=duration,size:stream=codec_type,width,height",
             "-of", "json", str(path),
         ]
         p = subprocess.run(probe, capture_output=True, text=True, timeout=30, check=False)
         if p.returncode != 0:
             return {"status": "FAIL", "score": 0.0, "evidence": "local_visual_proxy",
-                    "issues": ["ffprobe_failed"]}
+                    "issues": ["ffprobe_failed"], "stderr": p.stderr[-500:]}
         try:
             data = json.loads(p.stdout or "{}")
             streams = data.get("streams") or []
