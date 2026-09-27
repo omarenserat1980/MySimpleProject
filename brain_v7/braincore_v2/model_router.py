@@ -195,10 +195,25 @@ class ModelRouter:
         else:
             result = {"status": "COMFYUI_NOT_CONFIGURED"}
             latency = time.monotonic() - started
+        # Free-only production path: when no ComfyUI workflow is configured,
+        # do not enter a paid/legacy provider merely to discover that it is
+        # unavailable. Route directly to the built-in FFmpeg cinematic renderer.
+        if self.local is not None and not self.comfy.configured():
+            local_result = self.local.render(shot=enriched, authorized=authorized)
+            if local_result.get("status") == "VERIFIED_COMPLETED":
+                local_result["provider"] = "local_ffmpeg_cinematic"
+                local_result["router"] = {
+                    "selected": family,
+                    "fallback_used": True,
+                    "emergency_local_fallback": True,
+                    "primary_error": "NO_CONFIGURED_FREE_MEDIA_BACKEND",
+                }
+                return local_result
+
         result = self.fallback.render(shot=enriched, authorized=authorized)
         if (
             self.local is not None
-            and result.get("status") in {"PROVIDER_ERROR","PROVIDER_FAILED","PROVIDER_TIMEOUT","SUBMISSION_UNVERIFIED","FAL_CLIENT_MISSING"}
+            and result.get("status") in {"PROVIDER_ERROR","PROVIDER_FAILED","PROVIDER_TIMEOUT","SUBMISSION_UNVERIFIED","FAL_CLIENT_MISSING","REAL_MEDIA_PROVIDER_REQUIRED","MEDIA_BACKEND_REQUIRED"}
         ):
             local_result = self.local.render(shot=enriched, authorized=authorized)
             if local_result.get("status") == "VERIFIED_COMPLETED":
