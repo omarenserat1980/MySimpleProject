@@ -44,13 +44,13 @@ def _build_renderer():
         or os.getenv("MEDIA_PROVIDER_URL", "").strip()
         or os.getenv("COMFYUI_URL", "").strip()
     )
-    allow_local = _truthy("FACTORY_ALLOW_LOCAL_FALLBACK", "0") and not _truthy(
-        "FACTORY_ALLOW_PRODUCTION", "0"
-    )
+    # Free-only production mode: local FFmpeg cinematic rendering is an explicit
+    # production backend, not an accidental silent downgrade.
+    allow_local = _truthy("FACTORY_ALLOW_LOCAL_FALLBACK", "0")
     if not has_real_provider and not allow_local:
         raise RuntimeError(
-            "REAL_MEDIA_PROVIDER_REQUIRED: configure FAL_KEY, MEDIA_PROVIDER_URL, "
-            "or COMFYUI_URL; local FFmpeg fallback is disabled for production."
+            "MEDIA_BACKEND_REQUIRED: configure a free local backend "
+            "(FACTORY_ALLOW_LOCAL_FALLBACK=1) or an explicitly configured backend."
         )
     fallback = BrainMediaProvider()
     if _truthy("FACTORY_MODEL_ROUTER", "1"):
