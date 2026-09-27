@@ -6,7 +6,8 @@ def evaluate_audio_evidence(shot: dict[str, Any], result: dict[str, Any], memory
     memory = memory or {}
     evidence = result.get("audio_qc") or result.get("audio_evidence") or {}
     errors: list[str] = []
-    if not shot.get("voice_prompt") and not shot.get("sound_design_prompt"):
+    explicit_silence = str(shot.get("audio_mode", "")).lower() in {"silent", "none"}
+    if not explicit_silence and not shot.get("voice_prompt") and not shot.get("sound_design_prompt"):
         errors.append("audio_intent_missing")
     if isinstance(evidence, dict):
         status = str(evidence.get("status", "")).upper()
@@ -18,7 +19,6 @@ def evaluate_audio_evidence(shot: dict[str, Any], result: dict[str, Any], memory
     if score is None:
         # Absence of provider audio evidence is not a pass. For silent shots,
         # an explicit silent intent is sufficient.
-        explicit_silence = str(shot.get("audio_mode", "")).lower() in {"silent", "none"}
         status = "VERIFIED" if explicit_silence and not errors else ("REPAIR" if errors else "UNVERIFIED")
         return {"status": status, "score": 1.0 if explicit_silence else 0.0,
                 "evidence": "explicit_silence" if explicit_silence else "prompt_only",
