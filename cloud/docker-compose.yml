@@ -1,0 +1,21 @@
+services:
+  brain:
+    build:
+      context: ..
+      dockerfile: cloud/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - brain_output:/app/cinematic_output
+      - brain_state:/app/.brain_state
+    environment:
+      FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_REQUIRE_REAL_MEDIA: "1"
+      FACTORY_ONE_SHOT: "1"
+      FACTORY_ALLOW_YOUTUBE_PUBLISH: "0"
+      FACTORY_INTERVAL_SECONDS: "21600"
+
+volumes:
+  brain_output:
+  brain_state:
