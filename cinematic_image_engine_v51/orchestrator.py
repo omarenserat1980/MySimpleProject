@@ -6,6 +6,7 @@ from .router import LocalModelRouter
 from .planner import decompose_script, plan_shots
 from .qc import CinematicQC
 from .adapter import CommandImageAdapter
+from .termux_diffusion_adapter import TermuxDiffusionAdapter
 from .local_runtime import discover_runtime
 
 class ImageFactory:
@@ -51,6 +52,10 @@ class ImageFactory:
         route=self.router.choose(shot.get("camera","medium"),"preview")
         executable=route.get("executable") or route.get("path") or self.runtime[0]["executable"]
         out=self.root/"candidates"/f"{shot['shot_id']}_attempt{attempt:02d}.png"
+        if executable == 'termux-diffusion' or executable.endswith('/termux-diffusion'):
+            return TermuxDiffusionAdapter(executable=executable).generate(prompt,out,{
+                "shot": shot, "attempt": attempt, "route": route
+            })
         return CommandImageAdapter(executable).generate(prompt,out,{
             "shot": shot, "attempt": attempt, "route": route
         })
