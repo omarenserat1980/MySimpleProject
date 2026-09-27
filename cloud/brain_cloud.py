@@ -46,6 +46,7 @@ while not STOP:
     env.setdefault("BRAIN_HTTP_TIMEOUT", "30")
 
     print("BRAIN_CLOUD_CYCLE_START=1", flush=True)
+    run_software_factory(env)
     try:
         result = subprocess.run(
             ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
