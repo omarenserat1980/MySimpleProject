@@ -1,10 +1,9 @@
-"""Autonomous software factory for authorized Brain-owned workloads."""
+"""Autonomous software factory cycle for authorized Brain-owned workloads."""
 from __future__ import annotations
-import json, os, subprocess, time
+import json, subprocess
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-INTERVAL=int(os.getenv("BRAIN_SOFTWARE_FACTORY_INTERVAL_SECONDS","1800"))
 
 def run(cmd, timeout=900):
     p=subprocess.run(cmd,cwd=ROOT,text=True,capture_output=True,timeout=timeout)
@@ -21,12 +20,9 @@ def cycle():
     for cmd in checks:
         if run(cmd):
             print("BRAIN_SOFTWARE_FACTORY_GATE=FAIL",flush=True)
-            return
+            return 1
     print("BRAIN_SOFTWARE_FACTORY_GATE=PASS",flush=True)
+    return 0
 
-while True:
-    try:
-        cycle()
-    except Exception as exc:
-        print(f"BRAIN_SOFTWARE_FACTORY_ERROR={type(exc).__name__}:{exc}",flush=True)
-    time.sleep(INTERVAL)
+if __name__=="__main__":
+    raise SystemExit(cycle())
