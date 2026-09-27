@@ -32,7 +32,7 @@ jobs:
       FAL_KEY: ${{ secrets.FAL_KEY }}
       FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
       FAL_SHOT_DURATION: "5"
-      FAL_GENERATE_AUDIO: "0"
+      FAL_GENERATE_AUDIO: "1"
       FAL_VISION_QC: "1"
       FACTORY_OUTPUT_DIR: "cinematic_output"
       MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
