@@ -1,0 +1,139 @@
+name: Brain 6 - 168H Cloud Campaign
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "Start or continue the 168-hour campaign"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 */6 * * *"
+  push:
+    paths:
+      - "production/BRAIN6_168H.json"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: brain6-168h-cloud
+  cancel-in-progress: false
+
+jobs:
+  brain6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      BRAIN6_168H: "1"
+      BRAIN_MAX_RUNTIME_SECONDS: "21600"
+      BRAIN_MAX_ITERATIONS: "1000000"
+      FACTORY_ONE_SHOT: "1"
+      FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "1"
+      FACTORY_EMERGENCY_LOCAL_FALLBACK: "1"
+      FACTORY_REQUIRE_REAL_MEDIA: "1"
+      FACTORY_MODEL_ROUTER: "1"
+      FACTORY_DURATION_SECONDS: "5"
+      FACTORY_OUTPUT_DIR: "cinematic_output"
+      FACTORY_MIN_QUALITY: "0.82"
+      FACTORY_ALLOW_YOUTUBE_PUBLISH: "0"
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read 168H campaign state
+        id: state
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, time
+          p="production/BRAIN6_168H.json"
+          if not os.path.exists(p):
+              raise SystemExit("BRAIN6_168H state file is missing")
+          s=json.load(open(p,encoding="utf-8"))
+          if not s.get("enabled", False):
+              print("enabled=false")
+              raise SystemExit(0)
+          started=float(s["started_epoch"])
+          elapsed=max(0,time.time()-started)
+          remaining=max(0,604800-elapsed)
+          print(f"elapsed={elapsed:.0f}s remaining={remaining:.0f}s")
+          with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+              f.write(f"elapsed={elapsed:.0f}\nremaining={remaining:.0f}\n")
+          if remaining <= 0:
+              raise SystemExit("CAMPAIGN_COMPLETE")
+          PY
+
+      - name: Setup Python
+        if: steps.state.outputs.remaining != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg
+        if: steps.state.outputs.remaining != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install factory dependencies
+        if: steps.state.outputs.remaining != ''
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
+
+      - name: Restore latest successful factory state
+        if: steps.state.outputs.remaining != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          run_id="$(gh run list --workflow 'Electronic Brain Cinematic Factory' --status success --limit 10 --json databaseId --jq '.[0].databaseId')"
+          if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+            gh run download "$run_id" --name cinematic-factory-state --dir .factory_resume || true
+            if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
+          fi
+
+      - name: Run Brain 6 cloud slice
+        if: steps.state.outputs.remaining != ''
+        run: |
+          set -o pipefail
+          python -m brain_v7.braincore_v2.background_factory_worker | tee brain6_slice_result.json
+
+      - name: Verify output
+        if: success()
+        run: |
+          test -f cinematic_output/final.mp4
+          test -s cinematic_output/final.mp4
+          ffprobe -v error -show_entries format=duration:stream=codec_type,width,height -of json cinematic_output/final.mp4 > final_probe.json
+          python - <<'PY'
+          import json
+          d=json.load(open("final_probe.json"))
+          duration=float(d["format"].get("duration") or 0)
+          streams=d.get("streams",[])
+          v=next((x for x in streams if x.get("codec_type")=="video"),None)
+          a=next((x for x in streams if x.get("codec_type")=="audio"),None)
+          if not v or not a or duration < 1 or v.get("width",0)<640 or v.get("height",0)<360:
+              raise SystemExit("FINAL_QC_FAILED")
+          print(f"FINAL_QC_OK duration={duration:.2f}s")
+          PY
+
+      - name: Save campaign checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain6-168h-state
+          path: |
+            .factory_state.json
+            task_stack.json
+            world_state.json
+            cinematic_manifest.json
+            cinematic_project_manifest.json
+            brain6_slice_result.json
+          if-no-files-found: ignore
+          retention-days: 30
