@@ -28,6 +28,7 @@ jobs:
       FACTORY_MODEL_ROUTER: "1"
       FACTORY_MODEL: "auto"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
+      FACTORY_ALLOW_YOUTUBE_PUBLISH: "0"
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
       FAL_KEY: ${{ secrets.FAL_KEY }}
@@ -43,6 +44,7 @@ jobs:
       FACTORY_SPEED_MODE: "max"
       FACTORY_MAX_CONCURRENCY: "8"
       FACTORY_RENDER_CONCURRENCY: "6"
+      FACTORY_ADAPTIVE_CONCURRENCY: "1"
     steps:
       - name: Checkout Electronic Brain
         uses: actions/checkout@v4
