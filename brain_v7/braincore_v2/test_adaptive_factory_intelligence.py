@@ -1,4 +1,6 @@
 import tempfile
+
+# CI trigger: adaptive factory intelligence regression suite
 import unittest
 from pathlib import Path
 
