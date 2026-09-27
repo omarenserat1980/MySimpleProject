@@ -68,8 +68,24 @@ class BrainMediaProvider:
                 "detailed_analysis":True,
             }})
             raw=(result or {}).get("output") or (result or {}).get("data",{}).get("output","")
-            parsed=json.loads(raw) if isinstance(raw,str) else raw
+            parsed=raw
+            if isinstance(raw,str):
+                text=raw.strip()
+                try:
+                    parsed=json.loads(text)
+                except Exception:
+                    start=text.find("{"); end=text.rfind("}")
+                    try:
+                        parsed=json.loads(text[start:end+1]) if start >= 0 and end > start else None
+                    except Exception:
+                        parsed=None
             if isinstance(parsed,dict):
+                try:
+                    parsed["score"]=max(0.0,min(1.0,float(parsed.get("score",0.0))))
+                except Exception:
+                    parsed["score"]=0.0
+                parsed.setdefault("status","FAIL")
+                parsed.setdefault("issues",[])
                 return parsed
             return {"score":0.0,"status":"FAIL","issues":["vision_output_not_json"],"raw":str(raw)}
         except Exception as exc:
@@ -85,6 +101,10 @@ class BrainMediaProvider:
         payload={"operation":"generate","shot":shot,
                  "prompt":shot.get("visual_prompt",""),
                  "audio_prompt":shot.get("audio_prompt",""),
+                 "sound_design_prompt":shot.get("sound_design_prompt",""),
+                 "voice_prompt":shot.get("voice_prompt",""),
+                 "image_reference_prompt":shot.get("image_reference_prompt",""),
+                 "negative_prompt":shot.get("negative_prompt",""),
                  "shot_id":shot.get("shot_id")}
         try:
             with httpx.Client(timeout=self.timeout) as client:
