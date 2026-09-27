@@ -59,6 +59,19 @@ jobs:
       - name: Checkout Electronic Brain
         uses: actions/checkout@v4
 
+      - name: Load production request duration
+        run: |
+          python - <<'PY'
+          import json, os
+          p = "production/REQUEST.json"
+          with open(p, "r", encoding="utf-8") as fh:
+              req = json.load(fh)
+          duration = int(req.get("duration_seconds", 60))
+          duration = max(1, min(600, duration))
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+              fh.write(f"FACTORY_DURATION_SECONDS={duration}\\n")
+          print(f"FACTORY_DURATION_SECONDS={duration}")
+          PY
       - name: Restore factory checkpoint
         env:
           GH_TOKEN: ${{ github.token }}
