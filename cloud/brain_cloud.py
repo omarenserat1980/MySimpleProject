@@ -22,17 +22,17 @@ print("BRAIN_CLOUD_BOOT=1", flush=True)
 print("BRAIN_CLOUD_MODE=internet-connected", flush=True)
 print("BRAIN_CLOUD_PUBLIC_WEB=1", flush=True)
 print("BRAIN_SOFTWARE_FACTORY=1", flush=True)
+print("BRAIN_GOAL_ORCHESTRATOR=1", flush=True)
 
 def run_software_factory(env):
     try:
         return subprocess.run(
-            ["python", "cloud/autonomous_software_factory.py"],
+            ["python", "cloud/goal_engine.py"],
             cwd=ROOT, env=env, timeout=300
         ).returncode
     except Exception as exc:
         print(f"BRAIN_SOFTWARE_FACTORY_ERROR={type(exc).__name__}:{exc}", flush=True)
         return 1
-
 
 failure_backoff = BACKOFF
 
@@ -55,6 +55,7 @@ while not STOP:
             time.sleep(1)
         failure_backoff = min(failure_backoff * 2, MAX_BACKOFF)
         continue
+
     print("BRAIN_CLOUD_SOFTWARE_GATE=PASS", flush=True)
     try:
         result = subprocess.run(
