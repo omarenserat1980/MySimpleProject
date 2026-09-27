@@ -1,0 +1,13 @@
+{
+  "factory": "brain-product-factory",
+  "products": [
+    {"id":"chat","type":"ai-assistant","capabilities":["chat","memory","tools","files","web"],"deployment":"authorized-cloud"},
+    {"id":"luna","type":"reasoning-assistant","capabilities":["reasoning","coding","research","agents"],"deployment":"authorized-cloud"},
+    {"id":"cloud","type":"cloud-control-plane","capabilities":["services","jobs","observability","deployment"],"deployment":"authorized-cloud"},
+    {"id":"windows","type":"desktop-automation","capabilities":["local-apps","files","processes"],"deployment":"authorized-host"},
+    {"id":"directory","type":"identity-directory","capabilities":["users","roles","service-identities"],"deployment":"authorized-infrastructure"},
+    {"id":"network","type":"network-platform","capabilities":["inventory","health","metrics","authorized-config"],"deployment":"authorized-infrastructure"}
+  ],
+  "gates":["tests","security","authorization","health","rollback"],
+  "principles":["human-control","least-privilege","auditability","reversibility"]
+}
