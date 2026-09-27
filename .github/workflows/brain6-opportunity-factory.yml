@@ -1,0 +1,90 @@
+name: Brain 6 - Opportunity Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      live_search:
+        description: "Run live opportunity discovery"
+        required: true
+        type: boolean
+        default: true
+      execute_deliverables:
+        description: "Create local deliverables when inputs are available"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "15 */6 * * *"
+  push:
+    paths:
+      - "brain_v7/braincore_v2/revenue_engine.py"
+      - "brain_v7/braincore_v2/self_executable_opportunities.py"
+      - "brain_v7/braincore_v2/api_executable_opportunities.py"
+      - "brain_v7/braincore_v2/opportunity_intake.py"
+      - "brain_v12/brain/income_engine.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain6-opportunity-factory
+  cancel-in-progress: false
+
+jobs:
+  discover-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+      FACTORY_REQUIRE_REAL_MEDIA: "1"
+      LIVE_SEARCH: ${{ inputs.live_search || 'true' }}
+      EXECUTE_DELIVERABLES: ${{ inputs.execute_deliverables || 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Brain opportunity modules
+        run: |
+          python -m py_compile \
+            brain_v7/braincore_v2/revenue_engine.py \
+            brain_v7/braincore_v2/self_executable_opportunities.py \
+            brain_v7/braincore_v2/api_executable_opportunities.py \
+            brain_v7/braincore_v2/revenue_target_engine.py \
+            brain_v7/braincore_v2/opportunity_intake.py \
+            brain_v12/brain/income_engine.py
+      - name: Build opportunity catalog
+        run: |
+          python - <<'PY'
+          import json
+          from brain_v7.braincore_v2.revenue_engine import rank_with_financials
+          from brain_v7.braincore_v2.self_executable_opportunities import catalog as self_catalog
+          from brain_v7.braincore_v2.api_executable_opportunities import catalog as api_catalog
+          from brain_v7.braincore_v2.revenue_target_engine import PATHS
+          data = {
+            "financial_opportunities": rank_with_financials(),
+            "self_executable": self_catalog(),
+            "api_routes": api_catalog(),
+            "revenue_paths": [x.__dict__ for x in PATHS],
+          }
+          with open("opportunity_catalog.json","w",encoding="utf-8") as f:
+              json.dump(data,f,ensure_ascii=False,indent=2)
+          print(json.dumps({
+            "financial_opportunities": len(data["financial_opportunities"]),
+            "self_executable": len(data["self_executable"]),
+            "api_routes": len(data["api_routes"]),
+            "revenue_paths": len(data["revenue_paths"])
+          }, ensure_ascii=False))
+          PY
+      - name: Validate tests
+        run: |
+          if [ -d brain_v7/tests ]; then python -m pytest -q brain_v7/tests; fi
+          if [ -d cloud ]; then python -m pytest -q cloud/test_api_server.py; fi
+      - name: Upload opportunity catalog
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain6-opportunity-catalog
+          path: opportunity_catalog.json
+          retention-days: 30
