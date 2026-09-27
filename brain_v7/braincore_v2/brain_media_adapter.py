@@ -21,6 +21,12 @@ class BrainMediaProvider:
         self.timeout=float(os.getenv("MEDIA_PROVIDER_TIMEOUT_SECONDS","900"))
         self.poll=float(os.getenv("MEDIA_PROVIDER_POLL_SECONDS","8"))
         self.max_polls=max(1,int(os.getenv("MEDIA_PROVIDER_MAX_POLLS","120")))
+        # Reuse one HTTP connection pool across concurrent shots. This removes
+        # repeated TLS/TCP setup while leaving generation/QC unchanged.
+        self._client=httpx.Client(timeout=self.timeout, limits=httpx.Limits(
+            max_connections=max(8, int(os.getenv("MEDIA_PROVIDER_HTTP_CONNECTIONS","32"))),
+            max_keepalive_connections=max(4, int(os.getenv("MEDIA_PROVIDER_HTTP_KEEPALIVE","16"))),
+        ))
 
     def _headers(self):
         return {"Authorization": f"Bearer {self.key}"} if self.key else {}
@@ -107,8 +113,8 @@ class BrainMediaProvider:
                  "negative_prompt":shot.get("negative_prompt",""),
                  "shot_id":shot.get("shot_id")}
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                r=client.post(self.url,json=payload,headers=self._headers())
+            client=self._client
+            r=client.post(self.url,json=payload,headers=self._headers())
                 r.raise_for_status()
                 data=r.json()
                 ref=data.get("video_ref") or data.get("output_url") or data.get("media_url")
