@@ -27,7 +27,15 @@ jobs:
         run: test -s cloud/Dockerfile
       - name: Validate compose
         run: docker compose -f cloud/docker-compose.yml config
-      - name: Validate factory import
+      - name: Validate factory and control plane imports
         env:
           PYTHONPATH: .
-        run: python -c "import brain_v7.braincore_v2.background_factory_worker"
+        run: python -c "import brain_v7.braincore_v2.background_factory_worker; import cloud.goal_engine; import cloud.api_server"
+      - name: Run Brain control plane tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q cloud/test_api_server.py
+      - name: Compile all Brain cloud code
+        run: python -m compileall -q cloud brain_v7
+      - name: Dependency audit
+        run: python -m pip install --disable-pip-version-check pip-audit && python -m pip_audit -r brain_v7/requirements.txt
