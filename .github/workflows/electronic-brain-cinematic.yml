@@ -51,6 +51,7 @@ jobs:
     timeout-minutes: 360
     env:
       FACTORY_ALLOW_PRODUCTION: "1"
+      # Free-only production profile: no paid media API is required.
       FACTORY_MODEL_ROUTER: "1"
       FACTORY_MODEL: "auto"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
@@ -60,7 +61,8 @@ jobs:
       FAL_KEY: ${{ secrets.FAL_KEY }}
       COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
       COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
-      FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
+      # FAL is intentionally not used in the free-only profile.
+      FAL_MODEL: ""
       FAL_SHOT_DURATION: "5"
       FAL_GENERATE_AUDIO: "1"
       FAL_VISION_QC: "1"
