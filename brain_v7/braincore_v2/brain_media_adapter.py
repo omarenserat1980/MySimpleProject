@@ -42,12 +42,38 @@ class BrainMediaProvider:
             ref=video.get("url")
             if not ref:
                 return {"status":"SUBMISSION_UNVERIFIED","provider_result":result}
-            return {"status":"VERIFIED_COMPLETED","video_ref":ref,
+            vision=self._vision_qc_fal(ref,shot)
+            return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,
                     "provider_result":result,"shot_id":shot.get("shot_id"),
                     "provider":"fal","model":model}
         except Exception as exc:
             return {"status":"PROVIDER_ERROR","error":repr(exc),"shot_id":shot.get("shot_id"),
                     "provider":"fal","model":model}
+
+    def _vision_qc_fal(self, video_url: str, shot: dict[str, Any]) -> dict[str, Any] | None:
+        if fal_client is None or os.getenv("FAL_VISION_QC","1").strip().lower() not in {"1","true","yes","on"}:
+            return None
+        prompt = (
+            "Evaluate this generated cinematic shot against the requested visual prompt and continuity anchors. "
+            "Return ONLY JSON with keys score, status, identity, world, prompt_alignment, issues. "
+            "score must be 0..1. status must be PASS or FAIL. "
+            "Check subject identity/appearance consistency, wardrobe, world/geography, lighting continuity, "
+            "composition/camera intent, anatomy/artifacts, and whether the requested action actually occurs. "
+            "Do not invent details that cannot be observed."
+        )
+        try:
+            result=fal_client.subscribe("fal-ai/video-understanding", arguments={"input":{
+                "video_url":video_url,
+                "prompt":prompt + "\nREQUESTED SHOT:\n" + shot.get("visual_prompt",""),
+                "detailed_analysis":True,
+            }})
+            raw=(result or {}).get("output") or (result or {}).get("data",{}).get("output","")
+            parsed=json.loads(raw) if isinstance(raw,str) else raw
+            if isinstance(parsed,dict):
+                return parsed
+            return {"score":0.0,"status":"FAIL","issues":["vision_output_not_json"],"raw":str(raw)}
+        except Exception as exc:
+            return {"score":0.0,"status":"FAIL","issues":["vision_qc_error",repr(exc)]}
 
     def render(self, *, shot: dict[str, Any], authorized: bool=False) -> dict[str, Any]:
         if not authorized:
@@ -68,7 +94,8 @@ class BrainMediaProvider:
                 ref=data.get("video_ref") or data.get("output_url") or data.get("media_url")
                 status=str(data.get("status","")).upper()
                 if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
-                    return {"status":"VERIFIED_COMPLETED","video_ref":ref,"provider_result":data,"shot_id":shot.get("shot_id")}
+                    vision=self._vision_qc_fal(ref,shot)
+                        return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
                 job_id=data.get("job_id") or data.get("id")
                 if not job_id:
                     return {"status":"SUBMISSION_UNVERIFIED","provider_result":data}
