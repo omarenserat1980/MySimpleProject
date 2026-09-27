@@ -1,0 +1,33 @@
+name: Brain Cloud Runtime Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloud/**'
+      - 'brain_v7/**'
+      - '.github/workflows/cloud-runtime-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate Python
+        run: python -m py_compile cloud/brain_cloud.py
+      - name: Validate Dockerfile
+        run: test -s cloud/Dockerfile
+      - name: Validate compose
+        run: docker compose -f cloud/docker-compose.yml config
+      - name: Validate factory import
+        env:
+          PYTHONPATH: .
+        run: python -c "import brain_v7.braincore_v2.background_factory_worker"
