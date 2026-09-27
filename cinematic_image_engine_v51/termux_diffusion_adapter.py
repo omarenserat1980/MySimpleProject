@@ -1,11 +1,11 @@
 from __future__ import annotations
-import shutil, subprocess
+import os, shutil, subprocess
 from pathlib import Path
 
 class TermuxDiffusionAdapter:
     def __init__(self, executable=None, model='anime', steps=6, threads=4, width=512, height=512):
         self.executable = executable or shutil.which('termux-diffusion')
-        self.model, self.steps, self.threads = model, steps, threads
+        self.model = os.environ.get('EB_DIFFUSION_MODEL', model)\n        self.steps = int(os.environ.get('EB_DIFFUSION_STEPS', steps))\n        self.threads = int(os.environ.get('EB_DIFFUSION_THREADS', threads))
         self.width, self.height = width, height
     def generate(self, prompt, output, metadata=None):
         if not self.executable:
