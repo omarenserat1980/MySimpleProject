@@ -1,0 +1,81 @@
+name: Electronic Brain Cinematic Factory
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: "Film duration in seconds"
+        required: true
+        default: "60"
+      resume:
+        description: "Resume verified shots from previous state"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  cinematic-factory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_DURATION_SECONDS: ${{ inputs.duration }}
+      FACTORY_MIN_QUALITY: "0.82"
+      MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
+      MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
+      MEDIA_PROVIDER_TIMEOUT_SECONDS: "900"
+      MEDIA_PROVIDER_POLL_SECONDS: "8"
+      MEDIA_PROVIDER_MAX_POLLS: "120"
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Restore factory checkpoint
+        if: ${{ inputs.resume }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          run_id="$(gh run list --workflow electronic-brain-cinematic.yml --status completed --limit 5 --json databaseId --jq '.[0].databaseId')"
+          if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+            gh run download "$run_id" --name cinematic-factory-state --dir .factory_resume || true
+            if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install factory dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
+
+      - name: Run Electronic Brain Cinematic Factory
+        run: |
+          python -m brain_v7.braincore_v2.background_factory_worker | tee factory_result.json
+
+      - name: Save resumable checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinematic-factory-state
+          path: |
+            .factory_state.json
+            factory_result.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload final film
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electronic-brain-film
+          path: "**/final.mp4"
+          if-no-files-found: ignore
+          retention-days: 30
