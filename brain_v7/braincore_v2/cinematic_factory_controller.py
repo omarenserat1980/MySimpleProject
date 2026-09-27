@@ -90,6 +90,7 @@ def build_production(objective: str, config: FactoryConfig) -> dict[str, Any]:
 
 def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]], *, authorized: bool = False, state_path: str = ".factory_state.json") -> dict[str, Any]:
     state = FactoryState(state_path)
+    ledger = ContinuityLedger(Path(state_path).with_name("continuity_ledger.json").as_posix())
     outputs = []
     skipped = 0
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
@@ -105,12 +106,21 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
             "world_lock": "preserve geography, time of day, weather, architecture and color language",
             "camera_lock": "preserve lens, framing and motivated camera movement",
         }
+        reference = build_reference_manifest({"character_bible": shot.get("character_bible", {}), "world_bible": shot.get("world_bible", {})}, Path(state_path).parent.as_posix())
+        shot["reference_manifest"] = reference
         result = None
         for attempt in range(max_retries + 1):
             result = renderer.render(shot=shot, authorized=authorized)
             if result.get("status") in {"COMPLETED", "VERIFIED_COMPLETED"}:
                 result["attempt"] = attempt + 1
-                break
+                qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
+                result["visual_qc"] = qc
+                if qc["status"] == "VERIFIED":
+                    ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt+1)
+                    result["status"] = "VERIFIED_COMPLETED"
+                    break
+                result["status"] = "QC_REJECTED"
+                shot["retry_context"] = "Visual QC rejected attempt %d: %s" % (attempt+1, qc.get("errors", []))
             shot["retry_context"] = f"Previous attempt failed: {result.get('status')}. Improve validity and prompt adherence."
         state.save(shot_id, result or {"status": "PROVIDER_ERROR"})
         if not result or result.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
