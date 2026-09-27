@@ -12,8 +12,8 @@ def _shot():
     return {"shot_id": "S1", "role": "PERFORMANCE"}
 
 
-def test_benchmark_learns_latency_without_bypassing_quality_floor():
-    state = load_state(Path("/tmp/nonexistent-electronic-brain-benchmark.json"))
+def test_benchmark_learns_latency_without_bypassing_quality_floor(tmp_path: Path):
+    state = load_state(tmp_path / "benchmark.json")
     for _ in range(3):
         record_observation(state, _shot(), "wan", latency_s=10, success=True, qc_score=0.93)
         record_observation(state, _shot(), "ltx", latency_s=5, success=True, qc_score=0.70)
