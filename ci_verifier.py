@@ -13,7 +13,12 @@ COMMANDS = [
     ("speed_tests", [sys.executable, "-m", "pytest", "-q",
                      "brain_v7/braincore_v2/test_speed_pipeline.py",
                      "brain_v7/braincore_v2/test_speed_optimizer.py",
-                     "brain_v7/braincore_v2/test_benchmark_router.py"]),
+                     "brain_v7/braincore_v2/test_benchmark_router.py",
+                     "brain_v7/braincore_v2/test_production_speed_optimizer.py"]),
+    ("cinema_v6_tests", [sys.executable, "-m", "pytest", "-q",
+                         "brain_v7/braincore_v2/test_cinema_engine_v6.py"]),
+    ("brain_v12_tests", [sys.executable, "-m", "unittest", "discover",
+                         "-s", "brain_v12/tests", "-v"]),
 ]
 
 def main() -> int:
