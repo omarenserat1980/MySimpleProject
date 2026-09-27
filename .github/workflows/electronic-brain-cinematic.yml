@@ -41,6 +41,8 @@ jobs:
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
       FAL_KEY: ${{ secrets.FAL_KEY }}
+      COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
+      COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
       FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
       FAL_SHOT_DURATION: "5"
       FAL_GENERATE_AUDIO: "1"
