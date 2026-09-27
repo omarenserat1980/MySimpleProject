@@ -83,14 +83,14 @@ class ComfyUIBackend:
         try:
             client = self.client
             payload = {"prompt": self._workflow(shot), "client_id": self.client_id}
-                started = time.monotonic()
-                queued = client.post(self.base_url + "/prompt", json=payload)
-                queued.raise_for_status()
-                data = queued.json()
-                prompt_id = data.get("prompt_id")
-                if not prompt_id:
-                    return {"status": "COMFYUI_SUBMISSION_UNVERIFIED", "provider_result": data}
-                for _ in range(self.max_polls):
+            started = time.monotonic()
+            queued = client.post(self.base_url + "/prompt", json=payload)
+            queued.raise_for_status()
+            data = queued.json()
+            prompt_id = data.get("prompt_id")
+            if not prompt_id:
+                return {"status": "COMFYUI_SUBMISSION_UNVERIFIED", "provider_result": data}
+            for _ in range(self.max_polls):
                     time.sleep(self.poll)
                     history = client.get(self.base_url + "/history/" + str(prompt_id))
                     history.raise_for_status()
