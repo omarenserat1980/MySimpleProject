@@ -38,11 +38,21 @@ class BrainMediaProvider:
         duration=str(int(shot.get("duration_s") or os.getenv("FAL_SHOT_DURATION","5")))
         generate_audio=os.getenv("FAL_GENERATE_AUDIO","0").strip().lower() in {"1","true","yes","on"}
         try:
+            visual = str(shot.get("visual_prompt", "")).strip()
+            audio = str(shot.get("audio_prompt", "")).strip()
+            sound = str(shot.get("sound_design_prompt", "")).strip()
+            voice = str(shot.get("voice_prompt", "")).strip()
+            audio_directive = " ".join(x for x in (audio, sound, voice) if x)
+            prompt = visual
+            if audio_directive:
+                prompt += " Native audio direction: " + audio_directive
             result=fal_client.subscribe(model, arguments={"input":{
-                "prompt":shot.get("visual_prompt",""),
+                "prompt":prompt,
                 "duration":duration,
                 "generate_audio":generate_audio,
                 "shot_type":"customize",
+                "aspect_ratio":shot.get("aspect_ratio","16:9"),
+                "negative_prompt":shot.get("negative_prompt","blur, distort, low quality, black frames, blank screen"),
             }})
             video=((result or {}).get("video") or {})
             ref=video.get("url")
