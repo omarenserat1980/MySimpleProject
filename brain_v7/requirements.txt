@@ -5,3 +5,4 @@ httpx==0.27.2
 pytest==8.4.2
 google-auth-oauthlib>=1.2,<2
 cryptography>=43,<47
+fal-client>=0.5,<1
