@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "started_at": 1790494871.1453745,
+  "results": [
+    {
+      "name": "compile_v7",
+      "returncode": 0,
+      "duration_s": 0.263,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "compile_v12",
+      "returncode": 0,
+      "duration_s": 0.111,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "speed_tests",
+      "returncode": 0,
+      "duration_s": 0.749,
+      "stdout_tail": "........                                                                 [100%]\n8 passed in 0.13s\n",
+      "stderr_tail": ""
+    }
+  ],
+  "status": "PASS",
+  "completed_at": 1790494872.2687242
+}
