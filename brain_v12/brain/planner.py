@@ -2,7 +2,7 @@ from .commerce_neuron import build_commerce_plan
 
 
 def options_for(goal):
-    text = str(goal.get("text", ""))
+    text = str(goal["text"] if hasattr(goal, "__getitem__") and "text" in goal.keys() else "")
     commerce = any(k in text.lower() for k in ("متجر", "موقع", "منتجات رقمية", "commerce", "store", "website"))
     options = [
         {"id":"inspect","action":"INSPECT","risk":0.05,"expected":"فحص الهدف والسياق"},
@@ -21,7 +21,7 @@ def options_for(goal):
 
 
 def choose(goal, options):
-    commerce = any(k in str(goal.get("text", "")).lower() for k in ("متجر", "موقع", "منتجات رقمية", "commerce", "store", "website"))
+    commerce = any(k in str(goal["text"] if hasattr(goal, "__getitem__") and "text" in goal.keys() else "").lower() for k in ("متجر", "موقع", "منتجات رقمية", "commerce", "store", "website"))
     if commerce:
         for option in options:
             if option["id"] == "commerce_orchestrate":
