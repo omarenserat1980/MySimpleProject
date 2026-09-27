@@ -5,53 +5,62 @@ authorization on Google's consent page. Credentials are supplied to the
 runtime through environment variables and token material is kept out of logs.
 """
 from __future__ import annotations
+
 import json
 import os
 import time
 from typing import Any
-from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
+
 from cryptography.fernet import Fernet
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-SESSION = {}
+SESSION: dict[str, tuple[float, Flow]] = {}
 STATE_TTL_SECONDS = 600
 
+
 class YouTubeOAuth:
-    def __init__(self, store):
+    def __init__(self, store: Any):
         self.store = store
 
     def _event(self, kind: str, payload: dict[str, Any]) -> None:
-        """Best-effort audit event; lightweight test stores may omit event()."""
         writer = getattr(self.store, "event", None)
         if callable(writer):
             writer(kind, payload)
 
-    def _fernet(self):
+    def _fernet(self) -> Fernet | None:
         key = os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY")
-        if not key:
-            return None
-        return Fernet(key.encode())
+        return Fernet(key.encode()) if key else None
 
-    def _save_refresh_token(self, token: str):
-        f = self._fernet()
-        if not f:
+    def _save_refresh_token(self, token: str) -> None:
+        fernet = self._fernet()
+        if fernet is None:
             raise RuntimeError("YOUTUBE_TOKEN_ENCRYPTION_KEY is required")
         self._event(
             "YOUTUBE_REFRESH_TOKEN_STORED",
-            {"token_ciphertext": f.encrypt(token.encode()).decode()},
+            {"token_ciphertext": fernet.encrypt(token.encode()).decode()},
         )
 
-    def _load_refresh_token(self):
-        for row in self.store.events(200):
-            if row.get("kind") == "YOUTUBE_REFRESH_TOKEN_STORED":
-                try:
-                    payload = json.loads(row.get("payload", "{}"))
-                    return self._fernet().decrypt(
-                        payload["token_ciphertext"].encode()
-                    ).decode()
-                except Exception:
+    def _load_refresh_token(self) -> str | None:
+        events = getattr(self.store, "events", None)
+        if not callable(events):
+            return None
+        for row in events(200):
+            if row.get("kind") != "YOUTUBE_REFRESH_TOKEN_STORED":
+                continue
+            try:
+                payload = row.get("payload", {})
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+                fernet = self._fernet()
+                if fernet is None:
                     return None
+                return fernet.decrypt(
+                    payload["token_ciphertext"].encode()
+                ).decode()
+            except Exception:
+                continue
         return None
 
     def configured(self) -> bool:
@@ -60,23 +69,23 @@ class YouTubeOAuth:
             and os.getenv("YOUTUBE_CLIENT_SECRET")
         )
 
+    def redirect_uri(self) -> str:
+        return os.getenv("YOUTUBE_OAUTH_REDIRECT_URI", "")
+
     def _client_config(self) -> dict[str, Any]:
-        cid = os.getenv("YOUTUBE_CLIENT_ID")
-        secret = os.getenv("YOUTUBE_CLIENT_SECRET")
-        if not cid or not secret:
+        client_id = os.getenv("YOUTUBE_CLIENT_ID")
+        client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+        if not client_id or not client_secret:
             raise RuntimeError("YouTube OAuth client is not configured")
         return {
             "web": {
-                "client_id": cid,
-                "client_secret": secret,
+                "client_id": client_id,
+                "client_secret": client_secret,
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "redirect_uris": [self.redirect_uri()],
             }
         }
-
-    def redirect_uri(self) -> str:
-        return os.getenv("YOUTUBE_OAUTH_REDIRECT_URI", "")
 
     def start(self) -> dict[str, Any]:
         if not self.configured() or not self.redirect_uri():
@@ -89,69 +98,79 @@ class YouTubeOAuth:
                     "YOUTUBE_OAUTH_REDIRECT_URI",
                 ],
             }
+
         flow = Flow.from_client_config(
             self._client_config(),
             scopes=SCOPES,
             redirect_uri=self.redirect_uri(),
         )
-        url, state = flow.authorization_url(
+        authorization_url, state = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
             prompt="consent",
         )
         SESSION[state] = (time.time(), flow)
-        self._event("YOUTUBE_OAUTH_STARTED", {"state_hash": state[:12]})
+        self._event(
+            "YOUTUBE_OAUTH_STARTED",
+            {"state_hash": state[:12]},
+        )
         return {
             "ok": True,
             "status": "AUTHORIZATION_REQUIRED",
-            "authorization_url": url,
+            "authorization_url": authorization_url,
         }
 
     def callback(self, code: str, state: str) -> dict[str, Any]:
         entry = SESSION.pop(state, None)
-        if not entry:
+        if entry is None:
             return {"ok": False, "status": "INVALID_OR_EXPIRED_OAUTH_STATE"}
+
         created_at, flow = entry
         if time.time() - created_at > STATE_TTL_SECONDS:
             return {"ok": False, "status": "INVALID_OR_EXPIRED_OAUTH_STATE"}
+
         try:
             flow.fetch_token(code=code)
-            creds = flow.credentials
-            if not creds.refresh_token:
+            credentials = flow.credentials
+            if not credentials.refresh_token:
                 return {
                     "ok": False,
                     "status": "NO_REFRESH_TOKEN",
                     "reason": "Google did not return offline authorization",
                 }
-            self._save_refresh_token(creds.refresh_token)
+            self._save_refresh_token(credentials.refresh_token)
         except Exception as exc:
             return {
                 "ok": False,
                 "status": "OAUTH_CALLBACK_FAILED",
                 "error": str(exc)[:300],
             }
+
         self._event(
             "YOUTUBE_OAUTH_AUTHORIZED",
-            {"scopes": list(creds.scopes or SCOPES)},
+            {"scopes": list(credentials.scopes or SCOPES)},
         )
         return {
             "ok": True,
             "status": "AUTHORIZED",
-            "scopes": list(creds.scopes or SCOPES),
+            "scopes": list(credentials.scopes or SCOPES),
         }
 
     def credentials(self) -> Credentials | None:
-        refresh = self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN")
-        cid = os.getenv("YOUTUBE_CLIENT_ID")
-        secret = os.getenv("YOUTUBE_CLIENT_SECRET")
-        if not (refresh and cid and secret):
+        refresh_token = (
+            self._load_refresh_token()
+            or os.getenv("YOUTUBE_REFRESH_TOKEN")
+        )
+        client_id = os.getenv("YOUTUBE_CLIENT_ID")
+        client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+        if not (refresh_token and client_id and client_secret):
             return None
         return Credentials(
             token=None,
-            refresh_token=refresh,
+            refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=cid,
-            client_secret=secret,
+            client_id=client_id,
+            client_secret=client_secret,
             scopes=SCOPES,
         )
 
@@ -161,9 +180,12 @@ class YouTubeOAuth:
             and os.getenv("YOUTUBE_CLIENT_SECRET")
         )
         redirect_configured = bool(self.redirect_uri())
-        encryption_configured = bool(os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY"))
+        encryption_configured = bool(
+            os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY")
+        )
         authorized = bool(
-            self._load_refresh_token() or os.getenv("YOUTUBE_REFRESH_TOKEN")
+            self._load_refresh_token()
+            or os.getenv("YOUTUBE_REFRESH_TOKEN")
         )
         return {
             "ok": True,
