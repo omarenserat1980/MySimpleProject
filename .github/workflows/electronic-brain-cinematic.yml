@@ -1,6 +1,9 @@
 name: Electronic Brain Cinematic Factory
 
 on:
+  push:
+    paths:
+      - "production/REQUEST.json"
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
