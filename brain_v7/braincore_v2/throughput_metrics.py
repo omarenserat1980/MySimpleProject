@@ -17,7 +17,15 @@ DEFAULT_PATH = ".factory_throughput.json"
 
 
 def telemetry_path(path: str | Path | None = None) -> Path:
-    return Path(path or os.getenv("FACTORY_THROUGHPUT_PATH", DEFAULT_PATH))
+    if path:
+        return Path(path)
+    configured = os.getenv("FACTORY_THROUGHPUT_PATH")
+    if configured:
+        return Path(configured)
+    state_path = os.getenv("FACTORY_STATE_PATH")
+    if state_path:
+        return Path(state_path).with_name("factory_throughput.json")
+    return Path(DEFAULT_PATH)
 
 
 def load(path: str | Path | None = None) -> dict[str, Any]:
