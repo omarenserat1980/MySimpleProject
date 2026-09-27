@@ -151,17 +151,23 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
             state.save(shot_id, final)
         return shot_id, final
 
+    pending_map = {shot_id: shot for shot_id, shot in pending}
+    task_stack = seed_tasks(TaskStack(Path(state_path).with_name("task_stack.json").as_posix()), list(pending_map.values()))
     with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="factory-shot") as pool:
-        futures = [pool.submit(render_one, shot_id, shot) for shot_id, shot in pending]
-        for future in as_completed(futures):
-            shot_id, result = future.result()
-            if result.get("status") == "VERIFIED_COMPLETED":
-                with lock:
-                    memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
-                    production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
-                outputs.append(result)
-            else:
-                failures.append({"shot_id": shot_id, "result": result})
+        while True:
+            ready = [t for t in task_stack.ready() if t["task_id"] in pending_map]
+            if not ready: break
+            futures = [pool.submit(render_one, t["task_id"], pending_map[t["task_id"]]) for t in ready]
+            for t, future in zip(ready, futures):
+                shot_id, result = future.result()
+                if result.get("status") == "VERIFIED_COMPLETED":
+                    with lock:
+                        memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
+                        production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
+                    outputs.append(result); task_stack.complete(shot_id)
+                else:
+                    failures.append({"shot_id": shot_id, "result": result}); task_stack.fail(shot_id, result.get("repair_plan"))
+            if failures: break
 
     outputs.sort(key=lambda x: str(x.get("shot_id", "")))
     if failures:
