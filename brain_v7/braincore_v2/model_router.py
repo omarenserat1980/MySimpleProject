@@ -147,9 +147,16 @@ class ModelRouter:
         configured = [k for k, raw in self.comfy.workflow_by_family.items() if raw]
         if self.comfy.workflow_json:
             configured = configured or ["comfyui"]
-        requested = str(shot.get("model_family") or (shot.get("generation") or {}).get("backend_preference") or self.requested)
-        if requested in PROFILES and requested != "auto":
-            return [requested]
+        explicit_family = str(shot.get("model_family") or "").strip().lower()
+        if explicit_family in PROFILES and explicit_family != "auto":
+            return [explicit_family]
+        requested = str(
+            (shot.get("generation") or {}).get("backend_preference")
+            or self.requested
+        ).strip().lower()
+        if requested not in {"", "auto"} and requested in PROFILES:
+            ordered = [requested] + [name for name in configured if name != requested]
+            return ordered or [requested]
         return configured or ["fallback"]
 
     def _profile(self, shot: dict[str, Any]) -> str:
