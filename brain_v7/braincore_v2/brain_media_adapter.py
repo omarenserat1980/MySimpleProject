@@ -29,7 +29,7 @@ class BrainMediaProvider:
         if fal_client is None:
             return {"status":"FAL_CLIENT_MISSING"}
         model=os.getenv("FAL_MODEL","fal-ai/kling-video/v3/pro/text-to-video")
-        duration=str(os.getenv("FAL_SHOT_DURATION","5"))
+        duration=str(int(shot.get("duration_s") or os.getenv("FAL_SHOT_DURATION","5")))
         generate_audio=os.getenv("FAL_GENERATE_AUDIO","0").strip().lower() in {"1","true","yes","on"}
         try:
             result=fal_client.subscribe(model, arguments={"input":{
