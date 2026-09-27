@@ -18,6 +18,9 @@ import os
 from pathlib import Path
 
 from .cinematic_money_factory import ContentOpportunity, rank
+from .reference_engine import build_reference_manifest
+from .visual_qc import inspect_shot
+from .continuity_ledger import ContinuityLedger
 from .cinematic_director import CinematicPlan, build_plan, provider_prompts
 from .youtube_publisher import YouTubePackage, prepare_package, publish
 from .cinematic_story_engine import build_story
