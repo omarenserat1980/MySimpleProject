@@ -12,7 +12,9 @@ def evaluate_master(video_ref: str | None, expected_shots: int, *, manifest: dic
     # A technically valid MP4 is not enough: every production shot must carry
     # explicit provenance from a real generation backend.
     shots = (manifest or {}).get("shots") or []
-    real_providers = {"fal", "comfyui", "media_provider"}
+    # Free local cinematic renderer is a valid production provenance.
+    # External paid APIs are not required by the free-only factory profile.
+    real_providers = {"comfyui", "media_provider", "local_ffmpeg_cinematic"}
     providers = {
         str(item.get("provider") or "").strip().lower()
         for item in shots
