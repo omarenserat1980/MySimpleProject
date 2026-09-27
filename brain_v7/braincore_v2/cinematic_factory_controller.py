@@ -16,7 +16,7 @@ import time
 import json
 import os
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 import threading
 
 from .cinematic_money_factory import ContentOpportunity, rank
@@ -187,21 +187,54 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
 
     pending_map = {shot_id: shot for shot_id, shot in pending}
     task_stack = seed_tasks(TaskStack(Path(state_path).with_name("task_stack.json").as_posix()), list(pending_map.values()))
+    # Dynamic dependency-aware dispatch: keep the full worker pool busy and
+    # release continuity-dependent shots immediately when their prerequisite
+    # completes. The previous implementation waited for every shot in the
+    # current batch before unlocking the next dependent shot, which could leave
+    # workers idle behind a slow render. This changes scheduling only; QC and
+    # quality thresholds remain untouched.
     with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="factory-shot") as pool:
-        while True:
-            ready = [t for t in task_stack.ready() if t["task_id"] in pending_map]
-            if not ready: break
-            futures = [pool.submit(render_one, t["task_id"], pending_map[t["task_id"]]) for t in ready]
-            for t, future in zip(ready, futures):
-                shot_id, result = future.result()
+        active = {}
+        dispatched = set()
+
+        def dispatch_ready():
+            available = max(0, concurrency - len(active))
+            if available <= 0:
+                return
+            ready = [
+                t for t in task_stack.ready()
+                if t["task_id"] in pending_map
+                and t["task_id"] not in dispatched
+            ][:available]
+            for t in ready:
+                sid = t["task_id"]
+                active[pool.submit(render_one, sid, pending_map[sid])] = sid
+                dispatched.add(sid)
+
+        dispatch_ready()
+        while active:
+            done, _ = wait(tuple(active.keys()), return_when=FIRST_COMPLETED)
+            for future in done:
+                shot_id = active.pop(future)
+                try:
+                    _, result = future.result()
+                except Exception as exc:
+                    result = {"status": "PROVIDER_ERROR", "error": str(exc)}
                 if result.get("status") == "VERIFIED_COMPLETED":
                     with lock:
                         memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "audio_qc": result.get("audio_qc"), "research_qc": result.get("research_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
                         production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "audio_qc": result.get("audio_qc"), "research_qc": result.get("research_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
-                    outputs.append(result); task_stack.complete(shot_id)
+                    outputs.append(result)
+                    task_stack.complete(shot_id)
                 else:
-                    failures.append({"shot_id": shot_id, "result": result}); task_stack.fail(shot_id, result.get("repair_plan"))
-            if failures: break
+                    failures.append({"shot_id": shot_id, "result": result})
+                    task_stack.fail(shot_id, result.get("repair_plan"))
+            if failures:
+                for future in active:
+                    future.cancel()
+                break
+            # A completed prerequisite can unlock a dependent shot immediately.
+            dispatch_ready()
 
     outputs.sort(key=lambda x: str(x.get("shot_id", "")))
     diagnostics = diagnose({"status": "SHOTS_BLOCKED" if failures else "VERIFIED_COMPLETED", "visual_qc": outputs[-1].get("visual_qc") if outputs else {}, "film_qc": outputs[-1].get("film_qc") if outputs else {}})
