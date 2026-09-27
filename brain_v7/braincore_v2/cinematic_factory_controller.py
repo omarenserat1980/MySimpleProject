@@ -35,6 +35,13 @@ from .director_scheduler import seed_tasks, choose_next
 from .task_stack import TaskStack
 from .final_film_qc import evaluate_final_film
 from .cinematic_quality_gate import inspect_video
+from .audio_continuity import AudioContinuity
+from .audio_qc import evaluate_audio_evidence
+from .research_ledger import ResearchLedger
+from .research_gate import evaluate_research_gate
+from .self_improvement import SelfImprovement
+from .production_diagnostics import diagnose
+from .mastering_qc import evaluate_master
 from .brain_media_adapter import FactoryState
 
 
@@ -104,6 +111,10 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     ledger = ContinuityLedger(Path(state_path).with_name("continuity_ledger.json").as_posix())
     memory = FilmMemory(Path(state_path).with_name("film_memory.json").as_posix())
     production_memory = ProductionMemory(Path(state_path).parent.as_posix())
+    audio_memory = AudioContinuity(Path(state_path).with_name("audio_continuity.json").as_posix())
+    research_ledger = ResearchLedger(Path(state_path).with_name("research_ledger.json").as_posix())
+    self_improvement = SelfImprovement(Path(state_path).with_name("production_policy.json").as_posix())
+    require_audio_evidence = os.getenv("FACTORY_REQUIRE_AUDIO_EVIDENCE", "0").lower() in {"1", "true", "yes", "on"}
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
     concurrency = max(1, min(8, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3"))))
     lock = threading.Lock()
@@ -136,8 +147,18 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 result["attempt"] = attempt + 1
                 qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
                 result["visual_qc"] = qc
+                result["audio_qc"] = evaluate_audio_evidence(shot, result, audio_memory.context())
+                result["research_qc"] = evaluate_research_gate(shot, result, research_ledger.items)
                 result["film_qc"] = evaluate_film_evidence(shot, result, memory.snapshot())
+                if require_audio_evidence and result["audio_qc"]["status"] != "VERIFIED":
+                    result["film_qc"]["status"] = "REPAIR"
+                    result["film_qc"].setdefault("issues", []).append("audio_qc_not_verified")
+                if result["research_qc"]["status"] != "VERIFIED":
+                    result["film_qc"]["status"] = "REPAIR"
+                    result["film_qc"].setdefault("issues", []).append("research_gate_blocked")
                 result["repair_plan"] = build_repairs(result["film_qc"], shot)
+                self_improvement.observe(shot_id, result)
+                audio_memory.update(shot_id, {"voice_prompt": shot.get("voice_prompt"), "sound_design_prompt": shot.get("sound_design_prompt"), "qc": result["audio_qc"]})
                 if qc["status"] == "VERIFIED" and result["film_qc"]["status"] == "VERIFIED":
                     ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt + 1)
                     result["status"] = "VERIFIED_COMPLETED"
@@ -162,20 +183,21 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 shot_id, result = future.result()
                 if result.get("status") == "VERIFIED_COMPLETED":
                     with lock:
-                        memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
-                        production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
+                        memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "audio_qc": result.get("audio_qc"), "research_qc": result.get("research_qc"), "film_qc": result.get("film_qc"), "repair_plan": result.get("repair_plan"), "video_ref": result.get("video_ref")})
+                        production_memory.commit_evidence(shot_id, {"visual_qc": result.get("visual_qc"), "audio_qc": result.get("audio_qc"), "research_qc": result.get("research_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
                     outputs.append(result); task_stack.complete(shot_id)
                 else:
                     failures.append({"shot_id": shot_id, "result": result}); task_stack.fail(shot_id, result.get("repair_plan"))
             if failures: break
 
     outputs.sort(key=lambda x: str(x.get("shot_id", "")))
+    diagnostics = diagnose({"status": "SHOTS_BLOCKED" if failures else "VERIFIED_COMPLETED", "visual_qc": outputs[-1].get("visual_qc") if outputs else {}, "film_qc": outputs[-1].get("film_qc") if outputs else {}})
     if failures:
-        manifest = {"version": 4, "status": "SHOTS_BLOCKED", "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "updated_at": time.time()}
+        manifest = {"version": 5, "status": "SHOTS_BLOCKED", "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
         Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return {"status": "SHOTS_BLOCKED", "failed_shot": failures[0]["shot_id"], "outputs": outputs, "skipped": skipped, "failures": failures, "manifest": manifest}
 
-    manifest = {"version": 4, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
+    manifest = {"version": 5, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
@@ -240,7 +262,8 @@ def run_factory(
         }
 
     quality = inspect_video(video_ref)
-    if quality.get("status") != "ACCEPTED":
+    mastering = evaluate_master(video_ref, len(rendered["outputs"]), manifest=rendered.get("manifest"))
+    if quality.get("status") != "ACCEPTED" or mastering.get("status") != "VERIFIED":
         return {
             "status": "QUALITY_GATE_BLOCKED",
             "topic": topic,
@@ -249,6 +272,7 @@ def run_factory(
             "render": rendered,
             "assembly": assembled,
             "quality": quality,
+            "mastering_qc": mastering,
         }
 
     yt = prepare_package(
@@ -285,6 +309,7 @@ def run_factory(
         "story": story,
         "executable_story": export_story(executable_story),
         "quality": quality,
+        "mastering_qc": mastering,
         "rendered_shots": len(rendered["outputs"]),
         "skipped_verified_shots": rendered.get("skipped", 0),
         "manifest": rendered.get("manifest"),
@@ -365,6 +390,12 @@ def snapshot() -> dict[str, Any]:
         "research_ledger": True,
         "closed_loop_repair": True,
         "next_cycle_learning": True,
+        "audio_continuity": True,
+        "audio_qc": True,
+        "research_gate": True,
+        "adaptive_policy": True,
+        "production_diagnostics": True,
+        "mastering_qc": True,
         "credentials_in_source": False,
         "guaranteed_revenue": False,
     }
