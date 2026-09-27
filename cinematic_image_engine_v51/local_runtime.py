@@ -10,6 +10,7 @@ COMMON_EXECUTABLES = (
     "comfy",
     "comfyui",
     "python",
+    "termux-diffusion",
 )
 
 def discover_runtime(config=None):
