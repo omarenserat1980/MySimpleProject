@@ -95,7 +95,7 @@ class BrainMediaProvider:
                 status=str(data.get("status","")).upper()
                 if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
                     vision=self._vision_qc_fal(ref,shot)
-                        return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
+                    return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
                 job_id=data.get("job_id") or data.get("id")
                 if not job_id:
                     return {"status":"SUBMISSION_UNVERIFIED","provider_result":data}
@@ -108,7 +108,8 @@ class BrainMediaProvider:
                     ref=data.get("video_ref") or data.get("output_url") or data.get("media_url")
                     status=str(data.get("status","")).upper()
                     if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
-                        return {"status":"VERIFIED_COMPLETED","video_ref":ref,
+                        vision=self._vision_qc_fal(ref,shot)
+                        return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,
                                 "provider_result":data,"job_id":job_id,"shot_id":shot.get("shot_id")}
                     if status in {"FAILED","ERROR","CANCELLED"}:
                         return {"status":"PROVIDER_FAILED","provider_result":data,"job_id":job_id}
