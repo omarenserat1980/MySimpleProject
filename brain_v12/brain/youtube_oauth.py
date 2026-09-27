@@ -187,4 +187,3 @@ class YouTubeOAuth:
                 if not present
             ],
         }
-    }
