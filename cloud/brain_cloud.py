@@ -46,7 +46,16 @@ while not STOP:
     env.setdefault("BRAIN_HTTP_TIMEOUT", "30")
 
     print("BRAIN_CLOUD_CYCLE_START=1", flush=True)
-    run_software_factory(env)
+    factory_rc = run_software_factory(env)
+    if factory_rc != 0:
+        print(f"BRAIN_CLOUD_SOFTWARE_GATE=FAIL rc={factory_rc}", flush=True)
+        for _ in range(failure_backoff):
+            if STOP:
+                break
+            time.sleep(1)
+        failure_backoff = min(failure_backoff * 2, MAX_BACKOFF)
+        continue
+    print("BRAIN_CLOUD_SOFTWARE_GATE=PASS", flush=True)
     try:
         result = subprocess.run(
             ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
