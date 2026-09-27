@@ -31,6 +31,9 @@ from .film_memory import FilmMemory
 from .film_qc import evaluate_film_evidence
 from .repair_planner import build_repairs
 from .production_memory import ProductionMemory
+from .director_scheduler import seed_tasks, choose_next
+from .task_stack import TaskStack
+from .final_film_qc import evaluate_final_film
 from .cinematic_quality_gate import inspect_video
 from .brain_media_adapter import FactoryState
 
@@ -211,10 +214,15 @@ def run_factory(
             "shot_prompts": production["shot_prompts"],
         }
 
+    task_stack = seed_tasks(TaskStack(Path(os.getenv("FACTORY_STATE_PATH", ".factory_state.json")).with_name("task_stack.json").as_posix()), production["shot_prompts"])
+    dispatch_preview = choose_next(task_stack, {"factory":"cinematic","objective":objective})
     rendered = render_shots(renderer, production["shot_prompts"], authorized=True, state_path=os.getenv("FACTORY_STATE_PATH", ".factory_state.json"))
     if rendered["status"] != "SHOTS_RENDERED":
         return {"status": rendered["status"], "topic": topic, "render": rendered}
 
+    final_qc = evaluate_final_film(rendered["manifest"], rendered["outputs"])
+    if final_qc.get("status") != "VERIFIED":
+        return {"status":"FINAL_FILM_QC_BLOCKED","topic":topic,"render":rendered,"final_qc":final_qc,"dispatch":dispatch_preview}
     assembled = assembler.assemble(outputs=rendered["outputs"], plan=plan)
     video_ref = assembled.get("video_ref")
     if not video_ref:
