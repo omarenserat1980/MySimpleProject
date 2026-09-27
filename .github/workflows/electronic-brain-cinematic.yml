@@ -98,6 +98,13 @@ jobs:
           set -o pipefail
           python -m brain_v7.braincore_v2.background_factory_worker | tee factory_result.json
 
+      - name: Verify final film artifact
+        if: success()
+        run: |
+          test -f cinematic_output/final.mp4
+          test -s cinematic_output/final.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 cinematic_output/final.mp4
+
       - name: Save resumable checkpoint
         if: always()
         uses: actions/upload-artifact@v4
