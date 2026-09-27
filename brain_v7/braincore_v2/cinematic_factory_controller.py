@@ -16,6 +16,8 @@ import time
 import json
 import os
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 from .cinematic_money_factory import ContentOpportunity, rank
 from .reference_engine import build_reference_manifest
@@ -89,11 +91,15 @@ def build_production(objective: str, config: FactoryConfig) -> dict[str, Any]:
 
 
 def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]], *, authorized: bool = False, state_path: str = ".factory_state.json") -> dict[str, Any]:
+    """Render independent shots concurrently with isolated retries and checkpoints."""
     state = FactoryState(state_path)
     ledger = ContinuityLedger(Path(state_path).with_name("continuity_ledger.json").as_posix())
-    outputs = []
-    skipped = 0
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
+    concurrency = max(1, min(8, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3"))))
+    lock = threading.Lock()
+    pending, outputs, failures = [], [], []
+    skipped = 0
+
     for index, original in enumerate(shot_prompts, 1):
         shot = dict(original)
         shot_id = str(shot.get("shot_id") or f"shot_{index:04d}")
@@ -106,8 +112,13 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
             "world_lock": "preserve geography, time of day, weather, architecture and color language",
             "camera_lock": "preserve lens, framing and motivated camera movement",
         }
-        reference = build_reference_manifest({"character_bible": shot.get("character_bible", {}), "world_bible": shot.get("world_bible", {})}, (Path(state_path).parent / "references" / shot_id).as_posix())
-        shot["reference_manifest"] = reference
+        shot["reference_manifest"] = build_reference_manifest(
+            {"character_bible": shot.get("character_bible", {}), "world_bible": shot.get("world_bible", {})},
+            (Path(state_path).parent / "references" / shot_id).as_posix(),
+        )
+        pending.append((shot_id, shot))
+
+    def render_one(shot_id, shot):
         result = None
         for attempt in range(max_retries + 1):
             result = renderer.render(shot=shot, authorized=authorized)
@@ -116,17 +127,34 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
                 result["visual_qc"] = qc
                 if qc["status"] == "VERIFIED":
-                    ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt+1)
+                    ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt + 1)
                     result["status"] = "VERIFIED_COMPLETED"
                     break
                 result["status"] = "QC_REJECTED"
-                shot["retry_context"] = "Visual QC rejected attempt %d: %s" % (attempt+1, qc.get("errors", []))
-            shot["retry_context"] = f"Previous attempt failed: {result.get('status')}. Improve validity and prompt adherence."
-        state.save(shot_id, result or {"status": "PROVIDER_ERROR"})
-        if not result or result.get("status") != "VERIFIED_COMPLETED":
-            return {"status": "SHOTS_BLOCKED", "failed_shot": shot_id, "outputs": outputs, "skipped": skipped, "reason": result}
-        outputs.append(result)
-    manifest = {"version": 3, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
+                shot["retry_context"] = "Visual QC rejected attempt %d: %s" % (attempt + 1, qc.get("errors", []))
+            else:
+                shot["retry_context"] = f"Previous attempt failed: {result.get('status')}. Improve validity and prompt adherence."
+        final = result or {"status": "PROVIDER_ERROR"}
+        with lock:
+            state.save(shot_id, final)
+        return shot_id, final
+
+    with ThreadPoolExecutor(max_workers=concurrency, thread_name_prefix="factory-shot") as pool:
+        futures = [pool.submit(render_one, shot_id, shot) for shot_id, shot in pending]
+        for future in as_completed(futures):
+            shot_id, result = future.result()
+            if result.get("status") == "VERIFIED_COMPLETED":
+                outputs.append(result)
+            else:
+                failures.append({"shot_id": shot_id, "result": result})
+
+    outputs.sort(key=lambda x: str(x.get("shot_id", "")))
+    if failures:
+        manifest = {"version": 4, "status": "SHOTS_BLOCKED", "shot_count": len(outputs), "skipped_verified": skipped, "failed_shots": failures, "shots": outputs, "updated_at": time.time()}
+        Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        return {"status": "SHOTS_BLOCKED", "failed_shot": failures[0]["shot_id"], "outputs": outputs, "skipped": skipped, "failures": failures, "manifest": manifest}
+
+    manifest = {"version": 4, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
