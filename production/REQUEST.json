@@ -1,8 +1,8 @@
 {
   "request": "CREATE_FILM",
-  "duration_seconds": 60,
-  "resume": true,
+  "duration_seconds": 5,
+  "resume": false,
   "youtube_publish": false,
   "quality_floor": 0.82,
-  "requested_at": "2026-09-27T12:00:00Z"
+  "requested_at": "2026-09-27T12:24:00Z"
 }
