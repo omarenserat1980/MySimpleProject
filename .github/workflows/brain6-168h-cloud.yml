@@ -101,7 +101,8 @@ jobs:
       - name: Build C# supervisor
         if: steps.state.outputs.remaining != ''
         run: |
-          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore
+          dotnet restore brain6_cs/Brain6.csproj
+dotnet build brain6_cs/Brain6.csproj -c Release --no-restore
 
       - name: Restore latest successful factory state
         if: steps.state.outputs.remaining != ''
