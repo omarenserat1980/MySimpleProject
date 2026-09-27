@@ -69,7 +69,7 @@ jobs:
           duration = int(req.get("duration_seconds", 60))
           duration = max(1, min(600, duration))
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
-              fh.write(f"FACTORY_DURATION_SECONDS={duration}\\n")
+              fh.write(f"FACTORY_DURATION_SECONDS={duration}\n")
           print(f"FACTORY_DURATION_SECONDS={duration}")
           PY
       - name: Restore factory checkpoint
