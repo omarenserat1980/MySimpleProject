@@ -55,6 +55,9 @@ jobs:
       FACTORY_RENDER_CONCURRENCY: "12"
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
+      # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
+      # This fixes 401 Requires authentication without storing a PAT in the repository.
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout Electronic Brain
         uses: actions/checkout@v4
