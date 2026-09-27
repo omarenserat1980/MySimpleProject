@@ -50,7 +50,7 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     write_manifest(os.getenv("CINEMA_ENGINE_MANIFEST", "cinema_engine_v6_manifest.json"))
     cfg = FactoryConfig(
         audience=os.getenv("FACTORY_AUDIENCE", "Arabic-speaking YouTube audience"),
-        target_duration_s=max(30, min(600, int(os.getenv("FACTORY_DURATION_SECONDS", "60")))),
+        target_duration_s=max(1, min(600, int(os.getenv("FACTORY_DURATION_SECONDS", "60")))),
         minimum_quality=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")),
         max_topics=max(1, min(50, int(os.getenv("FACTORY_MAX_TOPICS", "10")))),
         publish_privacy=os.getenv("YOUTUBE_PRIVACY", "private"),
