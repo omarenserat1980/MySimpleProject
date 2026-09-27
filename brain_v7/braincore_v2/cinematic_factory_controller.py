@@ -106,7 +106,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
             "world_lock": "preserve geography, time of day, weather, architecture and color language",
             "camera_lock": "preserve lens, framing and motivated camera movement",
         }
-        reference = build_reference_manifest({"character_bible": shot.get("character_bible", {}), "world_bible": shot.get("world_bible", {})}, Path(state_path).parent.as_posix())
+        reference = build_reference_manifest({"character_bible": shot.get("character_bible", {}), "world_bible": shot.get("world_bible", {})}, (Path(state_path).parent / "references" / shot_id).as_posix())
         shot["reference_manifest"] = reference
         result = None
         for attempt in range(max_retries + 1):
@@ -123,10 +123,10 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 shot["retry_context"] = "Visual QC rejected attempt %d: %s" % (attempt+1, qc.get("errors", []))
             shot["retry_context"] = f"Previous attempt failed: {result.get('status')}. Improve validity and prompt adherence."
         state.save(shot_id, result or {"status": "PROVIDER_ERROR"})
-        if not result or result.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
+        if not result or result.get("status") != "VERIFIED_COMPLETED":
             return {"status": "SHOTS_BLOCKED", "failed_shot": shot_id, "outputs": outputs, "skipped": skipped, "reason": result}
         outputs.append(result)
-    manifest = {"version": 2, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
+    manifest = {"version": 3, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
