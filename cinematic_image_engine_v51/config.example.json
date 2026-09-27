@@ -1,0 +1,7 @@
+{
+  "models": {
+    "portrait": [{"name":"local-portrait","path":"/models/portrait"}],
+    "environment": [{"name":"local-environment","path":"/models/environment"}],
+    "general": [{"name":"local-general","path":"/models/general"}]
+  }
+}
