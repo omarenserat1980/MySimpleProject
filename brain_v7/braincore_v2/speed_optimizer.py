@@ -23,7 +23,7 @@ def speed_policy() -> dict[str, Any]:
     requested = max(1, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3")))
     # More workers help only when the backend is remote or has multiple GPUs.
     # Keep a bounded ceiling to avoid API/GPU thrashing.
-    ceiling = max(1, min(8, int(os.getenv("FACTORY_MAX_CONCURRENCY", "8"))))
+    ceiling = max(1, min(12, int(os.getenv("FACTORY_MAX_CONCURRENCY", "12"))))
     concurrency = min(requested, ceiling)
     if truthy("FACTORY_ADAPTIVE_CONCURRENCY", "1"):
         telemetry = throughput_snapshot()
