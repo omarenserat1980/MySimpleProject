@@ -21,6 +21,7 @@ from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
 from .topic_sources import EnvTopicResearcher
 from .worker_health import WorkerHealthRegistry
 from .youtube_channel_control import YouTubeChannelControl
+from .brain_orchestrator import UnifiedBrain
 
 HEALTH = WorkerHealthRegistry(stale_after_s=180)
 WORKER_ID = os.getenv("WORKER_ID", "brain-v7-autonomous")
@@ -108,6 +109,60 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     return result
 
 
+def run_autonomous_cycle(cycle: int = 1) -> dict[str, Any]:
+    """Brain-first factory loop: diagnose, replan, retry up to 1000 times."""
+    max_attempts = max(1, min(1000, int(os.getenv("BRAIN_MAX_ITERATIONS", "1000"))))
+    brain = UnifiedBrain()
+    last: dict[str, Any] = {}
+    for attempt in range(1, max_attempts + 1):
+        _heartbeat("AUTONOMOUS_ATTEMPT", cycle, f"attempt={attempt}/{max_attempts}")
+        try:
+            result = run_once(cycle)
+            last = result
+            status = str(result.get("status", "")).upper()
+            if status in {"COMPLETED", "VERIFIED", "SUCCESS", "FACTORY_CYCLE_COMPLETE"}:
+                result["brain_autonomy"] = {"attempt": attempt, "max_attempts": max_attempts, "status": "SUCCESS"}
+                return result
+
+            diagnosis = brain.cycle(
+                os.getenv("FACTORY_OBJECTIVE", "Produce and verify the cinematic film"),
+                outcome="failure",
+                outcome_evidence=json.dumps(result, ensure_ascii=False, default=str)[:6000],
+            )
+            print(json.dumps({
+                "event": "BRAIN_REPLAN",
+                "attempt": attempt,
+                "max_attempts": max_attempts,
+                "diagnosis": diagnosis.get("selected_internal_focus"),
+                "result_status": status,
+            }, ensure_ascii=False, default=str), flush=True)
+        except Exception as exc:
+            last = {"status": "FACTORY_ERROR", "error": repr(exc)}
+            diagnosis = brain.cycle(
+                os.getenv("FACTORY_OBJECTIVE", "Produce and verify the cinematic film"),
+                outcome="failure",
+                outcome_evidence=repr(exc),
+            )
+            print(json.dumps({
+                "event": "BRAIN_REPLAN",
+                "attempt": attempt,
+                "max_attempts": max_attempts,
+                "error": repr(exc),
+                "diagnosis": diagnosis.get("selected_internal_focus"),
+            }, ensure_ascii=False, default=str), flush=True)
+
+    last["status"] = "MAX_ITERATIONS"
+    last["brain_autonomy"] = {
+        "attempt": max_attempts,
+        "max_attempts": max_attempts,
+        "status": "ESCALATE_TO_USER",
+        "reason": "1000 autonomous Brain attempts exhausted without verified success",
+    }
+    _heartbeat("ESCALATE", cycle, f"max_attempts={max_attempts}")
+    print(json.dumps(last, ensure_ascii=False, default=str), flush=True)
+    return last
+
+
 def run_forever() -> None:
     interval = max(60, int(os.getenv("FACTORY_INTERVAL_SECONDS", "21600")))
     cycle = 0
@@ -124,7 +179,7 @@ def run_forever() -> None:
 if __name__ == "__main__":
     # GitHub Actions is finite; run one production cycle there.
     if _truthy("FACTORY_ONE_SHOT", "0"):
-        result = run_once(1)
+        result = run_autonomous_cycle(1)
         # GitHub Actions must not report a green production when the factory
         # stopped before rendering/assembling the requested film.
         status = str(result.get("status", ""))
