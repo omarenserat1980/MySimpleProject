@@ -41,7 +41,7 @@ class CinematicLocalRenderer:
             "geq="
             "r='12+22*Y/H+35*exp(-((X/W-(0.22+0.06*sin(t/3)))^2+(Y/H-0.28)^2)*18)':"
             "g='16+18*Y/H+22*exp(-((X/W-(0.22+0.06*sin(t/3)))^2+(Y/H-0.28)^2)*18)':"
-            "b='34+28*Y/H+8*exp(-((X/W-(0.22+0.06*sin(T/3)))^2+(Y/H-0.28)^2)*18)',"
+            "b='34+28*Y/H+8*exp(-((X/W-(0.22+0.06*sin(t/3)))^2+(Y/H-0.28)^2)*18)',"
             "drawbox=x=0:y=504:w=1280:h=216:color=black@0.72:t=fill,"
             "drawbox=x='128+64*sin(t/4)':y=130:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
