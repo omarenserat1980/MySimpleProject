@@ -205,8 +205,8 @@ class ModelRouter:
                 local_result["provider"] = "local_ffmpeg_cinematic"
                 local_result["router"] = {
                     "selected": family,
-                    "fallback_used": true,
-                    "emergency_local_fallback": true,
+                    "fallback_used": True,
+                    "emergency_local_fallback": True,
                     "primary_error": result.get("error") or result.get("status"),
                 }
                 return local_result
