@@ -1,16 +1,22 @@
 """Long-running cinematic factory worker.
 
 All real external work is opt-in through environment configuration.
-No credentials are stored in source. The worker emits auditable heartbeats
-to stdout so factory logs can show liveness without exposing secrets.
+No credentials are stored here. The worker emits auditable heartbeats.
 """
 from __future__ import annotations
-import json, os, time
+
+import json
+import os
+import time
 from typing import Any
+
 from .cinematic_factory_controller import run_factory, FactoryConfig
 from .http_media_adapter import FfmpegVideoAssembler
 from .brain_media_adapter import BrainMediaProvider
 from .cinematic_local_renderer import CinematicLocalRenderer
+from .cinema_engine_v6 import CinemaEngineV6
+from .cinema_manifest import write_manifest
+from .model_router import ModelRouter
 from .youtube_api_client import YouTubeApiClient
 from .youtube_data_analytics_client import YouTubeDataAnalyticsClient
 from .topic_sources import EnvTopicResearcher
@@ -31,13 +37,17 @@ def _heartbeat(status: str, cycle: int, detail: str = "") -> None:
 
 
 def _build_renderer():
-    if os.getenv("MEDIA_PROVIDER_URL", "").strip():
-        return BrainMediaProvider()
-    return CinematicLocalRenderer()
+    fallback = BrainMediaProvider() if (
+        os.getenv("MEDIA_PROVIDER_URL", "").strip() or os.getenv("FAL_KEY", "").strip()
+    ) else CinematicLocalRenderer()
+    if _truthy("FACTORY_MODEL_ROUTER", "1"):
+        return ModelRouter(fallback)
+    return fallback
 
 
 def run_once(cycle: int = 0) -> dict[str, Any]:
     _heartbeat("HEALTHY", cycle, "starting_factory_cycle")
+    write_manifest(os.getenv("CINEMA_ENGINE_MANIFEST", "cinema_engine_v6_manifest.json"))
     cfg = FactoryConfig(
         audience=os.getenv("FACTORY_AUDIENCE", "Arabic-speaking YouTube audience"),
         target_duration_s=max(30, min(600, int(os.getenv("FACTORY_DURATION_SECONDS", "60")))),
@@ -74,6 +84,9 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
     )
     result["youtube_oauth"] = oauth_snapshot
     result["youtube_channel"] = channel_snapshot
+    if hasattr(renderer, "snapshot"):
+        result["model_router"] = renderer.snapshot()
+    result["cinema_engine"] = CinemaEngineV6().snapshot()
     final_status = "DEGRADED" if oauth_snapshot.get("status") == "OAUTH_INVALID" else "HEALTHY"
     final_detail = str(result.get("status", "cycle_complete"))
     if oauth_snapshot.get("status") == "OAUTH_INVALID":
