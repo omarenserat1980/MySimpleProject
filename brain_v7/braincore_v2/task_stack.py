@@ -30,14 +30,17 @@ class TaskStack:
     def complete(self,task_id,status="VERIFIED"):
         if task_id in self.data["tasks"]:
             self.data["tasks"][task_id]["status"]=status; self.save()
-    def next(self):
+    def ready(self):
         tasks=self.data["tasks"].values()
         ready=[]
         for t in tasks:
             if t["status"] not in ("PENDING","REPAIR"): continue
             if all(self.data["tasks"].get(d,{}).get("status")=="VERIFIED" for d in t["depends_on"]):
                 ready.append(t)
-        return sorted(ready,key=lambda x:(-x["priority"],x["created_at"]))[0] if ready else None
+        return sorted(ready,key=lambda x:(-x["priority"],x["created_at"]))
+    def next(self):
+        ready=self.ready()
+        return ready[0] if ready else None
     def fail(self,task_id,repair_payload=None):
         t=self.data["tasks"].get(task_id)
         if not t:return
