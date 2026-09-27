@@ -112,7 +112,9 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
 def run_autonomous_cycle(cycle: int = 1) -> dict[str, Any]:
     """Brain-first factory loop bounded by wall-clock time; attempts are secondary."""
     max_attempts = max(1, int(os.getenv("BRAIN_MAX_ITERATIONS", "1000000")))
-    max_runtime_s = max(60, min(6 * 60 * 60, int(os.getenv("BRAIN_MAX_RUNTIME_SECONDS", "21600"))))
+    requested_runtime_s = int(os.getenv("BRAIN_MAX_RUNTIME_SECONDS", "21600"))
+    runtime_cap_s = 7 * 24 * 60 * 60 if _truthy("BRAIN6_168H", "0") else 6 * 60 * 60
+    max_runtime_s = max(60, min(runtime_cap_s, requested_runtime_s))
     started = time.time()
     brain = UnifiedBrain()
     last: dict[str, Any] = {}
@@ -162,7 +164,7 @@ def run_autonomous_cycle(cycle: int = 1) -> dict[str, Any]:
         "runtime_seconds": round(time.time() - started, 1),
         "max_runtime_seconds": max_runtime_s,
         "status": "ESCALATE_TO_USER",
-        "reason": "five-minute wall-clock test window ended without verified success" if max_runtime_s == 300 else "autonomous Brain wall-clock window ended without verified success",
+        "reason": ("168-hour Brain 6 campaign ended without verified success" if _truthy("BRAIN6_168H", "0") else ("five-minute wall-clock test window ended without verified success" if max_runtime_s == 300 else "autonomous Brain wall-clock window ended without verified success")),
     }
     _heartbeat("TIME_LIMIT", cycle, f"runtime_seconds={round(time.time() - started, 1)}/{max_runtime_s}")
     print(json.dumps(last, ensure_ascii=False, default=str), flush=True)
@@ -183,8 +185,15 @@ def run_forever() -> None:
 
 
 if __name__ == "__main__":
+    # BRAIN6_168H is intended for a persistent/self-hosted machine.
+    # It keeps one Python process alive for the full campaign.
+    if _truthy("BRAIN6_168H", "0"):
+        result = run_autonomous_cycle(1)
+        status = str(result.get("status", ""))
+        if status not in {"COMPLETED", "VERIFIED", "SUCCESS", "FACTORY_CYCLE_COMPLETE"}:
+            raise SystemExit(2)
     # GitHub Actions is finite; run one production cycle there.
-    if _truthy("FACTORY_ONE_SHOT", "0"):
+    elif _truthy("FACTORY_ONE_SHOT", "0"):
         result = run_autonomous_cycle(1)
         # GitHub Actions must not report a green production when the factory
         # stopped before rendering/assembling the requested film.
