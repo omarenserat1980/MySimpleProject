@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 360
     env:
       FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_MODEL_ROUTER: "1"
+      FACTORY_MODEL: "auto"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
@@ -68,7 +70,9 @@ jobs:
           pip install fal-client
 
       - name: Validate cinematic brain modules
-        run: python -m compileall -q brain_v7/braincore_v2
+        run: |
+          python -m compileall -q brain_v7/braincore_v2
+          python -m compileall -q brain_v12
 
       - name: Run Electronic Brain Cinematic Factory
         run: |
@@ -81,8 +85,8 @@ jobs:
           name: cinematic-factory-state
           path: |
             .factory_state.json
-          task_stack.json
-          world_state.json
+            task_stack.json
+            world_state.json
             cinematic_manifest.json
             cinematic_project_manifest.json
             factory_result.json
