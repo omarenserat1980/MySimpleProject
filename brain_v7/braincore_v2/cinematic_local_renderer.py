@@ -39,16 +39,16 @@ class CinematicLocalRenderer:
         visual = (
             "color=c=0x0b1020:s=1280x720:r=24,"
             "geq="
-            "r='12+22*Y/H+35*exp(-((X/W-(0.22+0.06*sin(T/3)))^2+(Y/H-0.28)^2)*18)':"
+            "r='12+22*Y/H+35*exp(-((X/W-(0.22+0.06*sin(t/3)))^2+(Y/H-0.28)^2)*18)':"
             "g='16+18*Y/H+22*exp(-((X/W-(0.22+0.06*sin(T/3)))^2+(Y/H-0.28)^2)*18)':"
             "b='34+28*Y/H+8*exp(-((X/W-(0.22+0.06*sin(T/3)))^2+(Y/H-0.28)^2)*18)',"
             "drawbox=x=0:y=504:w=1280:h=216:color=black@0.72:t=fill,"
-            "drawbox=x='128+64*sin(T/4)':y=130:w=704:h=14:color=white@0.08:t=fill,"
+            "drawbox=x='128+64*sin(t/4)':y=130:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
             # Autonomous camera movement: slow push-in plus horizontal/vertical drift.
             # Deterministic FFmpeg expressions keep this CPU-friendly and asset-free.
             "scale=1472:828:flags=lanczos,"
-            "crop=1280:720:x=96+48*sin(T/4):y=54+27*cos(T/5),"
+            "crop=1280:720:x=96+48*sin(T/4):y=54+27*cos(t/5),"
             "vignette=PI/4,"
             "format=yuv420p,"
             f"drawtext=fontcolor=white:fontsize=38:x=(w-text_w)/2:y=h-110:text='{text.replace(chr(39), chr(92)+chr(39))}'"
