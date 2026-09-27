@@ -110,4 +110,8 @@ def run_forever() -> None:
 
 
 if __name__ == "__main__":
-    run_forever()
+    # GitHub Actions is finite; run one production cycle there.
+    if _truthy("FACTORY_ONE_SHOT", "0"):
+        run_once(1)
+    else:
+        run_forever()
