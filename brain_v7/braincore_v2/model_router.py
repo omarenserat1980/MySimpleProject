@@ -48,7 +48,7 @@ class ComfyUIBackend:
             "SOUND_DESIGN_PROMPT": shot.get("sound_design_prompt", ""),
             "VOICE_PROMPT": shot.get("voice_prompt", ""),
             "SHOT_ID": shot.get("shot_id", ""),
-            "DURATION": shot.get("duration_s", 5),
+            "DURATION": shot.get("duration_s", 5),\n            "INFERENCE_PROFILE": (shot.get("generation") or {}).get("inference_profile", "production"),\n            "SAMPLING_STEPS": (shot.get("generation") or {}).get("sampling_steps", 20),\n            "QUANTIZATION": (shot.get("generation") or {}).get("quantization", "bf16"),\n            "ATTENTION": (shot.get("generation") or {}).get("attention", "default"),
         }
         encoded = json.dumps(workflow, ensure_ascii=False)
         for key, value in replacements.items():
