@@ -55,6 +55,8 @@ jobs:
       FACTORY_RENDER_CONCURRENCY: "12"
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
+      FACTORY_REQUIRE_REAL_MEDIA: "1"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "0"
       # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
       # This fixes 401 Requires authentication without storing a PAT in the repository.
       GITHUB_TOKEN: ${{ github.token }}
@@ -103,6 +105,15 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
           pip install fal-client
+
+      - name: Preflight real media provider
+        run: |
+          set -euo pipefail
+          if [ -z "${FAL_KEY}" ] && [ -z "${MEDIA_PROVIDER_URL}" ] && [ -z "${COMFYUI_URL}" ]; then
+            echo "::error::No real media provider configured. Set FAL_KEY, MEDIA_PROVIDER_URL, or COMFYUI_URL in repository/environment secrets."
+            exit 1
+          fi
+          echo "Real media provider configured; local FFmpeg fallback is disabled."
 
       - name: Validate cinematic brain modules
         run: |
