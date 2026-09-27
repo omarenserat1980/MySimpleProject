@@ -129,7 +129,7 @@ class ModelRouter:
         }
 
     def _profile(self, shot: dict[str, Any]) -> str:
-        requested = str(shot.get("model_family") or self.requested)
+        requested = str(shot.get("model_family") or (shot.get("generation") or {}).get("backend_preference") or self.requested)
         if requested in PROFILES and requested != "auto":
             return requested
         for candidate in ("wan", "ltx", "hunyuan", "comfyui"):
