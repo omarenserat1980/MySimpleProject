@@ -17,6 +17,23 @@ on:
         required: true
         type: boolean
         default: true
+      brain_runtime_minutes:
+        description: "Brain autonomous test window (minutes)"
+        required: true
+        type: choice
+        default: "5"
+        options:
+          - "5"
+          - "10"
+          - "15"
+          - "20"
+          - "30"
+          - "60"
+          - "120"
+          - "180"
+          - "240"
+          - "300"
+          - "360"
 
 permissions:
   contents: read
@@ -58,6 +75,7 @@ jobs:
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
       BRAIN_MAX_ITERATIONS: "1000"
+      BRAIN_MAX_RUNTIME_SECONDS: "300"
       FACTORY_REQUIRE_REAL_MEDIA: "1"
       FACTORY_ALLOW_LOCAL_FALLBACK: "0"
       # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
@@ -66,6 +84,28 @@ jobs:
     steps:
       - name: Checkout Electronic Brain
         uses: actions/checkout@v4
+
+      - name: Configure Brain autonomy window
+        run: |
+          set -euo pipefail
+          minutes="${{ inputs.brain_runtime_minutes || '5' }}"
+          case "$minutes" in
+            5) seconds=300;;
+            10) seconds=600;;
+            15) seconds=900;;
+            20) seconds=1200;;
+            30) seconds=1800;;
+            60) seconds=3600;;
+            120) seconds=7200;;
+            180) seconds=10800;;
+            240) seconds=14400;;
+            300) seconds=18000;;
+            360) seconds=21600;;
+            *) echo "::error::Unsupported Brain runtime: $minutes minutes"; exit 1;;
+          esac
+          echo "BRAIN_MAX_RUNTIME_SECONDS=$seconds" >> "$GITHUB_ENV"
+          echo "BRAIN_MAX_ITERATIONS=1000" >> "$GITHUB_ENV"
+          echo "Brain autonomy window: $minutes minutes ($seconds seconds), max 1000 attempts."
 
       - name: Load production request duration
         run: |
