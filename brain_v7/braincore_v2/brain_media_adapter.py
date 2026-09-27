@@ -121,7 +121,9 @@ class BrainMediaProvider:
             status=str(data.get("status","")).upper()
             if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
                 vision=self._vision_qc_fal(ref,shot)
-                return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,"provider_result":data,"shot_id":shot.get("shot_id")}
+                return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,
+                        "provider_result":data,"shot_id":shot.get("shot_id"),
+                        "provider":"media_provider"}
             job_id=data.get("job_id") or data.get("id")
             if not job_id:
                 return {"status":"SUBMISSION_UNVERIFIED","provider_result":data}
@@ -136,7 +138,8 @@ class BrainMediaProvider:
                 if ref and status in {"COMPLETED","VERIFIED_COMPLETED","SUCCEEDED","SUCCESS"}:
                     vision=self._vision_qc_fal(ref,shot)
                     return {"status":"VERIFIED_COMPLETED","video_ref":ref,"vision_qc":vision,
-                            "provider_result":data,"job_id":job_id,"shot_id":shot.get("shot_id")}
+                            "provider_result":data,"job_id":job_id,"shot_id":shot.get("shot_id"),
+                            "provider":"media_provider"}
                 if status in {"FAILED","ERROR","CANCELLED"}:
                     return {"status":"PROVIDER_FAILED","provider_result":data,"job_id":job_id}
             return {"status":"PROVIDER_TIMEOUT","job_id":job_id}
@@ -153,7 +156,15 @@ class FactoryState:
 
     def verified(self, shot_id: str):
         item=self.data.get("shots",{}).get(shot_id,{})
-        return item if item.get("status")=="VERIFIED_COMPLETED" and item.get("video_ref") else None
+        provider = str(item.get("provider") or "").strip().lower()
+        real_providers = {"fal", "comfyui", "media_provider"}
+        return (
+            item
+            if item.get("status") == "VERIFIED_COMPLETED"
+            and item.get("video_ref")
+            and provider in real_providers
+            else None
+        )
 
     def save(self, shot_id: str, result: dict[str,Any]):
         self.data.setdefault("shots",{})[shot_id]=result
