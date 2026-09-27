@@ -18,10 +18,13 @@ class QueueWorker(private val context: Context) {
                 "ffmpeg_probe" -> ffmpeg.probe()
                 "ffmpeg_run" -> ffmpeg.run(jsonArgs(q.args))
                 "verify_file" -> verify(q.args)
+                "scene_prepare" -> ProductionTasks(context).execute(q.task,q.args)
+                "concat_video" -> ProductionTasks(context).execute(q.task,q.args)
+                "verify_output" -> ProductionTasks(context).execute(q.task,q.args)
                 else -> mapOf("ok" to false,"error" to ("unsupported queued task: " + q.task))
             }
             q.output=JSONObject(result).toString()
-            val ok=result["ok"]==true || result["available"]==true
+            val ok=result["ok"]==true || result["available"]==true || (result["exists"]==true && result["size_ok"]==true)
             q.state=if(ok) QueueState.SUCCEEDED else QueueState.FAILED
             q.lastError=if(ok) "" else result["error"]?.toString() ?: result["stderr"]?.toString() ?: "failed"
         } catch(e:Throwable) {
