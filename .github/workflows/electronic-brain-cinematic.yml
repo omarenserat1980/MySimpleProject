@@ -95,6 +95,7 @@ jobs:
 
       - name: Run Electronic Brain Cinematic Factory
         run: |
+          set -o pipefail
           python -m brain_v7.braincore_v2.background_factory_worker | tee factory_result.json
 
       - name: Save resumable checkpoint
