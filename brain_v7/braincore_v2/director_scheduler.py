@@ -12,7 +12,7 @@ def seed_tasks(stack: TaskStack, shots: list[dict]):
         # shots of a scene remain independent so different scenes can render
         # concurrently.
         deps: list[str] = []
-        if index > 0 and policy in {"identity_first", "match_cut"}:
+        if index > 0 and (not policy or policy in {"identity_first", "match_cut"}):
             prev = shots[index - 1]
             if prev.get("scene_id") == shot.get("scene_id"):
                 deps = [prev["shot_id"]]
