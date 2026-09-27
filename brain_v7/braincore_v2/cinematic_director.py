@@ -34,10 +34,10 @@ def _id(text: str) -> str:
 
 def _route_for_shot(role: str) -> dict[str, Any]:
     if role == "ESTABLISH":
-        return {"generation_mode": "t2v_or_i2v", "reference_policy": "world_anchor", "continuity_policy": "world_first"}
+        return {"generation_mode": "t2v_or_i2v", "reference_policy": "world_anchor", "continuity_policy": "world_first", "backend_preference": "ltx"}
     if role == "PERFORMANCE":
-        return {"generation_mode": "i2v", "reference_policy": "character_anchor+last_frame", "continuity_policy": "identity_first"}
-    return {"generation_mode": "i2v", "reference_policy": "prop_anchor+previous_frame", "continuity_policy": "match_cut"}
+        return {"generation_mode": "i2v", "reference_policy": "character_anchor+last_frame", "continuity_policy": "identity_first", "backend_preference": "wan"}
+    return {"generation_mode": "i2v", "reference_policy": "prop_anchor+previous_frame", "continuity_policy": "match_cut", "backend_preference": "ltx"}
 
 
 def _shot(scene, n, duration, purpose, action, framing, lens, move, composition, lighting, grade,
