@@ -130,7 +130,8 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
         cached = state.verified(shot_id)
         if cached:
             outputs.append(cached); skipped += 1; continue
-        shot = apply_speed_policy(shot)\n        shot["continuity_dna"] = {
+        shot = apply_speed_policy(shot)
+        shot["continuity_dna"] = {
             "continuity_key": shot.get("continuity_key", ""),
             "identity_lock": "preserve subject appearance, wardrobe, proportions and visual identity",
             "world_lock": "preserve geography, time of day, weather, architecture and color language",
