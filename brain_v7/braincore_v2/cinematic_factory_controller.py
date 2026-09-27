@@ -20,6 +20,7 @@ from .cinematic_director import CinematicPlan, build_plan, provider_prompts
 from .youtube_publisher import YouTubePackage, prepare_package, publish
 from .cinematic_story_engine import build_story
 from .cinematic_quality_gate import inspect_video
+from .brain_media_adapter import FactoryState
 
 
 class TopicResearcher(Protocol):
@@ -87,19 +88,30 @@ def render_shots(
     shot_prompts: Sequence[dict[str, Any]],
     *,
     authorized: bool = False,
+    state_path: str = ".factory_state.json",
 ) -> dict[str, Any]:
+    state = FactoryState(state_path)
     outputs = []
-    for shot in shot_prompts:
+    skipped = 0
+    for index, shot in enumerate(shot_prompts, 1):
+        shot_id = str(shot.get("shot_id") or f"shot_{index:04d}")
+        cached = state.verified(shot_id)
+        if cached:
+            outputs.append(cached)
+            skipped += 1
+            continue
         result = renderer.render(shot=shot, authorized=authorized)
+        state.save(shot_id, result)
         if result.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
             return {
-                "status": "RENDER_BLOCKED",
-                "failed_shot": shot.get("shot_id"),
+                "status": "SHOTS_BLOCKED",
+                "failed_shot": shot_id,
                 "outputs": outputs,
+                "skipped": skipped,
                 "reason": result,
             }
         outputs.append(result)
-    return {"status": "SHOTS_RENDERED", "outputs": outputs}
+    return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped}
 
 
 def run_factory(
