@@ -34,8 +34,8 @@ class CinematicLocalRenderer:
         out = self.output_dir / f"{shot_id}_cinematic.mp4"
 
         # One lavfi video source keeps the renderer portable and memory-light.
-        # The animated radial light and lower foreground create a simple cinematic
-        # depth cue without requiring downloaded images or a GPU.
+        # Use a time-based expression in drawbox because FFmpeg drawbox does not
+        # expose the geq/crop frame counter N consistently across builds.
         visual = (
             "color=c=0x0b1020:s=1280x720:r=24,"
             "geq="
@@ -43,10 +43,8 @@ class CinematicLocalRenderer:
             "g='16+18*Y/H+22*exp(-((X/W-(0.22+0.06*sin(N/72)))^2+(Y/H-0.28)^2)*18)':"
             "b='34+28*Y/H+8*exp(-((X/W-(0.22+0.06*sin(N/72)))^2+(Y/H-0.28)^2)*18)',"
             "drawbox=x=0:y=504:w=1280:h=216:color=black@0.72:t=fill,"
-            "drawbox=x='128+64*sin(N/96)':y=130:w=704:h=14:color=white@0.08:t=fill,"
+            "drawbox=x='128+64*sin(t*24/96)':y=130:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
-            # Autonomous camera movement: slow push-in plus horizontal/vertical drift.
-            # Deterministic FFmpeg expressions keep this CPU-friendly and asset-free.
             "scale=1472:828:flags=lanczos,"
             "crop=1280:720:x=96+48*sin(N/96):y=54+27*cos(N/120),"
             "vignette=PI/4,"
