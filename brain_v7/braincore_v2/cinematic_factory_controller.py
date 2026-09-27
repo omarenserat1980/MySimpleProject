@@ -26,6 +26,9 @@ from .continuity_ledger import ContinuityLedger
 from .cinematic_director import CinematicPlan, build_plan, provider_prompts
 from .youtube_publisher import YouTubePackage, prepare_package, publish
 from .cinematic_story_engine import build_story
+from .story_architect import build_story as build_executable_story, export_story
+from .film_memory import FilmMemory
+from .film_qc import evaluate_film_evidence
 from .cinematic_quality_gate import inspect_video
 from .brain_media_adapter import FactoryState
 
@@ -94,6 +97,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     """Render independent shots concurrently with isolated retries and checkpoints."""
     state = FactoryState(state_path)
     ledger = ContinuityLedger(Path(state_path).with_name("continuity_ledger.json").as_posix())
+    memory = FilmMemory(Path(state_path).with_name("film_memory.json").as_posix())
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
     concurrency = max(1, min(8, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3"))))
     lock = threading.Lock()
@@ -126,7 +130,8 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                 result["attempt"] = attempt + 1
                 qc = inspect_shot(shot, result, min_score=float(os.getenv("FACTORY_MIN_QUALITY", "0.82")))
                 result["visual_qc"] = qc
-                if qc["status"] == "VERIFIED":
+                result["film_qc"] = evaluate_film_evidence(shot, result, memory.snapshot())
+                if qc["status"] == "VERIFIED" and result["film_qc"]["status"] == "VERIFIED":
                     ledger.record(shot_id, scene_id=shot.get("scene_id"), continuity_key=shot.get("continuity_key"), qc=qc, attempt=attempt + 1)
                     result["status"] = "VERIFIED_COMPLETED"
                     break
@@ -144,6 +149,8 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
         for future in as_completed(futures):
             shot_id, result = future.result()
             if result.get("status") == "VERIFIED_COMPLETED":
+                with lock:
+                    memory.update_shot(shot_id, {"continuity_key": result.get("continuity_key"), "visual_qc": result.get("visual_qc"), "film_qc": result.get("film_qc"), "video_ref": result.get("video_ref")})
                 outputs.append(result)
             else:
                 failures.append({"shot_id": shot_id, "result": result})
@@ -181,9 +188,10 @@ def run_factory(
     objective = topic["selected"]["opportunity"]["objective"]
     production = build_production(objective, config)
     story = build_story(objective, audience=config.audience)
+    executable_story = build_executable_story(objective, genre=str(production["plan"].creative_contract.get("genre", "cinematic") if production["plan"].creative_contract else "cinematic"))
     plan = production["plan"]
     Path(os.getenv("FACTORY_PROJECT_MANIFEST", "cinematic_project_manifest.json")).write_text(
-        json.dumps({"plan": asdict(plan), "story": story, "shot_prompts": production["shot_prompts"], "created_at": time.time()},
+        json.dumps({"plan": asdict(plan), "story": story, "executable_story": export_story(executable_story), "shot_prompts": production["shot_prompts"], "created_at": time.time()},
                    ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
     )
@@ -194,6 +202,7 @@ def run_factory(
             "topic": topic,
             "plan": asdict(plan),
             "story": story,
+            "executable_story": export_story(executable_story),
             "shot_prompts": production["shot_prompts"],
         }
 
@@ -217,6 +226,7 @@ def run_factory(
             "status": "QUALITY_GATE_BLOCKED",
             "topic": topic,
             "story": story,
+            "executable_story": export_story(executable_story),
             "render": rendered,
             "assembly": assembled,
             "quality": quality,
@@ -254,6 +264,7 @@ def run_factory(
         "topic": topic,
         "plan": asdict(plan),
         "story": story,
+        "executable_story": export_story(executable_story),
         "quality": quality,
         "rendered_shots": len(rendered["outputs"]),
         "skipped_verified_shots": rendered.get("skipped", 0),
