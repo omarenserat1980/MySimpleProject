@@ -116,7 +116,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
     self_improvement = SelfImprovement(Path(state_path).with_name("production_policy.json").as_posix())
     require_audio_evidence = os.getenv("FACTORY_REQUIRE_AUDIO_EVIDENCE", "0").lower() in {"1", "true", "yes", "on"}
     max_retries = max(0, int(os.getenv("FACTORY_SHOT_RETRIES", "2")))
-    concurrency = max(1, min(8, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3"))))
+    speed = speed_policy()\n    concurrency = speed["concurrency"]
     lock = threading.Lock()
     pending, outputs, failures = [], [], []
     skipped = 0
@@ -127,7 +127,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
         cached = state.verified(shot_id)
         if cached:
             outputs.append(cached); skipped += 1; continue
-        shot["continuity_dna"] = {
+        shot = apply_speed_policy(shot)\n        shot["continuity_dna"] = {
             "continuity_key": shot.get("continuity_key", ""),
             "identity_lock": "preserve subject appearance, wardrobe, proportions and visual identity",
             "world_lock": "preserve geography, time of day, weather, architecture and color language",
@@ -197,7 +197,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
         Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
         return {"status": "SHOTS_BLOCKED", "failed_shot": failures[0]["shot_id"], "outputs": outputs, "skipped": skipped, "failures": failures, "manifest": manifest}
 
-    manifest = {"version": 5, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
+    manifest = {"version": 6, "status": "SHOTS_RENDERED", "shot_count": len(outputs), "skipped_verified": skipped, "shots": outputs, "diagnostics": diagnostics, "production_policy": self_improvement.context(), "audio_continuity": audio_memory.context(), "updated_at": time.time()}
     Path(state_path).with_name("cinematic_manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     return {"status": "SHOTS_RENDERED", "outputs": outputs, "skipped": skipped, "manifest": manifest}
 
