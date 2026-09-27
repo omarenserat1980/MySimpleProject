@@ -110,11 +110,15 @@ def run_once(cycle: int = 0) -> dict[str, Any]:
 
 
 def run_autonomous_cycle(cycle: int = 1) -> dict[str, Any]:
-    """Brain-first factory loop: diagnose, replan, retry up to 1000 times."""
+    """Brain-first factory loop with both attempt and wall-clock limits."""
     max_attempts = max(1, min(1000, int(os.getenv("BRAIN_MAX_ITERATIONS", "1000"))))
+    max_runtime_s = max(60, min(6 * 60 * 60, int(os.getenv("BRAIN_MAX_RUNTIME_SECONDS", "21600"))))
+    started = time.time()
     brain = UnifiedBrain()
     last: dict[str, Any] = {}
     for attempt in range(1, max_attempts + 1):
+        if time.time() - started >= max_runtime_s:
+            break
         _heartbeat("AUTONOMOUS_ATTEMPT", cycle, f"attempt={attempt}/{max_attempts}")
         try:
             result = run_once(cycle)
@@ -153,10 +157,12 @@ def run_autonomous_cycle(cycle: int = 1) -> dict[str, Any]:
 
     last["status"] = "MAX_ITERATIONS"
     last["brain_autonomy"] = {
-        "attempt": max_attempts,
+        "attempt": min(max_attempts, attempt if "attempt" in locals() else max_attempts),
         "max_attempts": max_attempts,
+        "runtime_seconds": round(time.time() - started, 1),
+        "max_runtime_seconds": max_runtime_s,
         "status": "ESCALATE_TO_USER",
-        "reason": "1000 autonomous Brain attempts exhausted without verified success",
+        "reason": "autonomous Brain budget exhausted (attempts or wall-clock limit) without verified success",
     }
     _heartbeat("ESCALATE", cycle, f"max_attempts={max_attempts}")
     print(json.dumps(last, ensure_ascii=False, default=str), flush=True)
