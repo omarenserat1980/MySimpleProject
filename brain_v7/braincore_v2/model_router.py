@@ -42,6 +42,13 @@ class ComfyUIBackend:
         self.timeout = float(os.getenv("COMFYUI_TIMEOUT_SECONDS", "900"))
         self.poll = float(os.getenv("COMFYUI_POLL_SECONDS", "3"))
         self.max_polls = max(1, int(os.getenv("COMFYUI_MAX_POLLS", "300")))
+        self.client = httpx.Client(
+            timeout=self.timeout,
+            limits=httpx.Limits(
+                max_connections=max(8, int(os.getenv("COMFYUI_HTTP_CONNECTIONS", "32"))),
+                max_keepalive_connections=max(4, int(os.getenv("COMFYUI_HTTP_KEEPALIVE", "16"))),
+            ),
+        )
 
     def configured(self) -> bool:
         return bool(self.base_url and (self.workflow_json or any(self.workflow_by_family.values())))
@@ -74,8 +81,8 @@ class ComfyUIBackend:
         if not self.configured():
             return {"status": "COMFYUI_NOT_CONFIGURED"}
         try:
-            with httpx.Client(timeout=self.timeout) as client:
-                payload = {"prompt": self._workflow(shot), "client_id": self.client_id}
+            client = self.client
+            payload = {"prompt": self._workflow(shot), "client_id": self.client_id}
                 started = time.monotonic()
                 queued = client.post(self.base_url + "/prompt", json=payload)
                 queued.raise_for_status()
