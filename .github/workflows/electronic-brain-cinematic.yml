@@ -39,6 +39,7 @@ jobs:
       MEDIA_PROVIDER_TIMEOUT_SECONDS: "900"
       MEDIA_PROVIDER_POLL_SECONDS: "8"
       MEDIA_PROVIDER_MAX_POLLS: "120"
+      FACTORY_RENDER_CONCURRENCY: "3"
     steps:
       - name: Checkout Electronic Brain
         uses: actions/checkout@v4
