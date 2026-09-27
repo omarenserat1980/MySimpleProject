@@ -50,7 +50,9 @@ class FfmpegVideoAssembler:
                 files.append(p)
             manifest=work/"concat.txt"
             manifest.write_text("".join(f"file '{p.as_posix()}'\n" for p in files),encoding="utf-8")
-            out=work/"final.mp4"
+            out_dir=Path(os.getenv("FACTORY_OUTPUT_DIR","cinematic_output"))
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out=out_dir/"final.mp4"
             subprocess.run([self.ffmpeg,"-y","-f","concat","-safe","0","-i",str(manifest),"-c:v","libx264","-preset",os.getenv("LOCAL_FFMPEG_PRESET","veryfast"),"-crf","27","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],check=True,capture_output=True,text=True)
             return {"status":"ASSEMBLED","video_ref":str(out),"shot_count":len(files)}
         except Exception as exc:
