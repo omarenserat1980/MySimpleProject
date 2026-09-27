@@ -33,9 +33,6 @@ class CinematicLocalRenderer:
         text = _safe_text(shot.get("action") or shot.get("purpose") or shot_id)
         out = self.output_dir / f"{shot_id}_cinematic.mp4"
 
-        # One lavfi video source keeps the renderer portable and memory-light.
-        # Use a time-based expression in drawbox because FFmpeg drawbox does not
-        # expose the geq/crop frame counter N consistently across builds.
         visual = (
             "color=c=0x0b1020:s=1280x720:r=24,"
             "geq="
@@ -46,7 +43,7 @@ class CinematicLocalRenderer:
             "drawbox=x='128+64*sin(t*24/96)':y=130:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
             "scale=1472:828:flags=lanczos,"
-            "crop=1280:720:x=96+48*sin(N/96):y=54+27*cos(N/120),"
+            "crop=1280:720:x='96+48*sin(t*24/96)':y='54+27*cos(t*24/120)',"
             "vignette=PI/4,"
             "format=yuv420p,"
             f"drawtext=fontcolor=white:fontsize=38:x=(w-text_w)/2:y=h-110:text='{text.replace(chr(39), chr(92)+chr(39))}'"
