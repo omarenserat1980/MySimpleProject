@@ -44,6 +44,7 @@ from .production_diagnostics import diagnose
 from .mastering_qc import evaluate_master
 from .brain_media_adapter import FactoryState
 from .speed_optimizer import speed_policy, apply_speed_policy
+from .take_budget import take_budget
 
 
 class TopicResearcher(Protocol):
@@ -143,7 +144,9 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
 
     def render_one(shot_id, shot):
         result = None
-        for attempt in range(max_retries + 1):
+        budget = take_budget(shot)
+        attempts_allowed = min(max_retries + 1, int(budget["max_takes"]))
+        for attempt in range(attempts_allowed):
             result = renderer.render(shot=shot, authorized=authorized)
             if result.get("status") in {"COMPLETED", "VERIFIED_COMPLETED"}:
                 result["attempt"] = attempt + 1
@@ -159,6 +162,7 @@ def render_shots(renderer: ShotRenderer, shot_prompts: Sequence[dict[str, Any]],
                     result["film_qc"]["status"] = "REPAIR"
                     result["film_qc"].setdefault("issues", []).append("research_gate_blocked")
                 result["repair_plan"] = build_repairs(result["film_qc"], shot)
+                result["take_budget"] = budget
                 self_improvement.observe(shot_id, result)
                 audio_memory.update(shot_id, {"voice_prompt": shot.get("voice_prompt"), "sound_design_prompt": shot.get("sound_design_prompt"), "qc": result["audio_qc"]})
                 if qc["status"] == "VERIFIED" and result["film_qc"]["status"] == "VERIFIED":
