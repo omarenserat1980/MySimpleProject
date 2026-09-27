@@ -74,7 +74,7 @@ jobs:
       FACTORY_RENDER_CONCURRENCY: "12"
       FACTORY_ADAPTIVE_CONCURRENCY: "1"
       FACTORY_ONE_SHOT: "1"
-      BRAIN_MAX_ITERATIONS: "1000"
+      BRAIN_MAX_ITERATIONS: "1000000"
       BRAIN_MAX_RUNTIME_SECONDS: "300"
       FACTORY_REQUIRE_REAL_MEDIA: "1"
       FACTORY_ALLOW_LOCAL_FALLBACK: "0"
@@ -104,7 +104,7 @@ jobs:
             *) echo "::error::Unsupported Brain runtime: $minutes minutes"; exit 1;;
           esac
           echo "BRAIN_MAX_RUNTIME_SECONDS=$seconds" >> "$GITHUB_ENV"
-          echo "BRAIN_MAX_ITERATIONS=1000" >> "$GITHUB_ENV"
+          echo "BRAIN_MAX_ITERATIONS=1000000" >> "$GITHUB_ENV"
           echo "Brain autonomy window: $minutes minutes ($seconds seconds), max 1000 attempts."
 
       - name: Load production request duration
