@@ -4,6 +4,7 @@ from dataclasses import dataclass, asdict
 from hashlib import sha256
 from typing import Any
 from .cinematic_bible import build_bibles
+from .genre_engine import creative_contract
 
 @dataclass(frozen=True)
 class Shot:
@@ -20,7 +21,7 @@ class Scene:
 class CinematicPlan:
     plan_id:str; objective:str; commercial_goal:str; audience:str; hook:str; scenes:tuple[Scene,...]
     continuity_ledger:dict[str,Any]; character_bible:dict[str,Any]; world_bible:dict[str,Any]
-    quality_targets:dict[str,float]; monetization_routes:tuple[str,...]
+    quality_targets:dict[str,float]; monetization_routes:tuple[str,...]; creative_contract:dict[str,Any]|None = None
 
 def _id(text:str)->str: return sha256(text.encode("utf-8")).hexdigest()[:12]
 
@@ -48,6 +49,7 @@ def build_plan(objective:str,*,commercial_goal:str="YouTube revenue",audience:st
     objective=objective.strip()
     if not objective: raise ValueError("objective must not be empty")
     duration_s=max(30,min(600,int(duration_s))); b=build_bibles(objective,audience=audience)
+    contract=creative_contract(objective,audience)
     c,w=b["character_bible"],b["world_bible"]
     grammar=[
       ("SC01","HOOK","Immediate attention","wide establishing","35mm","slow push-in","rule of thirds","Reveal the world and central visual mystery.","extreme wide","fade-in"),
@@ -74,9 +76,10 @@ def build_plan(objective:str,*,commercial_goal:str="YouTube revenue",audience:st
     return CinematicPlan(f"cin-{_id(objective+str(duration_s))}",objective,commercial_goal,audience,
         "Open with an immediate visual question, conflict or striking result; establish curiosity before explanation.",
         tuple(scenes),{"characters":c,"world":w,"shot_grammar":"12-shot minimum: establish -> perform -> insert across four acts",
+        "creative_contract":contract,"genre":contract["genre"],"factuality":contract["factuality"],
         "camera":"35/50/85mm progression with motivated movement","lighting":"preserve direction, exposure and practical sources",
         "audio":"stable voice identity, ambience and recurring music motif"},c,w,quality,
-        ("youtube_ads_when_channel_is_eligible","sponsorship_or_brand_deal","affiliate_or_product_link","lead_generation_for_paid_service"))
+        ("youtube_ads_when_channel_is_eligible","sponsorship_or_brand_deal","affiliate_or_product_link","lead_generation_for_paid_service"),contract)
 
 def provider_prompts(plan:CinematicPlan)->list[dict[str,Any]]:
     return [{"shot_id":s.shot_id,"scene_id":s.scene_id,"visual_prompt":s.visual_prompt,"audio_prompt":s.audio_prompt,
@@ -85,7 +88,7 @@ def provider_prompts(plan:CinematicPlan)->list[dict[str,Any]]:
              "character_bible":plan.character_bible,"world_bible":plan.world_bible,
              "negative_prompt":s.negative_prompt,"image_reference_prompt":s.image_reference_prompt,
              "sound_design_prompt":s.sound_design_prompt,"voice_prompt":s.voice_prompt,
-             "quality_targets":plan.quality_targets,
+             "quality_targets":plan.quality_targets,"creative_contract":plan.creative_contract,
              "production_rules":{"photorealism":true,"identity_consistency":true,"world_consistency":true,
                                  "temporal_consistency":true,"audio_sync":true,"no_text_artifacts":true}}
             for scene in plan.scenes for s in scene.shots]
