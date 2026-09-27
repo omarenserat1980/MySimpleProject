@@ -91,30 +91,30 @@ class ComfyUIBackend:
             if not prompt_id:
                 return {"status": "COMFYUI_SUBMISSION_UNVERIFIED", "provider_result": data}
             for _ in range(self.max_polls):
-                    time.sleep(self.poll)
-                    history = client.get(self.base_url + "/history/" + str(prompt_id))
-                    history.raise_for_status()
-                    item = history.json().get(str(prompt_id))
-                    if not item:
-                        continue
-                    outputs = item.get("outputs", {})
-                    media = self._find_media(outputs)
-                    if media:
-                        return {
-                            "status": "VERIFIED_COMPLETED",
-                            "video_ref": media,
-                            "provider": "comfyui",
-                            "model_family": shot.get("model_family"),
-                            "prompt_id": prompt_id,
-                            "provider_result": item,
-                            "shot_id": shot.get("shot_id"),
-                            "_generation_latency_s": time.monotonic() - started,
-                        }
-                    if item.get("status", {}).get("status_str") == "error":
-                        return {"status": "PROVIDER_FAILED", "provider_result": item, "prompt_id": prompt_id,
-                                "_generation_latency_s": time.monotonic() - started}
-                return {"status": "PROVIDER_TIMEOUT", "prompt_id": prompt_id,
-                        "_generation_latency_s": time.monotonic() - started}
+                time.sleep(self.poll)
+                history = client.get(self.base_url + "/history/" + str(prompt_id))
+                history.raise_for_status()
+                item = history.json().get(str(prompt_id))
+                if not item:
+                    continue
+                outputs = item.get("outputs", {})
+                media = self._find_media(outputs)
+                if media:
+                    return {
+                        "status": "VERIFIED_COMPLETED",
+                        "video_ref": media,
+                        "provider": "comfyui",
+                        "model_family": shot.get("model_family"),
+                        "prompt_id": prompt_id,
+                        "provider_result": item,
+                        "shot_id": shot.get("shot_id"),
+                        "_generation_latency_s": time.monotonic() - started,
+                    }
+                if item.get("status", {}).get("status_str") == "error":
+                    return {"status": "PROVIDER_FAILED", "provider_result": item, "prompt_id": prompt_id,
+                            "_generation_latency_s": time.monotonic() - started}
+            return {"status": "PROVIDER_TIMEOUT", "prompt_id": prompt_id,
+                    "_generation_latency_s": time.monotonic() - started}
         except Exception as exc:
             return {"status": "PROVIDER_ERROR", "error": repr(exc), "provider": "comfyui"}
 
