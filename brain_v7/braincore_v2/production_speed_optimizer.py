@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-def speed_plan(shots: list[dict[str, Any]], max_concurrency: int = 8) -> dict[str, Any]:
+def speed_plan(shots: list[dict[str, Any]], max_concurrency: int = 24) -> dict[str, Any]:
     groups: dict[tuple[Any, ...], list[str]] = defaultdict(list)
     for shot in shots:
         generation = shot.get("generation") or {}
@@ -21,7 +21,7 @@ def speed_plan(shots: list[dict[str, Any]], max_concurrency: int = 8) -> dict[st
         )
         groups[key].append(str(shot.get("shot_id", "")))
     return {
-        "max_concurrency": max(1, min(8, int(max_concurrency))),
+        "max_concurrency": max(1, min(24, int(max_concurrency))),
         "batch_groups": [
             {"key": list(key), "shot_ids": ids, "batch_eligible": len(ids) > 1}
             for key, ids in groups.items()
