@@ -150,16 +150,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
-          pip install fal-client
 
-      - name: Preflight real media provider
+      - name: Preflight free media backend
         run: |
           set -euo pipefail
-          if [ -z "${FAL_KEY}" ] && [ -z "${MEDIA_PROVIDER_URL}" ] && [ -z "${COMFYUI_URL}" ]; then
-            echo "::error::No real media provider configured. Set FAL_KEY, MEDIA_PROVIDER_URL, or COMFYUI_URL in repository/environment secrets."
+          if [ -z "${FAL_KEY}" ] && [ -z "${MEDIA_PROVIDER_URL}" ] && [ -z "${COMFYUI_URL}" ] && [ "${FACTORY_ALLOW_LOCAL_FALLBACK}" != "1" ]; then
+            echo "::error::No free media backend configured. Enable the built-in local FFmpeg cinematic renderer or configure a local ComfyUI backend."
             exit 1
           fi
-          echo "Real media provider configured; local FFmpeg fallback is disabled."
+          echo "Free-only media profile enabled: local FFmpeg/ComfyUI; paid API providers are not required."
 
       - name: Validate cinematic brain modules
         run: |
