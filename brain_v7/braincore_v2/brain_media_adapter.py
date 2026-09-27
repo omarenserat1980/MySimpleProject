@@ -167,7 +167,7 @@ class FactoryState:
     def verified(self, shot_id: str):
         item=self.data.get("shots",{}).get(shot_id,{})
         provider = str(item.get("provider") or "").strip().lower()
-        real_providers = {"fal", "comfyui", "media_provider"}
+        real_providers = {"fal", "comfyui", "media_provider", "local_ffmpeg_cinematic"}
         return (
             item
             if item.get("status") == "VERIFIED_COMPLETED"
