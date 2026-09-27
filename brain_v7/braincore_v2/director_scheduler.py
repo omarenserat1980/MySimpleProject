@@ -1,18 +1,35 @@
-"""Director-level scheduler: chooses the next useful production action."""
+"""Director-level dependency-aware scheduler optimized for throughput."""
 from __future__ import annotations
 from typing import Any
 from .task_stack import TaskStack
 
-def seed_tasks(stack:TaskStack,shots:list[dict]):
-    for s in shots:
-        sid=s["shot_id"]
-        deps=[]
-        idx=int(sid.rsplit("_",1)[-1]) if sid.rsplit("_",1)[-1].isdigit() else 0
-        if idx>1: deps=[f"shot_{idx-1:03d}"]
-        stack.add(sid,"GENERATE_SHOT",priority=100-int(s.get("scene_id",1)),depends_on=deps,payload={"shot":s})
+def seed_tasks(stack: TaskStack, shots: list[dict]):
+    for index, shot in enumerate(shots):
+        sid = shot["shot_id"]
+        generation = shot.get("generation") or {}
+        policy = str(generation.get("continuity_policy") or "")
+        # Only continuity-dependent shots wait. Establishing shots and first
+        # shots of a scene remain independent so different scenes can render
+        # concurrently.
+        deps: list[str] = []
+        if index > 0 and policy in {"identity_first", "match_cut"}:
+            prev = shots[index - 1]
+            if prev.get("scene_id") == shot.get("scene_id"):
+                deps = [prev["shot_id"]]
+        priority = int(1000 - index)
+        if shot.get("purpose") in {"Immediate attention", "Create tension and relevance"}:
+            priority += 50
+        stack.add(
+            sid,
+            "GENERATE_SHOT",
+            priority=priority,
+            depends_on=deps,
+            payload={"shot": shot, "continuity_dependency": deps},
+        )
     return stack
 
-def choose_next(stack:TaskStack, runtime:dict[str,Any]|None=None)->dict[str,Any]:
-    task=stack.next()
-    if not task:return {"status":"IDLE","reason":"no_ready_tasks"}
-    return {"status":"DISPATCH","task":task,"runtime":runtime or {}}
+def choose_next(stack: TaskStack, runtime: dict[str, Any] | None = None) -> dict[str, Any]:
+    task = stack.next()
+    if not task:
+        return {"status": "IDLE", "reason": "no_ready_tasks"}
+    return {"status": "DISPATCH", "task": task, "runtime": runtime or {}}
