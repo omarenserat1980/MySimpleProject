@@ -112,6 +112,11 @@ def run_forever() -> None:
 if __name__ == "__main__":
     # GitHub Actions is finite; run one production cycle there.
     if _truthy("FACTORY_ONE_SHOT", "0"):
-        run_once(1)
+        result = run_once(1)
+        # GitHub Actions must not report a green production when the factory
+        # stopped before rendering/assembling the requested film.
+        status = str(result.get("status", ""))
+        if status not in {"COMPLETED", "VERIFIED", "SUCCESS"}:
+            raise SystemExit(2)
     else:
         run_forever()
