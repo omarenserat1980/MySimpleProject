@@ -15,6 +15,7 @@ import httpx
 
 from .benchmark_router import benchmark_snapshot, choose_backend, load_state, record_observation, save_state
 from .speed_optimizer import apply_speed_policy, speed_policy
+from .cinematic_local_renderer import CinematicLocalRenderer
 
 
 class MediaBackend(Protocol):
@@ -137,6 +138,7 @@ class ModelRouter:
         self.comfy = ComfyUIBackend()
         self.requested = os.getenv("FACTORY_MODEL", "auto").strip().lower()
         self.benchmark_state = load_state()
+        self.local = CinematicLocalRenderer() if os.getenv("FACTORY_EMERGENCY_LOCAL_FALLBACK","0").strip().lower() in {"1","true","yes","on"} else None
 
     def snapshot(self) -> dict[str, Any]:
         return {
@@ -194,6 +196,20 @@ class ModelRouter:
             result = {"status": "COMFYUI_NOT_CONFIGURED"}
             latency = time.monotonic() - started
         result = self.fallback.render(shot=enriched, authorized=authorized)
+        if (
+            self.local is not None
+            and result.get("status") in {"PROVIDER_ERROR","PROVIDER_FAILED","PROVIDER_TIMEOUT","SUBMISSION_UNVERIFIED","FAL_CLIENT_MISSING"}
+        ):
+            local_result = self.local.render(shot=enriched, authorized=authorized)
+            if local_result.get("status") == "VERIFIED_COMPLETED":
+                local_result["provider"] = "local_ffmpeg_cinematic"
+                local_result["router"] = {
+                    "selected": family,
+                    "fallback_used": true,
+                    "emergency_local_fallback": true,
+                    "primary_error": result.get("error") or result.get("status"),
+                }
+                return local_result
         result["router"] = {"selected": family, "fallback_used": True}
         return result
 
