@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from .throughput_metrics import snapshot as throughput_snapshot
+
 
 def truthy(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
@@ -23,6 +25,16 @@ def speed_policy() -> dict[str, Any]:
     # Keep a bounded ceiling to avoid API/GPU thrashing.
     ceiling = max(1, min(8, int(os.getenv("FACTORY_MAX_CONCURRENCY", "8"))))
     concurrency = min(requested, ceiling)
+    if truthy("FACTORY_ADAPTIVE_CONCURRENCY", "1"):
+        telemetry = throughput_snapshot()
+        generation = telemetry.get("stages", {}).get("generation", {})
+        steady = generation.get("ewma_steady_latency_s")
+        if steady is not None and int(generation.get("steady_samples", 0)) >= 3:
+            # Only tune within the caller's explicit ceiling. This never changes QC.
+            if float(steady) <= 20.0:
+                concurrency = min(ceiling, concurrency + 1)
+            elif float(steady) >= 180.0:
+                concurrency = max(1, concurrency - 1)
     if mode == "quality":
         profile = "production"
     elif mode == "balanced":
