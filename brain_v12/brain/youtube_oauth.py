@@ -21,6 +21,12 @@ class YouTubeOAuth:
     def __init__(self, store):
         self.store = store
 
+    def _event(self, kind: str, payload: dict[str, Any]) -> None:
+        """Best-effort audit event; lightweight test stores may omit event()."""
+        writer = getattr(self.store, "event", None)
+        if callable(writer):
+            writer(kind, payload)
+
     def _fernet(self):
         key=os.getenv("YOUTUBE_TOKEN_ENCRYPTION_KEY")
         if not key: return None
@@ -29,10 +35,9 @@ class YouTubeOAuth:
     def _save_refresh_token(self, token: str):
         f=self._fernet()
         if not f: raise RuntimeError("YOUTUBE_TOKEN_ENCRYPTION_KEY is required")
-        self.store.event("YOUTUBE_REFRESH_TOKEN_STORED", {"token_ciphertext": f.encrypt(token.encode()).decode()})
+        self._event("YOUTUBE_REFRESH_TOKEN_STORED", {"token_ciphertext": f.encrypt(token.encode()).decode()})
 
     def _load_refresh_token(self):
-        import json
         for row in self.store.events(200):
             if row.get("kind")=="YOUTUBE_REFRESH_TOKEN_STORED":
                 try:
@@ -66,7 +71,7 @@ class YouTubeOAuth:
                                      redirect_uri=self.redirect_uri())
         url,state=flow.authorization_url(access_type="offline",include_granted_scopes="true",prompt="consent")
         SESSION[state]=(time.time(), flow)
-        self.store.event("YOUTUBE_OAUTH_STARTED",{"state_hash":state[:12]})
+        self._event("YOUTUBE_OAUTH_STARTED",{"state_hash":state[:12]})
         return {"ok":True,"status":"AUTHORIZATION_REQUIRED","authorization_url":url}
 
     def callback(self, code: str, state: str) -> dict[str, Any]:
@@ -84,7 +89,7 @@ class YouTubeOAuth:
             self._save_refresh_token(creds.refresh_token)
         except Exception as exc:
             return {"ok":False,"status":"OAUTH_CALLBACK_FAILED","error":str(exc)[:300]}
-        self.store.event("YOUTUBE_OAUTH_AUTHORIZED",{"scopes":list(creds.scopes or SCOPES)})
+        self._event("YOUTUBE_OAUTH_AUTHORIZED",{"scopes":list(creds.scopes or SCOPES)})
         return {"ok":True,"status":"AUTHORIZED","scopes":list(creds.scopes or SCOPES)}
 
     def credentials(self) -> Credentials | None:
@@ -118,3 +123,4 @@ class YouTubeOAuth:
                 ) if not present
             ],
         }
+    }
