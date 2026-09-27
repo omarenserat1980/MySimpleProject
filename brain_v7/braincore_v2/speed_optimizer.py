@@ -23,7 +23,7 @@ def speed_policy() -> dict[str, Any]:
     requested = max(1, int(os.getenv("FACTORY_RENDER_CONCURRENCY", "3")))
     # More workers help only when the backend is remote or has multiple GPUs.
     # Keep a bounded ceiling to avoid API/GPU thrashing.
-    ceiling = max(1, min(12, int(os.getenv("FACTORY_MAX_CONCURRENCY", "12"))))
+    ceiling = max(1, min(24, int(os.getenv("FACTORY_MAX_CONCURRENCY", "24"))))
     concurrency = min(requested, ceiling)
     if truthy("FACTORY_ADAPTIVE_CONCURRENCY", "1"):
         telemetry = throughput_snapshot()
@@ -32,7 +32,7 @@ def speed_policy() -> dict[str, Any]:
         if steady is not None and int(generation.get("steady_samples", 0)) >= 3:
             # Only tune within the caller's explicit ceiling. This never changes QC.
             if float(steady) <= 20.0:
-                concurrency = min(ceiling, concurrency + 1)
+                concurrency = min(ceiling, concurrency + 2)
             elif float(steady) >= 180.0:
                 concurrency = max(1, concurrency - 1)
     if mode == "quality":
