@@ -1,6 +1,9 @@
 name: Electronic Brain Cinematic Factory
 
 on:
+  push:
+    paths:
+      - ".github/workflows/electronic-brain-cinematic.yml"
   workflow_dispatch:
     inputs:
       duration:
@@ -23,13 +26,14 @@ jobs:
     timeout-minutes: 360
     env:
       FACTORY_ALLOW_PRODUCTION: "1"
-      FACTORY_DURATION_SECONDS: ${{ inputs.duration }}
+      FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
       FAL_KEY: ${{ secrets.FAL_KEY }}
       FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
       FAL_SHOT_DURATION: "5"
       FAL_GENERATE_AUDIO: "0"
+      FAL_VISION_QC: "1"
       FACTORY_OUTPUT_DIR: "cinematic_output"
       MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
       MEDIA_PROVIDER_TIMEOUT_SECONDS: "900"
@@ -40,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Restore factory checkpoint
-        if: ${{ inputs.resume }}
+        if: ${{ inputs.resume != false }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
