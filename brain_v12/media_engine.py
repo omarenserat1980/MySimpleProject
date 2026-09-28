@@ -147,6 +147,7 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
     durations: list[float] = []
     ffprobe = _tool("ffprobe")
 
+    input_index = 0
     for i, scene in enumerate(scenes):
         if not isinstance(scene, dict):
             raise ValueError("INVALID_TIMELINE_SCENE")
@@ -157,6 +158,8 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
             raise ValueError("INVALID_TIMELINE_SCENE_RANGE")
         durations.append(duration)
         inputs += ["-ss", str(start), "-t", str(duration), "-i", str(src)]
+        video_input_index = input_index
+        input_index += 1
         v = f"v{i}"
         a = f"a{i}"
         vf = f"[{i}:v]scale={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:force_original_aspect_ratio=decrease,pad={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={TIMELINE_FPS},format=yuv420p"
@@ -168,10 +171,11 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
 
         probe = subprocess.run([ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", str(src)], capture_output=True, text=True, timeout=30, check=False)
         if probe.returncode == 0 and probe.stdout.strip():
-            filters.append(f"[{i}:a]aresample=48000,asetpts=N/SR/TB[{a}]")
+            filters.append(f"[{video_input_index}:a]aresample=48000,asetpts=N/SR/TB[{a}]")
         else:
-            silent_index = len(scenes) + len([x for x in audio_labels if x.startswith("silent")])
+            silent_index = input_index
             inputs += ["-f", "lavfi", "-t", str(duration), "-i", "anullsrc=r=48000:cl=stereo"]
+            input_index += 1
             filters.append(f"[{silent_index}:a]atrim=duration={duration},asetpts=PTS-STARTPTS[{a}]")
         video_labels.append(v)
         audio_labels.append(a)
@@ -179,8 +183,9 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
     watermark = str(spec.get("watermark") or "").strip()
     if watermark:
         wp = _resolve_input(watermark)
+        wi = input_index
         inputs += ["-loop", "1", "-i", str(wp)]
-        wi = len(scenes) + sum(1 for _ in audio_labels if _.startswith("silent"))
+        input_index += 1
         filters.append(f"[{wi}:v]scale=320:-1,format=rgba[wm]")
         for i, label in enumerate(list(video_labels)):
             wmout = f"vw{i}"
