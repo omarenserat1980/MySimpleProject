@@ -4,5 +4,6 @@
   "resume": false,
   "youtube_publish": false,
   "quality_floor": 0.82,
-  "requested_at": "2026-09-28T05:25:54.199Z"
+  "requested_at": "2026-09-28T05:30:31.240Z",
+  "reason": "factory repair app integration test"
 }
