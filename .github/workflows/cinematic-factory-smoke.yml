@@ -5,7 +5,6 @@ on:
     paths:
       - "brain_v7/**"
       - "brain_v12/**"
-      - "render.yaml"
       - ".github/workflows/cinematic-factory-smoke.yml"
   workflow_dispatch:
 
