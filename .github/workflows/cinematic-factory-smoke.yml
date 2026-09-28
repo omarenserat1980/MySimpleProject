@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   smoke:
@@ -60,6 +60,28 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
+
+      - name: Capture V12 failure diagnostics
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          mkdir -p ci-diagnostics
+          python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v > ci-diagnostics/last-v12-test-failure.txt 2>&1
+          rc=$?
+          {
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit=${GITHUB_SHA}"
+            echo "unittest_exit_code=${rc}"
+            echo
+            cat ci-diagnostics/last-v12-test-failure.txt
+          } > ci-diagnostics/last-v12-failure.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-diagnostics/last-v12-failure.txt
+          git diff --cached --quiet || git commit -m "ci: record latest V12 smoke failure"
+          git push origin HEAD:main || true
 
       - name: Run V6 cinema tests
         env:
