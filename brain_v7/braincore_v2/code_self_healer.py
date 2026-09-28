@@ -26,6 +26,7 @@ SOURCE_ALLOWLIST = {
     ROOT / "brain_v7/braincore_v2/brain_media_adapter.py",
     ROOT / ".github/workflows/electronic-brain-cinematic.yml",
     ROOT / ".github/workflows/brain6-168h-cloud.yml",
+    ROOT / ".github/workflows/cloud-runtime-build.yml",
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
@@ -60,6 +61,21 @@ def rule_brain6_dotnet_build_indentation() -> list[str]:
     new = "          dotnet restore brain6_cs/Brain6.csproj\n          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
     return [str(p.relative_to(ROOT))] if _replace_once(p, old, new) else []
 
+
+def rule_cloud_installs_pytest() -> list[str]:
+    """Ensure the Cloud Runtime workflow installs pytest before invoking it."""
+    p = ROOT / ".github/workflows/cloud-runtime-build.yml"
+    text = _read(p) if p.exists() else ""
+    marker = "      - name: Install test runner"
+    if marker in text:
+        return []
+    needle = "      - name: Run Brain control plane tests\n        env:"
+    block = """      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run Brain control plane tests
+        env:"""
+    return [str(p.relative_to(ROOT))] if _replace_once(p, needle, block) else []
+
 def rule_import_repair_100_test() -> list[str]:
     p = ROOT / "brain_v7/braincore_v2/test_factory_repair_app.py"
     if p.exists() and p not in SOURCE_ALLOWLIST:
@@ -93,6 +109,7 @@ RULES: tuple[Callable[[], list[str]], ...] = (
     rule_empty_fal_model,
     rule_workflow_persists_route,
     rule_brain6_dotnet_build_indentation,
+    rule_cloud_installs_pytest,
 )
 
 def diagnose_failure(error_text: str) -> dict[str, str]:
@@ -104,6 +121,8 @@ def diagnose_failure(error_text: str) -> dict[str, str]:
         return {"class": "routing", "repair": "rule_workflow_persists_route"}
     if "dotnet restore brain6_cs/brain6.csproj" in text and "dotnet build brain6_cs/brain6.csproj" in text:
         return {"class": "workflow_yaml", "repair": "rule_brain6_dotnet_build_indentation"}
+    if "no module named pytest" in text or "modulenotfounderror: no module named pytest" in text:
+        return {"class": "workflow_dependency", "repair": "rule_cloud_installs_pytest"}
     if "syntaxerror" in text or "indentationerror" in text:
         return {"class": "syntax", "repair": "none_allowlisted"}
     if "modulenotfounderror" in text or "importerror" in text:
@@ -118,6 +137,8 @@ def _failure_hint(error_text: str) -> str:
         return "rule_empty_fal_model"
     if "factory_media_route" in text:
         return "rule_workflow_persists_route"
+    if "no module named pytest" in text:
+        return "rule_cloud_installs_pytest"
     return "verification_failure"
 
 def verify() -> tuple[bool, str]:
