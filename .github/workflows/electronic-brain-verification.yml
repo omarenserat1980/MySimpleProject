@@ -24,15 +24,13 @@ jobs:
         id: verify
         continue-on-error: true
         run: python ci_verifier.py
-      - name: Persist verification report
+      - name: Upload verification report
         if: always()
-        run: |
-          git config user.name "electronic-brain-ci"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add verification/latest.json
-          git diff --cached --quiet && exit 0
-          git commit -m "ci: persist verification report"
-          git push
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report-${{ github.run_id }}
+          path: verification/latest.json
+          if-no-files-found: warn
       - name: Fail workflow when verification failed
         if: steps.verify.outcome == 'failure'
         run: exit 1
