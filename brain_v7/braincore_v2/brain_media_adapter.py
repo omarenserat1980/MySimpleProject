@@ -10,6 +10,11 @@ from typing import Any
 import httpx
 
 try:
+    from .cinematic_local_renderer import CinematicLocalRenderer
+except Exception:
+    CinematicLocalRenderer = None
+
+try:
     import fal_client
 except Exception:
     fal_client = None
@@ -63,7 +68,23 @@ class BrainMediaProvider:
                     "provider_result":result,"shot_id":shot.get("shot_id"),
                     "provider":"fal","model":model}
         except Exception as exc:
-            return {"status":"PROVIDER_ERROR","error":repr(exc),"shot_id":shot.get("shot_id"),
+            message = repr(exc)
+            quota_blocked = any(token in message.lower() for token in (
+                "exhausted balance", "user is locked", "403 forbidden", "status_code=403"
+            ))
+            local_enabled = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "0").strip().lower() in {
+                "1", "true", "yes", "on"
+            }
+            if quota_blocked and local_enabled and CinematicLocalRenderer is not None:
+                local = CinematicLocalRenderer().render(shot=shot, authorized=True)
+                if local.get("status") == "VERIFIED_COMPLETED":
+                    return {
+                        **local,
+                        "provider": "local_ffmpeg_cinematic",
+                        "fallback_reason": "fal_quota_blocked",
+                        "fal_error": message,
+                    }
+            return {"status":"PROVIDER_ERROR","error":message,"shot_id":shot.get("shot_id"),
                     "provider":"fal","model":model}
 
     def _vision_qc_fal(self, video_url: str, shot: dict[str, Any]) -> dict[str, Any] | None:
