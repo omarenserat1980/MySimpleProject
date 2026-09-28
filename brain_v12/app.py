@@ -34,6 +34,7 @@ from .brain.device_bridge import DeviceBridge
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
+from .movie_summary_factory.engine import create_job, mark_stage
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -210,6 +211,30 @@ def youtube_release_record_published(body: dict, request: Request):
         str(body.get("published_url", "")),
         str(body.get("evidence", "")),
     )
+
+
+class MovieSummaryIn(BaseModel):
+    title: str
+    target_minutes: int = 12
+    language: str = "ar"
+
+@app.post("/api/movie-summary/jobs")
+def movie_summary_create(body: MovieSummaryIn):
+    job = create_job(body.title, body.target_minutes, body.language)
+    store.event("MOVIE_SUMMARY_JOB_CREATED", job)
+    return {"ok": True, "job": job}
+
+@app.post("/api/movie-summary/jobs/{job_id}/stage")
+def movie_summary_stage(job_id: str, stage: str, status: str = "COMPLETED"):
+    # Stage updates are recorded as Brain events so the existing cognitive/event UI can observe them.
+    payload = {"job_id": job_id, "stage": stage, "status": status}
+    store.event("MOVIE_SUMMARY_STAGE", payload)
+    return {"ok": True, **payload}
+
+@app.get("/api/movie-summary/status")
+def movie_summary_status():
+    events = [e for e in store.events(200) if e.get("type") in ("MOVIE_SUMMARY_JOB_CREATED", "MOVIE_SUMMARY_STAGE")]
+    return {"ok": True, "jobs": events}
 
 @app.get("/api/capabilities")
 def capabilities(): return {"capabilities":CAPABILITIES,"plugins":PLUGINS,"tools":TOOLS}
