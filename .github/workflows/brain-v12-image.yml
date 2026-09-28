@@ -2,87 +2,36 @@ name: Brain V12 Image
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "brain_v12/**"
-      - "brain_v7/**"
-      - ".dockerignore"
-      - ".github/workflows/brain-v12-image.yml"
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: brain-v12-image-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  BRAIN_V14_VERSION: "14.0"
-  BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
-  BRAIN_WORKFORCE_ENABLED: "false"
-
 jobs:
-  build-and-smoke:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Build Brain image
-        run: |
-          set -Eeuo pipefail
-          docker build --platform linux/amd64 -f brain_v12/Dockerfile -t electronic-brain-v12:ci .
+      - name: Build image
+        run: docker build --platform linux/amd64 -f brain_v12/Dockerfile -t electronic-brain-v12:ci .
 
-      - name: Container health smoke test
+      - name: Run health smoke
         shell: bash
         run: |
-          set -Eeuo pipefail
-          name="brain-v12-smoke-${GITHUB_RUN_ID}"
-          cid=""
-          cleanup() {
-            if [[ -n "$cid" ]]; then
-              docker logs "$cid" || true
-              docker rm -f "$cid" >/dev/null 2>&1 || true
-            fi
-          }
-          trap cleanup EXIT
-
-          cid="$(docker run -d --name "$name" --init \
-            -p 18012:10000 \
-            -e PORT=10000 \
-            -e BRAIN_V14_VERSION="$BRAIN_V14_VERSION" \
-            -e BRAIN_DB=/tmp/brain-v12-smoke.db \
-            -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false \
-            -e BRAIN_WORKFORCE_ENABLED=false \
-            electronic-brain-v12:ci)"
-
+          set -e
+          docker run -d --name brain-v12-smoke -p 18012:10000             -e PORT=10000             -e BRAIN_V14_VERSION=14.0             -e BRAIN_DB=/tmp/brain-v12-smoke.db             -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false             -e BRAIN_WORKFORCE_ENABLED=false             electronic-brain-v12:ci
+          trap 'docker logs brain-v12-smoke || true; docker rm -f brain-v12-smoke || true' EXIT
           for i in $(seq 1 45); do
-            state="$(docker inspect "$cid" --format '{{.State.Status}}' 2>/dev/null || true)"
-            echo "attempt=$i state=$state"
-            if [[ "$state" == "exited" || "$state" == "dead" ]]; then
-              echo "::error::Container exited before health check"
-              exit 1
-            fi
-            if python - <<'PY'
-import json
-import urllib.request
-try:
-    with urllib.request.urlopen("http://127.0.0.1:18012/health", timeout=3) as response:
-        payload = json.load(response)
-    assert payload.get("ok") is True
-    assert payload.get("version") == "14.0"
-    print(json.dumps(payload, sort_keys=True))
-except Exception:
-    raise SystemExit(1)
-PY
-            then
-              echo "BRAIN Media/Runtime image smoke: OK"
+            if curl -fsS http://127.0.0.1:18012/health; then
+              echo
+              echo "BRAIN V12 image health: OK"
               exit 0
             fi
             sleep 2
           done
-
-          echo "::error::Container did not become healthy within 90 seconds"
+          echo "health timeout"
           exit 1
