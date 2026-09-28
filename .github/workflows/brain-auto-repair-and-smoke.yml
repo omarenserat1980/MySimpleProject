@@ -1,0 +1,88 @@
+name: Brain Auto Repair + Cinematic Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      repair_cycles:
+        description: "Maximum controller cycles (1..15000)"
+        required: true
+        default: "15000"
+      smoke:
+        description: "Run the cinematic factory smoke after repair"
+        required: true
+        type: boolean
+        default: true
+  push:
+    paths:
+      - "brain_v7/braincore_v2/auto_repair_app.py"
+      - "brain_v7/braincore_v2/code_self_healer.py"
+      - "brain_v7/braincore_v2/repair_controller_15000.py"
+      - ".github/workflows/brain-auto-repair-and-smoke.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  repair-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "1"
+      FACTORY_EMERGENCY_LOCAL_FALLBACK: "1"
+      FACTORY_MODEL_ROUTER: "1"
+      FACTORY_REQUIRE_REAL_MEDIA: "1"
+      FACTORY_DURATION_SECONDS: "5"
+      FACTORY_ONE_SHOT: "1"
+      FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
+      BRAIN_MAX_RUNTIME_SECONDS: "300"
+      BRAIN_MAX_ITERATIONS: "1000000"
+      FAL_KEY: ${{ secrets.FAL_KEY }}
+      MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
+      MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
+      COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
+      COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg ruby
+          python -m pip install --upgrade pip
+          python -m pip install -r brain_v7/requirements.txt
+
+      - name: Inspect and repair code
+        run: |
+          set -o pipefail
+          python -m brain_v7.braincore_v2.auto_repair_app             --cycles "${{ inputs.repair_cycles || '15000' }}"             $([ "${{ inputs.smoke || 'true' }}" = "true" ] && echo --smoke) | tee auto_repair_stdout.json
+
+      - name: Verify final artifact
+        if: success()
+        run: |
+          test -s auto_repair_app_report.json
+          if [ -f cinematic_output/final.mp4 ]; then
+            ffprobe -v error -show_entries format=duration,size:stream=codec_type,width,height -of json cinematic_output/final.mp4
+          fi
+
+      - name: Upload repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-auto-repair-evidence
+          path: |
+            auto_repair_app_report.json
+            auto_repair_stdout.json
+            repair_15000_report.json
+            code_repair_report.json
+            code_self_healer_report.json
+            factory_repair_100_report.json
+            factory_result.json
+            cinematic_output/final.mp4
+          if-no-files-found: ignore
+          retention-days: 30
