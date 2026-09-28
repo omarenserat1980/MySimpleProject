@@ -1,124 +1,181 @@
 package com.brain.hondaconnect;
 
-import android.app.*;
-import android.os.*;
+import android.app.Activity;
+import android.os.Bundle;
 import android.graphics.Color;
-import android.view.*;
+import android.view.View;
 import android.widget.*;
 import java.io.*;
 import java.net.*;
-import org.json.*;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class BrainCloudActivity extends Activity {
-    EditText url, token, filmTitle;
-    TextView status, pipeline;
+    EditText portInput;
+    TextView serverStatus;
+    ServerSocket serverSocket;
+    ExecutorService pool;
+    volatile boolean running = false;
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
+        buildUi();
+    }
+
+    private void buildUi() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(28,28,28,28);
+        root.setBackgroundColor(Color.rgb(12,12,16));
+
         TextView title = new TextView(this);
-        title.setText("BRAIN CLOUD HUB\nCINEMATIC V3 PRO");
+        title.setText("BRAIN PHONE SERVER\nCINEMATIC V3 PRO");
         title.setTextSize(25);
         title.setTextColor(Color.WHITE);
-        root.setBackgroundColor(Color.rgb(12,12,16));
         root.addView(title);
 
-        url = new EditText(this);
-        url.setHint("https://your-brain-cloud.example");
-        url.setSingleLine(true);
-        root.addView(url);
+        TextView info = new TextView(this);
+        info.setTextColor(Color.LTGRAY);
+        info.setText("حوّل الهاتف إلى عقدة BRAIN محلية عبر Wi‑Fi.");
+        info.setPadding(0,20,0,20);
+        root.addView(info);
 
-        token = new EditText(this);
-        token.setHint("BRAIN_CONTROL_TOKEN");
-        token.setSingleLine(true);
-        token.setInputType(0x00000081);
-        filmTitle = new EditText(this);
-        filmTitle.setHint("عنوان الفيلم");
-        filmTitle.setSingleLine(true);
-        root.addView(filmTitle);
-        root.addView(token);
+        portInput = new EditText(this);
+        portInput.setHint("Port");
+        portInput.setText("8787");
+        portInput.setSingleLine(true);
+        root.addView(portInput);
 
-        Button connect = new Button(this);
-        connect.setText("اتصال بـ BRAIN Cloud");
-        root.addView(connect);
+        Button start = new Button(this);
+        start.setText("▶ تشغيل السيرفر");
+        root.addView(start);
 
-        Button film = new Button(this);
-        film.setText("🎬 إنشاء فيلم");
-        root.addView(film);
+        Button stop = new Button(this);
+        stop.setText("■ إيقاف السيرفر");
+        root.addView(stop);
 
-        pipeline = new TextView(this);
-        pipeline.setText("Script → Scenes → Images → Motion → Audio → Render → QC");
-        pipeline.setTextColor(Color.LTGRAY);
-        pipeline.setPadding(0,24,0,12);
-        root.addView(pipeline);
+        serverStatus = new TextView(this);
+        serverStatus.setTextColor(Color.WHITE);
+        serverStatus.setPadding(0,24,0,12);
+        root.addView(serverStatus);
 
-        status = new TextView(this);
-        status.setText("غير متصل");
-        status.setTextColor(Color.WHITE);
-        root.addView(status);
+        TextView api = new TextView(this);
+        api.setTextColor(Color.LTGRAY);
+        api.setText("API: /healthz   /v1/status   /");
+        root.addView(api);
+
         setContentView(root);
+        refreshStatus();
 
-        connect.setOnClickListener(v -> request("/v1/status"));
-        film.setOnClickListener(v -> createFilm());
+        start.setOnClickListener(v -> startServer());
+        stop.setOnClickListener(v -> stopServer());
     }
 
-    private void createFilm() {
-        final String base = url.getText().toString().trim().replaceAll("/+$","");
-        final String auth = token.getText().toString().trim();
-        final String requestedTitle = filmTitle.getText().toString().trim();
-        if (base.isEmpty()) { status.setText("أدخل عنوان BRAIN Cloud"); return; }
-        if (requestedTitle.isEmpty()) { status.setText("أدخل عنوان الفيلم"); return; }
-        status.setText("جاري إنشاء الفيلم عبر BRAIN Cloud Hub...");
-        new Thread(() -> {
+    private void startServer() {
+        if (running) return;
+        final int port;
+        try { port = Integer.parseInt(portInput.getText().toString().trim()); }
+        catch (Exception e) { serverStatus.setText("منفذ غير صالح"); return; }
+        if (port < 1024 || port > 65535) {
+            serverStatus.setText("اختر منفذًا بين 1024 و65535");
+            return;
+        }
+        try {
+            serverSocket = new ServerSocket(port);
+            pool = Executors.newCachedThreadPool();
+            running = true;
+            pool.execute(() -> acceptLoop());
+            refreshStatus();
+        } catch (Exception e) {
+            serverStatus.setText("فشل التشغيل: " + e.getMessage());
+        }
+    }
+
+    private void acceptLoop() {
+        while (running) {
             try {
-                HttpURLConnection c=(HttpURLConnection)new URL(base+"/v1/films").openConnection();
-                c.setRequestMethod("POST");
-                c.setConnectTimeout(10000); c.setReadTimeout(15000);
-                c.setDoOutput(true);
-                c.setRequestProperty("Content-Type","application/json; charset=UTF-8");
-                if(!auth.isEmpty()) c.setRequestProperty("Authorization","Bearer "+auth);
-                String body="{\"title\":\""+requestedTitle.replace("\\","\\\\").replace("\"","\\\"")+"\",\"target_minutes\":1,\"language\":\"ar\"}";
-                try(OutputStream o=c.getOutputStream()){o.write(body.getBytes("UTF-8"));}
-                int code=c.getResponseCode();
-                InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
-                StringBuilder s=new StringBuilder();
-                if(stream!=null){byte[] buf=new byte[2048]; int n; while((n=stream.read(buf))!=-1)s.append(new String(buf,0,n,"UTF-8"));}
-                final String result=s.toString();
-                runOnUiThread(() -> status.setText("HTTP "+code+"\n"+result));
-            } catch(Exception e) {
-                runOnUiThread(() -> status.setText("خطأ إنشاء الفيلم: "+e.getMessage()));
+                Socket socket = serverSocket.accept();
+                pool.execute(() -> handle(socket));
+            } catch (IOException e) {
+                if (running) runOnUiThread(() ->
+                    serverStatus.setText("خطأ السيرفر: " + e.getMessage()));
             }
-        }).start();
+        }
     }
 
-    private void request(String path) {
-        final String base = url.getText().toString().trim().replaceAll("/+$","");
-        final String auth = token.getText().toString().trim();
-        if (base.isEmpty()) { status.setText("أدخل عنوان BRAIN Cloud"); return; }
-        status.setText("جاري الاتصال...");
-        new Thread(() -> {
-            try {
-                HttpURLConnection c=(HttpURLConnection)new URL(base+path).openConnection();
-                c.setRequestMethod(path.equals("/v1/films") ? "POST" : "GET");
-                c.setConnectTimeout(10000); c.setReadTimeout(15000);
-                if(!auth.isEmpty()) c.setRequestProperty("Authorization","Bearer "+auth);
-                if(path.equals("/v1/films")) {
-                    c.setDoOutput(true);
-                    c.setRequestProperty("Content-Type","application/json");
-                    String body="{\"profile\":\"CINEMATIC V3 PRO\",\"source\":\"mobile\",\"mode\":\"cloud\"}";
-                    try(OutputStream o=c.getOutputStream()){o.write(body.getBytes("UTF-8"));}
+    private void handle(Socket socket) {
+        try (Socket s = socket;
+             BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
+             OutputStream out = s.getOutputStream()) {
+
+            String first = in.readLine();
+            if (first == null) return;
+            String[] parts = first.split(" ");
+            String path = parts.length > 1 ? parts[1] : "/";
+            while (true) {
+                String line = in.readLine();
+                if (line == null || line.isEmpty()) break;
+            }
+
+            String body;
+            if (path.equals("/healthz")) {
+                body = "{\"status\":\"ok\",\"server\":\"BRAIN Phone Server\"}";
+            } else if (path.equals("/v1/status")) {
+                body = "{\"service\":\"BRAIN Phone Server\",\"role\":\"phone_server\",\"port\":" +
+                        serverSocket.getLocalPort() + ",\"running\":true,\"next\":\"Termux can run the full BRAIN Cloud Hub\"}";
+            } else {
+                body = "{\"service\":\"BRAIN Phone Server\",\"status\":\"online\",\"endpoints\":[\"/healthz\",\"/v1/status\"]}";
+            }
+
+            byte[] data = body.getBytes("UTF-8");
+            String headers = "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: application/json; charset=utf-8\r\n" +
+                    "Content-Length: " + data.length + "\r\n" +
+                    "Connection: close\r\n\r\n";
+            out.write(headers.getBytes("UTF-8"));
+            out.write(data);
+            out.flush();
+        } catch (Exception ignored) {}
+    }
+
+    private void stopServer() {
+        running = false;
+        try { if (serverSocket != null) serverSocket.close(); } catch (Exception ignored) {}
+        if (pool != null) pool.shutdownNow();
+        refreshStatus();
+    }
+
+    private void refreshStatus() {
+        if (serverStatus == null) return;
+        if (!running) {
+            serverStatus.setText("🔴 متوقف");
+            return;
+        }
+        serverStatus.setText("🟢 يعمل\n" + localUrls());
+    }
+
+    private String localUrls() {
+        StringBuilder s = new StringBuilder();
+        try {
+            Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
+            while (nets.hasMoreElements()) {
+                NetworkInterface ni = nets.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    InetAddress a = addrs.nextElement();
+                    if (a instanceof Inet4Address && !a.isLoopbackAddress()) {
+                        s.append("http://").append(a.getHostAddress())
+                         .append(":").append(serverSocket.getLocalPort()).append("\n");
+                    }
                 }
-                int code=c.getResponseCode();
-                InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
-                StringBuilder s=new StringBuilder();
-                if(stream!=null){byte[] buf=new byte[2048]; int n; while((n=stream.read(buf))!=-1)s.append(new String(buf,0,n,"UTF-8"));}
-                final String result=s.toString();
-                runOnUiThread(() -> status.setText("HTTP "+code+"\n"+result));
-            } catch(Exception e) {
-                runOnUiThread(() -> status.setText("خطأ اتصال: "+e.getMessage()));
             }
-        }).start();
+        } catch (Exception ignored) {}
+        return s.toString().trim();
+    }
+
+    @Override protected void onDestroy() {
+        stopServer();
+        super.onDestroy();
     }
 }
