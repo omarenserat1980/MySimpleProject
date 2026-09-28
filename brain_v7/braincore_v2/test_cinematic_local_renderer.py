@@ -7,7 +7,7 @@ def test_local_renderer_filter_uses_time_not_frame_N():
     source = Path(__file__).with_name("cinematic_local_renderer.py").read_text(encoding="utf-8")
     assert "sin(N/" not in source
     assert "cos(N/" not in source
-    assert "sin(T*24/96)" in source
+    assert "sin(T*24/72)" in source
 
 
 def test_local_renderer_smoke(tmp_path):
