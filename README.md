@@ -13,20 +13,20 @@ Perceive → Understand → Memory → Goal → Plan → Decide → Act → Obse
 
 تمت إزالة ملفات مشروع المضخة من جذر المشروع حتى لا تبقى واجهة أو تشغيلات خاصة بالمضخات ضمن المشروع الحالي.
 
-## Brain V12 ↔ Termux Agent Gateway
+## Brain V12 ↔ BRAIN Termux Emulator Agent Gateway
 
 The gateway uses HTTPS polling with an allowlist and shared secret. The initial smoke test is `python_version`.
 
-### Termux
+### BRAIN Termux Emulator
 ```bash
 cd ~/MySimpleProject
 export BRAIN_URL="http://127.0.0.1:10000"
-export TERMUX_AGENT_KEY='YOUR_SECRET'
-export TERMUX_AGENT_ID="android-termux-v12"
+export BRAIN_EMULATOR_AGENT_KEY='YOUR_SECRET'
+export BRAIN_EMULATOR_AGENT_ID="android-termux-v12"
 bash termux_agent/run_agent.sh
 ```
 
-Keep `TERMUX_AGENT_KEY` out of source control and chat messages.
+Keep `BRAIN_EMULATOR_AGENT_KEY` out of source control and chat messages.
 
 ### Smoke test
 After the agent is running, the Brain control endpoint can enqueue `python_version`. The Agent claims it, executes `python --version`, reports the result, and Brain verifies the stored result.
@@ -35,8 +35,8 @@ Allowed initial tasks: `status`, `python_version`, `termux_path`, `platform`.
 
 
 ### V12 heartbeat
-The Termux agent sends an authenticated heartbeat every 10 seconds by default.
-Set `TERMUX_HEARTBEAT_SECONDS` to change the interval. Brain diagnostics expose persistent
+The BRAIN Termux Emulator agent sends an authenticated heartbeat every 10 seconds by default.
+Set `BRAIN_EMULATOR_HEARTBEAT_SECONDS` to change the interval. Brain diagnostics expose persistent
 agent last-seen information and online state.
 
 
