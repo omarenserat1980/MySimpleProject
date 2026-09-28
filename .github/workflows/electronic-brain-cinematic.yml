@@ -143,7 +143,7 @@ jobs:
         run: |
           python -m compileall -q brain_v7/braincore_v2
           python -m compileall -q brain_v12
-          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py brain_v7/braincore_v2/test_code_repair_app.py
+          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py brain_v7/braincore_v2/test_code_repair_app.py brain_v7/braincore_v2/test_cinematic_local_renderer.py
 
       - name: Run Code Repair Application
         run: |
