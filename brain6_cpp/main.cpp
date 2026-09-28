@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
+#include <signal.h>
 
 namespace fs = std::filesystem;
 
@@ -78,14 +79,14 @@ public:
         : factory_(std::move(factory)), quality_gate_(std::move(quality_gate)) {}
 
     int run() {
-        log("BRAIN6_CPP_BOOT version=3 architecture=RAII_SMART_POINTERS");
+        log("BRAIN6_CPP_BOOT version=4 architecture=SUPERVISED_TIMEOUT");
 
         if (!fs::exists("production/BRAIN6_168H.json")) {
             log("BRAIN6_STATE_MISSING");
             return 20;
         }
 
-        const int retries = env_int("BRAIN6_CPP_RETRIES", 2);
+        const int retries = env_int("BRAIN6_CPP_RETRIES", 0);
         for (int attempt = 1; attempt <= retries + 1; ++attempt) {
             log("BRAIN6_ATTEMPT " + std::to_string(attempt));
             const int status = spawn_factory();
@@ -96,7 +97,7 @@ public:
                 return 0;
             }
 
-            checkpoint(attempt, "RETRY");
+            checkpoint(attempt, status == 124 ? "TIMEOUT" : "RETRY");
             if (attempt <= retries)
                 std::this_thread::sleep_for(
                     std::chrono::seconds(env_int("BRAIN6_CPP_BACKOFF_SECONDS", 5)));
@@ -116,8 +117,34 @@ private:
         if (pid < 0) { perror("fork"); return 21; }
         if (pid == 0) return factory_->run();
 
+        const int timeout = env_int("BRAIN6_EXECUTION_TIMEOUT_SECONDS", 19800);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout);
+
+        while (std::chrono::steady_clock::now() < deadline) {
+            int status = 0;
+            const pid_t result = waitpid(pid, &status, WNOHANG);
+            if (result == pid) return child_exit_code(status);
+            if (result < 0) { perror("waitpid"); return 22; }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+
+        log("BRAIN6_FACTORY_TIMEOUT sending SIGTERM");
+        kill(pid, SIGTERM);
+        for (int i = 0; i < 10; ++i) {
+            int status = 0;
+            const pid_t result = waitpid(pid, &status, WNOHANG);
+            if (result == pid) return 124;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+
+        log("BRAIN6_FACTORY_TIMEOUT sending SIGKILL");
+        kill(pid, SIGKILL);
         int status = 0;
-        if (waitpid(pid, &status, 0) < 0) { perror("waitpid"); return 22; }
+        waitpid(pid, &status, 0);
+        return 124;
+    }
+
+    static int child_exit_code(int status) {
         if (WIFEXITED(status)) return WEXITSTATUS(status);
         if (WIFSIGNALED(status)) return 128 + WTERMSIG(status);
         return 23;
@@ -128,7 +155,7 @@ private:
         if (!value || !*value) return fallback;
         try {
             const int parsed = std::stoi(value);
-            return parsed > 0 ? parsed : fallback;
+            return parsed >= 0 ? parsed : fallback;
         } catch (...) {
             return fallback;
         }
