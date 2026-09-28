@@ -51,3 +51,14 @@ def test_film_video_requires_completed_job(monkeypatch, tmp_path):
         headers={"Authorization": "Bearer test-token"},
     )
     assert response.status_code == 409
+
+
+def test_local_android_bridge_auth(monkeypatch):
+    monkeypatch.delenv("BRAIN_CONTROL_TOKEN", raising=False)
+    import importlib
+    import cloud.api_server as api
+    importlib.reload(api)
+    client = TestClient(api.app)
+    response = client.get("/v1/status", headers={"X-BRAIN-Local-App": "1"})
+    assert response.status_code == 200
+
