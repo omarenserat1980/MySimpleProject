@@ -94,22 +94,37 @@ def verify() -> tuple[bool, str]:
     )
     return test.returncode == 0, (test.stdout + test.stderr)[-4000:]
 
+def _snapshot(paths: list[Path]) -> dict[Path, str]:
+    return {path: _read(path) for path in paths if path.exists()}
+
+def _restore(snapshot: dict[Path, str]) -> None:
+    for path, content in snapshot.items():
+        _write(path, content)
+
 def heal(error_text: str = "", report_path: str = "code_self_healer_report.json") -> dict:
     history = []
     last_error = error_text
     for cycle in range(1, MAX_CYCLES + 1):
+        before = _snapshot(list(SOURCE_ALLOWLIST))
         changed = []
+        rule_errors = []
         for rule in RULES:
             try:
                 changed.extend(rule())
             except Exception as exc:
+                rule_errors.append(str(exc))
                 last_error = str(exc)
         ok, verification = verify()
+        rolled_back = bool(changed) and not ok
+        if rolled_back:
+            _restore(before)
         entry = {
             "cycle": cycle,
-            "changed_files": changed,
+            "changed_files": sorted(set(changed)),
+            "rule_errors": rule_errors,
             "verification_passed": ok,
             "verification_tail": verification,
+            "rolled_back": rolled_back,
         }
         history.append(entry)
         if ok:
