@@ -105,7 +105,7 @@ public class BrainTermuxActivity extends Activity {
             for (File f : files) s.append(f.getName()).append(f.isDirectory()?"/  ":"  ");
             return s.toString();
         }
-        if (cmd.startsWith("cd ")) return "cwd -> " + resolve(cmd.substring(3)).getAbsolutePath();
+        if (cmd.startsWith("cd ")) { try { return "cwd -> " + resolve(cmd.substring(3)).getAbsolutePath(); } catch(Exception e) { return "error: " + e.getMessage(); } }
         if (cmd.startsWith("mkdir ")) { try { File f=resolve(cmd.substring(6)); return f.mkdirs() ? "created "+f.getName() : "exists/failed"; } catch(Exception e){return "error: "+e.getMessage();} }
         if (cmd.startsWith("touch ")) {
             try { File f=resolve(cmd.substring(6)); if(f.exists()||f.createNewFile()) return "created "+f.getName(); }
@@ -129,10 +129,10 @@ public class BrainTermuxActivity extends Activity {
             request("POST","/v1/films",body,"FACTORY");
             return "FACTORY: submitting real local film job...";
         }
-        if (cmd.startsWith("job ")) { String id=cmd.substring(4).trim(); if(id.isEmpty())return "usage: job ID"; request("GET","/v1/films/"+safeId(id),null,"JOB"); return "JOB: querying "+id; }
+        if (cmd.startsWith("job ")) { String id=cmd.substring(4).trim(); try { if(id.isEmpty())return "usage: job ID"; request("GET","/v1/films/"+safeId(id),null,"JOB"); return "JOB: querying "+id; } catch(Exception e) { return "error: "+e.getMessage(); } }
         if (cmd.equals("ffmpeg")) { request("GET","/v1/platform",null,"FFMPEG"); return "FFMPEG: querying factory capabilities..."; }
         if (cmd.equals("qc")) return lastJobId.isEmpty() ? "usage: qc JOB_ID" : "QC: query "+lastJobId+" with 'qc "+lastJobId+"'";
-        if (cmd.startsWith("qc ")) { String id=cmd.substring(3).trim(); request("GET","/v1/films/"+safeId(id),null,"QC"); return "QC: querying verified state for "+id; }
+        if (cmd.startsWith("qc ")) { String id=cmd.substring(3).trim(); try { if(id.isEmpty())return "usage: qc JOB_ID"; request("GET","/v1/films/"+safeId(id),null,"QC"); return "QC: querying verified state for "+id; } catch(Exception e) { return "error: "+e.getMessage(); } }
         if (cmd.equals("processes")) return "brain-phone-server [Android]\nbrain-termux-emulator [UI]\ncloud-hub-bridge [HTTP localhost]";
         if (cmd.equals("clear")) { terminal.setText(""); return ""; }
         if (cmd.equals("exit")) { finish(); return ""; }
