@@ -1351,6 +1351,7 @@ def builder_plan(project:str,objective:str):
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
+app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
