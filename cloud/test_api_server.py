@@ -66,3 +66,21 @@ def test_local_android_bridge_auth(monkeypatch):
     response = remote.get("/v1/status", headers={"X-BRAIN-Local-App": "1"})
     assert response.status_code == 503
 
+
+
+def test_final_video_is_job_scoped(monkeypatch, tmp_path):
+    api, _ = _client(monkeypatch)
+    output = tmp_path / "output"
+    output.mkdir()
+    old = output / "old.mp4"
+    exact = output / "final.mp4"
+    old.write_bytes(b"x" * 2048)
+    exact.write_bytes(b"y" * 2048)
+    monkeypatch.setenv("FACTORY_OUTPUT_DIR", str(output))
+    selected = api._find_final_video({"id": "job-1", "output_dir": str(output)})
+    assert selected == exact
+
+    recorded = output / "recorded.mp4"
+    recorded.write_bytes(b"z" * 2048)
+    selected = api._find_final_video({"id": "job-2", "output_dir": str(output), "video_path": str(recorded)})
+    assert selected == recorded
