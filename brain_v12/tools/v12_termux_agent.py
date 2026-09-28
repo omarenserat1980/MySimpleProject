@@ -8,7 +8,7 @@ import time
 import urllib.error
 import urllib.request
 
-BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://electronic-brain-v12-gwwg.onrender.com").rstrip("/")
+BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:10000").rstrip("/")
 AGENT_KEY = os.getenv("V12_AGENT_KEY", "")
 AGENT_ID = os.getenv("V12_AGENT_ID", "android-termux-01")
 POLL_SECONDS = max(2, int(os.getenv("V12_AGENT_POLL_SECONDS", "5")))
