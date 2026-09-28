@@ -25,8 +25,8 @@ on:
         options: ["5","10","15","20","30","60","120","180","240","300","360"]
 
 permissions:
-  contents: read
-  actions: read
+  contents: write
+  actions: write
 
 concurrency:
   group: electronic-brain-cinematic-production
@@ -222,3 +222,77 @@ jobs:
           path: "**/final.mp4"
           if-no-files-found: ignore
           retention-days: 30
+
+  self-heal:
+    name: Self-Heal Failed Factory Run
+    needs: cinematic-factory
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout failed revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect failed run log
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          gh run view "${GITHUB_RUN_ID}" --log-failed > latest_failure.log 2>&1
+          test -s latest_failure.log || echo "No failed log was available" > latest_failure.log
+          tail -n 120 latest_failure.log
+
+      - name: Run bounded code repair
+        run: |
+          set -euo pipefail
+          python -m brain_v7.braincore_v2.code_self_healer --error-file latest_failure.log --report code_self_healer_report.json
+          test -s code_self_healer_report.json
+
+      - name: Verify repaired workspace
+        run: |
+          set -euo pipefail
+          python -m compileall -q brain_v7/braincore_v2
+          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py
+
+      - name: Persist verified repair
+        id: persist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "electronic-brain-auto-healer"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- brain_v7/braincore_v2 .github/workflows/electronic-brain-cinematic.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No verified source change to persist."
+            exit 0
+          fi
+          count="$(git log --all --format='%s' --grep='\[BRAIN-AUTO-HEAL\]' | wc -l | tr -d ' ')"
+          if [ "$count" -ge 100 ]; then
+            echo "::error::100 automatic repair commits already exist; stopping to prevent an infinite loop."
+            exit 1
+          fi
+          git add brain_v7/braincore_v2 .github/workflows/electronic-brain-cinematic.yml
+          git commit -m "[BRAIN-AUTO-HEAL] verified repair cycle $((count+1))"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Report repair result
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          p="code_self_healer_report.json"
+          try:
+              r=json.load(open(p,encoding="utf-8"))
+          except Exception as e:
+              print(f"self-healer report unavailable: {e}")
+          else:
+              print(json.dumps({
+                  "status": r.get("status"),
+                  "cycles_completed": r.get("cycles_completed"),
+                  "changed_files": r.get("changed_files"),
+              }, ensure_ascii=False))
+          PY
