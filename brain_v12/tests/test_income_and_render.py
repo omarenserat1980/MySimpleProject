@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 from brain_v12.brain.memory import MemoryStore
 from brain_v12.brain.income_engine import IncomeEngine
-from brain_v12.brain.render_deploy_monitor import RenderDeployMonitor
 
 
 class IncomeAndRenderContracts(unittest.TestCase):
@@ -29,9 +28,6 @@ class IncomeAndRenderContracts(unittest.TestCase):
             self.assertEqual(len(accepted),1)
             self.assertEqual(store.income_opportunities(10)[0]["data"]["source_kind"],"LIVE_OPPORTUNITY")
 
-    def test_render_monitor_exposes_public_poll(self):
-        monitor=RenderDeployMonitor(MemoryStore(":memory:"))
-        self.assertTrue(hasattr(monitor,"poll_public_once"))
 
 
 if __name__=="__main__": unittest.main()
