@@ -17,7 +17,8 @@ from pydantic import BaseModel
 
 from cloud.deploy_engine import DeployError, deploy, docker_available, logs, restart, status as docker_status, stop
 
-STATE = Path(os.getenv("BRAIN_STATE_DIR", "/app/.brain_state"))
+ROOT = Path(__file__).resolve().parents[1]
+STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
 STARTED = time.time()
 TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
 app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
