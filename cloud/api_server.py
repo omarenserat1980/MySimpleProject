@@ -5,6 +5,7 @@ No arbitrary shell, credential, or filesystem control is exposed here.
 from __future__ import annotations
 
 import hashlib
+import json
 import hmac
 import os
 import time
