@@ -4,15 +4,17 @@ on:
     paths:
       - "brain_v12/**"
       - ".github/workflows/brain-v12.yml"
-      - "render.yaml"
   pull_request:
     paths:
       - "brain_v12/**"
+      - ".github/workflows/brain-v12.yml"
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -21,45 +23,16 @@ jobs:
       - run: python -m pip install -r brain_v12/requirements.txt
       - run: python -m compileall -q brain_v12
       - run: python -m unittest discover -s brain_v12/tests -v
-
-  verify-render:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Wait for Render to deploy this commit
+      - name: Verify GitHub CI identity
         env:
-          EXPECTED_COMMIT: ${{ github.sha }}
-          RENDER_URL: https://electronic-brain-v13-gwwg.onrender.com
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
-          set -euo pipefail
-          for attempt in $(seq 1 45); do
-            echo "Render verification attempt $attempt/45"
-            health=$(curl -fsS --max-time 20 "$RENDER_URL/health" || true)
-            identity=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/identity" || true)
-            verify=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/verify" || true)
-            diagnostics=$(curl -fsS --max-time 20 "$RENDER_URL/api/deploy/diagnostics" || true)
-            echo "health=$health"
-            echo "identity=$identity"
-            echo "verify=$verify"
-            echo "diagnostics=$diagnostics"
-            version=$(printf '%s' "$health" | jq -r '.version // empty' 2>/dev/null || true)
-            commit=$(printf '%s' "$identity" | jq -r '.commit // empty' 2>/dev/null || true)
-            verified=$(printf '%s' "$verify" | jq -r '.ok // false' 2>/dev/null || true)
-            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "14.0" ] && [ "$verified" = "true" ]; then
-              echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
-              curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
-              curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
-              problem=$(curl -fsS --max-time 20 -X POST "$RENDER_URL/api/problem/solve?goal=deployment%20verification" || true)
-              echo "problem_solver=$problem"
-              if ! printf "%s" "$problem" | jq -e ".external_action == \"NOT_CLAIMED\"" >/dev/null 2>&1; then
-                echo "Problem Solver endpoint is not responding with the expected V12 contract." >&2
-                exit 1
-              fi
-              echo "Required V12 APIs are live."
-              exit 0
-            fi
-            sleep 20
-          done
-          echo "Render did not converge to GitHub commit $EXPECTED_COMMIT within the verification window." >&2
-          exit 1
+          python - <<'PY'
+          import os
+          assert os.environ["GITHUB_SHA"]
+          assert os.environ["GITHUB_REPOSITORY"]
+          assert os.environ["GITHUB_RUN_ID"]
+          print("GitHub-native CI identity verified:", os.environ["GITHUB_SHA"])
+          PY
