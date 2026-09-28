@@ -1,0 +1,9 @@
+package com.brain.hondaconnect;
+
+import android.app.*; import android.os.*; import android.content.*; import android.net.Uri; import android.view.*; import android.widget.*; import java.io.*; import org.json.*;
+
+public class MainActivity extends Activity {
+ TextView out;
+ public void onCreate(Bundle b){super.onCreate(b); LinearLayout l=new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); l.setPadding(32,32,32,32); TextView t=new TextView(this); t.setText("Honda CONNECT Brain\nHonda NP1 2023"); t.setTextSize(24); l.addView(t); Button pick=new Button(this); pick.setText("اختيار ملف update_by_usb.json"); pick.setOnClickListener(v->startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE),7)); l.addView(pick); out=new TextView(this); out.setTextSize(17); l.addView(out); setContentView(l); }
+ protected void onActivityResult(int r,int c,Intent d){super.onActivityResult(r,c,d); if(r!=7||c!=RESULT_OK||d==null)return; try(InputStream in=getContentResolver().openInputStream(d.getData())){String s=new String(in.readAllBytes(),"UTF-8"); JSONObject j=new JSONObject(s); String sw=j.optString("softwareVersion",j.optString("software_version",j.optString("version","غير معروف"))); String hw=j.optString("hardwareVersion",j.optString("hardware_version","غير معروف")); String mcu=j.optString("mcuVersion",j.optString("mcu_version","غير معروف")); out.setText("Software: "+sw+"\nHardware: "+hw+"\nMCU: "+mcu+"\n\nالحالة: تم تحليل الملف\nالتثبيت التلقائي: معطّل"); }catch(Exception e){out.setText("تعذر قراءة الملف: "+e.getMessage());}}
+}
