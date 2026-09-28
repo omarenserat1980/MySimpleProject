@@ -2,7 +2,8 @@
 import os
 import threading
 from uuid import uuid4
-from fastapi import FastAPI, UploadFile, File, Response, Request
+from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -31,6 +32,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.device_auth import require_device_agent
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
@@ -187,13 +189,6 @@ def youtube_oauth_callback(code: str = "", state: str = ""):
 def youtube_status():
     return workforce.youtube_publisher.snapshot()
 
-class CinematicReleaseIn(BaseModel):
-    title: str
-    description: str = ""
-    media_path: str = ""
-    tags: list[str] = []
-    privacy: str = "private"
-
 @app.post("/api/youtube/cinematic/prepare")
 def youtube_cinematic_prepare(body: CinematicReleaseIn, request: Request):
     require_control_key(request)
@@ -213,6 +208,13 @@ def youtube_release_record_published(body: dict, request: Request):
         str(body.get("evidence", "")),
     )
 
+
+class CinematicReleaseIn(BaseModel):
+    title: str
+    description: str = ""
+    media_path: str = ""
+    tags: list[str] = []
+    privacy: str = "private"
 
 class MovieSummaryIn(BaseModel):
     title: str
