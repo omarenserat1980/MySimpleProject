@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ALLOWLIST = {
     ROOT / "brain_v7/braincore_v2/factory_repair_app.py",
     ROOT / "brain_v7/braincore_v2/brain_media_adapter.py",
+    ROOT / "brain_v7/braincore_v2/cinematic_local_renderer.py",
     ROOT / ".github/workflows/electronic-brain-cinematic.yml",
     ROOT / ".github/workflows/brain6-168h-cloud.yml",
     ROOT / ".github/workflows/cloud-runtime-build.yml",
@@ -32,6 +33,7 @@ SOURCE_ALLOWLIST = {
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
     "brain_v7/braincore_v2/test_code_repair_app.py",
+    "brain_v7/braincore_v2/test_cinematic_local_renderer.py",
 )
 
 
@@ -55,6 +57,27 @@ def rule_empty_fal_model() -> list[str]:
     old = 'model=os.getenv("FAL_MODEL","fal-ai/kling-video/v3/pro/text-to-video")'
     new = 'model=os.getenv("FAL_MODEL","").strip() or "fal-ai/kling-video/v3/pro/text-to-video"'
     return [str(p.relative_to(ROOT))] if _replace_once(p, old, new) else []
+
+def rule_local_renderer_uses_ffmpeg_time_expression() -> list[str]:
+    """Repair the known FFmpeg filter regression that used frame variable N."""
+    p = ROOT / "brain_v7/braincore_v2/cinematic_local_renderer.py"
+    text = _read(p) if p.exists() else ""
+    if "sin(N/" not in text and "cos(N/" not in text:
+        return []
+    changed = False
+    replacements = {
+        "sin(N/72)": "sin(t*24/72)",
+        "sin(N/96)": "sin(t*24/96)",
+        "cos(N/120)": "cos(t*24/120)",
+    }
+    for old, new in replacements.items():
+        if old in text:
+            text = text.replace(old, new)
+            changed = True
+    if not changed:
+        return []
+    _write(p, text)
+    return [str(p.relative_to(ROOT))]
 
 def rule_brain6_dotnet_build_indentation() -> list[str]:
     """Repair the known YAML indentation defect in the Brain 6 build step."""
@@ -117,6 +140,7 @@ def rule_workflow_persists_route() -> list[str]:
 
 RULES: tuple[Callable[[], list[str]], ...] = (
     rule_empty_fal_model,
+    rule_local_renderer_uses_ffmpeg_time_expression,
     rule_workflow_persists_route,
     rule_brain6_dotnet_build_indentation,
     rule_cloud_installs_pytest,
@@ -129,6 +153,10 @@ def diagnose_failure(error_text: str) -> dict[str, str]:
         return {"class": "configuration", "repair": "rule_empty_fal_model"}
     if "factory_media_route" in text:
         return {"class": "routing", "repair": "rule_workflow_persists_route"}
+    if "undefined constant" in text and "n/96" in text:
+        return {"class": "ffmpeg_filter", "repair": "rule_local_renderer_uses_ffmpeg_time_expression"}
+    if "sin(n/" in text or "cos(n/" in text:
+        return {"class": "ffmpeg_filter", "repair": "rule_local_renderer_uses_ffmpeg_time_expression"}
     if "dotnet restore brain6_cs/brain6.csproj" in text and "dotnet build brain6_cs/brain6.csproj" in text:
         return {"class": "workflow_yaml", "repair": "rule_brain6_dotnet_build_indentation"}
     if "no module named pytest" in text or "modulenotfounderror: no module named pytest" in text:
@@ -151,6 +179,8 @@ def _failure_hint(error_text: str) -> str:
         return "rule_empty_fal_model"
     if "factory_media_route" in text:
         return "rule_workflow_persists_route"
+    if ("undefined constant" in text and "n/96" in text) or "sin(n/" in text or "cos(n/" in text:
+        return "rule_local_renderer_uses_ffmpeg_time_expression"
     if "no module named pytest" in text:
         if "cinematic-factory-smoke" in text or "run v6 cinema tests" in text:
             return "rule_cinematic_smoke_installs_pytest"
