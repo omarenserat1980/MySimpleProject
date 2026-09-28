@@ -5,7 +5,8 @@ services:
       dockerfile: cloud/Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - brain_output:/app/cinematic_output
       - brain_state:/app/.brain_state
