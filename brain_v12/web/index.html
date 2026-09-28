@@ -53,7 +53,7 @@
   </div>
   <div class="navTitle">الإدراك الحسي</div><div class="nav">
     <button data-view="permissions">◉ الصلاحيات والأجهزة</button>
-    <button data-view="vision">▣ الكاميرا والصور</button>
+    <button data-view="vision">▣ الكاميرا والصور</button><button data-view="imageFactory">🏭 مصنع الصور</button>
     <button data-view="voice">♬ الصوت</button>
     <button data-view="video">▶ الفيديو</button>
   </div>
@@ -234,7 +234,7 @@
  <div class="card permission"><div><div class="permissionIcon">📷</div><h3>الكاميرا</h3><span id="camStatus" class="badge">غير مفحوص</span></div><button class="primary" onclick="requestCamera()">السماح بالكاميرا</button></div>
  </div><div class="card" style="margin-top:14px"><h3>إذا لم تظهر نافذة السماح</h3><p class="note">افتح الموقع من رابط HTTPS على Render، ثم اضغط زر السماح. إذا سبق أن اخترت «رفض»، افتح إعدادات الموقع في المتصفح وأعد تفعيل الميكروفون والكاميرا. لا يمكن للواجهة تجاوز قرار المتصفح.</p></div></div></section>
 
-<section id="vision" class="view"><div class="grid"><div class="card"><h3>📷 إدراك بصري مباشر</h3><video id="cameraVideo" class="videoBox" autoplay muted playsinline></video><div class="tools" style="margin-top:10px"><button class="primary" onclick="requestCamera()">تشغيل الكاميرا</button><button onclick="capture()">📸 التقاط صورة</button><button onclick="stopCamera()">إيقاف</button></div><img id="shot" class="videoBox" style="display:none;margin-top:10px"></div><div class="card"><h3>🖼️ رفع صورة أو ملف</h3><input id="filePick" type="file" accept="image/*,.pdf,.txt" style="width:100%"><br><br><button class="primary" onclick="uploadFile()">إدخال إلى العقل</button><div id="fileResult" class="note" style="margin-top:15px"></div></div></div></section>
+<section id="imageFactory" class="view"><div class="grid"><div class="card"><div class="sectionTitle"><div><h3>🏭 مصنع الصور — اختصارات Brain</h3><p class="note">اكتب اختصاراً مثل /cinematic أو /hero أو /thumbnail، وسيحوّله المصنع إلى Prompt جاهز.</p></div><span class="badge" id="factoryStatus">جاهز</span></div><div class="tools" style="margin-bottom:10px"><button onclick="factoryInsert('/cinematic')">/cinematic</button><button onclick="factoryInsert('/hero')">/hero</button><button onclick="factoryInsert('/portrait')">/portrait</button><button onclick="factoryInsert('/product')">/product</button><button onclick="factoryInsert('/poster')">/poster</button><button onclick="factoryInsert('/thumbnail')">/thumbnail</button><button onclick="factoryInsert('/consistent')">/consistent</button><button onclick="factoryInsert('/transparent')">/transparent</button></div><textarea id="factoryInput" placeholder="/cinematic + /consistent + /16x9\nمشهد لمدينة مستقبلية ليلاً..." style="width:100%;min-height:130px;background:#07111d;color:#fff;border:1px solid var(--line);border-radius:12px;padding:13px;direction:rtl"></textarea><div class="tools" style="margin-top:10px"><button class="primary" onclick="buildFactoryPrompt()">⚡ بناء Prompt</button><button onclick="copyFactoryPrompt()">نسخ</button><button onclick="factoryClear()">مسح</button></div></div><div class="card"><h3>🧾 Prompt الناتج</h3><pre id="factoryOutput" class="toolResult" style="min-height:300px">—</pre><h3 style="margin-top:15px">الاختصارات المدعومة</h3><div id="factoryDictionary" class="toolGrid"></div></div></div></section><section id="vision" class="view"><div class="grid"><div class="card"><h3>📷 إدراك بصري مباشر</h3><video id="cameraVideo" class="videoBox" autoplay muted playsinline></video><div class="tools" style="margin-top:10px"><button class="primary" onclick="requestCamera()">تشغيل الكاميرا</button><button onclick="capture()">📸 التقاط صورة</button><button onclick="stopCamera()">إيقاف</button></div><img id="shot" class="videoBox" style="display:none;margin-top:10px"></div><div class="card"><h3>🖼️ رفع صورة أو ملف</h3><input id="filePick" type="file" accept="image/*,.pdf,.txt" style="width:100%"><br><br><button class="primary" onclick="uploadFile()">إدخال إلى العقل</button><div id="fileResult" class="note" style="margin-top:15px"></div></div></div></section>
 
 <section id="voice" class="view"><div class="grid"><div class="card"><h3>🎙️ التحدث مع العقل</h3><p class="note">استخدم زر الميكروفون ثم تحدث. سيتم تحويل الكلام إلى نص وإرساله للمحادثة، ثم يمكنك سماع الرد.</p><button class="primary" onclick="toggleVoice()">🎙️ ابدأ التحدث</button><button onclick="speakLast()">🔊 اقرأ آخر رد</button><div id="speechInfo" class="panel" style="margin-top:15px">جاهز.</div></div><div class="card"><h3>🔊 الصوت</h3><p class="note">الرد الصوتي يستخدم محرك النطق في جهازك. ويمكن لاحقاً ربط مزود صوت AI من الخادم.</p></div></div></section>
 
@@ -447,6 +447,50 @@ function closeCommandPalette(){$('commandPalette').classList.remove('open')}
 function filterCommands(q=''){const z=q.trim().toLowerCase();$('commandList').innerHTML=brainCommands.filter(x=>!z||x[0].toLowerCase().includes(z)||x[1].toLowerCase().includes(z)).map(x=>'<div class="commandItem" onclick="show(\''+x[2]+'\');closeCommandPalette()"><div><b>'+esc(x[0])+'</b><br><small>'+esc(x[1])+'</small></div><span class="shortcut">Enter</span></div>').join('')||'<div class="note" style="padding:15px">لا توجد نتيجة.</div>'}
 function selectAIMode(el,mode){document.querySelectorAll('.aiMode').forEach(x=>x.classList.remove('active'));el.classList.add('active');$('selectedAIMode').textContent='🧠 '+mode;$('modeValue').textContent=mode;toast('تم اختيار نمط: '+mode)}
 document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openCommandPalette()}if(e.key==='Escape')closeCommandPalette()});
+
+// Brain Image Factory — prompt shortcut layer
+const imageFactoryCommands={
+ '/hero':'لقطة رئيسية بطابع بصري قوي، تكوين واضح، إضاءة احترافية وتفاصيل عالية.',
+ '/cinematic':'مشهد سينمائي احترافي، تكوين درامي، إضاءة سينمائية، عمق مجال مناسب، عدسة واقعية وتدرج لوني سينمائي.',
+ '/portrait':'بورتريه احترافي، تعبير طبيعي، إضاءة وجه متوازنة، تفاصيل جلد وشعر واقعية، خلفية مناسبة.',
+ '/closeup':'لقطة قريبة تبرز التفاصيل الدقيقة للعنصر الرئيسي مع عزل خلفية مناسب.',
+ '/wide':'لقطة واسعة تُظهر البيئة كاملة وتوضح علاقة الشخصية/العنصر بالمكان.',
+ '/aerial':'منظور جوي مرتفع يوضح المشهد والبيئة مع مقياس وعمق واضحين.',
+ '/action':'لقطة حركة ديناميكية، إحساس بالسرعة والطاقة، تجميد حركة واضح وتكوين قابل للقراءة.',
+ '/product':'تصوير منتج احترافي، إضاءة استوديو، مواد واقعية، انعكاسات مضبوطة، خلفية نظيفة.',
+ '/poster':'بوستر سينمائي احترافي، تكوين هرمي واضح، مساحة مناسبة للعنوان، صورة دعائية عالية التأثير.',
+ '/thumbnail':'صورة مصغرة جذابة وواضحة، موضوع رئيسي بارز، تباين بصري قوي ومساحة آمنة للنص.',
+ '/character':'تصميم شخصية متسق، silhouette واضح، ملابس وملامح قابلة لإعادة الاستخدام.',
+ '/turnaround':'عرض الشخصية من عدة زوايا مع الحفاظ على الهوية والتفاصيل.',
+ '/posepack':'مجموعة وضعيات متنوعة للشخصية مع الحفاظ على الاتساق البصري.',
+ '/expression':'مجموعة تعبيرات وجه متنوعة للشخصية مع الحفاظ على الهوية.',
+ '/exploded':'منظور exploded view منظم يوضح مكونات العنصر وعلاقاتها.',
+ '/blueprint':'مخطط هندسي/تقني واضح بعلامات وأبعاد بصرية منظمة.',
+ '/infographic':'إنفوغرافيك منظم، تسلسل بصري واضح، رموز وعناوين سهلة القراءة.',
+ '/transparent':'خلفية شفافة ونظيفة حول العنصر الرئيسي، دون عناصر زائدة.',
+ '/reference':'استخدم الصورة المرجعية المرفقة للحفاظ على الهوية والشكل والتفاصيل الأساسية.',
+ '/edit':'تعديل الصورة الحالية مع الحفاظ على العناصر غير المطلوبة للتغيير.',
+ '/restore':'ترميم وتحسين الصورة، إزالة العيوب والضوضاء مع الحفاظ على الهوية.',
+ '/variation':'أنشئ تنويعات بصرية متعددة مع الحفاظ على الفكرة والعنصر الرئيسي.',
+ '/consistent':'حافظ على الاتساق الصارم للشخصيات والملابس والألوان والمواقع بين اللقطات.',
+ '/16x9':'نسبة أبعاد 16:9 مناسبة للفيديو والشاشة العريضة.',
+ '/9x16':'نسبة أبعاد 9:16 مناسبة للفيديو العمودي والشورتس.',
+ '/1x1':'نسبة أبعاد 1:1 مناسبة للمنشورات المربعة.'
+};
+function factoryInsert(x){const e=$('factoryInput');e.value=(e.value?e.value.trim()+' ':'')+x;e.focus()}
+function buildFactoryPrompt(){
+ const raw=$('factoryInput').value.trim(); if(!raw){$('factoryOutput').textContent='اكتب اختصارات أو وصفاً أولاً.';return}
+ const tokens=raw.match(/\/[a-z0-9-]+/gi)||[]; const used=[]; const unknown=[];
+ for(const t of tokens){const k=t.toLowerCase(); if(imageFactoryCommands[k]) used.push(imageFactoryCommands[k]); else unknown.push(t)}
+ const desc=raw.replace(/\/[a-z0-9-]+/gi,' ').replace(/\s+/g,' ').trim();
+ const prompt=['BRAIN IMAGE FACTORY — PRODUCTION PROMPT','',...used,desc?('المشهد/الموضوع: '+desc):'','', 'حافظ على الاتساق البصري، التفاصيل الدقيقة، التكوين الواضح، والإخراج الجاهز للإنتاج.'].filter(Boolean).join('\n');
+ $('factoryOutput').textContent=prompt+(unknown.length?'\n\nاختصارات غير معروفة: '+unknown.join(' '):'');
+ $('factoryStatus').textContent='تم البناء • '+used.length+' اختصار';
+}
+function copyFactoryPrompt(){const t=$('factoryOutput').textContent;if(!t||t==='—')return toast('ابنِ الـPrompt أولاً');navigator.clipboard?.writeText(t).then(()=>toast('تم نسخ Prompt')).catch(()=>toast('تعذر النسخ تلقائياً'))}
+function factoryClear(){$('factoryInput').value='';$('factoryOutput').textContent='—';$('factoryStatus').textContent='جاهز'}
+function loadFactoryDictionary(){const e=$('factoryDictionary');if(e)e.innerHTML=Object.entries(imageFactoryCommands).map(([k,v])=>'<div class="toolPill"><b>'+esc(k)+'</b><small>'+esc(v)+'</small></div>').join('')}
+loadFactoryDictionary();
 </script>
 
 <div class="commandPalette" id="commandPalette" onclick="if(event.target===this)closeCommandPalette()">
