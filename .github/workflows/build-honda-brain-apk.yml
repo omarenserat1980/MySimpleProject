@@ -77,6 +77,30 @@ jobs:
       - name: Validate Gradle model
         run: gradle :app:tasks --all --no-daemon --stacktrace
 
+      - name: Static Android regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVER="app/src/main/java/com/brain/hondaconnect/BrainServerService.java"
+          TERMUX="app/src/main/java/com/brain/hondaconnect/BrainTermuxActivity.java"
+
+          test -f "$SERVER"
+          test -f "$TERMUX"
+
+          # BrainServerService: accept() must remain inside a checked-exception handler.
+          grep -Fq 'final Socket client = serverSocket.accept();' "$SERVER"
+
+          # BrainTermuxActivity: View.getParent() returns ViewParent, not View.
+          grep -Fq 'terminal.getParent() instanceof ScrollView' "$TERMUX"
+
+          # Guard against reintroducing the exact compile-time regression from the failed run.
+          if grep -Fq 'View p=terminal.getParent()' "$TERMUX"; then
+            echo "ERROR: terminal.getParent() must not be assigned to View."
+            exit 1
+          fi
+
+          echo "Android source regression checks passed."
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all
 
