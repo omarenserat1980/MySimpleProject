@@ -68,11 +68,11 @@ public class BrainServerService extends Service {
             }
             String body;
             if ("/healthz".equals(path)) {
-                body = "{"status":"ok","server":"BRAIN Phone Server","role":"phone_server"}";
+                body = "{\"status\":\"ok\",\"server\":\"BRAIN Phone Server\",\"role\":\"phone_server\"}";
             } else if ("/v1/status".equals(path)) {
-                body = "{"service":"BRAIN Phone Server","role":"phone_server","running":true,"port":8787}";
+                body = "{\"service\":\"BRAIN Phone Server\",\"role\":\"phone_server\",\"running\":true,\"port\":8787}";
             } else {
-                body = "{"service":"BRAIN Phone Server","status":"online","endpoints":["/healthz","/v1/status"]}";
+                body = "{\"service\":\"BRAIN Phone Server\",\"status\":\"online\",\"endpoints\":[\"/healthz\",\"/v1/status\"]}";
             }
             byte[] data = body.getBytes("UTF-8");
             String headers = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: "
