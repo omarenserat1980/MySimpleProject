@@ -29,6 +29,7 @@ class MediaEngineTests(unittest.TestCase):
         self.assertTrue(shutil.which("ffprobe"))
 
     def test_timeline_command_is_allowlisted(self):
+        self.assertIn("timeline", {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade", "timeline"})
         with self.assertRaises(ValueError):
             media_engine._validate_transition("rm -rf")
         with self.assertRaises(ValueError):
