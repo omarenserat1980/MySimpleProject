@@ -14,7 +14,7 @@ public sealed class Supervisor
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
-        Console.WriteLine("BRAIN6_CSHARP_BOOT version=1 mode=CPP_BRIDGE");
+        Console.WriteLine("BRAIN6_CSHARP_BOOT version=2 mode=CPP_BRIDGE_TIMEOUT");
 
         if (!File.Exists("production/BRAIN6_168H.json"))
         {
@@ -22,7 +22,7 @@ public sealed class Supervisor
             return 20;
         }
 
-        var retries = ReadPositiveInt("BRAIN6_CS_RETRIES", 2);
+        var retries = ReadNonNegativeInt("BRAIN6_CS_RETRIES", 0);
         for (var attempt = 1; attempt <= retries + 1; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -36,7 +36,7 @@ public sealed class Supervisor
                 return 0;
             }
 
-            await SaveCheckpointAsync(new(attempt, "RETRY", DateTimeOffset.UtcNow));
+            await SaveCheckpointAsync(new(attempt, exitCode == 124 ? "TIMEOUT" : "RETRY", DateTimeOffset.UtcNow));
             if (attempt <= retries)
                 await Task.Delay(TimeSpan.FromSeconds(ReadPositiveInt("BRAIN6_CS_BACKOFF_SECONDS", 5)), cancellationToken);
         }
@@ -64,7 +64,21 @@ public sealed class Supervisor
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await process.WaitForExitAsync(token);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(ReadPositiveInt("BRAIN6_EXECUTION_TIMEOUT_SECONDS", 19800)));
+
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+        {
+            Console.Error.WriteLine("BRAIN6_CS_CPP_TIMEOUT");
+            try { process.Kill(entireProcessTree: true); } catch { }
+            await process.WaitForExitAsync(CancellationToken.None);
+            return 124;
+        }
+
         return process.ExitCode;
     }
 
@@ -76,7 +90,7 @@ public sealed class Supervisor
         var psi = new ProcessStartInfo
         {
             FileName = "ffprobe",
-            Arguments = "-v error -show_entries stream=codec_type -of csv=p=0 cinematic_output/final.mp4",
+            Arguments = "-v error -show_entries format=duration:stream=codec_type,width,height -of json cinematic_output/final.mp4",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
@@ -86,11 +100,39 @@ public sealed class Supervisor
         if (process is null) return false;
 
         var stdout = await process.StandardOutput.ReadToEndAsync(token);
+        var stderr = await process.StandardError.ReadToEndAsync(token);
         await process.WaitForExitAsync(token);
+        if (process.ExitCode != 0) return false;
 
-        var hasVideo = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Any(x => x.Trim() == "video");
-        var hasAudio = stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Any(x => x.Trim() == "audio");
-        return process.ExitCode == 0 && hasVideo && hasAudio;
+        try
+        {
+            using var doc = JsonDocument.Parse(stdout);
+            var duration = doc.RootElement.GetProperty("format").GetProperty("duration").GetDouble();
+            var streams = doc.RootElement.GetProperty("streams");
+            var hasVideo = false;
+            var hasAudio = false;
+            var validVideo = false;
+
+            foreach (var stream in streams.EnumerateArray())
+            {
+                var type = stream.GetProperty("codec_type").GetString();
+                if (type == "audio") hasAudio = true;
+                if (type == "video")
+                {
+                    hasVideo = true;
+                    var width = stream.TryGetProperty("width", out var w) ? w.GetInt32() : 0;
+                    var height = stream.TryGetProperty("height", out var h) ? h.GetInt32() : 0;
+                    validVideo = width >= 640 && height >= 360;
+                }
+            }
+
+            return duration >= 1 && hasVideo && hasAudio && validVideo;
+        }
+        catch (JsonException)
+        {
+            Console.Error.WriteLine(stderr);
+            return false;
+        }
     }
 
     private async Task SaveCheckpointAsync(Checkpoint checkpoint)
@@ -105,6 +147,12 @@ public sealed class Supervisor
     {
         var value = Environment.GetEnvironmentVariable(name);
         return int.TryParse(value, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static int ReadNonNegativeInt(string name, int fallback)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        return int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : fallback;
     }
 }
 
