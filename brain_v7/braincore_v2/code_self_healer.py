@@ -123,7 +123,7 @@ def _failure_hint(error_text: str) -> str:
 def verify() -> tuple[bool, str]:
     """Run the smallest meaningful production verification suite."""
     yaml_check = subprocess.run(
-        ["python", "-c", "import yaml; yaml.safe_load(open('.github/workflows/brain6-168h-cloud.yml', encoding='utf-8'))"],
+        ["ruby", "-e", "require 'yaml'; YAML.load_file('.github/workflows/brain6-168h-cloud.yml')"],
         cwd=ROOT, capture_output=True, text=True, timeout=30,
     )
     if yaml_check.returncode:
