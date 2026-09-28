@@ -11,7 +11,7 @@ The Brain now contains a resumable 60-part cinematic executor.
 - persist state after every part
 - never regenerate a verified part
 
-## Termux
+## BRAIN Termux Emulator
 Run from the repository root:
 
 ```bash
