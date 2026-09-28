@@ -12,10 +12,9 @@ rewrite the Git repository history.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
-import re
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -27,6 +26,10 @@ SOURCE_ALLOWLIST = {
     ROOT / "brain_v7/braincore_v2/brain_media_adapter.py",
     ROOT / ".github/workflows/electronic-brain-cinematic.yml",
 }
+VERIFY_TESTS = (
+    "brain_v7/braincore_v2/test_factory_repair_app.py",
+    "brain_v7/braincore_v2/test_code_self_healer.py",
+)
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -83,6 +86,21 @@ RULES: tuple[Callable[[], list[str]], ...] = (
     rule_workflow_persists_route,
 )
 
+def diagnose_failure(error_text: str) -> dict[str, str]:
+    """Classify failure text without executing arbitrary instructions from it."""
+    text = (error_text or "").lower()
+    if "fal_model" in text and "empty" in text:
+        return {"class": "configuration", "repair": "rule_empty_fal_model"}
+    if "factory_media_route" in text:
+        return {"class": "routing", "repair": "rule_workflow_persists_route"}
+    if "syntaxerror" in text or "indentationerror" in text:
+        return {"class": "syntax", "repair": "none_allowlisted"}
+    if "modulenotfounderror" in text or "importerror" in text:
+        return {"class": "dependency_or_import", "repair": "none_allowlisted"}
+    if "pytest" in text or "assertionerror" in text:
+        return {"class": "test_failure", "repair": "none_allowlisted"}
+    return {"class": "unknown", "repair": "none_allowlisted"}
+
 def _failure_hint(error_text: str) -> str:
     text = (error_text or "").lower()
     if "fal_model" in text and "empty" in text:
@@ -92,15 +110,16 @@ def _failure_hint(error_text: str) -> str:
     return "verification_failure"
 
 def verify() -> tuple[bool, str]:
+    """Run the smallest meaningful production verification suite."""
     compile_cmd = ["python", "-m", "compileall", "-q", "brain_v7/braincore_v2"]
     p = subprocess.run(compile_cmd, cwd=ROOT, capture_output=True, text=True, timeout=120)
     if p.returncode:
-        return False, (p.stdout + p.stderr)[-4000:]
+        return False, (p.stdout + p.stderr)[-6000:]
     test = subprocess.run(
-        ["python", "-m", "pytest", "-q", "brain_v7/braincore_v2/test_factory_repair_app.py"],
-        cwd=ROOT, capture_output=True, text=True, timeout=180,
+        ["python", "-m", "pytest", "-q", *VERIFY_TESTS],
+        cwd=ROOT, capture_output=True, text=True, timeout=240,
     )
-    return test.returncode == 0, (test.stdout + test.stderr)[-4000:]
+    return test.returncode == 0, (test.stdout + test.stderr)[-6000:]
 
 def _snapshot(paths: list[Path]) -> dict[Path, str]:
     return {path: _read(path) for path in paths if path.exists()}
@@ -126,10 +145,12 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
         rolled_back = bool(changed) and not ok
         if rolled_back:
             _restore(before)
-        diagnosis = _failure_hint(verification if not ok else last_error)
+        failure = diagnose_failure(verification if not ok else last_error)
+        diagnosis = failure["repair"]
         entry = {
             "cycle": cycle,
             "failure_diagnosis": diagnosis,
+            "failure_class": failure["class"],
             "changed_files": sorted(set(changed)),
             "rule_errors": rule_errors,
             "verification_passed": ok,
@@ -161,6 +182,16 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
     return result
 
 if __name__ == "__main__":
-    result = heal(os.getenv("FACTORY_LAST_ERROR", ""))
+    parser = argparse.ArgumentParser(description="Bounded Electronic Brain source-code self-healer")
+    parser.add_argument("--error-file", default="", help="Optional file containing the latest failure output")
+    parser.add_argument("--report", default="code_self_healer_report.json")
+    args = parser.parse_args()
+    supplied = os.getenv("FACTORY_LAST_ERROR", "")
+    if args.error_file:
+        try:
+            supplied = Path(args.error_file).read_text(encoding="utf-8")[-12000:]
+        except OSError as exc:
+            supplied = f"error-file-read-failed: {exc}\n{supplied}"
+    result = heal(supplied, args.report)
     print(json.dumps(result, ensure_ascii=False))
     raise SystemExit(0 if result["status"] == "CODE_VERIFIED" else 2)
