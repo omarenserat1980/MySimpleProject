@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Browser</title>
+<style>
+:root{--bg:#050b14;--panel:#0b1422;--line:#20334a;--text:#edf6ff;--muted:#91a5bc;--cyan:#55d6ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui;min-height:100vh}
+header{display:flex;gap:8px;padding:10px;background:#07111d;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+button,input{font:inherit;border:1px solid var(--line);border-radius:10px;background:#102238;color:#fff;padding:10px}
+input{flex:1;min-width:0;background:#050b14;direction:ltr;text-align:left}
+main{height:calc(100vh - 70px);padding:10px}.frame{width:100%;height:100%;border:1px solid var(--line);border-radius:16px;background:#000}
+.note{color:var(--muted);font-size:11px;padding:6px 10px}
+</style>
+</head>
+<body>
+<header>
+<button onclick="goBack()">‹</button><button onclick="goForward()">›</button><button onclick="reload()">↻</button>
+<input id="url" value="https://www.google.com" placeholder="ابحث أو اكتب عنوانًا">
+<button onclick="navigate()">فتح</button>
+<button onclick="home()">⌂</button>
+</header>
+<div class="note">BRAIN Browser Workspace — على Android استخدم المتصفح الأصلي المدمج للحصول على WebView كامل.</div>
+<main><iframe id="view" class="frame" title="BRAIN Browser"></iframe></main>
+<script>
+const frame=document.getElementById('view'), input=document.getElementById('url');
+function normalize(v){v=v.trim();if(!v)return '';if(/^https?:\/\//i.test(v))return v;if(/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(v))return 'https://'+v;return 'https://www.google.com/search?q='+encodeURIComponent(v)}
+function navigate(){const u=normalize(input.value);if(u){frame.src=u;input.value=u}}
+function reload(){try{frame.contentWindow.location.reload()}catch(e){frame.src=frame.src}}
+function goBack(){try{frame.contentWindow.history.back()}catch(e){}}
+function goForward(){try{frame.contentWindow.history.forward()}catch(e){}}
+function home(){input.value='https://www.google.com';navigate()}
+navigate();
+</script>
+</body>
+</html>
