@@ -17,7 +17,7 @@ public class BrainCloudActivity extends Activity {
         root.setBackgroundColor(Color.rgb(12,12,16));
 
         TextView title = new TextView(this);
-        title.setText("BRAIN PHONE SERVER\\nCINEMATIC V3 PRO");
+        title.setText("BRAIN PHONE SERVER\nCINEMATIC V3 PRO");
         title.setTextSize(25);
         title.setTextColor(Color.WHITE);
         root.addView(title);
@@ -36,8 +36,12 @@ public class BrainCloudActivity extends Activity {
         stop.setText("■ إيقاف السيرفر");
         root.addView(stop);
 
+        Button terminal = new Button(this);
+        terminal.setText("⌘ فتح BRAIN Termux Emulator");
+        root.addView(terminal);
+
         Button termux = new Button(this);
-        termux.setText("⚙ تشغيل Full Cloud Hub عبر Termux");
+        termux.setText("⚙ تشغيل Full Cloud Hub عبر Termux الحقيقي");
         root.addView(termux);
 
         serverStatus = new TextView(this);
@@ -47,7 +51,7 @@ public class BrainCloudActivity extends Activity {
 
         TextView api = new TextView(this);
         api.setTextColor(Color.LTGRAY);
-        api.setText("API: /healthz   /v1/status   |   Full Factory: Termux + Python + FFmpeg");
+        api.setText("API: /healthz   /v1/status   |   Emulator: virtual shell   |   Factory: Python + FFmpeg");
         root.addView(api);
 
         setContentView(root);
@@ -55,6 +59,7 @@ public class BrainCloudActivity extends Activity {
 
         start.setOnClickListener(v -> startServer());
         stop.setOnClickListener(v -> stopServer());
+        terminal.setOnClickListener(v -> startActivity(new Intent(this, BrainTermuxActivity.class)));
         termux.setOnClickListener(v -> openTermux());
     }
 
@@ -79,13 +84,13 @@ public class BrainCloudActivity extends Activity {
             Intent i = new Intent();
             i.setClassName("com.termux", "com.termux.app.TermuxActivity");
             startActivity(i);
-            serverStatus.setText("افتح Termux وشغّل setup_brain_phone_server.sh");
+            serverStatus.setText("تم فتح Termux الحقيقي.");
         } catch (Exception e) {
-            serverStatus.setText("ثبّت Termux لتشغيل Full Cloud Hub: " + e.getMessage());
+            serverStatus.setText("Termux الحقيقي غير مثبت. استخدم BRAIN Termux Emulator.");
         }
     }
 
     private void refreshStatus() {
-        serverStatus.setText("جاهز — اختر تشغيل السيرفر.");
+        serverStatus.setText("جاهز — شغّل السيرفر أو افتح المحاكي.");
     }
 }
