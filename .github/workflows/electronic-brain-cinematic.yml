@@ -22,25 +22,12 @@ on:
         required: true
         type: choice
         default: "5"
-        options:
-          - "5"
-          - "10"
-          - "15"
-          - "20"
-          - "30"
-          - "60"
-          - "120"
-          - "180"
-          - "240"
-          - "300"
-          - "360"
+        options: ["5","10","15","20","30","60","120","180","240","300","360"]
 
 permissions:
   contents: read
   actions: read
 
-# Never let two cinematic production runs compete for the same provider,
-# checkpoint, or output directory.
 concurrency:
   group: electronic-brain-cinematic-production
   cancel-in-progress: true
@@ -51,7 +38,6 @@ jobs:
     timeout-minutes: 360
     env:
       FACTORY_ALLOW_PRODUCTION: "1"
-      # Free-only production profile: no paid media API is required.
       FACTORY_MODEL_ROUTER: "1"
       FACTORY_MODEL: "auto"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
@@ -61,7 +47,6 @@ jobs:
       FAL_KEY: ${{ secrets.FAL_KEY }}
       COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
       COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
-      # Explicit, valid FAL video endpoint. Empty env values must never reach fal_client.
       FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
       FAL_SHOT_DURATION: "5"
       FAL_GENERATE_AUDIO: "1"
@@ -81,8 +66,6 @@ jobs:
       FACTORY_REQUIRE_REAL_MEDIA: "1"
       FACTORY_ALLOW_LOCAL_FALLBACK: "1"
       FACTORY_EMERGENCY_LOCAL_FALLBACK: "1"
-      # Pass the ephemeral GitHub Actions token to Python code that calls the GitHub API.
-      # This fixes 401 Requires authentication without storing a PAT in the repository.
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout Electronic Brain
@@ -93,36 +76,26 @@ jobs:
           set -euo pipefail
           minutes="${{ inputs.brain_runtime_minutes || '5' }}"
           case "$minutes" in
-            5) seconds=300;;
-            10) seconds=600;;
-            15) seconds=900;;
-            20) seconds=1200;;
-            30) seconds=1800;;
-            60) seconds=3600;;
-            120) seconds=7200;;
-            180) seconds=10800;;
-            240) seconds=14400;;
-            300) seconds=18000;;
-            360) seconds=21600;;
+            5) seconds=300;; 10) seconds=600;; 15) seconds=900;; 20) seconds=1200;;
+            30) seconds=1800;; 60) seconds=3600;; 120) seconds=7200;; 180) seconds=10800;;
+            240) seconds=14400;; 300) seconds=18000;; 360) seconds=21600;;
             *) echo "::error::Unsupported Brain runtime: $minutes minutes"; exit 1;;
           esac
           echo "BRAIN_MAX_RUNTIME_SECONDS=$seconds" >> "$GITHUB_ENV"
           echo "BRAIN_MAX_ITERATIONS=1000000" >> "$GITHUB_ENV"
-          echo "Brain autonomy window: $minutes minutes ($seconds seconds), max 1000 attempts."
 
       - name: Load production request duration
         run: |
           python - <<'PY'
           import json, os
-          p = "production/REQUEST.json"
-          with open(p, "r", encoding="utf-8") as fh:
-              req = json.load(fh)
-          duration = int(req.get("duration_seconds", 60))
-          duration = max(1, min(600, duration))
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+          with open("production/REQUEST.json", encoding="utf-8") as fh:
+              req=json.load(fh)
+          duration=max(1,min(600,int(req.get("duration_seconds",60))))
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as fh:
               fh.write(f"FACTORY_DURATION_SECONDS={duration}\n")
           print(f"FACTORY_DURATION_SECONDS={duration}")
           PY
+
       - name: Restore factory checkpoint
         env:
           GH_TOKEN: ${{ github.token }}
@@ -154,22 +127,38 @@ jobs:
       - name: Preflight free media backend
         run: |
           set -euo pipefail
-          if [ -z "${FAL_KEY}" ] && [ -z "${MEDIA_PROVIDER_URL}" ] && [ -z "${COMFYUI_URL}" ] && [ "${FACTORY_ALLOW_LOCAL_FALLBACK}" != "1" ]; then
-            echo "::error::No free media backend configured. Enable the built-in local FFmpeg cinematic renderer or configure a local ComfyUI backend."
+          if [ -z "$FAL_KEY" ] && [ -z "$MEDIA_PROVIDER_URL" ] && [ -z "$COMFYUI_URL" ] && [ "$FACTORY_ALLOW_LOCAL_FALLBACK" != "1" ]; then
+            echo "::error::No free media backend configured."
             exit 1
           fi
-          echo "Free-only media profile enabled: local FFmpeg/ComfyUI; paid API providers are not required."
+          echo "Free-only media profile enabled."
 
       - name: Validate cinematic brain modules
         run: |
           python -m compileall -q brain_v7/braincore_v2
           python -m compileall -q brain_v12
+          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py
 
       - name: Run Factory Repair App
         run: |
           set -euo pipefail
-          FACTORY_REPAIR_100=1 python -m brain_v7.braincore_v2.factory_repair_app
-          cat factory_repair_report.json
+          FACTORY_REPAIR_100=1 python -m brain_v7.braincore_v2.factory_repair_app | tee factory_repair_stdout.json
+          test -s factory_repair_100_report.json
+          python - <<'PY'
+          import json, os
+          report=json.load(open("factory_repair_100_report.json",encoding="utf-8"))
+          status=report.get("status")
+          if status=="REPAIR_LIMIT_REACHED":
+              raise SystemExit("SELF_HEALING_FAILED: 100 repair cycles exhausted")
+          history=report.get("history") or []
+          route=(history[-1].get("diagnosis") or {}).get("recommended_route") if history else None
+          if route and route != "configuration_required":
+              with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as fh:
+                  fh.write(f"FACTORY_MEDIA_ROUTE={route}\n")
+              print(f"Persisted FACTORY_MEDIA_ROUTE={route}")
+          print(json.dumps({"status":status,"cycles_completed":report.get("cycles_completed"),"route":route},ensure_ascii=False))
+          PY
+
       - name: Run Electronic Brain Cinematic Factory
         run: |
           set -o pipefail
@@ -183,17 +172,15 @@ jobs:
           test -s cinematic_output/final.mp4
           ffprobe -v error -show_entries format=duration,size:stream=codec_type,codec_name,width,height -of json cinematic_output/final.mp4 > final_probe.json
           python - <<'PY'
-          import json, subprocess
-          p="cinematic_output/final.mp4"
+          import json, subprocess, re
           data=json.load(open("final_probe.json"))
           duration=float(data["format"].get("duration") or 0)
           streams=data.get("streams") or []
           video=next((s for s in streams if s.get("codec_type")=="video"),None)
           audio=next((s for s in streams if s.get("codec_type")=="audio"),None)
-          if not video or not audio or duration < 1 or video.get("width",0)<640 or video.get("height",0)<360):
+          if not video or not audio or duration < 1 or video.get("width",0)<640 or video.get("height",0)<360:
               raise SystemExit("FINAL_QC_FAILED: missing valid video/audio content")
-          r=subprocess.run(["ffmpeg","-v","info","-i",p,"-vf","blackdetect=d=0.5:pix_th=0.98","-an","-f","null","-"],capture_output=True,text=True,timeout=180)
-          import re
+          r=subprocess.run(["ffmpeg","-v","info","-i","cinematic_output/final.mp4","-vf","blackdetect=d=0.5:pix_th=0.98","-an","-f","null","-"],capture_output=True,text=True,timeout=180)
           black=sum(float(x) for x in re.findall(r"black_duration:([0-9.]+)",r.stderr or ""))
           ratio=black/duration
           print(f"duration={duration:.2f}s black_ratio={ratio:.3f}")
@@ -214,6 +201,8 @@ jobs:
             cinematic_project_manifest.json
             factory_result.json
             cinema_engine_v6_manifest.json
+            factory_repair_100_report.json
+            factory_repair_stdout.json
           if-no-files-found: ignore
           retention-days: 30
 
