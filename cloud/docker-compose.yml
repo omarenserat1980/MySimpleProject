@@ -13,6 +13,11 @@ services:
     environment:
       FACTORY_ALLOW_PRODUCTION: "1"
       FACTORY_REQUIRE_REAL_MEDIA: "1"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "1"
+      FACTORY_MEDIA_ROUTE: "local_ffmpeg_cinematic"
+      LOCAL_MEDIA_DIR: "/app/cinematic_output"
+      FACTORY_OUTPUT_DIR: "/app/cinematic_output"
+      BRAIN_DEPLOY_EXECUTOR: "none"
       FACTORY_ONE_SHOT: "1"
       FACTORY_ALLOW_YOUTUBE_PUBLISH: "0"
       FACTORY_INTERVAL_SECONDS: "21600"
