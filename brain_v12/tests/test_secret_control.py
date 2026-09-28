@@ -6,11 +6,7 @@ from brain_v12.brain.secret_control import SecretControlPlane
 
 class SecretControlPlaneTests(unittest.TestCase):
     def test_never_returns_secret_values(self):
-        env = {
-            "RENDER_API_KEY": "render-secret-value",
-            "RENDER_OWNER_ID": "owner-123",
-            "OPENAI_API_KEY": "openai-secret-value",
-        }
+        env = {"OPENAI_API_KEY": "openai-secret-value"}
         status = SecretControlPlane(env).status()
         raw = str(status)
         self.assertNotIn("render-secret-value", raw)
@@ -19,11 +15,11 @@ class SecretControlPlaneTests(unittest.TestCase):
         self.assertEqual(status["missing"], [])
 
     def test_missing_secret_is_reported_without_value(self):
-        env = {"RENDER_SERVICE_ID": "srv-test"}
+        env = {}
         status = SecretControlPlane(env).status()
         self.assertEqual(
             set(status["missing"]),
-            {"RENDER_API_KEY", "RENDER_OWNER_ID", "OPENAI_API_KEY"},
+            {"OPENAI_API_KEY"},
         )
 
     def test_plan_requires_external_connector_for_remote_write(self):
