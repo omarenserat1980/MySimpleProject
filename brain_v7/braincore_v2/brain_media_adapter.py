@@ -131,6 +131,10 @@ class BrainMediaProvider:
     def render(self, *, shot: dict[str, Any], authorized: bool=False) -> dict[str, Any]:
         if not authorized:
             return {"status":"AUTHORIZATION_REQUIRED"}
+        from .legal_media_guard import enforce_media_license
+        legal_media = enforce_media_license(shot)
+        if not legal_media.get("allowed"):
+            return {"status":"LEGAL_MEDIA_REJECTED", "legal_media": legal_media, "shot_id": shot.get("shot_id")}
         forced_route = os.getenv("FACTORY_MEDIA_ROUTE", "").strip().lower()
         local_enabled = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "0").strip().lower() in {
             "1", "true", "yes", "on"
