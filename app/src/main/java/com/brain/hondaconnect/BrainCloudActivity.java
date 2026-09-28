@@ -10,7 +10,7 @@ import java.net.*;
 import org.json.*;
 
 public class BrainCloudActivity extends Activity {
-    EditText url, token;
+    EditText url, token, title;
     TextView status, pipeline;
 
     @Override public void onCreate(Bundle b) {
@@ -34,6 +34,10 @@ public class BrainCloudActivity extends Activity {
         token.setHint("BRAIN_CONTROL_TOKEN");
         token.setSingleLine(true);
         token.setInputType(0x00000081);
+        title = new EditText(this);
+        title.setHint("عنوان الفيلم");
+        title.setSingleLine(true);
+        root.addView(title);
         root.addView(token);
 
         Button connect = new Button(this);
@@ -57,7 +61,36 @@ public class BrainCloudActivity extends Activity {
         setContentView(root);
 
         connect.setOnClickListener(v -> request("/v1/status"));
-        film.setOnClickListener(v -> request("/v1/films"));
+        film.setOnClickListener(v -> createFilm());
+    }
+
+    private void createFilm() {
+        final String base = url.getText().toString().trim().replaceAll("/+$","");
+        final String auth = token.getText().toString().trim();
+        final String filmTitle = title.getText().toString().trim();
+        if (base.isEmpty()) { status.setText("أدخل عنوان BRAIN Cloud"); return; }
+        if (filmTitle.isEmpty()) { status.setText("أدخل عنوان الفيلم"); return; }
+        status.setText("جاري إنشاء الفيلم...");
+        new Thread(() -> {
+            try {
+                HttpURLConnection c=(HttpURLConnection)new URL(base+"/v1/films").openConnection();
+                c.setRequestMethod("POST");
+                c.setConnectTimeout(10000); c.setReadTimeout(15000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type","application/json; charset=UTF-8");
+                if(!auth.isEmpty()) c.setRequestProperty("Authorization","Bearer "+auth);
+                String body="{\"title\":\""+filmTitle.replace("\\","\\\\").replace("\"","\\\"")+"\",\"target_minutes\":1,\"language\":\"ar\"}";
+                try(OutputStream o=c.getOutputStream()){o.write(body.getBytes("UTF-8"));}
+                int code=c.getResponseCode();
+                InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
+                StringBuilder s=new StringBuilder();
+                if(stream!=null){byte[] buf=new byte[2048]; int n; while((n=stream.read(buf))!=-1)s.append(new String(buf,0,n,"UTF-8"));}
+                final String result=s.toString();
+                runOnUiThread(() -> status.setText("HTTP "+code+"\n"+result));
+            } catch(Exception e) {
+                runOnUiThread(() -> status.setText("خطأ إنشاء الفيلم: "+e.getMessage()));
+            }
+        }).start();
     }
 
     private void request(String path) {
