@@ -29,6 +29,7 @@ SOURCE_ALLOWLIST = {
     ROOT / ".github/workflows/brain6-168h-cloud.yml",
     ROOT / ".github/workflows/cloud-runtime-build.yml",
     ROOT / ".github/workflows/cinematic-factory-smoke.yml",
+    ROOT / ".github/workflows/brain-auto-repair-and-smoke.yml",
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
@@ -190,7 +191,9 @@ def _failure_hint(error_text: str) -> str:
 def verify() -> tuple[bool, str]:
     """Run the smallest meaningful production verification suite."""
     yaml_check = subprocess.run(
-        ["ruby", "-e", "require 'yaml'; YAML.load_file('.github/workflows/brain6-168h-cloud.yml')"],
+        ["ruby", "-e", "require 'yaml'; ARGV.each { |p| YAML.load_file(p) }",
+         ".github/workflows/brain6-168h-cloud.yml",
+         ".github/workflows/brain-auto-repair-and-smoke.yml"],
         cwd=ROOT, capture_output=True, text=True, timeout=30,
     )
     if yaml_check.returncode:
