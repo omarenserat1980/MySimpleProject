@@ -269,6 +269,11 @@ def media_jobs(limit: int = 30):
 def media_job(job_id: str):
     return media_engine.snapshot(job_id)
 
+@app.post("/api/media/jobs/{job_id}/cancel")
+def media_cancel_job(job_id: str):
+    return media_engine.cancel(job_id)
+
+
 
 @app.post("/api/media/probe")
 def media_probe(body: MediaJobIn):
