@@ -16,6 +16,8 @@ on:
     paths:
       - "brain_v7/braincore_v2/auto_repair_app.py"
       - "brain_v7/braincore_v2/code_self_healer.py"
+      - "brain_v7/braincore_v2/brain_media_adapter.py"
+      - "brain_v7/braincore_v2/legal_media_guard.py"
       - "brain_v7/braincore_v2/repair_controller_15000.py"
       - ".github/workflows/brain-auto-repair-and-smoke.yml"
 
