@@ -11,7 +11,7 @@ KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent
 POLL_SECONDS = int(os.getenv("V12_POLL_SECONDS", "5"))
 TIMEOUT = 15
 
-ALLOWED_TASKS = {"status", "python_version", "termux_path", "platform"}
+ALLOWED_TASKS = {"status", "python_version", "brain_emulator_path", "platform"}
 
 def load_key():
     with open(KEY_FILE, "r", encoding="utf-8") as f:
@@ -22,7 +22,7 @@ def load_key():
 
 def request(method, path, key, payload=None):
     data = None
-    headers = {"X-V12-Agent-Key": key, "User-Agent": "V12-Termux-Agent/1.0"}
+    headers = {"X-V12-Agent-Key": key, "User-Agent": "V12-BRAIN Termux Emulator-Agent/1.0"}
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False).encode()
         headers["Content-Type"] = "application/json"
@@ -36,13 +36,13 @@ def execute(task, params):
             "device": platform.system(),
             "machine": platform.machine(),
             "python": platform.python_version(),
-            "agent": "V12-Termux-Agent",
+            "agent": "V12-BRAIN Termux Emulator-Agent",
             "status": "READY",
         }
     if task == "python_version":
         p = subprocess.run(["python", "--version"], capture_output=True, text=True, timeout=10)
         return {"returncode": p.returncode, "stdout": p.stdout.strip(), "stderr": p.stderr.strip()}
-    if task == "termux_path":
+    if task == "brain_emulator_path":
         p = subprocess.run(["pwd"], capture_output=True, text=True, timeout=10)
         return {"returncode": p.returncode, "stdout": p.stdout.strip(), "stderr": p.stderr.strip()}
     if task == "platform":
@@ -51,7 +51,7 @@ def execute(task, params):
 
 def main():
     key = load_key()
-    print(f"V12 Termux Agent connected to {BRAIN_URL}")
+    print(f"V12 BRAIN Termux Emulator Agent connected to {BRAIN_URL}")
     print(f"Agent ID: {AGENT_ID}")
     while True:
         try:
