@@ -34,10 +34,11 @@ public class BrainTermuxActivity extends Activity {
         new File(brainHome, ".brain_state").mkdirs();
         env.put("HOME", brainHome.getAbsolutePath());
         env.put("PREFIX", new File(getFilesDir(), "usr").getAbsolutePath());
-        env.put("BRAIN_MODE", "phone");
+        env.put("BRAIN_MODE", "emulator");
+        env.put("BRAIN_RUNTIME", "BRAIN_TERMUX_EMULATOR");
         env.put("BRAIN_PORT", "8787");
         buildUi();
-        print("BRAIN TERMUX EMULATOR v3.0\\nLocal Cloud Hub bridge enabled.\\nSystem shell execution remains blocked.\\nType 'help'.\\n$ ");
+        print("BRAIN TERMUX EMULATOR v4.0\\nNative BRAIN command runtime.\\nNo Termux installation required.\\nCloud Hub bridge enabled.\\nType 'help'.\\n$ ");
     }
 
     private void buildUi() {
@@ -47,7 +48,7 @@ public class BrainTermuxActivity extends Activity {
         root.setBackgroundColor(Color.rgb(8,10,8));
 
         TextView header = new TextView(this);
-        header.setText("BRAIN • PHONE TERMINAL v3");
+        header.setText("BRAIN • TERMUX EMULATOR v4");
         header.setTextColor(Color.WHITE);
         header.setTextSize(18);
         header.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
@@ -90,13 +91,14 @@ public class BrainTermuxActivity extends Activity {
 
     private String execute(String cmd) {
         if (cmd.equals("help")) return
-            "BRAIN commands:\n" +
+            "BRAIN Termux Emulator commands:\n" +
             "  pwd | ls | cd DIR\n" +
             "  mkdir NAME | touch NAME | rm NAME\n" +
             "  cat NAME | echo TEXT | env\n" +
             "  status | health | brain | processes\n" +
             "  factory TITLE | job ID | ffmpeg | qc ID\n" +
-            "  clear | exit";
+            "  clear | exit\n" +
+            "External Termux packages are not required.";
         if (cmd.equals("pwd")) return brainHome.getAbsolutePath();
         if (cmd.equals("ls")) {
             File[] files = brainHome.listFiles();
@@ -117,23 +119,23 @@ public class BrainTermuxActivity extends Activity {
             try { Scanner sc=new Scanner(resolve(cmd.substring(4))); StringBuilder s=new StringBuilder(); while(sc.hasNextLine())s.append(sc.nextLine()).append("\n"); sc.close(); return s.toString(); }
             catch(Exception e){ return "error: "+e.getMessage(); }
         }
-        if (cmd.equals("env")) return "HOME="+env.get("HOME")+"\nPREFIX="+env.get("PREFIX")+"\nBRAIN_MODE=phone\nBRAIN_PORT=8787";
-        if (cmd.equals("status")) { request("GET","/v1/status",null,"STATUS"); return "STATUS: querying local Cloud Hub..."; }
+        if (cmd.equals("env")) return "HOME="+env.get("HOME")+"\nPREFIX="+env.get("PREFIX")+"\nBRAIN_MODE=emulator\nBRAIN_RUNTIME=BRAIN_TERMUX_EMULATOR\nBRAIN_PORT=8787";
+        if (cmd.equals("status")) { request("GET","/v1/status",null,"STATUS"); return "STATUS: querying local BRAIN Cloud Hub..."; }
         if (cmd.equals("health")) { request("GET","/healthz",null,"HEALTH"); return "HEALTH: querying 127.0.0.1:8787..."; }
-        if (cmd.equals("brain")) return "API | Movie Factory | CinematicLocalRenderer | FFmpeg | QC";
+        if (cmd.equals("brain")) return "BRAIN Cloud Hub | Movie Factory | CinematicLocalRenderer | FFmpeg | QC";
         if (cmd.equals("factory")) return "usage: factory TITLE";
         if (cmd.startsWith("factory ")) {
             String title=cmd.substring(8).trim();
             if(title.isEmpty()) return "usage: factory TITLE";
             String body="{\"title\":\""+jsonEscape(title)+"\",\"target_minutes\":1,\"language\":\"ar\"}";
             request("POST","/v1/films",body,"FACTORY");
-            return "FACTORY: submitting real local film job...";
+            return "FACTORY: submitting local BRAIN film job...";
         }
         if (cmd.startsWith("job ")) { String id=cmd.substring(4).trim(); try { if(id.isEmpty())return "usage: job ID"; request("GET","/v1/films/"+safeId(id),null,"JOB"); return "JOB: querying "+id; } catch(Exception e) { return "error: "+e.getMessage(); } }
-        if (cmd.equals("ffmpeg")) { request("GET","/v1/platform",null,"FFMPEG"); return "FFMPEG: querying factory capabilities..."; }
+        if (cmd.equals("ffmpeg")) { request("GET","/v1/platform",null,"FFMPEG"); return "FFMPEG: querying BRAIN factory capabilities..."; }
         if (cmd.equals("qc")) return lastJobId.isEmpty() ? "usage: qc JOB_ID" : "QC: query "+lastJobId+" with 'qc "+lastJobId+"'";
         if (cmd.startsWith("qc ")) { String id=cmd.substring(3).trim(); try { if(id.isEmpty())return "usage: qc JOB_ID"; request("GET","/v1/films/"+safeId(id),null,"QC"); return "QC: querying verified state for "+id; } catch(Exception e) { return "error: "+e.getMessage(); } }
-        if (cmd.equals("processes")) return "brain-phone-server [Android]\nbrain-termux-emulator [UI]\ncloud-hub-bridge [HTTP localhost]";
+        if (cmd.equals("processes")) return "brain-termux-emulator [Android UI]\nbrain-cloud-hub [HTTP localhost]\nbrain-film-factory [Cloud Hub]\nbrain-qc [Cloud Hub]";
         if (cmd.equals("clear")) { terminal.setText(""); return ""; }
         if (cmd.equals("exit")) { finish(); return ""; }
         if (cmd.startsWith("echo ")) return cmd.substring(5);
@@ -146,7 +148,7 @@ public class BrainTermuxActivity extends Activity {
     }
 
     private String jsonEscape(String s) {
-        return s.replace("\\\\","\\\\\\\\").replace("\"","\\\\\"");
+        return s.replace("\\","\\\\").replace("\"","\\\"");
     }
 
     private File resolve(String path) throws IOException {
@@ -176,7 +178,7 @@ public class BrainTermuxActivity extends Activity {
                 InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
                 StringBuilder b=new StringBuilder();
                 if(stream!=null){BufferedReader r=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8));String line;while((line=r.readLine())!=null)b.append(line);}
-                String result=label+" HTTP "+code+"\\n"+b;
+                String result=label+" HTTP "+code+"\n"+b;
                 if(label.equals("FACTORY")){
                     String marker="\"id\":\"";
                     int p=b.indexOf(marker);
