@@ -1076,6 +1076,42 @@ def revoke(request:Request, body:Permission):
 @app.post("/api/permissions/check")
 def permission_check(capabilities:list[str],approved:bool=False): return cognitive.permissions.check(capabilities,approved)
 
+@app.post("/api/image-factory/generate")
+def image_factory_generate(body:dict):
+    """Generate a Brain Image Factory image server-side; API key never reaches the browser."""
+    prompt=str(body.get("prompt","")).strip()
+    size=str(body.get("size","1024x1024")).strip()
+    quality=str(body.get("quality","auto")).strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="PROMPT_REQUIRED")
+    if not openai_provider.configured:
+        return {"ok":False,"error":"OPENAI_NOT_CONFIGURED","message":"Set OPENAI_API_KEY on the server."}
+    allowed_sizes={"1024x1024","1536x1024","1024x1536","auto"}
+    if size not in allowed_sizes: size="1024x1024"
+    payload={"model":os.getenv("OPENAI_IMAGE_MODEL","gpt-image-2"),"prompt":prompt,"size":size}
+    if quality in {"low","medium","high","auto"}: payload["quality"]=quality
+    headers={"Authorization":f"Bearer {openai_provider.api_key}","Content-Type":"application/json"}
+    try:
+        import base64, time
+        with httpx.Client(timeout=180.0) as client:
+            response=client.post(f"{openai_provider.base_url}/images/generations",headers=headers,json=payload)
+        if response.status_code >= 400:
+            return {"ok":False,"error":"OPENAI_IMAGE_API_ERROR","status_code":response.status_code,"detail":response.text[:2000]}
+        data=response.json()
+        item=(data.get("data") or [{}])[0]
+        b64=item.get("b64_json")
+        if not b64:
+            return {"ok":False,"error":"IMAGE_DATA_MISSING"}
+        media_dir=os.path.join(ROOT,"web","media","generated")
+        os.makedirs(media_dir,exist_ok=True)
+        filename=f"brain-image-{int(time.time()*1000)}.png"
+        path=os.path.join(media_dir,filename)
+        with open(path,"wb") as fh: fh.write(base64.b64decode(b64))
+        store.event("IMAGE_FACTORY_GENERATED",{"filename":filename,"model":payload["model"],"size":size})
+        return {"ok":True,"model":payload["model"],"size":size,"url":f"/media/generated/{filename}","filename":filename}
+    except httpx.HTTPError as exc:
+        return {"ok":False,"error":"OPENAI_IMAGE_NETWORK_ERROR","detail":str(exc)[:1000]}
+
 @app.get("/api/ai/status")
 def ai_status(): return {"providers":ai.status(),"openai":openai_provider.status()}
 @app.post("/api/ai/invoke")
