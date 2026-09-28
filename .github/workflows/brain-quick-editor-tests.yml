@@ -3,17 +3,17 @@ name: brain-quick-editor-tests
 on:
   push:
     paths:
-      - 'brain_v12/app.py'
-      - 'brain_v12/web/quick-editor.html'
-      - 'brain_v12/tests/test_quick_editor.py'
-      - 'brain_v12/requirements.txt'
-      - '.github/workflows/brain-quick-editor-tests.yml'
+      - brain_v12/app.py
+      - brain_v12/web/quick-editor.html
+      - brain_v12/tests/test_quick_editor.py
+      - brain_v12/requirements.txt
+      - .github/workflows/brain-quick-editor-tests.yml
   pull_request:
     paths:
-      - 'brain_v12/app.py'
-      - 'brain_v12/web/quick-editor.html'
-      - 'brain_v12/tests/test_quick_editor.py'
-      - 'brain_v12/requirements.txt'
+      - brain_v12/app.py
+      - brain_v12/web/quick-editor.html
+      - brain_v12/tests/test_quick_editor.py
+      - brain_v12/requirements.txt
 
 permissions:
   contents: read
@@ -21,23 +21,20 @@ permissions:
 jobs:
   quick-editor:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Install runtime dependencies
         run: python -m pip install -r brain_v12/requirements.txt
-      - name: Compile
+      - name: Compile Brain
         run: python -m compileall -q brain_v12
-      - name: Quick Editor tests
+      - name: Quick Editor unit tests
         run: python -m unittest brain_v12.tests.test_quick_editor -v
-      - name: Validate UI
-        run: python - <<'PY'
-          from pathlib import Path
-          p=Path("brain_v12/web/quick-editor.html")
-          text=p.read_text(encoding="utf-8")
-          required=["/api/quick-editor/read","/api/quick-editor/validate","/api/quick-editor/write","BRAIN Quick Editor"]
-          missing=[x for x in required if x not in text]
-          raise SystemExit("Missing UI contracts: "+", ".join(missing) if missing else 0)
-          PY
+      - name: Validate Quick Editor UI contract
+        run: |
+          python -c 'from pathlib import Path; t=Path("brain_v12/web/quick-editor.html").read_text(encoding="utf-8"); r=["/api/quick-editor/read","/api/quick-editor/validate","/api/quick-editor/write","BRAIN Quick Editor"]; m=[x for x in r if x not in t]; raise SystemExit("Missing UI contracts: "+", ".join(m)) if m else None'
