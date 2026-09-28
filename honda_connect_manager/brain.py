@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
-"""Honda CONNECT compatibility brain.
+"""Honda CONNECT firmware intake and compatibility brain.
 
-Input: exact Honda CONNECT firmware/version string plus apps.json.
-Output: compatible package candidates, with a conservative decision:
-- exact version match
-- supported range match
-- unknown => no automatic install
+The vehicle-side export is expected to be a JSON file such as
+HondaSoftwareUpdates/rb/update_by_usb.json or update_by_usb.json.
+
+The brain extracts version/package metadata and only selects an app package
+when an explicit compatibility rule and verified source are present.
+It never invents a firmware package or performs vehicle installation.
 """
 
-import json, re, sys
+import hashlib
+import json
+import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 MANIFEST = ROOT / "apps.json"
 
+
 def version_tuple(value):
     nums = re.findall(r"\d+", value or "")
     return tuple(int(x) for x in nums[:4]) if nums else ()
+
 
 def compatible(app, firmware):
     rules = app.get("compatibility_rules", [])
@@ -41,9 +47,56 @@ def compatible(app, firmware):
 
     return False, "firmware outside supported ranges"
 
-def main(firmware):
+
+def load_vehicle_export(path):
+    p = Path(path)
+    data = json.loads(p.read_text(encoding="utf-8"))
+
+    def first(*keys):
+        for key in keys:
+            value = data.get(key)
+            if value not in (None, ""):
+                return str(value)
+        return ""
+
+    firmware = first(
+        "softwareVersion", "software_version", "systemVersion",
+        "system_version", "version", "firmwareVersion", "firmware_version"
+    )
+    package = first("package", "packageName", "package_name", "fileName", "filename")
+    sha256 = first("sha256", "SHA256", "packageSha256", "package_sha256")
+
+    return {
+        "source_file": str(p),
+        "system_version": first("systemVersion", "system_version"),
+        "software_version": first("softwareVersion", "software_version"),
+        "hardware_version": first("hardwareVersion", "hardware_version"),
+        "mcu_version": first("mcuVersion", "mcu_version", "MCU"),
+        "firmware": firmware,
+        "package": package,
+        "sha256": sha256,
+        "raw": data,
+    }
+
+
+def main():
+    if len(sys.argv) != 2:
+        raise SystemExit(
+            "Usage: python brain.py '<firmware version>' | python brain.py --vehicle-json <file>"
+        )
+
+    if sys.argv[1] == "--vehicle-json":
+        if len(sys.argv) != 3:
+            raise SystemExit("Usage: python brain.py --vehicle-json <file>")
+        vehicle = load_vehicle_export(sys.argv[2])
+        firmware = vehicle["firmware"]
+    else:
+        vehicle = {"firmware": sys.argv[1]}
+        firmware = sys.argv[1]
+
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     candidates = []
+
     for app in data.get("apps", []):
         ok, reason = compatible(app, firmware)
         if ok is True and app.get("source"):
@@ -56,14 +109,21 @@ def main(firmware):
 
     result = {
         "target": data.get("target", {}),
-        "firmware": firmware,
+        "vehicle_export": vehicle,
         "candidates": candidates,
         "automatic_install_allowed": False,
-        "next_step": "Use a verified package source and the head-unit's supported installation mechanism."
+        "decision": (
+            "compatible_candidate_found"
+            if candidates else
+            "no_verified_compatible_package"
+        ),
+        "next_step": (
+            "Use the head-unit's supported installation mechanism only after "
+            "the package source and checksum are independently verified."
+        ),
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: python brain.py '<Honda CONNECT firmware version>'")
-    main(sys.argv[1])
+    main()
