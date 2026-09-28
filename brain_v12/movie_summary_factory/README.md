@@ -63,3 +63,10 @@ MovieSummaryJob {
 
 ## Definition of Done
 لا يعتبر الملخص جاهزًا إلا إذا اجتاز Story + Visual + Audio + Continuity + Runtime QC.
+
+## CINEMATIC V3 PRO
+
+V3 upgrades the existing factory without replacing it. It adds a shot-level cinematic planner, camera-motion vocabulary, rhythm-aware editing, audio ducking metadata, SFX binding, subtitle timing fields, character/location continuity gates, mobile/GPU-friendly rendering requirements, and an anti-slideshow QC gate. The V3 API endpoint is `POST /api/movie-summary/v3/plan` and the browser UI is `/movie-summary-v3.html`.
+
+### V3 Quality Gate
+The plan is rejected unless it has multiple shots per beat, camera motion, voiceover, music, event-bound SFX, subtitles, transitions, continuity metadata, and a non-static presentation path.
