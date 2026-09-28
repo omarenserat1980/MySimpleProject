@@ -4,6 +4,6 @@
   "resume": false,
   "youtube_publish": false,
   "quality_floor": 0.82,
-  "requested_at": "2026-09-28T06:15:00.000Z",
-  "reason": "code self-healer rollback validation"
+  "requested_at": "2026-09-28T06:25:00.000Z",
+  "reason": "code self-healer diagnostic loop validation"
 }
