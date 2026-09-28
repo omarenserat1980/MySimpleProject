@@ -14,12 +14,15 @@ jobs:
   verify-and-persist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -r brain_v7/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r brain_v7/requirements.txt
+          python -m pip install -r brain_v12/requirements.txt
       - name: Run verification
         id: verify
         continue-on-error: true
