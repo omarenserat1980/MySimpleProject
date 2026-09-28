@@ -12,14 +12,17 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install dependencies
         run: |
           python -m pip install --disable-pip-version-check -r brain_v7/requirements.txt
           python -m pip install --disable-pip-version-check pytest
+      - name: Validate Brain V12 import contract
+        run: |
+          python -c "from brain_v12.app import app; print('brain_v12.app import: OK')"
       - name: Compile Brain V7 and V12 modules
         run: |
           python -m compileall -q brain_v7/braincore_v2
