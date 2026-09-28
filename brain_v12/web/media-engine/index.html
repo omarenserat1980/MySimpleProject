@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Media Engine</title>
+<style>
+:root{--bg:#050b14;--panel:#0c1726;--panel2:#101d2e;--line:#21364d;--text:#edf6ff;--muted:#8fa6bb;--cyan:#55d6ff;--green:#43e0a1;--red:#ff6b81}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 70% 0,#16324b,#050b14 55%);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{max-width:1450px;margin:auto;padding:22px}.head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:16px}.brand{font-size:25px;font-weight:800}.brand small{display:block;color:var(--muted);font-size:12px;font-weight:400;margin-top:4px}.badge{padding:7px 11px;border:1px solid var(--line);border-radius:99px;color:var(--muted)}.good{color:var(--green)}.bad{color:var(--red)}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.card{background:linear-gradient(145deg,#0d1928ee,#091321ee);border:1px solid var(--line);border-radius:20px;padding:18px}.card h2{margin:0 0 12px}.ops{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.op{padding:12px;background:#07111d;border:1px solid var(--line);border-radius:13px;color:#cce4f5;cursor:pointer}.op.active{border-color:var(--cyan);box-shadow:0 0 18px #55d6ff18}.fields{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.field{display:grid;gap:5px}.field.full{grid-column:1/-1}label{font-size:11px;color:var(--muted)}input,select{width:100%;background:#07111d;border:1px solid var(--line);border-radius:10px;padding:10px;color:#fff}button{border:1px solid var(--line);border-radius:12px;padding:11px 15px;background:#14263b;color:#fff;cursor:pointer}.primary{background:linear-gradient(135deg,#147da6,#3565c4);border:0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.job{padding:11px;border-bottom:1px solid #17283b}.jobHead{display:flex;justify-content:space-between;gap:8px}.track{height:7px;background:#07111d;border-radius:99px;overflow:hidden;margin:8px 0}.bar{height:100%;background:linear-gradient(90deg,var(--cyan),#9d7cff);width:0}.log{max-height:260px;overflow:auto;background:#050b14;border-radius:10px;padding:9px;font:11px ui-monospace,monospace;white-space:pre-wrap}.note{color:var(--muted);line-height:1.7}.preview{width:100%;max-height:390px;background:#000;border-radius:12px;object-fit:contain}.outputs{display:grid;gap:7px}.out{padding:9px;background:#07111d;border:1px solid var(--line);border-radius:10px}.link{color:var(--cyan);text-decoration:none}@media(max-width:850px){.grid{grid-template-columns:1fr}.ops{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.ops,.fields{grid-template-columns:1fr}.field.full{grid-column:auto}}
+</style></head>
+<body><div class="wrap">
+<div class="head"><div class="brand">🧠 BRAIN Media Engine<small>محرك وسائط آمن شبيه بـ FFmpeg داخل Electronic Brain</small></div><div id="health" class="badge">فحص المحرك…</div></div>
+<div class="grid">
+<section class="card"><h2>🎛 Media Command Builder</h2><div class="ops">
+<div class="op active" data-op="convert" onclick="selectOp('convert')">🎬 تحويل</div>
+<div class="op" data-op="concat" onclick="selectOp('concat')">🔗 دمج</div>
+<div class="op" data-op="probe" onclick="selectOp('probe')">🔍 معلومات</div>
+<div class="op" data-op="extract-audio" onclick="selectOp('extract-audio')">🔊 استخراج صوت</div>
+<div class="op" data-op="extract-frames" onclick="selectOp('extract-frames')">🖼 Frames</div>
+<div class="op" data-op="slideshow" onclick="selectOp('slideshow')">🎞 Slideshow</div>
+<div class="op" data-op="trim" onclick="selectOp('trim')">✂️ قص</div>
+<div class="op" data-op="mix-audio" onclick="selectOp('mix-audio')">🎚 Mix Audio</div>
+<div class="op" data-op="fade" onclick="selectOp('fade')">✨ Fade</div>
+<div class="op" data-op="timeline" onclick="selectOp('timeline')">🎬 Timeline</div>
+</div>
+<div class="fields">
+<div class="field full"><label>ملف الإدخال (بعد رفعه إلى مركز الوسائط)</label><input id="input" placeholder="video.mp4"></div>
+<div class="field"><label>العرض</label><input id="width" type="number" placeholder="1920"></div>
+<div class="field"><label>الارتفاع</label><input id="height" type="number" placeholder="1080"></div>
+<div class="field"><label>FPS</label><input id="fps" type="number" placeholder="30"></div>
+<div class="field"><label>Bitrate</label><input id="bitrate" placeholder="5M"></div>
+<div class="field"><label>الصيغة</label><select id="format"><option>mp4</option><option>webm</option><option>mov</option><option>mkv</option></select></div>
+<div class="field"><label>مدة الشريحة / القص (ثانية)</label><input id="duration" type="number" value="3"></div>
+<div class="field"><label>بداية القص (ثانية)</label><input id="start" type="number" value="0"></div>
+<div class="field"><label>Fade In (ثانية)</label><input id="fade_in" type="number" value="0"></div>
+<div class="field"><label>Fade Out (ثانية)</label><input id="fade_out" type="number" value="0"></div>
+<div class="field"><label>صوت إضافي</label><input id="audio" placeholder="music.mp3"></div>
+<div class="field"><label>مستوى الصوت</label><input id="volume" type="number" value="1" step="0.1"></div>
+<div class="field full"><label>ملفات متعددة للدمج/Slideshow — أسماء مفصولة بفواصل</label><input id="inputs" placeholder="scene1.mp4,scene2.mp4"></div>
+<div class="field full"><label>Timeline JSON — لكل Scene: input,start,duration,caption</label><textarea id="timeline" rows="7" style="width:100%;background:#07111d;border:1px solid var(--line);border-radius:10px;padding:10px;color:#fff" placeholder='[{"input":"scene1.mp4","start":0,"duration":5,"caption":"المشهد الأول"},{"input":"scene2.mp4","start":0,"duration":5}]'></textarea></div>
+<div class="field"><label>Transition</label><select id="transition"><option>none</option><option>fade</option><option>wipeleft</option><option>wiperight</option><option>slideleft</option><option>slideright</option></select></div>
+<div class="field"><label>Transition Duration</label><input id="transition_duration" type="number" value="0.6" step="0.1"></div>
+<div class="field"><label>Watermark</label><input id="watermark" placeholder="logo.png"></div>
+<div class="field"><label>CRF</label><input id="crf" type="number" value="20" min="18" max="30"></div>
+<div class="field"><label>Cinematic Profile</label><select id="profile"><option value="youtube_1080p">YouTube 1080p</option><option value="shorts_1080x1920">Shorts 1080x1920</option><option value="cinematic_4k">Cinematic 4K</option></select></div>
+<div class="field"><label>Music</label><input id="music" placeholder="music.mp3"></div>
+<div class="field"><label>Music Volume</label><input id="music_volume" type="number" value="0.35" step="0.05"></div>
+<div class="field"><label>Voiceover</label><input id="voiceover" placeholder="voice.wav"></div>
+<div class="field"><label>Voice Volume</label><input id="voiceover_volume" type="number" value="1" step="0.05"></div>
+</div>
+<div class="row"><button onclick="document.getElementById('file').click()">📥 رفع ملف</button><input id="file" type="file" hidden onchange="upload()"><button class="primary" onclick="run()">▶ تشغيل المهمة</button><a class="badge" href="/">↩ العودة للعقل</a></div>
+<div id="uploadResult" class="note"></div><div id="result" class="note" style="margin-top:10px">جاهز.</div></section>
+<section class="card"><h2>📊 Job Queue</h2><div id="jobs" class="outputs"><div class="note">لا توجد مهام.</div></div></section>
+<section class="card"><h2>🎞 آخر نتيجة</h2><div id="preview"><div class="note">سيظهر الإخراج بعد اكتمال المهمة.</div></div></section>
+<section class="card"><h2>🛡 QC / Logs</h2><div id="qc" class="note">—</div><div id="logs" class="log">—</div></section>
+</div></div>
+<script>
+const $=id=>document.getElementById(id);let op='convert';
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function selectOp(x){op=x;document.querySelectorAll('.op').forEach(e=>e.classList.toggle('active',e.dataset.op===x));}
+async function api(url,opt){const r=await fetch(url,opt);const t=await r.text();let d={};try{d=JSON.parse(t)}catch{}if(!r.ok)throw new Error(d.detail||d.error||t||('HTTP '+r.status));return d}
+async function upload(){const f=$('file').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);try{const r=await api('/api/media/upload',{method:'POST',body:fd});$('input').value=r.filename;$('uploadResult').textContent='تم الرفع: '+r.filename}catch(e){$('uploadResult').textContent='فشل الرفع: '+e.message}}
+function spec(){const names=$('inputs').value.split(',').map(x=>x.trim()).filter(Boolean);return {input:$('input').value.trim(),inputs:names,width:Number($('width').value)||0,height:Number($('height').value)||0,fps:Number($('fps').value)||0,bitrate:$('bitrate').value.trim(),format:$('format').value,duration:Number($('duration').value)||3,start:Number($('start').value)||0,transition:$('transition').value,transition_duration:Number($('transition_duration').value)||0.6,watermark:$('watermark').value.trim(),crf:Number($('crf').value)||20,profile:$('profile').value,music:$('music').value.trim(),music_volume:Number($('music_volume').value)||0.35,voiceover:$('voiceover').value.trim(),voiceover_volume:Number($('voiceover_volume').value)||1,timeline:$('timeline').value.trim(),fade_in:Number($('fade_in').value)||0,fade_out:Number($('fade_out').value)||0,audio:$('audio').value.trim(),video:$('input').value.trim(),volume:Number($('volume').value)||1,count:30}}
+async function run(){try{let payload={operation:op,spec:spec()};if(op==='timeline'){payload={operation:'timeline',spec:{...spec(),scenes:JSON.parse($('timeline').value||'[]')}}}const endpoint=op==='trim'?'/api/media/trim':op==='mix-audio'?'/api/media/mix-audio':op==='fade'?'/api/media/fade':op==='timeline'?'/api/media/timeline':'/api/media/jobs';const r=await api(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});$('result').textContent='تم إنشاء المهمة '+r.job_id;poll(r.job_id)}catch(e){$('result').textContent='فشل: '+e.message}}
+async function poll(id){for(let i=0;i<300;i++){const j=await api('/api/media/jobs/'+id);renderJob(j);if(['COMPLETED','FAILED'].includes(j.status))return;await new Promise(x=>setTimeout(x,1000))}}
+function renderJob(j){$('result').textContent=j.status+' • '+j.progress+'%';$('logs').textContent=(j.logs||[]).join('\n')||j.error||'—';$('qc').textContent=j.qc?JSON.stringify(j.qc,null,2):(j.error||'جاري المعالجة…');if(j.result?.outputs){$('preview').innerHTML='<div class="outputs">'+j.result.outputs.map(x=>'<div class="out"><a class="link" href="'+esc(x)+'" target="_blank" rel="noopener">'+esc(x)+'</a></div>').join('')+'</div>';const first=j.result.outputs[0];if(/\.(mp4|mov|webm|mkv)$/i.test(first))$('preview').innerHTML='<video class="preview" controls src="'+esc(first)+'"></video>'}$('jobs').innerHTML='<div class="job"><div class="jobHead"><b>'+esc(j.operation)+'</b><span class="badge">'+esc(j.status)+'</span></div><div class="track"><div class="bar" style="width:'+Number(j.progress||0)+'%"></div></div><small>'+esc(j.job_id)+'</small></div>'}
+async function refresh(){try{const h=await api('/api/media/health');$('health').textContent=h.ffmpeg?'FFmpeg جاهز ✓':'FFmpeg غير متاح';$('health').className='badge '+(h.ffmpeg?'good':'bad');const r=await api('/api/media/jobs');$('jobs').innerHTML=(r.jobs||[]).map(j=>'<div class="job"><div class="jobHead"><b>'+esc(j.operation)+'</b><span class="badge">'+esc(j.status)+' '+esc(j.progress)+'%</span></div><div class="track"><div class="bar" style="width:'+Number(j.progress||0)+'%"></div></div></div>').join('')||'<div class="note">لا توجد مهام.</div>'}catch(e){$('health').textContent='المحرك غير متاح';$('health').className='badge bad'}}
+refresh();setInterval(refresh,3000);
+</script></body></html>
