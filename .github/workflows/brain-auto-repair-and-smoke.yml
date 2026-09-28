@@ -49,7 +49,7 @@ jobs:
       COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
       COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
       REPAIR_CYCLES: ${{ inputs.repair_cycles || 15000 }}
-      RUN_SMOKE: ${{ inputs.smoke || true }}
+      RUN_SMOKE: ${{ github.event_name == 'push' || inputs.smoke }}
 
     steps:
       - name: Checkout
