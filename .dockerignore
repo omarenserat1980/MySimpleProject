@@ -1,0 +1,17 @@
+.git
+.github
+__pycache__
+*.py[cod]
+*.db
+*.sqlite
+*.sqlite3
+.pytest_cache
+.coverage
+htmlcov
+dist
+build
+*.egg-info
+.env
+.env.*
+brain_v12/web/media/*
+!brain_v12/web/media/.gitkeep
