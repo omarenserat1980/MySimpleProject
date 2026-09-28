@@ -17,14 +17,20 @@ on:
     paths:
       - "brain_v7/braincore_v2/repair_controller_15000.py"
       - "brain_v7/braincore_v2/code_self_healer.py"
+      - "brain_v7/braincore_v2/repair_preflight.py"
       - ".github/workflows/brain-15000-auto-repair.yml"
 
 permissions:
   contents: write
   actions: write
 
+concurrency:
+  group: brain-15000-auto-repair
+  cancel-in-progress: false
+
 jobs:
   auto-repair:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
@@ -35,30 +41,27 @@ jobs:
       FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install FFmpeg and Python dependencies
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then python -m pip install -r brain_v7/requirements.txt; fi
-          python -m pip install pytest
-
+          python -m pip install pytest pyyaml
+      - name: Preflight repair environment
+        run: |
+          set -euo pipefail
+          python -m brain_v7.braincore_v2.repair_preflight | tee repair_preflight.json
       - name: Collect latest failed factory log
         run: |
           set +e
           run_id="$(gh run list --limit 20 --json databaseId,conclusion,name --jq '.[] | select(.conclusion=="failure") | .databaseId' | head -n 1)"
-          if [ -n "$run_id" ]; then
-            gh run view "$run_id" --log-failed > latest_failure.log
-          else
-            : > latest_failure.log
-          fi
+          if [ -n "$run_id" ]; then gh run view "$run_id" --log-failed > latest_failure.log; else : > latest_failure.log; fi
           test -f latest_failure.log
-
       - name: Run 15000-cycle repair controller
         env:
           MAX_CYCLES: ${{ inputs.max_cycles || '15000' }}
@@ -68,7 +71,6 @@ jobs:
           args=(--error-file latest_failure.log --max-cycles "$MAX_CYCLES" --report repair_15000_report.json)
           if [ "$RUN_FACTORY" = "1" ]; then args+=(--run-factory); fi
           python -m brain_v7.braincore_v2.repair_controller_15000 "${args[@]}" | tee repair_controller_stdout.json
-
       - name: Verify repair controller report
         if: always()
         run: |
@@ -77,17 +79,36 @@ jobs:
           import json
           r=json.load(open("repair_15000_report.json",encoding="utf-8"))
           assert 1 <= r["cycles_completed"] <= r["max_controller_cycles"] <= 15000
+          assert r["status"] == "VERIFIED_SUCCESS", r
           print("status=", r["status"])
           print("cycles=", r["cycles_completed"], "/", r["max_controller_cycles"])
           PY
-
+      - name: Persist verified source repairs
+        if: success()
+        run: |
+          set -euo pipefail
+          allowed='^(brain_v7/braincore_v2/(factory_repair_app|brain_media_adapter|cinematic_local_renderer|code_self_healer|repair_controller_15000|repair_preflight)\.py|\.github/workflows/(electronic-brain-cinematic|brain6-168h-cloud|cloud-runtime-build|cinematic-factory-smoke|brain-15000-auto-repair)\.yml)$'
+          git status --short
+          git status --short | awk '{print $2}' | while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            echo "$file" | grep -Eq "$allowed" || { echo "Unexpected changed file: $file"; exit 1; }
+          done
+          changed="$(git status --short | awk '{print $2}')"
+          if [ -z "$changed" ]; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $changed
+          git commit -m "chore(brain): persist verified auto-repair [skip ci]"
+          git push origin HEAD:main
       - name: Upload repair evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: brain-15000-repair-evidence
           path: |
+            repair_preflight.json
             repair_15000_report.json
             repair_controller_stdout.json
             latest_failure.log
+            code_self_healer_report.json
           if-no-files-found: warn
