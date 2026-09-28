@@ -27,6 +27,9 @@ MAX_INPUTS = 50
 MAX_DURATION = int(os.getenv("BRAIN_MEDIA_MAX_DURATION_SECONDS", "3600"))
 MAX_OUTPUT_BYTES = int(os.getenv("BRAIN_MEDIA_MAX_OUTPUT_BYTES", str(1024 * 1024 * 1024)))
 MAX_WORKERS = max(1, min(int(os.getenv("BRAIN_MEDIA_WORKERS", "2")), 4))
+TIMELINE_WIDTH = 1920
+TIMELINE_HEIGHT = 1080
+TIMELINE_FPS = 30
 
 _pool = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="brain-media")
 _lock = threading.RLock()
@@ -116,6 +119,98 @@ def _progress_from_log(line: str) -> int | None:
         return None
 
 
+
+
+def _validate_transition(value: Any) -> str:
+    value = str(value or "none").lower()
+    if value not in {"none", "fade", "wipeleft", "wiperight", "slideleft", "slideright"}:
+        raise ValueError("UNSUPPORTED_TRANSITION")
+    return value
+
+
+def _drawtext_escape(value: Any) -> str:
+    text = str(value or "")
+    if len(text) > 300:
+        raise ValueError("TIMELINE_TEXT_TOO_LONG")
+    return text.replace("\\", r"\\").replace(":", r"\:").replace("'", r"\'").replace("%", r"\%")
+
+
+def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pathlib.Path]:
+    scenes = spec.get("scenes") or []
+    if not isinstance(scenes, list) or not 1 <= len(scenes) <= 50:
+        raise ValueError("TIMELINE_REQUIRES_1_TO_50_SCENES")
+    output = _output_path("timeline", "mp4")
+    inputs: list[str] = []
+    filters: list[str] = []
+    video_labels: list[str] = []
+    audio_labels: list[str] = []
+    durations: list[float] = []
+    for i, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise ValueError("INVALID_TIMELINE_SCENE")
+        src = _resolve_input(scene.get("input", ""))
+        start = float(scene.get("start") or 0)
+        duration = float(scene.get("duration") or 0)
+        if start < 0 or duration <= 0 or duration > 1800:
+            raise ValueError("INVALID_TIMELINE_SCENE_RANGE")
+        durations.append(duration)
+        inputs += ["-ss", str(start), "-t", str(duration), "-i", str(src)]
+        v = f"v{i}"
+        a = f"a{i}"
+        vf = f"[{i}:v]scale={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:force_original_aspect_ratio=decrease,pad={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={TIMELINE_FPS},format=yuv420p"
+        caption = scene.get("caption")
+        if caption:
+            vf += f",drawtext=text='{_drawtext_escape(caption)}':x=(w-text_w)/2:y=h-120:fontsize=46:fontcolor=white:borderw=3:bordercolor=black"
+        vf += f"[{v}]"
+        filters.append(vf)
+        filters.append(f"[{i}:a]aresample=48000,asetpts=N/SR/TB[{a}]")
+        video_labels.append(v)
+        audio_labels.append(a)
+
+    watermark = str(spec.get("watermark") or "").strip()
+    if watermark:
+        wp = _resolve_input(watermark)
+        inputs += ["-i", str(wp)]
+        wi = len(scenes)
+        filters.append(f"[{wi}:v]scale=320:-1[wm]")
+        filters.append(f"[{video_labels[-1]}][wm]overlay=W-w-35:H-h-35[{video_labels[-1]}wm]")
+        video_labels[-1] = f"{video_labels[-1]}wm"
+
+    transition = _validate_transition(spec.get("transition", "none"))
+    if transition == "none" or len(video_labels) == 1:
+        if len(video_labels) == 1:
+            filters.append(f"[{video_labels[0]}]null[vout]")
+            filters.append(f"[{audio_labels[0]}]anull[aout]")
+        else:
+            vcat = "".join(f"[{x}]" for x in video_labels)
+            acat = "".join(f"[{x}]" for x in audio_labels)
+            filters.append(f"{vcat}concat=n={len(video_labels)}:v=1:a=0[vout]")
+            filters.append(f"{acat}concat=n={len(audio_labels)}:v=0:a=1[aout]")
+    else:
+        current_v = video_labels[0]
+        current_a = audio_labels[0]
+        offset = durations[0]
+        for i in range(1, len(video_labels)):
+            trans = min(float(spec.get("transition_duration") or 0.6), durations[i] / 2, durations[i-1] / 2)
+            if trans <= 0:
+                raise ValueError("INVALID_TRANSITION_DURATION")
+            vout = f"vx{i}"
+            aout = f"ax{i}"
+            filters.append(f"[{current_v}][{video_labels[i]}]xfade=transition={transition}:duration={trans}:offset={max(0, offset-trans)}[{vout}]")
+            filters.append(f"[{current_a}][{audio_labels[i]}]acrossfade=d={trans}:c1=tri:c2=tri[{aout}]")
+            current_v, current_a = vout, aout
+            offset += durations[i] - trans
+        filters.append(f"[{current_v}]null[vout]")
+        filters.append(f"[{current_a}]anull[aout]")
+
+    cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning"] + inputs
+    cmd += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]",
+            "-c:v", "libx264", "-preset", str(spec.get("preset") or "medium"),
+            "-crf", str(max(18, min(int(spec.get("crf") or 20), 30))),
+            "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart", str(output)]
+    return cmd, output
+
 def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
     _update(job_id, status="PREPARING", progress=5)
     try:
@@ -123,7 +218,9 @@ def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
         ffprobe = _tool("ffprobe")
         output: pathlib.Path
 
-        if operation == "probe":
+        if operation == "timeline":
+            cmd, output = _timeline_command(spec, ffmpeg)
+        elif operation == "probe":
             src = _resolve_input(spec["input"])
             proc = subprocess.run(
                 [ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", str(src)],
@@ -301,7 +398,7 @@ def cancel(job_id: str) -> dict[str, Any]:
     return snapshot(job_id)
 
 def submit(operation: str, spec: dict[str, Any]) -> dict[str, Any]:
-    allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade"}
+    allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade", "timeline"}
     if operation not in allowed:
         raise ValueError("UNSUPPORTED_MEDIA_OPERATION")
     job_id = uuid4().hex
