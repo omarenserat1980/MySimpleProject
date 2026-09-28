@@ -66,9 +66,9 @@ def rule_local_renderer_uses_ffmpeg_time_expression() -> list[str]:
         return []
     changed = False
     replacements = {
-        "sin(N/72)": "sin(t*24/72)",
-        "sin(N/96)": "sin(t*24/96)",
-        "cos(N/120)": "cos(t*24/120)",
+        "sin(N/72)": "sin(T*24/72)",
+        "sin(N/96)": "sin(T*24/96)",
+        "cos(N/120)": "cos(T*24/120)",
     }
     for old, new in replacements.items():
         if old in text:
