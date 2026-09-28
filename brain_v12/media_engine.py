@@ -26,7 +26,7 @@ OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 MAX_INPUTS = 50
 MAX_DURATION = int(os.getenv("BRAIN_MEDIA_MAX_DURATION_SECONDS", "3600"))
 MAX_OUTPUT_BYTES = int(os.getenv("BRAIN_MEDIA_MAX_OUTPUT_BYTES", str(1024 * 1024 * 1024)))
-MAX_WORKERS = max(1, min(int(os.getenv("BRAIN_MEDIA_WORKERS", "1")), 4))
+MAX_WORKERS = max(1, min(int(os.getenv("BRAIN_MEDIA_WORKERS", "2")), 4))
 
 _pool = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="brain-media")
 _lock = threading.RLock()
@@ -105,7 +105,15 @@ def _update(job_id: str, **fields: Any) -> None:
 def _progress_from_log(line: str) -> int | None:
     if "time=" not in line:
         return None
-    return None
+    try:
+        import re
+        match = re.search(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", line)
+        if not match:
+            return None
+        seconds = int(match.group(1)) * 3600 + int(match.group(2)) * 60 + float(match.group(3))
+        return min(90, max(15, int(seconds / max(1, MAX_DURATION) * 75) + 15))
+    except Exception:
+        return None
 
 
 def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
@@ -183,6 +191,36 @@ def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
                 for path in paths:
                     fh.write("file " + json.dumps(str(path)) + "\n")
             cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c:v", "libx264", "-c:a", "aac", "-movflags", "+faststart", str(output)]
+        elif operation == "trim":
+            src = _resolve_input(spec["input"])
+            start = float(spec.get("start") or 0)
+            duration = float(spec.get("duration") or 0)
+            if start < 0 or duration <= 0 or start > MAX_DURATION or duration > MAX_DURATION:
+                raise ValueError("INVALID_TRIM_RANGE")
+            output = _output_path("trim", "mp4")
+            cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning", "-ss", str(start), "-i", str(src), "-t", str(duration), "-c:v", "libx264", "-c:a", "aac", "-movflags", "+faststart", str(output)]
+        elif operation == "mix-audio":
+            video = _resolve_input(spec["video"])
+            audio = _resolve_input(spec["audio"])
+            output = _output_path("mix-audio", "mp4")
+            volume = float(spec.get("volume") or 1)
+            if not 0 <= volume <= 3:
+                raise ValueError("INVALID_AUDIO_VOLUME")
+            cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning", "-i", str(video), "-i", str(audio), "-filter_complex", f"[1:a]volume={volume}[a]", "-map", "0:v:0", "-map", "[a]", "-shortest", "-c:v", "copy", "-c:a", "aac", "-movflags", "+faststart", str(output)]
+        elif operation == "fade":
+            src = _resolve_input(spec["input"])
+            fade_in = float(spec.get("fade_in") or 0)
+            fade_out = float(spec.get("fade_out") or 0)
+            duration = float(spec.get("duration") or 0)
+            if min(fade_in, fade_out) < 0 or max(fade_in, fade_out) > 30 or duration <= 0:
+                raise ValueError("INVALID_FADE")
+            output = _output_path("fade", "mp4")
+            filters = []
+            if fade_in:
+                filters.append(f"fade=t=in:st=0:d={fade_in}")
+            if fade_out:
+                filters.append(f"fade=t=out:st={max(0, duration-fade_out)}:d={fade_out}")
+            cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning", "-i", str(src), "-vf", ",".join(filters), "-c:v", "libx264", "-c:a", "aac", "-movflags", "+faststart", str(output)]
         elif operation == "slideshow":
             names = spec.get("inputs") or []
             if not isinstance(names, list) or not 1 <= len(names) <= 30:
@@ -263,7 +301,7 @@ def cancel(job_id: str) -> dict[str, Any]:
     return snapshot(job_id)
 
 def submit(operation: str, spec: dict[str, Any]) -> dict[str, Any]:
-    allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow"}
+    allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade"}
     if operation not in allowed:
         raise ValueError("UNSUPPORTED_MEDIA_OPERATION")
     job_id = uuid4().hex
