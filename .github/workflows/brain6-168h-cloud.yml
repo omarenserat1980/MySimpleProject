@@ -15,6 +15,7 @@ on:
       - "production/BRAIN6_168H.json"
       - "brain6_cpp/**"
       - "brain6_cs/**"
+      - "brain6_tools/**"
       - ".github/workflows/brain6-168h-cloud.yml"
 
 permissions:
@@ -28,11 +29,14 @@ concurrency:
 jobs:
   brain6:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 350
     env:
       BRAIN6_168H: "1"
       BRAIN_MAX_RUNTIME_SECONDS: "21600"
       BRAIN_MAX_ITERATIONS: "1000000"
+      BRAIN6_EXECUTION_TIMEOUT_SECONDS: "19800"
+      BRAIN6_CPP_RETRIES: "0"
+      BRAIN6_CS_RETRIES: "0"
       FACTORY_ONE_SHOT: "1"
       FACTORY_ALLOW_PRODUCTION: "1"
       FACTORY_ALLOW_LOCAL_FALLBACK: "1"
@@ -63,6 +67,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y g++ ffmpeg
 
+      - name: Brain 6 deterministic preflight
+        run: |
+          set -euo pipefail
+          python brain6_tools/preflight.py
+          cat brain6_preflight_report.json
+
       - name: Read 168H campaign state
         id: state
         shell: bash
@@ -71,41 +81,43 @@ jobs:
           python - <<'PY'
           import json, os, time
           p="production/BRAIN6_168H.json"
-          if not os.path.exists(p):
-              raise SystemExit("BRAIN6_168H state file is missing")
           s=json.load(open(p,encoding="utf-8"))
           if not s.get("enabled", False):
               print("enabled=false")
-              raise SystemExit(0)
+              with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+                  f.write("enabled=false\nremaining=0\ncampaign_complete=false\n")
+              raise SystemExit(1)
           started=float(s["started_epoch"])
+          duration=float(s.get("duration_seconds",604800))
           elapsed=max(0,time.time()-started)
-          remaining=max(0,604800-elapsed)
+          remaining=max(0,duration-elapsed)
           print(f"elapsed={elapsed:.0f}s remaining={remaining:.0f}s")
           with open(os.environ["GITHUB_OUTPUT"],"a") as f:
               f.write(f"elapsed={elapsed:.0f}\nremaining={remaining:.0f}\n")
+              f.write(f"campaign_complete={'true' if remaining <= 0 else 'false'}\n")
           if remaining <= 0:
-              raise SystemExit("CAMPAIGN_COMPLETE")
+              print("CAMPAIGN_COMPLETE")
           PY
 
       - name: Install factory dependencies
-        if: steps.state.outputs.remaining != ''
+        if: steps.state.outputs.remaining != '' && steps.state.outputs.campaign_complete != 'true'
         run: |
           python -m pip install --upgrade pip
           if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
 
       - name: Build C++ core
-        if: steps.state.outputs.remaining != ''
+        if: steps.state.outputs.remaining != '' && steps.state.outputs.campaign_complete != 'true'
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -pedantic brain6_cpp/main.cpp -o brain6_cpp/brain6
 
       - name: Build C# supervisor
-        if: steps.state.outputs.remaining != ''
+        if: steps.state.outputs.remaining != '' && steps.state.outputs.campaign_complete != 'true'
         run: |
           dotnet restore brain6_cs/Brain6.csproj
           dotnet build brain6_cs/Brain6.csproj -c Release --no-restore
 
       - name: Restore latest successful factory state
-        if: steps.state.outputs.remaining != ''
+        if: steps.state.outputs.remaining != '' && steps.state.outputs.campaign_complete != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -117,14 +129,14 @@ jobs:
           fi
 
       - name: Run Brain 6 C# -> C++ -> Python
-        if: steps.state.outputs.remaining != ''
+        if: steps.state.outputs.remaining != '' && steps.state.outputs.campaign_complete != 'true'
         run: |
           set -o pipefail
           export BRAIN6_CPP_BINARY="$GITHUB_WORKSPACE/brain6_cpp/brain6"
           dotnet run --project brain6_cs/Brain6.csproj -c Release --no-build | tee brain6_slice_result.json
 
       - name: Final media QC
-        if: success()
+        if: success() && steps.state.outputs.campaign_complete != 'true'
         run: |
           test -f cinematic_output/final.mp4
           test -s cinematic_output/final.mp4
@@ -154,5 +166,8 @@ jobs:
             cinematic_project_manifest.json
             brain6_slice_result.json
             brain6_cs/checkpoint.json
+            brain6_cpp/checkpoint.json
+            brain6_preflight_report.json
+            final_probe.json
           if-no-files-found: ignore
           retention-days: 30
