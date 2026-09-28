@@ -61,8 +61,8 @@ jobs:
       FAL_KEY: ${{ secrets.FAL_KEY }}
       COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
       COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
-      # FAL is intentionally not used in the free-only profile.
-      FAL_MODEL: ""
+      # Explicit, valid FAL video endpoint. Empty env values must never reach fal_client.
+      FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
       FAL_SHOT_DURATION: "5"
       FAL_GENERATE_AUDIO: "1"
       FAL_VISION_QC: "1"
