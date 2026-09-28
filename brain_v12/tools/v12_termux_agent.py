@@ -1,4 +1,4 @@
-"""V12 Termux Agent: poll Brain V12, execute only allowlisted local tasks, report results."""
+"""V12 BRAIN Termux Emulator Agent: poll Brain V12, execute only allowlisted local tasks, report results."""
 from __future__ import annotations
 
 import json
@@ -36,7 +36,7 @@ def execute(task):
         }
     if task == "python_version":
         return {"python": platform.python_version()}
-    if task == "termux_path":
+    if task == "brain_home":
         return {"cwd": os.getcwd(), "home": os.path.expanduser("~")}
     if task == "platform":
         return {
@@ -51,7 +51,7 @@ def execute(task):
 def main():
     if not AGENT_KEY:
         raise SystemExit("V12_AGENT_KEY is required")
-    print(f"V12 Termux Agent {AGENT_ID} -> {BRAIN_URL}")
+    print(f"V12 BRAIN Termux Emulator Agent {AGENT_ID} -> {BRAIN_URL}")
     while True:
         try:
             poll = request("GET", f"/api/device/poll?agent_id={AGENT_ID}")
