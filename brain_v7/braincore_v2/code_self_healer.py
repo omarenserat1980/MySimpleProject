@@ -56,8 +56,8 @@ def rule_empty_fal_model() -> list[str]:
 def rule_brain6_dotnet_build_indentation() -> list[str]:
     """Repair the known YAML indentation defect in the Brain 6 build step."""
     p = ROOT / ".github/workflows/brain6-168h-cloud.yml"
-    old = "          dotnet restore brain6_cs/Brain6.csproj\\ndotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
-    new = "          dotnet restore brain6_cs/Brain6.csproj\\n          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
+    old = "          dotnet restore brain6_cs/Brain6.csproj\ndotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
+    new = "          dotnet restore brain6_cs/Brain6.csproj\n          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
     return [str(p.relative_to(ROOT))] if _replace_once(p, old, new) else []
 
 def rule_import_repair_100_test() -> list[str]:
@@ -122,6 +122,12 @@ def _failure_hint(error_text: str) -> str:
 
 def verify() -> tuple[bool, str]:
     """Run the smallest meaningful production verification suite."""
+    yaml_check = subprocess.run(
+        ["python", "-c", "import yaml; yaml.safe_load(open('.github/workflows/brain6-168h-cloud.yml', encoding='utf-8'))"],
+        cwd=ROOT, capture_output=True, text=True, timeout=30,
+    )
+    if yaml_check.returncode:
+        return False, (yaml_check.stdout + yaml_check.stderr)[-6000:]
     compile_cmd = ["python", "-m", "compileall", "-q", "brain_v7/braincore_v2"]
     p = subprocess.run(compile_cmd, cwd=ROOT, capture_output=True, text=True, timeout=120)
     if p.returncode:
