@@ -3,7 +3,7 @@
 import json, os, platform, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 
-DEFAULT_BASE="https://electronic-brain-v12-gwwg.onrender.com"
+DEFAULT_BASE="http://127.0.0.1:10000"
 AGENT_ID=os.getenv("V12_AGENT_ID","redmi3-01")
 BASE_URL=os.getenv("V12_BRAIN_URL",DEFAULT_BASE).rstrip("/")
 KEY_FILE=Path(os.getenv("V12_AGENT_KEY_FILE",str(Path.home()/"v12-agent"/"agent.key")))
