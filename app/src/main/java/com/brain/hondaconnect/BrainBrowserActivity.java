@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
+import android.app.DownloadManager;
+import android.os.Environment;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -55,6 +57,7 @@ public class BrainBrowserActivity extends Activity {
 
         Button home = button("⌂");
         Button bookmark = button("☆");
+        bookmark.setOnLongClickListener(v -> { showBookmarks(); return true; });
         Button share = button("↗");
 
         bar.addView(back); bar.addView(forward); bar.addView(reload);
@@ -82,6 +85,21 @@ public class BrainBrowserActivity extends Activity {
         web.setBackgroundColor(Color.BLACK);
         web.setWebViewClient(new BrowserClient());
         web.setWebChromeClient(new WebChromeClient());
+        web.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            try {
+                DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+                req.setMimeType(mimeType);
+                req.addRequestHeader("User-Agent", userAgent);
+                req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                req.setTitle(name);
+                req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+                ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(req);
+                Toast.makeText(this, "بدأ تنزيل: " + name, Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "تعذر بدء التنزيل", Toast.LENGTH_SHORT).show();
+            }
+        });
         root.addView(web, new LinearLayout.LayoutParams(-1,0,1));
 
         back.setOnClickListener(v -> { if(web.canGoBack()) web.goBack(); });
@@ -152,6 +170,20 @@ public class BrainBrowserActivity extends Activity {
         Toast.makeText(this, "تم حفظ الصفحة في إشارات BRAIN", Toast.LENGTH_SHORT).show();
     }
 
+    private void showBookmarks() {
+        Set<String> set = prefs.getStringSet("bookmarks", new HashSet<>());
+        if (set.isEmpty()) {
+            Toast.makeText(this, "لا توجد إشارات محفوظة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] items = set.toArray(new String[0]);
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("إشارات BRAIN")
+            .setItems(items, (d, which) -> web.loadUrl(items[which]))
+            .setNegativeButton("إغلاق", null)
+            .show();
+    }
+
     private void sharePage() {
         String u = web.getUrl();
         if (u == null) return;
@@ -169,6 +201,10 @@ public class BrainBrowserActivity extends Activity {
         @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
             Uri u = req.getUrl();
             String scheme = u.getScheme() == null ? "" : u.getScheme().toLowerCase();
+            if ("brain-search".equals(scheme)) {
+                navigate(u.toString());
+                return true;
+            }
             if ("http".equals(scheme) || "https".equals(scheme)) return false;
             try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch(Exception ignored) {}
             return true;
