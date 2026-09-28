@@ -1,1 +1,71 @@
-name: Brain V12 GitHub Pages\n\non:\n  push:\n    branches: ["main"]\n    paths:\n      - "brain_v12/web/**"\n      - "scripts/validate-pages.sh"\n      - ".github/workflows/brain-v12-pages.yml"\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: github-pages-${{ github.ref }}\n  cancel-in-progress: true\n\nenv:\n  SITE_ROOT: brain_v12/web\n  SITE_OUT: _site\n\njobs:\n  validate:\n    name: Validate and package Pages\n    runs-on: ubuntu-latest\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n        with:\n          fetch-depth: 1\n\n      - name: Validate and assemble site\n        shell: bash\n        run: |\n          set -euo pipefail\n          chmod +x scripts/validate-pages.sh\n          ./scripts/validate-pages.sh "$SITE_ROOT" "$SITE_OUT"\n\n      - name: Configure GitHub Pages\n        uses: actions/configure-pages@v5\n\n      - name: Upload Pages artifact\n        uses: actions/upload-pages-artifact@v4\n        with:\n          path: ${{ env.SITE_OUT }}\n\n  deploy:\n    name: Deploy Pages\n    needs: validate\n    runs-on: ubuntu-latest\n    environment:\n      name: github-pages\n      url: ${{ steps.deployment.outputs.page_url }}\n    steps:\n      - name: Deploy to GitHub Pages\n        id: deployment\n        uses: actions/deploy-pages@v4\n\n      - name: Post-deploy smoke test\n        shell: bash\n        env:\n          PAGE_URL: ${{ steps.deployment.outputs.page_url }}\n        run: |\n          set -euo pipefail\n          test -n "$PAGE_URL"\n          echo "Checking: $PAGE_URL"\n          for attempt in 1 2 3 4 5; do\n            if curl --fail --silent --show-error --location \\n              --retry 2 --retry-delay 2 --max-time 20 \\n              -o /tmp/brain-pages.html "$PAGE_URL"; then\n              break\n            fi\n            echo "Page not ready yet (attempt $attempt/5)"\n            sleep 5\n          done\n          test -s /tmp/brain-pages.html\n          grep -qi "<html" /tmp/brain-pages.html\n          grep -q "العقل الإلكتروني" /tmp/brain-pages.html\n          echo "GitHub Pages smoke test: OK"\n
+name: Brain V12 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/web/**"
+      - "scripts/validate-pages.sh"
+      - ".github/workflows/brain-v12-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SITE_ROOT: brain_v12/web
+  SITE_OUT: _site
+
+jobs:
+  validate:
+    name: Validate and package Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - name: Validate and assemble site
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/validate-pages.sh
+          ./scripts/validate-pages.sh "$SITE_ROOT" "$SITE_OUT"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ env.SITE_OUT }}
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Post-deploy smoke test
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          test -n "$PAGE_URL"
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --location --retry 2 --retry-delay 2 --max-time 20 -o /tmp/brain-pages.html "$PAGE_URL"; then
+              break
+            fi
+            echo "Page not ready yet (attempt $attempt/5)"
+            sleep 5
+          done
+          test -s /tmp/brain-pages.html
+          grep -qi "<html" /tmp/brain-pages.html
+          grep -q "العقل الإلكتروني" /tmp/brain-pages.html
+          echo "GitHub Pages smoke test: OK"
