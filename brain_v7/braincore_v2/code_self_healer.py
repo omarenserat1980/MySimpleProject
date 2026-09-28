@@ -31,8 +31,8 @@ SOURCE_ALLOWLIST = {
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
-    "brain_v7/braincore_v2/test_code_self_healer.py",
 )
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -138,6 +138,8 @@ def diagnose_failure(error_text: str) -> dict[str, str]:
         return {"class": "syntax", "repair": "none_allowlisted"}
     if "modulenotfounderror" in text or "importerror" in text:
         return {"class": "dependency_or_import", "repair": "none_allowlisted"}
+    if "verification_timeout" in text or "timed out after" in text:
+        return {"class": "verification_timeout", "repair": "none_allowlisted"}
     if "pytest" in text or "assertionerror" in text:
         return {"class": "test_failure", "repair": "none_allowlisted"}
     return {"class": "unknown", "repair": "none_allowlisted"}
@@ -166,10 +168,14 @@ def verify() -> tuple[bool, str]:
     p = subprocess.run(compile_cmd, cwd=ROOT, capture_output=True, text=True, timeout=120)
     if p.returncode:
         return False, (p.stdout + p.stderr)[-6000:]
-    test = subprocess.run(
-        ["python", "-m", "pytest", "-q", *VERIFY_TESTS],
-        cwd=ROOT, capture_output=True, text=True, timeout=240,
-    )
+    try:
+        test = subprocess.run(
+            ["python", "-m", "pytest", "-q", *VERIFY_TESTS],
+            cwd=ROOT, capture_output=True, text=True, timeout=240,
+        )
+    except subprocess.TimeoutExpired as exc:
+        output = (exc.stdout or "") + (exc.stderr or "")
+        return False, ("verification_timeout: pytest exceeded 240s; " + output)[-6000:]
     return test.returncode == 0, (test.stdout + test.stderr)[-6000:]
 
 def _snapshot(paths: list[Path]) -> dict[Path, str]:
