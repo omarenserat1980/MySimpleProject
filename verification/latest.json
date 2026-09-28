@@ -1,43 +1,43 @@
 {
   "version": 1,
-  "started_at": 1790575555.8837726,
+  "started_at": 1790575654.0572453,
   "results": [
     {
       "name": "compile_v7",
       "returncode": 0,
-      "duration_s": 0.171,
+      "duration_s": 0.197,
       "stdout_tail": "",
       "stderr_tail": ""
     },
     {
       "name": "compile_v12",
       "returncode": 0,
-      "duration_s": 0.073,
+      "duration_s": 0.083,
       "stdout_tail": "",
       "stderr_tail": ""
     },
     {
       "name": "speed_tests",
       "returncode": 0,
-      "duration_s": 0.532,
-      "stdout_tail": "..............                                                           [100%]\n14 passed in 0.11s\n",
+      "duration_s": 0.678,
+      "stdout_tail": "..............                                                           [100%]\n14 passed in 0.16s\n",
       "stderr_tail": ""
     },
     {
       "name": "cinema_v6_tests",
       "returncode": 0,
-      "duration_s": 0.283,
-      "stdout_tail": "....                                                                     [100%]\n4 passed in 0.10s\n",
+      "duration_s": 0.379,
+      "stdout_tail": "....                                                                     [100%]\n4 passed in 0.13s\n",
       "stderr_tail": ""
     },
     {
       "name": "brain_v12_tests",
       "returncode": 0,
-      "duration_s": 0.473,
+      "duration_s": 0.982,
       "stdout_tail": "",
-      "stderr_tail": "_ten_jod) ... ok\ntest_search_plan_contains_sources_and_evidence (test_income_strategy.IncomeStrategyTests.test_search_plan_contains_sources_and_evidence) ... ok\ntest_extract_accepts_absolute_and_relative_listing_links (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_extract_accepts_absolute_and_relative_listing_links) ... ok\ntest_sources_include_primary_freelance_channels (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_sources_include_primary_freelance_channels) ... ok\ntest_compare_is_explicitly_input_based (test_mining_engine.MiningEngineTests.test_compare_is_explicitly_input_based) ... ok\ntest_energy_cost_and_net_profit (test_mining_engine.MiningEngineTests.test_energy_cost_and_net_profit) ... ok\ntest_invalid_unit_is_rejected (test_mining_engine.MiningEngineTests.test_invalid_unit_is_rejected) ... ok\ntest_snapshot_does_not_claim_live_mining (test_mining_engine.MiningEngineTests.test_snapshot_does_not_claim_live_mining) ... ok\ntest_run_builds_plan_from_active_goal (test_orchestrator.OrchestratorTests.test_run_builds_plan_from_active_goal) ... ok\ntest_generates_multiple_solutions_and_verifies_selected_solution (test_problem_solver.ProblemSolverTests.test_generates_multiple_solutions_and_verifies_selected_solution) ... ok\ntest_retry_is_bounded (test_problem_solver.ProblemSolverTests.test_retry_is_bounded) ... ok\ntest_missing_secret_is_reported_without_value (test_secret_control.SecretControlPlaneTests.test_missing_secret_is_reported_without_value) ... ok\ntest_never_returns_secret_values (test_secret_control.SecretControlPlaneTests.test_never_returns_secret_values) ... ok\ntest_plan_requires_external_connector_for_remote_write (test_secret_control.SecretControlPlaneTests.test_plan_requires_external_connector_for_remote_write) ... ok\ntest_path_is_allowlisted (test_self_improvement.SelfImprovementTests.test_path_is_allowlisted) ... ok\ntest_status_is_bounded (test_self_improvement.SelfImprovementTests.test_status_is_bounded) ... ok\ntest_all_human_views_exist (test_ui_contract.HumanInterfaceContractTests.test_all_human_views_exist) ... ok\ntest_all_javascript_dom_references_exist (test_ui_contract.HumanInterfaceContractTests.test_all_javascript_dom_references_exist) ... ok\ntest_api_gets_are_cache_busted (test_ui_contract.HumanInterfaceContractTests.test_api_gets_are_cache_busted) ... ok\ntest_human_command_input_exists (test_ui_contract.HumanInterfaceContractTests.test_human_command_input_exists) ... ok\ntest_inline_handlers_reference_existing_functions (test_ui_contract.HumanInterfaceContractTests.test_inline_handlers_reference_existing_functions) ... ok\ntest_nav_binding_does_not_override_non_navigation_buttons (test_ui_contract.HumanInterfaceContractTests.test_nav_binding_does_not_override_non_navigation_buttons) ... ok\ntest_navigation_points_to_existing_views (test_ui_contract.HumanInterfaceContractTests.test_navigation_points_to_existing_views) ... ok\ntest_overview_and_cycle_required_elements_exist (test_ui_contract.HumanInterfaceContractTests.test_overview_and_cycle_required_elements_exist) ... ok\ntest_readiness_and_overview_are_wired (test_ui_contract.HumanInterfaceContractTests.test_readiness_and_overview_are_wired) ... ok\ntest_expired_state_is_rejected (test_youtube_oauth.YouTubeOAuthTests.test_expired_state_is_rejected) ... ok\ntest_not_configured_without_client_credentials (test_youtube_oauth.YouTubeOAuthTests.test_not_configured_without_client_credentials) ... ok\ntest_ready_to_start_with_client_and_redirect (test_youtube_oauth.YouTubeOAuthTests.test_ready_to_start_with_client_and_redirect) ... ok\ntest_snapshot_reports_missing_encryption_key (test_youtube_oauth.YouTubeOAuthTests.test_snapshot_reports_missing_encryption_key) ... ok\ntest_start_stores_expiring_state_without_secret_material (test_youtube_oauth.YouTubeOAuthTests.test_start_stores_expiring_state_without_secret_material) ... ok\n\n----------------------------------------------------------------------\nRan 53 tests in 0.130s\n\nOK\n"
+      "stderr_tail": "_ten_jod) ... ok\ntest_search_plan_contains_sources_and_evidence (test_income_strategy.IncomeStrategyTests.test_search_plan_contains_sources_and_evidence) ... ok\ntest_extract_accepts_absolute_and_relative_listing_links (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_extract_accepts_absolute_and_relative_listing_links) ... ok\ntest_sources_include_primary_freelance_channels (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_sources_include_primary_freelance_channels) ... ok\ntest_compare_is_explicitly_input_based (test_mining_engine.MiningEngineTests.test_compare_is_explicitly_input_based) ... ok\ntest_energy_cost_and_net_profit (test_mining_engine.MiningEngineTests.test_energy_cost_and_net_profit) ... ok\ntest_invalid_unit_is_rejected (test_mining_engine.MiningEngineTests.test_invalid_unit_is_rejected) ... ok\ntest_snapshot_does_not_claim_live_mining (test_mining_engine.MiningEngineTests.test_snapshot_does_not_claim_live_mining) ... ok\ntest_run_builds_plan_from_active_goal (test_orchestrator.OrchestratorTests.test_run_builds_plan_from_active_goal) ... ok\ntest_generates_multiple_solutions_and_verifies_selected_solution (test_problem_solver.ProblemSolverTests.test_generates_multiple_solutions_and_verifies_selected_solution) ... ok\ntest_retry_is_bounded (test_problem_solver.ProblemSolverTests.test_retry_is_bounded) ... ok\ntest_missing_secret_is_reported_without_value (test_secret_control.SecretControlPlaneTests.test_missing_secret_is_reported_without_value) ... ok\ntest_never_returns_secret_values (test_secret_control.SecretControlPlaneTests.test_never_returns_secret_values) ... ok\ntest_plan_requires_external_connector_for_remote_write (test_secret_control.SecretControlPlaneTests.test_plan_requires_external_connector_for_remote_write) ... ok\ntest_path_is_allowlisted (test_self_improvement.SelfImprovementTests.test_path_is_allowlisted) ... ok\ntest_status_is_bounded (test_self_improvement.SelfImprovementTests.test_status_is_bounded) ... ok\ntest_all_human_views_exist (test_ui_contract.HumanInterfaceContractTests.test_all_human_views_exist) ... ok\ntest_all_javascript_dom_references_exist (test_ui_contract.HumanInterfaceContractTests.test_all_javascript_dom_references_exist) ... ok\ntest_api_gets_are_cache_busted (test_ui_contract.HumanInterfaceContractTests.test_api_gets_are_cache_busted) ... ok\ntest_human_command_input_exists (test_ui_contract.HumanInterfaceContractTests.test_human_command_input_exists) ... ok\ntest_inline_handlers_reference_existing_functions (test_ui_contract.HumanInterfaceContractTests.test_inline_handlers_reference_existing_functions) ... ok\ntest_nav_binding_does_not_override_non_navigation_buttons (test_ui_contract.HumanInterfaceContractTests.test_nav_binding_does_not_override_non_navigation_buttons) ... ok\ntest_navigation_points_to_existing_views (test_ui_contract.HumanInterfaceContractTests.test_navigation_points_to_existing_views) ... ok\ntest_overview_and_cycle_required_elements_exist (test_ui_contract.HumanInterfaceContractTests.test_overview_and_cycle_required_elements_exist) ... ok\ntest_readiness_and_overview_are_wired (test_ui_contract.HumanInterfaceContractTests.test_readiness_and_overview_are_wired) ... ok\ntest_expired_state_is_rejected (test_youtube_oauth.YouTubeOAuthTests.test_expired_state_is_rejected) ... ok\ntest_not_configured_without_client_credentials (test_youtube_oauth.YouTubeOAuthTests.test_not_configured_without_client_credentials) ... ok\ntest_ready_to_start_with_client_and_redirect (test_youtube_oauth.YouTubeOAuthTests.test_ready_to_start_with_client_and_redirect) ... ok\ntest_snapshot_reports_missing_encryption_key (test_youtube_oauth.YouTubeOAuthTests.test_snapshot_reports_missing_encryption_key) ... ok\ntest_start_stores_expiring_state_without_secret_material (test_youtube_oauth.YouTubeOAuthTests.test_start_stores_expiring_state_without_secret_material) ... ok\n\n----------------------------------------------------------------------\nRan 53 tests in 0.472s\n\nOK\n"
     }
   ],
   "status": "PASS",
-  "completed_at": 1790575557.4156857
+  "completed_at": 1790575656.3762395
 }
