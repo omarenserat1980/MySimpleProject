@@ -36,7 +36,7 @@ public class BrainCloudActivity extends Activity {
         stop.setText("■ إيقاف السيرفر");
         root.addView(stop);
 
-        Button terminal = new Button(this);
+        Button browser = new Button(this);\n        browser.setText("🌐 فتح BRAIN Browser");\n        root.addView(browser);\n\n        Button terminal = new Button(this);
         terminal.setText("⌘ فتح BRAIN Termux Emulator");
         root.addView(terminal);
 
@@ -59,7 +59,7 @@ public class BrainCloudActivity extends Activity {
 
         start.setOnClickListener(v -> startServer());
         stop.setOnClickListener(v -> stopServer());
-        terminal.setOnClickListener(v -> startActivity(new Intent(this, BrainTermuxActivity.class)));
+        browser.setOnClickListener(v -> startActivity(new Intent(this, BrainBrowserActivity.class)));\n        terminal.setOnClickListener(v -> startActivity(new Intent(this, BrainTermuxActivity.class)));
         termux.setOnClickListener(v -> openTermux());
     }
 
