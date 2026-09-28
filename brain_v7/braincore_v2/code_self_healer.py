@@ -33,7 +33,6 @@ SOURCE_ALLOWLIST = {
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
-    "brain_v7/braincore_v2/test_code_repair_app.py",
     "brain_v7/braincore_v2/test_cinematic_local_renderer.py",
 )
 
