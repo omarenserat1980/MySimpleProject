@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""V12 Termux Agent for Electronic Brain.
+"""V12 BRAIN Termux Emulator Agent for Electronic Brain.
 
 GitHub is the control-plane contract. Runtime execution remains provider-agnostic:
 the cinematic factory delegates generation/publishing to authenticated runtime
@@ -16,13 +16,13 @@ import urllib.request
 from pathlib import Path
 
 BRAIN_URL = os.environ["BRAIN_URL"].rstrip("/")
-AGENT_KEY = os.environ["TERMUX_AGENT_KEY"]
-AGENT_ID = os.getenv("TERMUX_AGENT_ID", "android-termux-v12")
-MAX_TASKS_PER_RUN = max(1, int(os.getenv("TERMUX_MAX_TASKS_PER_RUN", "100")))
+AGENT_KEY = os.environ["BRAIN_EMULATOR_KEY"]
+AGENT_ID = os.getenv("BRAIN_EMULATOR_ID", "android-brain-emulator-v12")
+MAX_TASKS_PER_RUN = max(1, int(os.getenv("BRAIN_EMULATOR_MAX_TASKS_PER_RUN", "100")))
 STOP_ON_ERROR = os.getenv("TERMUX_STOP_ON_ERROR", "false").lower() == "true"
-POLL_SECONDS = max(1, int(os.getenv("TERMUX_POLL_SECONDS", "2")))
-HEARTBEAT_SECONDS = max(5, int(os.getenv("TERMUX_HEARTBEAT_SECONDS", "10")))
-REQUEST_TIMEOUT = max(5, int(os.getenv("TERMUX_REQUEST_TIMEOUT", "30")))
+POLL_SECONDS = max(1, int(os.getenv("BRAIN_EMULATOR_POLL_SECONDS", "2")))
+HEARTBEAT_SECONDS = max(5, int(os.getenv("BRAIN_EMULATOR_HEARTBEAT_SECONDS", "10")))
+REQUEST_TIMEOUT = max(5, int(os.getenv("BRAIN_EMULATOR_REQUEST_TIMEOUT", "30")))
 ROOT = Path(__file__).resolve().parent.parent
 
 def request(method, path, payload=None, params=None):
@@ -44,7 +44,7 @@ def execute(task, params):
         output = (p.stdout or p.stderr).strip()
         return p.returncode == 0, {"stdout": output, "stderr": (p.stderr or "").strip(), "returncode": p.returncode}, ""
 
-    if task == "termux_path":
+    if task == "brain_home":
         p = subprocess.run(["pwd"], capture_output=True, text=True, timeout=10)
         return p.returncode == 0, {"stdout": p.stdout.strip(), "stderr": p.stderr.strip(), "returncode": p.returncode}, ""
 
