@@ -118,6 +118,32 @@ jobs:
           print("cinematic V6 smoke: OK")
           PY
 
+      - name: Final failure diagnostics
+        if: failure()
+        run: |
+          set +e
+          mkdir -p ci-diagnostics
+          python -m pytest -vv brain_v7/braincore_v2/test_code_repair_app.py > ci-diagnostics/last-code-repair-test-failure.txt 2>&1
+          rc1=$?
+          python -m pytest -vv brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_cinematic_local_renderer.py > ci-diagnostics/last-underlying-tests-failure.txt 2>&1
+          rc2=$?
+          {
+            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit=${GITHUB_SHA}"
+            echo "code_repair_exit=${rc1}"
+            echo "underlying_exit=${rc2}"
+            echo
+            cat ci-diagnostics/last-code-repair-test-failure.txt
+            echo
+            echo "===== underlying tests ====="
+            cat ci-diagnostics/last-underlying-tests-failure.txt
+          } > ci-diagnostics/last-smoke-failure.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci-diagnostics/last-smoke-failure.txt
+          git diff --cached --quiet || git commit -m "ci: record latest cinematic smoke failure"
+          git push origin HEAD:main || true
+
       - name: Verify FFmpeg runtime
         run: |
           command -v ffmpeg
