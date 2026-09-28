@@ -136,6 +136,13 @@ class CodeChanges(BaseModel):
     persist_to_github:bool=True
 class CodePaths(BaseModel): paths:list[str]=[]
 
+class CinematicReleaseIn(BaseModel):
+    title: str
+    description: str = ""
+    media_path: str = ""
+    tags: list[str] = []
+    privacy: str = "private"
+
 @app.post("/api/media/upload")
 async def media_upload(file:UploadFile=File(...)):
     media_dir=os.path.join(ROOT,"web","media"); os.makedirs(media_dir,exist_ok=True)
@@ -207,13 +214,6 @@ def youtube_release_record_published(body: dict, request: Request):
         str(body.get("evidence", "")),
     )
 
-
-class CinematicReleaseIn(BaseModel):
-    title: str
-    description: str = ""
-    media_path: str = ""
-    tags: list[str] = []
-    privacy: str = "private"
 
 class MovieSummaryIn(BaseModel):
     title: str
