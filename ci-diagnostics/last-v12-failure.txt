@@ -1,0 +1,103 @@
+timestamp=2026-09-28T15:15:05Z
+commit=e31692755dacdd9ba90cae50960c03c617ed48b6
+unittest_exit_code=1
+
+test_correct_key_is_allowed (test_control_auth.ControlAuthTests.test_correct_key_is_allowed) ... ok
+test_missing_configuration_is_denied (test_control_auth.ControlAuthTests.test_missing_configuration_is_denied) ... ok
+test_wrong_key_is_denied (test_control_auth.ControlAuthTests.test_wrong_key_is_denied) ... ok
+test_cycle_creates_decision (test_core.BrainCoreTests.test_cycle_creates_decision) ... ok
+test_observe_matching_prediction_completes_goal (test_core.BrainCoreTests.test_observe_matching_prediction_completes_goal) ... ok
+test_app_compiles (test_deployment_contract.DeploymentContractTests.test_app_compiles) ... ok
+test_cinematic_model_is_defined_before_use (test_deployment_contract.DeploymentContractTests.test_cinematic_model_is_defined_before_use) ... FAIL
+test_json_response_is_imported (test_deployment_contract.DeploymentContractTests.test_json_response_is_imported) ... ok
+test_v14_contract_is_aligned (test_deployment_contract.DeploymentContractTests.test_v14_contract_is_aligned) ... ok
+test_workflow_runs_compile_check (test_deployment_contract.DeploymentContractTests.test_workflow_runs_compile_check) ... ok
+test_authentication (test_device_bridge.DeviceBridgeTests.test_authentication) ... ok
+test_queue_poll_report (test_device_bridge.DeviceBridgeTests.test_queue_poll_report) ... ok
+test_rejects_unknown_task (test_device_bridge.DeviceBridgeTests.test_rejects_unknown_task) ... ok
+test_requeues_stale_claim (test_device_bridge.DeviceBridgeTests.test_requeues_stale_claim) ... ok
+test_device_goal_gets_safe_device_option (test_device_decision.DeviceDecisionTests.test_device_goal_gets_safe_device_option) ... ok
+test_channels_are_not_opportunities (test_income_and_render.IncomeAndRenderContracts.test_channels_are_not_opportunities) ... ok
+test_live_listing_requires_fresh_evidence (test_income_and_render.IncomeAndRenderContracts.test_live_listing_requires_fresh_evidence) ... ok
+test_render_monitor_exposes_public_poll (test_income_and_render.IncomeAndRenderContracts.test_render_monitor_exposes_public_poll) ... ok
+test_canonical_url_removes_tracking_and_trailing_slash (test_income_engine.IncomeEngineTests.test_canonical_url_removes_tracking_and_trailing_slash) ... ok
+test_changed_content_is_updated (test_income_engine.IncomeEngineTests.test_changed_content_is_updated) ... ok
+test_fit_score_uses_matching_skills (test_income_engine.IncomeEngineTests.test_fit_score_uses_matching_skills) ... ok
+test_same_url_with_tracking_is_deduplicated (test_income_engine.IncomeEngineTests.test_same_url_with_tracking_is_deduplicated) ... ok
+test_stale_refresh_marks_old_live_opportunity (test_income_engine.IncomeEngineTests.test_stale_refresh_marks_old_live_opportunity) ... ok
+test_unchanged_content_is_detected (test_income_engine.IncomeEngineTests.test_unchanged_content_is_detected) ... ok
+test_cannot_skip_lifecycle_stage (test_income_lifecycle.IncomeLifecycleTests.test_cannot_skip_lifecycle_stage) ... ok
+test_external_steps_require_evidence (test_income_lifecycle.IncomeLifecycleTests.test_external_steps_require_evidence) ... ok
+test_payment_cannot_skip_delivery (test_income_lifecycle.IncomeLifecycleTests.test_payment_cannot_skip_delivery) ... ok
+test_prepare_does_not_claim_submission (test_income_lifecycle.IncomeLifecycleTests.test_prepare_does_not_claim_submission) ... ok
+test_first_target_is_ten_jod (test_income_strategy.IncomeStrategyTests.test_first_target_is_ten_jod) ... ok
+test_search_plan_contains_sources_and_evidence (test_income_strategy.IncomeStrategyTests.test_search_plan_contains_sources_and_evidence) ... ok
+test_extract_accepts_absolute_and_relative_listing_links (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_extract_accepts_absolute_and_relative_listing_links) ... ok
+test_sources_include_primary_freelance_channels (test_live_opportunity_researcher.LiveOpportunityResearcherTests.test_sources_include_primary_freelance_channels) ... ok
+test_compare_is_explicitly_input_based (test_mining_engine.MiningEngineTests.test_compare_is_explicitly_input_based) ... ok
+test_energy_cost_and_net_profit (test_mining_engine.MiningEngineTests.test_energy_cost_and_net_profit) ... ok
+test_invalid_unit_is_rejected (test_mining_engine.MiningEngineTests.test_invalid_unit_is_rejected) ... ok
+test_snapshot_does_not_claim_live_mining (test_mining_engine.MiningEngineTests.test_snapshot_does_not_claim_live_mining) ... ok
+test_run_builds_plan_from_active_goal (test_orchestrator.OrchestratorTests.test_run_builds_plan_from_active_goal) ... ok
+test_generates_multiple_solutions_and_verifies_selected_solution (test_problem_solver.ProblemSolverTests.test_generates_multiple_solutions_and_verifies_selected_solution) ... ok
+test_retry_is_bounded (test_problem_solver.ProblemSolverTests.test_retry_is_bounded) ... ok
+test_dockerfile_has_runtime_healthcheck (test_runtime_contract.RuntimeContractTests.test_dockerfile_has_runtime_healthcheck) ... ok
+test_health_contract_without_external_services (test_runtime_contract.RuntimeContractTests.test_health_contract_without_external_services) ... /opt/hostedtoolcache/Python/3.12.14/x64/lib/python3.12/site-packages/starlette/testclient.py:31: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+  [], typing.ContextManager[anyio.abc.BlockingPortal]
+ERROR
+test_preflight_module_imports (test_runtime_contract.RuntimeContractTests.test_preflight_module_imports) ... ok
+test_required_runtime_routes (test_runtime_contract.RuntimeContractTests.test_required_runtime_routes) ... ERROR
+test_missing_secret_is_reported_without_value (test_secret_control.SecretControlPlaneTests.test_missing_secret_is_reported_without_value) ... ok
+test_never_returns_secret_values (test_secret_control.SecretControlPlaneTests.test_never_returns_secret_values) ... ok
+test_plan_requires_external_connector_for_remote_write (test_secret_control.SecretControlPlaneTests.test_plan_requires_external_connector_for_remote_write) ... ok
+test_path_is_allowlisted (test_self_improvement.SelfImprovementTests.test_path_is_allowlisted) ... ok
+test_status_is_bounded (test_self_improvement.SelfImprovementTests.test_status_is_bounded) ... ok
+test_all_human_views_exist (test_ui_contract.HumanInterfaceContractTests.test_all_human_views_exist) ... ok
+test_all_javascript_dom_references_exist (test_ui_contract.HumanInterfaceContractTests.test_all_javascript_dom_references_exist) ... ok
+test_api_gets_are_cache_busted (test_ui_contract.HumanInterfaceContractTests.test_api_gets_are_cache_busted) ... ok
+test_human_command_input_exists (test_ui_contract.HumanInterfaceContractTests.test_human_command_input_exists) ... ok
+test_inline_handlers_reference_existing_functions (test_ui_contract.HumanInterfaceContractTests.test_inline_handlers_reference_existing_functions) ... ok
+test_nav_binding_does_not_override_non_navigation_buttons (test_ui_contract.HumanInterfaceContractTests.test_nav_binding_does_not_override_non_navigation_buttons) ... ok
+test_navigation_points_to_existing_views (test_ui_contract.HumanInterfaceContractTests.test_navigation_points_to_existing_views) ... ok
+test_overview_and_cycle_required_elements_exist (test_ui_contract.HumanInterfaceContractTests.test_overview_and_cycle_required_elements_exist) ... ok
+test_readiness_and_overview_are_wired (test_ui_contract.HumanInterfaceContractTests.test_readiness_and_overview_are_wired) ... ok
+test_expired_state_is_rejected (test_youtube_oauth.YouTubeOAuthTests.test_expired_state_is_rejected) ... ok
+test_not_configured_without_client_credentials (test_youtube_oauth.YouTubeOAuthTests.test_not_configured_without_client_credentials) ... ok
+test_ready_to_start_with_client_and_redirect (test_youtube_oauth.YouTubeOAuthTests.test_ready_to_start_with_client_and_redirect) ... ok
+test_snapshot_reports_missing_encryption_key (test_youtube_oauth.YouTubeOAuthTests.test_snapshot_reports_missing_encryption_key) ... ok
+test_start_stores_expiring_state_without_secret_material (test_youtube_oauth.YouTubeOAuthTests.test_start_stores_expiring_state_without_secret_material) ... ok
+
+======================================================================
+ERROR: test_health_contract_without_external_services (test_runtime_contract.RuntimeContractTests.test_health_contract_without_external_services)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/MySimpleProject/MySimpleProject/brain_v12/tests/test_runtime_contract.py", line 34, in test_health_contract_without_external_services
+    from brain_v12.app import app
+  File "/home/runner/work/MySimpleProject/MySimpleProject/brain_v12/app.py", line 150, in <module>
+    def youtube_cinematic_validate(body: CinematicReleaseIn, request: Request):
+                                         ^^^^^^^^^^^^^^^^^^
+NameError: name 'CinematicReleaseIn' is not defined
+
+======================================================================
+ERROR: test_required_runtime_routes (test_runtime_contract.RuntimeContractTests.test_required_runtime_routes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/MySimpleProject/MySimpleProject/brain_v12/tests/test_runtime_contract.py", line 27, in test_required_runtime_routes
+    from brain_v12.app import app
+  File "/home/runner/work/MySimpleProject/MySimpleProject/brain_v12/app.py", line 150, in <module>
+    def youtube_cinematic_validate(body: CinematicReleaseIn, request: Request):
+                                         ^^^^^^^^^^^^^^^^^^
+NameError: name 'CinematicReleaseIn' is not defined
+
+======================================================================
+FAIL: test_cinematic_model_is_defined_before_use (test_deployment_contract.DeploymentContractTests.test_cinematic_model_is_defined_before_use)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/MySimpleProject/MySimpleProject/brain_v12/tests/test_deployment_contract.py", line 26, in test_cinematic_model_is_defined_before_use
+    self.assertLess(positions["class"], positions["function"])
+AssertionError: 211 not less than 150
+
+----------------------------------------------------------------------
+Ran 62 tests in 0.268s
+
+FAILED (failures=1, errors=2)
