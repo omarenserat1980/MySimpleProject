@@ -26,7 +26,7 @@ def main():
     if not shutil_which("ffprobe"):
         raise SystemExit("ERROR: ffprobe is not available to the BRAIN runtime.")
 
-    os.environ["BRAIN_RUNTIME"] = "BRAIN_TERMUX_EMULATOR"
+    os.environ["BRAIN_RUNTIME"] = "BRAIN_BRAIN_EMULATOR_EMULATOR"
     os.environ["EB_IMAGE_ADAPTER"] = os.environ.get(
         "EB_IMAGE_ADAPTER",
         os.environ.get("BRAIN_EMULATOR_DIFFUSION_BIN", "")
@@ -62,7 +62,7 @@ def main():
     duration = float((data.get("format") or {}).get("duration") or 0)
     streams = data.get("streams") or []
     ok = abs(duration-5.0) <= 0.10 and any(s.get("codec_type")=="video" for s in streams)
-    result = {"status":"COMPLETE" if ok else "QC_FAILED","duration_s":duration,"video":str(video),"master_image":str(master),"project":str(PROJECT),"runtime":"BRAIN_TERMUX_EMULATOR","model":os.environ["EB_DIFFUSION_MODEL"]}
+    result = {"status":"COMPLETE" if ok else "QC_FAILED","duration_s":duration,"video":str(video),"master_image":str(master),"project":str(PROJECT),"runtime":"BRAIN_BRAIN_EMULATOR_EMULATOR","model":os.environ["EB_DIFFUSION_MODEL"]}
     (OUT/"result.json").write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(result,ensure_ascii=False,indent=2))
     return 0 if ok else 2
