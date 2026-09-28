@@ -266,9 +266,7 @@ def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
         ffprobe = _tool("ffprobe")
         output: pathlib.Path
 
-        if operation == "timeline":
-            cmd, output = _timeline_command(spec, ffmpeg)
-        elif operation == "probe":
+        if operation == "probe":
             src = _resolve_input(spec["input"])
             proc = subprocess.run(
                 [ffprobe, "-v", "error", "-show_format", "-show_streams", "-of", "json", str(src)],
@@ -282,7 +280,10 @@ def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
 
         _update(job_id, status="PROCESSING", progress=15)
 
-        if operation == "convert":
+        if operation == "timeline":
+            cmd, output = _timeline_command(spec, ffmpeg)
+
+        elif operation == "convert":
             src = _resolve_input(spec["input"])
             output = _output_path("convert", spec.get("format", "mp4"))
             fmt = spec.get("format", "mp4")
