@@ -4,6 +4,6 @@
   "resume": false,
   "youtube_publish": false,
   "quality_floor": 0.82,
-  "requested_at": "2026-09-28T06:25:39.610Z",
-  "reason": "production smoke: bounded code repair application integrated"
+  "requested_at": "2026-09-28T07:21:04.594Z",
+  "reason": "production smoke after FFmpeg local renderer self-healing fix"
 }
