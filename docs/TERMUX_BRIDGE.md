@@ -4,9 +4,9 @@ The Termux device does **not** expose a public listening port.
 
 The architecture is:
 
-1. Brain V12 on Render queues an allowlisted device task.
+1. Brain V12 running from the GitHub-managed application queues an allowlisted device task.
 2. Termux makes an outbound HTTPS poll to `/api/device/poll`.
-3. Termux authenticates with the shared secret configured in Render as `TERMUX_AGENT_KEY`.
+3. Termux authenticates with the shared secret configured as `TERMUX_AGENT_KEY` in the runtime secret store.
 4. Termux executes only fixed tasks; arbitrary shell commands are rejected by design.
 5. Termux posts the result to `/api/device/report`.
 6. Brain V12 verifies the task/agent match and exposes the result to the cognitive loop.
