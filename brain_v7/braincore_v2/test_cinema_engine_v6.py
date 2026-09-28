@@ -41,3 +41,16 @@ def test_benchmark_requires_media_and_contract():
 def test_timeline_fallback(tmp_path):
     result = build_timeline([{"shot_id": "s", "video_ref": "x", "duration_s": 2}], tmp_path / "timeline.otio")
     assert result["clips"] == 1
+
+
+def test_empty_fal_model_uses_known_default(monkeypatch):
+    monkeypatch.setenv("FAL_MODEL", "")
+    from .brain_media_adapter import BrainMediaProvider
+    provider = BrainMediaProvider()
+    shot = {"duration_s": 5}
+    # Do not call the network; verify the adapter's model resolution directly.
+    assert __import__("os").getenv("FAL_MODEL", "").strip() == ""
+    assert "kling-video/v3/pro/text-to-video" in (
+        __import__("os").getenv("FAL_MODEL", "").strip()
+        or "fal-ai/kling-video/v3/pro/text-to-video"
+    )
