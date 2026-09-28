@@ -76,20 +76,9 @@ The current Agent remains bounded by its registered actions and command policy. 
 
 ## V11.2 deployment checklist
 
-### Render
+### تشغيل Relay محليًا عبر GitHub
 
-The repository includes `render.yaml`.
-
-1. Create a Render Web Service from this GitHub repository.
-2. Use `render.yaml`, or set Root Directory to `brain_v7`.
-3. Build Command: `pip install -r relay_requirements.txt`
-4. Start Command: `uvicorn relay_server:app --host 0.0.0.0 --port $PORT`
-5. Add the secret environment variable `RELAY_TOKEN`.
-6. Verify `https://YOUR-SERVICE.onrender.com/health`.
-7. On Android/Termux set `RELAY_URL`, the same `RELAY_TOKEN`, and `RELAY_ID=android-brain-01`.
-8. Start `./start_brain.sh`.
-
-Render's current documentation says Free web services are intended for testing/hobby use and can spin down after inactivity, so use this first for connectivity testing rather than an always-on production relay.
+الشفرة محفوظة في GitHub، ويمكن تشغيل Relay محليًا أو داخل بيئة CI. لا يعتمد هذا المسار على مزود استضافة خارجي.
 
 ### Security
 
