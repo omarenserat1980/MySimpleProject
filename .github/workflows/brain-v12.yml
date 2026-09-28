@@ -29,7 +29,7 @@ jobs:
       - name: Wait for Render to deploy this commit
         env:
           EXPECTED_COMMIT: ${{ github.sha }}
-          RENDER_URL: https://electronic-brain-v12-gwwg.onrender.com
+          RENDER_URL: https://electronic-brain-v13-gwwg.onrender.com
         run: |
           set -euo pipefail
           for attempt in $(seq 1 45); do
@@ -45,7 +45,7 @@ jobs:
             version=$(printf '%s' "$health" | jq -r '.version // empty' 2>/dev/null || true)
             commit=$(printf '%s' "$identity" | jq -r '.commit // empty' 2>/dev/null || true)
             verified=$(printf '%s' "$verify" | jq -r '.ok // false' 2>/dev/null || true)
-            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "12.6" ] && [ "$verified" = "true" ]; then
+            if [ "$commit" = "$EXPECTED_COMMIT" ] && [ "$version" = "14.0" ] && [ "$verified" = "true" ]; then
               echo "Render is running the exact GitHub commit: $EXPECTED_COMMIT"
               curl -fsS --max-time 20 "$RENDER_URL/api/workforce/report" >/dev/null
               curl -fsS --max-time 20 "$RENDER_URL/api/income/opportunities" >/dev/null
