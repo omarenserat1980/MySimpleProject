@@ -31,6 +31,7 @@ MAX_WORKERS = max(1, min(int(os.getenv("BRAIN_MEDIA_WORKERS", "1")), 4))
 _pool = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="brain-media")
 _lock = threading.RLock()
 _jobs: dict[str, dict[str, Any]] = {}
+_processes: dict[str, subprocess.Popen] = {}
 
 
 def _now() -> float:
@@ -81,6 +82,8 @@ def _run(cmd: list[str], job_id: str) -> tuple[int, str]:
         bufsize=1,
     )
     lines: list[str] = []
+    with _lock:
+        _processes[job_id] = proc
     assert proc.stdout is not None
     for line in proc.stdout:
         line = line.rstrip()
@@ -231,6 +234,32 @@ def _execute(job_id: str, operation: str, spec: dict[str, Any]) -> None:
     except Exception as exc:
         _update(job_id, status="FAILED", progress=100, error=str(exc), finished_at=_now())
 
+
+
+def cancel(job_id: str) -> dict[str, Any]:
+    with _lock:
+        job = _jobs.get(job_id)
+        proc = _processes.get(job_id)
+        if not job:
+            return {"ok": False, "status": "NOT_FOUND", "job_id": job_id}
+        if job["status"] in {"COMPLETED", "FAILED", "CANCELLED"}:
+            return snapshot(job_id)
+        if proc is None:
+            job["status"] = "CANCELLED"
+            job["finished_at"] = _now()
+            job["progress"] = 100
+            return snapshot(job_id)
+        job["status"] = "CANCELLING"
+    try:
+        proc.terminate()
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    _update(job_id, status="CANCELLED", progress=100, finished_at=_now(), error="CANCELLED_BY_USER")
+    return snapshot(job_id)
 
 def submit(operation: str, spec: dict[str, Any]) -> dict[str, Any]:
     allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow"}
