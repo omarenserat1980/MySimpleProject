@@ -8,7 +8,7 @@ UI = ROOT / "web" / "index.html"
 EXPECTED_VIEWS = {
     "home", "overview", "chat", "thinking", "goals", "memory", "permissions",
     "vision", "voice", "video", "chatgpt", "ai", "tools", "agent", "evolve",
-    "workforce", "events",
+    "workforce", "events", "imageFactory",
 }
 
 class HumanInterfaceContractTests(unittest.TestCase):
@@ -68,12 +68,12 @@ class HumanInterfaceContractTests(unittest.TestCase):
         self.assertIn("/api/system/readiness", self.html)
         self.assertIn("ovReadiness", self.html)
 
-if __name__ == "__main__":
-    unittest.main()
-
     def test_connection_status_ui_contract(self):
         ids = set(re.findall(r'\bid=["\']([^"\']+)["\']', self.html))
         self.assertIn("connectionStatus", ids)
         self.assertIn("connectionText", ids)
         self.assertIn("checkBrainConnection", self.html)
         self.assertIn("/api/system/connection", self.html)
+
+if __name__ == "__main__":
+    unittest.main()
