@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://electronic-brain-v12-gwwg.onrender.com").rstrip("/")
+BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:10000").rstrip("/")
 AGENT_ID = os.getenv("V12_AGENT_ID", "redmi3-termux-01")
 KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / "v12-agent" / "agent.key")))
 POLL_SECONDS = max(2.0, float(os.getenv("V12_POLL_SECONDS", "3")))
