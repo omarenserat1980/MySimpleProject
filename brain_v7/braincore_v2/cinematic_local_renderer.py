@@ -118,6 +118,15 @@ class CinematicLocalRenderer:
         if p.returncode != 0 or not out.is_file() or out.stat().st_size < 1024:
             return {"status": "RENDER_FAILED", "error": p.stderr[-3000:]}
         local_qc = self._local_visual_qc(out, duration)
+        if local_qc.get("status") != "PASS":
+            return {
+                "status": "QC_FAILED",
+                "shot_id": shot_id,
+                "video_ref": str(out),
+                "duration_s": duration,
+                "renderer": "local_ffmpeg_cinematic",
+                "local_visual_qc": local_qc,
+            }
         return {
             "status": "VERIFIED_COMPLETED",
             "shot_id": shot_id,
