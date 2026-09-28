@@ -94,7 +94,7 @@ public class BrainBrowserActivity extends Activity {
                 req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                 String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
                 req.setTitle(name);
-                req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+                req.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, name);
                 ((DownloadManager)getSystemService(DOWNLOAD_SERVICE)).enqueue(req);
                 Toast.makeText(this, "بدأ تنزيل: " + name, Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
