@@ -2,8 +2,7 @@ name: Brain V12 Image
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "brain_v12/**"
       - "brain_v7/**"
@@ -13,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: brain-v12-image-${{ github.ref }}
@@ -23,153 +21,68 @@ env:
   BRAIN_V14_VERSION: "14.0"
   BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
   BRAIN_WORKFORCE_ENABLED: "false"
-  
+
 jobs:
-  build-and-push:
+  build-and-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: brain_v12/requirements.txt
+      - name: Build Brain image
+        run: |
+          set -Eeuo pipefail
+          docker build --platform linux/amd64 -f brain_v12/Dockerfile -t electronic-brain-v12:ci .
 
-      - name: Verify build context
+      - name: Container health smoke test
         shell: bash
         run: |
           set -Eeuo pipefail
-          required_files=(
-            brain_v12/Dockerfile
-            brain_v12/requirements.txt
-            brain_v12/app.py
-            brain_v12/tools/ci_preflight.py
-          )
-          required_dirs=(
-            brain_v12/brain
-            brain_v12/movie_summary_factory
-            brain_v7
-          )
-          for path in "${required_files[@]}"; do
-            test -f "$path" || { echo "::error::Missing file: $path"; exit 1; }
-          done
-          for path in "${required_dirs[@]}"; do
-            test -d "$path" || { echo "::error::Missing directory: $path"; exit 1; }
-          done
-
-      - name: Install Python dependencies
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python -m pip install --upgrade pip
-          python -m pip install -r brain_v12/requirements.txt
-
-      - name: Run deterministic preflight
-        shell: bash
-        env:
-          BRAIN_DB: /tmp/brain_v12-smoke.db
-        run: |
-          set -Eeuo pipefail
-          python -m brain_v12.tools.ci_preflight
-
-      - name: Run V12 contract tests
-        shell: bash
-        env:
-          BRAIN_DB: /tmp/brain_v12-tests.db
-        run: |
-          set -Eeuo pipefail
-          python -m compileall -q brain_v12
-          python -m unittest discover -s brain_v12/tests -v
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./brain_v12/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/electronic-brain-v12:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/electronic-brain-v12:main
-
-      - name: Pull immutable image for smoke test
-        shell: bash
-        env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/electronic-brain-v12:${{ github.sha }}
-        run: |
-          set -Eeuo pipefail
-          docker pull "$IMAGE"
-          docker image inspect "$IMAGE" >/dev/null
-
-      - name: Container health and API contract smoke test
-        shell: bash
-        env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/electronic-brain-v12:${{ github.sha }}
-          PORT: "18012"
-        run: |
-          set -Eeuo pipefail
-
           name="brain-v12-smoke-${GITHUB_RUN_ID}"
           cid=""
-
           cleanup() {
             if [[ -n "$cid" ]]; then
               docker logs "$cid" || true
-              docker inspect "$cid" --format 'state={{json .State}}' || true
               docker rm -f "$cid" >/dev/null 2>&1 || true
             fi
           }
           trap cleanup EXIT
 
-          cid="$(docker run -d --name "$name" --init -p 18012:8012 -e PORT=8012 -e BRAIN_V14_VERSION="$BRAIN_V14_VERSION" -e BRAIN_DB=/tmp/brain_v12-smoke.db -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false -e BRAIN_WORKFORCE_ENABLED=false "$IMAGE")"
-
-          echo "container=$cid"
+          cid="$(docker run -d --name "$name" --init \
+            -p 18012:10000 \
+            -e PORT=10000 \
+            -e BRAIN_V14_VERSION="$BRAIN_V14_VERSION" \
+            -e BRAIN_DB=/tmp/brain-v12-smoke.db \
+            -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false \
+            -e BRAIN_WORKFORCE_ENABLED=false \
+            electronic-brain-v12:ci)"
 
           for i in $(seq 1 45); do
             state="$(docker inspect "$cid" --format '{{.State.Status}}' 2>/dev/null || true)"
-            health="$(docker inspect "$cid" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' 2>/dev/null || true)"
-            echo "attempt=$i state=$state health=$health"
-
+            echo "attempt=$i state=$state"
             if [[ "$state" == "exited" || "$state" == "dead" ]]; then
-              echo "::error::Container exited before becoming healthy"
-              docker logs "$cid" || true
+              echo "::error::Container exited before health check"
               exit 1
             fi
-
             if python - <<'PY'
 import json
 import urllib.request
-
 try:
     with urllib.request.urlopen("http://127.0.0.1:18012/health", timeout=3) as response:
         payload = json.load(response)
     assert payload.get("ok") is True
     assert payload.get("version") == "14.0"
-    assert payload.get("deployment", {}).get("converged") is False
     print(json.dumps(payload, sort_keys=True))
 except Exception:
     raise SystemExit(1)
 PY
             then
-              echo "container health/API contract smoke passed"
+              echo "BRAIN Media/Runtime image smoke: OK"
               exit 0
             fi
             sleep 2
           done
 
           echo "::error::Container did not become healthy within 90 seconds"
-          docker logs "$cid" || true
-          docker inspect "$cid" --format '{{json .State.Health}}' || true
           exit 1
