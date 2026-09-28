@@ -145,6 +145,8 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
     video_labels: list[str] = []
     audio_labels: list[str] = []
     durations: list[float] = []
+    ffprobe = _tool("ffprobe")
+
     for i, scene in enumerate(scenes):
         if not isinstance(scene, dict):
             raise ValueError("INVALID_TIMELINE_SCENE")
@@ -163,18 +165,27 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
             vf += f",drawtext=text='{_drawtext_escape(caption)}':x=(w-text_w)/2:y=h-120:fontsize=46:fontcolor=white:borderw=3:bordercolor=black"
         vf += f"[{v}]"
         filters.append(vf)
-        filters.append(f"[{i}:a]aresample=48000,asetpts=N/SR/TB[{a}]")
+
+        probe = subprocess.run([ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index", "-of", "csv=p=0", str(src)], capture_output=True, text=True, timeout=30, check=False)
+        if probe.returncode == 0 and probe.stdout.strip():
+            filters.append(f"[{i}:a]aresample=48000,asetpts=N/SR/TB[{a}]")
+        else:
+            silent_index = len(scenes) + len([x for x in audio_labels if x.startswith("silent")])
+            inputs += ["-f", "lavfi", "-t", str(duration), "-i", "anullsrc=r=48000:cl=stereo"]
+            filters.append(f"[{silent_index}:a]atrim=duration={duration},asetpts=PTS-STARTPTS[{a}]")
         video_labels.append(v)
         audio_labels.append(a)
 
     watermark = str(spec.get("watermark") or "").strip()
     if watermark:
         wp = _resolve_input(watermark)
-        inputs += ["-i", str(wp)]
-        wi = len(scenes)
-        filters.append(f"[{wi}:v]scale=320:-1[wm]")
-        filters.append(f"[{video_labels[-1]}][wm]overlay=W-w-35:H-h-35[{video_labels[-1]}wm]")
-        video_labels[-1] = f"{video_labels[-1]}wm"
+        inputs += ["-loop", "1", "-i", str(wp)]
+        wi = len(scenes) + sum(1 for _ in audio_labels if _.startswith("silent"))
+        filters.append(f"[{wi}:v]scale=320:-1,format=rgba[wm]")
+        for i, label in enumerate(list(video_labels)):
+            wmout = f"vw{i}"
+            filters.append(f"[{label}][wm]overlay=W-w-35:H-h-35:shortest=1[{wmout}]")
+            video_labels[i] = wmout
 
     transition = _validate_transition(spec.get("transition", "none"))
     if transition == "none" or len(video_labels) == 1:
@@ -203,10 +214,13 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
         filters.append(f"[{current_v}]null[vout]")
         filters.append(f"[{current_a}]anull[aout]")
 
+    preset = str(spec.get("preset") or "medium")
+    if preset not in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow"}:
+        raise ValueError("UNSUPPORTED_ENCODER_PRESET")
+    crf = max(18, min(int(spec.get("crf") or 20), 30))
     cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning"] + inputs
     cmd += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]",
-            "-c:v", "libx264", "-preset", str(spec.get("preset") or "medium"),
-            "-crf", str(max(18, min(int(spec.get("crf") or 20), 30))),
+            "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
             "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
             "-movflags", "+faststart", str(output)]
     return cmd, output
