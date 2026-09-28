@@ -58,7 +58,11 @@ def test_local_android_bridge_auth(monkeypatch):
     import importlib
     import cloud.api_server as api
     importlib.reload(api)
-    client = TestClient(api.app)
+    client = TestClient(api.app, client=("127.0.0.1", 12345))
     response = client.get("/v1/status", headers={"X-BRAIN-Local-App": "1"})
     assert response.status_code == 200
+
+    remote = TestClient(api.app, client=("10.0.0.5", 12345))
+    response = remote.get("/v1/status", headers={"X-BRAIN-Local-App": "1"})
+    assert response.status_code == 503
 
