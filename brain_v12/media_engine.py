@@ -140,6 +140,11 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
     if not isinstance(scenes, list) or not 1 <= len(scenes) <= 50:
         raise ValueError("TIMELINE_REQUIRES_1_TO_50_SCENES")
     output = _output_path("timeline", "mp4")
+    profile = str(spec.get("profile") or "youtube_1080p")
+    profiles = {"youtube_1080p": (1920, 1080, 30), "shorts_1080x1920": (1080, 1920, 30), "cinematic_4k": (3840, 2160, 24)}
+    if profile not in profiles:
+        raise ValueError("UNSUPPORTED_CINEMATIC_PROFILE")
+    timeline_width, timeline_height, timeline_fps = profiles[profile]
     inputs: list[str] = []
     filters: list[str] = []
     video_labels: list[str] = []
@@ -162,7 +167,7 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
         input_index += 1
         v = f"v{i}"
         a = f"a{i}"
-        vf = f"[{i}:v]scale={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:force_original_aspect_ratio=decrease,pad={TIMELINE_WIDTH}:{TIMELINE_HEIGHT}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={TIMELINE_FPS},format=yuv420p"
+        vf = f"[{i}:v]scale={timeline_width}:{timeline_height}:force_original_aspect_ratio=decrease,pad={timeline_width}:{timeline_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={timeline_fps},format=yuv420p"
         caption = scene.get("caption")
         if caption:
             vf += f",drawtext=text='{_drawtext_escape(caption)}':x=(w-text_w)/2:y=h-120:fontsize=46:fontcolor=white:borderw=3:bordercolor=black"
@@ -192,6 +197,25 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
             filters.append(f"[{label}][wm]overlay=W-w-35:H-h-35:shortest=1[{wmout}]")
             video_labels[i] = wmout
 
+    global_audio_files = []
+    for key, default_volume in (("music", 0.35), ("voiceover", 1.0)):
+        name = str(spec.get(key) or "").strip()
+        if name:
+            global_audio_files.append((name, float(spec.get(key + "_volume") or default_volume)))
+    global_audio_label = None
+    if global_audio_files:
+        extras = []
+        for name, volume in global_audio_files:
+            path = _resolve_input(name)
+            inputs += ["-stream_loop", "-1", "-i", str(path)]
+            idx = input_index
+            input_index += 1
+            label = "ga" + str(idx)
+            filters.append("[" + str(idx) + ":a]volume=" + str(volume) + ",aresample=48000[" + label + "]")
+            extras.append(label)
+        joined = "".join("[" + x + "]" for x in extras)
+        global_audio_label = "global_audio"
+        filters.append(joined + "amix=inputs=" + str(len(extras)) + ":duration=longest:dropout_transition=2[" + global_audio_label + "]")
     transition = _validate_transition(spec.get("transition", "none"))
     if transition == "none" or len(video_labels) == 1:
         if len(video_labels) == 1:
@@ -219,12 +243,17 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
         filters.append(f"[{current_v}]null[vout]")
         filters.append(f"[{current_a}]anull[aout]")
 
+    if global_audio_label:
+        filters.append("[aout][" + global_audio_label + "]amix=inputs=2:duration=longest:dropout_transition=2[aout_final]")
+        audio_output_label = "aout_final"
+    else:
+        audio_output_label = "aout"
     preset = str(spec.get("preset") or "medium")
     if preset not in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow"}:
         raise ValueError("UNSUPPORTED_ENCODER_PRESET")
     crf = max(18, min(int(spec.get("crf") or 20), 30))
     cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "warning"] + inputs
-    cmd += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[aout]",
+    cmd += ["-filter_complex", ";".join(filters), "-map", "[vout]", "-map", "[" + audio_output_label + "]",
             "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
             "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
             "-movflags", "+faststart", str(output)]
