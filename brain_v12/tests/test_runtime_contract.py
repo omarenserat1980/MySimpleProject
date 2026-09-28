@@ -12,7 +12,6 @@ class RuntimeContractTests(unittest.TestCase):
         os.environ.setdefault("BRAIN_DB", "/tmp/brain-v12-test.db")
         os.environ.setdefault("BRAIN_LIVE_INCOME_SEARCH_ENABLED", "false")
         os.environ.setdefault("BRAIN_WORKFORCE_ENABLED", "false")
-        os.environ.setdefault("BRAIN_GITHUB_RUNTIME_ENABLED", "false")
 
     def test_preflight_module_imports(self):
         from brain_v12.tools import ci_preflight
@@ -38,7 +37,6 @@ class RuntimeContractTests(unittest.TestCase):
             {
                 "BRAIN_LIVE_INCOME_SEARCH_ENABLED": "false",
                 "BRAIN_WORKFORCE_ENABLED": "false",
-                "BRAIN_GITHUB_RUNTIME_ENABLED": "false",
                 "BRAIN_V14_VERSION": "14.0",
             },
             clear=False,
