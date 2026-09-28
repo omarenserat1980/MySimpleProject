@@ -12,6 +12,12 @@ on:
         description: "Film duration in seconds"
         required: true
         default: "60"
+      repair_generation:
+        description: "Automatic repair retry generation (0 or 1)"
+        required: true
+        type: choice
+        default: "0"
+        options: ["0","1"]
       resume:
         description: "Resume verified shots from previous state"
         required: true
@@ -41,6 +47,8 @@ jobs:
       FACTORY_MODEL_ROUTER: "1"
       FACTORY_MODEL: "auto"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
+      FACTORY_REPAIR_GENERATION: ${{ inputs.repair_generation || '0' }}
+      FACTORY_RESUME: ${{ inputs.resume || 'true' }}
       FACTORY_ALLOW_YOUTUBE_PUBLISH: "0"
       FACTORY_MIN_QUALITY: "0.82"
       MEDIA_PROVIDER_URL: ${{ secrets.MEDIA_PROVIDER_URL }}
@@ -84,13 +92,36 @@ jobs:
           echo "BRAIN_MAX_RUNTIME_SECONDS=$seconds" >> "$GITHUB_ENV"
           echo "BRAIN_MAX_ITERATIONS=1000000" >> "$GITHUB_ENV"
 
-      - name: Load production request duration
+      - name: Ensure production request exists
         run: |
+          set -euo pipefail
+          mkdir -p production
+          if [ ! -s production/REQUEST.json ]; then
+            cat > production/REQUEST.json <<'JSON'
+          {
+            "duration_seconds": 60,
+            "title": "Electronic Brain Cinematic Film",
+            "language": "ar"
+          }
+          JSON
+          fi
+          python -m json.tool production/REQUEST.json >/dev/null
+
+      - name: Load production request duration
+        env:
+          INPUT_DURATION: ${{ inputs.duration || '' }}
+        run: |
+          set -euo pipefail
           python - <<'PY'
           import json, os
-          with open("production/REQUEST.json", encoding="utf-8") as fh:
-              req=json.load(fh)
-          duration=max(1,min(600,int(req.get("duration_seconds",60))))
+          raw=os.getenv("INPUT_DURATION","").strip()
+          if raw:
+              duration=int(raw)
+          else:
+              with open("production/REQUEST.json", encoding="utf-8") as fh:
+                  req=json.load(fh)
+              duration=int(req.get("duration_seconds",60))
+          duration=max(1,min(600,duration))
           with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as fh:
               fh.write(f"FACTORY_DURATION_SECONDS={duration}\n")
           print(f"FACTORY_DURATION_SECONDS={duration}")
@@ -121,8 +152,15 @@ jobs:
 
       - name: Install factory dependencies
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          if [ -f brain_v7/requirements.txt ]; then pip install -r brain_v7/requirements.txt; fi
+          if [ -f brain_v7/requirements.txt ]; then
+            python -m pip install -r brain_v7/requirements.txt
+          else
+            echo "::error::brain_v7/requirements.txt is missing"
+            exit 1
+          fi
+          python -m pytest --version
 
       - name: Preflight free media backend
         run: |
@@ -274,6 +312,16 @@ jobs:
           python -m compileall -q brain_v7/braincore_v2
           python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py
 
+      - name: Setup Python for self-heal
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install self-heal dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f brain_v7/requirements.txt ]; then python -m pip install -r brain_v7/requirements.txt; fi
+
       - name: Persist verified repair
         id: persist
         env:
@@ -296,6 +344,21 @@ jobs:
           git commit -m "[BRAIN-AUTO-HEAL] verified repair cycle $((count+1))"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch one repaired production retry
+        if: steps.persist.outputs.changed == 'true' && inputs.repair_generation != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          duration="${{ inputs.duration || '60' }}"
+          gh workflow run electronic-brain-cinematic.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f duration="$duration" \
+            -f resume=true \
+            -f brain_runtime_minutes=5 \
+            -f repair_generation=1
 
       - name: Report repair result
         if: always()
