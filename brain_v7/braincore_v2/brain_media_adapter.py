@@ -39,7 +39,7 @@ class BrainMediaProvider:
     def _render_fal(self, shot: dict[str, Any]) -> dict[str, Any]:
         if fal_client is None:
             return {"status":"FAL_CLIENT_MISSING"}
-        model=os.getenv("FAL_MODEL","fal-ai/kling-video/v3/pro/text-to-video")
+        model=os.getenv("FAL_MODEL","").strip() or "fal-ai/kling-video/v3/pro/text-to-video"
         duration=str(int(shot.get("duration_s") or os.getenv("FAL_SHOT_DURATION","5")))
         generate_audio=os.getenv("FAL_GENERATE_AUDIO","0").strip().lower() in {"1","true","yes","on"}
         try:
