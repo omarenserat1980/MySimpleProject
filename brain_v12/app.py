@@ -246,7 +246,7 @@ def media_health():
         "ffprobe": bool(ffprobe),
         "media_root": str(media_engine.MEDIA_ROOT),
         "queue_workers": media_engine.MAX_WORKERS,
-        "operations": ["probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow"],
+        "operations": ["probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade", "timeline"],
     }
 
 
@@ -335,6 +335,14 @@ def media_mix_audio(body: MediaJobIn):
 def media_fade(body: MediaJobIn):
     try:
         return media_engine.submit("fade", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/timeline")
+def media_timeline(body: MediaJobIn):
+    try:
+        return media_engine.submit("timeline", body.spec)
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
