@@ -88,7 +88,8 @@ jobs:
           python -m pytest -q \
             brain_v7/braincore_v2/test_factory_repair_app.py \
             brain_v7/braincore_v2/test_code_repair_app.py \
-            brain_v7/braincore_v2/test_cinematic_local_renderer.py
+            brain_v7/braincore_v2/test_cinematic_local_renderer.py \
+            brain_v7/braincore_v2/test_repair_preflight.py
 
       - name: Inspect and repair code
         run: |
