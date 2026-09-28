@@ -83,6 +83,14 @@ RULES: tuple[Callable[[], list[str]], ...] = (
     rule_workflow_persists_route,
 )
 
+def _failure_hint(error_text: str) -> str:
+    text = (error_text or "").lower()
+    if "fal_model" in text and "empty" in text:
+        return "rule_empty_fal_model"
+    if "factory_media_route" in text:
+        return "rule_workflow_persists_route"
+    return "verification_failure"
+
 def verify() -> tuple[bool, str]:
     compile_cmd = ["python", "-m", "compileall", "-q", "brain_v7/braincore_v2"]
     p = subprocess.run(compile_cmd, cwd=ROOT, capture_output=True, text=True, timeout=120)
@@ -118,8 +126,10 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
         rolled_back = bool(changed) and not ok
         if rolled_back:
             _restore(before)
+        diagnosis = _failure_hint(verification if not ok else last_error)
         entry = {
             "cycle": cycle,
+            "failure_diagnosis": diagnosis,
             "changed_files": sorted(set(changed)),
             "rule_errors": rule_errors,
             "verification_passed": ok,
@@ -139,9 +149,11 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
             Path(report_path).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
             return result
         last_error = verification
+        if not ok and not changed:
+            break
     result = {
         "status": "CODE_REPAIR_LIMIT_REACHED",
-        "cycles_completed": MAX_CYCLES,
+        "cycles_completed": len(history),
         "history": history,
         "last_error": last_error,
     }
