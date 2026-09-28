@@ -15,3 +15,13 @@ def test_diagnose_never_claims_provider_success(monkeypatch):
     d = diagnose("HTTP 403 User is locked: exhausted balance")
     assert d["fal_quota_blocked"] is True
     assert d["recommended_route"] in {"local_ffmpeg_cinematic", "fal", "configuration_required"}
+
+
+def test_100_cycle_controller_stops_on_healthy_runtime(monkeypatch, tmp_path):
+    monkeypatch.setenv("FACTORY_ALLOW_LOCAL_FALLBACK", "1")
+    monkeypatch.setenv("FAL_MODEL", "")
+    monkeypatch.setenv("FFMPEG_BIN", "ffmpeg")
+    result = repair_100_cycles("", str(tmp_path / "100.json"))
+    assert result["cycles_completed"] <= 100
+    assert result["status"] in {"RUNTIME_HEALTHY", "REPAIR_LIMIT_REACHED"}
+    assert len(result["history"]) == result["cycles_completed"]
