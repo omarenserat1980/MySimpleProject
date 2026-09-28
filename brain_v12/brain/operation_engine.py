@@ -32,7 +32,6 @@ class OperationEngine:
     TEMPLATES = {
         "CODE_CHANGE": "Inspect the requested code area, plan the smallest safe change, implement it, test it, verify it, document it, and commit only after evidence.",
         "GITHUB": "Inspect repository state, compare before changing, apply the requested repository operation, verify the resulting commit/files/actions, and report evidence.",
-        "RENDER": "Inspect service, deployment, logs, and health. Diagnose the failure class before changing anything. Preserve the existing service and avoid creating a new service unless explicitly authorized.",
         "TEST": "Discover the relevant test surface, run deterministic tests, classify failures, repair only when permitted, rerun, and retain evidence.",
         "MONITORING": "Inspect the alert and correlated runtime evidence, deduplicate the incident, attempt a safe recovery when permitted, verify health, and audit the result.",
         "REVENUE": "Discover only evidence-backed opportunities, qualify them, prepare the smallest lawful action, verify delivery/payment evidence, and never fabricate revenue.",
