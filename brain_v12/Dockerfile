@@ -16,8 +16,7 @@ RUN python -m compileall -q brain_v12 \
     && BRAIN_DB=/tmp/brain-v12-build.db \
        BRAIN_LIVE_INCOME_SEARCH_ENABLED=false \
        BRAIN_WORKFORCE_ENABLED=false \
-       BRAIN_RENDER_MONITOR_ENABLED=false \
-       python -m brain_v12.tools.ci_preflight
+              python -m brain_v12.tools.ci_preflight
 
 EXPOSE 10000
 
