@@ -1,0 +1,40 @@
+name: Build Honda CONNECT Brain APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - '.github/workflows/build-honda-brain-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew 2>/dev/null || true
+          if [ ! -f gradlew ]; then
+            curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.9-bin.zip
+            unzip -q gradle.zip
+            ./gradle-8.9/bin/gradle wrapper --gradle-version 8.9
+          fi
+          ./gradlew assembleDebug --no-daemon
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HondaConnectBrain-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
