@@ -26,7 +26,15 @@ FILM_JOBS = STATE / "film_jobs"
 FILM_JOBS.mkdir(parents=True, exist_ok=True)
 
 
-def require_auth(authorization: str | None = Header(default=None)) -> None:
+def require_auth(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    local_app: str | None = Header(default=None, alias="X-BRAIN-Local-App"),
+) -> None:
+    # Local Android control is allowed only over loopback with an explicit marker.
+    host = request.client.host if request.client else ""
+    if local_app == "1" and host in {"127.0.0.1", "::1", "localhost"}:
+        return
     if not TOKEN:
         raise HTTPException(status_code=503, detail="control plane token is not configured")
     expected = "Bearer " + TOKEN
@@ -77,17 +85,19 @@ def _save_job(job: dict) -> None:
 
 
 def _find_final_video(job: dict) -> Path | None:
-    configured = os.getenv("FACTORY_OUTPUT_DIR", "cinematic_output")
+    recorded = job.get("video_path")
+    if recorded:
+        path = Path(str(recorded))
+        if path.is_file() and path.stat().st_size >= 1024:
+            return path
+    configured = job.get("output_dir") or os.getenv("FACTORY_OUTPUT_DIR", "cinematic_output")
     output_dir = Path(configured)
     if not output_dir.is_absolute():
         output_dir = Path(__file__).resolve().parents[1] / output_dir
     if not output_dir.is_dir():
         return None
-    candidates = [p for p in output_dir.rglob("*.mp4") if p.is_file() and p.stat().st_size >= 1024]
-    if not candidates:
-        return None
-    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return candidates[0]
+    exact = output_dir / "final.mp4"
+    return exact if exact.is_file() and exact.stat().st_size >= 1024 else None
 
 
 def _run_film_job(job_id: str, body: FilmRequest) -> None:
@@ -108,6 +118,15 @@ def _run_film_job(job_id: str, body: FilmRequest) -> None:
     env["FACTORY_ALLOW_LOCAL_FALLBACK"] = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "1")
     env["FACTORY_MEDIA_ROUTE"] = os.getenv("FACTORY_MEDIA_ROUTE", "local_ffmpeg_cinematic")
     env["FACTORY_DURATION_SECONDS"] = str(max(1, min(600, body.target_minutes * 60)))
+    base_output = Path(env.get("FACTORY_OUTPUT_DIR", "cinematic_output")).resolve()
+    job_output = base_output / ("job_" + job_id)
+    job_output.mkdir(parents=True, exist_ok=True)
+    env["FACTORY_OUTPUT_DIR"] = str(job_output)
+    env["LOCAL_MEDIA_DIR"] = str(job_output)
+    env["BRAIN_STATE_DIR"] = str(STATE.resolve())
+    env["FACTORY_STATE_PATH"] = str(job_output / "factory_state.json")
+    env["FACTORY_PROJECT_MANIFEST"] = str(job_output / "cinematic_project_manifest.json")
+    env["CINEMA_ENGINE_MANIFEST"] = str(job_output / "cinema_engine_v6_manifest.json")
     env["FACTORY_TOPICS_JSON"] = json.dumps([{
         "title": body.title,
         "objective": body.title,
@@ -132,6 +151,9 @@ def _run_film_job(job_id: str, body: FilmRequest) -> None:
         job["log"] = str(log_path.relative_to(STATE))
         job["output_dir"] = env.get("FACTORY_OUTPUT_DIR", "cinematic_output")
         if job["status"] == "COMPLETED":
+            candidate = Path(job["output_dir"]) / "final.mp4"
+            if candidate.is_file():
+                job["video_path"] = str(candidate)
             video = _find_final_video(job)
             if video:
                 job["video_name"] = video.name
