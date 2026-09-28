@@ -35,6 +35,7 @@ from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
 from .movie_summary_factory.engine import create_job, mark_stage
+from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -230,6 +231,13 @@ def movie_summary_stage(job_id: str, stage: str, status: str = "COMPLETED"):
     payload = {"job_id": job_id, "stage": stage, "status": status}
     store.event("MOVIE_SUMMARY_STAGE", payload)
     return {"ok": True, **payload}
+
+@app.post("/api/movie-summary/v3/plan")
+def movie_summary_v3_plan(body: MovieSummaryIn):
+    plan = build_v3_plan(body.title, body.language, body.target_minutes)
+    qc = validate_v3(plan)
+    store.event("MOVIE_SUMMARY_V3_PLAN", {"title": body.title, "qc": qc})
+    return {"ok": qc["status"] == "PASS", "plan": plan, "qc": qc}
 
 @app.get("/api/movie-summary/status")
 def movie_summary_status():
