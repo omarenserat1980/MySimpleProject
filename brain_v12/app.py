@@ -22,8 +22,6 @@ from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineering
 from brain_v7.braincore_v2.code_tool_api import CodeTool
 from brain_v7.braincore_v2.employee_hierarchy import EmployeeHierarchy
 from .brain.code_agent import BrainCodeAgent
-from .brain.render_monitor import RenderLogMonitor
-from .brain.render_deploy_monitor import RenderDeployMonitor
 from .brain.secret_control import SecretControlPlane
 from .brain.control_auth import require_control_key
 from .brain.workforce_control import WorkforceControl
@@ -50,23 +48,6 @@ code_tool=CodeTool(code_workspace, code_team)
 brain_code_agent=BrainCodeAgent(openai_provider, code_tool, code_workspace)
 cognitive.code_tool=code_tool
 
-def handle_render_incident(incident):
-    message=f"Render incident {incident.get('fingerprint')}: {incident.get('message','')[:500]}"
-    store.event("RENDER_INCIDENT_DETECTED", {
-        "fingerprint":incident.get("fingerprint"),
-        "severity":incident.get("severity"),
-        "message":incident.get("message","")[:1000],
-        "service_id":incident.get("service_id"),
-    })
-    try:
-        existing=[g for g in store.goals() if g.get("text")==message and g.get("status") in ("PENDING","IN_PROGRESS")]
-        if not existing:
-            store.add_goal(message,1.0)
-    except Exception as exc:
-        store.event("RENDER_INCIDENT_GOAL_ERROR", {"error":str(exc)})
-
-render_monitor=RenderLogMonitor(store,incident_callback=handle_render_incident)
-render_deploy_monitor=RenderDeployMonitor(store)
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
 mining=MiningEngine()
@@ -94,11 +75,11 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("RENDER_GIT_BRANCH","unknown")
-DEPLOY_REPOSITORY=os.getenv("RENDER_GIT_REPO_SLUG","unknown")
-DEPLOY_SERVICE_ID=os.getenv("RENDER_SERVICE_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
+RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 
 @app.middleware("http")
@@ -180,7 +161,7 @@ def youtube_oauth_readiness():
         "next_step": (
             "AUTHORIZED" if snapshot.get("authorized")
             else "AUTHORIZE_GOOGLE" if snapshot.get("ready_to_start")
-            else "CONFIGURE_RENDER_OAUTH_SECRETS"
+            else "CONFIGURE_GITHUB_OAUTH_SECRETS"
         ),
         "scope": snapshot.get("scope", "youtube.upload"),
         "credentials_in_logs": False,
@@ -306,34 +287,22 @@ def workforce_health():
     return workforce.health()
 
 def _deployment_snapshot():
-    expected = os.getenv("RENDER_GIT_COMMIT", "")
+    expected = os.getenv("GITHUB_SHA", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "render_git_commit": expected or None,
+        "github_sha": expected or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
-        "service_id": DEPLOY_SERVICE_ID,
+        "run_id": DEPLOY_SERVICE_ID,
         "instance": RUNTIME_INSTANCE,
         "converged": bool(DEPLOY_COMMIT and expected and DEPLOY_COMMIT == expected),
     }
 
-@app.get("/health")
-def health():
-    deployment = _deployment_snapshot()
-    return {
-        "ok": True,
-        "brain": "V13",
-        "version": APP_VERSION,
-        "commit": DEPLOY_COMMIT,
-        "branch": DEPLOY_BRANCH,
-        "deployment": deployment,
-        "systems": ["cognition","memory","decision","tasks","permissions","plugins","ai_gateway","chatgpt","brain_code_agent","code_tool"],
-    }
 @app.get("/api/deploy/diagnostics")
 def deploy_diagnostics():
     snapshot = _deployment_snapshot()
-    snapshot["marker"] = os.getenv("PRERENDER_BUILD_MARKER", "unset")
+    snapshot["marker"] = os.getenv("GITHUB_RUN_ID", "unset")
     snapshot["oauth_env"] = {
         "client_id": bool(os.getenv("YOUTUBE_CLIENT_ID")),
         "client_secret": bool(os.getenv("YOUTUBE_CLIENT_SECRET")),
@@ -345,7 +314,7 @@ def deploy_diagnostics():
 @app.get("/api/deploy/verify")
 def deploy_verify():
     snapshot = _deployment_snapshot()
-    return {"ok": snapshot["converged"], "actual_commit": snapshot["commit"], "render_git_commit": snapshot["render_git_commit"], "instance": snapshot["instance"]}
+    return {"ok": snapshot["converged"], "actual_commit": snapshot["commit"], "github_sha": snapshot["github_sha"], "instance": snapshot["instance"]}
 
 @app.get("/api/deploy/identity")
 def deploy_identity():
@@ -567,39 +536,9 @@ def security_secrets_plan(names:list[str]|None=None):
     return secret_control.plan(names)
 
 
-@app.get("/api/monitor/status")
-def monitor_status():
-    live = render_monitor.poll_once() if render_monitor.configured else None
-    return {"ok":True,"monitor":render_monitor.status(),"live_poll":live,"incidents":store.incidents(20)}
-
-@app.get("/api/deploy/status")
-def deploy_status():
-    live = render_deploy_monitor.poll_once() if render_deploy_monitor.configured else None
-    return {"ok":True,"supervisor":render_deploy_monitor.status(),"live_poll":live}
-
-@app.post("/api/deploy/run-once")
-def deploy_run_once():
-    return render_deploy_monitor.poll_once()
-
 @app.get("/api/monitor/incidents")
 def monitor_incidents(limit:int=50):
     return {"ok":True,"incidents":store.incidents(max(1,min(limit,200)))}
-
-@app.post("/api/monitor/run-once")
-def monitor_run_once():
-    return render_monitor.poll_once()
-
-@app.post("/api/monitor/start")
-def monitor_start(request:Request):
-    require_control_key(request)
-    if not render_monitor.configured:
-        return {"ok":False,"status":"NOT_CONFIGURED","required":["RENDER_API_KEY","RENDER_OWNER_ID","RENDER_SERVICE_ID"]}
-    return render_monitor.start()
-
-@app.post("/api/monitor/stop")
-def monitor_stop(request:Request):
-    require_control_key(request)
-    return render_monitor.stop()
 
 @app.get("/api/income/mission")
 def income_mission():
@@ -738,9 +677,6 @@ def system_overview():
     plugin_status_value = plugins.status()
     agent_status_value = agent.status()
     self_improvement = self_improver.status()
-    deploy = render_deploy_monitor.status()
-    monitor = render_monitor.status()
-    public_render = deploy.get("public_health", {})
     identity = deploy_identity()
 
     return {
@@ -754,7 +690,6 @@ def system_overview():
             "decision": state.get("cognitive_trace", {}).get("decision"),
             "next": income.get("next_actions", [])[:4],
             "attention": [
-                *([{"level": "NORMAL", "text": "مراقبة Render العامة تعمل من داخل العقل عبر /health و/deploy/identity؛ مراقبة السجلات وعمليات النشر التفصيلية تحتاج RENDER_API_KEY."}] if public_render.get("ok") else [{"level": "ATTENTION", "text": "مراقبة Render العامة غير متاحة حاليًا."}]),
                 *([{"level": "NORMAL", "text": "محرك البحث الحي مفعّل ويقبل فقط إعلانات حديثة ذات رابط ودليل زمني؛ لا تُحسب كإيراد."}] if os.getenv("BRAIN_LIVE_INCOME_SEARCH_ENABLED","true").lower()=="true" else [{"level": "ATTENTION", "text": "البحث الحي عن فرص الدخل متوقف."}]),
                 *([{"level": "NORMAL", "text": "التطوير الذاتي الكتابي مغلق افتراضياً ويظل محمياً بالموافقة الصريحة."}] if not self_improver.status().get("enabled") else []),
             ],
@@ -762,7 +697,7 @@ def system_overview():
         "architecture": {
             "core": ["الإدراك", "الذاكرة", "التفكير", "القرار", "التنفيذ", "التحقق", "التعلم"],
             "subsystems": ["Cognitive Loop", "Memory", "Decision", "Tasks", "Permissions", "AI Gateway",
-                           "ChatGPT", "Brain Code Agent", "Code Tool", "Workforce", "Income", "Render Monitor"],
+                           "ChatGPT", "Brain Code Agent", "Code Tool", "Workforce", "Income"],
             "tools_count": len(cognitive.tool_catalog()),
             "memory_count": len(store.memories()),
             "event_count": len(store.events(1000)),
@@ -780,8 +715,6 @@ def system_overview():
         "engineering": {
             "code": code,
             "deployment": identity,
-            "deploy_monitor": deploy,
-            "render_monitor": monitor,
         },
         "human_readable_rules": [
             "العقل يشرح ما فهمه قبل أن يقرر عندما تتوفر بيانات كافية.",
@@ -841,21 +774,6 @@ def system_diagnostics():
 
 @app.on_event("startup")
 def start_background_services():
-    # Render API logs/deploys use secrets when configured; public health/identity never do.
-    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","true").lower()=="true":
-        try:
-            render_deploy_monitor.poll_public_once()
-        except Exception as exc:
-            store.event("RENDER_PUBLIC_MONITOR_START_FAILED", {"error": str(exc)[:1000]})
-        def render_public_loop():
-            import time
-            while True:
-                time.sleep(max(30, int(os.getenv("RENDER_PUBLIC_POLL_SECONDS", "60"))))
-                try: render_deploy_monitor.poll_public_once()
-                except Exception as exc: store.event("RENDER_PUBLIC_MONITOR_FAILED", {"error": str(exc)[:1000]})
-        threading.Thread(target=render_public_loop, daemon=True).start()
-    if os.getenv("BRAIN_RENDER_MONITOR_ENABLED","true").lower()=="true" and render_monitor.configured:
-        render_monitor.start()
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
