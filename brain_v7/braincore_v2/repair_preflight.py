@@ -30,6 +30,7 @@ TESTS = [
     ROOT / "brain_v7/braincore_v2/test_factory_repair_app.py",
     ROOT / "brain_v7/braincore_v2/test_code_repair_app.py",
     ROOT / "brain_v7/braincore_v2/test_cinematic_local_renderer.py",
+    ROOT / "brain_v7/braincore_v2/test_repair_preflight.py",
 ]
 
 
