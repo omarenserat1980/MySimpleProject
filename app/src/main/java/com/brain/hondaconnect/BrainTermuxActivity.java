@@ -10,12 +10,21 @@ import android.widget.*;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.OutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class BrainTermuxActivity extends Activity {
     private TextView terminal;
     private EditText input;
     private final Map<String,String> env = new HashMap<>();
     private File brainHome;
+    private final ExecutorService network = Executors.newSingleThreadExecutor();
+    private String lastJobId = "";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
