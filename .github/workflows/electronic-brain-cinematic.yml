@@ -165,6 +165,11 @@ jobs:
           python -m compileall -q brain_v7/braincore_v2
           python -m compileall -q brain_v12
 
+      - name: Run Factory Repair App
+        run: |
+          set -euo pipefail
+          python -m brain_v7.braincore_v2.factory_repair_app
+          cat factory_repair_report.json
       - name: Run Electronic Brain Cinematic Factory
         run: |
           set -o pipefail
