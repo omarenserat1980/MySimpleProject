@@ -143,7 +143,25 @@ jobs:
         run: |
           python -m compileall -q brain_v7/braincore_v2
           python -m compileall -q brain_v12
-          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py
+          python -m pytest -q brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_code_self_healer.py brain_v7/braincore_v2/test_code_repair_app.py
+
+      - name: Run Code Repair Application
+        run: |
+          set -euo pipefail
+          python -m brain_v7.braincore_v2.code_repair_app --report code_repair_report.json
+          test -s code_repair_report.json
+          python - <<'PY'
+          import json
+          report=json.load(open("code_repair_report.json",encoding="utf-8"))
+          print(json.dumps({
+              "status": report.get("status"),
+              "failure_class": report.get("classification",{}).get("failure_class"),
+              "repair_rule": report.get("classification",{}).get("repair_rule"),
+              "cycles_completed": report.get("cycles_completed"),
+          },ensure_ascii=False))
+          if report.get("status") != "CODE_VERIFIED":
+              raise SystemExit("CODE_REPAIR_APPLICATION_FAILED")
+          PY
 
       - name: Run Factory Repair App
         run: |
