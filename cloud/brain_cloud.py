@@ -24,6 +24,13 @@ print("BRAIN_CLOUD_PUBLIC_WEB=1", flush=True)
 print("BRAIN_SOFTWARE_FACTORY=1", flush=True)
 print("BRAIN_GOAL_ORCHESTRATOR=1", flush=True)
 
+if os.getenv("BRAIN_CLOUD_SKIP_FACTORY", "0").strip().lower() in {"1", "true", "yes", "on"}:
+    print("BRAIN_CLOUD_FACTORY_SKIPPED=1", flush=True)
+    while not STOP:
+        time.sleep(1)
+    print("BRAIN_CLOUD_STOP=1", flush=True)
+    raise SystemExit(0)
+
 def run_software_factory(env):
     try:
         return subprocess.run(
