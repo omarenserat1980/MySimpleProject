@@ -1327,7 +1327,7 @@ def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
-app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web'), html=True), name='media-engine')
+app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
