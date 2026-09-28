@@ -168,7 +168,7 @@ jobs:
       - name: Run Factory Repair App
         run: |
           set -euo pipefail
-          python -m brain_v7.braincore_v2.factory_repair_app
+          FACTORY_REPAIR_100=1 python -m brain_v7.braincore_v2.factory_repair_app
           cat factory_repair_report.json
       - name: Run Electronic Brain Cinematic Factory
         run: |
