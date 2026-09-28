@@ -27,6 +27,7 @@ SOURCE_ALLOWLIST = {
     ROOT / ".github/workflows/electronic-brain-cinematic.yml",
     ROOT / ".github/workflows/brain6-168h-cloud.yml",
     ROOT / ".github/workflows/cloud-runtime-build.yml",
+    ROOT / ".github/workflows/cinematic-factory-smoke.yml",
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
@@ -76,11 +77,19 @@ def rule_cloud_installs_pytest() -> list[str]:
         env:"""
     return [str(p.relative_to(ROOT))] if _replace_once(p, needle, block) else []
 
-def rule_import_repair_100_test() -> list[str]:
-    p = ROOT / "brain_v7/braincore_v2/test_factory_repair_app.py"
-    if p.exists() and p not in SOURCE_ALLOWLIST:
+def rule_cinematic_smoke_installs_pytest() -> list[str]:
+    """Repair the cinematic smoke workflow when pytest is invoked without installation."""
+    p = ROOT / ".github/workflows/cinematic-factory-smoke.yml"
+    text = _read(p) if p.exists() else ""
+    if "python -m pip install --disable-pip-version-check pytest" in text:
         return []
-    return []
+    needle = '      - name: Install dependencies\n        run: pip install -r brain_v7/requirements.txt'
+    block = '''      - name: Install dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r brain_v7/requirements.txt
+          python -m pip install --disable-pip-version-check pytest'''
+    return [str(p.relative_to(ROOT))] if _replace_once(p, needle, block) else []
+
 
 def rule_workflow_persists_route() -> list[str]:
     p = ROOT / ".github/workflows/electronic-brain-cinematic.yml"
@@ -122,6 +131,8 @@ def diagnose_failure(error_text: str) -> dict[str, str]:
     if "dotnet restore brain6_cs/brain6.csproj" in text and "dotnet build brain6_cs/brain6.csproj" in text:
         return {"class": "workflow_yaml", "repair": "rule_brain6_dotnet_build_indentation"}
     if "no module named pytest" in text or "modulenotfounderror: no module named pytest" in text:
+        if "cinematic-factory-smoke" in text or "run v6 cinema tests" in text:
+            return {"class": "workflow_dependency", "repair": "rule_cinematic_smoke_installs_pytest"}
         return {"class": "workflow_dependency", "repair": "rule_cloud_installs_pytest"}
     if "syntaxerror" in text or "indentationerror" in text:
         return {"class": "syntax", "repair": "none_allowlisted"}
@@ -138,6 +149,8 @@ def _failure_hint(error_text: str) -> str:
     if "factory_media_route" in text:
         return "rule_workflow_persists_route"
     if "no module named pytest" in text:
+        if "cinematic-factory-smoke" in text or "run v6 cinema tests" in text:
+            return "rule_cinematic_smoke_installs_pytest"
         return "rule_cloud_installs_pytest"
     return "verification_failure"
 
