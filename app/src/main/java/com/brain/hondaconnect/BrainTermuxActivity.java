@@ -7,23 +7,21 @@ import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.*;
-import java.io.File;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.io.OutputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 
 public class BrainTermuxActivity extends Activity {
     private TextView terminal;
     private EditText input;
     private final Map<String,String> env = new HashMap<>();
-    private File brainHome;
     private final ExecutorService network = Executors.newSingleThreadExecutor();
+    private File brainHome;
     private String lastJobId = "";
 
     @Override public void onCreate(Bundle state) {
@@ -33,13 +31,12 @@ public class BrainTermuxActivity extends Activity {
         new File(brainHome, "brain").mkdirs();
         new File(brainHome, "cinematic_output").mkdirs();
         new File(brainHome, ".brain_state").mkdirs();
-
         env.put("HOME", brainHome.getAbsolutePath());
         env.put("PREFIX", new File(getFilesDir(), "usr").getAbsolutePath());
         env.put("BRAIN_MODE", "phone");
         env.put("BRAIN_PORT", "8787");
         buildUi();
-        print("BRAIN TERMUX EMULATOR v2.0\nPersistent virtual filesystem enabled.\nType 'help'.\n$ ");
+        print("BRAIN TERMUX EMULATOR v3.0\\nLocal Cloud Hub bridge enabled.\\nSystem shell execution remains blocked.\\nType 'help'.\\n$ ");
     }
 
     private void buildUi() {
@@ -49,7 +46,7 @@ public class BrainTermuxActivity extends Activity {
         root.setBackgroundColor(Color.rgb(8,10,8));
 
         TextView header = new TextView(this);
-        header.setText("BRAIN • PHONE TERMINAL v2");
+        header.setText("BRAIN • PHONE TERMINAL v3");
         header.setTextColor(Color.WHITE);
         header.setTextSize(18);
         header.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
@@ -95,9 +92,9 @@ public class BrainTermuxActivity extends Activity {
             "BRAIN commands:\n" +
             "  pwd | ls | cd DIR\n" +
             "  mkdir NAME | touch NAME | rm NAME\n" +
-            "  cat NAME | echo TEXT\n" +
-            "  env | status | health | brain\n" +
-            "  factory | ffmpeg | qc | processes\n" +
+            "  cat NAME | echo TEXT | env\n" +
+            "  status | health | brain | processes\n" +
+            "  factory TITLE | job ID | ffmpeg | qc ID\n" +
             "  clear | exit";
         if (cmd.equals("pwd")) return brainHome.getAbsolutePath();
         if (cmd.equals("ls")) {
@@ -108,38 +105,93 @@ public class BrainTermuxActivity extends Activity {
             return s.toString();
         }
         if (cmd.startsWith("cd ")) return "cwd -> " + resolve(cmd.substring(3)).getAbsolutePath();
-        if (cmd.startsWith("mkdir ")) {
-            File f=resolve(cmd.substring(6)); return f.mkdirs() ? "created "+f.getName() : "exists/failed";
-        }
+        if (cmd.startsWith("mkdir ")) { try { File f=resolve(cmd.substring(6)); return f.mkdirs() ? "created "+f.getName() : "exists/failed"; } catch(Exception e){return "error: "+e.getMessage();} }
         if (cmd.startsWith("touch ")) {
             try { File f=resolve(cmd.substring(6)); if(f.exists()||f.createNewFile()) return "created "+f.getName(); }
             catch(Exception e){ return "error: "+e.getMessage(); }
             return "failed";
         }
-        if (cmd.startsWith("rm ")) {
-            File f=resolve(cmd.substring(3)); return f.delete() ? "removed "+f.getName() : "not removed";
-        }
+        if (cmd.startsWith("rm ")) { try { File f=resolve(cmd.substring(3)); return f.delete() ? "removed "+f.getName() : "not removed"; } catch(Exception e){return "error: "+e.getMessage();} }
         if (cmd.startsWith("cat ")) {
-            try { java.util.Scanner sc=new java.util.Scanner(resolve(cmd.substring(4))); StringBuilder s=new StringBuilder(); while(sc.hasNextLine())s.append(sc.nextLine()).append("\n"); sc.close(); return s.toString(); }
+            try { Scanner sc=new Scanner(resolve(cmd.substring(4))); StringBuilder s=new StringBuilder(); while(sc.hasNextLine())s.append(sc.nextLine()).append("\n"); sc.close(); return s.toString(); }
             catch(Exception e){ return "error: "+e.getMessage(); }
         }
         if (cmd.equals("env")) return "HOME="+env.get("HOME")+"\nPREFIX="+env.get("PREFIX")+"\nBRAIN_MODE=phone\nBRAIN_PORT=8787";
-        if (cmd.equals("status")) return "Phone Server: Android Foreground Service\nHTTP: 8787\nFactory route: local_ffmpeg_cinematic";
-        if (cmd.equals("health")) return "BRAIN Phone Server /healthz -> local endpoint on :8787";
+        if (cmd.equals("status")) { request("GET","/v1/status",null,"STATUS"); return "STATUS: querying local Cloud Hub..."; }
+        if (cmd.equals("health")) { request("GET","/healthz",null,"HEALTH"); return "HEALTH: querying 127.0.0.1:8787..."; }
         if (cmd.equals("brain")) return "API | Movie Factory | CinematicLocalRenderer | FFmpeg | QC";
-        if (cmd.equals("factory")) return "FACTORY: READY\nUse real Termux for Python production execution.";
-        if (cmd.equals("ffmpeg")) return "FFmpeg: configured in real Termux path.";
-        if (cmd.equals("qc")) return "QC gate: video + audio + duration + resolution + file-size checks.";
-        if (cmd.equals("processes")) return "brain-phone-server [Android]\nbrain-termux-emulator [UI]";
+        if (cmd.equals("factory")) return "usage: factory TITLE";
+        if (cmd.startsWith("factory ")) {
+            String title=cmd.substring(8).trim();
+            if(title.isEmpty()) return "usage: factory TITLE";
+            String body="{\"title\":\""+jsonEscape(title)+"\",\"target_minutes\":1,\"language\":\"ar\"}";
+            request("POST","/v1/films",body,"FACTORY");
+            return "FACTORY: submitting real local film job...";
+        }
+        if (cmd.startsWith("job ")) { String id=cmd.substring(4).trim(); if(id.isEmpty())return "usage: job ID"; request("GET","/v1/films/"+safeId(id),null,"JOB"); return "JOB: querying "+id; }
+        if (cmd.equals("ffmpeg")) { request("GET","/v1/platform",null,"FFMPEG"); return "FFMPEG: querying factory capabilities..."; }
+        if (cmd.equals("qc")) return lastJobId.isEmpty() ? "usage: qc JOB_ID" : "QC: query "+lastJobId+" with 'qc "+lastJobId+"'";
+        if (cmd.startsWith("qc ")) { String id=cmd.substring(3).trim(); request("GET","/v1/films/"+safeId(id),null,"QC"); return "QC: querying verified state for "+id; }
+        if (cmd.equals("processes")) return "brain-phone-server [Android]\nbrain-termux-emulator [UI]\ncloud-hub-bridge [HTTP localhost]";
         if (cmd.equals("clear")) { terminal.setText(""); return ""; }
         if (cmd.equals("exit")) { finish(); return ""; }
         if (cmd.startsWith("echo ")) return cmd.substring(5);
         return "command not found: "+cmd+"\nType 'help'.";
     }
 
-    private File resolve(String path) {
-        File f = path.startsWith("/") ? new File(path) : new File(brainHome, path);
-        try { return f.getCanonicalFile(); } catch(Exception e) { return f; }
+    private String safeId(String id) {
+        if (!id.matches("[A-Za-z0-9_-]{1,64}")) throw new IllegalArgumentException("invalid job id");
+        return id;
+    }
+
+    private String jsonEscape(String s) {
+        return s.replace("\\\\","\\\\\\\\").replace("\"","\\\\\"");
+    }
+
+    private File resolve(String path) throws IOException {
+        if(path == null || path.trim().isEmpty() || path.startsWith("/")) throw new SecurityException("absolute paths are blocked");
+        File base=brainHome.getCanonicalFile();
+        File f=new File(base,path).getCanonicalFile();
+        String prefix=base.getPath()+File.separator;
+        if(!f.getPath().equals(base.getPath()) && !f.getPath().startsWith(prefix)) throw new SecurityException("path escapes BRAIN HOME");
+        return f;
+    }
+
+    private void request(String method,String path,String body,String label) {
+        network.submit(() -> {
+            HttpURLConnection c=null;
+            try {
+                c=(HttpURLConnection)new URL("http://127.0.0.1:8787"+path).openConnection();
+                c.setRequestMethod(method);
+                c.setConnectTimeout(1500);
+                c.setReadTimeout(10000);
+                c.setRequestProperty("Content-Type","application/json");
+                c.setRequestProperty("X-BRAIN-Local-App","1");
+                if(body!=null) {
+                    c.setDoOutput(true);
+                    try(OutputStream out=c.getOutputStream()){out.write(body.getBytes(StandardCharsets.UTF_8));}
+                }
+                int code=c.getResponseCode();
+                InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
+                StringBuilder b=new StringBuilder();
+                if(stream!=null){BufferedReader r=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8));String line;while((line=r.readLine())!=null)b.append(line);}
+                String result=label+" HTTP "+code+"\\n"+b;
+                if(label.equals("FACTORY")){
+                    String marker="\"id\":\"";
+                    int p=b.indexOf(marker);
+                    if(p>=0){int s=p+marker.length(),e=b.indexOf("\"",s);if(e>s)lastJobId=b.substring(s,e);}
+                }
+                final String out=result;
+                runOnUiThread(() -> print("\n"+out+"\n$ "));
+            } catch(Exception e) {
+                runOnUiThread(() -> print("\n"+label+" ERROR: "+e.getMessage()+"\n$ "));
+            } finally { if(c!=null)c.disconnect(); }
+        });
+    }
+
+    @Override protected void onDestroy() {
+        network.shutdownNow();
+        super.onDestroy();
     }
 
     private void print(String s) {
