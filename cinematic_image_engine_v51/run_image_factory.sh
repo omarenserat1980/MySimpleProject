@@ -1,6 +1,7 @@
-#!/data/data/com.termux/files/usr/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 export PYTHONPATH="$ROOT"
-if command -v termux-diffusion >/dev/null 2>&1; then export EB_IMAGE_ADAPTER="termux-diffusion"; fi
+export BRAIN_RUNTIME="BRAIN_TERMUX_EMULATOR"
+export BRAIN_CLOUD_HUB_URL="${BRAIN_CLOUD_HUB_URL:-http://127.0.0.1:8787}"
 python -m cinematic_image_engine_v51.cli "$@"
