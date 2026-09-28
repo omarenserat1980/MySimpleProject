@@ -1,0 +1,93 @@
+name: Brain 15000 Auto Repair Controller
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_cycles:
+        description: "Maximum automatic repair cycles (1..15000)"
+        required: true
+        default: "15000"
+      run_factory:
+        description: "After code verification, run the cinematic factory and repair factory failures"
+        required: true
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - "brain_v7/braincore_v2/repair_controller_15000.py"
+      - "brain_v7/braincore_v2/code_self_healer.py"
+      - ".github/workflows/brain-15000-auto-repair.yml"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  auto-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FACTORY_ALLOW_PRODUCTION: "1"
+      FACTORY_ALLOW_LOCAL_FALLBACK: "1"
+      FACTORY_EMERGENCY_LOCAL_FALLBACK: "1"
+      FAL_MODEL: "fal-ai/kling-video/v3/pro/text-to-video"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install FFmpeg and Python dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          if [ -f brain_v7/requirements.txt ]; then python -m pip install -r brain_v7/requirements.txt; fi
+          python -m pip install pytest
+
+      - name: Collect latest failed factory log
+        run: |
+          set +e
+          run_id="$(gh run list --limit 20 --json databaseId,conclusion,name --jq '.[] | select(.conclusion=="failure") | .databaseId' | head -n 1)"
+          if [ -n "$run_id" ]; then
+            gh run view "$run_id" --log-failed > latest_failure.log
+          else
+            : > latest_failure.log
+          fi
+          test -f latest_failure.log
+
+      - name: Run 15000-cycle repair controller
+        env:
+          MAX_CYCLES: ${{ inputs.max_cycles || '15000' }}
+          RUN_FACTORY: ${{ inputs.run_factory && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          args=(--error-file latest_failure.log --max-cycles "$MAX_CYCLES" --report repair_15000_report.json)
+          if [ "$RUN_FACTORY" = "1" ]; then args+=(--run-factory); fi
+          python -m brain_v7.braincore_v2.repair_controller_15000 "${args[@]}" | tee repair_controller_stdout.json
+
+      - name: Verify repair controller report
+        if: always()
+        run: |
+          test -s repair_15000_report.json
+          python - <<'PY'
+          import json
+          r=json.load(open("repair_15000_report.json",encoding="utf-8"))
+          assert 1 <= r["cycles_completed"] <= r["max_controller_cycles"] <= 15000
+          print("status=", r["status"])
+          print("cycles=", r["cycles_completed"], "/", r["max_controller_cycles"])
+          PY
+
+      - name: Upload repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-15000-repair-evidence
+          path: |
+            repair_15000_report.json
+            repair_controller_stdout.json
+            latest_failure.log
+          if-no-files-found: warn
