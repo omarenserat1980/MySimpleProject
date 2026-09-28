@@ -11,7 +11,7 @@ $env:AGENT_TOKEN="ضع-رمزاً-سرياً-هنا"
 Windows CMD:
 set AGENT_TOKEN=ضع-رمزاً-سرياً-هنا
 
-Linux/macOS/Termux:
+Linux/macOS/BRAIN Termux Emulator:
 export AGENT_TOKEN="ضع-رمزاً-سرياً-هنا"
 
 ## 3) Start the Agent
@@ -27,7 +27,7 @@ $env:AGENT_URL="http://127.0.0.1:9000"
 $env:AGENT_TOKEN="ضع-نفس-الرمز-هنا"
 python main.py
 
-Linux/macOS/Termux:
+Linux/macOS/BRAIN Termux Emulator:
 export AGENT_URL="http://127.0.0.1:9000"
 export AGENT_TOKEN="ضع-نفس-الرمز-هنا"
 python main.py
