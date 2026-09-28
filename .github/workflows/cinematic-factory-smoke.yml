@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   smoke:
@@ -61,28 +61,6 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
 
-      - name: Capture V12 failure diagnostics
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set +e
-          mkdir -p ci-diagnostics
-          python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v > ci-diagnostics/last-v12-test-failure.txt 2>&1
-          rc=$?
-          {
-            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "commit=${GITHUB_SHA}"
-            echo "unittest_exit_code=${rc}"
-            echo
-            cat ci-diagnostics/last-v12-test-failure.txt
-          } > ci-diagnostics/last-v12-failure.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ci-diagnostics/last-v12-failure.txt
-          git diff --cached --quiet || git commit -m "ci: record latest V12 smoke failure"
-          git push origin HEAD:main || true
-
       - name: Run V6 cinema tests
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -117,32 +95,6 @@ jobs:
           assert CinemaEngineV6().snapshot()["version"] == 6
           print("cinematic V6 smoke: OK")
           PY
-
-      - name: Final failure diagnostics
-        if: failure()
-        run: |
-          set +e
-          mkdir -p ci-diagnostics
-          python -m pytest -vv brain_v7/braincore_v2/test_code_repair_app.py > ci-diagnostics/last-code-repair-test-failure.txt 2>&1
-          rc1=$?
-          python -m pytest -vv brain_v7/braincore_v2/test_factory_repair_app.py brain_v7/braincore_v2/test_cinematic_local_renderer.py > ci-diagnostics/last-underlying-tests-failure.txt 2>&1
-          rc2=$?
-          {
-            echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "commit=${GITHUB_SHA}"
-            echo "code_repair_exit=${rc1}"
-            echo "underlying_exit=${rc2}"
-            echo
-            cat ci-diagnostics/last-code-repair-test-failure.txt
-            echo
-            echo "===== underlying tests ====="
-            cat ci-diagnostics/last-underlying-tests-failure.txt
-          } > ci-diagnostics/last-smoke-failure.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ci-diagnostics/last-smoke-failure.txt
-          git diff --cached --quiet || git commit -m "ci: record latest cinematic smoke failure"
-          git push origin HEAD:main || true
 
       - name: Verify FFmpeg runtime
         run: |
