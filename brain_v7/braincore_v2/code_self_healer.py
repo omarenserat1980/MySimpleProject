@@ -193,7 +193,8 @@ def verify() -> tuple[bool, str]:
     yaml_check = subprocess.run(
         ["ruby", "-e", "require 'yaml'; ARGV.each { |p| YAML.load_file(p) }",
          ".github/workflows/brain6-168h-cloud.yml",
-         ".github/workflows/brain-auto-repair-and-smoke.yml"],
+         ".github/workflows/brain-auto-repair-and-smoke.yml",
+         ".github/workflows/electronic-brain-cinematic.yml"],
         cwd=ROOT, capture_output=True, text=True, timeout=30,
     )
     if yaml_check.returncode:
