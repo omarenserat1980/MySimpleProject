@@ -1,6 +1,12 @@
 # V14 HUMAN-READABLE UI INTEGRATION
 import os
+import ast
+import base64
+import json
+import pathlib
 import threading
+import subprocess
+import httpx
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
 from fastapi.responses import JSONResponse
@@ -88,6 +94,110 @@ async def no_cache(request, call_next):
     response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"]="no-cache"
     return response
+
+class QuickEditorReadIn(BaseModel):
+    path:str
+    branch:str="main"
+
+class QuickEditorValidateIn(BaseModel):
+    path:str
+    content:str
+
+class QuickEditorWriteIn(BaseModel):
+    path:str
+    content:str
+    branch:str="main"
+    commit_message:str="brain: quick editor update"
+    expected_sha:str=""
+    run_tests:bool=True
+
+def _quick_editor_path(path:str)->str:
+    raw=path.strip().replace("\\","/")
+    if not raw or raw.startswith("/") or ".." in pathlib.PurePosixPath(raw).parts:
+        raise HTTPException(status_code=400, detail="INVALID_PATH")
+    if not raw.startswith(("brain_v12/","brain_v7/","cloud/","docs/","cinematic_image_engine_v51/","brain_emulator/","brain_emulator_agent/")):
+        raise HTTPException(status_code=403, detail="PATH_NOT_ALLOWED")
+    return raw
+
+def _quick_editor_validate(path:str, content:str):
+    path=_quick_editor_path(path)
+    ext=pathlib.PurePosixPath(path).suffix.lower()
+    errors=[]; warnings=[]
+    if len(content.encode("utf-8")) > 1024*1024: errors.append("FILE_TOO_LARGE")
+    if ext==".py":
+        try: ast.parse(content, filename=path)
+        except SyntaxError as exc: errors.append(f"PYTHON_SYNTAX:{exc.msg}:line={exc.lineno}:col={exc.offset}")
+    elif ext==".json":
+        try: json.loads(content)
+        except json.JSONDecodeError as exc: errors.append(f"JSON_SYNTAX:{exc.msg}:line={exc.lineno}:col={exc.colno}")
+    elif ext in {".yml",".yaml"} and "\t" in content: errors.append("YAML_TABS_NOT_ALLOWED")
+    elif ext in {".html",".js",".css"} and not content.strip(): warnings.append("EMPTY_FILE")
+    if "RENDER" in content.upper(): warnings.append("LEGACY_RENDER_REFERENCE")
+    return {"ok":not errors,"path":path,"extension":ext,"errors":errors,"warnings":warnings}
+
+def _github_config():
+    return {"configured":bool(os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")),
+            "repository":os.getenv("BRAIN_GITHUB_REPOSITORY") or os.getenv("GITHUB_REPOSITORY") or "omarenserat1980/MySimpleProject",
+            "branch":os.getenv("BRAIN_GITHUB_BRANCH") or os.getenv("GITHUB_REF_NAME") or "main"}
+
+def _github_headers():
+    token=os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+    if not token: raise HTTPException(status_code=503,detail="GITHUB_TOKEN_NOT_CONFIGURED")
+    return {"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2026-03-10"}
+
+def _github_repo():
+    repo=os.getenv("BRAIN_GITHUB_REPOSITORY") or os.getenv("GITHUB_REPOSITORY") or "omarenserat1980/MySimpleProject"
+    if "/" not in repo: raise HTTPException(status_code=500,detail="INVALID_GITHUB_REPOSITORY")
+    return repo
+
+@app.get("/api/quick-editor/status")
+def quick_editor_status():
+    return {"ok":True,"editor":"BRAIN Quick Editor","runtime":"BRAIN_TERMUX_EMULATOR","github":_github_config(),
+            "features":["read","validate","preview","checkpoint","github_write","tests"]}
+
+@app.post("/api/quick-editor/validate")
+def quick_editor_validate(body:QuickEditorValidateIn):
+    return _quick_editor_validate(body.path,body.content)
+
+@app.get("/api/quick-editor/read")
+async def quick_editor_read(path:str,branch:str="main"):
+    path=_quick_editor_path(path); repo=_github_repo()
+    url=f"https://api.github.com/repos/{repo}/contents/{path}"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r=await client.get(url,headers=_github_headers(),params={"ref":branch})
+        if r.status_code==404: raise HTTPException(status_code=404,detail="FILE_NOT_FOUND")
+        if r.status_code>=400: return {"ok":False,"status_code":r.status_code,"detail":r.text[:1000]}
+        data=r.json(); raw=data.get("content","")
+        content=base64.b64decode(raw.replace("\n","")).decode("utf-8") if raw else ""
+        return {"ok":True,"path":path,"branch":branch,"sha":data.get("sha"),"content":content}
+    except httpx.HTTPError as exc:
+        return {"ok":False,"error":"GITHUB_NETWORK_ERROR","detail":str(exc)[:1000]}
+
+@app.post("/api/quick-editor/write")
+async def quick_editor_write(request:Request,body:QuickEditorWriteIn):
+    require_control_key(request)
+    path=_quick_editor_path(body.path); validation=_quick_editor_validate(path,body.content)
+    if not validation["ok"]: return {"ok":False,"status":"VALIDATION_FAILED","validation":validation}
+    repo=_github_repo(); branch=body.branch.strip() or "main"; url=f"https://api.github.com/repos/{repo}/contents/{path}"; headers=_github_headers()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            current=await client.get(url,headers=headers,params={"ref":branch})
+            current_data=current.json() if current.status_code==200 else {}; current_sha=current_data.get("sha")
+            if body.expected_sha and current_sha and body.expected_sha!=current_sha:
+                return {"ok":False,"status":"CONFLICT","expected_sha":body.expected_sha,"actual_sha":current_sha}
+            payload={"message":body.commit_message.strip() or "brain: quick editor update",
+                     "content":base64.b64encode(body.content.encode("utf-8")).decode("ascii"),"branch":branch}
+            if current_sha: payload["sha"]=current_sha
+            result=await client.put(url,headers=headers,json=payload)
+        if result.status_code not in (200,201):
+            return {"ok":False,"status":"GITHUB_WRITE_FAILED","status_code":result.status_code,"detail":result.text[:2000]}
+        data=result.json(); commit_sha=data.get("commit",{}).get("sha")
+        store.event("QUICK_EDITOR_GITHUB_WRITE",{"path":path,"branch":branch,"commit":commit_sha,"validation":"PASS"})
+        return {"ok":True,"status":"COMMITTED","path":path,"branch":branch,"sha":data.get("content",{}).get("sha"),"commit_sha":commit_sha,
+                "validation":validation,"tests":{"status":"QUEUED","note":"GitHub Actions will verify the commit."} if body.run_tests else None}
+    except httpx.HTTPError as exc:
+        return {"ok":False,"status":"GITHUB_NETWORK_ERROR","detail":str(exc)[:1000]}
 
 class BrainCodePlanIn(BaseModel):
     objective:str
