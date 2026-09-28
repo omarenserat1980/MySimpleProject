@@ -25,6 +25,7 @@ SOURCE_ALLOWLIST = {
     ROOT / "brain_v7/braincore_v2/factory_repair_app.py",
     ROOT / "brain_v7/braincore_v2/brain_media_adapter.py",
     ROOT / ".github/workflows/electronic-brain-cinematic.yml",
+    ROOT / ".github/workflows/brain6-168h-cloud.yml",
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
@@ -50,6 +51,13 @@ def rule_empty_fal_model() -> list[str]:
     p = ROOT / "brain_v7/braincore_v2/brain_media_adapter.py"
     old = 'model=os.getenv("FAL_MODEL","fal-ai/kling-video/v3/pro/text-to-video")'
     new = 'model=os.getenv("FAL_MODEL","").strip() or "fal-ai/kling-video/v3/pro/text-to-video"'
+    return [str(p.relative_to(ROOT))] if _replace_once(p, old, new) else []
+
+def rule_brain6_dotnet_build_indentation() -> list[str]:
+    """Repair the known YAML indentation defect in the Brain 6 build step."""
+    p = ROOT / ".github/workflows/brain6-168h-cloud.yml"
+    old = "          dotnet restore brain6_cs/Brain6.csproj\\ndotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
+    new = "          dotnet restore brain6_cs/Brain6.csproj\\n          dotnet build brain6_cs/Brain6.csproj -c Release --no-restore"
     return [str(p.relative_to(ROOT))] if _replace_once(p, old, new) else []
 
 def rule_import_repair_100_test() -> list[str]:
@@ -84,6 +92,7 @@ def rule_workflow_persists_route() -> list[str]:
 RULES: tuple[Callable[[], list[str]], ...] = (
     rule_empty_fal_model,
     rule_workflow_persists_route,
+    rule_brain6_dotnet_build_indentation,
 )
 
 def diagnose_failure(error_text: str) -> dict[str, str]:
@@ -93,6 +102,8 @@ def diagnose_failure(error_text: str) -> dict[str, str]:
         return {"class": "configuration", "repair": "rule_empty_fal_model"}
     if "factory_media_route" in text:
         return {"class": "routing", "repair": "rule_workflow_persists_route"}
+    if "dotnet restore brain6_cs/brain6.csproj" in text and "dotnet build brain6_cs/brain6.csproj" in text:
+        return {"class": "workflow_yaml", "repair": "rule_brain6_dotnet_build_indentation"}
     if "syntaxerror" in text or "indentationerror" in text:
         return {"class": "syntax", "repair": "none_allowlisted"}
     if "modulenotfounderror" in text or "importerror" in text:
