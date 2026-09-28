@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Video Player</title>
+<style>
+:root{--bg:#050b14;--panel:#0b1624;--line:#1b3046;--text:#eef7ff;--muted:#8fa7bd;--accent:#55d6ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 70% 0,#15304a,#050b14 55%);color:var(--text);font-family:system-ui,sans-serif}button,input{font:inherit}button{border:1px solid var(--line);background:#102338;color:#fff;border-radius:11px;padding:9px 12px;cursor:pointer}button:hover,button.active{border-color:var(--accent)}.app{display:grid;grid-template-columns:330px 1fr;min-height:100vh}.side{border-left:1px solid var(--line);padding:16px;background:#07111ddd}.brand{padding:8px 4px 16px}.brand b{font-size:22px}.brand small{display:block;color:var(--muted);margin-top:4px}.tools{display:flex;gap:7px;flex-wrap:wrap}.search{width:100%;margin:10px 0;background:#07111d;border:1px solid var(--line);border-radius:11px;color:#fff;padding:11px}.playlist{display:grid;gap:7px;max-height:calc(100vh - 220px);overflow:auto}.item{padding:10px;border:1px solid var(--line);border-radius:11px;background:#091522;cursor:pointer}.item.active{border-color:var(--accent);box-shadow:0 0 15px #55d6ff18}.item b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.item small{color:var(--muted)}main{padding:20px;max-width:1450px;width:100%;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px}.top h1{font-size:24px;margin:0}.status{color:var(--muted);font-size:12px}.player{margin-top:15px;background:#000;border:1px solid var(--line);border-radius:18px;overflow:hidden;position:relative}.screen{width:100%;max-height:72vh;display:block;background:#000}.controls{padding:10px;background:#08121e;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.seek{flex:1;min-width:180px}.time{font-variant-numeric:tabular-nums;color:#b8cad9;font-size:12px}.panel{margin-top:14px;background:linear-gradient(145deg,#0c1726,#091321);border:1px solid var(--line);border-radius:16px;padding:14px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.metric{background:#07111d;border:1px solid var(--line);border-radius:11px;padding:10px}.metric small{color:var(--muted);display:block}.metric b{display:block;margin-top:4px}.drop{border:1px dashed #315170;border-radius:13px;padding:16px;text-align:center;color:var(--muted);margin-top:10px}.drop.drag{border-color:var(--accent);color:#fff}.kbd{font-size:11px;color:var(--muted)}select,input[type=number]{background:#07111d;color:#fff;border:1px solid var(--line);border-radius:9px;padding:8px}.danger{border-color:#6a3540}.hidden{display:none}@media(max-width:900px){.app{grid-template-columns:1fr}.side{border-left:0;border-bottom:1px solid var(--line)}.playlist{max-height:240px}.grid{grid-template-columns:repeat(2,1fr)}.screen{max-height:58vh}}@media(max-width:550px){main{padding:10px}.grid{grid-template-columns:1fr 1fr}.controls button{padding:8px}.top{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body>
+<div class="app">
+<aside class="side">
+ <div class="brand"><b>🧠 BRAIN Video Player</b><small>مشغل الفيديو الأصلي داخل Electronic Brain</small></div>
+ <div class="tools">
+  <button id="open">📂 فتح فيديو</button><button id="add">➕ قائمة</button><button id="clear" class="danger">🗑️ مسح</button>
+ </div>
+ <input id="search" class="search" placeholder="🔎 بحث في القائمة">
+ <div id="playlist" class="playlist"></div>
+ <div class="drop" id="drop">اسحب ملفات الفيديو هنا<br><span class="kbd">يدعم MP4 / WebM / OGG / MOV حسب المتصفح</span></div>
+ <input id="files" type="file" accept="video/*" multiple class="hidden">
+</aside>
+<main>
+ <div class="top"><div><h1>🎬 مشغل الفيديو</h1><div class="status" id="status">جاهز</div></div><button id="engine">⚙️ BRAIN Media Engine</button></div>
+ <section class="player" id="playerBox">
+  <video id="video" class="screen" playsinline preload="metadata"></video>
+  <div class="controls">
+   <button id="prev">⏮</button><button id="play">▶</button><button id="next">⏭</button>
+   <button id="back">↶ 10</button><button id="forward">10 ↷</button>
+   <span class="time" id="time">00:00 / 00:00</span>
+   <input id="seek" class="seek" type="range" min="0" max="1000" value="0">
+   <button id="mute">🔊</button><input id="volume" type="range" min="0" max="1" step=".01" value="1" style="width:85px">
+   <select id="speed"><option>.5x</option><option>.75x</option><option selected>1x</option><option>1.25x</option><option>1.5x</option><option>2x</option></select>
+   <button id="pip">⧉</button><button id="full">⛶</button>
+  </div>
+ </section>
+ <div class="panel">
+  <div class="grid">
+   <div class="metric"><small>الفيديو</small><b id="title">لا يوجد ملف</b></div>
+   <div class="metric"><small>الدقة</small><b id="resolution">—</b></div>
+   <div class="metric"><small>المدة</small><b id="duration">—</b></div>
+   <div class="metric"><small>الحالة</small><b id="state">متوقف</b></div>
+  </div>
+ </div>
+ <div class="panel">
+  <b>🧠 تحكم العقل</b>
+  <p class="status">المشغل يركز على التشغيل؛ عند الحاجة إلى قص/تحويل/دمج/Timeline ينتقل الطلب إلى BRAIN Media Engine.</p>
+  <div class="tools"><button id="trim">✂️ تحرير هذا الفيديو</button><button id="cinema">🎞️ فتح السينما</button><button id="subtitle">💬 إضافة ترجمة</button></div>
+  <input id="subtitleFile" type="file" accept=".vtt,.srt" class="hidden">
+ </div>
+</main></div>
+<script>
+const $=id=>document.getElementById(id), video=$('video'); let list=[],idx=-1,objectUrls=[];
+const fmt=s=>{s=Number(s)||0;return String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0')};
+function render(){const q=$('search').value.toLowerCase();$('playlist').innerHTML=list.map((x,i)=>({x,i})).filter(o=>!q||o.x.x.name.toLowerCase().includes(q)).map(o=>'<div class="item '+(o.i===idx?'active':'')+'" data-i="'+o.i+'"><b>'+esc(o.x.name)+'</b><small>'+fmt(o.x.duration||0)+'</small></div>').join('')||'<div class="status">القائمة فارغة</div>';document.querySelectorAll('.item').forEach(e=>e.onclick=()=>load(Number(e.dataset.i),true))}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+function add(files){[...files].forEach(f=>{if(!f.type.startsWith('video/'))return;const url=URL.createObjectURL(f);objectUrls.push(url);list.push({name:f.name,url,file:f,duration:0})});render();if(idx<0&&list.length)load(0,false)}
+function load(i,auto){if(!list[i])return;idx=i;video.src=list[i].url;$('title').textContent=list[i].name;$('status').textContent='جارٍ تجهيز '+list[i].name;render();video.load();if(auto)video.play().catch(()=>{})}
+$('open').onclick=()=>$('files').click();$('add').onclick=()=>$('files').click();$('files').onchange=e=>add(e.target.files);$('search').oninput=render;
+$('clear').onclick=()=>{objectUrls.forEach(URL.revokeObjectURL);objectUrls=[];list=[];idx=-1;video.removeAttribute('src');video.load();render();$('title').textContent='لا يوجد ملف'};
+$('play').onclick=()=>video.paused?video.play():video.pause();$('prev').onclick=()=>load(Math.max(0,idx-1),true);$('next').onclick=()=>{if(idx+1<list.length)load(idx+1,true)};
+$('back').onclick=()=>video.currentTime=Math.max(0,video.currentTime-10);$('forward').onclick=()=>video.currentTime=Math.min(video.duration||0,video.currentTime+10);
+$('seek').oninput=e=>{if(video.duration)video.currentTime=Number(e.target.value)/1000*video.duration};$('volume').oninput=e=>video.volume=Number(e.target.value);
+$('mute').onclick=()=>{video.muted=!video.muted;$('mute').textContent=video.muted?'🔇':'🔊'};
+$('speed').onchange=e=>video.playbackRate=parseFloat(e.target.value);$('full').onclick=()=>$('playerBox').requestFullscreen?.();$('pip').onclick=()=>video.requestPictureInPicture?.();
+video.ontimeupdate=()=>{$('seek').value=video.duration?video.currentTime/video.duration*1000:0;$('time').textContent=fmt(video.currentTime)+' / '+fmt(video.duration);$('state').textContent=video.paused?'متوقف':'تشغيل'};
+video.onplay=()=>{$('play').textContent='⏸';$('state').textContent='تشغيل'};video.onpause=()=>{$('play').textContent='▶';$('state').textContent='متوقف'};
+video.onloadedmetadata=()=>{const x=list[idx];if(x)x.duration=video.duration;$('resolution').textContent=video.videoWidth+'×'+video.videoHeight;$('duration').textContent=fmt(video.duration);$('status').textContent='جاهز';render()};
+video.onended=()=>{if(idx+1<list.length)load(idx+1,true)};
+$('engine').onclick=()=>location.href='/media-engine/';$('trim').onclick=()=>location.href='/media-engine/?source='+encodeURIComponent(list[idx]?.name||'');
+$('cinema').onclick=()=>location.href='/media-engine/?mode=cinematic';$('subtitle').onclick=()=>$('subtitleFile').click();
+$('subtitleFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const track=document.createElement('track');track.kind='subtitles';track.label=f.name;track.srclang='ar';track.src=url;track.default=true;video.querySelectorAll('track').forEach(t=>t.remove());video.appendChild(track)};
+document.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;if(e.code==='Space'){e.preventDefault();$('play').click()}else if(e.key==='ArrowLeft')$('back').click();else if(e.key==='ArrowRight')$('forward').click();else if(e.key==='f')$('full').click();else if(e.key==='m')$('mute').click()});
+['dragenter','dragover'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.add('drag')}));['dragleave','drop'].forEach(t=>$('drop').addEventListener(t,e=>{e.preventDefault();$('drop').classList.remove('drag')}));$('drop').ondrop=e=>add(e.dataTransfer.files);
+</script></body></html>
