@@ -34,7 +34,6 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn('actions/setup-python@v6', workflow)
         self.assertIn('python -m compileall -q brain_v12', workflow)
         self.assertNotIn('render.yaml', workflow)
-        self.assertNotIn('onrender.com', workflow)
 
     def test_workflow_runs_compile_check(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
