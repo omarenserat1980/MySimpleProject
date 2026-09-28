@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application android:theme="@style/AppTheme" android:label="BRAIN Cloud Hub">
         <activity android:name=".BrainCloudActivity" android:exported="true">
             <intent-filter>
@@ -7,6 +10,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name=".BrainTermuxActivity" android:exported="false"/>
         <activity android:name=".MainActivity" android:exported="false"/>
-            <service android:name=".BrainServerService" android:exported="false" android:foregroundServiceType="dataSync" />\n    </application>
+        <service android:name=".BrainServerService" android:exported="false" android:foregroundServiceType="dataSync"/>
+    </application>
 </manifest>
