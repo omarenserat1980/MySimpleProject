@@ -41,6 +41,7 @@ from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
+from . import media_engine
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -226,6 +227,96 @@ class CodeChanges(BaseModel):
     approved:bool=False
     persist_to_github:bool=True
 class CodePaths(BaseModel): paths:list[str]=[]
+
+class MediaJobIn(BaseModel):
+    operation: str
+    spec: dict = {}
+
+
+@app.get("/api/media/health")
+def media_health():
+    import shutil
+    ffmpeg = shutil.which("ffmpeg")
+    ffprobe = shutil.which("ffprobe")
+    return {
+        "ok": bool(ffmpeg and ffprobe),
+        "engine": "BRAIN Media Engine",
+        "version": "1.0",
+        "ffmpeg": bool(ffmpeg),
+        "ffprobe": bool(ffprobe),
+        "media_root": str(media_engine.MEDIA_ROOT),
+        "queue_workers": media_engine.MAX_WORKERS,
+        "operations": ["probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow"],
+    }
+
+
+@app.post("/api/media/jobs")
+def media_create_job(body: MediaJobIn):
+    try:
+        job = media_engine.submit(body.operation.strip().lower(), body.spec)
+        store.event("MEDIA_JOB_CREATED", {"job_id": job["job_id"], "operation": body.operation})
+        return job
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/api/media/jobs")
+def media_jobs(limit: int = 30):
+    return {"ok": True, "jobs": media_engine.list_jobs(limit)}
+
+
+@app.get("/api/media/jobs/{job_id}")
+def media_job(job_id: str):
+    return media_engine.snapshot(job_id)
+
+
+@app.post("/api/media/probe")
+def media_probe(body: MediaJobIn):
+    try:
+        return media_engine.submit("probe", {"input": body.spec.get("input", "")})
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/convert")
+def media_convert(body: MediaJobIn):
+    try:
+        return media_engine.submit("convert", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/concat")
+def media_concat(body: MediaJobIn):
+    try:
+        return media_engine.submit("concat", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/extract-audio")
+def media_extract_audio(body: MediaJobIn):
+    try:
+        return media_engine.submit("extract-audio", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/extract-frames")
+def media_extract_frames(body: MediaJobIn):
+    try:
+        return media_engine.submit("extract-frames", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/slideshow")
+def media_slideshow(body: MediaJobIn):
+    try:
+        return media_engine.submit("slideshow", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 
 class CinematicReleaseIn(BaseModel):
     title: str
@@ -1199,6 +1290,7 @@ def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
+app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web'), html=True), name='media-engine')
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
