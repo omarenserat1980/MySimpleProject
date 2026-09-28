@@ -140,3 +140,43 @@ def film_status(job_id: str):
 def fingerprint():
     value = os.getenv("BRAIN_INSTANCE_ID", "brain")
     return {"instance": hashlib.sha256(value.encode()).hexdigest()[:16]}
+
+
+class DeployRequest(BaseModel):
+    name: str
+    image: str
+    port: int = 8000
+
+@app.get("/v1/platform", dependencies=[Depends(require_auth)])
+def platform():
+    return {
+        "service": "BRAIN Cloud Hub",
+        "role": "self_hosted_render_alternative",
+        "paid_render_dependency": False,
+        "capabilities": ["services", "health", "film_jobs", "ffmpeg", "qc"],
+        "executor": "local_docker" if os.getenv("BRAIN_DEPLOY_EXECUTOR", "none") == "local_docker" else "film_factory_only",
+    }
+
+@app.get("/v1/services", dependencies=[Depends(require_auth)])
+def services():
+    services_dir = STATE / "services"
+    services_dir.mkdir(parents=True, exist_ok=True)
+    items = []
+    for p in sorted(services_dir.glob("*.json")):
+        try:
+            items.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return {"ok": True, "services": items}
+
+@app.post("/v1/services", dependencies=[Depends(require_auth)])
+def register_service(body: DeployRequest):
+    if not body.name.strip():
+        raise HTTPException(status_code=400, detail="name is required")
+    if body.port < 1 or body.port > 65535:
+        raise HTTPException(status_code=400, detail="invalid port")
+    services_dir = STATE / "services"
+    services_dir.mkdir(parents=True, exist_ok=True)
+    service = {"name": body.name.strip(), "image": body.image.strip(), "port": body.port, "status": "REGISTERED"}
+    (services_dir / (body.name.strip().replace("/", "_") + ".json")).write_text(json.dumps(service, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "service": service}
