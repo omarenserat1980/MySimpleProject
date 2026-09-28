@@ -46,8 +46,9 @@ def _tool(name: str) -> str:
 
 
 def _safe_name(name: str) -> str:
-    base = pathlib.Path(str(name)).name
-    if not base or base in {".", ".."} or base != str(name).replace("\\", "/").split("/")[-1]:
+    raw = str(name).strip().replace("\\", "/")
+    base = pathlib.PurePosixPath(raw).name
+    if not raw or raw in {".", ".."} or "/" in raw or base != raw:
         raise ValueError("INVALID_MEDIA_NAME")
     if any(ord(ch) < 32 for ch in base):
         raise ValueError("INVALID_MEDIA_NAME")
