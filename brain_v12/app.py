@@ -32,7 +32,6 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
-from .brain.device_auth import require_device_agent
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
