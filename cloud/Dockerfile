@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates docker.io && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN pip install --no-cache-dir -r brain_v7/requirements.txt
 ENV PYTHONPATH=/app
