@@ -197,6 +197,6 @@ public class BrainTermuxActivity extends Activity {
 
     private void print(String s) {
         terminal.append(s);
-        terminal.post(() -> { View p=terminal.getParent(); if(p instanceof ScrollView)((ScrollView)p).fullScroll(View.FOCUS_DOWN); });
+        terminal.post(() -> { if (terminal.getParent() instanceof ScrollView) ((ScrollView)terminal.getParent()).fullScroll(View.FOCUS_DOWN); });
     }
 }
