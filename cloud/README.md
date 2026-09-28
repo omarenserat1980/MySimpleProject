@@ -2,7 +2,7 @@
 
 This directory is the provider-neutral cloud runtime for Electronic Brain.
 
-It does not require Render and does not require a self-hosted GitHub Runner. The container can run on any cloud VM/container platform that supports Docker.
+It is provider-neutral and can run from GitHub Actions or any Docker-compatible runtime. The container can run on any cloud VM/container platform that supports Docker.
 
 ## Runtime
 
