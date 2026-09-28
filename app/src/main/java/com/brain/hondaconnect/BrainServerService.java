@@ -5,7 +5,6 @@ import android.content.*;
 import android.os.*;
 import java.io.*;
 import java.net.*;
-import java.util.*;
 import java.util.concurrent.*;
 
 public class BrainServerService extends Service {
@@ -36,22 +35,29 @@ public class BrainServerService extends Service {
 
     private void startServer(int port) {
         try {
-            serverSocket = new ServerSocket(port);
+            serverSocket = new ServerSocket();
+            serverSocket.setReuseAddress(true);
+            serverSocket.bind(new InetSocketAddress("0.0.0.0", port));
             pool = Executors.newCachedThreadPool();
             running = true;
             pool.execute(() -> {
                 while (running) {
-                    try { pool.execute(() -> handle(serverSocketAccept())); }
-                    catch (Exception e) { if (running) break; }
+                    try {
+                        final Socket client = serverSocket.accept();
+                        pool.execute(() -> handle(client));
+                    } catch (IOException e) {
+                        if (running) stopSelf();
+                        break;
+                    } catch (RuntimeException e) {
+                        if (running) stopSelf();
+                        break;
+                    }
                 }
             });
         } catch (Exception e) {
+            running = false;
             stopSelf();
         }
-    }
-
-    private Socket serverSocketAccept() throws IOException {
-        return serverSocket.accept();
     }
 
     private void handle(Socket socket) {
@@ -66,6 +72,7 @@ public class BrainServerService extends Service {
                 String line = in.readLine();
                 if (line == null || line.isEmpty()) break;
             }
+
             String body;
             if ("/healthz".equals(path)) {
                 body = "{\"status\":\"ok\",\"server\":\"BRAIN Phone Server\",\"role\":\"phone_server\"}";
@@ -74,6 +81,7 @@ public class BrainServerService extends Service {
             } else {
                 body = "{\"service\":\"BRAIN Phone Server\",\"status\":\"online\",\"endpoints\":[\"/healthz\",\"/v1/status\"]}";
             }
+
             byte[] data = body.getBytes("UTF-8");
             String headers = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: "
                 + data.length + "\r\nConnection: close\r\n\r\n";
