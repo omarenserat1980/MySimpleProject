@@ -1,0 +1,26 @@
+{
+  "target": {
+    "vehicle": "Honda NP1",
+    "year": 2023,
+    "system": "Honda CONNECT",
+    "connect_plus": true
+  },
+  "apps": [
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "type": "video",
+      "compatibility": "unknown",
+      "source": "",
+      "notes": "Add only a verified official/vendor package URL after confirming compatibility with the exact Honda CONNECT firmware."
+    },
+    {
+      "id": "youtube_music",
+      "name": "YouTube Music",
+      "type": "music",
+      "compatibility": "unknown",
+      "source": "",
+      "notes": "Compatibility must be confirmed for the exact Honda CONNECT firmware."
+    }
+  ]
+}
