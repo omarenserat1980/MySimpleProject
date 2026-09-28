@@ -396,6 +396,16 @@ def freelance_payment_verified(body:dict):
 def workforce_health():
     return workforce.health()
 
+@app.get("/health")
+def health():
+    return {
+        "ok": True,
+        "status": "healthy",
+        "version": APP_VERSION,
+        "runtime": "BRAIN_TERMUX_EMULATOR",
+        "deployment": _deployment_snapshot() if "_deployment_snapshot" in globals() else {"converged": False},
+    }
+
 def _deployment_snapshot():
     expected = os.getenv("GITHUB_SHA", "")
     return {
