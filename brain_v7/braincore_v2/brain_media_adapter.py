@@ -131,6 +131,16 @@ class BrainMediaProvider:
     def render(self, *, shot: dict[str, Any], authorized: bool=False) -> dict[str, Any]:
         if not authorized:
             return {"status":"AUTHORIZATION_REQUIRED"}
+        forced_route = os.getenv("FACTORY_MEDIA_ROUTE", "").strip().lower()
+        local_enabled = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "0").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        if forced_route == "local_ffmpeg_cinematic" and local_enabled and CinematicLocalRenderer is not None:
+            return {
+                **CinematicLocalRenderer().render(shot=shot, authorized=True),
+                "provider": "local_ffmpeg_cinematic",
+                "fallback_reason": "repair_app_route",
+            }
         if os.getenv("FAL_KEY","").strip():
             return self._render_fal(shot)
         if not self.url:
