@@ -339,6 +339,29 @@ def media_fade(body: MediaJobIn):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.get("/api/media/presets")
+def media_presets():
+    return {
+        "ok": True,
+        "presets": {
+            "youtube_1080p": {"width": 1920, "height": 1080, "fps": 30, "crf": 20},
+            "shorts_1080x1920": {"width": 1080, "height": 1920, "fps": 30, "crf": 20},
+            "cinematic_4k": {"width": 3840, "height": 2160, "fps": 24, "crf": 20},
+        },
+        "transitions": ["none", "fade", "wipeleft", "wiperight", "slideleft", "slideright"],
+    }
+
+
+@app.post("/api/media/cinematic-render")
+def media_cinematic_render(body: MediaJobIn):
+    try:
+        spec = dict(body.spec)
+        spec.setdefault("profile", "youtube_1080p")
+        return media_engine.submit("timeline", spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/media/timeline")
 def media_timeline(body: MediaJobIn):
     try:
