@@ -5,7 +5,6 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP = ROOT / "app.py"
 WORKFLOW = ROOT.parent / ".github" / "workflows" / "brain-v12.yml"
-RENDER = ROOT.parent / "render.yaml"
 
 
 class DeploymentContractTests(unittest.TestCase):
@@ -31,12 +30,11 @@ class DeploymentContractTests(unittest.TestCase):
 
     def test_v14_contract_is_aligned(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
-        render = RENDER.read_text(encoding="utf-8")
-        self.assertIn('RENDER_URL: https://electronic-brain-v13-gwwg.onrender.com', workflow)
-        self.assertIn('[ "$version" = "14.0" ]', workflow)
-        self.assertIn("BRAIN_V14_VERSION", render)
-        self.assertIn('value: "14.0"', render)
-        self.assertNotIn("BRAIN_V13_VERSION", render)
+        self.assertIn('actions/checkout@v5', workflow)
+        self.assertIn('actions/setup-python@v6', workflow)
+        self.assertIn('python -m compileall -q brain_v12', workflow)
+        self.assertNotIn('render.yaml', workflow)
+        self.assertNotIn('onrender.com', workflow)
 
     def test_workflow_runs_compile_check(self):
         workflow = WORKFLOW.read_text(encoding="utf-8")
