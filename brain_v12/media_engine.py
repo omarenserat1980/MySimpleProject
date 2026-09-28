@@ -244,7 +244,7 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
         filters.append(f"[{current_a}]anull[aout]")
 
     if global_audio_label:
-        filters.append("[aout][" + global_audio_label + "]amix=inputs=2:duration=longest:dropout_transition=2[aout_final]")
+        filters.append("[aout][" + global_audio_label + "]amix=inputs=2:duration=first:dropout_transition=2[aout_final]")
         audio_output_label = "aout_final"
     else:
         audio_output_label = "aout"
