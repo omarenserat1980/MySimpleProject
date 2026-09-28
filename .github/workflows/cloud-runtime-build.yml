@@ -28,7 +28,13 @@ jobs:
       - name: Validate compose
         run: docker compose -f cloud/docker-compose.yml config
       - name: Install Brain Python dependencies
-        run: python -m pip install --disable-pip-version-check -r requirements.txt
+        run: python -m pip install --disable-pip-version-check -r brain_v7/requirements.txt
+      - name: Prepare CI runtime state
+        run: mkdir -p "$GITHUB_WORKSPACE/.brain_state"
+      - name: Set CI runtime paths
+        run: |
+          echo "BRAIN_STATE_DIR=$GITHUB_WORKSPACE/.brain_state" >> "$GITHUB_ENV"
+          echo "FACTORY_OUTPUT_DIR=$GITHUB_WORKSPACE/cinematic_output" >> "$GITHUB_ENV"
       - name: Validate factory and control plane imports
         env:
           PYTHONPATH: .
