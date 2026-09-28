@@ -61,10 +61,12 @@ jobs:
 
       - name: Supervisor binary smoke check
         run: |
-          test -x /tmp/brain6
+          rm -rf /tmp/brain6-smoke
+          mkdir -p /tmp/brain6-smoke
+          cd /tmp/brain6-smoke
           /tmp/brain6 >/tmp/brain6-smoke.log 2>&1 || code=$?
           test "${code:-0}" -eq 20
-          grep -q "BRAIN6_STATE_MISSING" /tmp/brain6-smoke.log || true
+          grep -q "BRAIN6_STATE_MISSING" /tmp/brain6-smoke.log
 
       - name: Upload verification report
         if: always()
