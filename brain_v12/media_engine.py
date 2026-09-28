@@ -446,6 +446,7 @@ def cancel(job_id: str) -> dict[str, Any]:
     return snapshot(job_id)
 
 def submit(operation: str, spec: dict[str, Any]) -> dict[str, Any]:
+    operation = str(operation).strip().lower()
     allowed = {"probe", "convert", "concat", "extract-audio", "extract-frames", "slideshow", "trim", "mix-audio", "fade", "timeline"}
     if operation not in allowed:
         raise ValueError("UNSUPPORTED_MEDIA_OPERATION")
