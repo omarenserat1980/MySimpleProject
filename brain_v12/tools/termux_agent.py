@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""V12 Termux agent: polls Brain V12, executes only allowlisted read-only tasks."""
+"""V12 BRAIN Termux Emulator agent: polls Brain V12, executes only allowlisted read-only tasks."""
 import json
 import os
 import platform
@@ -40,7 +40,7 @@ def execute(task):
             "device": platform.system(),
             "machine": platform.machine(),
             "python": platform.python_version(),
-            "agent": "V12-Termux-Agent",
+            "agent": "V12-BRAIN-EMULATOR",
             "status": "READY",
         }
     if task == "python_version":
@@ -49,7 +49,7 @@ def execute(task):
             capture_output=True, text=True, timeout=10
         )
         return {"returncode": p.returncode, "stdout": p.stdout.strip(), "stderr": p.stderr.strip()}
-    if task == "termux_path":
+    if task == "brain_home":
         p = subprocess.run(
             ["pwd"],
             capture_output=True, text=True, timeout=10
@@ -66,7 +66,7 @@ def execute(task):
 
 def main():
     key = load_key()
-    print(f"V12 Termux Agent connected to {BRAIN_URL}")
+    print(f"V12 BRAIN Termux Emulator Agent connected to {BRAIN_URL}")
     print(f"Agent ID: {AGENT_ID}")
     while True:
         try:
@@ -99,7 +99,7 @@ def main():
                 print("IDLE", flush=True)
             time.sleep(POLL_SECONDS)
         except KeyboardInterrupt:
-            print("V12 Termux Agent stopped.")
+            print("V12 BRAIN Termux Emulator Agent stopped.")
             return
         except Exception as exc:
             print(f"connection/error: {exc}", flush=True)
