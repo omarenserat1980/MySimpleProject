@@ -124,6 +124,13 @@ def verify() -> tuple[bool, str]:
 def _snapshot(paths: list[Path]) -> dict[Path, str]:
     return {path: _read(path) for path in paths if path.exists()}
 
+def _changed_files(before: dict[Path, str]) -> list[str]:
+    changed = []
+    for path, old in before.items():
+        if path.exists() and _read(path) != old:
+            changed.append(str(path.relative_to(ROOT)))
+    return sorted(changed)
+
 def _restore(snapshot: dict[Path, str]) -> None:
     for path, content in snapshot.items():
         _write(path, content)
@@ -142,16 +149,18 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
                 rule_errors.append(str(exc))
                 last_error = str(exc)
         ok, verification = verify()
-        rolled_back = bool(changed) and not ok
+        actual_changed = _changed_files(before)
+        rolled_back = bool(actual_changed) and not ok
         if rolled_back:
             _restore(before)
+            actual_changed = []
         failure = diagnose_failure(verification if not ok else last_error)
         diagnosis = failure["repair"]
         entry = {
             "cycle": cycle,
             "failure_diagnosis": diagnosis,
             "failure_class": failure["class"],
-            "changed_files": sorted(set(changed)),
+            "changed_files": sorted(set(actual_changed)),
             "rule_errors": rule_errors,
             "verification_passed": ok,
             "verification_tail": verification,
@@ -162,7 +171,7 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
             result = {
                 "status": "CODE_VERIFIED",
                 "cycles_completed": cycle,
-                "changed_files": sorted(set(changed)),
+                "changed_files": sorted(set(actual_changed)),
                 "history": history,
                 "last_error": last_error,
                 "note": "Source was verified in the current workspace; repository persistence requires a reviewed commit.",
@@ -170,7 +179,7 @@ def heal(error_text: str = "", report_path: str = "code_self_healer_report.json"
             Path(report_path).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
             return result
         last_error = verification
-        if not ok and not changed:
+        if not ok and not actual_changed:
             break
     result = {
         "status": "CODE_REPAIR_LIMIT_REACHED",
