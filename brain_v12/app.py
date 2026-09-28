@@ -315,6 +315,30 @@ def media_extract_frames(body: MediaJobIn):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/api/media/trim")
+def media_trim(body: MediaJobIn):
+    try:
+        return media_engine.submit("trim", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/mix-audio")
+def media_mix_audio(body: MediaJobIn):
+    try:
+        return media_engine.submit("mix-audio", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/media/fade")
+def media_fade(body: MediaJobIn):
+    try:
+        return media_engine.submit("fade", body.spec)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/media/slideshow")
 def media_slideshow(body: MediaJobIn):
     try:
