@@ -80,11 +80,16 @@ public class BrainCloudActivity extends Activity {
     }
 
     private void openTermux() {
+        // Port 8787 is owned by the Android Phone Server. Stop it before
+        // launching the real Termux Cloud Hub so both runtimes never compete
+        // for the same listening socket.
+        stopService(new Intent(this, BrainServerService.class));
+        serverStatus.setText("🟡 Phone Server stopped — opening real Termux Cloud Hub...");
         try {
             Intent i = new Intent();
             i.setClassName("com.termux", "com.termux.app.TermuxActivity");
             startActivity(i);
-            serverStatus.setText("تم فتح Termux الحقيقي.");
+            serverStatus.setText("تم فتح Termux الحقيقي. شغّل termux/setup_brain_phone_server.sh لتشغيل Full Cloud Hub على 8787.");
         } catch (Exception e) {
             serverStatus.setText("Termux الحقيقي غير مثبت. استخدم BRAIN Termux Emulator.");
         }
