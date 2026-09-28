@@ -11,13 +11,13 @@ External controller
        ^
        | outbound HTTPS polling
        |
-Android / Termux
+Android / BRAIN Termux Emulator
        |
 Electronic Brain
        |
      Agent
        |
-     Termux
+     BRAIN Termux Emulator
 ```
 
 The Android device does **not** need an inbound public port.
@@ -36,7 +36,7 @@ python relay_server.py
 
 For production, put the service behind HTTPS and keep `RELAY_TOKEN` secret.
 
-## Configure Android / Termux
+## Configure Android / BRAIN Termux Emulator
 
 Inside `brain_v7`:
 
