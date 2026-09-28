@@ -13,18 +13,6 @@ class SecretControlPlane:
 
     REQUIRED = (
         {
-            "name": "RENDER_API_KEY",
-            "scope": ("web", "render-monitor-worker"),
-            "purpose": "Render API read access for deployment/log supervision",
-            "provider_action": "create_or_attach",
-        },
-        {
-            "name": "RENDER_OWNER_ID",
-            "scope": ("web", "render-monitor-worker"),
-            "purpose": "Render account owner identifier",
-            "provider_action": "set",
-        },
-        {
             "name": "OPENAI_API_KEY",
             "scope": ("web",),
             "purpose": "OpenAI API access for the V12 AI gateway",
