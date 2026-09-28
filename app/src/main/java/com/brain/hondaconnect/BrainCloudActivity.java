@@ -10,7 +10,7 @@ import java.net.*;
 import org.json.*;
 
 public class BrainCloudActivity extends Activity {
-    EditText url, token, title;
+    EditText url, token, filmTitle;
     TextView status, pipeline;
 
     @Override public void onCreate(Bundle b) {
@@ -34,10 +34,10 @@ public class BrainCloudActivity extends Activity {
         token.setHint("BRAIN_CONTROL_TOKEN");
         token.setSingleLine(true);
         token.setInputType(0x00000081);
-        title = new EditText(this);
-        title.setHint("عنوان الفيلم");
-        title.setSingleLine(true);
-        root.addView(title);
+        filmTitle = new EditText(this);
+        filmTitle.setHint("عنوان الفيلم");
+        filmTitle.setSingleLine(true);
+        root.addView(filmTitle);
         root.addView(token);
 
         Button connect = new Button(this);
@@ -67,10 +67,10 @@ public class BrainCloudActivity extends Activity {
     private void createFilm() {
         final String base = url.getText().toString().trim().replaceAll("/+$","");
         final String auth = token.getText().toString().trim();
-        final String filmTitle = title.getText().toString().trim();
+        final String requestedTitle = filmTitle.getText().toString().trim();
         if (base.isEmpty()) { status.setText("أدخل عنوان BRAIN Cloud"); return; }
-        if (filmTitle.isEmpty()) { status.setText("أدخل عنوان الفيلم"); return; }
-        status.setText("جاري إنشاء الفيلم...");
+        if (requestedTitle.isEmpty()) { status.setText("أدخل عنوان الفيلم"); return; }
+        status.setText("جاري إنشاء الفيلم عبر BRAIN Cloud Hub...");
         new Thread(() -> {
             try {
                 HttpURLConnection c=(HttpURLConnection)new URL(base+"/v1/films").openConnection();
@@ -79,7 +79,7 @@ public class BrainCloudActivity extends Activity {
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type","application/json; charset=UTF-8");
                 if(!auth.isEmpty()) c.setRequestProperty("Authorization","Bearer "+auth);
-                String body="{\"title\":\""+filmTitle.replace("\\","\\\\").replace("\"","\\\"")+"\",\"target_minutes\":1,\"language\":\"ar\"}";
+                String body="{\"title\":\""+requestedTitle.replace("\\","\\\\").replace("\"","\\\"")+"\",\"target_minutes\":1,\"language\":\"ar\"}";
                 try(OutputStream o=c.getOutputStream()){o.write(body.getBytes("UTF-8"));}
                 int code=c.getResponseCode();
                 InputStream stream=code>=400?c.getErrorStream():c.getInputStream();
