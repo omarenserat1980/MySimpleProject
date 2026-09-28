@@ -12,8 +12,8 @@ services:
     envVars:
       - key: BRAIN_RENDER_MONITOR_ENABLED
         value: "true"
-      - key: BRAIN_V13_VERSION
-        value: "13.0"
+      - key: BRAIN_V14_VERSION
+        value: "14.0"
       - key: PRERENDER_BUILD_MARKER
         value: "v13-main-deploy"
       - key: TERMUX_AGENT_KEY
