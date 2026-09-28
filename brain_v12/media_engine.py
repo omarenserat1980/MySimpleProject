@@ -167,7 +167,7 @@ def _timeline_command(spec: dict[str, Any], ffmpeg: str) -> tuple[list[str], pat
         input_index += 1
         v = f"v{i}"
         a = f"a{i}"
-        vf = f"[{i}:v]scale={timeline_width}:{timeline_height}:force_original_aspect_ratio=decrease,pad={timeline_width}:{timeline_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={timeline_fps},format=yuv420p"
+        vf = f"[{video_input_index}:v]scale={timeline_width}:{timeline_height}:force_original_aspect_ratio=decrease,pad={timeline_width}:{timeline_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={timeline_fps},format=yuv420p"
         caption = scene.get("caption")
         if caption:
             vf += f",drawtext=text='{_drawtext_escape(caption)}':x=(w-text_w)/2:y=h-120:fontsize=46:fontcolor=white:borderw=3:bordercolor=black"
