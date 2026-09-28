@@ -1,6 +1,6 @@
-# PHONE-ONLY Cinematic Factory
+# BRAIN Media Engine — Cinematic Factory
 
-The Brain now contains a resumable 60-part cinematic executor.
+BRAIN Media Engine is the unified media control plane for the cinematic pipeline. The existing resumable 60-part executor remains the runtime worker, while media operations, normalization and QC are owned by the Media Engine contract.
 
 ## Contract
 - 60 MP4 files
@@ -34,6 +34,6 @@ The publisher receives:
 The publisher must return exit code 0 only after the external platform confirms the upload.
 
 ## Important
-FFmpeg performs normalization and technical verification; it does not generate cinematic footage. A real video-generation provider must be connected through `VIDEO_RENDER_COMMAND`.
+BRAIN Media Engine performs normalization, composition and technical verification. FFmpeg remains an internal execution dependency only; there is no separate FFmpeg GUI or user-facing FFmpeg workflow. A real video-generation provider may be connected through `VIDEO_RENDER_COMMAND`, while the resulting media is handed back to BRAIN Media Engine for processing and QC.
 
 YouTube OAuth/API credentials must remain in environment variables or a secure secret store, never in Git.
