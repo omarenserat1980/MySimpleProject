@@ -109,7 +109,7 @@ def main() -> int:
         encoding="utf-8",
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if failed else 0 if all(r["returncode"] == 0 for r in results) else 1
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
