@@ -31,9 +31,11 @@ SOURCE_ALLOWLIST = {
     ROOT / ".github/workflows/cinematic-factory-smoke.yml",
     ROOT / ".github/workflows/brain-auto-repair-and-smoke.yml",
 }
+# Keep verification acyclic: these are production-facing tests only.
+# test_code_repair_app.py and test_code_self_healer.py call heal(), so including
+# them here would recursively invoke the verifier until its timeout.
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
-    "brain_v7/braincore_v2/test_code_repair_app.py",
     "brain_v7/braincore_v2/test_cinematic_local_renderer.py",
 )
 
@@ -209,7 +211,14 @@ def verify() -> tuple[bool, str]:
             cwd=ROOT, capture_output=True, text=True, timeout=240,
         )
     except subprocess.TimeoutExpired as exc:
-        output = (exc.stdout or "") + (exc.stderr or "")
+        def _text(value: object) -> str:
+            if value is None:
+                return ""
+            if isinstance(value, bytes):
+                return value.decode("utf-8", errors="replace")
+            return str(value)
+
+        output = _text(exc.stdout) + _text(exc.stderr)
         return False, ("verification_timeout: pytest exceeded 240s; " + output)[-6000:]
     return test.returncode == 0, (test.stdout + test.stderr)[-6000:]
 
