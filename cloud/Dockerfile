@@ -9,4 +9,4 @@ ENV FACTORY_INTERVAL_SECONDS=21600
 ENV FACTORY_ALLOW_PRODUCTION=1
 ENV FACTORY_ALLOW_YOUTUBE_PUBLISH=0
 ENV FACTORY_REQUIRE_REAL_MEDIA=1
-CMD ["python","cloud/brain_cloud.py"]
+CMD ["sh","-c","uvicorn cloud.api_server:app --host 0.0.0.0 --port ${PORT:-8000} & exec python cloud/brain_cloud.py"]
