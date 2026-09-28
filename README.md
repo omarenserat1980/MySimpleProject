@@ -20,7 +20,7 @@ The gateway uses HTTPS polling with an allowlist and shared secret. The initial 
 ### Termux
 ```bash
 cd ~/MySimpleProject
-export BRAIN_URL="https://electronic-brain-v12-gwwg.onrender.com"
+export BRAIN_URL="http://127.0.0.1:10000"
 export TERMUX_AGENT_KEY='YOUR_SECRET'
 export TERMUX_AGENT_ID="android-termux-v12"
 bash termux_agent/run_agent.sh
