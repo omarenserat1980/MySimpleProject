@@ -1,5 +1,7 @@
 name: Brain Auto Repair + Cinematic Smoke
 
+run-name: Brain repair • ${{ github.ref_name }} • ${{ github.run_number }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,6 +9,7 @@ on:
         description: "Maximum controller cycles (1..15000)"
         required: true
         default: "15000"
+        type: number
       smoke:
         description: "Run the cinematic factory smoke after repair"
         required: true
@@ -14,16 +17,16 @@ on:
         default: true
   push:
     paths:
-      - "brain_v7/braincore_v2/auto_repair_app.py"
-      - "brain_v7/braincore_v2/code_self_healer.py"
-      - "brain_v7/braincore_v2/brain_media_adapter.py"
-      - "brain_v7/braincore_v2/legal_media_guard.py"
-      - "brain_v7/braincore_v2/repair_controller_15000.py"
+      - "brain_v7/braincore_v2/**"
       - ".github/workflows/brain-auto-repair-and-smoke.yml"
 
+concurrency:
+  group: brain-auto-repair-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: write
-  actions: write
+  contents: read
+  actions: read
 
 jobs:
   repair-and-smoke:
@@ -45,39 +48,90 @@ jobs:
       MEDIA_PROVIDER_API_KEY: ${{ secrets.MEDIA_PROVIDER_API_KEY }}
       COMFYUI_URL: ${{ secrets.COMFYUI_URL }}
       COMFYUI_WORKFLOW_JSON: ${{ secrets.COMFYUI_WORKFLOW_JSON }}
+      REPAIR_CYCLES: ${{ inputs.repair_cycles || 15000 }}
+      RUN_SMOKE: ${{ inputs.smoke || true }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: brain_v7/requirements.txt
 
-      - name: Install FFmpeg and Python dependencies
+      - name: Install system tools
         run: |
+          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y ffmpeg ruby
+
+      - name: Install Python dependencies
+        run: |
+          set -euxo pipefail
           python -m pip install --upgrade pip
           python -m pip install -r brain_v7/requirements.txt
+
+      - name: Preflight repair environment
+        run: |
+          set -o pipefail
+          python -m brain_v7.braincore_v2.repair_preflight --report repair_preflight_report.json | tee repair_preflight_stdout.json
+
+      - name: Compile repair modules
+        run: |
+          python -m compileall -q brain_v7/braincore_v2
+
+      - name: Run deterministic unit tests
+        run: |
+          python -m pytest -q \
+            brain_v7/braincore_v2/test_factory_repair_app.py \
+            brain_v7/braincore_v2/test_code_repair_app.py \
+            brain_v7/braincore_v2/test_cinematic_local_renderer.py
 
       - name: Inspect and repair code
         run: |
           set -o pipefail
-          python -m brain_v7.braincore_v2.auto_repair_app             --cycles "${{ inputs.repair_cycles || '15000' }}"             $([ "${{ inputs.smoke || 'true' }}" = "true" ] && echo --smoke) | tee auto_repair_stdout.json
+          args=(--cycles "$REPAIR_CYCLES")
+          if [ "$RUN_SMOKE" = "true" ]; then
+            args+=(--smoke)
+          fi
+          python -m brain_v7.braincore_v2.auto_repair_app "${args[@]}" | tee auto_repair_stdout.json
 
-      - name: Verify final artifact
+      - name: Verify final repair report
         if: success()
         run: |
+          set -euxo pipefail
           test -s auto_repair_app_report.json
-          if [ -f cinematic_output/final.mp4 ]; then
-            ffprobe -v error -show_entries format=duration,size:stream=codec_type,width,height -of json cinematic_output/final.mp4
-          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path("auto_repair_app_report.json").read_text(encoding="utf-8"))
+          assert report.get("status") == "VERIFIED", report
+          assert report.get("controller", {}).get("status") == "VERIFIED_SUCCESS", report
+          print("REPAIR_VERIFIED")
+          PY
+
+      - name: Verify final cinematic artifact
+        if: success() && env.RUN_SMOKE == 'true'
+        run: |
+          set -euxo pipefail
+          test -s cinematic_output/final.mp4
+          ffprobe -v error \
+            -show_entries format=duration,size \
+            -show_entries stream=codec_type,width,height \
+            -of json cinematic_output/final.mp4 > final_mp4_probe.json
+          test -s final_mp4_probe.json
 
       - name: Upload repair evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: brain-auto-repair-evidence
+          name: brain-auto-repair-evidence-${{ github.run_number }}
           path: |
+            repair_preflight_report.json
+            repair_preflight_stdout.json
             auto_repair_app_report.json
             auto_repair_stdout.json
             repair_15000_report.json
@@ -85,6 +139,7 @@ jobs:
             code_self_healer_report.json
             factory_repair_100_report.json
             factory_result.json
+            final_mp4_probe.json
             cinematic_output/final.mp4
           if-no-files-found: ignore
           retention-days: 30
