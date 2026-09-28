@@ -4,7 +4,6 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "index.html"
       - "brain_v12/web/**"
       - "scripts/validate-pages.sh"
       - ".github/workflows/brain-v12-pages.yml"
@@ -12,19 +11,20 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
   validate:
+    name: Validate Pages site
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate and assemble site
         shell: bash
@@ -32,17 +32,25 @@ jobs:
           chmod +x scripts/validate-pages.sh
           ./scripts/validate-pages.sh brain_v12/web _site
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
+          name: github-pages
           path: _site
 
   deploy:
+    name: Deploy Pages
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: validate
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
