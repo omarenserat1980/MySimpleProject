@@ -1,4 +1,4 @@
-from .factory_repair_app import diagnose, repair, FAL_DEFAULT
+from .factory_repair_app import diagnose, repair, repair_100_cycles, FAL_DEFAULT
 
 def test_repair_resolves_empty_model(monkeypatch, tmp_path):
     monkeypatch.delenv("FAL_MODEL", raising=False)
@@ -15,7 +15,6 @@ def test_diagnose_never_claims_provider_success(monkeypatch):
     d = diagnose("HTTP 403 User is locked: exhausted balance")
     assert d["fal_quota_blocked"] is True
     assert d["recommended_route"] in {"local_ffmpeg_cinematic", "fal", "configuration_required"}
-
 
 def test_100_cycle_controller_stops_on_healthy_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("FACTORY_ALLOW_LOCAL_FALLBACK", "1")
