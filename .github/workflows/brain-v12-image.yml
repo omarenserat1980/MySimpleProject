@@ -133,8 +133,7 @@ jobs:
           }
           trap cleanup EXIT
 
-          cid="$(
-            docker run -d               --name "$name"               --init               -e BRAIN_V14_VERSION="$BRAIN_V14_VERSION"               -e BRAIN_DB=/tmp/brain_v12-smoke.db               -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false               -e BRAIN_WORKFORCE_ENABLED=false               -e           )"
+          cid="$(docker run -d --name "$name" --init -p 18012:8012 -e PORT=8012 -e BRAIN_V14_VERSION="$BRAIN_V14_VERSION" -e BRAIN_DB=/tmp/brain_v12-smoke.db -e BRAIN_LIVE_INCOME_SEARCH_ENABLED=false -e BRAIN_WORKFORCE_ENABLED=false "$IMAGE")"
 
           echo "container=$cid"
 
