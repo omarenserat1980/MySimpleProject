@@ -36,6 +36,12 @@ def main() -> int:
     env = os.environ.copy()
     env["BRAIN_DEMO_CAPABILITY"] = decision["capability"]
     env["BRAIN_DEMO_OBJECTIVE"] = decision["objective"]
+    plan_rc = subprocess.run([sys.executable, "-m", "cloud.capability_film"], cwd=ROOT, env=env, check=False).returncode
+    if plan_rc != 0:
+        decision["execution_status"] = "FAILED_PLAN"
+        DECISION.write_text(json.dumps(decision, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return plan_rc
+    env["BRAIN_CINEMATIC_PLAN"] = str(ROOT / "STATE" / "capability_demo" / "brain-capability-film.json")
     result = subprocess.run(
         [sys.executable, "-m", "brain_v12.cinematic_autopilot"],
         cwd=ROOT, env=env, check=False,
