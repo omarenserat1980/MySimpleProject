@@ -11,6 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
 RENDERER = ROOT / "brain_v12/movie_summary_factory/render_room13_animatic.py"
 QC = ROOT / "brain_v12/movie_summary_factory/room13_qc.py"
+REGISTRY = ROOT / "brain_v12/movie_summary_factory/room13_components.py"
 
 
 class Room13PipelineTests(unittest.TestCase):
@@ -36,6 +37,7 @@ class Room13PipelineTests(unittest.TestCase):
     def test_python_sources_compile(self):
         ast.parse(self.renderer, filename=str(RENDERER))
         ast.parse(self.qc, filename=str(QC))
+        ast.parse(REGISTRY.read_text(encoding="utf-8"), filename=str(REGISTRY))
 
     def test_renderer_has_integrity_qc(self):
         for token in ("ROOM13_OUTPUT_INVALID", "ROOM13_QC_FAILED", "RENDERED"):
@@ -61,8 +63,16 @@ class Room13PipelineTests(unittest.TestCase):
         self.assertTrue(gate.is_file())
         ast.parse(gate.read_text(encoding="utf-8"), filename=str(gate))
         source = gate.read_text(encoding="utf-8")
-        for token in ("READY", "BLOCKED", "espeak-ng", "make_ppm", "ROOM13_QC_FAILED"):
+        for token in ("READY", "BLOCKED", "espeak-ng", "make_ppm", "ROOM13_QC_FAILED", "component_count"):
             self.assertIn(token, source)
+
+    def test_component_registry_has_100_components(self):
+        source = REGISTRY.read_text(encoding="utf-8")
+        namespace = {}
+        exec(compile(source, str(REGISTRY), "exec"), namespace)
+        errors = namespace["validate_registry"]()
+        self.assertEqual(errors, [])
+        self.assertEqual(len(namespace["all_components"]()), 100)
 
     def test_brain_toolchain_is_required(self):
         self.assertIn("brain_ffmpeg", self.renderer)
