@@ -1,6 +1,6 @@
 """Autonomous Brain capability selection for cinematic demonstrations."""
 from __future__ import annotations
-import json, os, time
+import json, os, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +33,17 @@ def main() -> int:
     decision = choose()
     DECISION.write_text(json.dumps(decision, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(decision, ensure_ascii=False))
-    return 0
+    env = os.environ.copy()
+    env["BRAIN_DEMO_CAPABILITY"] = decision["capability"]
+    env["BRAIN_DEMO_OBJECTIVE"] = decision["objective"]
+    result = subprocess.run(
+        [sys.executable, "-m", "brain_v12.cinematic_autopilot"],
+        cwd=ROOT, env=env, check=False,
+    )
+    decision["execution_return_code"] = result.returncode
+    decision["execution_status"] = "COMPLETED" if result.returncode == 0 else "FAILED"
+    DECISION.write_text(json.dumps(decision, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return result.returncode
 
 if __name__ == "__main__":
     raise SystemExit(main())
