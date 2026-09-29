@@ -78,7 +78,7 @@ if not OUT.exists() or OUT.stat().st_size < 1024:
     write_progress("FAILED", 100, len(shots))
     raise SystemExit("ROOM13_OUTPUT_INVALID")
 probe = subprocess.run([
-    ff, "-v", "error", "-show_entries",
+    shutil.which("ffprobe"), "-v", "error", "-show_entries",
     "format=duration,size:stream=codec_type,codec_name,width,height",
     "-of", "json", str(OUT)
 ], capture_output=True, text=True, check=True)
