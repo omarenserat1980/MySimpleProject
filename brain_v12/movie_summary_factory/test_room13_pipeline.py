@@ -58,6 +58,14 @@ class Room13PipelineTests(unittest.TestCase):
         self.assertIn('"ar"', self.renderer)
         self.assertIn('"voiceover": True', self.renderer)
 
+    def test_stage7_self_healing_gate_exists(self):
+        p = ROOT / "brain_v12/movie_summary_factory/room13_stage7_repair.py"
+        self.assertTrue(p.is_file())
+        ast.parse(p.read_text(encoding="utf-8"))
+        text = p.read_text(encoding="utf-8")
+        for token in ("MAX_REPAIRS", "Component\\\\(0([1-9])", "UNSUPPORTED_STAGE7_SYNTAX", "READY"):
+            self.assertIn(token, text)
+
     def test_media_health_gate_exists(self):
         gate = ROOT / "brain_v12/movie_summary_factory/room13_media_health.py"
         self.assertTrue(gate.is_file())
