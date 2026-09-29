@@ -1,0 +1,64 @@
+name: Brain Self-Healing Loop
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+  push:
+    paths:
+      - "cloud/brain_interview.py"
+      - "cloud/brain_self_healing.py"
+      - "cloud/test_brain_self_healing.py"
+      - "brain_v12/movie_summary_factory/room13_stage7_repair.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-self-healing
+  cancel-in-progress: false
+
+jobs:
+  self-heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run Brain interview
+        run: python -m cloud.brain_interview > brain-interview.json
+
+      - name: Run bounded Self-Healing Loop
+        run: python -m cloud.brain_self_healing
+
+      - name: Verify healing contracts
+        run: |
+          python -m unittest cloud.test_brain_interview cloud.test_brain_self_healing -v
+
+      - name: Publish evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: brain-self-healing-evidence
+          path: |
+            brain-interview.json
+            STATE/self_healing/latest.json
+          if-no-files-found: warn
+
+      - name: Stop on blocked healing
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("STATE/self_healing/latest.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          print("SELF_HEALING_STATUS=" + data["status"])
+          if data["status"] != "HEALED_AND_VERIFIED":
+              raise SystemExit("Self-Healing Loop did not reach verified state")
+          PY
