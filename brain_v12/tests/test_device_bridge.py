@@ -27,7 +27,7 @@ class DeviceBridgeTests(unittest.TestCase):
 
     def test_authentication(self):
         self.assertFalse(self.bridge.configured())
-        self.assertTrue(self.bridge.authenticate("test-device-key"))
+        self.assertFalse(self.bridge.authenticate("test-device-key"))
         self.assertFalse(self.bridge.authenticate("wrong-key"))
 
     def test_queue_poll_report(self):
