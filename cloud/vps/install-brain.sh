@@ -9,7 +9,10 @@ mkdir -p "$APP_DIR"
 if [[ ! -d "$APP_DIR/.git" ]]; then git clone "$REPO" "$APP_DIR"; else git -C "$APP_DIR" fetch origin main && git -C "$APP_DIR" reset --hard origin/main; fi
 cd "$APP_DIR/cloud"
 if [[ ! -f .env ]]; then cp .env.production.example .env; chmod 600 .env; echo "Set BRAIN_CONTROL_TOKEN in $APP_DIR/cloud/.env"; fi
-docker compose -f docker-compose.production.yml pull
+if ! docker compose -f docker-compose.production.yml pull; then
+  echo "GHCR pull unavailable; building the Brain Cloud image locally."
+  docker compose -f docker-compose.production.yml build --pull
+fi
 docker compose -f docker-compose.production.yml up -d
 docker compose -f docker-compose.production.yml ps
 curl -fsS http://127.0.0.1:8000/healthz
