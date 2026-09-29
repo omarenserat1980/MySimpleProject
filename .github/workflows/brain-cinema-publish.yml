@@ -6,6 +6,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  pages: write
+  id-token: write
 jobs:
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
@@ -25,6 +27,21 @@ d['status']['self_healing']='not_run'
           d['build']={'workflow':'Brain Cinema - Publish Film Page','source':'Last Light In The City - No Pay Production'}
           p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
           PY
+      - name: Download verified film artifact
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: brain-factory-last-light-verified
+          path: docs/assets
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Normalize published video
+        if: ${{ github.event_name == 'workflow_run' }}
+        run: |
+          test -s docs/assets/last_light_city.mp4
+          rm -f docs/assets/ffprobe.json docs/assets/film_manifest.json docs/assets/VERIFIED_COMPLETED
+
       - name: Verify web package
         run: |
           test -s docs/index.html
@@ -38,3 +55,19 @@ d['status']['self_healing']='not_run'
           git add docs/film.json
           git diff --cached --quiet || git commit -m 'chore: update Brain Cinema production status'
           git push
+
+  deploy:
+    needs: publish
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
