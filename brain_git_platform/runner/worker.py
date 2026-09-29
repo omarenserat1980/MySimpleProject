@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -38,26 +40,47 @@ def _manifest_for(workspace: Path, workflow_name: str) -> Path:
     raise FileNotFoundError(f"workflow manifest not found: {workflow_name}")
 
 
-def execute_claimed_run(run: dict, worker_id: str) -> dict:
+def execute_claimed_run(run: dict, worker_id: str, heartbeat_interval: float = 30.0) -> dict:
     run_id = int(run["id"])
     temp = Path(tempfile.mkdtemp(prefix="brain-runner-"))
+    stop_heartbeat = threading.Event()
+    heartbeat_error: list[Exception] = []
+
+    def keepalive() -> None:
+        while not stop_heartbeat.wait(heartbeat_interval):
+            try:
+                heartbeat(run_id, worker_id)
+            except Exception as exc:
+                heartbeat_error.append(exc)
+                stop_heartbeat.set()
+                return
+
+    thread = threading.Thread(target=keepalive, name=f"brain-heartbeat-{run_id}", daemon=True)
     try:
         workspace = temp / "workspace"
         checkout_repository(run["namespace"], run["repository"], run["ref"], workspace)
         heartbeat(run_id, worker_id)
+        thread.start()
         workflow = load(_manifest_for(workspace, run["workflow"]))
         result = BrainRunnerExecutor(
             workspace,
             RunLog(service.ROOT / "logs"),
             ArtifactStore(str(service.ROOT / "artifacts")),
         ).run_workflow(workflow, run_id)
+        if heartbeat_error:
+            raise heartbeat_error[0]
         status = "success" if result.success else "failed"
-        set_status(run_id, status)
+        set_status(run_id, status, worker_id=worker_id)
         return {"run_id": run_id, "status": status, "steps": [x.__dict__ for x in result.steps]}
     except Exception:
-        set_status(run_id, "failed")
+        try:
+            set_status(run_id, "failed", worker_id=worker_id)
+        except Exception:
+            pass
         raise
     finally:
+        stop_heartbeat.set()
+        thread.join(timeout=max(1.0, heartbeat_interval))
         shutil.rmtree(temp, ignore_errors=True)
 
 
