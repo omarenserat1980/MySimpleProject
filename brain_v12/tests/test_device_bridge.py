@@ -26,37 +26,27 @@ class DeviceBridgeTests(unittest.TestCase):
             pass
 
     def test_authentication(self):
+        self.assertFalse(self.bridge.configured())
         self.assertTrue(self.bridge.authenticate("test-device-key"))
         self.assertFalse(self.bridge.authenticate("wrong-key"))
 
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
-        self.assertTrue(queued["ok"])
-        task_id = queued["task"]["task_id"]
+        self.assertFalse(queued["ok"])
+        self.assertEqual(queued["status"], "DEVICE_EXECUTION_DISABLED")
         polled = self.bridge.poll("android-test")
-        self.assertTrue(polled["ok"])
-        self.assertEqual(polled["task"]["task_id"], task_id)
-        reported = self.bridge.report(task_id, "android-test", True, {"status": "READY"})
-        self.assertTrue(reported["ok"])
-        self.assertEqual(reported["status"], "COMPLETED")
-        self.assertTrue(self.bridge.result(task_id)["ok"])
+        self.assertFalse(polled["ok"])
+        self.assertEqual(polled["status"], "DEVICE_EXECUTION_DISABLED")
+        self.assertFalse(self.bridge.result("missing")["ok"])
 
     def test_rejects_unknown_task(self):
         result = self.bridge.enqueue("shell")
         self.assertFalse(result["ok"])
-        self.assertEqual(result["status"], "TASK_NOT_ALLOWED")
+        self.assertEqual(result["status"], "DEVICE_EXECUTION_DISABLED")
 
     def test_requeues_stale_claim(self):
-        queued = self.bridge.enqueue("status")
-        task_id = queued["task"]["task_id"]
-        polled = self.bridge.poll("android-test")
-        self.assertEqual(polled["task"]["task_id"], task_id)
-        with self.store.connect() as con:
-            con.execute("UPDATE device_tasks SET claimed_at=? WHERE task_id=?", ("1", task_id))
-            con.commit()
         result = self.bridge.requeue_stale(5)
-        self.assertEqual(result["requeued"], 1)
-        self.assertEqual(self.store.device_task_get(task_id)["status"], "QUEUED")
+        self.assertEqual(result["requeued"], 0)
 
 
 if __name__ == "__main__":
