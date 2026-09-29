@@ -2,7 +2,7 @@
 """Stage 7 self-healing gate.
 
 Runs before every cinematic production. It repairs only deterministic, known
-registry syntax corruption, then compiles and validates the Stage 7 registry.
+registry syntax corruption, then compiles and validates the Stage 7 registry.\nThe repair contract is Component\\\\(0([1-9]), -> Component(\\1,).
 Unknown failures are blocked and reported instead of silently changing code.
 """
 from __future__ import annotations
