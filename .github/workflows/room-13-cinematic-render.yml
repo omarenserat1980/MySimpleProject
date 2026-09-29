@@ -28,10 +28,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core
           ffmpeg -version | head -n 1
+      - name: Brain Cloud preflight QC
+        run: python brain_v12/movie_summary_factory/room13_qc.py
       - name: Render Room 13 animatic
         run: |
           set -o pipefail
           python brain_v12/movie_summary_factory/render_room13_animatic.py | tee room13-render.log
+      - name: Brain Cloud final QC
+        if: always()
+        run: python brain_v12/movie_summary_factory/room13_qc.py
       - name: Report render progress
         if: always()
         run: |
@@ -65,7 +70,18 @@ jobs:
           echo "ROOM_13_RENDER_STATUS=COMPLETED" >> "$GITHUB_STEP_SUMMARY"
           echo "ROOM_13_RENDER_PERCENT=100" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload Room 13 QC and progress
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: room-13-render-qc
+          path: |
+            brain_v12/web/media/engine/room-13-progress.json
+            brain_v12/web/media/engine/room-13-qc.json
+            room13-render.log
+          if-no-files-found: warn
       - name: Upload MP4 artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: room-13-horror-10m-animatic
