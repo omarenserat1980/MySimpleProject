@@ -220,32 +220,6 @@ class ExecutorService : Service() {
         }
     }
 
-    private fun runEmbeddedTerminal(operation: String): Map<String, Any> {
-        val prefs = getSharedPreferences("executor", MODE_PRIVATE)
-        val bash = prefs.getString("termux_bash", "")?.trim().orEmpty()
-        val host = prefs.getString("vps_host", "")?.trim().orEmpty()
-        if (bash.isBlank()) throw IllegalStateException("EMBEDDED_TERMUX_BASH_NOT_CONFIGURED")
-        if (host.isBlank()) throw IllegalStateException("VPS_HOST_NOT_CONFIGURED")
-        val script = File(filesDir, "brain-termux-autodeploy.sh")
-        if (!script.exists()) {
-            assets.open("brain-termux-autodeploy.sh").use { input ->
-                script.outputStream().use { output -> input.copyTo(output) }
-            }
-            script.setExecutable(true)
-        }
-        val pb = ProcessBuilder(bash, script.absolutePath, operation)
-        val env = pb.environment()
-        env["BRAIN_VPS_HOST"] = host
-        env["BRAIN_VPS_USER"] = prefs.getString("vps_user", "root")?.trim() ?: "root"
-        env["BRAIN_SSH_PORT"] = prefs.getString("vps_port", "22")?.trim() ?: "22"
-        prefs.getString("ssh_key_path", "")?.trim()?.takeIf { it.isNotBlank() }?.let { env["BRAIN_SSH_KEY"] = it }
-        env["BRAIN_REPO"] = "https://github.com/omarenserat1980/MySimpleProject.git"
-        val result = LocalTools.runProcess(pb, 20 * 60 * 1000L)
-        return mapOf("operation" to operation, "exit_code" to result.first,
-            "stdout" to result.second.takeLast(12000), "stderr" to result.third.takeLast(12000),
-            "verified" to (result.first == 0))
-    }
-
     private fun readAtMost(file: File, maxBytes: Int): ByteArray {
         FileInputStream(file).use { input ->
             val out = ByteArray(maxBytes)
