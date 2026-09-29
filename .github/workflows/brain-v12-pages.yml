@@ -1,4 +1,5 @@
 name: Brain V12 GitHub Pages
+# Deployment is rebuilt from a fresh artifact on every workflow invocation.
 
 on:
   push:
