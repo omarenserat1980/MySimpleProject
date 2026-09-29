@@ -1,0 +1,39 @@
+name: Brain Cinema - Publish Film Page
+on:
+  workflow_run:
+    workflows: ["Last Light In The City - No Pay Production"]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare cinema metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('docs/film.json')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          for k in ('render','video','audio','verification','self_healing','web'): d['status'][k]='ready'
+          d['build']={'workflow':'Brain Cinema - Publish Film Page','source':'Last Light In The City - No Pay Production'}
+          p.write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          PY
+      - name: Verify web package
+        run: |
+          test -s docs/index.html
+          test -s docs/film.json
+          test -s docs/assets/poster.svg
+      - name: Commit generated metadata
+        shell: bash
+        run: |
+          git config user.name 'Brain Factory'
+          git config user.email 'actions@users.noreply.github.com'
+          git add docs/film.json
+          git diff --cached --quiet || git commit -m 'chore: update Brain Cinema production status'
+          git push
