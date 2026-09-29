@@ -1,0 +1,51 @@
+name: Brain Cloud Deploy
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Brain Cloud Native"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy Brain Cloud to production host
+    if: >
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.workflow_run.conclusion == 'success') &&
+      secrets.BRAIN_CLOUD_SSH_HOST != '' &&
+      secrets.BRAIN_CLOUD_SSH_USER != '' &&
+      secrets.BRAIN_CLOUD_SSH_KEY != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+          SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/brain_cloud_key
+          chmod 600 ~/.ssh/brain_cloud_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+      - name: Upload compose
+        env:
+          SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+        run: |
+          scp -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mkdir -p ~/brain-cloud'
+          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" "printf '%s' '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mv ~/brain-cloud-compose.yml ~/brain-cloud/docker-compose.yml && cd ~/brain-cloud && docker compose pull && docker compose up -d && docker compose ps'
