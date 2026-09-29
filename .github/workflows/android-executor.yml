@@ -87,8 +87,14 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/platform-tools/aapt" dump badging "$APK" | head -n 5
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          "$APKSIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" > /tmp/apk-badging.txt
+          grep -q "package: name=" /tmp/apk-badging.txt
+          head -n 5 /tmp/apk-badging.txt
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
