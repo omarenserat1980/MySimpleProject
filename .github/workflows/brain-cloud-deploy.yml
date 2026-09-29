@@ -49,7 +49,7 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/brain_cloud_key
           chmod 600 ~/.ssh/brain_cloud_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" true
+          ssh -o ConnectTimeout=15 -o BatchMode=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" true
 
       - name: Upload compose
         if: steps.config.outputs.configured == 'true'
@@ -58,7 +58,7 @@ jobs:
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           set -euo pipefail
-          scp -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
+          scp -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
 
       - name: Deploy
         if: steps.config.outputs.configured == 'true'
@@ -69,9 +69,9 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mkdir -p ~/brain-cloud'
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" "printf '%s' '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mv ~/brain-cloud-compose.yml ~/brain-cloud/docker-compose.yml && cd ~/brain-cloud && docker compose pull && docker compose up -d && docker compose ps'
+          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mkdir -p ~/brain-cloud'
+          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" "printf '%s' '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mv ~/brain-cloud-compose.yml ~/brain-cloud/docker-compose.yml && cd ~/brain-cloud && docker compose config -q && docker compose pull && docker compose up -d && docker compose ps'
 
       - name: Verify production health
         if: steps.config.outputs.configured == 'true'
@@ -80,7 +80,7 @@ jobs:
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" '
+          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" '
             set -e
             cd ~/brain-cloud
             docker compose ps
