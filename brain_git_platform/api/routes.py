@@ -28,8 +28,8 @@ class BrainGitApi:
     def workflow(self, run_id: int):
         return ApiResponse(True, get_run(run_id)).json()
 
-    def set_workflow_status(self, run_id: int, status: str):
-        set_status(run_id, status)
+    def set_workflow_status(self, run_id: int, status: str, worker_id: str | None = None):
+        set_status(run_id, status, worker_id=worker_id)
         return ApiResponse(True, {"run_id": run_id, "status": status}).json()
 
     def cancel_workflow(self, run_id: int):
@@ -44,8 +44,13 @@ class BrainGitApi:
         return ApiResponse(True, {"run_id": run_id, "stream": stream, "text": RunLog(ROOT / "logs").read(run_id, stream)}).json()
 
     def artifact(self, run_id: int, name: str):
-        data = ArtifactStore(str(ROOT / "artifacts")).get(str(run_id), name)
-        return ApiResponse(True, {"run_id": run_id, "name": name, "size": len(data), "data": data.decode("utf-8", errors="replace")}).json()
+        store = ArtifactStore(str(ROOT / "artifacts"))
+        data = store.get(str(run_id), name)
+        meta = store.metadata(str(run_id), name)
+        return ApiResponse(True, {"run_id": run_id, "name": name, "size": len(data), "sha256": meta["sha256"], "data": data.decode("utf-8", errors="replace")}).json()
+
+    def artifacts(self, run_id: int):
+        return ApiResponse(True, {"run_id": run_id, "artifacts": ArtifactStore(str(ROOT / "artifacts")).list(str(run_id))}).json()
 
     def create_pr(self, namespace: str, repository: str, source: str, target: str, title: str):
         pr = create_pull_request(namespace, repository, source, target, title)
