@@ -55,10 +55,12 @@ jobs:
       - name: Run Brain tests
         run: python -m pytest -q brain_v12/tests
 
-      - name: Validate cloud runtime
+      - name: Validate cloud runtime and flipbook engine
         run: |
-          python -m py_compile cloud/brain_cloud.py cloud/api_server.py cloud/runtime_orchestrator.py cloud/youtube_executor.py
-          python -m pytest -q cloud/test_runtime_orchestrator.py
+          python -m py_compile cloud/brain_cloud.py cloud/api_server.py cloud/runtime_orchestrator.py cloud/youtube_executor.py cloud/flipbook_renderer.py
+          python -m pytest -q cloud/test_runtime_orchestrator.py cloud/test_flipbook_renderer.py
+          python -m cloud.flipbook_renderer --output /tmp/brain-flipbook --frames 8 --fps 8
+          test -s /tmp/brain-flipbook/flipbook.mp4
 
   image:
     name: Build and publish Brain Cloud image
