@@ -487,7 +487,7 @@ async def brain_hub_compare(owner:str="",repo:str="",base:str="main",head:str="m
 
 @app.get("/api/quick-editor/status")
 def quick_editor_status():
-    return {"ok":True,"editor":"BRAIN Quick Editor","runtime":"BRAIN_TERMUX_EMULATOR","github":_github_config(),
+    return {"ok":True,"editor":"BRAIN Quick Editor","runtime":"BRAIN_CLOUD_NATIVE","github":_github_config(),
             "features":["read","validate","preview","checkpoint","github_write","tests"]}
 
 @app.post("/api/quick-editor/validate")
@@ -931,7 +931,7 @@ def health():
         "ok": True,
         "status": "healthy",
         "version": APP_VERSION,
-        "runtime": "BRAIN_TERMUX_EMULATOR",
+        "runtime": "BRAIN_CLOUD_NATIVE",
         "deployment": _deployment_snapshot() if "_deployment_snapshot" in globals() else {"converged": False},
     }
 
