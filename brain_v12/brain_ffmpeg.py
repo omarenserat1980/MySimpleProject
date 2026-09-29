@@ -1,0 +1,44 @@
+"""Brain-native media toolchain resolver.
+
+Production media code must use the Brain-provided FFmpeg/FFprobe toolchain.
+There is intentionally NO fallback to the host/system ffmpeg binaries.
+Configure BRAIN_FFMPEG_BIN and BRAIN_FFPROBE_BIN, or package executables at
+brain_v12/bin/ffmpeg and brain_v12/bin/ffprobe.
+"""
+from __future__ import annotations
+import os
+import pathlib
+import shutil
+
+ROOT = pathlib.Path(__file__).resolve().parent
+BIN_ROOT = ROOT / "bin"
+
+def _resolve(env_name: str, filename: str) -> str:
+    configured = os.getenv(env_name, "").strip()
+    candidates = []
+    if configured:
+        candidates.append(pathlib.Path(configured))
+    candidates.append(BIN_ROOT / filename)
+    for path in candidates:
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path.resolve())
+    raise RuntimeError(
+        f"{env_name}_NOT_CONFIGURED_OR_EXECUTABLE; "
+        f"Brain toolchain required: set {env_name} or package {BIN_ROOT / filename}"
+    )
+
+def ffmpeg() -> str:
+    return _resolve("BRAIN_FFMPEG_BIN", "ffmpeg")
+
+def ffprobe() -> str:
+    return _resolve("BRAIN_FFPROBE_BIN", "ffprobe")
+
+def diagnostics() -> dict:
+    result = {}
+    for key, fn in (("ffmpeg", ffmpeg), ("ffprobe", ffprobe)):
+        try:
+            result[key] = {"ok": True, "path": fn()}
+        except Exception as exc:
+            result[key] = {"ok": False, "error": str(exc)}
+    result["source"] = "brain-native-toolchain"
+    return result
