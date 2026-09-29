@@ -58,19 +58,23 @@ class BrainGitHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/")
         if path == "/api/v1/health":
             return self._send(200, health())
-        if not self._authorize("repo:read"):
-            return
+
         try:
             if path.endswith("/info/refs"):
                 service_name = parse_qs(parsed.query).get("service", [None])[0]
-                if not service_name:
-                    raise BrainGitError("git service is required")
+                if service_name not in {"git-upload-pack", "git-receive-pack"}:
+                    raise BrainGitError("unsupported git service")
+                scope = "repo:write" if service_name == "git-receive-pack" else "repo:read"
+                if not self._authorize(scope):
+                    return
                 repo = resolve_repo_path(self._git_repo_base(path, "/info/refs"))
                 return self._send_git(
                     f"application/x-{service_name}-advertisement",
                     advertise_refs(repo, service_name),
                 )
 
+            if not self._authorize("repo:read"):
+                return
             parts = path.split("/")
             if len(parts) == 7 and parts[:4] == ["", "api", "v1", "repos"] and parts[6] == "refs":
                 return self._send(200, api.refs(parts[4], parts[5]))
