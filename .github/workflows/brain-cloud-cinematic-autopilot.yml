@@ -68,6 +68,7 @@ jobs:
         run: |
           python -m compileall -q brain_v12 cloud
           python -m unittest brain_v12.movie_summary_factory.test_room13_pipeline -v
+          python brain_v12/movie_summary_factory/room13_media_health.py
           python - <<'PY'
           from brain_v12.brain_ffmpeg import ffmpeg, ffprobe
           print("BRAIN_FFMPEG_RESOLVED=" + ffmpeg())
