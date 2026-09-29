@@ -90,7 +90,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: android-build-diagnostics-\${{ github.run_id }}
+          name: android-build-diagnostics-${{ github.run_id }}
           path: /tmp/android-build.log
           if-no-files-found: error
 
