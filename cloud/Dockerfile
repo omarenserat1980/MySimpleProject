@@ -10,7 +10,8 @@ COPY . .
 
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r brain_v12/requirements.txt \
-    && python -m pip install --no-cache-dir -r brain_v7/requirements.txt
+    && python -m pip install --no-cache-dir -r brain_v7/requirements.txt \
+    && python -m pip install --no-cache-dir -r cloud/requirements.txt
 
 ENV PYTHONPATH=/app
 ENV BRAIN_SLEEP_SECONDS=60

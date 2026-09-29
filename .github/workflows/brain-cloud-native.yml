@@ -30,12 +30,14 @@ jobs:
           cache-dependency-path: |
             brain_v12/requirements.txt
             brain_v7/requirements.txt
+            cloud/requirements.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r brain_v12/requirements.txt
           python -m pip install -r brain_v7/requirements.txt
+          python -m pip install -r cloud/requirements.txt
           python -m pip install pytest
 
       - name: Compile Brain
@@ -45,7 +47,9 @@ jobs:
         run: python -m pytest -q brain_v12/tests
 
       - name: Validate cloud runtime
-        run: python -m py_compile cloud/brain_cloud.py cloud/api_server.py
+        run: |
+          python -m py_compile cloud/brain_cloud.py cloud/api_server.py cloud/runtime_orchestrator.py cloud/youtube_executor.py
+          python -m pytest -q cloud/test_runtime_orchestrator.py
 
   image:
     name: Build and publish Brain Cloud image
