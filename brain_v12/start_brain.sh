@@ -2,6 +2,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT/.."
+# Load the local Brain↔Termux bridge secret when configured; never print it.
+BRAIN_KEY_FILE="${BRAIN_EMULATOR_KEY_FILE:-$HOME/.brain/secrets/termux_agent.key}"
+if [ -f "$BRAIN_KEY_FILE" ]; then
+  export BRAIN_EMULATOR_KEY="$(cat "$BRAIN_KEY_FILE")"
+fi
 export PYTHONPATH="$PWD"
 PORT="${PORT:-8012}"
 if command -v curl >/dev/null 2>&1 && curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
