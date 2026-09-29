@@ -21,6 +21,9 @@ services:
       BRAIN_RUNTIME_MODE: "${BRAIN_RUNTIME_MODE:-cloud_only}"
       BRAIN_DEVICE_EXECUTION_ENABLED: "${BRAIN_DEVICE_EXECUTION_ENABLED:-0}"
       BRAIN_TERMUX_REQUIRED: "${BRAIN_TERMUX_REQUIRED:-0}"
+      BRAIN_QUEUE_POLL_SECONDS: "${BRAIN_QUEUE_POLL_SECONDS:-5}"
+      BRAIN_FACTORY_TIMEOUT_SECONDS: "${BRAIN_FACTORY_TIMEOUT_SECONDS:-3600}"
+      BRAIN_MEDIA_STORAGE: /data/cinematic_output
     volumes:
       - brain_state:/data/brain_state
       - brain_media:/data/cinematic_output
