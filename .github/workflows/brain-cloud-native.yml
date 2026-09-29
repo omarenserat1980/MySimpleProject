@@ -32,6 +32,13 @@ jobs:
             brain_v7/requirements.txt
             cloud/requirements.txt
 
+      - name: Install FFmpeg runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
