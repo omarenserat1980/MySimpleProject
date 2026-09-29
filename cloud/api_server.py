@@ -210,13 +210,19 @@ def publish_film(job_id: str):
         raise HTTPException(status_code=404, detail="film job not found")
     if job["stage"] != "ready":
         raise HTTPException(status_code=409, detail="film is not ready for publication")
-    payload = dict(job["payload"])
-    payload["publish_youtube"] = True
-    # Requeue as an explicit cloud publication job; credentials stay in cloud secrets.
-    with runtime._db() as c:
-        c.execute("UPDATE jobs SET payload=?, stage='queued', updated_at=? WHERE id=?",
-                  (json.dumps(payload, ensure_ascii=False), time.time(), job_id))
-    return {"ok": True, "job": runtime.get(job_id), "executor": "cloud_youtube_executor"}
+    result = job.get("result", {})
+    verification = result.get("verification", {})
+    video_path = verification.get("video_path") or result.get("video_path")
+    if not video_path:
+        raise HTTPException(status_code=409, detail="verified video path is missing")
+    publish_job = runtime.enqueue("youtube_publish", {
+        "video_path": video_path,
+        "title": job["payload"].get("title", "Brain Cloud Video"),
+        "description": job["payload"].get("description", ""),
+        "tags": job["payload"].get("tags", []),
+        "privacy": job["payload"].get("privacy", "private"),
+    })
+    return {"ok": True, "job": publish_job, "executor": "cloud_youtube_executor"}
 
 
 @app.get("/v1/runtime", dependencies=[Depends(require_auth)])
