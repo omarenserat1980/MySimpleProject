@@ -29,6 +29,7 @@ jobs:
         run: docker compose -f cloud/docker-compose.yml config
       - name: Install Brain Python dependencies
         run: python -m pip install --disable-pip-version-check -r brain_v7/requirements.txt
+          python -m pip install --disable-pip-version-check -r cloud/requirements.txt
       - name: Prepare CI runtime state
         run: mkdir -p "$GITHUB_WORKSPACE/.brain_state"
       - name: Set CI runtime paths
