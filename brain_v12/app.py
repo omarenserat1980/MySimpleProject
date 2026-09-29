@@ -444,6 +444,46 @@ async def brain_hub_pulls(owner:str="",repo:str="",state:str="open"):
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"pulls":[{"number":x["number"],"title":x["title"],"state":x["state"],"draft":x.get("draft",False),"head":(x.get("head") or {}).get("ref"),"base":(x.get("base") or {}).get("ref"),"html_url":x.get("html_url")} for x in r.json()]}
 
+
+class BrainHubMergeIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    method:str="squash"
+    commit_title:str=""
+    commit_message:str=""
+
+@app.post("/api/brain-hub/pulls/{number}/merge")
+async def brain_hub_merge_pull(number:int, request:Request, body:BrainHubMergeIn):
+    require_control_key(request)
+    full=_brain_hub_full(body.owner,body.repo)
+    method=body.method if body.method in {"merge","squash","rebase"} else "squash"
+    payload={"merge_method":method}
+    if body.commit_title.strip(): payload["commit_title"]=body.commit_title.strip()
+    if body.commit_message.strip(): payload["commit_message"]=body.commit_message.strip()
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.put(f"https://api.github.com/repos/{full}/pulls/{number}/merge",headers=_github_headers(),json=payload)
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":bool(x.get("merged")),"number":number,"merged":x.get("merged"),"message":x.get("message"),"sha":x.get("sha")}
+
+@app.post("/api/brain-hub/issues/{number}/close")
+async def brain_hub_close_issue(number:int, request:Request, body:BrainHubIssueIn):
+    require_control_key(request)
+    full=_brain_hub_full(body.owner,body.repo)
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.patch(f"https://api.github.com/repos/{full}/issues/{number}",headers=_github_headers(),json={"state":"closed"})
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"number":number,"state":x.get("state"),"html_url":x.get("html_url")}
+
+@app.get("/api/brain-hub/actions/{run_id}/jobs")
+async def brain_hub_action_jobs(run_id:int, owner:str="",repo:str=""):
+    full=_brain_hub_full(owner,repo)
+    async with httpx.AsyncClient(timeout=20) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/jobs",headers=_github_headers(),params={"per_page":100})
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"jobs":[{"id":x.get("id"),"name":x.get("name"),"status":x.get("status"),"conclusion":x.get("conclusion"),"started_at":x.get("started_at"),"completed_at":x.get("completed_at"),"html_url":x.get("html_url")} for x in r.json().get("jobs",[])]}
+
 @app.get("/api/brain-hub/compare")
 async def brain_hub_compare(owner:str="",repo:str="",base:str="main",head:str="main"):
     full=_brain_hub_full(owner,repo)
