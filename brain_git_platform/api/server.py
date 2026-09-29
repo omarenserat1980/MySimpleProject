@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import urlparse
 
 from brain_git_platform.api.routes import BrainGitApi
+from brain_git_platform.runner.service import execute_run
 from brain_git_platform.service import BrainGitError, health
 
 api = BrainGitApi()
 
 
 class BrainGitHandler(BaseHTTPRequestHandler):
-    server_version = "BrainGit/0.3"
+    server_version = "BrainGit/0.4"
 
     def _send(self, code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode()
@@ -51,6 +53,9 @@ class BrainGitHandler(BaseHTTPRequestHandler):
                 return self._send(201, api.create_repo(data["namespace"], data["name"], data.get("default_branch", "main")))
             if path == "/api/v1/workflows/dispatch":
                 return self._send(202, api.dispatch_workflow(data["namespace"], data["repository"], data["workflow"], data.get("ref", "main")))
+            if path == "/api/v1/workflows/execute":
+                result = execute_run(int(data["run_id"]), Path(data["manifest"]).resolve(), Path(data["workspace"]).resolve())
+                return self._send(200, result)
             if path == "/api/v1/pulls":
                 return self._send(201, api.create_pr(data["namespace"], data["repository"], data["source"], data["target"], data["title"]))
             if path == "/api/v1/pulls/merge":
