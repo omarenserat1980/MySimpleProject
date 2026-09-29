@@ -17,6 +17,9 @@ on:
       - "brain_v12/movie_summary_factory/**"
       - "brain_v12/brain_ffmpeg.py"
       - ".github/workflows/brain-cloud-cinematic-autopilot.yml"
+      - "cloud/film_reliability.py"
+      - "cloud/runtime_orchestrator.py"
+      - "cloud/test_film_reliability.py"
 
 permissions:
   contents: read
