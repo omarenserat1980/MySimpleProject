@@ -23,3 +23,13 @@ def test_unknown_dimension_is_rejected():
     except ValueError:
         return
     raise AssertionError("unknown benchmark dimension was accepted")
+
+
+from cloud.human_like_benchmark import benchmark_plan, validate_plan, TARGET_TESTS
+
+
+def test_plan_totals_5000():
+    validate_plan()
+    plan = benchmark_plan()
+    assert sum(plan.values()) == TARGET_TESTS
+    assert len(plan) == len(DIMENSIONS)
