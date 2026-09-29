@@ -191,6 +191,18 @@ def create_film(body: FilmRequest):
     return {"ok": True, "job": job, "profile": "CINEMATIC V3 PRO", "runtime": "brain_cloud"}
 
 
+class CinematicAutopilotRequest(BaseModel):
+    max_attempts: int = 3
+
+
+@app.post("/v1/cinematic/autopilot", dependencies=[Depends(require_auth)])
+def cinematic_autopilot(body: CinematicAutopilotRequest):
+    attempts = max(1, min(5, int(body.max_attempts)))
+    job = runtime.enqueue("cinematic_autopilot", {"max_attempts": attempts})
+    return {"ok": True, "job": job, "profile": "BRAIN CLOUD CINEMATIC AUTOPILOT",
+            "runtime": "brain_cloud", "device_required": False, "termux_required": False}
+
+
 @app.get("/v1/films", dependencies=[Depends(require_auth)])
 def list_films(limit: int = 50):
     return {"ok": True, "jobs": runtime.list(limit)}
