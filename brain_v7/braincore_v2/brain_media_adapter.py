@@ -139,6 +139,17 @@ class BrainMediaProvider:
         local_enabled = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "0").strip().lower() in {
             "1", "true", "yes", "on"
         }
+        free_only = os.getenv("FACTORY_FREE_ONLY", "0").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        # Free-only production is an explicit safety rail: never call a paid
+        # provider when this mode is enabled, even if a provider secret exists.
+        if free_only and local_enabled and CinematicLocalRenderer is not None:
+            return {
+                **CinematicLocalRenderer().render(shot=shot, authorized=True),
+                "provider": "local_ffmpeg_cinematic",
+                "fallback_reason": "free_only_mode",
+            }
         if forced_route == "local_ffmpeg_cinematic" and local_enabled and CinematicLocalRenderer is not None:
             return {
                 **CinematicLocalRenderer().render(shot=shot, authorized=True),
