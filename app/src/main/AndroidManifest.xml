@@ -4,7 +4,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application android:theme="@style/AppTheme" android:label="BRAIN Cloud Hub">
-        <activity android:name=".BrainBrowserActivity" android:exported="false"/>\n        <activity android:name=".BrainCloudActivity" android:exported="true">
+        <activity android:name=".BrainBrowserActivity" android:exported="false"/>
+        <activity android:name=".BrainCloudActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
