@@ -27,7 +27,7 @@ small{color:#91a8bb}@media(max-width:800px){.grid{grid-template-columns:1fr}}
 <button onclick="generate()">🎨 توليد</button><button onclick="toggleAnimation()">▶️ حركة</button>
 <button onclick="downloadHTML()">💾 HTML</button><button onclick="downloadSVG()">⬇️ SVG</button><button onclick="downloadPNG()">🖼️ PNG</button>
 <button onclick="downloadScene()">🧩 Scene JSON</button><button onclick="downloadTimeline()">🎬 Timeline JSON</button>
-<button onclick="openMediaEngine()">🎬 إلى BRAIN Media Engine</button><button onclick="clearAll()">مسح</button>
+<button onclick="openMediaEngine()">🎬 إلى BRAIN Media Engine</button><button onclick="renderToMediaMP4()">🎞️ إنشاء MP4 تلقائيًا</button><button onclick="clearAll()">مسح</button>
 </div>
 <div id="status" class="status"></div><div id="meta" class="meta"></div>
 </div>
@@ -73,7 +73,53 @@ async function downloadSVG(){if(!currentSVG)await generate();downloadBlob('brain
 async function downloadHTML(){if(!currentSVG)await generate();downloadBlob('brain-scene.html','<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>BRAIN Scene</title><style>body{margin:0;background:#050b14;display:grid;place-items:center;min-height:100vh}svg{max-width:100%;height:auto}</style>'+currentSVG+'</html>','text/html')}
 async function downloadScene(){if(!currentScene)await generate();downloadBlob('brain-scene.json',JSON.stringify(currentScene,null,2),'application/json')}
 async function downloadTimeline(){if(!currentTimeline)await generate();downloadBlob('brain-media-timeline.json',JSON.stringify(currentTimeline,null,2),'application/json')}
-async function downloadPNG(){if(!currentSVG)await generate();const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml'}),url=URL.createObjectURL(blob);img.onload=()=>{const c=document.createElement('canvas');c.width=1000;c.height=650;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click()})};img.src=url}
+async function svgToPNGBlob(){
+ if(!currentSVG)await generate();
+ const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob);
+ return await new Promise((resolve,reject)=>{
+   img.onload=()=>{try{
+     const c=document.createElement('canvas');c.width=1000;c.height=650;
+     const ctx=c.getContext('2d');ctx.drawImage(img,0,0);
+     URL.revokeObjectURL(url);c.toBlob(b=>b?resolve(b):reject(new Error('PNG_RENDER_FAILED')),'image/png');
+   }catch(e){URL.revokeObjectURL(url);reject(e)}};
+   img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('SVG_RASTERIZE_FAILED'))};
+   img.src=url;
+ });
+}
+async function downloadPNG(){const b=await svgToPNGBlob();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
+async function renderToMediaMP4(){
+ try{
+   if(!currentScene||!currentSVG)await generate();
+   statusEl.textContent='⏳ تجهيز PNG محلي وإرساله إلى BRAIN Media Engine...';
+   const png=await svgToPNGBlob();
+   const name='brain-visual-'+Date.now()+'.png';
+   const form=new FormData();form.append('file',png,name);
+   const upload=await fetch('/api/media/upload',{method:'POST',body:form});
+   if(!upload.ok)throw new Error('MEDIA_UPLOAD_FAILED');
+   const up=await upload.json();if(!up.ok)throw new Error(up.error||'MEDIA_UPLOAD_FAILED');
+   const duration=Math.max(.5,Math.min(Number(durationEl.value)||5,30));
+   const jobResp=await fetch('/api/media/slideshow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation:'slideshow',spec:{inputs:[up.filename],duration}})});
+   if(!jobResp.ok)throw new Error('MEDIA_JOB_FAILED');
+   const job=await jobResp.json();if(!job.job_id)throw new Error('MEDIA_JOB_ID_MISSING');
+   for(let i=0;i<180;i++){
+     await new Promise(r=>setTimeout(r,1000));
+     const r=await fetch('/api/media/jobs/'+encodeURIComponent(job.job_id));
+     const s=await r.json();
+     statusEl.textContent='🎬 Media Engine: '+s.status+' — '+(s.progress||0)+'%';
+     if(s.status==='COMPLETED'){
+       const out=s.result&&s.result.outputs&&s.result.outputs[0];
+       if(out){
+         statusEl.innerHTML='✅ تم إنشاء MP4 تلقائيًا — <a href="'+out+'" target="_blank" rel="noopener">فتح الفيديو</a> | <a href="/video-player/?src='+encodeURIComponent(out)+'">مشغل BRAIN Video Player</a>';
+         return;
+       }
+       throw new Error('MEDIA_OUTPUT_MISSING');
+     }
+     if(s.status==='FAILED'||s.status==='CANCELLED')throw new Error(s.error||'MEDIA_RENDER_FAILED');
+   }
+   throw new Error('MEDIA_RENDER_TIMEOUT');
+ }catch(e){statusEl.textContent='❌ فشل إنشاء MP4: '+(e.message||e)}
+}
+
 function toggleAnimation(){preview.classList.toggle('animated');statusEl.textContent=preview.classList.contains('animated')?'▶️ المعاينة المتحركة تعمل':'⏹ تم إيقاف الحركة'}
 async function openMediaEngine(){if(!currentScene)await generate();localStorage.setItem('brain.visual.scene',JSON.stringify(currentScene));localStorage.setItem('brain.visual.timeline',JSON.stringify(currentTimeline));localStorage.setItem('brain.visual.svg',currentSVG);location.href='/media-engine/'}
 function clearAll(){preview.innerHTML='';codeEl.textContent='';sceneCode.textContent='';timelineCode.textContent='';metaEl.innerHTML='';statusEl.textContent='';currentSVG='';currentScene=null;currentTimeline=null}
