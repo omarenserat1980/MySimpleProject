@@ -1,4 +1,4 @@
-name: Last Light In The City - No Pay Production
+name: Brain Factory - Single Production Path
 
 on:
   push:
@@ -7,6 +7,10 @@ on:
       - "cloud/last_light_movie.py"
       - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
+
+concurrency:
+  group: brain-factory-production
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,23 +21,62 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install local renderer dependencies
+
+      - name: Install local renderer
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
           python -m pip install --disable-pip-version-check Pillow
-      - name: Render 16:9 film locally
-        run: python cloud/last_light_movie.py --output /tmp/last-light --seconds 12 --fps 12
-      - name: Verify final MP4
+
+      - name: Render film
+        run: |
+          rm -rf /tmp/last-light
+          python cloud/last_light_movie.py --output /tmp/last-light --seconds 12 --fps 12
+
+      - name: Verify MP4 and streams
         run: |
           test -s /tmp/last-light/last_light_city.mp4
-          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_type,codec_name,width,height -of json /tmp/last-light/last_light_city.mp4
-      - name: Upload film artifact
+          ffprobe -v error \
+            -show_entries format=duration,size \
+            -show_entries stream=codec_type,codec_name,width,height \
+            -of json /tmp/last-light/last_light_city.mp4 | tee /tmp/last-light/ffprobe.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("/tmp/last-light/ffprobe.json")
+          data = json.loads(p.read_text())
+          streams = data.get("streams", [])
+          assert any(s.get("codec_type") == "video" for s in streams), "missing video stream"
+          assert any(s.get("codec_type") == "audio" for s in streams), "missing audio stream"
+          fmt = data.get("format", {})
+          assert float(fmt.get("duration", 0)) > 0, "invalid duration"
+          assert int(fmt.get("size", 0)) > 0, "empty MP4"
+          Path("/tmp/last-light/VERIFIED_COMPLETED").write_text("verified\n")
+          PY
+
+      - name: Build production manifest
+        run: |
+          cat > /tmp/last-light/film_manifest.json <<'JSON'
+          {
+            "title": "آخر ضوء في المدينة",
+            "status": "VERIFIED_COMPLETED",
+            "renderer": "Python/Pillow + FFmpeg",
+            "resolution": "16:9",
+            "source": "Brain Factory - Single Production Path"
+          }
+          JSON
+
+      - name: Upload verified production
         uses: actions/upload-artifact@v4
         with:
-          name: last-light-in-the-city-mp4
-          path: /tmp/last-light/last_light_city.mp4
+          name: brain-factory-last-light-verified
+          path: |
+            /tmp/last-light/last_light_city.mp4
+            /tmp/last-light/ffprobe.json
+            /tmp/last-light/film_manifest.json
+            /tmp/last-light/VERIFIED_COMPLETED
           if-no-files-found: error
