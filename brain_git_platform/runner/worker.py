@@ -16,11 +16,29 @@ def checkout_repository(namespace: str, repository: str, ref: str, destination: 
     repo = service.repository_path(namespace, repository)
     destination.parent.mkdir(parents=True, exist_ok=True)
     import subprocess
-    subprocess.run(["git", "clone", "--no-tags", "--branch", ref, str(repo), str(destination)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "clone", "--no-tags", "--branch", ref, str(repo), str(destination)],
+        check=True,
+        capture_output=True,
+    )
     return destination
 
 
-def execute_queued_run(run_id: int, manifest_relative: str = "brain_git_platform/workflows/brain-git-foundation.json") -> dict:
+def _manifest_for(workspace: Path, workflow_name: str) -> Path:
+    safe = Path(workflow_name).name
+    if safe != workflow_name or not safe.endswith(".json"):
+        safe = safe + ".json"
+    candidates = [
+        workspace / "brain_git_platform" / "workflows" / safe,
+        workspace / "workflows" / safe,
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"workflow manifest not found: {workflow_name}")
+
+
+def execute_queued_run(run_id: int) -> dict:
     run = get_run(run_id)
     if run["status"] != "queued":
         raise ValueError("workflow run is not queued")
@@ -29,7 +47,7 @@ def execute_queued_run(run_id: int, manifest_relative: str = "brain_git_platform
     try:
         workspace = temp / "workspace"
         checkout_repository(run["namespace"], run["repository"], run["ref"], workspace)
-        manifest = workspace / manifest_relative
+        manifest = _manifest_for(workspace, run["workflow"])
         workflow = load(manifest)
         result = BrainRunnerExecutor(
             workspace,
