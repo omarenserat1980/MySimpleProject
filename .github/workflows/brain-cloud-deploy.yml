@@ -5,6 +5,7 @@ on:
   workflow_run:
     workflows: ["Brain Cloud Native"]
     types: [completed]
+
   push:
     paths:
       - ".github/workflows/brain-cloud-deploy.yml"
