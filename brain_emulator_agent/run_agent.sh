@@ -2,7 +2,11 @@
 set -euo pipefail
 
 : "${BRAIN_URL:?BRAIN_URL is required}"
-: "${BRAIN_EMULATOR_KEY:?BRAIN_EMULATOR_KEY is required}"
+BRAIN_KEY_FILE="${BRAIN_EMULATOR_KEY_FILE:-$HOME/.brain/secrets/termux_agent.key}"
+if [ -z "${BRAIN_EMULATOR_KEY:-}" ] && [ -f "$BRAIN_KEY_FILE" ]; then
+  export BRAIN_EMULATOR_KEY="$(cat "$BRAIN_KEY_FILE")"
+fi
+: "${BRAIN_EMULATOR_KEY:?BRAIN_EMULATOR_KEY is required (or configure $BRAIN_KEY_FILE)}"
 
 export BRAIN_EMULATOR_ID="${BRAIN_EMULATOR_ID:-android-brain-emulator-v12}"
 export BRAIN_EMULATOR_POLL_SECONDS="${BRAIN_EMULATOR_POLL_SECONDS:-2}"
