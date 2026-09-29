@@ -20,12 +20,12 @@ a{color:var(--accent)}
 <main class="wrap">
 <section class="hero">
 <span class="badge">BRAIN FACTORY • NO-PAY PRODUCTION</span>
-<h1>آخر ضوء في المدينة</h1>
-<p class="lead">فيلم سينمائي قصير — من إنتاج خط الإنتاج المحلي داخل Brain Cloud</p>
+<h1 id="title">آخر ضوء في المدينة</h1>
+<p class="lead" id="subtitle">فيلم سينمائي قصير — من إنتاج خط الإنتاج المحلي داخل Brain Cloud</p>
 </section>
 
 <section class="player">
-<video controls playsinline preload="metadata" poster="assets/poster.jpg">
+<video controls playsinline preload="metadata" poster="assets/poster.svg">
 <source src="assets/last_light_city.mp4" type="video/mp4">
 متصفحك لا يدعم تشغيل الفيديو.
 </video>
@@ -58,7 +58,21 @@ a{color:var(--accent)}
 </section>
 
 <footer class="footer">© Brain Factory — صفحة عرض الفيلم • آخر تحديث آلي مع كل إنتاج</footer>
-</main>
+
+<section class="card" style="margin-top:22px">
+<h2>🧪 حالة المصنع</h2>
+<div id="status" class="team"></div>
+</section>
+<script>
+(async()=>{try{
+const d=await fetch('film.json',{cache:'no-store'}).then(r=>r.json());
+document.getElementById('title').textContent=d.title;
+document.getElementById('subtitle').textContent=d.subtitle;
+const names={render:'Rendering',video:'Video',audio:'Audio',verification:'Verification',self_healing:'Self-Healing',web:'Web Package'};
+document.getElementById('status').innerHTML=Object.entries(d.status).map(([k,v])=>'<div><span>'+names[k]+'</span><strong>'+ (v==='ready'?'✓ READY':v==='pending'?'◷ PENDING':v.toUpperCase())+'</strong></div>').join('');
+document.querySelector('.player video').poster=d.poster;
+}catch(e){console.warn('film metadata unavailable',e)}})();
+</script></main>
 <script>
 document.querySelector('video').addEventListener('error',()=>console.log('ضع ملف الفيلم النهائي في assets/last_light_city.mp4'));
 </script>
