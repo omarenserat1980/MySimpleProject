@@ -24,6 +24,10 @@ on:
       - "cloud/test_film_reliability.py"
       - "cloud/nafs_engine.py"
       - "cloud/test_nafs_engine.py"
+      - "cloud/brain_interview.py"
+      - "cloud/brain_self_healing.py"
+      - "cloud/test_brain_self_healing.py"
+      - ".github/workflows/brain-operational-interview.yml"
 
 permissions:
   contents: read
@@ -70,6 +74,10 @@ jobs:
           echo "BRAIN_FFPROBE=$(readlink -f brain_v12/bin/ffprobe)"
           brain_v12/bin/ffmpeg -version | head -n 1
           brain_v12/bin/ffprobe -version | head -n 1
+
+      - name: Brain interview -> Self-Healing Loop
+        run: |
+          python -m cloud.brain_self_healing
 
       - name: Stage 7 self-healing repair
         run: |
