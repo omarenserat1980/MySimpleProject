@@ -93,7 +93,7 @@ class CloudRuntime:
         with self._lock:
             with self._db() as c:
                 row = c.execute(
-                    "SELECT * FROM jobs WHERE stage IN ('queued','failed') ORDER BY updated_at LIMIT 1"
+                    "SELECT * FROM jobs WHERE stage='queued' ORDER BY updated_at LIMIT 1"
                 ).fetchone()
             if not row:
                 return None
