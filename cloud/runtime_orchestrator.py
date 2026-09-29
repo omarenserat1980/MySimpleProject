@@ -111,6 +111,19 @@ class CloudRuntime:
 
     def _process(self, job: dict[str, Any]) -> dict[str, Any]:
         jid, payload = job["id"], job["payload"]
+        if job["kind"] == "youtube_publish":
+            self._update(jid, "publishing")
+            from cloud.youtube_executor import publish_video
+            result = publish_video(
+                video_path=str(payload.get("video_path", "")),
+                title=str(payload.get("title", "Brain Cloud Video")),
+                description=str(payload.get("description", "")),
+                tags=list(payload.get("tags", [])),
+                privacy=str(payload.get("privacy", "private")),
+            )
+            self._agent("youtube_publisher", result.get("published", False))
+            self._update(jid, "published" if result.get("published") else "failed", {"youtube": result})
+            return self.get(jid)  # type: ignore[return-value]
         self._update(jid, "planning")
         plan = self._plan(payload)
         self._agent("planner", True)
