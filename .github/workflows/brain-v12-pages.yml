@@ -36,8 +36,10 @@ jobs:
           set -euo pipefail
           chmod +x scripts/validate-pages.sh
           ./scripts/validate-pages.sh "$SITE_ROOT" "$SITE_OUT"
-      - name: Configure GitHub Pages
+      - name: Configure and enable GitHub Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
