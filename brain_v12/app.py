@@ -302,7 +302,8 @@ def _brain_hub_full(owner:str="", repo:str=""):
     return full
 
 @app.post("/api/brain-hub/repositories")
-async def brain_hub_create_repository(body:BrainHubCreateRepoIn):
+async def brain_hub_create_repository(request:Request, body:BrainHubCreateRepoIn):
+    require_control_key(request)
     name=body.name.strip()
     if not name or "/" in name or len(name)>100:
         raise HTTPException(status_code=400, detail="INVALID_REPOSITORY_NAME")
@@ -315,7 +316,8 @@ async def brain_hub_create_repository(body:BrainHubCreateRepoIn):
     return {"ok":True,"repository":{"full_name":x.get("full_name"),"name":x.get("name"),"default_branch":x.get("default_branch","main"),"private":x.get("private"),"html_url":x.get("html_url")}}
 
 @app.post("/api/brain-hub/branches")
-async def brain_hub_create_branch(body:BrainHubCreateBranchIn):
+async def brain_hub_create_branch(request:Request, body:BrainHubCreateBranchIn):
+    require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     name=body.name.strip().replace(" ","-")
     if not name or name in {"main","master"}:
@@ -332,7 +334,8 @@ async def brain_hub_create_branch(body:BrainHubCreateBranchIn):
     return {"ok":True,"branch":name,"sha":sha,"from_ref":base}
 
 @app.post("/api/brain-hub/issues")
-async def brain_hub_create_issue(body:BrainHubIssueIn):
+async def brain_hub_create_issue(request:Request, body:BrainHubIssueIn):
+    require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     payload={"title":body.title.strip(),"body":body.body}
     if body.labels: payload["labels"]=body.labels
@@ -344,7 +347,8 @@ async def brain_hub_create_issue(body:BrainHubIssueIn):
     return {"ok":True,"issue":{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"html_url":x.get("html_url")}}
 
 @app.post("/api/brain-hub/pulls")
-async def brain_hub_create_pull(body:BrainHubPullIn):
+async def brain_hub_create_pull(request:Request, body:BrainHubPullIn):
+    require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     if not body.title.strip() or not body.head.strip() or not body.base.strip():
         raise HTTPException(status_code=400,detail="PULL_REQUEST_FIELDS_REQUIRED")
@@ -356,7 +360,8 @@ async def brain_hub_create_pull(body:BrainHubPullIn):
     return {"ok":True,"pull":{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"draft":x.get("draft"),"html_url":x.get("html_url")}}
 
 @app.post("/api/brain-hub/actions/{run_id}/cancel")
-async def brain_hub_cancel_action(run_id:int, body:BrainHubActionIn):
+async def brain_hub_cancel_action(run_id:int, request:Request, body:BrainHubActionIn):
+    require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     async with httpx.AsyncClient(timeout=30) as client:
         r=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/cancel",headers=_github_headers())
@@ -365,7 +370,8 @@ async def brain_hub_cancel_action(run_id:int, body:BrainHubActionIn):
     return {"ok":True,"run_id":run_id,"status":"CANCEL_REQUESTED"}
 
 @app.post("/api/brain-hub/actions/{run_id}/rerun")
-async def brain_hub_rerun_action(run_id:int, body:BrainHubActionIn):
+async def brain_hub_rerun_action(run_id:int, request:Request, body:BrainHubActionIn):
+    require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     async with httpx.AsyncClient(timeout=30) as client:
         r=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/rerun-failed-jobs",headers=_github_headers())
