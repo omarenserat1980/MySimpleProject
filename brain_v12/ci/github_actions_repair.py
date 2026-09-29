@@ -8,6 +8,9 @@ def run(cmd):
     p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
     return {'command': cmd, 'returncode': p.returncode, 'stdout': p.stdout[-12000:], 'stderr': p.stderr[-12000:]}
 checks = [run([sys.executable, '-m', 'compileall', '-q', 'brain_v12'])]
+# GitHub authentication/API diagnostics; never prints token values.
+if any(os.getenv(k) for k in ('BRAIN_GITHUB_TOKEN','GITHUB_TOKEN','GH_TOKEN')):
+    checks.append(run([sys.executable, 'brain_v12/ci/brain_github_auth.py']))
 for tool in ('ffmpeg', 'ffprobe'):
     checks.append(run(['bash', '-lc', f'command -v {tool} >/dev/null 2>&1']))
 result = {'schema':'brain-ci-repair/v1','timestamp':int(time.time()),'github_run_id':os.getenv('GITHUB_RUN_ID'),'github_sha':os.getenv('GITHUB_SHA'),'checks':checks,'passed':all(x['returncode']==0 for x in checks)}
