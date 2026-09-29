@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import json, pathlib, subprocess, shutil, os
+import json, pathlib, subprocess, shutil
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 PLAN=ROOT/"brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
 OUT=ROOT/"brain_v12/web/media/engine/room-13-horror-10m-animatic.mp4"
@@ -14,7 +14,7 @@ OUT.parent.mkdir(parents=True,exist_ok=True)
 segments=[]
 def esc(t): return str(t).replace("\\","\\\\").replace(":","\\:").replace("'","\\'").replace("%","\\%").replace(",","\\,")
 for i,s in enumerate(shots):
- d=per; progress=int(((i+1)/len(shots))*100) label=esc(f'{s["id"]} — {s["visual"]}')
+ d=per; progress=int(((i+1)/len(shots))*100); label=esc(f'{s["id"]} — {s["visual"]}')
  vf=f"scale=1920:1080,format=yuv420p,drawtext=fontfile='{FONT}':text='{label}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=42:fontcolor=white:borderw=3:bordercolor=black,fade=t=in:st=0:d=1,fade=t=out:st={max(0,d-1)}:d=1"
  out=OUT.parent/f"room13-segment-{i:02d}.mp4"
  subprocess.run([ff,"-y","-hide_banner","-loglevel","error","-f","lavfi","-i","color=c=black:s=1920x1080:r=24","-t",f"{d:.3f}","-vf",vf,"-an","-c:v","libx264","-preset","veryfast","-crf","23","-pix_fmt","yuv420p",str(out)],check=True)
