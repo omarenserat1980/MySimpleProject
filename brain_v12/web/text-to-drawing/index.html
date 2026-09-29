@@ -69,13 +69,13 @@ async function generate(){
  metaEl.innerHTML='<span class="pill">المحرك: SVG</span><span class="pill">الوضع: '+currentScene.type+'</span><span class="pill">العناصر: '+currentScene.objects.length+'</span><span class="pill">محلي: نعم</span><span class="pill">API خارجي: لا</span>';
 }
 function downloadBlob(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
-function downloadSVG(){if(!currentSVG)return generate();downloadBlob('brain-scene.svg',currentSVG,'image/svg+xml')}
-function downloadHTML(){if(!currentSVG)return generate();downloadBlob('brain-scene.html','<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>BRAIN Scene</title><style>body{margin:0;background:#050b14;display:grid;place-items:center;min-height:100vh}svg{max-width:100%;height:auto}</style>'+currentSVG+'</html>','text/html')}
-function downloadScene(){if(!currentScene)return generate();downloadBlob('brain-scene.json',JSON.stringify(currentScene,null,2),'application/json')}
-function downloadTimeline(){if(!currentTimeline)return generate();downloadBlob('brain-media-timeline.json',JSON.stringify(currentTimeline,null,2),'application/json')}
-function downloadPNG(){if(!currentSVG)return generate();const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml'}),url=URL.createObjectURL(blob);img.onload=()=>{const c=document.createElement('canvas');c.width=1000;c.height=650;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click()})};img.src=url}
+async function downloadSVG(){if(!currentSVG)await generate();downloadBlob('brain-scene.svg',currentSVG,'image/svg+xml')}
+async function downloadHTML(){if(!currentSVG)await generate();downloadBlob('brain-scene.html','<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>BRAIN Scene</title><style>body{margin:0;background:#050b14;display:grid;place-items:center;min-height:100vh}svg{max-width:100%;height:auto}</style>'+currentSVG+'</html>','text/html')}
+async function downloadScene(){if(!currentScene)await generate();downloadBlob('brain-scene.json',JSON.stringify(currentScene,null,2),'application/json')}
+async function downloadTimeline(){if(!currentTimeline)await generate();downloadBlob('brain-media-timeline.json',JSON.stringify(currentTimeline,null,2),'application/json')}
+async function downloadPNG(){if(!currentSVG)await generate();const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml'}),url=URL.createObjectURL(blob);img.onload=()=>{const c=document.createElement('canvas');c.width=1000;c.height=650;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click()})};img.src=url}
 function toggleAnimation(){preview.classList.toggle('animated');statusEl.textContent=preview.classList.contains('animated')?'▶️ المعاينة المتحركة تعمل':'⏹ تم إيقاف الحركة'}
-function openMediaEngine(){if(!currentScene)generate();localStorage.setItem('brain.visual.scene',JSON.stringify(currentScene));localStorage.setItem('brain.visual.timeline',JSON.stringify(currentTimeline));localStorage.setItem('brain.visual.svg',currentSVG);location.href='/media-engine/'}
+async function openMediaEngine(){if(!currentScene)await generate();localStorage.setItem('brain.visual.scene',JSON.stringify(currentScene));localStorage.setItem('brain.visual.timeline',JSON.stringify(currentTimeline));localStorage.setItem('brain.visual.svg',currentSVG);location.href='/media-engine/'}
 function clearAll(){preview.innerHTML='';codeEl.textContent='';sceneCode.textContent='';timelineCode.textContent='';metaEl.innerHTML='';statusEl.textContent='';currentSVG='';currentScene=null;currentTimeline=null}
 generate();
 </script>
