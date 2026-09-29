@@ -67,7 +67,14 @@ function renderList(filter=""){
 function render(){
   const c=current(),wrap=$("#messageWrap");wrap.innerHTML="";
   if(!c.messages.length){wrap.innerHTML='<div class="empty"><h1>مرحبًا بك في Brain</h1><p>اكتب طلبك، ودع Electronic Brain يتولى المحادثة والتحليل والأدوات.</p></div>';renderList();return}
-  c.messages.forEach(m=>{const row=document.createElement("div");row.className="msg "+m.role;const av=document.createElement("div");av.className="avatar";av.textContent=m.role==="user"?"أ":"B";const b=document.createElement("div");b.className="bubble";b.textContent=m.content;row.append(av,b);wrap.appendChild(row)});
+  c.messages.forEach(m=>{
+    const row=document.createElement("div");row.className="msg "+m.role;
+    const av=document.createElement("div");av.className="avatar";av.textContent=m.role==="user"?"أ":"B";
+    const b=document.createElement("div");b.className="bubble";b.textContent=m.content||"";
+    row.append(av,b);
+    if(m.image){const img=document.createElement("img");img.src=m.image;img.alt="Brain generated image";img.loading="lazy";img.style.cssText="max-width:100%;border-radius:14px;margin-top:8px;display:block";b.appendChild(img)}
+    wrap.appendChild(row)
+  });
   const area=$("#messages");area.scrollTop=area.scrollHeight;renderList()
 }
 async function health(){
@@ -114,11 +121,7 @@ $("#file").onchange=async e=>{
 $("#image").onclick=async()=>{const p=prompt("اكتب وصف الصورة:");if(!p)return;const c=current();c.messages.push({role:"user",content:"🖼 "+p});c.messages.push({role:"assistant",content:"جاري توليد الصورة…"});render();try{const r=await fetch("/api/image-factory/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p})});const j=await r.json();
       if(j.ok&&j.url){
         c.messages[c.messages.length-1].content="تم إنشاء الصورة.";
-        const img=document.createElement("img");
-        img.src=j.url;img.alt="Brain generated image";
-        img.style.cssText="max-width:100%;border-radius:14px;margin-top:8px;display:block";
-        img.loading="lazy";
-        $("#messageWrap").appendChild(img);
+        c.messages[c.messages.length-1].image=j.url;
       }else{
         c.messages[c.messages.length-1].content=j.message||j.error||"فشل التوليد";
       }}catch(e){c.messages[c.messages.length-1].content="تعذر التوليد: "+e.message}save();render()};
