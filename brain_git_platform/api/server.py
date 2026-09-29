@@ -2,18 +2,16 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import urlparse
 
 from brain_git_platform.api.routes import BrainGitApi
-from brain_git_platform.runner.service import execute_run
 from brain_git_platform.service import BrainGitError, health
 
 api = BrainGitApi()
 
 
 class BrainGitHandler(BaseHTTPRequestHandler):
-    server_version = "BrainGit/0.4"
+    server_version = "BrainGit/0.5"
 
     def _send(self, code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode()
@@ -25,6 +23,8 @@ class BrainGitHandler(BaseHTTPRequestHandler):
 
     def _body(self):
         length = int(self.headers.get("Content-Length", "0"))
+        if length > 2_000_000:
+            raise ValueError("request_too_large")
         return json.loads(self.rfile.read(length) or b"{}")
 
     def do_GET(self):
@@ -37,7 +37,11 @@ class BrainGitHandler(BaseHTTPRequestHandler):
                 return self._send(200, api.refs(parts[4], parts[5]))
             if len(parts) == 5 and parts[:4] == ["", "api", "v1", "runs"]:
                 return self._send(200, api.workflow(int(parts[4])))
-        except (BrainGitError, ValueError) as exc:
+            if len(parts) == 6 and parts[:4] == ["", "api", "v1", "runs"] and parts[5] in {"stdout", "stderr"}:
+                return self._send(200, api.run_logs(int(parts[4]), parts[5]))
+            if len(parts) == 7 and parts[:4] == ["", "api", "v1", "runs"] and parts[5] == "artifacts":
+                return self._send(200, api.artifact(int(parts[4]), parts[6]))
+        except (BrainGitError, ValueError, FileNotFoundError) as exc:
             return self._send(404, {"error": str(exc)})
         return self._send(404, {"error": "not_found"})
 
@@ -46,16 +50,17 @@ class BrainGitHandler(BaseHTTPRequestHandler):
         try:
             data = self._body()
         except (json.JSONDecodeError, ValueError):
-            return self._send(400, {"error": "invalid_json"})
+            return self._send(400, {"error": "invalid_request"})
 
         try:
             if path == "/api/v1/repos":
                 return self._send(201, api.create_repo(data["namespace"], data["name"], data.get("default_branch", "main")))
             if path == "/api/v1/workflows/dispatch":
                 return self._send(202, api.dispatch_workflow(data["namespace"], data["repository"], data["workflow"], data.get("ref", "main")))
-            if path == "/api/v1/workflows/execute":
-                result = execute_run(int(data["run_id"]), Path(data["manifest"]).resolve(), Path(data["workspace"]).resolve())
-                return self._send(200, result)
+            if path == "/api/v1/workflows/cancel":
+                return self._send(200, api.cancel_workflow(int(data["run_id"])))
+            if path == "/api/v1/workflows/retry":
+                return self._send(202, api.retry_workflow(int(data["run_id"])))
             if path == "/api/v1/pulls":
                 return self._send(201, api.create_pr(data["namespace"], data["repository"], data["source"], data["target"], data["title"]))
             if path == "/api/v1/pulls/merge":
