@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from .contracts import ApiResponse
-from ..service import Repository, create_repository, repository_path
+from ..service import Repository, create_repository, repository_path, ROOT
 from ..refs import list_refs, create_branch
-from ..workflows import dispatch, get_run, set_status
+from ..workflows import dispatch, get_run, set_status, cancel, retry
 from ..pull_requests import create_pull_request, merge_pull_request, close_pull_request
+from ..runner.logs import RunLog
+from ..storage.artifacts import ArtifactStore
 
 
 class BrainGitApi:
@@ -29,6 +31,21 @@ class BrainGitApi:
     def set_workflow_status(self, run_id: int, status: str):
         set_status(run_id, status)
         return ApiResponse(True, {"run_id": run_id, "status": status}).json()
+
+    def cancel_workflow(self, run_id: int):
+        cancel(run_id)
+        return ApiResponse(True, {"run_id": run_id, "status": "cancelled"}).json()
+
+    def retry_workflow(self, run_id: int):
+        retry(run_id)
+        return ApiResponse(True, {"run_id": run_id, "status": "queued"}).json()
+
+    def run_logs(self, run_id: int, stream: str = "stdout"):
+        return ApiResponse(True, {"run_id": run_id, "stream": stream, "text": RunLog(ROOT / "logs").read(run_id, stream)}).json()
+
+    def artifact(self, run_id: int, name: str):
+        data = ArtifactStore(str(ROOT / "artifacts")).get(str(run_id), name)
+        return ApiResponse(True, {"run_id": run_id, "name": name, "size": len(data), "data": data.decode("utf-8", errors="replace")}).json()
 
     def create_pr(self, namespace: str, repository: str, source: str, target: str, title: str):
         pr = create_pull_request(namespace, repository, source, target, title)
