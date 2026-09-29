@@ -8,6 +8,7 @@ on:
       - "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
       - "brain_v12/movie_summary_factory/render_room13_animatic.py"
       - "brain_v12/movie_summary_factory/room13_qc.py"
+      - "brain_v12/movie_summary_factory/test_room13_pipeline.py"
       - ".github/workflows/room-13-cinematic-render.yml"
 permissions:
   contents: read
@@ -29,6 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core
           ffmpeg -version | head -n 1
+      - name: Room 13 deterministic tests
+        run: python -m unittest brain_v12.movie_summary_factory.test_room13_pipeline -v
       - name: Brain Cloud preflight QC
         run: python brain_v12/movie_summary_factory/room13_qc.py
       - name: Render Room 13 animatic
