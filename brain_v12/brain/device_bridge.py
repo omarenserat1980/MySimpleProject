@@ -41,8 +41,8 @@ class DeviceBridge:
         return hmac.compare_digest(supplied_hash, expected_hash)
 
     def enqueue(self, task, params=None):
-        if task not in self.ALLOWED_TASKS:
-            return {"ok": False, "status": "TASK_NOT_ALLOWED", "allowed": sorted(self.ALLOWED_TASKS)}
+        # Device/Termux execution is intentionally disabled in Brain Cloud.
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         item = {
             "task_id": "DEV-" + uuid4().hex[:12],
             "task": task,
@@ -54,8 +54,7 @@ class DeviceBridge:
         return {"ok": True, "task": item}
 
     def poll(self, agent_id):
-        if not agent_id:
-            return {"ok": False, "status": "AGENT_ID_REQUIRED"}
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         self._last_seen = time.time()
         self.store.device_agent_touch(agent_id, self._last_seen)
         self.store.device_task_requeue_stale(max_age_seconds=int(os.getenv("TERMUX_TASK_STALE_SECONDS", "120")))
@@ -63,8 +62,7 @@ class DeviceBridge:
         return {"ok": True, "task": item, "status": "IDLE" if item is None else "CLAIMED"}
 
     def heartbeat(self, agent_id):
-        if not agent_id:
-            return {"ok": False, "status": "AGENT_ID_REQUIRED"}
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         now = time.time()
         self._last_seen = now
         self.store.device_agent_touch(agent_id, now)
