@@ -144,3 +144,25 @@ jobs:
             sleep 5
             adb shell pidof com.brain.hondaconnect
             adb shell dumpsys activity activities | grep -q 'com.brain.hondaconnect'
+
+
+  native_executor_build:
+    name: Build embedded Termux Android Executor
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android_executor
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10"
+      - run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electronic-brain-android-executor-debug
+          path: android_executor/app/build/outputs/apk/debug/app-debug.apk

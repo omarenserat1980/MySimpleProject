@@ -9,7 +9,7 @@ AGENT_KEY_SHA256_ENV = "TERMUX_AGENT_KEY_SHA256"
 HEARTBEAT_STALE = "STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS = {"status": {}, "python_version": {}, "termux_path": {}, "platform": {}}
+    ALLOWED_TASKS = {"status": {}, "python_version": {}, "termux_path": {}, "platform": {}, "termux_vps_preflight": {}, "termux_vps_deploy": {}, "termux_vps_health": {}}
 
     def __init__(self, store):
         self.store = store
