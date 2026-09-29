@@ -40,7 +40,7 @@ if os.getenv("BRAIN_CLOUD_SKIP_FACTORY", "0").strip().lower() in {"1", "true", "
     raise SystemExit(0)
 
 runtime = CloudRuntime()
-
+\n# The API server owns the HTTP control plane and its queue worker; the Cloud process owns only the scheduled factory cycle.\n
 def run_software_factory(env):
     try:
         return subprocess.run(
