@@ -51,7 +51,7 @@
       "id": "B01-S01",
       "shot_type": "ESTABLISHING",
       "camera": "SLOW_PUSH",
-      "visual": "المستشفى المهجور ليلًا تحت المطر؛ البطل يقف أمام المدخل",
+      "visual": "واجهة المستشفى المهجور تحت المطر؛ البطل يصل وحيدًا",
       "voice": "في تلك الليلة، دخل المستشفى بحثًا عن إجابة واحدة.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -66,14 +66,14 @@
       "id": "B01-S02",
       "shot_type": "WIDE",
       "camera": "DOLLY_IN",
-      "visual": "الممر الرئيسي مظلم؛ أرقام الغرف تقفز من 12 إلى 14",
-      "voice": "المخطط يقول إن الغرفة 13 غير موجودة.",
+      "visual": "بوابة صدئة تتحرك مع الريح بينما ينطفئ آخر ضوء خلفه",
+      "voice": "لم يكن يعرف أن خروجه لن يكون سهلًا.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "DOOR"
       ],
       "transition": "HARD_CUT",
-      "subtitle": "المخطط يقول إن الغرفة 13 غير موجودة.",
+      "subtitle": "لم يكن يعرف أن خروجه لن يكون سهلًا.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -81,14 +81,14 @@
       "id": "B01-S03",
       "shot_type": "CLOSE_UP",
       "camera": "RACK_FOCUS",
-      "visual": "لقطة قريبة لباب يحمل الرقم 13",
-      "voice": "لكن الباب كان أمامه، ورقم 13 واضح.",
+      "visual": "الممر الرئيسي؛ الأرقام تنتقل من 12 إلى 14 دون رقم 13",
+      "voice": "المخطط يقول إن الغرفة الثالثة عشرة غير موجودة.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "FOOTSTEPS"
       ],
       "transition": "MATCH_CUT",
-      "subtitle": "لكن الباب كان أمامه، ورقم 13 واضح.",
+      "subtitle": "المخطط يقول إن الغرفة الثالثة عشرة غير موجودة.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -96,14 +96,14 @@
       "id": "B01-S04",
       "shot_type": "DETAIL",
       "camera": "PARALLAX",
-      "visual": "جهاز تسجيل قديم وشريط يدور ببطء",
-      "voice": "ثم بدأ التسجيل يتحدث عن أشياء لم يفعلها بعد.",
+      "visual": "خريطة قديمة معلقة على الحائط وفيها فراغ غريب",
+      "voice": "كلما بحث عن الرقم، وجد فراغًا بدلًا منه.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "RADIO"
       ],
       "transition": "J_CUT",
-      "subtitle": "ثم بدأ التسجيل يتحدث عن أشياء لم يفعلها بعد.",
+      "subtitle": "كلما بحث عن الرقم، وجد فراغًا بدلًا منه.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -111,14 +111,14 @@
       "id": "B02-S01",
       "shot_type": "MEDIUM",
       "camera": "TRACKING",
-      "visual": "البطل يستمع إلى التسجيل وتظهر دهشة على وجهه",
-      "voice": "والأسوأ أنه كان يسمع صوته هو.",
+      "visual": "جدار فارغ يهتز خلفه طرق بطيء ومنتظم",
+      "voice": "ثم سمع طرقًا يأتي من جدار بلا باب.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "MECHANICAL"
       ],
       "transition": "CROSS_DISSOLVE",
-      "subtitle": "والأسوأ أنه كان يسمع صوته هو.",
+      "subtitle": "ثم سمع طرقًا يأتي من جدار بلا باب.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -126,14 +126,14 @@
       "id": "B02-S02",
       "shot_type": "REACTION",
       "camera": "HANDHELD",
-      "visual": "الممر يتغير بينما يحاول البطل الهرب",
-      "voice": "كل باب حاول فتحه أعاده إلى المكان نفسه.",
+      "visual": "البطل يرفع مصباحه نحو نهاية الممر",
+      "voice": "تقدم نحو الصوت رغم أن كل غريزة داخله كانت تحذره.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "RUMBLE"
       ],
       "transition": "HANDHELD",
-      "subtitle": "كل باب حاول فتحه أعاده إلى المكان نفسه.",
+      "subtitle": "تقدم نحو الصوت رغم أن كل غريزة داخله كانت تحذره.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -141,14 +141,14 @@
       "id": "B02-S03",
       "shot_type": "WIDE",
       "camera": "PUSH_IN",
-      "visual": "اسم البطل يظهر على جدار مليء بأسماء سابقة",
-      "voice": "عندها فهم أن الغرفة لا تسجل الماضي... بل الحاضر.",
+      "visual": "باب أبيض قديم يظهر فجأة وعليه الرقم 13",
+      "voice": "هناك كان الباب، واضحًا للمرة الأولى.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "SOUND_BRIDGE",
-      "subtitle": "عندها فهم أن الغرفة لا تسجل الماضي... بل الحاضر.",
+      "subtitle": "هناك كان الباب، واضحًا للمرة الأولى.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -156,14 +156,14 @@
       "id": "B02-S04",
       "shot_type": "MEDIUM",
       "camera": "DOLLY_OUT",
-      "visual": "البطل أمام جهاز التسجيل والشريط الأخير",
-      "voice": "بقي شريط واحد فقط.",
+      "visual": "مقبض الباب يرتجف بينما تتساقط قطرات المطر من معطفه",
+      "voice": "لم يلمسه، ومع ذلك بدأ المقبض يتحرك.",
       "music": "AMBIENT_SPACE",
       "sfx": [
         "WHOOSH"
       ],
       "transition": "DIP_TO_BLACK",
-      "subtitle": "بقي شريط واحد فقط.",
+      "subtitle": "لم يلمسه، ومع ذلك بدأ المقبض يتحرك.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -171,14 +171,14 @@
       "id": "B03-S01",
       "shot_type": "CLOSE_UP",
       "camera": "DEPTH_ZOOM",
-      "visual": "مقبض باب الغرفة 13 يهتز مع طرق من الجهة الأخرى",
-      "voice": "قال الصوت: لا تفتح الباب.",
+      "visual": "جهاز تسجيل قديم فوق كرسي معدني وشريط يدور",
+      "voice": "وجد جهاز تسجيل يعمل وحده.",
       "music": "MYSTERY",
       "sfx": [
         "DOOR"
       ],
       "transition": "HARD_CUT",
-      "subtitle": "قال الصوت: لا تفتح الباب.",
+      "subtitle": "وجد جهاز تسجيل يعمل وحده.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -186,14 +186,14 @@
       "id": "B03-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "لقطة قريبة للشريط واسم البطل مكتوب على ملصقه",
+      "voice": "وعلى الشريط كان اسمه مكتوبًا بخط يده.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "وعلى الشريط كان اسمه مكتوبًا بخط يده.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -201,14 +201,14 @@
       "id": "B03-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يستمع؛ صوته المسجل يصف خطواته الحالية",
+      "voice": "سمع صوته يصف ما كان يفعله في اللحظة نفسها.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "سمع صوته يصف ما كان يفعله في اللحظة نفسها.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -216,14 +216,14 @@
       "id": "B03-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "ساعة حائط تقفز عقاربها إلى الخلف",
+      "voice": "الوقت بدأ يتصرف بطريقة لا تشبه العالم خارج الغرفة.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "الوقت بدأ يتصرف بطريقة لا تشبه العالم خارج الغرفة.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -231,14 +231,14 @@
       "id": "B04-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "الممر يمتد أطول كلما مشى؛ الأبواب تتكرر",
+      "voice": "كل طريق للخروج أعاده إلى النقطة ذاتها.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "كل طريق للخروج أعاده إلى النقطة ذاتها.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -246,14 +246,14 @@
       "id": "B04-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يفتح باب الطوارئ فيجد الغرفة 13 خلفه",
+      "voice": "حتى باب الطوارئ قاده إلى الغرفة نفسها.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "حتى باب الطوارئ قاده إلى الغرفة نفسها.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -261,14 +261,14 @@
       "id": "B04-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "جدار مليء بصور وأسماء أشخاص اختفوا",
+      "voice": "ثم رأى أسماء من دخلوا قبله.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "ثم رأى أسماء من دخلوا قبله.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -276,14 +276,14 @@
       "id": "B04-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "مساحة فارغة في الجدار وبها بطاقة تحمل اسمه",
+      "voice": "وكان هناك مكان فارغ ينتظر اسمه.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "وكان هناك مكان فارغ ينتظر اسمه.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -291,14 +291,14 @@
       "id": "B05-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "شريط جديد يحمل تاريخ اليوم بجانب جهاز التسجيل",
+      "voice": "ظهر شريط آخر مؤرخ بتاريخ اليوم.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "ظهر شريط آخر مؤرخ بتاريخ اليوم.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -306,14 +306,14 @@
       "id": "B05-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يتردد قبل الضغط على زر التشغيل",
+      "voice": "لم يعد يريد سماع ما سيأتي، لكنه ضغط الزر.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "لم يعد يريد سماع ما سيأتي، لكنه ضغط الزر.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -321,14 +321,14 @@
       "id": "B05-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "التسجيل يقول جملة لم ينطقها بعد؛ وجهه يبهت",
+      "voice": "التسجيل كان يسبق أفعاله بثوانٍ.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "التسجيل كان يسبق أفعاله بثوانٍ.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -336,14 +336,14 @@
       "id": "B05-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "يده تقترب من المقبض بينما يسمع صوت يده في الشريط",
+      "voice": "ثم سمع نفسه يقول: لا تفتح.",
       "music": "MYSTERY",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "ثم سمع نفسه يقول: لا تفتح.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -351,14 +351,14 @@
       "id": "B06-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "الممر ينهار ضوئيًا وتغلق الأبواب واحدًا تلو الآخر",
+      "voice": "بدأت الأبواب تغلق خلفه.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "بدأت الأبواب تغلق خلفه.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -366,14 +366,14 @@
       "id": "B06-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يركض؛ كل انعطاف يعيد الرقم 13 إلى الواجهة",
+      "voice": "ركض، لكن الرقم ظل ينتظره.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "ركض، لكن الرقم ظل ينتظره.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -381,14 +381,14 @@
       "id": "B06-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "لقطة علوية للممرات على شكل دائرة مغلقة",
+      "voice": "لم يكن داخل مبنى، بل داخل حلقة.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "لم يكن داخل مبنى، بل داخل حلقة.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -396,14 +396,14 @@
       "id": "B06-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يجد اسمه ضمن قائمة الضحايا",
+      "voice": "عندها وجد اسمه في قائمة الضحايا.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "عندها وجد اسمه في قائمة الضحايا.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -411,14 +411,14 @@
       "id": "B07-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "الاسم يتوهج بينما ينطفئ الضوء حوله",
+      "voice": "وحين لمس الورقة انطفأت الأنوار.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "وحين لمس الورقة انطفأت الأنوار.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -426,14 +426,14 @@
       "id": "B07-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "غرفة 13 في ظلام كامل؛ شريط أخير ينتظر",
+      "voice": "بقي شريط واحد فقط.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "بقي شريط واحد فقط.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -441,14 +441,14 @@
       "id": "B07-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "لقطة قريبة للملصق: لا تفتح الباب",
+      "voice": "كانت الرسالة الوحيدة واضحة: لا تفتح الباب.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "كانت الرسالة الوحيدة واضحة: لا تفتح الباب.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -456,14 +456,14 @@
       "id": "B07-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "البطل يمد يده إلى المقبض رغم التحذير",
+      "voice": "لكنه كان قد اتخذ قراره.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "لكنه كان قد اتخذ قراره.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -471,14 +471,14 @@
       "id": "B08-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "الباب ينفتح على ممر جديد شديد النظافة",
+      "voice": "خلف الباب لم يكن هناك الظلام الذي توقعه.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "خلف الباب لم يكن هناك الظلام الذي توقعه.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -486,14 +486,14 @@
       "id": "B08-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "نسخة أخرى من البطل تمر بعيدًا في الممر الجديد",
+      "voice": "رأى نسخة أخرى منه تمر في نهاية الممر.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "رأى نسخة أخرى منه تمر في نهاية الممر.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -501,14 +501,14 @@
       "id": "B08-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "النسخة الأخرى تلتفت للحظة ثم تختفي",
+      "voice": "توقفت النسخة ونظرت إليه قبل أن تختفي.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "توقفت النسخة ونظرت إليه قبل أن تختفي.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     },
@@ -516,14 +516,14 @@
       "id": "B08-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
-      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "visual": "لقطة نهائية: باب جديد يحمل الرقم 13 والبطل يقف أمامه",
+      "voice": "وعندما رفع عينيه، كان أمام باب ثالثة عشرة من جديد.",
       "music": "DEEP_LOW",
       "sfx": [
         "LOW_BOOM"
       ],
       "transition": "FADE",
-      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "subtitle": "وعندما رفع عينيه، كان أمام باب ثالثة عشرة من جديد.",
       "continuity": "CHARACTER+LOCATION+TIME",
       "duration_s": 18.75
     }
@@ -553,7 +553,7 @@
   "validation": {
     "status": "PASS",
     "checks": {
-      "images_present": true,
+      "shots_present": true,
       "multiple_shots_per_beat": true,
       "camera_motion": true,
       "voiceover": true,
@@ -573,7 +573,7 @@
     "type": "ANIMATIC",
     "target_duration_seconds": 600,
     "profile": "1920x1080@24",
-    "audio": "PENDING_EXTERNAL_VOICE_AND_MUSIC",
+    "audio": "ATMOSPHERIC_SYNTH_PENDING_VOICE",
     "status": "RENDER_WORKFLOW_READY"
   }
 }
