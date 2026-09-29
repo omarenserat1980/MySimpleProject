@@ -1,54 +1,141 @@
-"""BRAIN Visual Engine: deterministic text-to-scene compiler with no external image API."""
+"""BRAIN Visual Engine: deterministic local text-to-scene compiler.
+
+The engine is intentionally provider-free: text -> Scene JSON -> SVG/HTML.
+No external image API is required. The scene contract is also suitable for
+feeding BRAIN Media Engine timelines.
+"""
+import html
 import re
 
 MODES={"landscape","city","robot","car","abstract"}
 
+PALETTES={
+    "default":{"sky":"#8ed8ff","sun":"#ffd84d","ground":"#6ca85a","dark":"#263746"},
+    "night":{"sky":"#101827","sun":"#f3c969","ground":"#263746","dark":"#121b2a"},
+    "sunset":{"sky":"#d97a6d","sun":"#ffd08a","ground":"#5f8057","dark":"#352d43"},
+}
+
+def _text(s):
+    return (s or "").strip()
+
+def _low(s):
+    return _text(s).lower()
+
+def _has(t,*words):
+    return any(w in t for w in words)
+
 def detect_mode(text:str, mode:str="auto")->str:
     if mode in MODES:
         return mode
-    t=text.lower()
-    if re.search(r"روبوت|robot",t): return "robot"
-    if re.search(r"سيارة|car|automobile",t): return "car"
-    if re.search(r"مدينة|city|مبنى|building",t): return "city"
-    if re.search(r"دائرة|مربع|مثلث|هندسي|abstract",t): return "abstract"
+    t=_low(text)
+    if re.search(r"روبوت|robot|android",t): return "robot"
+    if re.search(r"سيارة|car|automobile|vehicle",t): return "car"
+    if re.search(r"مدينة|city|مبنى|مباني|building|street",t): return "city"
+    if re.search(r"دائرة|مربع|مثلث|هندسي|abstract|geometric",t): return "abstract"
     return "landscape"
 
-def compile_scene(text:str, mode:str="auto")->dict:
-    text=(text or "منظر طبيعي").strip()
-    selected=detect_mode(text,mode)
-    low=text.lower()
-    def has(*words): return any(w in low for w in words)
-    objects=[]
+def detect_palette(text:str)->str:
+    t=_low(text)
+    if _has(t,"ليل","ليلي","night","dark"): return "night"
+    if _has(t,"غروب","شروق","sunset","sunrise"): return "sunset"
+    return "default"
+
+def _objects(text:str, selected:str):
+    t=_low(text)
     if selected=="landscape":
-        objects=["sky","sun"]
-        for words,name in [(("جبل","جبال","mountain"),"mountains"),(("شجرة","شجر","tree"),"tree"),(("بحيرة","ماء","lake","water"),"lake"),(("بيت","منزل","house"),"house")]:
-            if has(*words): objects.append(name)
-        if len(objects)==2: objects += ["mountains","tree","lake"]
-    elif selected=="city": objects=["sky","sun","buildings","road","car"]
-    elif selected=="robot": objects=["background","ground","robot"]
-    elif selected=="car": objects=["sky","ground","car"]
-    else: objects=["background","circle","triangle","square"]
-    return {"type":selected,"text":text,"objects":objects,"renderer":"svg","local":True,"external_api":False}
+        out=["sky","sun","mountains","ground"]
+        if _has(t,"شجرة","شجر","tree","forest"): out.append("tree")
+        if _has(t,"بحيرة","ماء","lake","water","river"): out.append("lake")
+        if _has(t,"بيت","منزل","house","cabin"): out.append("house")
+        if _has(t,"قمر","moon"): out.append("moon")
+        if _has(t,"نجوم","نجمة","stars","star"): out.append("stars")
+        return list(dict.fromkeys(out))
+    if selected=="city":
+        out=["sky","sun","buildings","road","car"]
+        if _has(t,"برج","tower","skyscraper"): out.append("tower")
+        if _has(t,"شجرة","tree"): out.append("tree")
+        return out
+    if selected=="robot":
+        out=["background","ground","robot"]
+        if _has(t,"مدينة","city"): out.append("city-lights")
+        if _has(t,"قمر","moon"): out.append("moon")
+        return out
+    if selected=="car":
+        out=["sky","ground","car"]
+        if _has(t,"طريق","road","highway"): out.append("road")
+        if _has(t,"شجرة","tree"): out.append("tree")
+        return out
+    return ["background","circle","triangle","square"]
+
+def compile_scene(text:str, mode:str="auto")->dict:
+    text=_text(text) or "منظر طبيعي"
+    selected=detect_mode(text,mode)
+    palette=detect_palette(text)
+    objects=_objects(text,selected)
+    return {
+        "version":"1.1",
+        "type":selected,
+        "text":text,
+        "objects":objects,
+        "palette":palette,
+        "renderer":"svg",
+        "local":True,
+        "external_api":False,
+        "animation":{"enabled":False,"duration":5,"fps":30},
+        "media":{"width":1000,"height":650,"fps":30},
+    }
+
+def scene_timeline(scene:dict,duration:float=5.0)->dict:
+    d=max(0.5,float(duration))
+    return {
+        "version":"1.0",
+        "profile":"youtube_1080p",
+        "scenes":[{
+            "id":"visual-scene-1",
+            "duration":d,
+            "asset_type":"svg",
+            "scene":scene,
+            "transition":"fade",
+            "transition_duration":0.5,
+        }],
+        "metadata":{"source":"BRAIN Visual Engine","local":True}
+    }
 
 def render_svg(scene:dict)->str:
-    import html
-    text=html.escape(scene["text"],quote=True)
-    typ=scene["type"]; objects=scene["objects"]; body=""
+    text=html.escape(str(scene.get("text","")),quote=True)
+    typ=scene.get("type","landscape")
+    objects=scene.get("objects",[])
+    palette=PALETTES.get(scene.get("palette","default"),PALETTES["default"])
+    body=""
     if typ=="landscape":
-        body='<rect width="1000" height="650" fill="#8ed8ff"/><circle cx="800" cy="115" r="65" fill="#ffd84d"/>'
-        if "mountains" in objects: body+='<path d="M0 470L220 190 430 470 630 170 1000 470Z" fill="#667f92"/><path d="M0 500L300 280 540 500 730 250 1000 500V650H0Z" fill="#435c70"/>'
-        body+='<rect y="500" width="1000" height="150" fill="#6ca85a"/>'
+        body=f'<rect width="1000" height="650" fill="{palette["sky"]}"/>'
+        if "sun" in objects: body+=f'<circle cx="800" cy="115" r="65" fill="{palette["sun"]}"/>'
+        if "moon" in objects: body+='<circle cx="800" cy="115" r="58" fill="#e8edf5"/><circle cx="820" cy="95" r="58" fill="'+palette["sky"]+'"/>'
+        if "stars" in objects:
+            body+=''.join(f'<circle cx="{x}" cy="{y}" r="4" fill="#fff"/>' for x,y in [(90,90),(180,145),(300,80),(420,130),(560,75),(690,150)])
+        body+='<path d="M0 470L220 190 430 470 630 170 1000 470Z" fill="#667f92"/>'
+        body+='<path d="M0 500L300 280 540 500 730 250 1000 500V650H0Z" fill="#435c70"/>'
+        body+=f'<rect y="500" width="1000" height="150" fill="{palette["ground"]}"/>'
         if "lake" in objects: body+='<path d="M360 540 Q500 500 650 540 T930 540V650H360Z" fill="#4fa7c9"/>'
         if "tree" in objects: body+='<rect x="145" y="415" width="25" height="150" fill="#6b4226"/><path d="M158 300L80 450H236Z M158 350L95 485H220Z" fill="#285b32"/>'
         if "house" in objects: body+='<rect x="720" y="400" width="170" height="130" fill="#d98b5b"/><path d="M690 405L805 315 920 405Z" fill="#7d3d35"/><rect x="780" y="455" width="40" height="75" fill="#523d32"/>'
     elif typ=="city":
-        body='<rect width="1000" height="650" fill="#8bcfff"/><circle cx="820" cy="110" r="55" fill="#ffd84d"/>'
-        for i,x in enumerate([80,210,350,500,670,820]): body+=f'<rect x="{x}" y="{250-(i%3)*45}" width="110" height="{400-(i%3)*45}" fill="{["#526b82","#3f566b","#657c91"][i%3]}"/>'
+        body=f'<rect width="1000" height="650" fill="{palette["sky"]}"/><circle cx="820" cy="110" r="55" fill="{palette["sun"]}"/>'
+        for i,x in enumerate([80,210,350,500,670,820]):
+            y=250-(i%3)*45; h=400-(i%3)*45
+            body+=f'<rect x="{x}" y="{y}" width="110" height="{h}" fill="#{["526b82","3f566b","657c91"][i%3]}"/>'
+        if "tower" in objects: body+='<rect x="455" y="110" width="95" height="260" fill="#71889d"/><path d="M455 110L502 45 550 110Z" fill="#51697d"/>'
         body+='<path d="M0 650L350 490H650L1000 650Z" fill="#303c48"/><path d="M500 650L500 520" stroke="#f5d76e" stroke-width="12" stroke-dasharray="30 25"/>'
     elif typ=="robot":
-        body='<rect width="1000" height="650" fill="#16243a"/><rect y="500" width="1000" height="150" fill="#263746"/><rect x="360" y="220" width="280" height="220" rx="35" fill="#9aaabd"/><circle cx="440" cy="315" r="30" fill="#55d9ff"/><circle cx="560" cy="315" r="30" fill="#55d9ff"/><rect x="440" y="375" width="120" height="22" rx="11" fill="#243648"/><path d="M500 220V145" stroke="#9aaabd" stroke-width="14"/><circle cx="500" cy="125" r="22" fill="#ffd84d"/>'
+        body=f'<rect width="1000" height="650" fill="{palette["sky"]}"/><rect y="500" width="1000" height="150" fill="{palette["dark"]}"/>'
+        body+='<rect x="360" y="220" width="280" height="220" rx="35" fill="#9aaabd"/><circle cx="440" cy="315" r="30" fill="#55d9ff"/><circle cx="560" cy="315" r="30" fill="#55d9ff"/><rect x="440" y="375" width="120" height="22" rx="11" fill="#243648"/><path d="M500 220V145" stroke="#9aaabd" stroke-width="14"/><circle cx="500" cy="125" r="22" fill="#ffd84d"/><rect x="300" y="260" width="60" height="150" rx="20" fill="#8799ad"/><rect x="640" y="260" width="60" height="150" rx="20" fill="#8799ad"/>'
+        if "city-lights" in objects: body+=''.join(f'<circle cx="{x}" cy="480" r="6" fill="#ffd84d"/>' for x in range(80,940,70))
+        if "moon" in objects: body+='<circle cx="820" cy="120" r="52" fill="#eef2f7"/>'
     elif typ=="car":
-        body='<rect width="1000" height="650" fill="#91d7ff"/><rect y="480" width="1000" height="170" fill="#343f49"/><path d="M210 455L300 360H650L790 455Z" fill="#d84d4d"/><rect x="335" y="370" width="130" height="70" fill="#9bd9ee"/><rect x="480" y="370" width="135" height="70" fill="#9bd9ee"/><rect x="170" y="440" width="660" height="95" rx="35" fill="#d84d4d"/><circle cx="300" cy="535" r="58" fill="#171d22"/><circle cx="700" cy="535" r="58" fill="#171d22"/>'
+        body=f'<rect width="1000" height="650" fill="{palette["sky"]}"/><rect y="480" width="1000" height="170" fill="#343f49"/>'
+        body+='<path d="M210 455L300 360H650L790 455Z" fill="#d84d4d"/><rect x="335" y="370" width="130" height="70" fill="#9bd9ee"/><rect x="480" y="370" width="135" height="70" fill="#9bd9ee"/><rect x="170" y="440" width="660" height="95" rx="35" fill="#d84d4d"/><circle cx="300" cy="535" r="58" fill="#171d22"/><circle cx="700" cy="535" r="58" fill="#171d22"/><circle cx="300" cy="535" r="25" fill="#aab5bd"/><circle cx="700" cy="535" r="25" fill="#aab5bd"/>'
+        if "tree" in objects: body+='<rect x="90" y="390" width="20" height="120" fill="#6b4226"/><circle cx="100" cy="350" r="65" fill="#2f713d"/>'
     else:
         body='<rect width="1000" height="650" fill="#101827"/><circle cx="250" cy="300" r="120" fill="#ffcf4a"/><path d="M500 150L650 430H350Z" fill="#55c7a5"/><rect x="700" y="210" width="170" height="170" rx="25" fill="#d85b74"/>'
-    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img"><title>BRAIN Visual Engine: {text}</title>{body}</svg>'
+    title=f'<title>BRAIN Visual Engine: {text}</title>'
+    return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img">{title}{body}</svg>'
