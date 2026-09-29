@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Text → Drawing</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:18px}.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:14px}
+h1{margin:0 0 8px}p{color:#9db0c4}textarea,input,button{font:inherit;border:1px solid #29445d;border-radius:10px;background:#08111d;color:#fff;padding:11px}
+textarea{width:100%;min-height:90px;resize:vertical}button{cursor:pointer;background:#12304a;margin:4px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:750px){.grid{grid-template-columns:1fr}}
+canvas{width:100%;background:white;border-radius:12px;display:block}.code{direction:ltr;text-align:left;white-space:pre-wrap;max-height:360px;overflow:auto;font-family:monospace;color:#bce7ff}
+.row{display:flex;gap:8px;flex-wrap:wrap}.status{color:#62e6a5}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>🧠 BRAIN Text → Drawing</h1>
+<p>اكتب وصف الصورة، وسيحوّله التطبيق إلى رسم HTML/SVG قابل للتعديل.</p>
+<textarea id="prompt">منظر جبلي جميل مع شمس وسماء زرقاء وشجرة</textarea>
+<div class="row"><button onclick="generate()">🎨 توليد الرسم</button><button onclick="clearCanvas()">مسح</button><button onclick="downloadPNG()">⬇️ حفظ PNG</button><button onclick="downloadCode()">💾 حفظ HTML</button></div>
+<div id="status" class="status"></div>
+</div>
+<div class="grid">
+<div class="card"><h2>🖼️ الصورة</h2><canvas id="canvas" width="1000" height="650"></canvas></div>
+<div class="card"><h2>⌨️ كود الرسم</h2><pre id="code" class="code"></pre></div>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d'),code=document.getElementById('code');
+function esc(s){return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')}
+function drawScene(text){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+const sky=ctx.createLinearGradient(0,0,0,650);sky.addColorStop(0,'#5fc9ff');sky.addColorStop(1,'#eaf8ff');ctx.fillStyle=sky;ctx.fillRect(0,0,1000,650);
+ctx.fillStyle='#ffd84d';ctx.beginPath();ctx.arc(790,120,65,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#73899b';ctx.beginPath();ctx.moveTo(0,470);ctx.lineTo(230,210);ctx.lineTo(430,470);ctx.lineTo(620,180);ctx.lineTo(1000,470);ctx.closePath();ctx.fill();
+ctx.fillStyle='#435b70';ctx.beginPath();ctx.moveTo(0,500);ctx.lineTo(320,290);ctx.lineTo(540,500);ctx.lineTo(720,250);ctx.lineTo(1000,500);ctx.lineTo(1000,650);ctx.lineTo(0,650);ctx.closePath();ctx.fill();
+ctx.fillStyle='#69a957';ctx.fillRect(0,510,1000,140);
+ctx.fillStyle='#315d32';ctx.fillRect(150,410,22,150);ctx.beginPath();ctx.moveTo(161,310);ctx.lineTo(90,450);ctx.lineTo(230,450);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(161,355);ctx.lineTo(105,470);ctx.lineTo(220,470);ctx.closePath();ctx.fill();
+ctx.fillStyle='#173d28';ctx.font='bold 30px system-ui';ctx.fillText(text.slice(0,45),30,610);
+}
+function makeCode(text){
+return `<!doctype html>
+<html><body><canvas id="drawing" width="1000" height="650"></canvas>
+<script>
+const c=document.getElementById('drawing'),x=c.getContext('2d');
+x.fillStyle='#5fc9ff';x.fillRect(0,0,1000,650);
+x.fillStyle='#ffd84d';x.beginPath();x.arc(790,120,65,0,Math.PI*2);x.fill();
+x.fillStyle='#73899b';x.beginPath();x.moveTo(0,470);x.lineTo(230,210);x.lineTo(430,470);x.lineTo(620,180);x.lineTo(1000,470);x.fill();
+x.fillStyle='#69a957';x.fillRect(0,510,1000,140);
+</script></body></html>`;
+}
+function generate(){const t=document.getElementById('prompt').value.trim()||'منظر طبيعي';drawScene(t);code.textContent=makeCode(t);document.getElementById('status').textContent='✓ تم توليد الصورة من النص';}
+function clearCanvas(){ctx.clearRect(0,0,canvas.width,canvas.height);code.textContent='';document.getElementById('status').textContent=''}
+function downloadPNG(){const a=document.createElement('a');a.download='brain-drawing.png';a.href=canvas.toDataURL('image/png');a.click()}
+function downloadCode(){const blob=new Blob([makeCode(document.getElementById('prompt').value)],{type:'text/html'}),a=document.createElement('a');a.download='brain-drawing.html';a.href=URL.createObjectURL(blob);a.click();URL.revokeObjectURL(a.href)}
+generate();
+</script>
+</body></html>
