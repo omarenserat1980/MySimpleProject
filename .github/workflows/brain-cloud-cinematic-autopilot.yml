@@ -46,10 +46,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core build-essential pkg-config yasm nasm libx264-dev libfreetype6-dev libfontconfig1-dev
 
+      - name: Bind CI media toolchain into Brain
+        run: |
+          set -euo pipefail
+          mkdir -p brain_v12/bin
+          FF=$(command -v ffmpeg)
+          FP=$(command -v ffprobe)
+          test -x "$FF"
+          test -x "$FP"
+          ln -sfn "$FF" brain_v12/bin/ffmpeg
+          ln -sfn "$FP" brain_v12/bin/ffprobe
+          test -x brain_v12/bin/ffmpeg
+          test -x brain_v12/bin/ffprobe
+          echo "BRAIN_FFMPEG=$(readlink -f brain_v12/bin/ffmpeg)"
+          echo "BRAIN_FFPROBE=$(readlink -f brain_v12/bin/ffprobe)"
+          brain_v12/bin/ffmpeg -version | head -n 1
+          brain_v12/bin/ffprobe -version | head -n 1
+
       - name: Brain preflight
         run: |
           python -m compileall -q brain_v12 cloud
           python -m unittest brain_v12.movie_summary_factory.test_room13_pipeline -v
+          python - <<'PY'
+          from brain_v12.brain_ffmpeg import ffmpeg, ffprobe
+          print("BRAIN_FFMPEG_RESOLVED=" + ffmpeg())
+          print("BRAIN_FFPROBE_RESOLVED=" + ffprobe())
+          PY
 
       - name: Run cinematic autopilot
         run: python -m brain_v12.cinematic_autopilot
@@ -70,7 +92,7 @@ jobs:
             echo "autopilot log missing"
           fi
           echo "=== media engine files ==="
-          find brain_v12/web/media/engine -maxdepth 1 -type f -printf '%f %s bytes\\n' | sort || true
+          find brain_v12/web/media/engine -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
 
       - name: Verify final MP4
         run: |
