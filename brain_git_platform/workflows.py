@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import sqlite3
 from . import service
 from .service import BrainGitError
@@ -32,12 +32,14 @@ def _init():
           workflow TEXT, ref TEXT, status TEXT, created_at TEXT, completed_at TEXT,
           attempt_count INTEGER NOT NULL DEFAULT 0, worker_id TEXT, heartbeat_at TEXT)""")
         columns = {row[1] for row in db.execute("PRAGMA table_info(workflow_runs)")}
-        if "attempt_count" not in columns:
-            db.execute("ALTER TABLE workflow_runs ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0")
-        if "worker_id" not in columns:
-            db.execute("ALTER TABLE workflow_runs ADD COLUMN worker_id TEXT")
-        if "heartbeat_at" not in columns:
-            db.execute("ALTER TABLE workflow_runs ADD COLUMN heartbeat_at TEXT")
+        migrations = {
+            "attempt_count": "ALTER TABLE workflow_runs ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0",
+            "worker_id": "ALTER TABLE workflow_runs ADD COLUMN worker_id TEXT",
+            "heartbeat_at": "ALTER TABLE workflow_runs ADD COLUMN heartbeat_at TEXT",
+        }
+        for name, sql in migrations.items():
+            if name not in columns:
+                db.execute(sql)
         db.commit()
 
 
@@ -46,20 +48,20 @@ def dispatch(namespace: str, repository: str, workflow: str, ref: str = "main") 
     now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(service.DB) as db:
         cur = db.execute(
-            """INSERT INTO workflow_runs(namespace,repository,workflow,ref,status,created_at)
-               VALUES(?,?,?,?,?,?)""",
+            "INSERT INTO workflow_runs(namespace,repository,workflow,ref,status,created_at) VALUES(?,?,?,?,?,?)",
             (namespace, repository, workflow, ref, "queued", now),
         )
         db.commit()
         return get_run(cur.lastrowid)
 
 
-def claim_next(worker_id: str) -> dict | None:
+def claim_next(worker_id: str, max_attempts: int = 3) -> dict | None:
     _init()
     now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(service.DB, timeout=30, isolation_level="IMMEDIATE") as db:
         row = db.execute(
-            "SELECT id FROM workflow_runs WHERE status='queued' ORDER BY id LIMIT 1"
+            "SELECT id FROM workflow_runs WHERE status='queued' AND attempt_count < ? ORDER BY id LIMIT 1",
+            (max_attempts,),
         ).fetchone()
         if not row:
             return None
@@ -67,13 +69,38 @@ def claim_next(worker_id: str) -> dict | None:
         cur = db.execute(
             """UPDATE workflow_runs
                SET status='running', worker_id=?, heartbeat_at=?, attempt_count=attempt_count+1
-               WHERE id=? AND status='queued'""",
-            (worker_id, now, run_id),
+               WHERE id=? AND status='queued' AND attempt_count < ?""",
+            (worker_id, now, run_id, max_attempts),
         )
         if cur.rowcount != 1:
             return None
         db.commit()
     return get_run(run_id)
+
+
+def recover_stale(timeout_seconds: int = 900, max_attempts: int = 3) -> int:
+    _init()
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
+    with sqlite3.connect(service.DB) as db:
+        rows = db.execute(
+            "SELECT id, attempt_count FROM workflow_runs WHERE status='running' AND heartbeat_at IS NOT NULL AND heartbeat_at < ?",
+            (cutoff.isoformat(),),
+        ).fetchall()
+        recovered = 0
+        for run_id, attempts in rows:
+            if attempts < max_attempts:
+                db.execute(
+                    "UPDATE workflow_runs SET status='queued', worker_id=NULL, heartbeat_at=NULL WHERE id=?",
+                    (run_id,),
+                )
+            else:
+                db.execute(
+                    "UPDATE workflow_runs SET status='failed', worker_id=NULL, heartbeat_at=NULL, completed_at=? WHERE id=?",
+                    (datetime.now(timezone.utc).isoformat(), run_id),
+                )
+            recovered += 1
+        db.commit()
+    return recovered
 
 
 def heartbeat(run_id: int, worker_id: str) -> None:
@@ -110,12 +137,7 @@ def set_status(run_id: int, status: str) -> None:
             """UPDATE workflow_runs
                SET status=?, completed_at=?, heartbeat_at=CASE WHEN ?='running' THEN heartbeat_at ELSE NULL END
                WHERE id=?""",
-            (
-                status,
-                datetime.now(timezone.utc).isoformat() if status in {"success", "failed", "cancelled"} else None,
-                status,
-                run_id,
-            ),
+            (status, datetime.now(timezone.utc).isoformat() if status in {"success", "failed", "cancelled"} else None, status, run_id),
         )
         if cur.rowcount != 1:
             raise BrainGitError("workflow run not found")
