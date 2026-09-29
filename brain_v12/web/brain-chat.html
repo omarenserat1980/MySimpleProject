@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain Chat — Electronic Brain</title>
+<style>
+:root{--bg:#0b0d10;--panel:#11151a;--panel2:#171c22;--line:#29313a;--text:#eef2f6;--muted:#98a3ae;--accent:#19c37d;--user:#20262d;--danger:#ef6b73}
+*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif}
+body{overflow:hidden}.app{display:grid;grid-template-columns:280px 1fr;height:100vh}
+.sidebar{background:#080a0d;border-left:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;padding:8px 6px;font-weight:800}.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#19c37d,#0e8dff);display:grid;place-items:center;color:#00130b}
+button{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit}
+button:hover{border-color:#46525e}.new{width:100%;text-align:right;background:#121820}.search{width:100%;background:#0f1318;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px}
+.chats{overflow:auto;flex:1}.chat-item{padding:10px;border-radius:9px;color:#d9dee4;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chat-item:hover,.chat-item.active{background:#171c22}.side-bottom{border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:12px}
+.main{min-width:0;display:grid;grid-template-rows:auto 1fr auto}.top{height:58px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:rgba(11,13,16,.94)}
+.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#777}.dot.ok{background:var(--accent);box-shadow:0 0 10px #19c37d}
+.model{font-weight:700}.messages{overflow:auto;padding:22px 0 30px}.wrap{max-width:920px;margin:auto;padding:0 20px}.msg{display:flex;gap:12px;margin:20px 0;align-items:flex-start}.avatar{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:#1c232a;flex:0 0 auto;font-size:14px}.msg.user .avatar{background:#26313a}.bubble{max-width:calc(100% - 44px);line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}.msg.user .bubble{background:var(--user);padding:11px 14px;border-radius:14px}.msg.assistant .bubble{padding:2px 0}.empty{text-align:center;color:var(--muted);padding:14vh 20px}.empty h1{color:var(--text);font-size:28px;margin:0 0 8px}.empty p{margin:0}.composer{border-top:1px solid var(--line);padding:12px 18px 16px;background:linear-gradient(transparent,var(--bg) 25%)}.compose-box{max-width:920px;margin:auto;border:1px solid #39434e;background:#11151a;border-radius:16px;padding:8px;box-shadow:0 5px 30px #0005}.input-row{display:flex;align-items:flex-end;gap:8px}.input{flex:1;resize:none;min-height:46px;max-height:180px;border:0;outline:0;background:transparent;color:var(--text);font:inherit;line-height:1.6;padding:8px}.send{background:var(--accent);color:#001b10;border-color:var(--accent);font-weight:800}.tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:5px 4px 0}.tool-btn{font-size:12px;padding:6px 9px;color:var(--muted)}.file{display:none}.preview{font-size:12px;color:var(--muted);padding:5px}.notice{font-size:11px;color:#77818c;text-align:center;margin-top:7px}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{display:none}.wrap{padding:0 12px}.top{padding:0 12px}.composer{padding:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="logo">B</div><div>Brain Chat</div></div>
+  <button class="new" id="newChat">＋ محادثة جديدة</button>
+  <input class="search" id="search" placeholder="بحث في المحادثات">
+  <div class="chats" id="chats"></div>
+  <div class="side-bottom">Electronic Brain · Chat Layer<br>المحادثة تمر عبر Brain API، والمفتاح السري يبقى على الخادم.</div>
+</aside>
+<main class="main">
+  <header class="top">
+    <div><span class="model">Brain</span> <span id="mode" class="status">AI</span></div>
+    <div class="status"><span id="dot" class="dot"></span><span id="health">جاري التحقق…</span></div>
+  </header>
+  <section class="messages" id="messages"><div class="wrap" id="messageWrap"></div></section>
+  <footer class="composer">
+    <div class="compose-box">
+      <div class="input-row">
+        <button id="mic" title="إملاء صوتي">🎙</button>
+        <textarea id="input" class="input" placeholder="اكتب رسالتك إلى Brain…" rows="1"></textarea>
+        <button id="send" class="send">إرسال</button>
+      </div>
+      <div class="tools">
+        <label class="tool-btn">📎 ملف<input id="file" class="file" type="file" multiple></label>
+        <button class="tool-btn" id="image">🖼 توليد صورة</button>
+        <button class="tool-btn" id="clear">مسح الواجهة</button>
+      </div>
+      <div id="preview" class="preview"></div>
+    </div>
+    <div class="notice">Brain قد يستخدم الذاكرة والأدوات المتاحة في الخادم. التنفيذ الخارجي يبقى خاضعًا لصلاحيات Brain.</div>
+  </footer>
+</main>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const state={id:null,chats:JSON.parse(localStorage.getItem("brainChats")||"{}")};
+function save(){localStorage.setItem("brainChats",JSON.stringify(state.chats))}
+function makeId(){return "chat_"+Date.now().toString(36)}
+function current(){if(!state.id){state.id=makeId();state.chats[state.id]={title:"محادثة جديدة",messages:[]};save()}return state.chats[state.id]}
+function renderList(filter=""){
+  const box=$("#chats");box.innerHTML="";
+  Object.entries(state.chats).reverse().filter(([_,c])=>c.title.toLowerCase().includes(filter.toLowerCase())).forEach(([id,c])=>{
+    const d=document.createElement("div");d.className="chat-item"+(id===state.id?" active":"");d.textContent=c.title||"محادثة";d.onclick=()=>{state.id=id;render();renderList($("#search").value)};box.appendChild(d)
+  })
+}
+function render(){
+  const c=current(),wrap=$("#messageWrap");wrap.innerHTML="";
+  if(!c.messages.length){wrap.innerHTML='<div class="empty"><h1>مرحبًا بك في Brain</h1><p>اكتب طلبك، ودع Electronic Brain يتولى المحادثة والتحليل والأدوات.</p></div>';renderList();return}
+  c.messages.forEach(m=>{const row=document.createElement("div");row.className="msg "+m.role;const av=document.createElement("div");av.className="avatar";av.textContent=m.role==="user"?"أ":"B";const b=document.createElement("div");b.className="bubble";b.textContent=m.content;row.append(av,b);wrap.appendChild(row)});
+  const area=$("#messages");area.scrollTop=area.scrollHeight;renderList()
+}
+async function health(){
+ try{const r=await fetch("/api/ai/status");const j=await r.json();$("#dot").classList.add("ok");$("#health").textContent=j.openai?.configured?"متصل":"Brain API متصل";}catch(e){$("#health").textContent="الخادم غير متاح"}
+}
+async function send(){
+ const input=$("#input"),text=input.value.trim();if(!text)return;
+ const c=current();c.messages.push({role:"user",content:text});if(c.title==="محادثة جديدة")c.title=text.slice(0,42);input.value="";autoSize();render();
+ const thinking={role:"assistant",content:"…"};c.messages.push(thinking);render();
+ try{
+   const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+   const j=await r.json();thinking.content=j.reply||j.error||"لم يصل رد من Brain.";
+ }catch(e){thinking.content="تعذر الاتصال بـ Brain API: "+e.message}
+ save();render()
+}
+function autoSize(){const x=$("#input");x.style.height="auto";x.style.height=Math.min(x.scrollHeight,180)+"px"}
+$("#send").onclick=send;$("#input").addEventListener("input",autoSize);$("#input").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
+$("#newChat").onclick=()=>{state.id=null;render();};$("#search").oninput=e=>renderList(e.target.value);
+$("#clear").onclick=()=>{current().messages=[];save();render()};
+$("#file").onchange=e=>{$("#preview").textContent=[...e.target.files].map(f=>f.name).join(" · ")};
+$("#image").onclick=async()=>{const p=prompt("اكتب وصف الصورة:");if(!p)return;const c=current();c.messages.push({role:"user",content:"🖼 "+p});c.messages.push({role:"assistant",content:"جاري توليد الصورة…"});render();try{const r=await fetch("/api/image-factory/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p})});const j=await r.json();c.messages[c.messages.length-1].content=j.ok?"تم إنشاء الصورة: "+j.url:(j.message||j.error||"فشل التوليد")}catch(e){c.messages[c.messages.length-1].content="تعذر التوليد: "+e.message}save();render()};
+$("#mic").onclick=()=>{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){alert("الإملاء الصوتي غير متاح في هذا المتصفح.");return}const r=new R();r.lang="ar-JO";r.onresult=e=>{$("#input").value=e.results[0][0].transcript;autoSize()};r.start()};
+render();health();
+</script>
+</body>
+</html>
