@@ -8,6 +8,10 @@ separate so the aggregate can be audited.
 from dataclasses import dataclass
 
 
+TEST_WEIGHT_PERCENT = 0.02
+TARGET_TESTS = 5000
+TOTAL_BENCHMARK_PERCENT = TEST_WEIGHT_PERCENT * TARGET_TESTS
+
 DIMENSIONS = (
     "reasoning",
     "planning",
@@ -77,7 +81,7 @@ def score(evidence: list[Evidence]) -> float:
     """
     weights = {"PASS": 1.0, "PARTIAL": 0.5}
     total = sum(weights.get(item.status.upper(), 0.0) for item in evidence)
-    return round(100.0 * total / len(DIMENSIONS), 2) if evidence else 0.0
+    return round(TEST_WEIGHT_PERCENT * total, 2)
 
 
 def validate_dimensions(evidence: list[Evidence]) -> None:
@@ -87,7 +91,9 @@ def validate_dimensions(evidence: list[Evidence]) -> None:
 
 
 def main() -> None:
-    print("BRAIN_HUMAN_LIKE_BENCHMARK=14_DIMENSIONS")
+    print("BRAIN_HUMAN_LIKE_BENCHMARK=5000_TESTS")
+    print(f"BRAIN_HUMAN_LIKE_TEST_WEIGHT_PERCENT={TEST_WEIGHT_PERCENT}")
+    print(f"BRAIN_HUMAN_LIKE_TARGET_PERCENT={TOTAL_BENCHMARK_PERCENT}")
     print("BRAIN_HUMAN_LIKE_SCORE=UNMEASURED")
     print("BRAIN_HUMAN_LIKE_NOTE=No score is claimed without executable evidence.")
 
