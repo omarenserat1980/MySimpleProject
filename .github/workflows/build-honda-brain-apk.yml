@@ -86,14 +86,6 @@ jobs:
         run: |
           set -o pipefail
           gradle :app:assembleDebug --no-daemon --stacktrace --warning-mode all 2>&1 | tee /tmp/android-build.log
-      - name: Upload Android build diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-build-diagnostics-${{ github.run_id }}
-          path: /tmp/android-build.log
-          if-no-files-found: error
-
       - name: Verify APK
         shell: bash
         run: |
