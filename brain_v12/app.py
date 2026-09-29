@@ -373,6 +373,63 @@ async def brain_hub_rerun_action(run_id:int, body:BrainHubActionIn):
         raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
     return {"ok":True,"run_id":run_id,"status":"RERUN_REQUESTED"}
 
+
+class BrainHubFileWriteIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    path:str
+    content:str=""
+    message:str="brain: Code Hub file change"
+    branch:str="main"
+    sha:str=""
+
+class BrainHubSearchIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    query:str
+    branch:str=""
+
+@app.post("/api/brain-hub/file")
+async def brain_hub_write_file(request:Request, body:BrainHubFileWriteIn):
+    require_control_key(request)
+    full=_brain_hub_full(body.owner,body.repo)
+    path=body.path.strip().lstrip("/")
+    if not path or ".." in pathlib.PurePosixPath(path).parts:
+        raise HTTPException(status_code=400,detail="INVALID_PATH")
+    url=f"https://api.github.com/repos/{full}/contents/{path}"
+    payload={"message":body.message.strip() or "brain: Code Hub file change","content":base64.b64encode(body.content.encode("utf-8")).decode("ascii"),"branch":body.branch.strip() or "main"}
+    if body.sha.strip(): payload["sha"]=body.sha.strip()
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.put(url,headers=_github_headers(),json=payload)
+    if r.status_code not in (200,201):
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"path":path,"branch":payload["branch"],"sha":(x.get("content") or {}).get("sha"),"commit_sha":(x.get("commit") or {}).get("sha")}
+
+@app.delete("/api/brain-hub/file")
+async def brain_hub_delete_file(request:Request, owner:str="",repo:str="",path:str="",branch:str="main",sha:str="",message:str="brain: Code Hub delete file"):
+    require_control_key(request)
+    full=_brain_hub_full(owner,repo)
+    if not path.strip() or not sha.strip(): raise HTTPException(status_code=400,detail="PATH_AND_SHA_REQUIRED")
+    url=f"https://api.github.com/repos/{full}/contents/{path.lstrip('/')}"
+    payload={"message":message.strip() or "brain: Code Hub delete file","sha":sha.strip(),"branch":branch.strip() or "main"}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.request("DELETE",url,headers=_github_headers(),json=payload)
+    if r.status_code!=200: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"path":path,"branch":payload["branch"],"commit_sha":(r.json().get("commit") or {}).get("sha")}
+
+@app.post("/api/brain-hub/search")
+async def brain_hub_search(body:BrainHubSearchIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    q=body.query.strip()
+    if not q: raise HTTPException(status_code=400,detail="QUERY_REQUIRED")
+    params={"q":f"{q} repo:{full}","per_page":50}
+    if body.branch.strip(): params["q"] += f" ref:{body.branch.strip()}"
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.get("https://api.github.com/search/code",headers=_github_headers(),params=params)
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"results":[{"name":x.get("name"),"path":x.get("path"),"sha":x.get("sha"),"html_url":x.get("html_url")} for x in r.json().get("items",[])]}
+
 @app.get("/api/brain-hub/pulls")
 async def brain_hub_pulls(owner:str="",repo:str="",state:str="open"):
     full=_brain_hub_full(owner,repo)
