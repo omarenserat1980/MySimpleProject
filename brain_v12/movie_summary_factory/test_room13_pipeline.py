@@ -63,7 +63,7 @@ class Room13PipelineTests(unittest.TestCase):
         self.assertTrue(p.is_file())
         ast.parse(p.read_text(encoding="utf-8"))
         text = p.read_text(encoding="utf-8")
-        for token in ("MAX_REPAIRS", "Component\\\\(0([1-9])", "UNSUPPORTED_STAGE7_SYNTAX", "READY"):
+        for token in ("MAX_REPAIRS", r"Component\(0([1-9])", "UNSUPPORTED_STAGE7_SYNTAX", "READY"):
             self.assertIn(token, text)
 
     def test_media_health_gate_exists(self):
