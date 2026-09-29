@@ -68,6 +68,11 @@ def main() -> int:
             write_state("FAILED", 0, error="DETERMINISTIC_TESTS_FAILED")
             return rc
 
+        rc = run([sys.executable, "brain_v12/movie_summary_factory/room13_media_health.py"], log)
+        if rc != 0:
+            write_state("FAILED", 0, error="MEDIA_HEALTH_GATE_FAILED")
+            return rc
+
         for attempt in range(1, MAX_ATTEMPTS + 1):
             write_state("RENDERING", attempt)
             clean_partial()
