@@ -7,7 +7,7 @@ Brain Git Platform is the internal source-control and automation plane for Brain
 Brain runtime operations are designed to operate without GitHub.com:
 
 - Git repositories are stored under the configured Brain Git root.
-- Git operations use the local Git service boundary.
+- Git operations use the local Brain Git service boundary.
 - Native CI jobs execute on Brain-owned runners.
 - Workflow state, logs, artifacts, and audit events remain in Brain storage.
 - GitHub is an optional import/export bridge only.
@@ -17,10 +17,12 @@ Brain runtime operations are designed to operate without GitHub.com:
 The platform now has:
 
 - repository and branch primitives
+- native Git Smart HTTP transport for clone/fetch/push
 - pull requests and fast-forward merge
-- scoped authentication foundation
+- scoped API authentication
 - workflow manifests
-- queued workflow runs
+- durable queued workflow runs
+- worker ownership and heartbeat recovery
 - runner checkout from Brain Git
 - workflow execution
 - run logs
@@ -29,6 +31,20 @@ The platform now has:
 - runtime GitHub-isolation verification
 
 The first native workflow is `brain-git-platform-foundation`.
+
+## Authentication
+
+The HTTP runtime requires a Brain-owned bearer token for every endpoint except health:
+
+- `BRAIN_GIT_TOKEN` — secret bearer token
+- `BRAIN_GIT_TOKEN_SCOPES` — comma-separated scopes, defaulting to `repo:read,repo:write,workflow:read,workflow:write,pull:write`
+- `BRAIN_GIT_MAX_REQUEST_BYTES` — maximum HTTP request body size, default 64 MiB
+
+Example Git remote:
+
+`http://brain-git-host:8090/git/brain/MySimpleProject.git`
+
+The deployment layer must inject the token securely; it must never be committed to the repository.
 
 ## Isolation rule
 
