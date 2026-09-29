@@ -25,6 +25,10 @@ TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
 app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
 runtime = CloudRuntime()
 
+# The Cloud Hub owns its queue worker. No Termux/external process is required.
+if os.getenv("BRAIN_API_QUEUE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}:
+    threading.Thread(target=runtime.run_forever, name="brain-cloud-queue", daemon=True).start()
+
 FILM_JOBS = STATE / "film_jobs"
 FILM_JOBS.mkdir(parents=True, exist_ok=True)
 
