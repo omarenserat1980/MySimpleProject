@@ -44,6 +44,19 @@ jobs:
           if [ -f room13-render.log ]; then
             tail -n 12 room13-render.log >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Validate Brain production plan
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json")
+          d=json.loads(p.read_text(encoding="utf-8"))
+          assert len(d["beats"]) == 8, "expected 8 beats"
+          assert len(d["shots"]) == 32, "expected 32 shots"
+          assert all(s.get("voice") and s.get("subtitle") and s.get("transition") for s in d["shots"])
+          assert all(s.get("duration_s",0) > 0 for s in d["shots"])
+          print("ROOM_13_PLAN_QC=PASS")
+          PY
       - name: Probe output
         run: ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json brain_v12/web/media/engine/room-13-horror-10m-animatic.mp4
       - name: Render status
