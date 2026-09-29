@@ -108,6 +108,14 @@ async def no_cache(request, call_next):
     response.headers["Pragma"]="no-cache"
     return response
 
+class CinematicReleaseIn(BaseModel):
+    title: str
+    description: str = ""
+    media_path: str = ""
+    tags: list[str] = []
+    privacy: str = "private"
+
+
 class BrainCodePlanIn(BaseModel):
     objective:str
     files:list[str]=[]
@@ -207,13 +215,6 @@ def youtube_release_record_published(body: dict, request: Request):
         str(body.get("evidence", "")),
     )
 
-
-class CinematicReleaseIn(BaseModel):
-    title: str
-    description: str = ""
-    media_path: str = ""
-    tags: list[str] = []
-    privacy: str = "private"
 
 class MovieSummaryIn(BaseModel):
     title: str
