@@ -1,6 +1,6 @@
 services:
   brain-cloud:
-    image: ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:latest
+    image: ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:${BRAIN_IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     ports:
