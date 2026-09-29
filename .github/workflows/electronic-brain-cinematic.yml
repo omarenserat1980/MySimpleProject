@@ -46,6 +46,10 @@ jobs:
       FACTORY_ALLOW_PRODUCTION: "1"
       FACTORY_MODEL_ROUTER: "1"
       FACTORY_MODEL: "auto"
+      # Explicit zero-cost media mode. The adapter will not call FAL,
+      # MEDIA_PROVIDER, or ComfyUI while this flag is enabled.
+      FACTORY_FREE_ONLY: "1"
+      FACTORY_MEDIA_ROUTE: "local_ffmpeg_cinematic"
       FACTORY_DURATION_SECONDS: ${{ inputs.duration || '60' }}
       FACTORY_REPAIR_GENERATION: ${{ inputs.repair_generation || '0' }}
       FACTORY_RESUME: ${{ inputs.resume || 'true' }}
