@@ -56,12 +56,11 @@ class BrainGitHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
-        if path != "/api/v1/health" and not path.endswith("/info/refs") and not self._authorize("repo:read"):
+        if path == "/api/v1/health":
+            return self._send(200, health())
+        if not self._authorize("repo:read"):
             return
         try:
-            if path == "/api/v1/health":
-                return self._send(200, health())
-
             if path.endswith("/info/refs"):
                 service_name = parse_qs(parsed.query).get("service", [None])[0]
                 if not service_name:
