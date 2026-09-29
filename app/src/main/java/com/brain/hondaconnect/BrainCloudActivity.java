@@ -17,8 +17,7 @@ public class BrainCloudActivity extends Activity {
         root.setBackgroundColor(Color.rgb(12,12,16));
 
         TextView title = new TextView(this);
-        title.setText("BRAIN PHONE SERVER
-CINEMATIC V3 PRO");
+        title.setText("BRAIN PHONE SERVER\nCINEMATIC V3 PRO");
         title.setTextSize(25);
         title.setTextColor(Color.WHITE);
         root.addView(title);
