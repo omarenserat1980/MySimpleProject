@@ -71,6 +71,59 @@ def main() -> int:
     discovery["finished_at"] = now()
     write_json("live_discovery.json", discovery)
 
+    # Autonomous freelance preparation: discovery -> technical fit -> proposal draft.
+    # External submission, login, contracts and money movement remain explicitly gated.
+    from brain_v12.brain.freelance_agent import FreelanceAgent
+    freelance = FreelanceAgent(store)
+    live_rows = engine.prioritize(100)
+    prepared = []
+    for opportunity in live_rows:
+        data = dict(opportunity.get("data") or {})
+        if data.get("source_kind") != "LIVE_OPPORTUNITY":
+            continue
+        candidate = {
+            "title": data.get("title") or opportunity.get("title"),
+            "url": data.get("source_url") or opportunity.get("source_url"),
+            "source_url": data.get("source_url"),
+            "requirements": data.get("requirements", ""),
+            "description": data.get("requirements", ""),
+            "category": data.get("category", "FREELANCE_JOB"),
+            "budget": data.get("budget"),
+            "evidence": data.get("evidence", ""),
+        }
+        analysis = freelance.analyze(candidate)
+        if analysis.get("recommendation") != "PREPARE_OFFER":
+            continue
+        offer = freelance.prepare_offer(candidate)
+        prepared.append({
+            "opportunity_id": data.get("opportunity_id") or opportunity.get("opportunity_id"),
+            "title": candidate["title"],
+            "url": candidate["url"],
+            "fit_score": analysis["fit_score"],
+            "categories": analysis["categories"],
+            "matched_skills": analysis["matched_skills"],
+            "proposal": offer["proposal"],
+            "submission_status": "NOT_SUBMITTED",
+            "human_gate": "REVIEW_AND_SUBMIT",
+        })
+        if len(prepared) >= 10:
+            break
+    prepared.sort(key=lambda x: x["fit_score"], reverse=True)
+    write_json("freelance_ready_offers.json", {
+        "generated_at": now(),
+        "count": len(prepared),
+        "offers": prepared,
+        "policy": {
+            "discovery": "AUTOMATED",
+            "technical_fit": "AUTOMATED",
+            "proposal_generation": "AUTOMATED",
+            "external_submission": "HUMAN_CONTROLLED",
+            "client_messages": "HUMAN_CONTROLLED",
+            "contracts": "HUMAN_CONTROLLED",
+            "payment_movement": "HUMAN_CONTROLLED",
+        },
+    })
+
     lifecycle = engine.refresh_lifecycle(
         max_age_hours=float(os.getenv("OPPORTUNITY_MAX_AGE_HOURS", "72")),
         limit=500,
