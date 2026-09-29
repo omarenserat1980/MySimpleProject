@@ -7,6 +7,7 @@ on:
       - 'app/**'
       - 'build.gradle'
       - 'settings.gradle'
+      - 'android_executor/**'
       - '.github/workflows/android-executor.yml'
   pull_request:
     branches: [main]
@@ -161,7 +162,28 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.10"
-      - run: gradle assembleDebug --no-daemon
+      - name: Validate embedded executor
+        run: |
+          set -euo pipefail
+          test -f settings.gradle.kts
+          test -f build.gradle.kts
+          test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
+          test -f app/src/main/assets/brain-termux-autodeploy.sh
+          chmod +x app/src/main/assets/brain-termux-autodeploy.sh
+          bash -n app/src/main/assets/brain-termux-autodeploy.sh
+          gradle --no-daemon --stacktrace projects
+      - name: Build embedded executor APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Verify embedded executor APK
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER="$SDK/build-tools/35.0.0/apksigner"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
       - uses: actions/upload-artifact@v4
         with:
           name: electronic-brain-android-executor-debug
