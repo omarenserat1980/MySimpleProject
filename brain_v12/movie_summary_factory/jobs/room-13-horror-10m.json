@@ -1,0 +1,84 @@
+{
+  "version": "BRAIN_MOVIE_SUMMARY_FACTORY_V1",
+  "job_id": "room-13-horror-10m",
+  "title": "الغرفة 13",
+  "language": "ar",
+  "target_minutes": 10,
+  "source_type": "ORIGINAL_STORY",
+  "genre": [
+    "HORROR",
+    "PSYCHOLOGICAL",
+    "SUPERNATURAL"
+  ],
+  "status": "PLAN_READY",
+  "beats": [
+    {
+      "id": "HOOK",
+      "label": "الخطاف",
+      "start": "00:00",
+      "end": "00:50",
+      "rhythm": "SLOW"
+    },
+    {
+      "id": "SETUP",
+      "label": "التأسيس",
+      "start": "00:50",
+      "end": "02:00",
+      "rhythm": "MEDIUM"
+    },
+    {
+      "id": "INCITING_EVENT",
+      "label": "الشرارة",
+      "start": "02:00",
+      "end": "03:00",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "ESCALATION",
+      "label": "التصعيد",
+      "start": "03:00",
+      "end": "04:20",
+      "rhythm": "SLOW"
+    },
+    {
+      "id": "MIDPOINT",
+      "label": "نقطة التحول",
+      "start": "04:20",
+      "end": "05:30",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "CRISIS",
+      "label": "الأزمة",
+      "start": "05:30",
+      "end": "07:00",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "CLIMAX",
+      "label": "الذروة",
+      "start": "07:00",
+      "end": "08:40",
+      "rhythm": "CLIMAX"
+    },
+    {
+      "id": "RESOLUTION",
+      "label": "الخاتمة",
+      "start": "08:40",
+      "end": "10:00",
+      "rhythm": "RELEASE"
+    }
+  ],
+  "quality_gates": {
+    "original_story": true,
+    "multiple_shots_per_beat": true,
+    "camera_motion": true,
+    "voiceover": true,
+    "music": true,
+    "sfx": true,
+    "subtitles": true,
+    "transitions": true,
+    "continuity": true,
+    "reject_static_slideshow": true
+  }
+}
