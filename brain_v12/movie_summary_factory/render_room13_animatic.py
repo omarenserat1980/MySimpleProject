@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import json, pathlib, subprocess, shutil
+from brain_v12 import brain_ffmpeg
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
@@ -14,12 +15,11 @@ plan = json.loads(PLAN.read_text(encoding="utf-8"))
 shots = plan["shots"]
 target = float(plan["target_minutes"]) * 60
 per = target / len(shots)
-ff = shutil.which("ffmpeg")
-ffprobe = shutil.which("ffprobe")
-if not ff:
-    raise SystemExit("FFMPEG_NOT_INSTALLED")
-if not ffprobe:
-    raise SystemExit("FFPROBE_NOT_INSTALLED")
+try:
+    ff = brain_ffmpeg.ffmpeg()
+    ffprobe = brain_ffmpeg.ffprobe()
+except RuntimeError as exc:
+    raise SystemExit(str(exc))
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 segments = []
@@ -81,7 +81,7 @@ if not OUT.exists() or OUT.stat().st_size < 1024:
     write_progress("FAILED", 100, len(shots))
     raise SystemExit("ROOM13_OUTPUT_INVALID")
 probe = subprocess.run([
-    shutil.which("ffprobe"), "-v", "error", "-show_entries",
+    ffprobe, "-v", "error", "-show_entries",
     "format=duration,size:stream=codec_type,codec_name,width,height",
     "-of", "json", str(OUT)
 ], capture_output=True, text=True, check=True)
