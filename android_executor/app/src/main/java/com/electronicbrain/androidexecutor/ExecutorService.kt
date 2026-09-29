@@ -307,6 +307,12 @@ class ExecutorService : Service() {
         getSystemService(NotificationManager::class.java).notify(7, notification(text))
     }
 
+    override fun onTimeout(startId: Int) {
+        running = false
+        executor.shutdownNow()
+        stopSelf(startId)
+    }
+
     override fun onDestroy() {
         running = false
         executor.shutdownNow()
