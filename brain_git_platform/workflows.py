@@ -6,8 +6,8 @@ import sqlite3
 from . import service
 from .service import BrainGitError
 
-
 STATUSES = {"queued", "running", "success", "failed", "cancelled"}
+TERMINAL = {"success", "failed", "cancelled"}
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,8 @@ def _init():
 
 
 def dispatch(namespace: str, repository: str, workflow: str, ref: str = "main") -> WorkflowRun:
+    if not all(isinstance(x, str) and x.strip() for x in (namespace, repository, workflow, ref)):
+        raise BrainGitError("workflow dispatch fields must be non-empty strings")
     _init()
     now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(service.DB) as db:
@@ -56,6 +58,10 @@ def dispatch(namespace: str, repository: str, workflow: str, ref: str = "main") 
 
 
 def claim_next(worker_id: str, max_attempts: int = 3) -> dict | None:
+    if not isinstance(worker_id, str) or not worker_id.strip():
+        raise BrainGitError("worker_id must be a non-empty string")
+    if max_attempts < 1:
+        raise BrainGitError("max_attempts must be positive")
     _init()
     now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(service.DB, timeout=30, isolation_level="IMMEDIATE") as db:
@@ -79,6 +85,8 @@ def claim_next(worker_id: str, max_attempts: int = 3) -> dict | None:
 
 
 def recover_stale(timeout_seconds: int = 900, max_attempts: int = 3) -> int:
+    if timeout_seconds < 1 or max_attempts < 1:
+        raise BrainGitError("timeout_seconds and max_attempts must be positive")
     _init()
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
     with sqlite3.connect(service.DB) as db:
@@ -90,12 +98,12 @@ def recover_stale(timeout_seconds: int = 900, max_attempts: int = 3) -> int:
         for run_id, attempts in rows:
             if attempts < max_attempts:
                 db.execute(
-                    "UPDATE workflow_runs SET status='queued', worker_id=NULL, heartbeat_at=NULL WHERE id=?",
+                    "UPDATE workflow_runs SET status='queued', worker_id=NULL, heartbeat_at=NULL WHERE id=? AND status='running'",
                     (run_id,),
                 )
             else:
                 db.execute(
-                    "UPDATE workflow_runs SET status='failed', worker_id=NULL, heartbeat_at=NULL, completed_at=? WHERE id=?",
+                    "UPDATE workflow_runs SET status='failed', worker_id=NULL, heartbeat_at=NULL, completed_at=? WHERE id=? AND status='running'",
                     (datetime.now(timezone.utc).isoformat(), run_id),
                 )
             recovered += 1
@@ -119,28 +127,41 @@ def heartbeat(run_id: int, worker_id: str) -> None:
 def retry(run_id: int) -> None:
     _init()
     with sqlite3.connect(service.DB) as db:
-        cur = db.execute(
-            "UPDATE workflow_runs SET status='queued', worker_id=NULL, heartbeat_at=NULL, completed_at=NULL WHERE id=? AND status='failed'",
+        row = db.execute("SELECT status, attempt_count FROM workflow_runs WHERE id=?", (run_id,)).fetchone()
+        if not row:
+            raise BrainGitError("workflow run not found")
+        if row[0] != "failed":
+            raise BrainGitError("only failed runs can be retried")
+        db.execute(
+            "UPDATE workflow_runs SET status='queued', worker_id=NULL, heartbeat_at=NULL, completed_at=NULL, attempt_count=0 WHERE id=?",
             (run_id,),
         )
-        if cur.rowcount != 1:
-            raise BrainGitError("only failed runs can be retried")
         db.commit()
 
 
-def set_status(run_id: int, status: str) -> None:
+def set_status(run_id: int, status: str, worker_id: str | None = None) -> None:
     if status not in STATUSES:
         raise BrainGitError("invalid workflow status")
     _init()
     with sqlite3.connect(service.DB) as db:
-        cur = db.execute(
-            """UPDATE workflow_runs
-               SET status=?, completed_at=?, heartbeat_at=CASE WHEN ?='running' THEN heartbeat_at ELSE NULL END
-               WHERE id=?""",
-            (status, datetime.now(timezone.utc).isoformat() if status in {"success", "failed", "cancelled"} else None, status, run_id),
-        )
-        if cur.rowcount != 1:
+        row = db.execute("SELECT status, worker_id FROM workflow_runs WHERE id=?", (run_id,)).fetchone()
+        if not row:
             raise BrainGitError("workflow run not found")
+        current, owner = row
+        if current in TERMINAL:
+            raise BrainGitError("workflow run is already terminal")
+        if current == "running" and owner and worker_id != owner:
+            raise BrainGitError("workflow run is owned by another worker")
+        if status == "running" and current != "queued":
+            raise BrainGitError("only queued runs can enter running state")
+        if status in TERMINAL and current == "queued" and status != "cancelled":
+            raise BrainGitError("queued runs can only be cancelled")
+        completed = datetime.now(timezone.utc).isoformat() if status in TERMINAL else None
+        heartbeat_at = None if status != "running" else datetime.now(timezone.utc).isoformat()
+        db.execute(
+            "UPDATE workflow_runs SET status=?, completed_at=?, heartbeat_at=?, worker_id=? WHERE id=?",
+            (status, completed, heartbeat_at, owner if status == "running" else None, run_id),
+        )
         db.commit()
 
 
