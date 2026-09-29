@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,22 +28,85 @@ class WorkflowResult:
 
 
 class BrainRunnerExecutor:
-    """Execute a parsed Brain workflow inside its assigned workspace."""
+    """Execute a parsed Brain workflow with bounded processes and cancellation."""
 
-    def __init__(self, workspace: Path, logs: RunLog | None = None, artifacts: ArtifactStore | None = None):
+    def __init__(
+        self,
+        workspace: Path,
+        logs: RunLog | None = None,
+        artifacts: ArtifactStore | None = None,
+        cancel_event: threading.Event | None = None,
+    ):
         self.workspace = workspace.resolve()
         self.workspace.mkdir(parents=True, exist_ok=True)
         self.logs = logs
         self.artifacts = artifacts
+        self.cancel_event = cancel_event or threading.Event()
 
     def run_step(self, name: str, command: list[str], timeout: int = 900) -> StepResult:
         if not command or any(not isinstance(x, str) or not x for x in command):
             raise ValueError("command must be a non-empty string list")
+        if timeout < 1:
+            raise ValueError("timeout must be positive")
+        if self.cancel_event.is_set():
+            return StepResult(name, " ".join(command), 130, "", "cancelled")
+
+        env = os.environ.copy()
+        env["BRAIN_RUNNER_WORKSPACE"] = str(self.workspace)
         try:
-            p = subprocess.run(command, cwd=self.workspace, text=True, capture_output=True, timeout=timeout)
-            return StepResult(name, " ".join(command), p.returncode, p.stdout, p.stderr)
-        except subprocess.TimeoutExpired as exc:
-            return StepResult(name, " ".join(command), 124, exc.stdout or "", exc.stderr or "timeout")
+            p = subprocess.Popen(
+                command,
+                cwd=self.workspace,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+                env=env,
+            )
+        except OSError as exc:
+            return StepResult(name, " ".join(command), 127, "", str(exc))
+
+        try:
+            elapsed = 0.0
+            while p.poll() is None:
+                if self.cancel_event.wait(0.25):
+                    try:
+                        os.killpg(p.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        p.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(p.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        p.wait()
+                    return StepResult(name, " ".join(command), 130, "", "cancelled")
+                elapsed += 0.25
+                if elapsed >= timeout:
+                    try:
+                        os.killpg(p.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    try:
+                        p.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            os.killpg(p.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        p.wait()
+                    return StepResult(name, " ".join(command), 124, "", "timeout")
+
+            stdout, stderr = p.communicate()
+            return StepResult(name, " ".join(command), p.returncode, stdout, stderr)
+        finally:
+            if p.poll() is None:
+                try:
+                    os.killpg(p.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
     def run_workflow(self, workflow: Workflow, run_id: int) -> WorkflowResult:
         results: list[StepResult] = []
