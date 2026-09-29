@@ -1,6 +1,17 @@
 name: room-13-cinematic-render
 on:
   workflow_dispatch:
+    inputs:
+      brain_command:
+        description: "Brain launch command"
+        required: true
+        default: "\\AUTO1000"
+        type: string
+      auto_confirm:
+        description: "Automatically approve internal confirmations"
+        required: true
+        default: true
+        type: boolean
   schedule:
     - cron: "*/5 * * * *"
   push:
