@@ -18,6 +18,7 @@ if [ -z "$GH_TOKEN" ]; then
 fi
 export BRAIN_GITHUB_TOKEN="$GH_TOKEN"
 export BRAIN_GITHUB_REPOSITORY="${BRAIN_GITHUB_REPOSITORY:-omarenserat1980/MySimpleProject}"
+export BRAIN_EMULATOR_KEY_FILE="${BRAIN_EMULATOR_KEY_FILE:-$HOME/.brain/secrets/termux_agent.key}"
 echo "BRAIN_GITHUB_SESSION=READY"
 if [ -f "brain_v12/ci/brain_github_auth.py" ]; then
   python brain_v12/ci/brain_github_auth.py
