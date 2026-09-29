@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>آخر ضوء في المدينة — صفحة الفيلم</title>
+<style>
+:root{--bg:#070a12;--card:#101624;--text:#f5f7fb;--muted:#aab3c5;--accent:#f1c56b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0,#1a2135 0,#070a12 55%);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:auto;padding:28px 18px 70px}.hero{padding:55px 0 28px;text-align:center}.badge{display:inline-block;border:1px solid #39445c;border-radius:999px;padding:7px 14px;color:var(--accent);font-size:13px}
+h1{font-size:clamp(38px,7vw,76px);margin:18px 0 8px}.lead{color:var(--muted);font-size:18px}
+.player{background:#000;border:1px solid #30394c;border-radius:20px;overflow:hidden;box-shadow:0 20px 70px #0008}.player video{display:block;width:100%;aspect-ratio:16/9;background:#05070b}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:22px}.card{background:#101624cc;border:1px solid #273149;border-radius:16px;padding:20px}.card h2{margin-top:0;font-size:20px}.muted{color:var(--muted)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.shot{aspect-ratio:16/9;background:linear-gradient(135deg,#111827,#313b50);border-radius:12px;display:grid;place-items:center;color:#cbd3e1;border:1px solid #30394c}
+.team div{display:flex;justify-content:space-between;border-bottom:1px solid #252d3e;padding:10px 0}.team div:last-child{border:0}
+audio{width:100%}.footer{text-align:center;color:#778198;margin-top:40px;font-size:13px}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main class="wrap">
+<section class="hero">
+<span class="badge">BRAIN FACTORY • NO-PAY PRODUCTION</span>
+<h1>آخر ضوء في المدينة</h1>
+<p class="lead">فيلم سينمائي قصير — من إنتاج خط الإنتاج المحلي داخل Brain Cloud</p>
+</section>
+
+<section class="player">
+<video controls playsinline preload="metadata" poster="assets/poster.jpg">
+<source src="assets/last_light_city.mp4" type="video/mp4">
+متصفحك لا يدعم تشغيل الفيديو.
+</video>
+</section>
+
+<section class="grid">
+<article class="card"><h2>🎬 الفيلم</h2><p>العنوان: آخر ضوء في المدينة</p><p>النوع: سينمائي / Flipbook</p><p>المقاس: 1280×720 — 16:9</p><p>المحرك: Python + Pillow + FFmpeg</p></article>
+<article class="card"><h2>🔊 الصوت</h2><p class="muted">المسار الصوتي المدمج في النسخة النهائية.</p><audio controls preload="metadata"><source src="assets/last_light_city.mp4" type="video/mp4"></audio></article>
+<article class="card"><h2>⚙️ الإنتاج</h2><p>إنتاج محلي مجاني بدون خدمة مدفوعة.</p><p class="muted">يتم التحقق من ملف MP4 بعد التوليد.</p></article>
+</section>
+
+<section class="card" style="margin-top:22px">
+<h2>👥 فريق العمل</h2>
+<div class="team">
+<div><span>الفكرة والإشراف</span><strong>Brain Factory</strong></div>
+<div><span>السيناريو والمحتوى</span><strong>Brain Cloud</strong></div>
+<div><span>الإخراج البصري</span><strong>Cinematic Renderer</strong></div>
+<div><span>الرسوم والإطارات</span><strong>Python + Pillow</strong></div>
+<div><span>المونتاج والترميز</span><strong>FFmpeg</strong></div>
+<div><span>التحقق</span><strong>MP4 / ffprobe</strong></div>
+</div>
+</section>
+
+<section class="card" style="margin-top:22px">
+<h2>🖼️ صور ومشاهد الفيلم</h2>
+<div class="gallery">
+<div class="shot">المشهد 01<br>آخر ضوء</div><div class="shot">المشهد 02<br>المدينة</div><div class="shot">المشهد 03<br>الغروب</div><div class="shot">المشهد 04<br>الإطار الأخير</div>
+</div>
+<p class="muted">يمكن للمصنع استبدال هذه البطاقات تلقائياً بإطارات الإنتاج عند توفرها في <code>assets/</code>.</p>
+</section>
+
+<footer class="footer">© Brain Factory — صفحة عرض الفيلم • آخر تحديث آلي مع كل إنتاج</footer>
+</main>
+<script>
+document.querySelector('video').addEventListener('error',()=>console.log('ضع ملف الفيلم النهائي في assets/last_light_city.mp4'));
+</script>
+</body></html>
