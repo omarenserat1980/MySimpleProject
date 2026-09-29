@@ -33,3 +33,5 @@ class BrainCodeHubTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+# CI contract validation marker: BRAIN Code Hub
