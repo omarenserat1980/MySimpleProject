@@ -13,16 +13,28 @@ permissions:
 jobs:
   deploy:
     name: Deploy Brain Cloud to production host
-    if: >
-      (github.event_name == 'workflow_dispatch' ||
-       github.event.workflow_run.conclusion == 'success') &&
-      secrets.BRAIN_CLOUD_SSH_HOST != '' &&
-      secrets.BRAIN_CLOUD_SSH_USER != '' &&
-      secrets.BRAIN_CLOUD_SSH_KEY != ''
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check deployment configuration
+        id: config
+        env:
+          SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          SSH_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SSH_HOST" ] && [ -n "$SSH_USER" ] && [ -n "$SSH_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Brain Cloud production SSH deployment is not configured; deployment skipped."
+          fi
+
       - name: Configure SSH
+        if: steps.config.outputs.configured == 'true'
         env:
           SSH_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
           SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
@@ -32,13 +44,17 @@ jobs:
           printf '%s\n' "$SSH_KEY" > ~/.ssh/brain_cloud_key
           chmod 600 ~/.ssh/brain_cloud_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
       - name: Upload compose
+        if: steps.config.outputs.configured == 'true'
         env:
           SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           scp -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
+
       - name: Deploy
+        if: steps.config.outputs.configured == 'true'
         env:
           SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
