@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Preflight gate for Room 13 media production.
-
-Checks the Brain media toolchain, TTS availability, plan integrity, and
-renderer/QC coupling before an expensive render starts.
-"""
+"""Preflight gate for Room 13 media production and its 100-component stack."""
 from __future__ import annotations
 
 import json
 import shutil
 import subprocess
 from pathlib import Path
+
+from room13_components import validate_registry
 
 ROOT = Path(__file__).resolve().parents[2]
 PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
@@ -25,6 +23,9 @@ def main() -> int:
     checks["plan"] = PLAN.is_file()
     checks["renderer"] = RENDERER.is_file()
     checks["qc"] = QC.is_file()
+    registry_errors = validate_registry()
+    checks["component_registry"] = not registry_errors
+    checks["component_count"] = 100 if not registry_errors else 0
 
     if checks["espeak_ng"]:
         p = subprocess.run(
@@ -32,8 +33,9 @@ def main() -> int:
             check=True, text=True, capture_output=True
         )
         checks["arabic_voice"] = any(
-            line.split() and "ar" in line.split()[:4]
+            token == "ar" or token.startswith("ar-")
             for line in p.stdout.splitlines()
+            for token in line.split()
         )
     else:
         checks["arabic_voice"] = False
@@ -57,8 +59,12 @@ def main() -> int:
     checks["rejects_bad_output"] = "ROOM13_QC_FAILED" in source
 
     failed = [k for k, v in checks.items() if v in (False, None, "", 0)]
-    result = {"status": "READY" if not failed else "BLOCKED",
-              "checks": checks, "failed": failed}
+    result = {
+        "status": "READY" if not failed else "BLOCKED",
+        "checks": checks,
+        "registry_errors": registry_errors,
+        "failed": failed,
+    }
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if not failed else 2
 
