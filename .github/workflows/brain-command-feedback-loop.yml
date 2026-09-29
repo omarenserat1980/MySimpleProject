@@ -7,6 +7,7 @@ on:
       - "cloud/brain_command_loop.py"
       - "cloud/brain_command_protocol.py"
       - "cloud/brain_command_stream.py"
+      - "cloud/test_brain_command_loop.py"
 
 permissions:
   contents: read
@@ -19,10 +20,12 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Test command feedback contract
+        run: python -m unittest cloud.test_brain_command_loop cloud.test_brain_command_protocol cloud.test_brain_command_stream -v
       - name: Generate next Brain command
         run: |
           python -m cloud.brain_command_loop | tee brain-next-command.json
-      - name: Publish command and dashboard evidence
+      - name: Publish command evidence
         uses: actions/upload-artifact@v6
         with:
           name: brain-command-feedback
