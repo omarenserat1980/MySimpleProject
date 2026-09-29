@@ -1,5 +1,7 @@
 name: brain-cloud-cinematic-autopilot
 
+# Brain Cloud cinematic pipeline: automatic push trigger enabled.
+
 on:
   workflow_dispatch:
     inputs:
