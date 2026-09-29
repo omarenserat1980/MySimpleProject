@@ -8,6 +8,11 @@ on:
       - ".github/workflows/room-13-cinematic-render.yml"
 permissions:
   contents: read
+
+concurrency:
+  group: room-13-cinematic-render
+  cancel-in-progress: false
+
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -25,6 +30,11 @@ jobs:
         run: python brain_v12/movie_summary_factory/render_room13_animatic.py
       - name: Probe output
         run: ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json brain_v12/web/media/engine/room-13-horror-10m-animatic.mp4
+      - name: Render status
+        run: |
+          echo "ROOM_13_RENDER_STATUS=COMPLETED" >> "$GITHUB_STEP_SUMMARY"
+          echo "ROOM_13_RENDER_PERCENT=100" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload MP4 artifact
         uses: actions/upload-artifact@v4
         with:
