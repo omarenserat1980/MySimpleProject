@@ -17,7 +17,7 @@ class MergeTests(unittest.TestCase):
             subprocess.run(["git","checkout","-b","feature"],cwd=work,check=True,capture_output=True)
             (work/"a").write_text("two")
             subprocess.run(["git","add","a"],cwd=work,check=True)
-            subprocess.run(["git","*cfg","commit","-m","feature"],cwd=work,check=True,capture_output=True)
+            subprocess.run(["git",*cfg,"commit","-m","feature"],cwd=work,check=True,capture_output=True)
             subprocess.run(["git","push","origin","feature"],cwd=work,check=True,capture_output=True)
             subprocess.run(["git","checkout","main"],cwd=work,check=True,capture_output=True)
             subprocess.run(["git","pull"],cwd=work,check=True,capture_output=True)
