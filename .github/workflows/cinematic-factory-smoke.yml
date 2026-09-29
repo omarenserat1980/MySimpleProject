@@ -19,27 +19,23 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v5
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: |
             brain_v7/requirements.txt
             brain_v12/requirements.txt
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-
       - name: Install project dependencies
         run: |
           python -m pip install --upgrade pip
@@ -47,35 +43,29 @@ jobs:
           python -m pip install --disable-pip-version-check -r brain_v12/requirements.txt
           python -m pip install --disable-pip-version-check pytest
           python -m pip check
-
       - name: Compile Brain V7 and V12 modules
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m compileall -q brain_v7/braincore_v2
           python -m compileall -q brain_v12
-
       - name: Run Brain V12 tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
-
       - name: Run V6 cinema tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest -q brain_v7/braincore_v2/test_cinema_engine_v6.py
-
       - name: Run bounded code repair app tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pytest -q brain_v7/braincore_v2/test_code_repair_app.py
-
       - name: Run adaptive speed and benchmark tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m pytest -q             brain_v7/braincore_v2/test_speed_pipeline.py             brain_v7/braincore_v2/test_speed_optimizer.py             brain_v7/braincore_v2/test_benchmark_router.py             brain_v7/braincore_v2/test_production_speed_optimizer.py
-
       - name: Run focused cinematic smoke
         env:
           PYTHONPATH: ${{ github.workspace }}
@@ -85,7 +75,6 @@ jobs:
           from brain_v7.braincore_v2.cinematic_director import build_plan
           from brain_v7.braincore_v2.cinematic_quality_gate import inspect_video
           from brain_v7.braincore_v2.cinema_engine_v6 import CinemaEngineV6
-
           story = build_story("اختبار سينمائي")
           plan = build_plan("اختبار سينمائي")
           assert story["story_id"]
@@ -94,7 +83,6 @@ jobs:
           assert CinemaEngineV6().snapshot()["version"] == 6
           print("cinematic V6 smoke: OK")
           PY
-
       - name: Verify FFmpeg runtime
         run: |
           command -v ffmpeg
