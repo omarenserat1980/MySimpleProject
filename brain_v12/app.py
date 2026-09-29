@@ -42,6 +42,7 @@ from .brain.youtube_oauth import YouTubeOAuth
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
+from . import visual_engine
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -231,6 +232,19 @@ class CodePaths(BaseModel): paths:list[str]=[]
 class MediaJobIn(BaseModel):
     operation: str
     spec: dict = {}
+
+class VisualCompileIn(BaseModel):
+    prompt: str
+    mode: str = "auto"
+
+@app.post("/api/visual-engine/compile")
+def visual_engine_compile(body: VisualCompileIn):
+    scene = visual_engine.compile_scene(body.prompt, body.mode)
+    return {"ok": True, "scene": scene, "svg": visual_engine.render_svg(scene)}
+
+@app.get("/api/visual-engine/health")
+def visual_engine_health():
+    return {"ok": True, "engine": "BRAIN Visual Engine", "renderer": "SVG", "local": True, "external_api": False}
 
 
 @app.get("/api/media/health")
