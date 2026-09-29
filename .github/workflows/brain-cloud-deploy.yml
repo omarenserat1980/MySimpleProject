@@ -5,6 +5,9 @@ on:
   workflow_run:
     workflows: ["Brain Cloud Native"]
     types: [completed]
+  push:
+    paths:
+      - ".github/workflows/brain-cloud-deploy.yml"
 
 permissions:
   contents: read
@@ -12,12 +15,12 @@ permissions:
 
 concurrency:
   group: brain-cloud-production-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy Brain Cloud to production host
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
