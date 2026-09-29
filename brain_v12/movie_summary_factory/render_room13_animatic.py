@@ -51,7 +51,7 @@ for i, s in enumerate(shots):
         "-f", "lavfi", "-i", "color=c=black:s=1920x1080:r=24",
         "-f", "lavfi", "-i", f"sine=frequency={freq}:sample_rate=48000",
         "-t", f"{d:.3f}", "-vf", vf,
-        "-af", "volume=0.035,afade=t=in:st=0:d=1,afade=t=out:st=17.75:d=1",
+        "-af", f"volume=0.035,afade=t=in:st=0:d=1,afade=t=out:st={max(0, d-1)}:d=1",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "96k", "-ar", "48000", "-ac", "2",
         "-pix_fmt", "yuv420p", str(out)
