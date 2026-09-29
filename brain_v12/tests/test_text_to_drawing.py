@@ -5,7 +5,7 @@ class TextToDrawingTests(unittest.TestCase):
     def test_visual_engine_page_contains_local_pipeline(self):
         path=pathlib.Path(__file__).resolve().parents[1]/"web"/"text-to-drawing"/"index.html"
         content=path.read_text(encoding="utf-8")
-        for marker in ("BRAIN Visual Engine","/api/visual-engine/compile","downloadHTML","downloadSVG","downloadPNG","downloadScene","downloadTimeline","openMediaEngine","brain.visual.timeline"):
+        for marker in ("BRAIN Visual Engine","/api/visual-engine/compile","downloadHTML","downloadSVG","downloadPNG","downloadScene","downloadTimeline","openMediaEngine","renderToMediaMP4","/api/media/upload","/api/media/slideshow","/api/media/jobs/","brain.visual.timeline"):
             self.assertIn(marker,content)
         self.assertNotIn("openai.com",content.lower())
 
