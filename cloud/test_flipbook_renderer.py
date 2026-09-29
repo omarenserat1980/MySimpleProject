@@ -2,7 +2,7 @@ from __future__ import annotations
 import tempfile, unittest
 from pathlib import Path
 from PIL import Image
-from cloud.flipbook_renderer import build_flipbook, render_frames
+from cloud.flipbook_renderer import build_flipbook, render_pages_from_images, render_frames
 
 class FlipbookRendererTests(unittest.TestCase):
     def test_frames_are_numbered_and_distinct(self):
@@ -22,3 +22,15 @@ class FlipbookRendererTests(unittest.TestCase):
             self.assertTrue(Path(result["video"]).exists())
 
 if __name__=="__main__": unittest.main()
+
+def test_external_drawing_pages(tmp_path):
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    for index in range(1, 4):
+        image = Image.new("RGB", (160, 90), "white")
+        image.save(source_dir / f"drawing_{index}.png")
+    pages = render_pages_from_images(
+        [source_dir / "drawing_1.png", source_dir / "drawing_2.png", source_dir / "drawing_3.png"],
+        tmp_path / "pages",
+    )
+    assert [p.name for p in pages] == ["frame_0001.png", "frame_0002.png", "frame_0003.png"]
