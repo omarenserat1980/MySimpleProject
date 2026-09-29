@@ -1,6 +1,7 @@
 name: brain-cloud-cinematic-autopilot
 
 # Brain Cloud cinematic pipeline: automatic push trigger enabled.
+# v7 hardening: every renderer/test change triggers a fresh production run.
 
 on:
   workflow_dispatch:
