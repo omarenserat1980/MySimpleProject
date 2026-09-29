@@ -26,7 +26,7 @@ COMPONENTS = (
     Component(02, "Media Health Gate", "يفحص جاهزية أدوات الوسائط قبل الإنتاج"),
     Component(03, "Renderer", "ينشئ المقاطع ويجمعها"),
     Component(04, "Quality Control", "يفحص الفيديو والصوت والمخرجات"),
-    Component(05, "Plan Validator", "يتحقق من بنية خطة الفيلم"),
+    Component(05, "Plan Validator", "يتحقق من بنية خطة الفيلم", "implemented"),
     Component(06, "Shot Validator", "يتحقق من جاهزية كل لقطة"),
     Component(07, "Beat Validator", "يتحقق من تسلسل النبضات السردية"),
     Component(08, "Duration Guard", "يتحقق من المدد"),
