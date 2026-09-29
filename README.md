@@ -13,37 +13,14 @@ Perceive → Understand → Memory → Goal → Plan → Decide → Act → Obse
 
 تمت إزالة ملفات مشروع المضخة من جذر المشروع حتى لا تبقى واجهة أو تشغيلات خاصة بالمضخات ضمن المشروع الحالي.
 
-## Brain V12 ↔ BRAIN BRAIN Termux Emulator Emulator Agent Gateway
+## Brain Cloud runtime
 
-The gateway uses HTTPS polling with an allowlist and shared secret. The initial smoke test is `python_version`.
+المسار التشغيلي المعتمد للإنتاج هو **Brain Cloud فقط**. الإنتاج السينمائي، الطوابير، التخزين، التحقق، وعمليات النشر الاختيارية تعمل داخل Cloud Runtime.
 
-### BRAIN BRAIN Termux Emulator Emulator
-```bash
-cd ~/MySimpleProject
-export BRAIN_URL="http://127.0.0.1:10000"
-export BRAIN_EMULATOR_AGENT_KEY='YOUR_SECRET'
-export BRAIN_EMULATOR_AGENT_ID="android-brain_emulator-v12"
-bash brain_emulator_agent/run_agent.sh
-```
-
-Keep `BRAIN_EMULATOR_AGENT_KEY` out of source control and chat messages.
-
-### Smoke test
-After the agent is running, the Brain control endpoint can enqueue `python_version`. The Agent claims it, executes `python --version`, reports the result, and Brain verifies the stored result.
-
-Allowed initial tasks: `status`, `python_version`, `brain_emulator_path`, `platform`.
-
-
-### V12 heartbeat
-The BRAIN BRAIN Termux Emulator Emulator agent sends an authenticated heartbeat every 10 seconds by default.
-Set `BRAIN_EMULATOR_HEARTBEAT_SECONDS` to change the interval. Brain diagnostics expose persistent
-agent last-seen information and online state.
-
-
-Agent status endpoint: `GET /api/device/agent-status` (authenticated with `X-V12-Agent-Key`). It reports ONLINE/STALE state and heartbeat age.
-
-- Per-agent status: `GET /api/device/agent-status/{agent_id}` returns heartbeat age, TTL, and ONLINE/STALE state.
-
+- لا يعتمد الإنتاج على Termux أو جهاز خارجي.
+- DeviceBridge موجود للتوافق البرمجي فقط، وتنفيذ مهام الأجهزة معطّل في Cloud.
+- لا يُعتبر الفيلم ناجحًا إلا بعد إنشاء MP4 حقيقي واجتياز FFprobe/QC مستقل للصوت والصورة.
+- FFmpeg وFFprobe يمران عبر عقد Brain-native toolchain (`BRAIN_FFMPEG_BIN` و`BRAIN_FFPROBE_BIN`).
 
 ## Mining Economics
 أضيفت طبقة **Mining Economics** للعقل V12 للتحليل الحسابي فقط، دون تشغيل تعدين أو شراء أجهزة أو ربط محافظ.
