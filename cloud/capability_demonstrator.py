@@ -41,7 +41,7 @@ def main() -> int:
         decision["execution_status"] = "FAILED_PLAN"
         DECISION.write_text(json.dumps(decision, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return plan_rc
-    env["BRAIN_CINEMATIC_PLAN"] = str(ROOT / "STATE" / "capability_demo" / "brain-capability-film.json")
+    env["BRAIN_CINEMATIC_PLAN"] = str(ROOT / "brain_v12" / "movie_summary_factory" / "jobs" / "room-13-horror-10m-cinematic-v3.json")
     result = subprocess.run(
         [sys.executable, "-m", "brain_v12.cinematic_autopilot"],
         cwd=ROOT, env=env, check=False,
