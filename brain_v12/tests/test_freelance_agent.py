@@ -18,6 +18,8 @@ def test_profile_and_fit():
     result = agent.analyze({
         "title": "تطوير موقع ASP.NET وربط WhatsApp",
         "requirements": "C# .NET REST API",
+        "source_url": "https://example.com/project",
+        "evidence": "documented project requirements",
     })
     assert result["fit_score"] >= 55
     assert "web" in result["categories"]
