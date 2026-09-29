@@ -238,7 +238,8 @@ class CloudRuntime:
             agents = [dict(x) for x in c.execute("SELECT * FROM agents ORDER BY name").fetchall()]
         return {"runtime": "brain_cloud", "device_required": False, "termux_required": False,
                 "queue": {"queued": queued, "running": running, "ready": ready, "published": published, "failed": failed},
-                "agents": agents,\n                "storage": {"state_dir": str(STATE), "media_dir": str(MEDIA), "queue_db": str(DB),\n                            "state_writable": os.access(STATE, os.W_OK), "media_writable": os.access(MEDIA, os.W_OK)}}
+                "agents": agents,\n                "storage": {"state_dir": str(STATE), "media_dir": str(MEDIA), "queue_db": str(DB),
+                            "state_writable": os.access(STATE, os.W_OK), "media_writable": os.access(MEDIA, os.W_OK)}}
 
     def run_forever(self) -> None:
         sleep_s = max(1, int(os.getenv("BRAIN_QUEUE_POLL_SECONDS", "5")))
