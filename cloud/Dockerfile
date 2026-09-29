@@ -22,6 +22,6 @@ ENV FACTORY_REQUIRE_REAL_MEDIA=1
 ENV BRAIN_FFMPEG_BIN=/usr/bin/ffmpeg
 ENV BRAIN_FFPROBE_BIN=/usr/bin/ffprobe
 
-CMD ["sh","-c","uvicorn cloud.api_server:app --host 0.0.0.0 --port ${PORT:-8000} & exec python cloud/brain_cloud.py"]
+CMD ["python","-m","cloud.brain_cloud"]
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"
