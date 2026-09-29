@@ -19,6 +19,8 @@ on:
       - ".github/workflows/brain-cloud-cinematic-autopilot.yml"
       - "cloud/film_reliability.py"
       - "cloud/runtime_orchestrator.py"
+      - "cloud/capability_demonstrator.py"
+      - "cloud/capability_film.py"
       - "cloud/test_film_reliability.py"
 
 permissions:
