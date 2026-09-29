@@ -1,0 +1,12 @@
+name: Brain CI Repair Diagnostics
+description: Run deterministic diagnostics and emit machine-readable repair evidence
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p brain_v12/ci-reports
+        python --version | tee brain_v12/ci-reports/python-version.txt
+        command -v ffmpeg >/dev/null 2>&1 && ffmpeg -version | head -n 1 | tee brain_v12/ci-reports/ffmpeg-version.txt || echo FFMPEG_MISSING | tee brain_v12/ci-reports/ffmpeg-version.txt
+        git status --short | tee brain_v12/ci-reports/git-status.txt
