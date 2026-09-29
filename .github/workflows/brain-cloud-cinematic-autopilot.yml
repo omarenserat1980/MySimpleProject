@@ -86,6 +86,9 @@ jobs:
         run: |
           python -m unittest cloud.test_film_reliability -v
 
+      - name: Brain autonomously chooses its capability demonstration
+        run: python -m cloud.capability_demonstrator
+
       - name: Run cinematic autopilot
         run: python -m brain_v12.cinematic_autopilot
 
@@ -138,6 +141,7 @@ jobs:
             cinematic_output/cinematic-autopilot.log
             brain_v12/web/media/engine/cinematic-autopilot-state.json
             brain_v12/web/media/engine/room-13-qc.json
+            STATE/capability_demo/decision.json
           if-no-files-found: error
 
       - name: Upload diagnostics on failure
