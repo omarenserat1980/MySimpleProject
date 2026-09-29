@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
+PLAN = Path(os.getenv("BRAIN_CINEMATIC_PLAN", str(ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json")))
 RENDER = ROOT / "brain_v12/movie_summary_factory/render_room13_animatic.py"
 QC = ROOT / "brain_v12/movie_summary_factory/room13_qc.py"
 TEST = ROOT / "brain_v12/movie_summary_factory/test_room13_pipeline.py"
