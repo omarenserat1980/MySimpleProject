@@ -1,0 +1,9 @@
+{
+  "name": "brain-git-platform-foundation",
+  "steps": [
+    {
+      "name": "unit-tests",
+      "command": ["python", "-m", "unittest", "discover", "-s", "brain_git_platform", "-p", "test_*.py", "-v"]
+    }
+  ]
+}
