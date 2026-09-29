@@ -32,12 +32,7 @@ print("BRAIN_CLOUD_STORAGE=1", flush=True)
 print("BRAIN_CLOUD_VERIFICATION=1", flush=True)
 print("BRAIN_CLOUD_YOUTUBE_EXECUTOR=1", flush=True)
 
-if os.getenv("BRAIN_CLOUD_SKIP_FACTORY", "0").strip().lower() in {"1", "true", "yes", "on"}:
-    print("BRAIN_CLOUD_FACTORY_SKIPPED=1", flush=True)
-    while not STOP:
-        time.sleep(1)
-    print("BRAIN_CLOUD_STOP=1", flush=True)
-    raise SystemExit(0)
+SKIP_FACTORY = os.getenv("BRAIN_CLOUD_SKIP_FACTORY", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 runtime = CloudRuntime()
 
@@ -81,8 +76,12 @@ while not STOP:
     env.setdefault("BRAIN_BLOCK_PRIVATE_NETWORKS", "1")
     env.setdefault("BRAIN_HTTP_TIMEOUT", "30")
 
-    print("BRAIN_CLOUD_CYCLE_START=1", flush=True)
-    factory_rc = run_software_factory(env)
+    if SKIP_FACTORY:
+        print("BRAIN_CLOUD_FACTORY_SKIPPED=1", flush=True)
+        factory_rc = 0
+    else:
+        print("BRAIN_CLOUD_CYCLE_START=1", flush=True)
+        factory_rc = run_software_factory(env)
     if factory_rc != 0:
         print(f"BRAIN_CLOUD_SOFTWARE_GATE=FAIL rc={factory_rc}", flush=True)
         for _ in range(failure_backoff):
@@ -93,6 +92,10 @@ while not STOP:
         continue
 
     print("BRAIN_CLOUD_SOFTWARE_GATE=PASS", flush=True)
+    if SKIP_FACTORY:
+        while not STOP:
+            time.sleep(1)
+        break
     try:
         result = subprocess.run(
             ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
