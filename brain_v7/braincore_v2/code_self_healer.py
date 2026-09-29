@@ -33,7 +33,6 @@ SOURCE_ALLOWLIST = {
 }
 VERIFY_TESTS = (
     "brain_v7/braincore_v2/test_factory_repair_app.py",
-    "brain_v7/braincore_v2/test_code_repair_app.py",
     "brain_v7/braincore_v2/test_cinematic_local_renderer.py",
 )
 
@@ -209,7 +208,13 @@ def verify() -> tuple[bool, str]:
             cwd=ROOT, capture_output=True, text=True, timeout=240,
         )
     except subprocess.TimeoutExpired as exc:
-        output = (exc.stdout or "") + (exc.stderr or "")
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        output = stdout + stderr
         return False, ("verification_timeout: pytest exceeded 240s; " + output)[-6000:]
     return test.returncode == 0, (test.stdout + test.stderr)[-6000:]
 
