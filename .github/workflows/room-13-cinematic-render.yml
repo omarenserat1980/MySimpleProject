@@ -1,4 +1,5 @@
 name: room-13-cinematic-render
+# Brain launch channel: this workflow is intentionally push-triggerable for immediate Brain execution.
 on:
   workflow_dispatch:
     inputs:
