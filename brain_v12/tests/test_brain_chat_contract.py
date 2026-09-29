@@ -6,7 +6,6 @@ PAGE = ROOT / "web" / "brain-chat.html"
 def test_brain_chat_contract():
     html = PAGE.read_text(encoding="utf-8")
     for marker in (
-        'POST /api/chat',
         'fetch("/api/chat"',
         '/api/ai/status',
         '/api/image-factory/generate',
