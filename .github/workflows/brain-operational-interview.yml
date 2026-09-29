@@ -21,10 +21,16 @@ jobs:
           python-version: "3.12"
       - name: Run interview tests
         run: python -m pytest -q cloud/test_brain_interview.py
+      - name: Run Brain Self-Healing Loop
+        run: python -m cloud.brain_self_healing
+
       - name: Generate Brain interview report
         run: python -m cloud.brain_interview > brain-interview-report.json
       - name: Upload interview evidence
         uses: actions/upload-artifact@v4
         with:
           name: brain-operational-interview
-          path: brain-interview-report.json
+          path: |
+            brain-interview-report.json
+            STATE/self_healing/latest.json
+
