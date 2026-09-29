@@ -204,6 +204,20 @@ def film_status(job_id: str):
     return {"ok": True, "job": job}
 
 
+@app.get("/v1/films/{job_id}/video", dependencies=[Depends(require_auth)])
+def legacy_film_video(job_id: str):
+    path = _job_path(job_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="film job not found")
+    job = json.loads(path.read_text(encoding="utf-8"))
+    if job.get("status") != "COMPLETED":
+        raise HTTPException(status_code=409, detail="film is not verified complete")
+    video = _find_final_video(job)
+    if not video:
+        raise HTTPException(status_code=404, detail="verified film output not found")
+    return FileResponse(video, media_type="video/mp4", filename=video.name)
+
+
 @app.post("/v1/films/{job_id}/publish", dependencies=[Depends(require_auth)])
 def publish_film(job_id: str):
     job = runtime.get(job_id)
