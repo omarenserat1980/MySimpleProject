@@ -1,8 +1,9 @@
-"""Human-like capability benchmark for Brain Cloud.
+"""Evidence-first cognitive benchmark for Brain Cloud.
 
-This is an evidence-first benchmark. It never assigns a capability score
-without an executable test result. The 14 dimensions are intentionally
-separate so the aggregate can be audited.
+The benchmark combines public reference families with Brain-specific tests.
+It is a measurement framework, not a claim of human equivalence or age.
+External benchmark results are only accepted when their evaluation protocol
+and provenance are recorded.
 """
 
 from dataclasses import dataclass
@@ -11,6 +12,16 @@ from dataclasses import dataclass
 TEST_WEIGHT_PERCENT = 0.02
 TARGET_TESTS = 5000
 TOTAL_BENCHMARK_PERCENT = TEST_WEIGHT_PERCENT * TARGET_TESTS
+
+REFERENCE_BENCHMARKS = {
+    'fluid_reasoning': 'ARC-AGI-2',
+    'interactive_adaptation': 'ARC-AGI-3',
+    'expert_knowledge_reasoning': "Humanity's Last Exam",
+    'graduate_science_reasoning': 'GPQA Diamond',
+    'software_engineering': 'SWE-bench Verified',
+    'computer_use': 'OSWorld',
+    'general_knowledge_reasoning': 'MMLU-Pro',
+}
 
 DIMENSIONS = (
     "reasoning",
@@ -74,14 +85,13 @@ class Evidence:
 
 
 def score(evidence: list[Evidence]) -> float:
-    """Return a percentage only from explicit PASS/PARTIAL evidence.
-
-    PASS=1, PARTIAL=0.5, anything else=0. This is a benchmark score,
-    not a claim about consciousness, intelligence, or human equivalence.
-    """
+    """Return earned percentage from at most the 5,000-test budget."""
+    validate_dimensions(evidence)
+    if len(evidence) > TARGET_TESTS:
+        raise ValueError("evidence exceeds the 5000-test benchmark budget")
     weights = {"PASS": 1.0, "PARTIAL": 0.5}
-    total = sum(weights.get(item.status.upper(), 0.0) for item in evidence)
-    return round(TEST_WEIGHT_PERCENT * total, 2)
+    earned = sum(weights.get(item.status.upper(), 0.0) for item in evidence)
+    return round(TEST_WEIGHT_PERCENT * earned, 2)
 
 
 def validate_dimensions(evidence: list[Evidence]) -> None:
