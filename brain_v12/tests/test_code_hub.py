@@ -9,5 +9,27 @@ class BrainCodeHubTests(unittest.TestCase):
     def test_ui_mount(self):
         self.assertIn("/code-hub", {getattr(r,"path","") for r in app.routes})
 
+    def test_write_routes_are_protected(self):
+        source=__import__("pathlib").Path(__file__).resolve().parents[1]/"app.py"
+        text=source.read_text(encoding="utf-8")
+        for marker in (
+            'def brain_hub_create_repository(request:Request',
+            'def brain_hub_create_branch(request:Request',
+            'def brain_hub_create_issue(request:Request',
+            'def brain_hub_create_pull(request:Request',
+            'def brain_hub_cancel_action(run_id:int, request:Request',
+            'def brain_hub_rerun_action(run_id:int, request:Request',
+            'def brain_hub_merge_pull(number:int, request:Request',
+            'def brain_hub_close_issue(number:int, request:Request',
+        ):
+            self.assertIn(marker,text)
+        self.assertGreaterEqual(text.count("require_control_key(request)"), 8)
+
+    def test_ui_controls(self):
+        source=__import__("pathlib").Path(__file__).resolve().parents[1]/"web"/"code-hub"/"index.html"
+        text=source.read_text(encoding="utf-8")
+        for marker in ("controlKey","closeIssue","mergePR","showJobs","actionRun"):
+            self.assertIn(marker,text)
+
 if __name__=="__main__":
     unittest.main()
