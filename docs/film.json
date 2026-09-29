@@ -7,19 +7,46 @@
     "render": "ready",
     "video": "ready",
     "audio": "ready",
-    "verification": "pending",
-    "self_healing": "pending",
+    "verification": "ready",
+    "self_healing": "not_run",
     "web": "ready"
   },
   "video": "assets/last_light_city.mp4",
   "poster": "assets/poster.svg",
   "team": [
-    ["الفكرة والإشراف","Brain Factory"],
-    ["السيناريو والمحتوى","Brain Cloud"],
-    ["الإخراج البصري","Cinematic Renderer"],
-    ["الرسوم والإطارات","Python + Pillow"],
-    ["المونتاج والترميز","FFmpeg"],
-    ["التحقق","MP4 / ffprobe"]
+    [
+      "الفكرة والإشراف",
+      "Brain Factory"
+    ],
+    [
+      "السيناريو والمحتوى",
+      "Brain Cloud"
+    ],
+    [
+      "الإخراج البصري",
+      "Cinematic Renderer"
+    ],
+    [
+      "الرسوم والإطارات",
+      "Python + Pillow"
+    ],
+    [
+      "المونتاج والترميز",
+      "FFmpeg"
+    ],
+    [
+      "التحقق",
+      "MP4 / ffprobe"
+    ]
   ],
-  "specs": {"resolution":"1280×720","aspect_ratio":"16:9","fps":12,"production_seconds":12}
+  "specs": {
+    "resolution": "1280×720",
+    "aspect_ratio": "16:9",
+    "fps": 12,
+    "production_seconds": 12
+  },
+  "build": {
+    "workflow": "Brain Cinema - Publish Film Page",
+    "source": "Last Light In The City - No Pay Production"
+  }
 }
