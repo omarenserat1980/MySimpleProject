@@ -43,6 +43,25 @@ def render_video(frame_dir, output_file, fps=12):
     subprocess.run(cmd,check=True)
     return output
 
+def render_pages_from_images(images, output_dir):
+    """Normalize externally generated drawings into numbered flipbook pages."""
+    root = Path(output_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for index, source in enumerate(images, 1):
+        source_path = Path(source)
+        if not source_path.exists():
+            raise FileNotFoundError(source_path)
+        with Image.open(source_path) as image:
+            page = image.convert("RGB")
+            target = root / f"frame_{index:04d}.png"
+            page.save(target, "PNG")
+            paths.append(target)
+    if len(paths) < 2:
+        raise ValueError("at least two drawing pages are required")
+    return paths
+
+
 def build_flipbook(work_dir, frames=24, fps=12):
     root=Path(work_dir); frame_dir=root/"frames"; video=root/"flipbook.mp4"
     paths=render_frames(frame_dir,frames=frames); render_video(frame_dir,video,fps=fps)
