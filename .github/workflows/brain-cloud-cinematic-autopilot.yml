@@ -71,13 +71,17 @@ jobs:
       - name: Brain preflight
         run: |
           python -m compileall -q brain_v12 cloud
-          python -m unittest brain_v12.movie_summary_factory.test_room13_pipeline -v
+          python -m unittest brain_v12.movie_summary_factory.test_room13_pipeline cloud.test_film_reliability -v
           python brain_v12/movie_summary_factory/room13_media_health.py
           python - <<'PY'
           from brain_v12.brain_ffmpeg import ffmpeg, ffprobe
           print("BRAIN_FFMPEG_RESOLVED=" + ffmpeg())
           print("BRAIN_FFPROBE_RESOLVED=" + ffprobe())
           PY
+
+      - name: Reliability engine contract gate
+        run: |
+          python -m unittest cloud.test_film_reliability -v
 
       - name: Run cinematic autopilot
         run: python -m brain_v12.cinematic_autopilot
