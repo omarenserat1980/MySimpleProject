@@ -111,6 +111,28 @@ class CloudRuntime:
 
     def _process(self, job: dict[str, Any]) -> dict[str, Any]:
         jid, payload = job["id"], job["payload"]
+        if job["kind"] == "cinematic_autopilot":
+            self._update(jid, "production", {"route": "brain_v12.cinematic_autopilot"})
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(ROOT)
+            env["CINEMATIC_MAX_ATTEMPTS"] = str(max(1, min(5, int(payload.get("max_attempts", 3)))))
+            log_dir = MEDIA / ("autopilot_" + jid)
+            log_dir.mkdir(parents=True, exist_ok=True)
+            env["FACTORY_OUTPUT_DIR"] = str(log_dir)
+            p = subprocess.run([sys.executable, "-m", "brain_v12.cinematic_autopilot"], cwd=ROOT, env=env,
+                               capture_output=True, text=True, timeout=int(os.getenv("BRAIN_FACTORY_TIMEOUT_SECONDS", "3600")),
+                               check=False)
+            result = {"ok": p.returncode == 0, "return_code": p.returncode,
+                      "stdout": p.stdout[-12000:], "stderr": p.stderr[-4000:]}
+            self._agent("cinematic_autopilot", result["ok"])
+            if result["ok"]:
+                manifest = ROOT / "cinematic_output" / "film_manifest.json"
+                video = ROOT / "cinematic_output" / "final.mp4"
+                result.update({"video_path": str(video), "manifest_path": str(manifest)})
+                self._update(jid, "ready", result)
+            else:
+                self._update(jid, "failed", result)
+            return self.get(jid)  # type: ignore[return-value]
         if job["kind"] == "youtube_publish":
             self._update(jid, "publishing")
             from cloud.youtube_executor import publish_video
