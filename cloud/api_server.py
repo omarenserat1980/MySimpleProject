@@ -228,7 +228,9 @@ def publish_film(job_id: str):
 @app.get("/v1/runtime", dependencies=[Depends(require_auth)])
 def runtime_status():
     return runtime.snapshot()
-\n@app.get("/v1/agents", dependencies=[Depends(require_auth)])
+
+
+@app.get("/v1/agents", dependencies=[Depends(require_auth)])
 def agents_status():
     return {"ok": True, "agents": runtime.snapshot().get("agents", []), "runtime": "brain_cloud"}
 
