@@ -4,6 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from brain_git_platform.api.auth_middleware import require_scope
 from brain_git_platform.api.routes import BrainGitApi
 from brain_git_platform.service import BrainGitError, health
 
@@ -11,7 +12,7 @@ api = BrainGitApi()
 
 
 class BrainGitHandler(BaseHTTPRequestHandler):
-    server_version = "BrainGit/0.5"
+    server_version = "BrainGit/0.6"
 
     def _send(self, code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode()
@@ -21,14 +22,26 @@ class BrainGitHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _authorize(self, scope: str) -> bool:
+        result = require_scope(dict(self.headers.items()), scope)
+        if result.ok:
+            return True
+        code = 503 if result.error == "authentication_not_configured" else (
+            401 if result.error == "authentication_required" else 403
+        )
+        self._send(code, {"error": result.error})
+        return False
+
     def _body(self):
         length = int(self.headers.get("Content-Length", "0"))
-        if length > 2_000_000:
+        if length < 0 or length > 2_000_000:
             raise ValueError("request_too_large")
         return json.loads(self.rfile.read(length) or b"{}")
 
     def do_GET(self):
         path = urlparse(self.path).path.rstrip("/")
+        if path != "/api/v1/health" and not self._authorize("repo:read"):
+            return
         try:
             if path == "/api/v1/health":
                 return self._send(200, health())
@@ -47,6 +60,13 @@ class BrainGitHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/")
+        scope = "repo:write"
+        if path in {"/api/v1/workflows/dispatch", "/api/v1/workflows/cancel", "/api/v1/workflows/retry"}:
+            scope = "workflow:write"
+        elif path.startswith("/api/v1/pulls"):
+            scope = "pull:write"
+        if not self._authorize(scope):
+            return
         try:
             data = self._body()
         except (json.JSONDecodeError, ValueError):
