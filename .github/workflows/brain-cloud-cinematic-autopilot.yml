@@ -44,7 +44,7 @@ jobs:
       - name: Install deterministic media dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends             ffmpeg fonts-noto-core build-essential pkg-config yasm nasm             libx264-dev libfreetype6-dev libfontconfig1-dev
+          sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core build-essential pkg-config yasm nasm libx264-dev libfreetype6-dev libfontconfig1-dev
 
       - name: Brain preflight
         run: |
@@ -53,6 +53,24 @@ jobs:
 
       - name: Run cinematic autopilot
         run: python -m brain_v12.cinematic_autopilot
+
+      - name: Show autopilot diagnostics
+        if: always()
+        run: |
+          echo "=== cinematic autopilot state ==="
+          if [ -f brain_v12/web/media/engine/cinematic-autopilot-state.json ]; then
+            cat brain_v12/web/media/engine/cinematic-autopilot-state.json
+          else
+            echo "state file missing"
+          fi
+          echo "=== cinematic autopilot log (tail) ==="
+          if [ -f cinematic_output/cinematic-autopilot.log ]; then
+            tail -n 160 cinematic_output/cinematic-autopilot.log
+          else
+            echo "autopilot log missing"
+          fi
+          echo "=== media engine files ==="
+          find brain_v12/web/media/engine -maxdepth 1 -type f -printf '%f %s bytes\\n' | sort || true
 
       - name: Verify final MP4
         run: |
@@ -86,6 +104,17 @@ jobs:
             brain_v12/web/media/engine/cinematic-autopilot-state.json
             brain_v12/web/media/engine/room-13-qc.json
           if-no-files-found: error
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: brain-cloud-cinematic-diagnostics
+          path: |
+            cinematic_output/cinematic-autopilot.log
+            brain_v12/web/media/engine/cinematic-autopilot-state.json
+            brain_v12/web/media/engine/room-13-progress.json
+          if-no-files-found: ignore
 
       - name: Production summary
         if: always()
