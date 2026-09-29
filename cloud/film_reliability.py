@@ -15,6 +15,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from cloud.cinematic_sensory_qc import CinematicSensoryQC
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -99,6 +101,37 @@ class FilmReliabilityEngine:
         return {"ok": True, "duration": duration, "size": size, "format": fmt,
                 "streams": streams}
 
+    def _sensory_qc(self, payload: dict[str, Any]) -> dict[str, Any]:
+        qc = CinematicSensoryQC()
+        shots = payload.get("shots") or []
+        if not shots:
+            return {"ok": True, "mode": "manifest_not_available", "requires_review": False}
+        issues = []
+        previous = None
+        for index, shot in enumerate(shots):
+            shot_id = str(shot.get("id") or shot.get("shot_id") or f"shot-{index + 1}")
+            qc.inspect_shot(
+                shot_id,
+                visual=str(shot.get("visual") or shot.get("description") or ""),
+                audio=str(shot.get("audio") or shot.get("voice") or shot.get("sfx") or ""),
+            )
+            current = {
+                "character": shot.get("character"),
+                "location": shot.get("location"),
+                "time": shot.get("time"),
+                "audio_signature": shot.get("audio_signature") or shot.get("sfx"),
+            }
+            if previous is not None:
+                issues.extend(qc.continuity_check(previous, current)["issues"])
+            previous = current
+        return {
+            "ok": not issues,
+            "inspected_shots": len(shots),
+            "issues": sorted(set(issues)),
+            "requires_review": bool(issues),
+            "audit": qc.audit(),
+        }
+
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.final.unlink(missing_ok=True)
         self.manifest.unlink(missing_ok=True)
@@ -127,12 +160,13 @@ class FilmReliabilityEngine:
                 self._log(f"ATTEMPT {attempt}: renderer timeout")
             candidate = attempt_dir / "final.mp4"
             qc = self._qc(candidate)
-            record = {"attempt": attempt, "return_code": rc, "qc": qc,
+            sensory_qc = self._sensory_qc(payload)
+            record = {"attempt": attempt, "return_code": rc, "qc": qc, "sensory_qc": sensory_qc,
                       "elapsed_seconds": round(time.time() - started, 2)}
             history.append(record)
-            self._log(f"ATTEMPT {attempt}: rc={rc} qc={qc.get('ok')}")
+            self._log(f"ATTEMPT {attempt}: rc={rc} media_qc={qc.get('ok')} sensory_qc={sensory_qc.get('ok')}")
 
-            if rc == 0 and qc.get("ok"):
+            if rc == 0 and qc.get("ok") and sensory_qc.get("ok"):
                 staging = self.output_dir / ".final.mp4.tmp"
                 shutil.copyfile(candidate, staging)
                 final_qc = self._qc(staging)
@@ -151,13 +185,13 @@ class FilmReliabilityEngine:
                     "max_attempts": self.attempts,
                     "video": str(self.final),
                     "bytes": self.final.stat().st_size,
-                    "verification": final_qc,
+                    "verification": {"media": final_qc, "sensory": sensory_qc},
                     "attempt_history": history,
                 }
                 self.manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
                 self._log(f"SUCCESS: verified master promoted on attempt {attempt}")
                 return {"ok": True, "video_path": str(self.final),
-                        "manifest_path": str(self.manifest), "verification": final_qc,
+                        "manifest_path": str(self.manifest), "verification": {"media": final_qc, "sensory": sensory_qc},
                         "attempt": attempt, "attempt_history": history}
 
         self.final.unlink(missing_ok=True)
