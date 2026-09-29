@@ -10,6 +10,7 @@ def test_brain_chat_contract():
         '/api/ai/status',
         '/api/image-factory/generate',
         'localStorage',
+        '/api/media/upload',
         'Brain Chat',
     ):
         assert marker in html, marker
