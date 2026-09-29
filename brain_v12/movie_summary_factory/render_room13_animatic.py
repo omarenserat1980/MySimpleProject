@@ -10,7 +10,7 @@ import subprocess
 from brain_v12 import brain_ffmpeg
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
+PLAN = pathlib.Path(os.getenv("BRAIN_CINEMATIC_PLAN", str(ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json")))
 OUT = ROOT / "brain_v12/web/media/engine/room-13-horror-10m-animatic.mp4"
 PROGRESS = OUT.parent / "room-13-progress.json"
 ASSET_DIR = OUT.parent / "room13-assets"
