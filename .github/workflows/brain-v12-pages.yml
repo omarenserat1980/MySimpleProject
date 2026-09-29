@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: github-pages-${{ github.ref }}
@@ -26,24 +24,33 @@ jobs:
   validate:
     name: Validate and package Pages
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
       - name: Validate and assemble site
         shell: bash
         run: |
           set -euo pipefail
           chmod +x scripts/validate-pages.sh
           ./scripts/validate-pages.sh "$SITE_ROOT" "$SITE_OUT"
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
           path: ${{ env.SITE_OUT }}
 
   deploy:
+    name: Deploy Brain V12 to GitHub Pages
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
