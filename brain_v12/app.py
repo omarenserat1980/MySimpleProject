@@ -263,6 +263,133 @@ async def brain_hub_actions(owner:str="",repo:str="",per_page:int=20):
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"runs":[{"id":x["id"],"name":x["name"],"status":x["status"],"conclusion":x["conclusion"],"branch":x.get("head_branch"),"sha":x.get("head_sha"),"html_url":x.get("html_url"),"created_at":x.get("created_at")} for x in r.json()]}
 
+
+class BrainHubCreateBranchIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    name:str
+    from_ref:str="main"
+
+class BrainHubIssueIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    title:str
+    body:str=""
+    labels:list[str]=[]
+
+class BrainHubPullIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    title:str
+    head:str
+    base:str="main"
+    body:str=""
+
+class BrainHubActionIn(BaseModel):
+    owner:str=""
+    repo:str=""
+
+class BrainHubCreateRepoIn(BaseModel):
+    name:str
+    description:str=""
+    private:bool=False
+    auto_init:bool=True
+
+def _brain_hub_full(owner:str="", repo:str=""):
+    full = f"{owner.strip()}/{repo.strip()}" if owner.strip() and repo.strip() else _github_repo()
+    if "/" not in full or any(part.strip() == "" for part in full.split("/",1)):
+        raise HTTPException(status_code=400, detail="INVALID_GITHUB_REPOSITORY")
+    return full
+
+@app.post("/api/brain-hub/repositories")
+async def brain_hub_create_repository(body:BrainHubCreateRepoIn):
+    name=body.name.strip()
+    if not name or "/" in name or len(name)>100:
+        raise HTTPException(status_code=400, detail="INVALID_REPOSITORY_NAME")
+    payload={"name":name,"description":body.description.strip(),"private":body.private,"auto_init":body.auto_init}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post("https://api.github.com/user/repos",headers=_github_headers(),json=payload)
+    if r.status_code>=400:
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"repository":{"full_name":x.get("full_name"),"name":x.get("name"),"default_branch":x.get("default_branch","main"),"private":x.get("private"),"html_url":x.get("html_url")}}
+
+@app.post("/api/brain-hub/branches")
+async def brain_hub_create_branch(body:BrainHubCreateBranchIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    name=body.name.strip().replace(" ","-")
+    if not name or name in {"main","master"}:
+        raise HTTPException(status_code=400,detail="INVALID_BRANCH_NAME")
+    base=body.from_ref.strip() or "main"
+    async with httpx.AsyncClient(timeout=30) as client:
+        ref=await client.get(f"https://api.github.com/repos/{full}/git/ref/heads/{base}",headers=_github_headers())
+        if ref.status_code>=400:
+            raise HTTPException(status_code=ref.status_code,detail=ref.text[:1000])
+        sha=ref.json().get("object",{}).get("sha")
+        r=await client.post(f"https://api.github.com/repos/{full}/git/refs",headers=_github_headers(),json={"ref":f"refs/heads/{name}","sha":sha})
+    if r.status_code>=400:
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"branch":name,"sha":sha,"from_ref":base}
+
+@app.post("/api/brain-hub/issues")
+async def brain_hub_create_issue(body:BrainHubIssueIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    payload={"title":body.title.strip(),"body":body.body}
+    if body.labels: payload["labels"]=body.labels
+    if not payload["title"]: raise HTTPException(status_code=400,detail="ISSUE_TITLE_REQUIRED")
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/issues",headers=_github_headers(),json=payload)
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"issue":{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"html_url":x.get("html_url")}}
+
+@app.post("/api/brain-hub/pulls")
+async def brain_hub_create_pull(body:BrainHubPullIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    if not body.title.strip() or not body.head.strip() or not body.base.strip():
+        raise HTTPException(status_code=400,detail="PULL_REQUEST_FIELDS_REQUIRED")
+    payload={"title":body.title.strip(),"head":body.head.strip(),"base":body.base.strip(),"body":body.body}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/pulls",headers=_github_headers(),json=payload)
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"pull":{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"draft":x.get("draft"),"html_url":x.get("html_url")}}
+
+@app.post("/api/brain-hub/actions/{run_id}/cancel")
+async def brain_hub_cancel_action(run_id:int, body:BrainHubActionIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/cancel",headers=_github_headers())
+    if r.status_code not in (202,204):
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"run_id":run_id,"status":"CANCEL_REQUESTED"}
+
+@app.post("/api/brain-hub/actions/{run_id}/rerun")
+async def brain_hub_rerun_action(run_id:int, body:BrainHubActionIn):
+    full=_brain_hub_full(body.owner,body.repo)
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/rerun-failed-jobs",headers=_github_headers())
+    if r.status_code not in (201,202,204):
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    return {"ok":True,"run_id":run_id,"status":"RERUN_REQUESTED"}
+
+@app.get("/api/brain-hub/pulls")
+async def brain_hub_pulls(owner:str="",repo:str="",state:str="open"):
+    full=_brain_hub_full(owner,repo)
+    async with httpx.AsyncClient(timeout=20) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/pulls",headers=_github_headers(),params={"state":state,"per_page":100})
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
+    return {"ok":True,"pulls":[{"number":x["number"],"title":x["title"],"state":x["state"],"draft":x.get("draft",False),"head":(x.get("head") or {}).get("ref"),"base":(x.get("base") or {}).get("ref"),"html_url":x.get("html_url")} for x in r.json()]}
+
+@app.get("/api/brain-hub/compare")
+async def brain_hub_compare(owner:str="",repo:str="",base:str="main",head:str="main"):
+    full=_brain_hub_full(owner,repo)
+    async with httpx.AsyncClient(timeout=20) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/compare/{base}...{head}",headers=_github_headers())
+    if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    x=r.json()
+    return {"ok":True,"status":x.get("status"),"ahead_by":x.get("ahead_by"),"behind_by":x.get("behind_by"),"total_commits":x.get("total_commits"),"files":[{"filename":f.get("filename"),"status":f.get("status"),"additions":f.get("additions"),"deletions":f.get("deletions"),"changes":f.get("changes")} for f in x.get("files",[])],"html_url":x.get("html_url")}
+
 @app.get("/api/quick-editor/status")
 def quick_editor_status():
     return {"ok":True,"editor":"BRAIN Quick Editor","runtime":"BRAIN_TERMUX_EMULATOR","github":_github_config(),
