@@ -39,7 +39,9 @@ if os.getenv("BRAIN_CLOUD_SKIP_FACTORY", "0").strip().lower() in {"1", "true", "
     print("BRAIN_CLOUD_STOP=1", flush=True)
     raise SystemExit(0)
 
-runtime = CloudRuntime()\n\ndef run_software_factory(env):
+runtime = CloudRuntime()
+
+def run_software_factory(env):
     try:
         return subprocess.run(
             ["python", "cloud/goal_engine.py"],
@@ -51,7 +53,19 @@ runtime = CloudRuntime()\n\ndef run_software_factory(env):
 
 failure_backoff = BACKOFF
 
-queue_thread = None\n\ndef run_queue():\n    try:\n        CloudRuntime().run_forever()\n    except Exception as exc:\n        print(f"BRAIN_CLOUD_QUEUE_ERROR={type(exc).__name__}:{exc}", flush=True)\n\nqueue_thread = threading.Thread(target=run_queue, name="brain-cloud-queue", daemon=True)\nqueue_thread.start()\n\nwhile not STOP:\n    env = os.environ.copy()
+queue_thread = None
+
+def run_queue():
+    try:
+        CloudRuntime().run_forever()
+    except Exception as exc:
+        print(f"BRAIN_CLOUD_QUEUE_ERROR={type(exc).__name__}:{exc}", flush=True)
+
+queue_thread = threading.Thread(target=run_queue, name="brain-cloud-queue", daemon=True)
+queue_thread.start()
+
+while not STOP:
+    env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(ROOT))
     env.setdefault("FACTORY_ALLOW_PRODUCTION", "1")
     env.setdefault("FACTORY_REQUIRE_REAL_MEDIA", "1")
