@@ -1,23 +1,32 @@
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from brain_git_platform.api.auth_middleware import require_scope
 from brain_git_platform.api.routes import BrainGitApi
+from brain_git_platform.git_transport import advertise_refs, receive_pack, resolve_repo_path, upload_pack
 from brain_git_platform.service import BrainGitError, health
 
 api = BrainGitApi()
 
 
 class BrainGitHandler(BaseHTTPRequestHandler):
-    server_version = "BrainGit/0.6"
+    server_version = "BrainGit/0.7"
 
     def _send(self, code: int, payload: dict):
         body = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_git(self, content_type: str, body: bytes):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -34,17 +43,35 @@ class BrainGitHandler(BaseHTTPRequestHandler):
 
     def _body(self):
         length = int(self.headers.get("Content-Length", "0"))
-        if length < 0 or length > 2_000_000:
+        max_bytes = int(os.environ.get("BRAIN_GIT_MAX_REQUEST_BYTES", str(64 * 1024 * 1024)))
+        if length < 0 or length > max_bytes:
             raise ValueError("request_too_large")
-        return json.loads(self.rfile.read(length) or b"{}")
+        return self.rfile.read(length)
+
+    def _git_repo_base(self, path: str, suffix: str):
+        if not path.endswith(suffix):
+            raise BrainGitError("invalid git transport path")
+        return path[:-len(suffix)]
 
     def do_GET(self):
-        path = urlparse(self.path).path.rstrip("/")
-        if path != "/api/v1/health" and not self._authorize("repo:read"):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/")
+        if path != "/api/v1/health" and not path.endswith("/info/refs") and not self._authorize("repo:read"):
             return
         try:
             if path == "/api/v1/health":
                 return self._send(200, health())
+
+            if path.endswith("/info/refs"):
+                service_name = parse_qs(parsed.query).get("service", [None])[0]
+                if not service_name:
+                    raise BrainGitError("git service is required")
+                repo = resolve_repo_path(self._git_repo_base(path, "/info/refs"))
+                return self._send_git(
+                    f"application/x-{service_name}-advertisement",
+                    advertise_refs(repo, service_name),
+                )
+
             parts = path.split("/")
             if len(parts) == 7 and parts[:4] == ["", "api", "v1", "repos"] and parts[6] == "refs":
                 return self._send(200, api.refs(parts[4], parts[5]))
@@ -60,15 +87,31 @@ class BrainGitHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/")
-        scope = "repo:write"
-        if path in {"/api/v1/workflows/dispatch", "/api/v1/workflows/cancel", "/api/v1/workflows/retry"}:
-            scope = "workflow:write"
-        elif path.startswith("/api/v1/pulls"):
-            scope = "pull:write"
+
+        if path.endswith("/git-upload-pack"):
+            scope = "repo:read"
+        elif path.endswith("/git-receive-pack"):
+            scope = "repo:write"
+        else:
+            scope = "repo:write"
+            if path in {"/api/v1/workflows/dispatch", "/api/v1/workflows/cancel", "/api/v1/workflows/retry"}:
+                scope = "workflow:write"
+            elif path.startswith("/api/v1/pulls"):
+                scope = "pull:write"
         if not self._authorize(scope):
             return
+
         try:
-            data = self._body()
+            if path.endswith("/git-upload-pack"):
+                repo = resolve_repo_path(self._git_repo_base(path, "/git-upload-pack"))
+                body = upload_pack(repo, self._body())
+                return self._send_git("application/x-git-upload-pack-result", body)
+            if path.endswith("/git-receive-pack"):
+                repo = resolve_repo_path(self._git_repo_base(path, "/git-receive-pack"))
+                body = receive_pack(repo, self._body())
+                return self._send_git("application/x-git-receive-pack-result", body)
+
+            data = json.loads(self._body() or b"{}")
         except (json.JSONDecodeError, ValueError):
             return self._send(400, {"error": "invalid_request"})
 
