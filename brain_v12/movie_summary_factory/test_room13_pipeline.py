@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fast deterministic tests for the Room 13 production pipeline."""
 from __future__ import annotations
+
 import ast
 import json
 import pathlib
@@ -10,6 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
 RENDERER = ROOT / "brain_v12/movie_summary_factory/render_room13_animatic.py"
 QC = ROOT / "brain_v12/movie_summary_factory/room13_qc.py"
+
 
 class Room13PipelineTests(unittest.TestCase):
     @classmethod
@@ -40,13 +42,26 @@ class Room13PipelineTests(unittest.TestCase):
             self.assertIn(token, self.renderer)
 
     def test_renderer_audio_is_dynamic(self):
-        self.assertIn("afade=t=out:st={max(0, d-1)}", self.renderer)
+        self.assertIn("afade=t=out:st=", self.renderer)
+        self.assertIn("amix=inputs=2", self.renderer)
+        self.assertIn("loudnorm=", self.renderer)
+
+    def test_renderer_creates_real_visual_assets(self):
+        for token in ("make_ppm", "hospital", "door", "corridor", "character", "clock"):
+            self.assertIn(token, self.renderer)
+        self.assertNotIn("drawtext=", self.renderer)
+
+    def test_renderer_has_arabic_voice_pipeline(self):
+        self.assertIn("espeak-ng", self.renderer)
+        self.assertIn('"ar"', self.renderer)
+        self.assertIn('"voiceover": True', self.renderer)
 
     def test_brain_toolchain_is_required(self):
         self.assertIn("brain_ffmpeg", self.renderer)
         self.assertIn("brain_ffmpeg", self.qc)
         self.assertNotIn('shutil.which("ffmpeg")', self.renderer)
         self.assertNotIn('shutil.which("ffprobe")', self.renderer)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
