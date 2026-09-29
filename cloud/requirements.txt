@@ -3,3 +3,4 @@ uvicorn[standard]>=0.30,<1
 pydantic>=2.7,<3
 google-api-python-client>=2.150,<3
 google-auth>=2.35,<3
+Pillow>=10.4,<12
