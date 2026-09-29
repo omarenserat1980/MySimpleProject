@@ -60,6 +60,17 @@ def execute(task, params):
             "root": str(ROOT),
         }, "" if p.returncode == 0 else "CINEMATIC_FACTORY_FAILED"
 
+    if task == "cinematic_room13_render":
+        script = ROOT / "brain_v12" / "movie_summary_factory" / "render_room13_animatic.py"
+        if not script.exists():
+            return False, {}, "ROOM13_RENDER_SCRIPT_NOT_FOUND"
+        p = subprocess.run(["python", str(script)], cwd=str(ROOT), capture_output=True,
+                           text=True, timeout=24 * 60 * 60)
+        return p.returncode == 0, {
+            "stdout": p.stdout[-12000:], "stderr": p.stderr[-6000:], "returncode": p.returncode,
+            "root": str(ROOT), "script": str(script),
+        }, "" if p.returncode == 0 else "CINEMATIC_ROOM13_RENDER_FAILED"
+
     if task == "status":
         return True, {"agent_id": AGENT_ID, "platform": platform.platform(),
                       "python": platform.python_version(), "status": "READY"}, ""
