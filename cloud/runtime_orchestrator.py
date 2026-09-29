@@ -96,17 +96,30 @@ class CloudRuntime:
     def process_one(self) -> dict[str, Any] | None:
         with self._lock:
             with self._db() as c:
+                c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
                     "SELECT * FROM jobs WHERE stage='queued' ORDER BY updated_at LIMIT 1"
                 ).fetchone()
-            if not row:
+                if not row:
+                    c.commit()
+                    return None
+                job_id = row["id"]
+                claimed = c.execute(
+                    "UPDATE jobs SET stage='planning', updated_at=? WHERE id=? AND stage='queued'",
+                    (_now(), job_id),
+                ).rowcount
+                c.commit()
+            if claimed != 1:
                 return None
-            job = self._row(row)
+            job = self.get(job_id)
+            if not job:
+                return None
             try:
                 return self._process(job)
             except Exception as exc:
                 self._update(job["id"], "failed", {"error": f"{type(exc).__name__}: {exc}"})
                 return self.get(job["id"])
+
 
     def _process(self, job: dict[str, Any]) -> dict[str, Any]:
         jid, payload = job["id"], job["payload"]
@@ -136,7 +149,6 @@ class CloudRuntime:
             self._update(jid, "published" if result.get("published") else "failed", {"youtube": result})
             return self.get(jid)  # type: ignore[return-value]
 
-        self._update(jid, "planning")
         plan = self._plan(payload)
         self._agent("planner", True)
         self._update(jid, "production", {"plan": plan, "production_contract": "verified_mp4_v1"})
