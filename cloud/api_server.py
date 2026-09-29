@@ -112,31 +112,16 @@ def _find_final_video(job: dict) -> Path | None:
 
 
 def _run_film_job(job_id: str, body: FilmRequest) -> None:
-    # Legacy file-based jobs now use the same verified reliability engine as CloudRuntime.
-    log_path = FILM_JOBS / (job_id + ".log")
-    job = {"id": job_id, "status": "RUNNING", "title": body.title,
-           "target_minutes": body.target_minutes, "language": body.language,
-           "profile": "CINEMATIC V3 PRO"}
-    _save_job(job)
-    try:
-        from cloud.film_reliability import FilmReliabilityEngine
-        out = Path(os.getenv("FACTORY_OUTPUT_DIR", str(ROOT / "cinematic_output"))).resolve() / ("job_" + job_id)
-        result = FilmReliabilityEngine(out, max_attempts=3).run({
-            "title": body.title, "target_minutes": body.target_minutes,
-            "language": body.language, "objective": body.title, "route": "cinematic",
-        })
-        job["status"] = "COMPLETED" if result.get("ok") else "FAILED"
-        job["video_ready"] = bool(result.get("ok"))
-        job["video_path"] = result.get("video_path")
-        job["manifest_path"] = result.get("manifest_path")
-        job["verification"] = result.get("verification")
-        job["attempt_history"] = result.get("attempt_history")
-        if not result.get("ok"):
-            job["error"] = result.get("error", "verified production failed")
-    except Exception as exc:
-        job["status"] = "FAILED"
-        job["error"] = f"{type(exc).__name__}: {exc}"
-    _save_job(job)
+    """Compatibility worker: enqueue into the single CloudRuntime production path."""
+    job = runtime.enqueue("cinematic", {
+        "title": body.title.strip(),
+        "target_minutes": body.target_minutes,
+        "language": body.language,
+        "publish_youtube": False,
+        "legacy_job_id": job_id,
+    })
+    legacy = {"id": job_id, "status": "QUEUED", "runtime_job_id": job["id"], "route": "cloud_runtime"}
+    _save_job(legacy)
 
 
 @app.post("/v1/films", dependencies=[Depends(require_auth)])
