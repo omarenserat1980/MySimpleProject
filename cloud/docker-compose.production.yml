@@ -1,0 +1,33 @@
+services:
+  brain-cloud:
+    image: ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:latest
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${BRAIN_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /app
+      BRAIN_STATE_DIR: /data/brain_state
+      FACTORY_OUTPUT_DIR: /data/cinematic_output
+      LOCAL_MEDIA_DIR: /data/cinematic_output
+      BRAIN_SLEEP_SECONDS: "${BRAIN_SLEEP_SECONDS:-60}"
+      FACTORY_INTERVAL_SECONDS: "${FACTORY_INTERVAL_SECONDS:-21600}"
+      FACTORY_ALLOW_PRODUCTION: "${FACTORY_ALLOW_PRODUCTION:-1}"
+      FACTORY_ALLOW_YOUTUBE_PUBLISH: "${FACTORY_ALLOW_YOUTUBE_PUBLISH:-0}"
+      FACTORY_REQUIRE_REAL_MEDIA: "${FACTORY_REQUIRE_REAL_MEDIA:-1}"
+    volumes:
+      - brain_state:/data/brain_state
+      - brain_media:/data/cinematic_output
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  brain_state:
+  brain_media:
