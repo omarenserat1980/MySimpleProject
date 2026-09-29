@@ -138,17 +138,26 @@ jobs:
             if [ -f .factory_resume/.factory_state.json ]; then cp .factory_resume/.factory_state.json .factory_state.json; fi
           fi
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           command -v ffmpeg
           ffmpeg -version | head -n 1
+
+      - name: Preflight free media backend
+        run: |
+          set -euo pipefail
+          if [ -z "$FAL_KEY" ] && [ -z "$MEDIA_PROVIDER_URL" ] && [ -z "$COMFYUI_URL" ] && [ "$FACTORY_ALLOW_LOCAL_FALLBACK" != "1" ]; then
+            echo "::error::No free media backend configured."
+            exit 1
+          fi
+          echo "Free-only media profile enabled."
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install factory dependencies
         run: |
@@ -161,15 +170,6 @@ jobs:
             exit 1
           fi
           python -m pytest --version
-
-      - name: Preflight free media backend
-        run: |
-          set -euo pipefail
-          if [ -z "$FAL_KEY" ] && [ -z "$MEDIA_PROVIDER_URL" ] && [ -z "$COMFYUI_URL" ] && [ "$FACTORY_ALLOW_LOCAL_FALLBACK" != "1" ]; then
-            echo "::error::No free media backend configured."
-            exit 1
-          fi
-          echo "Free-only media profile enabled."
 
       - name: Run Code Self-Healer
         run: |
