@@ -64,6 +64,10 @@ jobs:
           brain_v12/bin/ffmpeg -version | head -n 1
           brain_v12/bin/ffprobe -version | head -n 1
 
+      - name: Stage 7 self-healing repair
+        run: |
+          python brain_v12/movie_summary_factory/room13_stage7_repair.py
+
       - name: Brain preflight
         run: |
           python -m compileall -q brain_v12 cloud
