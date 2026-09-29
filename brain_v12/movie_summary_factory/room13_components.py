@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Room 13 / Stage 7 component registry.
 
-This registry defines 100 operational components used to structure and
+This registry defines 100 operational components used to structure and\n# Stage 7 production trigger: registry syntax repaired before cinematic launch.
 validate the cinematic production pipeline. The first four map to the
 existing supervisor, media health gate, renderer, and QC systems; the
 remaining components provide explicit support contracts for validation,
