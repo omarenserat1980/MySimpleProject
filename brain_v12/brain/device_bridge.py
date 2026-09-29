@@ -9,14 +9,14 @@ AGENT_KEY_SHA256_ENV = "BRAIN_AGENT_KEY_SHA256"
 HEARTBEAT_STALE = "STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS = {"status": {}, "python_version": {}, "platform": {}}
+    ALLOWED_TASKS = {"status": {}, "python_version": {}, "platform": {}, "cinematic_room13_render": {}}
 
     def __init__(self, store):
         self.store = store
         self._last_seen = None
 
     def configured(self):
-        return False  # Cloud-only runtime: device agents are never required or activated.
+        return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
 
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV, ""):
@@ -29,7 +29,7 @@ class DeviceBridge:
         if not supplied:
             return False
 
-        expected = os.getenv(AGENT_KEY_ENV, "")
+        expected = os.getenv(AGENT_KEY_ENV, "") or os.getenv("BRAIN_EMULATOR_KEY", "")
         if expected and hmac.compare_digest(supplied, expected):
             return True
 
@@ -41,7 +41,6 @@ class DeviceBridge:
         return hmac.compare_digest(supplied_hash, expected_hash)
 
     def enqueue(self, task, params=None):
-        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         if task not in self.ALLOWED_TASKS:
             return {"ok": False, "status": "TASK_NOT_ALLOWED", "allowed": sorted(self.ALLOWED_TASKS)}
         item = {
@@ -57,7 +56,6 @@ class DeviceBridge:
     def poll(self, agent_id):
         if not agent_id:
             return {"ok": False, "status": "AGENT_ID_REQUIRED"}
-        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         self._last_seen = time.time()
         self.store.device_agent_touch(agent_id, self._last_seen)
         self.store.device_task_requeue_stale(max_age_seconds=int(os.getenv("TERMUX_TASK_STALE_SECONDS", "120")))
@@ -70,7 +68,7 @@ class DeviceBridge:
         now = time.time()
         self._last_seen = now
         self.store.device_agent_touch(agent_id, now)
-        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED", "agent_id": agent_id}
+        return {"ok": True, "status": "HEARTBEAT_ACCEPTED", "agent_id": agent_id}
 
     def report(self, task_id, agent_id, ok, result=None, error=""):
         status = self.store.device_task_report(task_id, agent_id, ok, result or {}, error)
