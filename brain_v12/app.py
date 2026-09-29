@@ -148,7 +148,7 @@ def _github_config():
             "branch":os.getenv("BRAIN_GITHUB_BRANCH") or os.getenv("GITHUB_REF_NAME") or "main"}
 
 def _github_headers():
-    token=os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+    token=os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
     if not token: raise HTTPException(status_code=503,detail="GITHUB_TOKEN_NOT_CONFIGURED")
     return {"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2026-03-10"}
 
@@ -281,6 +281,14 @@ class BrainHubActionIn(BaseModel):
     owner:str=""
     repo:str=""
 
+class BrainHubDispatchIn(BaseModel):
+    owner:str=""
+    repo:str=""
+    workflow:str="room-13-cinematic-render.yml"
+    ref:str="main"
+    brain_command:str="\\AUTO1000"
+    auto_confirm:bool=True
+
 class BrainHubCreateRepoIn(BaseModel):
     name:str
     description:str=""
@@ -350,6 +358,22 @@ async def brain_hub_create_pull(request:Request, body:BrainHubPullIn):
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
     x=r.json()
     return {"ok":True,"pull":{"number":x.get("number"),"title":x.get("title"),"state":x.get("state"),"draft":x.get("draft"),"html_url":x.get("html_url")}}
+
+@app.post("/api/brain-hub/actions/dispatch")
+async def brain_hub_dispatch_action(request:Request, body:BrainHubDispatchIn):
+    require_control_key(request)
+    full=_brain_hub_full(body.owner,body.repo)
+    workflow=body.workflow.strip()
+    ref=body.ref.strip() or "main"
+    if not workflow or "/" in workflow or ".." in workflow:
+        raise HTTPException(status_code=400,detail="INVALID_WORKFLOW")
+    payload={"ref":ref,"inputs":{"brain_command":body.brain_command,"auto_confirm":str(bool(body.auto_confirm)).lower()}}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/actions/workflows/{workflow}/dispatches",headers=_github_headers(),json=payload)
+    if r.status_code not in (204,201,202):
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    store.event("BRAIN_GITHUB_WORKFLOW_DISPATCHED",{"repository":full,"workflow":workflow,"ref":ref,"brain_command":body.brain_command})
+    return {"ok":True,"status":"DISPATCHED","repository":full,"workflow":workflow,"ref":ref,"brain_command":body.brain_command,"auto_confirm":body.auto_confirm}
 
 @app.post("/api/brain-hub/actions/{run_id}/cancel")
 async def brain_hub_cancel_action(run_id:int, request:Request, body:BrainHubActionIn):
