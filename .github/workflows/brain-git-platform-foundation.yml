@@ -1,0 +1,31 @@
+name: Brain Git Platform Foundation
+
+on:
+  push:
+    paths:
+      - "brain_git_platform/**"
+      - ".github/workflows/brain-git-platform-foundation.yml"
+  pull_request:
+    paths:
+      - "brain_git_platform/**"
+      - ".github/workflows/brain-git-platform-foundation.yml"
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Git
+        run: git --version
+      - name: Run Brain-native service tests
+        working-directory: brain_git_platform
+        run: python -m unittest -v test_service.py
+      - name: Assert no GitHub runtime import
+        run: |
+          if grep -RniE 'github\.com|api\.github\.com|PyGithub|GITHUB_TOKEN' brain_git_platform --exclude='*.md'; then
+            echo "GitHub runtime dependency detected in Brain Git Platform"
+            exit 1
+          fi
