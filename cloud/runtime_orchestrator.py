@@ -12,6 +12,7 @@ from typing import Any
 
 from cloud.film_reliability import FilmReliabilityEngine
 from cloud.nafs_policy import NafsPolicy
+from cloud.brain_inner_state import BrainInnerState
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -31,6 +32,7 @@ class CloudRuntime:
         MEDIA.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self.nafs = NafsPolicy()
+        self.inner_state = BrainInnerState(nafs=self.nafs)
         self._init_db()
 
     def _db(self) -> sqlite3.Connection:
@@ -95,6 +97,20 @@ class CloudRuntime:
                          runs=agents.runs+1,failures=agents.failures+excluded.failures""",
                       (name, "PASS" if ok else "FAIL", _now(), 1, 0 if ok else 1))
 
+    def _inner_preflight(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.inner_state.evaluate(
+            action=action,
+            evidence=float(payload.get("heart_evidence", 0.5)),
+            ambiguity=float(payload.get("heart_ambiguity", payload.get("nafs_uncertainty", 0.0))),
+            pressure=float(payload.get("heart_pressure", payload.get("nafs_temptation", 0.0))),
+            social_impact=float(payload.get("heart_social_impact", 0.5)),
+            benefit=float(payload.get("nafs_benefit", 0.5)),
+            harm=float(payload.get("nafs_harm", 0.0)),
+            temptation=float(payload.get("nafs_temptation", 0.0)),
+            uncertainty=float(payload.get("nafs_uncertainty", 0.0)),
+            reversible=bool(payload.get("nafs_reversible", True)),
+        )
+
     def _nafs_preflight(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Run the advisory Nafs review before consequential execution."""
         result = self.nafs.evaluate(
@@ -138,18 +154,20 @@ class CloudRuntime:
         jid, payload = job["id"], job["payload"]
 
         if job["kind"] == "cinematic_autopilot":
-            nafs = self._nafs_preflight("produce-cinematic-film", payload)
-            if nafs["decision"] in {"REJECT", "DEFER", "REVIEW"}:
-                self._update(jid, "failed", {"nafs": nafs, "error": "Nafs preflight did not permit execution"})
+            inner = self._inner_preflight("produce-cinematic-film", payload)
+            nafs = inner["nafs"]
+            if inner["decision"] == "REVIEW":
+                self._update(jid, "failed", {"inner_state": inner, "error": "Heart/Nafs preflight requires review"})
                 return self.get(jid)  # type: ignore[return-value]
             self._update(jid, "production", {
                 "route": "verified_film_reliability_engine",
-                "nafs": nafs,
+                "nafs": nafs, "inner_state": inner,
             })
             out = MEDIA / ("autopilot_" + jid)
             engine = FilmReliabilityEngine(out, max_attempts=int(payload.get("max_attempts", 3)))
             result = engine.run(payload)
             result["nafs"] = nafs
+            result["inner_state"] = inner
             self._agent("cinematic_autopilot", result.get("ok", False))
             if result.get("ok"):
                 self._update(jid, "ready", result)
@@ -158,11 +176,12 @@ class CloudRuntime:
             return self.get(jid)  # type: ignore[return-value]
 
         if job["kind"] == "youtube_publish":
-            nafs = self._nafs_preflight("publish-video", payload)
-            if nafs["decision"] in {"REJECT", "DEFER", "REVIEW"}:
-                self._update(jid, "failed", {"nafs": nafs, "error": "Nafs preflight did not permit publishing"})
+            inner = self._inner_preflight("publish-video", payload)
+            nafs = inner["nafs"]
+            if inner["decision"] == "REVIEW":
+                self._update(jid, "failed", {"inner_state": inner, "error": "Heart/Nafs preflight requires review before publishing"})
                 return self.get(jid)  # type: ignore[return-value]
-            self._update(jid, "publishing", {"nafs": nafs})
+            self._update(jid, "publishing", {"nafs": nafs, "inner_state": inner})
             from cloud.youtube_executor import publish_video
             result = publish_video(
                 video_path=str(payload.get("video_path", "")),
@@ -173,23 +192,25 @@ class CloudRuntime:
             )
             self._agent("youtube_publisher", result.get("published", False))
             self._update(jid, "published" if result.get("published") else "failed",
-                         {"youtube": result, "nafs": nafs})
+                         {"youtube": result, "nafs": nafs, "inner_state": inner})
             return self.get(jid)  # type: ignore[return-value]
 
         plan = self._plan(payload)
-        nafs = self._nafs_preflight("produce-film", payload)
-        if nafs["decision"] in {"REJECT", "DEFER", "REVIEW"}:
-            self._update(jid, "failed", {"plan": plan, "nafs": nafs, "error": "Nafs preflight did not permit production"})
+        inner = self._inner_preflight("produce-film", payload)
+        nafs = inner["nafs"]
+        if inner["decision"] == "REVIEW":
+            self._update(jid, "failed", {"plan": plan, "inner_state": inner, "error": "Heart/Nafs preflight requires review"})
             return self.get(jid)  # type: ignore[return-value]
         self._agent("planner", True)
         self._update(jid, "production", {
             "plan": plan,
             "production_contract": "verified_mp4_v1",
-            "nafs": nafs,
+            "nafs": nafs, "inner_state": inner,
         })
         out = MEDIA / ("job_" + jid)
         produced = FilmReliabilityEngine(out, max_attempts=int(payload.get("max_attempts", 3))).run(payload)
         produced["nafs"] = nafs
+        produced["inner_state"] = inner
         self._agent("cinematic", produced.get("ok", False))
         if not produced.get("ok"):
             self._update(jid, "failed", produced)
@@ -203,9 +224,11 @@ class CloudRuntime:
             return self.get(jid)  # type: ignore[return-value]
 
         if payload.get("publish_youtube"):
-            publish_nafs = self._nafs_preflight("publish-video", payload)
+            publish_inner = self._inner_preflight("publish-video", payload)
+            publish_nafs = publish_inner["nafs"]
             result["publish_nafs"] = publish_nafs
-            if publish_nafs["decision"] in {"REJECT", "DEFER", "REVIEW"}:
+            result["publish_inner_state"] = publish_inner
+            if publish_inner["decision"] == "REVIEW":
                 self._update(jid, "ready", result)
                 return self.get(jid)  # type: ignore[return-value]
             self._update(jid, "publishing", result)
@@ -249,6 +272,7 @@ class CloudRuntime:
             "device_required": False,
             "termux_required": False,
             "nafs": self.nafs.review(),
+            "inner_state": self.inner_state.audit(),
             "queue": {"queued": queued, "running": running, "ready": ready, "published": published, "failed": failed},
             "agents": agents,
             "storage": {"state_dir": str(STATE), "media_dir": str(MEDIA), "queue_db": str(DB),
