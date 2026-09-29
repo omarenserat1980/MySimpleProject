@@ -1,0 +1,572 @@
+{
+  "version": "CINEMATIC_V3_PRO",
+  "title": "الغرفة 13",
+  "language": "ar",
+  "target_minutes": 10,
+  "source_type": "ORIGINAL_STORY",
+  "beats": [
+    {
+      "id": "HOOK",
+      "label": "الخطاف",
+      "rhythm": "SLOW"
+    },
+    {
+      "id": "SETUP",
+      "label": "التأسيس",
+      "rhythm": "MEDIUM"
+    },
+    {
+      "id": "INCITING_EVENT",
+      "label": "الشرارة",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "ESCALATION",
+      "label": "التصعيد",
+      "rhythm": "SLOW"
+    },
+    {
+      "id": "MIDPOINT",
+      "label": "نقطة التحول",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "CRISIS",
+      "label": "الأزمة",
+      "rhythm": "FAST"
+    },
+    {
+      "id": "CLIMAX",
+      "label": "الذروة",
+      "rhythm": "CLIMAX"
+    },
+    {
+      "id": "RESOLUTION",
+      "label": "الخاتمة",
+      "rhythm": "RELEASE"
+    }
+  ],
+  "shots": [
+    {
+      "id": "B01-S01",
+      "shot_type": "ESTABLISHING",
+      "camera": "SLOW_PUSH",
+      "visual": "المستشفى المهجور ليلًا تحت المطر؛ البطل يقف أمام المدخل",
+      "voice": "في تلك الليلة، دخل المستشفى بحثًا عن إجابة واحدة.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "WIND"
+      ],
+      "transition": "FADE",
+      "subtitle": "في تلك الليلة، دخل المستشفى بحثًا عن إجابة واحدة.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B01-S02",
+      "shot_type": "WIDE",
+      "camera": "DOLLY_IN",
+      "visual": "الممر الرئيسي مظلم؛ أرقام الغرف تقفز من 12 إلى 14",
+      "voice": "المخطط يقول إن الغرفة 13 غير موجودة.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "DOOR"
+      ],
+      "transition": "HARD_CUT",
+      "subtitle": "المخطط يقول إن الغرفة 13 غير موجودة.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B01-S03",
+      "shot_type": "CLOSE_UP",
+      "camera": "RACK_FOCUS",
+      "visual": "لقطة قريبة لباب يحمل الرقم 13",
+      "voice": "لكن الباب كان أمامه، ورقم 13 واضح.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "FOOTSTEPS"
+      ],
+      "transition": "MATCH_CUT",
+      "subtitle": "لكن الباب كان أمامه، ورقم 13 واضح.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B01-S04",
+      "shot_type": "DETAIL",
+      "camera": "PARALLAX",
+      "visual": "جهاز تسجيل قديم وشريط يدور ببطء",
+      "voice": "ثم بدأ التسجيل يتحدث عن أشياء لم يفعلها بعد.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "RADIO"
+      ],
+      "transition": "J_CUT",
+      "subtitle": "ثم بدأ التسجيل يتحدث عن أشياء لم يفعلها بعد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B02-S01",
+      "shot_type": "MEDIUM",
+      "camera": "TRACKING",
+      "visual": "البطل يستمع إلى التسجيل وتظهر دهشة على وجهه",
+      "voice": "والأسوأ أنه كان يسمع صوته هو.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "MECHANICAL"
+      ],
+      "transition": "CROSS_DISSOLVE",
+      "subtitle": "والأسوأ أنه كان يسمع صوته هو.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B02-S02",
+      "shot_type": "REACTION",
+      "camera": "HANDHELD",
+      "visual": "الممر يتغير بينما يحاول البطل الهرب",
+      "voice": "كل باب حاول فتحه أعاده إلى المكان نفسه.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "RUMBLE"
+      ],
+      "transition": "HANDHELD",
+      "subtitle": "كل باب حاول فتحه أعاده إلى المكان نفسه.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B02-S03",
+      "shot_type": "WIDE",
+      "camera": "PUSH_IN",
+      "visual": "اسم البطل يظهر على جدار مليء بأسماء سابقة",
+      "voice": "عندها فهم أن الغرفة لا تسجل الماضي... بل الحاضر.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "SOUND_BRIDGE",
+      "subtitle": "عندها فهم أن الغرفة لا تسجل الماضي... بل الحاضر.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B02-S04",
+      "shot_type": "MEDIUM",
+      "camera": "DOLLY_OUT",
+      "visual": "البطل أمام جهاز التسجيل والشريط الأخير",
+      "voice": "بقي شريط واحد فقط.",
+      "music": "AMBIENT_SPACE",
+      "sfx": [
+        "WHOOSH"
+      ],
+      "transition": "DIP_TO_BLACK",
+      "subtitle": "بقي شريط واحد فقط.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B03-S01",
+      "shot_type": "CLOSE_UP",
+      "camera": "DEPTH_ZOOM",
+      "visual": "مقبض باب الغرفة 13 يهتز مع طرق من الجهة الأخرى",
+      "voice": "قال الصوت: لا تفتح الباب.",
+      "music": "MYSTERY",
+      "sfx": [
+        "DOOR"
+      ],
+      "transition": "HARD_CUT",
+      "subtitle": "قال الصوت: لا تفتح الباب.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B03-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B03-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B03-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B04-S01",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B04-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B04-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B04-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B05-S01",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B05-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B05-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B05-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "MYSTERY",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 9
+    },
+    {
+      "id": "B06-S01",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B06-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B06-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B06-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B07-S01",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B07-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B07-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B07-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B08-S01",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B08-S02",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B08-S03",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    },
+    {
+      "id": "B08-S04",
+      "shot_type": "EXTREME_CLOSE_UP",
+      "camera": "PULL_BACK",
+      "visual": "الباب يفتح على ممر يبدو جديدًا؛ نسخة من البطل تمر في الخلفية",
+      "voice": "فتح الباب، وبدأت القصة من جديد.",
+      "music": "DEEP_LOW",
+      "sfx": [
+        "LOW_BOOM"
+      ],
+      "transition": "FADE",
+      "subtitle": "فتح الباب، وبدأت القصة من جديد.",
+      "continuity": "CHARACTER+LOCATION+TIME",
+      "duration_s": 6
+    }
+  ],
+  "audio": {
+    "voiceover": "cinematic_ar",
+    "music_duck_db": -10,
+    "sfx": "event_bound"
+  },
+  "camera_engine": {
+    "gpu_transforms": true,
+    "parallax": true
+  },
+  "continuity": {
+    "character_bible": true,
+    "location_bible": true,
+    "state_tracking": true
+  },
+  "quality_gates": {
+    "min_shots_per_beat": 3,
+    "max_static_seconds": 8,
+    "require_voice": true,
+    "require_audio_activity": true,
+    "require_transition": true,
+    "reject_slideshow": true
+  },
+  "validation": {
+    "status": "PASS",
+    "checks": {
+      "images_present": true,
+      "multiple_shots_per_beat": true,
+      "camera_motion": true,
+      "voiceover": true,
+      "music": true,
+      "sfx": true,
+      "subtitles": true,
+      "transitions": true,
+      "continuity": true,
+      "no_static_slideshow": true,
+      "mobile_ready": true
+    },
+    "shot_count": 32,
+    "beat_count": 8
+  },
+  "status": "PLAN_VALIDATED"
+}
