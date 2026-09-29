@@ -76,17 +76,15 @@ class CinematicLocalRenderer:
         text = _safe_text(shot.get("action") or shot.get("purpose") or shot_id)
         out = self.output_dir / f"{shot_id}_cinematic.mp4"
 
+        # Keep the local renderer deliberately conservative: these filters are
+        # available on stock Ubuntu FFmpeg builds and avoid fragile expression
+        # parsing that can turn a valid render into "Invalid argument".
         visual = (
             "color=c=0x0b1020:s=1280x720:r=24,"
-            "geq="
-            "r='12+22*Y/H+35*exp(-((X/W-(0.22+0.06*sin(t*24/72)))^2+(Y/H-0.28)^2)*18)':"
-            "g='16+18*Y/H+22*exp(-((X/W-(0.22+0.06*sin(t*24/72)))^2+(Y/H-0.28)^2)*18)':"
-            "b='34+28*Y/H+8*exp(-((X/W-(0.22+0.06*sin(t*24/72)))^2+(Y/H-0.28)^2)*18)',"
+            "drawbox=x=0:y=0:w=1280:h=720:color=0x16264a@0.45:t=fill,"
             "drawbox=x=0:y=504:w=1280:h=216:color=black@0.72:t=fill,"
-            "drawbox=x='128+64*sin(t*24/96)':y=130:w=704:h=14:color=white@0.08:t=fill,"
+            "drawbox=x=160:y=132:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
-            "scale=1472:828:flags=lanczos,"
-            "crop=1280:720:x='96+48*sin(t*24/96)':y='54+27*cos(t*24/120)',"
             "vignette=PI/4,"
             "format=yuv420p,"
             f"drawtext=fontcolor=white:fontsize=38:x=(w-text_w)/2:y=h-110:text='{text.replace(chr(39), chr(92)+chr(39))}'"
