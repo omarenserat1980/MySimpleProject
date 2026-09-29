@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          GRADLE_VERSION=8.10.2
+          GRADLE_VERSION=8.9
           curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /opt
           echo "/opt/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
@@ -117,9 +117,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://services.gradle.org/distributions/gradle-8.10.2-bin.zip -o /tmp/gradle.zip
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.9-bin.zip -o /tmp/gradle.zip
           unzip -q /tmp/gradle.zip -d /opt
-          echo "/opt/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+          echo "/opt/gradle-8.9/bin" >> "$GITHUB_PATH"
 
       - name: Build debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
