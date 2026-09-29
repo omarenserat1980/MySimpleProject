@@ -228,6 +228,24 @@ def publish_film(job_id: str):
 @app.get("/v1/runtime", dependencies=[Depends(require_auth)])
 def runtime_status():
     return runtime.snapshot()
+\n@app.get("/v1/agents", dependencies=[Depends(require_auth)])
+def agents_status():
+    return {"ok": True, "agents": runtime.snapshot().get("agents", []), "runtime": "brain_cloud"}
+
+
+@app.get("/v1/storage", dependencies=[Depends(require_auth)])
+def storage_status():
+    snap = runtime.snapshot()
+    storage = snap["storage"]
+    media = Path(storage["media_dir"])
+    files = []
+    if media.is_dir():
+        for p in sorted(media.rglob("*")):
+            if p.is_file():
+                files.append({"path": str(p), "size": p.stat().st_size})
+    return {"ok": True, "runtime": "brain_cloud", "storage": storage, "files": files[:500]}
+
+
 
 
 @app.get("/v1/fingerprint", dependencies=[Depends(require_auth)])
