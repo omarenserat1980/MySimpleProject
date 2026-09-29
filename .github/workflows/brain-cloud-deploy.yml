@@ -42,6 +42,7 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
           SSH_HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
@@ -84,6 +85,6 @@ jobs:
             cd ~/brain-cloud
             docker compose ps
             test "$(docker compose ps --status running --services | grep -c "^brain-cloud$")" -eq 1
-            python -c "import urllib.request; urllib.request.urlopen(\x27http://127.0.0.1:8000/healthz\x27, timeout=10).read()"
+            docker compose exec -T brain-cloud python -c "import urllib.request; urllib.request.urlopen(\x27http://127.0.0.1:8000/healthz\x27, timeout=10).read()"
           '
           echo "Brain Cloud production deployment and /healthz verification passed."
