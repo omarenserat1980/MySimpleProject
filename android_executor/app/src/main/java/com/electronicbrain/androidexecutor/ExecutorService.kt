@@ -21,9 +21,9 @@ class ExecutorService : Service() {
     companion object {
         const val ACTION_START = "START"
         private const val CHANNEL = "electronic_brain_executor"
-        private const val BASE_URL = "https://electronic-brain-v12-gwwg.onrender.com"
+        private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","queue_status","queue_enqueue","film_create")
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","queue_status","queue_enqueue","film_create","termux_vps_preflight","termux_vps_deploy","termux_vps_health")
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -49,6 +49,7 @@ class ExecutorService : Service() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
         val agentId = prefs.getString("agent_id", "android-executor-01") ?: "android-executor-01"
         val key = prefs.getString("agent_key", "") ?: ""
+        val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
         if (key.isBlank()) {
             updateNotification("ERROR: agent key missing")
             running = false
@@ -61,10 +62,10 @@ class ExecutorService : Service() {
                 // Resume one persisted production task on every executor cycle.
                 queueWorker.resumeOnce()
 
-                val task = poll(agentId, key)
+                val task = poll(baseUrl, agentId, key)
                 if (task != null) {
                     val result = execute(task)
-                    report(agentId, key, task.optString("task_id"), result)
+                    report(baseUrl, agentId, key, task.optString("task_id"), result)
                     updateNotification(
                         if (result.optBoolean("ok")) "EXECUTED: " + task.optString("task")
                         else "FAILED: " + task.optString("task")
@@ -79,8 +80,8 @@ class ExecutorService : Service() {
         }
     }
 
-    private fun poll(agentId: String, key: String): JSONObject? {
-        val url = URL(BASE_URL + "/api/device/poll?agent_id=" + URLEncoder.encode(agentId, "UTF-8"))
+    private fun poll(baseUrl: String, agentId: String, key: String): JSONObject? {
+        val url = URL(baseUrl + "/api/device/poll?agent_id=" + URLEncoder.encode(agentId, "UTF-8"))
         val c = url.openConnection() as HttpURLConnection
         c.requestMethod = "GET"
         c.setRequestProperty("X-V12-Agent-Key", key)
@@ -92,7 +93,7 @@ class ExecutorService : Service() {
         return if (root.has("task") && !root.isNull("task")) root.getJSONObject("task") else null
     }
 
-    private fun report(agentId: String, key: String, taskId: String, result: JSONObject) {
+    private fun report(baseUrl: String, agentId: String, key: String, taskId: String, result: JSONObject) {
         val payload = JSONObject()
             .put("task_id", taskId)
             .put("agent_id", agentId)
@@ -100,7 +101,7 @@ class ExecutorService : Service() {
             .put("result", result.optJSONObject("result") ?: JSONObject())
             .put("error", result.optString("error", ""))
 
-        val c = URL(BASE_URL + "/api/device/report").openConnection() as HttpURLConnection
+        val c = URL(baseUrl + "/api/device/report").openConnection() as HttpURLConnection
         c.requestMethod = "POST"
         c.doOutput = true
         c.setRequestProperty("X-V12-Agent-Key", key)
@@ -117,6 +118,9 @@ class ExecutorService : Service() {
 
         return try {
             when (name) {
+                "termux_vps_preflight", "termux_vps_deploy", "termux_vps_health" -> {
+                    ok(JSONObject(runEmbeddedTerminal(name.removePrefix("termux_vps_"))))
+                }
                 "queue_status" -> {
                     val items = QueueStore(this).load()
                     ok(JSONObject()
@@ -217,6 +221,32 @@ class ExecutorService : Service() {
         } catch (e: Exception) {
             fail(e.javaClass.simpleName + ": " + (e.message ?: "unknown"))
         }
+    }
+
+    private fun runEmbeddedTerminal(operation: String): Map<String, Any> {
+        val prefs = getSharedPreferences("executor", MODE_PRIVATE)
+        val bash = prefs.getString("termux_bash", "")?.trim().orEmpty()
+        val host = prefs.getString("vps_host", "")?.trim().orEmpty()
+        if (bash.isBlank()) throw IllegalStateException("EMBEDDED_TERMUX_BASH_NOT_CONFIGURED")
+        if (host.isBlank()) throw IllegalStateException("VPS_HOST_NOT_CONFIGURED")
+        val script = File(filesDir, "brain-termux-autodeploy.sh")
+        if (!script.exists()) {
+            assets.open("brain-termux-autodeploy.sh").use { input ->
+                script.outputStream().use { output -> input.copyTo(output) }
+            }
+            script.setExecutable(true)
+        }
+        val pb = ProcessBuilder(bash, script.absolutePath, operation)
+        val env = pb.environment()
+        env["BRAIN_VPS_HOST"] = host
+        env["BRAIN_VPS_USER"] = prefs.getString("vps_user", "root")?.trim() ?: "root"
+        env["BRAIN_SSH_PORT"] = prefs.getString("vps_port", "22")?.trim() ?: "22"
+        prefs.getString("ssh_key_path", "")?.trim()?.takeIf { it.isNotBlank() }?.let { env["BRAIN_SSH_KEY"] = it }
+        env["BRAIN_REPO"] = "https://github.com/omarenserat1980/MySimpleProject.git"
+        val result = LocalTools.runProcess(pb, 20 * 60 * 1000L)
+        return mapOf("operation" to operation, "exit_code" to result.first,
+            "stdout" to result.second.takeLast(12000), "stderr" to result.third.takeLast(12000),
+            "verified" to (result.first == 0))
     }
 
     private fun readAtMost(file: File, maxBytes: Int): ByteArray {
