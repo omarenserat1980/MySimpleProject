@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .. import service
 from ..workflow_manifest import load
-from ..workflows import claim_next, get_run, heartbeat, set_status
+from ..workflows import claim_next, get_run, heartbeat, recover_stale, set_status
 from .executor import BrainRunnerExecutor
 from .logs import RunLog
 from ..storage.artifacts import ArtifactStore
@@ -28,12 +28,11 @@ def checkout_repository(namespace: str, repository: str, ref: str, destination: 
 def _manifest_for(workspace: Path, workflow_name: str) -> Path:
     safe = Path(workflow_name).name
     if safe != workflow_name or not safe.endswith(".json"):
-        safe = safe + ".json"
-    candidates = [
+        safe += ".json"
+    for candidate in (
         workspace / "brain_git_platform" / "workflows" / safe,
         workspace / "workflows" / safe,
-    ]
-    for candidate in candidates:
+    ):
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(f"workflow manifest not found: {workflow_name}")
@@ -46,8 +45,7 @@ def execute_claimed_run(run: dict, worker_id: str) -> dict:
         workspace = temp / "workspace"
         checkout_repository(run["namespace"], run["repository"], run["ref"], workspace)
         heartbeat(run_id, worker_id)
-        manifest = _manifest_for(workspace, run["workflow"])
-        workflow = load(manifest)
+        workflow = load(_manifest_for(workspace, run["workflow"]))
         result = BrainRunnerExecutor(
             workspace,
             RunLog(service.ROOT / "logs"),
@@ -68,7 +66,6 @@ def execute_queued_run(run_id: int) -> dict:
     if run["status"] != "queued":
         raise ValueError("workflow run is not queued")
     worker_id = "manual-" + uuid.uuid4().hex
-    from ..workflows import claim_next
     claimed = claim_next(worker_id)
     if not claimed or int(claimed["id"]) != run_id:
         raise ValueError("workflow run could not be claimed")
@@ -77,6 +74,7 @@ def execute_queued_run(run_id: int) -> dict:
 
 def worker_once(worker_id: str | None = None) -> dict | None:
     worker_id = worker_id or "worker-" + uuid.uuid4().hex
+    recover_stale()
     run = claim_next(worker_id)
     if not run:
         return None
