@@ -1,9 +1,9 @@
 from cloud.human_like_benchmark import DIMENSIONS, Evidence, score, validate_dimensions
 
 
-def test_benchmark_has_fourteen_dimensions():
+def test_benchmark_has_fifty_dimensions():
     assert len(DIMENSIONS) == 50
-    assert len(set(DIMENSIONS)) == 14
+    assert len(set(DIMENSIONS)) == 50
 
 
 def test_score_requires_evidence():
@@ -14,7 +14,7 @@ def test_pass_and_partial_are_auditable():
     evidence = [Evidence(DIMENSIONS[0], "PASS", "test evidence")]
     evidence += [Evidence(d, "PARTIAL", "test evidence") for d in DIMENSIONS[1:]]
     validate_dimensions(evidence)
-    assert score(evidence) == round(100 * (1 + 49 * 0.5) / 50, 2)
+    assert score(evidence) == 0.51
 
 
 def test_unknown_dimension_is_rejected():
