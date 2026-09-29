@@ -10,11 +10,16 @@ permissions:
   contents: read
   packages: read
 
+concurrency:
+  group: brain-cloud-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy Brain Cloud to production host
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -46,10 +51,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/brain_cloud_key
+          printf '%s
+' "$SSH_KEY" > ~/.ssh/brain_cloud_key
           chmod 600 ~/.ssh/brain_cloud_key
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
-          ssh -o ConnectTimeout=15 -o BatchMode=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" true
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" true
 
       - name: Upload compose
         if: steps.config.outputs.configured == 'true'
@@ -58,7 +64,7 @@ jobs:
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           set -euo pipefail
-          scp -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
+          scp -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key cloud/docker-compose.production.yml "$SSH_USER@$SSH_HOST:~/brain-cloud-compose.yml"
 
       - name: Deploy
         if: steps.config.outputs.configured == 'true'
@@ -69,9 +75,9 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mkdir -p ~/brain-cloud'
-          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" "printf '%s' '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
-          ssh -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mv ~/brain-cloud-compose.yml ~/brain-cloud/docker-compose.yml && cd ~/brain-cloud && docker compose config -q && docker compose pull && docker compose up -d && docker compose ps'
+          ssh -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mkdir -p ~/brain-cloud'
+          ssh -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" "printf '%s' '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          ssh -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" 'mv ~/brain-cloud-compose.yml ~/brain-cloud/docker-compose.yml && cd ~/brain-cloud && docker compose config -q && docker compose pull && docker compose up -d && docker compose ps'
 
       - name: Verify production health
         if: steps.config.outputs.configured == 'true'
@@ -80,7 +86,7 @@ jobs:
           SSH_USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
         run: |
           set -euo pipefail
-          ssh -o ConnectTimeout=15 -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" '
+          ssh -o ConnectTimeout=15 -o ConnectionAttempts=1 -o BatchMode=yes -o StrictHostKeyChecking=yes -i ~/.ssh/brain_cloud_key "$SSH_USER@$SSH_HOST" '
             set -e
             cd ~/brain-cloud
             docker compose ps
