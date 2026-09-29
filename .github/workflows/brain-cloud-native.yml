@@ -38,6 +38,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
+          echo "BRAIN_FFMPEG_BIN=$(command -v ffmpeg)" >> "$GITHUB_ENV"
+          echo "BRAIN_FFPROBE_BIN=$(command -v ffprobe)" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: |
