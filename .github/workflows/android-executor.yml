@@ -71,8 +71,15 @@ jobs:
       - name: Build debug APK
         shell: bash
         run: |
-          set -euo pipefail
-          gradle --no-daemon --stacktrace :app:assembleDebug
+          set -o pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug 2>&1 | tee /tmp/android-executor-build.log
+      - name: Upload Android Executor diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-executor-diagnostics-${{ github.run_id }}
+          path: /tmp/android-executor-build.log
+          if-no-files-found: error
 
       - name: Verify APK exists
         shell: bash
