@@ -73,6 +73,24 @@ subprocess.run([
 for pth in segments:
     pth.unlink(missing_ok=True)
 lst.unlink(missing_ok=True)
+# Final integrity checks before declaring the render complete.
+if not OUT.exists() or OUT.stat().st_size < 1024:
+    write_progress("FAILED", 100, len(shots))
+    raise SystemExit("ROOM13_OUTPUT_INVALID")
+probe = subprocess.run([
+    ff, "-v", "error", "-show_entries",
+    "format=duration,size:stream=codec_type,codec_name,width,height",
+    "-of", "json", str(OUT)
+], capture_output=True, text=True, check=True)
+meta = json.loads(probe.stdout)
+duration = float(meta.get("format", {}).get("duration", 0))
+streams = meta.get("streams", [])
+has_video = any(x.get("codec_type") == "video" and x.get("width") == 1920 and x.get("height") == 1080 for x in streams)
+has_audio = any(x.get("codec_type") == "audio" and x.get("codec_name") == "aac" for x in streams)
+if duration < target - 2 or not has_video or not has_audio:
+    write_progress("FAILED_QC", 100, len(shots))
+    raise SystemExit(f"ROOM13_QC_FAILED duration={duration} video={has_video} audio={has_audio}")
+
 write_progress("RENDERED", 100, len(shots))
 print(json.dumps({
     "status": "RENDERED", "percent": 100, "output": str(OUT),
