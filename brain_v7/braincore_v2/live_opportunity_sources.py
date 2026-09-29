@@ -37,7 +37,14 @@ def _age_hours(published_at: str | None) -> float | None:
     if not published_at:
         return None
     try:
-        dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+        raw = published_at.strip()
+        # Date-only source metadata represents the publication calendar day,
+        # so use the end of that UTC day instead of midnight. This avoids
+        # rejecting a result merely because a 7-day-old date has crossed the
+        # exact hour boundary.
+        if len(raw) == 10:
+            raw = raw + "T23:59:59+00:00"
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         return max(0.0, (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 3600)
     except ValueError:
         return None
