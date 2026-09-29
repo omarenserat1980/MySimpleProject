@@ -15,7 +15,7 @@ def test_healthz_and_auth(monkeypatch):
     assert client.get("/v1/status").status_code == 401
     response = client.get("/v1/status", headers={"Authorization": "Bearer test-token"})
     assert response.status_code == 200
-    assert response.json()["role"] == "self_hosted_render_alternative"
+    assert response.json()["role"] == "brain_cloud_native"
 
 
 def test_service_registry_and_deploy_gate(monkeypatch, tmp_path):
