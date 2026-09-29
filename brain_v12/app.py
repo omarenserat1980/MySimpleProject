@@ -102,18 +102,6 @@ class BrainHubRepoIn(BaseModel):
     repo:str=""
     branch:str="main"
 
-class BrainHubCreateRepoIn(BaseModel):
-    name:str
-    description:str=""
-    private:bool=False
-
-class BrainHubFileIn(BaseModel):
-    path:str
-    content:str=""
-    message:str="brain: update file"
-    branch:str="main"
-    sha:str=""
-
 class QuickEditorReadIn(BaseModel):
     path:str
     branch:str="main"
@@ -276,6 +264,10 @@ class BrainHubIssueIn(BaseModel):
     title:str
     body:str=""
     labels:list[str]=[]
+
+class BrainHubIssueCloseIn(BaseModel):
+    owner:str=""
+    repo:str=""
 
 class BrainHubPullIn(BaseModel):
     owner:str=""
@@ -467,7 +459,7 @@ async def brain_hub_merge_pull(number:int, request:Request, body:BrainHubMergeIn
     return {"ok":bool(x.get("merged")),"number":number,"merged":x.get("merged"),"message":x.get("message"),"sha":x.get("sha")}
 
 @app.post("/api/brain-hub/issues/{number}/close")
-async def brain_hub_close_issue(number:int, request:Request, body:BrainHubIssueIn):
+async def brain_hub_close_issue(number:int, request:Request, body:BrainHubIssueCloseIn):
     require_control_key(request)
     full=_brain_hub_full(body.owner,body.repo)
     async with httpx.AsyncClient(timeout=30) as client:
