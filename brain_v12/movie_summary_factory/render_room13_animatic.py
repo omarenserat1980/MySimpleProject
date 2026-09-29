@@ -15,8 +15,11 @@ shots = plan["shots"]
 target = float(plan["target_minutes"]) * 60
 per = target / len(shots)
 ff = shutil.which("ffmpeg")
+ffprobe = shutil.which("ffprobe")
 if not ff:
     raise SystemExit("FFMPEG_NOT_INSTALLED")
+if not ffprobe:
+    raise SystemExit("FFPROBE_NOT_INSTALLED")
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 segments = []
