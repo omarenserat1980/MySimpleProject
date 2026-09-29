@@ -63,6 +63,11 @@ def main() -> int:
 
     with LOG.open("w", encoding="utf-8") as log:
         write_state("PREFLIGHT", 0)
+        rc = run([sys.executable, "brain_v12/movie_summary_factory/room13_stage7_repair.py"], log)
+        if rc != 0:
+            write_state("FAILED", 0, error="STAGE7_SELF_HEAL_FAILED")
+            return rc
+
         rc = run([sys.executable, "-m", "unittest", "brain_v12.movie_summary_factory.test_room13_pipeline", "-v"], log)
         if rc != 0:
             write_state("FAILED", 0, error="DETERMINISTIC_TESTS_FAILED")
