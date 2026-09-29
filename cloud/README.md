@@ -1,21 +1,18 @@
-# Brain 6 Cloud Runtime
+# Brain Cloud Runtime
 
-This directory is the provider-neutral cloud runtime for Electronic Brain.
-
-It is provider-neutral and can run from GitHub Actions or any Docker-compatible runtime. The container can run on any cloud VM/container platform that supports Docker.
+This directory contains the provider-neutral long-running runtime for Electronic Brain.
 
 ## Runtime
 
-`brain_cloud.py` supervises the existing Brain 7 cinematic factory, restarts the production cycle after each completed slice, keeps state/output on persistent volumes, and stops cleanly on SIGTERM/SIGINT.
-
-## Required media provider
-
-A real media provider must be configured through secrets/environment variables. The runtime deliberately does not create fake video when real media is required.
+- GitHub is the source-control and CI layer.
+- Brain Cloud runs the long-lived API and workers.
+- Secrets belong in the Brain Cloud environment/secret manager.
+- The runtime can build and run locally with Docker Compose for verification.
 
 ## Start
 
-1. Copy `.env.example` to `.env` and add secrets in the cloud secret manager.
-2. Start with `docker compose -f cloud/docker-compose.yml up -d --build` from the repository root.
+1. Copy `.env.example` to the Brain Cloud secret/environment configuration.
+2. Build and start with `docker compose -f cloud/docker-compose.yml up -d --build`.
 3. Inspect with `docker compose -f cloud/docker-compose.yml logs -f brain`.
 
-The GitHub repository remains source control/CI. The cloud container is the long-running Brain process.
+The Brain API is served by `brain_v12.app:app`; the authenticated Cloud Hub is served by `cloud.api_server:app`.
