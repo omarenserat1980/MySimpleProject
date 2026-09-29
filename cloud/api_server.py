@@ -22,7 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
 STARTED = time.time()
 TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
-app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)\nruntime = CloudRuntime()
+app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
+runtime = CloudRuntime()
 
 FILM_JOBS = STATE / "film_jobs"
 FILM_JOBS.mkdir(parents=True, exist_ok=True)
