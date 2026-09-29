@@ -83,7 +83,7 @@ class CinematicLocalRenderer:
             "color=c=0x0b1020:s=1280x720:r=24,"
             "drawbox=x=0:y=0:w=1280:h=720:color=0x16264a@0.45:t=fill,"
             "drawbox=x=0:y=504:w=1280:h=216:color=black@0.72:t=fill,"
-            "drawbox=x=160:y=132:w=704:h=14:color=white@0.08:t=fill,"
+            "drawbox=x='160+64*sin(t*24/96)':y=132:w=704:h=14:color=white@0.08:t=fill,"
             "noise=alls=4:allf=t+u,"
             "vignette=PI/4,"
             "format=yuv420p,"
