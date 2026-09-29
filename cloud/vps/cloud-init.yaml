@@ -1,0 +1,6 @@
+#cloud-config
+package_update: true
+packages: [ca-certificates, curl, git, ufw]
+runcmd:
+  - [bash, -lc, "curl -fsSL https://raw.githubusercontent.com/omarenserat1980/MySimpleProject/main/cloud/vps/bootstrap-ubuntu.sh -o /tmp/bootstrap-ubuntu.sh"]
+  - [bash, -lc, "chmod +x /tmp/bootstrap-ubuntu.sh && /tmp/bootstrap-ubuntu.sh"]
