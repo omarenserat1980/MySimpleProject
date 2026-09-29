@@ -1,0 +1,29 @@
+name: Brain Command Feedback Loop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "cloud/brain_command_loop.py"
+      - "cloud/brain_command_protocol.py"
+      - "cloud/brain_command_stream.py"
+
+permissions:
+  contents: read
+
+jobs:
+  command-loop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Generate next Brain command
+        run: |
+          python -m cloud.brain_command_loop | tee brain-next-command.json
+      - name: Publish command and dashboard evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: brain-command-feedback
+          path: brain-next-command.json
