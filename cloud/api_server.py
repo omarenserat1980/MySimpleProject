@@ -16,12 +16,13 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from cloud.deploy_engine import DeployError, deploy, docker_available, logs, restart, status as docker_status, stop
+from cloud.runtime_orchestrator import CloudRuntime
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
 STARTED = time.time()
 TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
-app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
+app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)\nruntime = CloudRuntime()
 
 FILM_JOBS = STATE / "film_jobs"
 FILM_JOBS.mkdir(parents=True, exist_ok=True)
@@ -66,6 +67,7 @@ def status():
         "goals": [g.strip() for g in os.getenv("BRAIN_GOALS", "").split(",") if g.strip()],
         "production_enabled": os.getenv("FACTORY_ALLOW_PRODUCTION", "0") == "1",
         "youtube_publish_enabled": os.getenv("FACTORY_ALLOW_YOUTUBE_PUBLISH", "0") == "1",
+        "cloud_runtime": runtime.snapshot(),
         "private_network_block": os.getenv("BRAIN_BLOCK_PRIVATE_NETWORKS", "1") == "1",
         "docker_executor_available": docker_available(),
         "uptime_seconds": round(time.time() - STARTED, 1),
@@ -179,47 +181,47 @@ def create_film(body: FilmRequest):
         raise HTTPException(status_code=400, detail="title is required")
     if body.target_minutes < 1 or body.target_minutes > 30:
         raise HTTPException(status_code=400, detail="target_minutes must be 1..30")
-    for p in FILM_JOBS.glob("*.json"):
-        try:
-            j = json.loads(p.read_text(encoding="utf-8"))
-            if j.get("status") == "RUNNING":
-                return JSONResponse({"ok": False, "status": "BUSY", "active_job": j}, status_code=409)
-        except Exception:
-            pass
-    job_id = uuid.uuid4().hex[:12]
-    job = {
-        "id": job_id,
-        "status": "QUEUED",
+    job = runtime.enqueue("cinematic", {
         "title": title,
         "target_minutes": body.target_minutes,
         "language": body.language,
-        "profile": "CINEMATIC V3 PRO",
-    }
-    _save_job(job)
-    threading.Thread(target=_run_film_job, args=(job_id, body), daemon=True).start()
-    return {"ok": True, "job": job, "profile": "CINEMATIC V3 PRO"}
+        "publish_youtube": False,
+    })
+    return {"ok": True, "job": job, "profile": "CINEMATIC V3 PRO", "runtime": "brain_cloud"}
+
+
+@app.get("/v1/films", dependencies=[Depends(require_auth)])
+def list_films(limit: int = 50):
+    return {"ok": True, "jobs": runtime.list(limit)}
 
 
 @app.get("/v1/films/{job_id}", dependencies=[Depends(require_auth)])
 def film_status(job_id: str):
-    path = _job_path(job_id)
-    if not path.exists():
+    job = runtime.get(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="film job not found")
-    return {"ok": True, "job": json.loads(path.read_text(encoding="utf-8"))}
+    return {"ok": True, "job": job}
 
 
-@app.get("/v1/films/{job_id}/video", dependencies=[Depends(require_auth)])
-def film_video(job_id: str):
-    path = _job_path(job_id)
-    if not path.exists():
+@app.post("/v1/films/{job_id}/publish", dependencies=[Depends(require_auth)])
+def publish_film(job_id: str):
+    job = runtime.get(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="film job not found")
-    job = json.loads(path.read_text(encoding="utf-8"))
-    if job.get("status") != "COMPLETED":
-        raise HTTPException(status_code=409, detail="film is not verified complete")
-    video = _find_final_video(job)
-    if not video:
-        raise HTTPException(status_code=404, detail="verified film output not found")
-    return FileResponse(video, media_type="video/mp4", filename=video.name)
+    if job["stage"] != "ready":
+        raise HTTPException(status_code=409, detail="film is not ready for publication")
+    payload = dict(job["payload"])
+    payload["publish_youtube"] = True
+    # Requeue as an explicit cloud publication job; credentials stay in cloud secrets.
+    with runtime._db() as c:
+        c.execute("UPDATE jobs SET payload=?, stage='queued', updated_at=? WHERE id=?",
+                  (json.dumps(payload, ensure_ascii=False), time.time(), job_id))
+    return {"ok": True, "job": runtime.get(job_id), "executor": "cloud_youtube_executor"}
+
+
+@app.get("/v1/runtime", dependencies=[Depends(require_auth)])
+def runtime_status():
+    return runtime.snapshot()
 
 
 @app.get("/v1/fingerprint", dependencies=[Depends(require_auth)])
