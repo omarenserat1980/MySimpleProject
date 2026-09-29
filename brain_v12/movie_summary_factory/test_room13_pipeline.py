@@ -42,5 +42,11 @@ class Room13PipelineTests(unittest.TestCase):
     def test_renderer_audio_is_dynamic(self):
         self.assertIn("afade=t=out:st={max(0, d-1)}", self.renderer)
 
+    def test_brain_toolchain_is_required(self):
+        self.assertIn("brain_ffmpeg", self.renderer)
+        self.assertIn("brain_ffmpeg", self.qc)
+        self.assertNotIn('shutil.which("ffmpeg")', self.renderer)
+        self.assertNotIn('shutil.which("ffprobe")', self.renderer)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
