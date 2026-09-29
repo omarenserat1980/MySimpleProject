@@ -6,6 +6,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from brain_v12 import brain_ffmpeg
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLAN = ROOT / "brain_v12/movie_summary_factory/jobs/room-13-horror-10m-cinematic-v3.json"
@@ -50,10 +51,12 @@ def main():
             if not shot.get(key): errors.append(f"MISSING_{key.upper()}:{sid}")
         if float(shot.get("duration_s", 0)) <= 0: errors.append(f"INVALID_DURATION:{sid}")
 
-    ff = shutil.which("ffmpeg")
-    fp = shutil.which("ffprobe")
-    if not ff: errors.append("FFMPEG_NOT_INSTALLED")
-    if not fp: errors.append("FFPROBE_NOT_INSTALLED")
+    try:
+        ff = brain_ffmpeg.ffmpeg()
+        fp = brain_ffmpeg.ffprobe()
+    except RuntimeError as exc:
+        errors.append(str(exc))
+        ff = fp = None
 
     if errors:
         fail(errors, warnings)
