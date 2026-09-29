@@ -2,113 +2,81 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BRAIN Visual Engine — Text → Code → HTML</title>
+<title>BRAIN Visual Engine — Text → Scene → SVG → Video</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}
-.wrap{max-width:1200px;margin:auto;padding:18px}.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:14px}
-h1{margin:0 0 8px}p{color:#9db0c4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-textarea,select,input,button{font:inherit;border:1px solid #29445d;border-radius:10px;background:#08111d;color:#fff;padding:11px}
-textarea{width:100%;min-height:100px;resize:vertical}button{cursor:pointer;background:#12304a;margin:4px 0}
-.row{display:flex;gap:8px;flex-wrap:wrap}.status{color:#62e6a5}.preview{background:#fff;border-radius:12px;overflow:hidden}
-svg{display:block;width:100%;height:auto}.code{direction:ltr;text-align:left;white-space:pre-wrap;max-height:500px;overflow:auto;font-family:monospace;color:#bce7ff}
+*{box-sizing:border-box}body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}.wrap{max-width:1250px;margin:auto;padding:18px}
+.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:14px}h1{margin:0 0 8px}p{color:#9db0c4}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}textarea,select,input,button{font:inherit;border:1px solid #29445d;border-radius:10px;background:#08111d;color:#fff;padding:11px}
+textarea{width:100%;min-height:100px;resize:vertical}button{cursor:pointer;background:#12304a;margin:4px 0}.row{display:flex;gap:8px;flex-wrap:wrap}
+.status{color:#62e6a5}.preview{background:#fff;border-radius:12px;overflow:hidden}.preview.animated svg{animation:scenePulse 5s ease-in-out infinite}
+@keyframes scenePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}svg{display:block;width:100%;height:auto}.code{direction:ltr;text-align:left;white-space:pre-wrap;max-height:500px;overflow:auto;font-family:monospace;color:#bce7ff}
 .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.pill{padding:5px 9px;border-radius:999px;background:#13263a;color:#b9d7ee}
-@media(max-width:800px){.grid{grid-template-columns:1fr}}
+.timeline{direction:ltr;text-align:left;background:#08111d;border:1px solid #20364d;border-radius:12px;padding:12px;max-height:320px;overflow:auto}
+small{color:#91a8bb}@media(max-width:800px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="card">
 <h1>🧠 BRAIN Visual Engine</h1>
-<p>محرك مجاني محلي: الوصف النصي يتحول إلى Scene JSON ثم SVG، ويمكن حفظه كـ HTML أو SVG أو PNG. لا يحتاج API صور خارجي.</p>
-<textarea id="prompt">منظر جبلي مع شمس وشجرة وبحيرة وبيت صغير</textarea>
+<p>محرك مجاني محلي: الوصف النصي يتحول إلى Scene JSON ثم SVG/HTML، مع تصدير JSON للربط مع BRAIN Media Engine. لا يحتاج API صور خارجي.</p>
+<textarea id="prompt">منظر جبلي عند الغروب مع شمس وشجرة وبحيرة وبيت صغير ونجوم</textarea>
 <div class="row">
 <select id="mode"><option value="auto">تلقائي</option><option value="landscape">منظر طبيعي</option><option value="city">مدينة</option><option value="robot">روبوت</option><option value="car">سيارة</option><option value="abstract">أشكال هندسية</option></select>
-<button onclick="generate()">🎨 توليد</button><button onclick="downloadHTML()">💾 HTML</button><button onclick="downloadSVG()">⬇️ SVG</button><button onclick="downloadPNG()">🖼️ PNG</button><button onclick="clearAll()">مسح</button>
+<input id="duration" type="number" min="0.5" max="120" step="0.5" value="5" title="مدة المشهد بالثواني">
+<button onclick="generate()">🎨 توليد</button><button onclick="toggleAnimation()">▶️ حركة</button>
+<button onclick="downloadHTML()">💾 HTML</button><button onclick="downloadSVG()">⬇️ SVG</button><button onclick="downloadPNG()">🖼️ PNG</button>
+<button onclick="downloadScene()">🧩 Scene JSON</button><button onclick="downloadTimeline()">🎬 Timeline JSON</button>
+<button onclick="openMediaEngine()">🎬 إلى BRAIN Media Engine</button><button onclick="clearAll()">مسح</button>
 </div>
-<div id="status" class="status"></div>
-<div id="meta" class="meta"></div>
+<div id="status" class="status"></div><div id="meta" class="meta"></div>
 </div>
 <div class="grid">
 <div class="card"><h2>🖼️ الناتج</h2><div id="preview" class="preview"></div></div>
-<div class="card"><h2>⌨️ الكود المولّد</h2><pre id="code" class="code"></pre></div>
+<div class="card"><h2>⌨️ SVG المولّد</h2><pre id="code" class="code"></pre></div>
 </div>
+<div class="card"><h2>🧩 Scene JSON</h2><pre id="sceneCode" class="code"></pre></div>
+<div class="card"><h2>🎬 BRAIN Media Timeline</h2><small>هذا العقد جاهز للإرسال إلى Media Engine بعد توفير ملف PNG/SVG كأصل إعلامي.</small><pre id="timelineCode" class="timeline"></pre></div>
 </div>
 <script>
-const promptEl=document.getElementById('prompt'),modeEl=document.getElementById('mode'),preview=document.getElementById('preview'),codeEl=document.getElementById('code'),statusEl=document.getElementById('status'),metaEl=document.getElementById('meta');
-let currentSVG='', currentScene=null;
+const promptEl=document.getElementById('prompt'),modeEl=document.getElementById('mode'),durationEl=document.getElementById('duration');
+const preview=document.getElementById('preview'),codeEl=document.getElementById('code'),sceneCode=document.getElementById('sceneCode'),timelineCode=document.getElementById('timelineCode'),statusEl=document.getElementById('status'),metaEl=document.getElementById('meta');
+let currentSVG='',currentScene=null,currentTimeline=null;
+
 function esc(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;')}
-function detect(text){
- const t=text.toLowerCase();
- if(modeEl.value!=='auto') return modeEl.value;
- if(/روبوت|robot/.test(t)) return 'robot';
- if(/سيارة|car|automobile/.test(t)) return 'car';
- if(/مدينة|city|مبنى|build/.test(t)) return 'city';
- if(/دائرة|مربع|مثلث|abstract|هندسي/.test(t)) return 'abstract';
- return 'landscape';
+function detect(text){const t=text.toLowerCase();if(modeEl.value!=='auto')return modeEl.value;if(/روبوت|robot|android/.test(t))return'robot';if(/سيارة|car|automobile|vehicle/.test(t))return'car';if(/مدينة|city|مبنى|build|building/.test(t))return'city';if(/دائرة|مربع|مثلث|abstract|هندسي/.test(t))return'abstract';return'landscape'}
+function localScene(type,text){
+ const t=text.toLowerCase(),has=(...w)=>w.some(x=>t.includes(x)),objects=[];
+ if(type==='landscape'){objects.push('sky','sun','mountains','ground');if(has('شجرة','شجر','tree'))objects.push('tree');if(has('بحيرة','ماء','lake','water'))objects.push('lake');if(has('بيت','منزل','house'))objects.push('house');if(has('قمر','moon'))objects.push('moon');if(has('نجوم','نجمة','stars','star'))objects.push('stars')}
+ else if(type==='city')objects.push('sky','sun','buildings','road','car');
+ else if(type==='robot')objects.push('background','ground','robot');
+ else if(type==='car')objects.push('sky','ground','car');
+ else objects.push('background','circle','triangle','square');
+ return {version:'1.1',type,text,objects,palette:/غروب|شروق|sunset|sunrise/i.test(text)?'sunset':/ليل|ليلي|night|dark/i.test(text)?'night':'default',renderer:'svg',local:true,external_api:false,animation:{enabled:false,duration:5,fps:30},media:{width:1000,height:650,fps:30}};
 }
-function scene(type,text){
- const has=(...words)=>words.some(w=>text.toLowerCase().includes(w));
- const s={type,text,objects:[]};
- if(type==='landscape'){
-  s.objects=['sky','sun'];
-  if(has('جبل','جبال','mountain'))s.objects.push('mountains');
-  if(has('شجرة','شجر','tree'))s.objects.push('tree');
-  if(has('بحيرة','ماء','lake','water'))s.objects.push('lake');
-  if(has('بيت','منزل','house'))s.objects.push('house');
-  if(s.objects.length===2)s.objects.push('mountains','tree','lake');
- } else if(type==='city') s.objects=['sky','sun','buildings','road','car'];
- else if(type==='robot') s.objects=['sky','ground','robot'];
- else if(type==='car') s.objects=['sky','ground','car'];
- else s.objects=['background','circle','triangle','square'];
- return s;
-}
-function render(s){
- const common='xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img"';
- let body='';
- if(s.type==='landscape'){
-  body+=`<rect width="1000" height="650" fill="#8ed8ff"/><circle cx="800" cy="115" r="65" fill="#ffd84d"/>`;
-  if(s.objects.includes('mountains'))body+=`<path d="M0 470L220 190 430 470 630 170 1000 470Z" fill="#667f92"/><path d="M0 500L300 280 540 500 730 250 1000 500V650H0Z" fill="#435c70"/>`;
-  body+=`<rect y="500" width="1000" height="150" fill="#6ca85a"/>`;
-  if(s.objects.includes('lake'))body+=`<path d="M360 540 Q500 500 650 540 T930 540V650H360Z" fill="#4fa7c9"/>`;
-  if(s.objects.includes('tree'))body+=`<rect x="145" y="415" width="25" height="150" fill="#6b4226"/><path d="M158 300L80 450H236Z M158 350L95 485H220Z" fill="#285b32"/>`;
-  if(s.objects.includes('house'))body+=`<rect x="720" y="400" width="170" height="130" fill="#d98b5b"/><path d="M690 405L805 315 920 405Z" fill="#7d3d35"/><rect x="780" y="455" width="40" height="75" fill="#523d32"/>`;
- } else if(s.type==='city'){
-  body+=`<rect width="1000" height="650" fill="#8bcfff"/><circle cx="820" cy="110" r="55" fill="#ffd84d"/>`;
-  [80,210,350,500,670,820].forEach((x,i)=>{body+=`<rect x="${x}" y="${250-(i%3)*45}" width="110" height="${400-(i%3)*45}" fill="${['#526b82','#3f566b','#657c91'][i%3]}"/>`;});
-  body+=`<path d="M0 650L350 490H650L1000 650Z" fill="#303c48"/><path d="M500 650L500 520" stroke="#f5d76e" stroke-width="12" stroke-dasharray="30 25"/>`;
- } else if(s.type==='robot'){
-  body+=`<rect width="1000" height="650" fill="#16243a"/><rect y="500" width="1000" height="150" fill="#263746"/><rect x="360" y="220" width="280" height="220" rx="35" fill="#9aaabd"/><circle cx="440" cy="315" r="30" fill="#55d9ff"/><circle cx="560" cy="315" r="30" fill="#55d9ff"/><rect x="440" y="375" width="120" height="22" rx="11" fill="#243648"/><path d="M500 220V145" stroke="#9aaabd" stroke-width="14"/><circle cx="500" cy="125" r="22" fill="#ffd84d"/><rect x="300" y="260" width="60" height="150" rx="20" fill="#8799ad"/><rect x="640" y="260" width="60" height="150" rx="20" fill="#8799ad"/>`;
- } else if(s.type==='car'){
-  body+=`<rect width="1000" height="650" fill="#91d7ff"/><rect y="480" width="1000" height="170" fill="#343f49"/><path d="M210 455L300 360H650L790 455Z" fill="#d84d4d"/><rect x="335" y="370" width="130" height="70" fill="#9bd9ee"/><rect x="480" y="370" width="135" height="70" fill="#9bd9ee"/><rect x="170" y="440" width="660" height="95" rx="35" fill="#d84d4d"/><circle cx="300" cy="535" r="58" fill="#171d22"/><circle cx="700" cy="535" r="58" fill="#171d22"/><circle cx="300" cy="535" r="25" fill="#aab5bd"/><circle cx="700" cy="535" r="25" fill="#aab5bd"/>`;
- } else {
-  body+=`<rect width="1000" height="650" fill="#101827"/><circle cx="250" cy="300" r="120" fill="#ffcf4a"/><path d="M500 150L650 430H350Z" fill="#55c7a5"/><rect x="700" y="210" width="170" height="170" rx="25" fill="#d85b74"/>`;
- }
- return `<svg ${common}><title>BRAIN Visual Engine: ${esc(s.text)}</title>${body}</svg>`;
-}
+function localRender(s){let b='';if(s.type==='landscape'){b='<rect width="1000" height="650" fill="#8ed8ff"/><circle cx="800" cy="115" r="65" fill="#ffd84d"/><path d="M0 470L220 190 430 470 630 170 1000 470Z" fill="#667f92"/><path d="M0 500L300 280 540 500 730 250 1000 500V650H0Z" fill="#435c70"/><rect y="500" width="1000" height="150" fill="#6ca85a"/>';if(s.objects.includes('lake'))b+='<path d="M360 540 Q500 500 650 540 T930 540V650H360Z" fill="#4fa7c9"/>';if(s.objects.includes('tree'))b+='<rect x="145" y="415" width="25" height="150" fill="#6b4226"/><path d="M158 300L80 450H236Z M158 350L95 485H220Z" fill="#285b32"/>';if(s.objects.includes('house'))b+='<rect x="720" y="400" width="170" height="130" fill="#d98b5b"/><path d="M690 405L805 315 920 405Z" fill="#7d3d35"/><rect x="780" y="455" width="40" height="75" fill="#523d32"/>'}
+else if(s.type==='city'){b='<rect width="1000" height="650" fill="#8bcfff"/><circle cx="820" cy="110" r="55" fill="#ffd84d"/>';[80,210,350,500,670,820].forEach((x,i)=>b+=`<rect x="${x}" y="${250-(i%3)*45}" width="110" height="${400-(i%3)*45}" fill="#526b82"/>`);b+='<path d="M0 650L350 490H650L1000 650Z" fill="#303c48"/>'}
+else if(s.type==='robot')b='<rect width="1000" height="650" fill="#16243a"/><rect y="500" width="1000" height="150" fill="#263746"/><rect x="360" y="220" width="280" height="220" rx="35" fill="#9aaabd"/><circle cx="440" cy="315" r="30" fill="#55d9ff"/><circle cx="560" cy="315" r="30" fill="#55d9ff"/><rect x="440" y="375" width="120" height="22" rx="11" fill="#243648"/>'
+else if(s.type==='car')b='<rect width="1000" height="650" fill="#91d7ff"/><rect y="480" width="1000" height="170" fill="#343f49"/><path d="M210 455L300 360H650L790 455Z" fill="#d84d4d"/><rect x="335" y="370" width="130" height="70" fill="#9bd9ee"/><rect x="480" y="370" width="135" height="70" fill="#9bd9ee"/><rect x="170" y="440" width="660" height="95" rx="35" fill="#d84d4d"/><circle cx="300" cy="535" r="58" fill="#171d22"/><circle cx="700" cy="535" r="58" fill="#171d22"/>'
+else b='<rect width="1000" height="650" fill="#101827"/><circle cx="250" cy="300" r="120" fill="#ffcf4a"/><path d="M500 150L650 430H350Z" fill="#55c7a5"/><rect x="700" y="210" width="170" height="170" rx="25" fill="#d85b74"/>';
+return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img"><title>BRAIN Visual Engine: ${esc(s.text)}</title>${b}</svg>`}
+function buildTimeline(scene){const d=Math.max(.5,Number(durationEl.value)||5);return{version:'1.0',profile:'youtube_1080p',scenes:[{id:'visual-scene-1',duration:d,asset_type:'svg',scene,transition:'fade',transition_duration:.5}],metadata:{source:'BRAIN Visual Engine',local:true}}}
 async function generate(){
- const text=promptEl.value.trim()||'منظر طبيعي';
- const mode=modeEl.value;
- try{
-  const res=await fetch('/api/visual-engine/compile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,mode})});
-  if(!res.ok) throw new Error('API_UNAVAILABLE');
-  const data=await res.json(); currentScene=data.scene; currentSVG=data.svg;
-  statusEl.textContent='✓ تم التحويل عبر BRAIN Visual Engine المحلي';
- }catch(e){
-  currentScene=scene(detect(text),text); currentSVG=render(currentScene);
-  statusEl.textContent='✓ تم التحويل محليًا داخل المتصفح';
- }
- preview.innerHTML=currentSVG; codeEl.textContent=currentSVG;
- metaEl.innerHTML='<span class="pill">المحرك: SVG</span><span class="pill">الوضع: '+currentScene.type+'</span><span class="pill">محلي: نعم</span><span class="pill">API خارجي: لا</span>';
+ const text=promptEl.value.trim()||'منظر طبيعي',mode=modeEl.value;
+ try{const r=await fetch('/api/visual-engine/compile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,mode})});if(!r.ok)throw Error();const d=await r.json();currentScene=d.scene;currentSVG=d.svg;statusEl.textContent='✓ تم التحويل عبر BRAIN Visual Engine المحلي'}
+ catch(e){currentScene=localScene(detect(text),text);currentSVG=localRender(currentScene);statusEl.textContent='✓ تم التحويل محليًا داخل المتصفح'}
+ currentTimeline=buildTimeline(currentScene);preview.innerHTML=currentSVG;codeEl.textContent=currentSVG;sceneCode.textContent=JSON.stringify(currentScene,null,2);timelineCode.textContent=JSON.stringify(currentTimeline,null,2);
+ metaEl.innerHTML='<span class="pill">المحرك: SVG</span><span class="pill">الوضع: '+currentScene.type+'</span><span class="pill">العناصر: '+currentScene.objects.length+'</span><span class="pill">محلي: نعم</span><span class="pill">API خارجي: لا</span>';
 }
-function downloadBlob(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
-function downloadSVG(){if(!currentSVG)generate();downloadBlob('brain-scene.svg',currentSVG,'image/svg+xml')}
-function downloadHTML(){if(!currentSVG)generate();downloadBlob('brain-scene.html','<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>BRAIN Scene</title><style>body{margin:0;background:#050b14;display:grid;place-items:center;min-height:100vh}svg{max-width:100%;height:auto}</style>'+currentSVG+'</html>','text/html')}
-function downloadPNG(){
- if(!currentSVG)generate();
- const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml'}),url=URL.createObjectURL(blob);
- img.onload=()=>{const c=document.createElement('canvas');c.width=1000;c.height=650;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click()})};img.src=url;
-}
-function clearAll(){preview.innerHTML='';codeEl.textContent='';metaEl.innerHTML='';statusEl.textContent='';currentSVG=''}
+function downloadBlob(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
+function downloadSVG(){if(!currentSVG)return generate();downloadBlob('brain-scene.svg',currentSVG,'image/svg+xml')}
+function downloadHTML(){if(!currentSVG)return generate();downloadBlob('brain-scene.html','<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>BRAIN Scene</title><style>body{margin:0;background:#050b14;display:grid;place-items:center;min-height:100vh}svg{max-width:100%;height:auto}</style>'+currentSVG+'</html>','text/html')}
+function downloadScene(){if(!currentScene)return generate();downloadBlob('brain-scene.json',JSON.stringify(currentScene,null,2),'application/json')}
+function downloadTimeline(){if(!currentTimeline)return generate();downloadBlob('brain-media-timeline.json',JSON.stringify(currentTimeline,null,2),'application/json')}
+function downloadPNG(){if(!currentSVG)return generate();const img=new Image(),blob=new Blob([currentSVG],{type:'image/svg+xml'}),url=URL.createObjectURL(blob);img.onload=()=>{const c=document.createElement('canvas');c.width=1000;c.height=650;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='brain-scene.png';a.click()})};img.src=url}
+function toggleAnimation(){preview.classList.toggle('animated');statusEl.textContent=preview.classList.contains('animated')?'▶️ المعاينة المتحركة تعمل':'⏹ تم إيقاف الحركة'}
+function openMediaEngine(){if(!currentScene)generate();localStorage.setItem('brain.visual.scene',JSON.stringify(currentScene));localStorage.setItem('brain.visual.timeline',JSON.stringify(currentTimeline));localStorage.setItem('brain.visual.svg',currentSVG);location.href='/media-engine/'}
+function clearAll(){preview.innerHTML='';codeEl.textContent='';sceneCode.textContent='';timelineCode.textContent='';metaEl.innerHTML='';statusEl.textContent='';currentSVG='';currentScene=null;currentTimeline=null}
 generate();
 </script>
 </body></html>
