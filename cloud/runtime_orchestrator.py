@@ -51,6 +51,10 @@ class CloudRuntime:
             )""")
 
     def enqueue(self, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if kind in {"cinematic", "cinematic_autopilot"}:
+            payload = dict(payload)
+            payload["route"] = "cloud_runtime_reliability_engine"
+            payload["production_contract"] = "verified_mp4_v1"
         job_id = uuid.uuid4().hex[:16]
         now = _now()
         with self._db() as c:
@@ -135,7 +139,7 @@ class CloudRuntime:
         self._update(jid, "planning")
         plan = self._plan(payload)
         self._agent("planner", True)
-        self._update(jid, "production", {"plan": plan})
+        self._update(jid, "production", {"plan": plan, "production_contract": "verified_mp4_v1"})
         out = MEDIA / ("job_" + jid)
         produced = FilmReliabilityEngine(out, max_attempts=int(payload.get("max_attempts", 3))).run(payload)
         self._agent("cinematic", produced.get("ok", False))
@@ -176,6 +180,7 @@ class CloudRuntime:
             "device_required": False,
             "termux_required": False,
             "stages": list(self.STAGES),
+            "production_contract": "verified_mp4_v1",
         }
 
     def snapshot(self) -> dict[str, Any]:
