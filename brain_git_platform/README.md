@@ -2,27 +2,42 @@
 
 Brain Git Platform is the internal source-control and automation plane for Brain Cloud.
 
-## Boundary
+## Runtime boundary
 
-The platform is designed so Brain runtime operations do not depend on GitHub.com:
+Brain runtime operations are designed to operate without GitHub.com:
 
 - Git repositories are stored under the configured Brain Git root.
-- Git operations use the local Git executable/library boundary.
-- CI jobs execute on Brain-owned runners.
-- Artifacts, logs, workflow state, and audit events remain in Brain storage.
-- GitHub integration is an optional import/export bridge, not a runtime dependency.
+- Git operations use the local Git service boundary.
+- Native CI jobs execute on Brain-owned runners.
+- Workflow state, logs, artifacts, and audit events remain in Brain storage.
+- GitHub is an optional import/export bridge only.
 
-## Services
+## Native execution
 
-- `api/` — repository, branch, commit, pull-request, workflow and artifact API.
-- `storage/` — repository and object storage boundary.
-- `runner/` — Brain CI runner contract.
-- `auth/` — users, teams, roles and scoped tokens.
-- `audit/` — immutable operational audit events.
-- `bridge/` — optional GitHub synchronization/import/export.
+The platform now has:
+
+- repository and branch primitives
+- pull requests and fast-forward merge
+- scoped authentication foundation
+- workflow manifests
+- queued workflow runs
+- runner checkout from Brain Git
+- workflow execution
+- run logs
+- run artifacts
+- audit events
+- runtime GitHub-isolation verification
+
+The first native workflow is `brain-git-platform-foundation`.
 
 ## Isolation rule
 
-Production Brain workflows must call the Brain Git Platform API or its local Git service. They must not call GitHub APIs directly.
+Production Brain workflows must call the Brain Git Platform API or local Git service. They must not require GitHub APIs, GitHub Actions runners, or `GITHUB_TOKEN` at runtime.
 
-The migration is additive first: existing GitHub Actions remain available as an external bridge while Brain-native workflows are introduced and verified.
+GitHub Actions remain an external validation/bridge mechanism during migration. They are not the target execution plane.
+
+## Migration target
+
+`Brain Cloud → Brain Git → Native Scheduler → Brain Runner → Verification → Artifacts/Audit → Production`
+
+The final detach phase removes GitHub credentials and direct GitHub runtime calls from Brain production configuration after the native isolation suite passes.
