@@ -1,9 +1,9 @@
 {
-  "version": "CINEMATIC_V3_PRO",
+  "version": "BRAIN_HORROR_DIRECTORS_CUT_V1",
   "title": "الغرفة 13",
   "language": "ar",
   "target_minutes": 10,
-  "source_type": "ORIGINAL_STORY",
+  "source_type": "BRAIN_AUTONOMOUS_CINEMATIC_DEMONSTRATION",
   "beats": [
     {
       "id": "HOOK",
@@ -51,7 +51,7 @@
       "id": "B01-S01",
       "shot_type": "ESTABLISHING",
       "camera": "SLOW_PUSH",
-      "visual": "واجهة المستشفى المهجور تحت المطر؛ البطل يصل وحيدًا",
+      "visual": "واجهة المستشفى المهجور تحت المطر؛ البطل يصل وحيدًا؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "في تلك الليلة، دخل المستشفى بحثًا عن إجابة واحدة.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -59,14 +59,14 @@
       ],
       "transition": "FADE",
       "subtitle": "في تلك الليلة، دخل المستشفى بحثًا عن إجابة واحدة.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B01-S02",
       "shot_type": "WIDE",
       "camera": "DOLLY_IN",
-      "visual": "بوابة صدئة تتحرك مع الريح بينما ينطفئ آخر ضوء خلفه",
+      "visual": "بوابة صدئة تتحرك مع الريح بينما ينطفئ آخر ضوء خلفه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "لم يكن يعرف أن خروجه لن يكون سهلًا.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -74,14 +74,14 @@
       ],
       "transition": "HARD_CUT",
       "subtitle": "لم يكن يعرف أن خروجه لن يكون سهلًا.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B01-S03",
       "shot_type": "CLOSE_UP",
       "camera": "RACK_FOCUS",
-      "visual": "الممر الرئيسي؛ الأرقام تنتقل من 12 إلى 14 دون رقم 13",
+      "visual": "الممر الرئيسي؛ الأرقام تنتقل من 12 إلى 14 دون رقم 13؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "المخطط يقول إن الغرفة الثالثة عشرة غير موجودة.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -89,14 +89,14 @@
       ],
       "transition": "MATCH_CUT",
       "subtitle": "المخطط يقول إن الغرفة الثالثة عشرة غير موجودة.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B01-S04",
       "shot_type": "DETAIL",
       "camera": "PARALLAX",
-      "visual": "خريطة قديمة معلقة على الحائط وفيها فراغ غريب",
+      "visual": "خريطة قديمة معلقة على الحائط وفيها فراغ غريب؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "كلما بحث عن الرقم، وجد فراغًا بدلًا منه.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -104,14 +104,14 @@
       ],
       "transition": "J_CUT",
       "subtitle": "كلما بحث عن الرقم، وجد فراغًا بدلًا منه.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B02-S01",
       "shot_type": "MEDIUM",
       "camera": "TRACKING",
-      "visual": "جدار فارغ يهتز خلفه طرق بطيء ومنتظم",
+      "visual": "جدار فارغ يهتز خلفه طرق بطيء ومنتظم؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "ثم سمع طرقًا يأتي من جدار بلا باب.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -119,14 +119,14 @@
       ],
       "transition": "CROSS_DISSOLVE",
       "subtitle": "ثم سمع طرقًا يأتي من جدار بلا باب.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B02-S02",
       "shot_type": "REACTION",
       "camera": "HANDHELD",
-      "visual": "البطل يرفع مصباحه نحو نهاية الممر",
+      "visual": "البطل يرفع مصباحه نحو نهاية الممر؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "تقدم نحو الصوت رغم أن كل غريزة داخله كانت تحذره.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -134,14 +134,14 @@
       ],
       "transition": "HANDHELD",
       "subtitle": "تقدم نحو الصوت رغم أن كل غريزة داخله كانت تحذره.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B02-S03",
       "shot_type": "WIDE",
       "camera": "PUSH_IN",
-      "visual": "باب أبيض قديم يظهر فجأة وعليه الرقم 13",
+      "visual": "باب أبيض قديم يظهر فجأة وعليه الرقم 13؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "هناك كان الباب، واضحًا للمرة الأولى.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -149,14 +149,14 @@
       ],
       "transition": "SOUND_BRIDGE",
       "subtitle": "هناك كان الباب، واضحًا للمرة الأولى.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B02-S04",
       "shot_type": "MEDIUM",
       "camera": "DOLLY_OUT",
-      "visual": "مقبض الباب يرتجف بينما تتساقط قطرات المطر من معطفه",
+      "visual": "مقبض الباب يرتجف بينما تتساقط قطرات المطر من معطفه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "لم يلمسه، ومع ذلك بدأ المقبض يتحرك.",
       "music": "AMBIENT_SPACE",
       "sfx": [
@@ -164,14 +164,14 @@
       ],
       "transition": "DIP_TO_BLACK",
       "subtitle": "لم يلمسه، ومع ذلك بدأ المقبض يتحرك.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B03-S01",
       "shot_type": "CLOSE_UP",
       "camera": "DEPTH_ZOOM",
-      "visual": "جهاز تسجيل قديم فوق كرسي معدني وشريط يدور",
+      "visual": "جهاز تسجيل قديم فوق كرسي معدني وشريط يدور؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "وجد جهاز تسجيل يعمل وحده.",
       "music": "MYSTERY",
       "sfx": [
@@ -179,14 +179,14 @@
       ],
       "transition": "HARD_CUT",
       "subtitle": "وجد جهاز تسجيل يعمل وحده.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B03-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "لقطة قريبة للشريط واسم البطل مكتوب على ملصقه",
+      "visual": "لقطة قريبة للشريط واسم البطل مكتوب على ملصقه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "وعلى الشريط كان اسمه مكتوبًا بخط يده.",
       "music": "MYSTERY",
       "sfx": [
@@ -194,14 +194,14 @@
       ],
       "transition": "FADE",
       "subtitle": "وعلى الشريط كان اسمه مكتوبًا بخط يده.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B03-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يستمع؛ صوته المسجل يصف خطواته الحالية",
+      "visual": "البطل يستمع؛ صوته المسجل يصف خطواته الحالية؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "سمع صوته يصف ما كان يفعله في اللحظة نفسها.",
       "music": "MYSTERY",
       "sfx": [
@@ -209,14 +209,14 @@
       ],
       "transition": "FADE",
       "subtitle": "سمع صوته يصف ما كان يفعله في اللحظة نفسها.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B03-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "ساعة حائط تقفز عقاربها إلى الخلف",
+      "visual": "ساعة حائط تقفز عقاربها إلى الخلف؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "الوقت بدأ يتصرف بطريقة لا تشبه العالم خارج الغرفة.",
       "music": "MYSTERY",
       "sfx": [
@@ -224,14 +224,14 @@
       ],
       "transition": "FADE",
       "subtitle": "الوقت بدأ يتصرف بطريقة لا تشبه العالم خارج الغرفة.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B04-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الممر يمتد أطول كلما مشى؛ الأبواب تتكرر",
+      "visual": "الممر يمتد أطول كلما مشى؛ الأبواب تتكرر؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "كل طريق للخروج أعاده إلى النقطة ذاتها.",
       "music": "MYSTERY",
       "sfx": [
@@ -239,14 +239,14 @@
       ],
       "transition": "FADE",
       "subtitle": "كل طريق للخروج أعاده إلى النقطة ذاتها.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B04-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يفتح باب الطوارئ فيجد الغرفة 13 خلفه",
+      "visual": "البطل يفتح باب الطوارئ فيجد الغرفة 13 خلفه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "حتى باب الطوارئ قاده إلى الغرفة نفسها.",
       "music": "MYSTERY",
       "sfx": [
@@ -254,14 +254,14 @@
       ],
       "transition": "FADE",
       "subtitle": "حتى باب الطوارئ قاده إلى الغرفة نفسها.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B04-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "جدار مليء بصور وأسماء أشخاص اختفوا",
+      "visual": "جدار مليء بصور وأسماء أشخاص اختفوا؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "ثم رأى أسماء من دخلوا قبله.",
       "music": "MYSTERY",
       "sfx": [
@@ -269,14 +269,14 @@
       ],
       "transition": "FADE",
       "subtitle": "ثم رأى أسماء من دخلوا قبله.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B04-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "مساحة فارغة في الجدار وبها بطاقة تحمل اسمه",
+      "visual": "مساحة فارغة في الجدار وبها بطاقة تحمل اسمه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "وكان هناك مكان فارغ ينتظر اسمه.",
       "music": "MYSTERY",
       "sfx": [
@@ -284,14 +284,14 @@
       ],
       "transition": "FADE",
       "subtitle": "وكان هناك مكان فارغ ينتظر اسمه.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B05-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "شريط جديد يحمل تاريخ اليوم بجانب جهاز التسجيل",
+      "visual": "شريط جديد يحمل تاريخ اليوم بجانب جهاز التسجيل؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "ظهر شريط آخر مؤرخ بتاريخ اليوم.",
       "music": "MYSTERY",
       "sfx": [
@@ -299,14 +299,14 @@
       ],
       "transition": "FADE",
       "subtitle": "ظهر شريط آخر مؤرخ بتاريخ اليوم.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B05-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يتردد قبل الضغط على زر التشغيل",
+      "visual": "البطل يتردد قبل الضغط على زر التشغيل؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "لم يعد يريد سماع ما سيأتي، لكنه ضغط الزر.",
       "music": "MYSTERY",
       "sfx": [
@@ -314,14 +314,14 @@
       ],
       "transition": "FADE",
       "subtitle": "لم يعد يريد سماع ما سيأتي، لكنه ضغط الزر.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B05-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "التسجيل يقول جملة لم ينطقها بعد؛ وجهه يبهت",
+      "visual": "التسجيل يقول جملة لم ينطقها بعد؛ وجهه يبهت؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "التسجيل كان يسبق أفعاله بثوانٍ.",
       "music": "MYSTERY",
       "sfx": [
@@ -329,14 +329,14 @@
       ],
       "transition": "FADE",
       "subtitle": "التسجيل كان يسبق أفعاله بثوانٍ.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B05-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "يده تقترب من المقبض بينما يسمع صوت يده في الشريط",
+      "visual": "يده تقترب من المقبض بينما يسمع صوت يده في الشريط؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "ثم سمع نفسه يقول: لا تفتح.",
       "music": "MYSTERY",
       "sfx": [
@@ -344,14 +344,14 @@
       ],
       "transition": "FADE",
       "subtitle": "ثم سمع نفسه يقول: لا تفتح.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B06-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الممر ينهار ضوئيًا وتغلق الأبواب واحدًا تلو الآخر",
+      "visual": "الممر ينهار ضوئيًا وتغلق الأبواب واحدًا تلو الآخر؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "بدأت الأبواب تغلق خلفه.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -359,14 +359,14 @@
       ],
       "transition": "FADE",
       "subtitle": "بدأت الأبواب تغلق خلفه.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B06-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يركض؛ كل انعطاف يعيد الرقم 13 إلى الواجهة",
+      "visual": "البطل يركض؛ كل انعطاف يعيد الرقم 13 إلى الواجهة؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "ركض، لكن الرقم ظل ينتظره.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -374,14 +374,14 @@
       ],
       "transition": "FADE",
       "subtitle": "ركض، لكن الرقم ظل ينتظره.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B06-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "لقطة علوية للممرات على شكل دائرة مغلقة",
+      "visual": "لقطة علوية للممرات على شكل دائرة مغلقة؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "لم يكن داخل مبنى، بل داخل حلقة.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -389,14 +389,14 @@
       ],
       "transition": "FADE",
       "subtitle": "لم يكن داخل مبنى، بل داخل حلقة.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B06-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يجد اسمه ضمن قائمة الضحايا",
+      "visual": "البطل يجد اسمه ضمن قائمة الضحايا؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "عندها وجد اسمه في قائمة الضحايا.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -404,14 +404,14 @@
       ],
       "transition": "FADE",
       "subtitle": "عندها وجد اسمه في قائمة الضحايا.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B07-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الاسم يتوهج بينما ينطفئ الضوء حوله",
+      "visual": "الاسم يتوهج بينما ينطفئ الضوء حوله؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "وحين لمس الورقة انطفأت الأنوار.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -419,14 +419,14 @@
       ],
       "transition": "FADE",
       "subtitle": "وحين لمس الورقة انطفأت الأنوار.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B07-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "غرفة 13 في ظلام كامل؛ شريط أخير ينتظر",
+      "visual": "غرفة 13 في ظلام كامل؛ شريط أخير ينتظر؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "بقي شريط واحد فقط.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -434,14 +434,14 @@
       ],
       "transition": "FADE",
       "subtitle": "بقي شريط واحد فقط.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B07-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "لقطة قريبة للملصق: لا تفتح الباب",
+      "visual": "لقطة قريبة للملصق: لا تفتح الباب؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "كانت الرسالة الوحيدة واضحة: لا تفتح الباب.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -449,14 +449,14 @@
       ],
       "transition": "FADE",
       "subtitle": "كانت الرسالة الوحيدة واضحة: لا تفتح الباب.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B07-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "البطل يمد يده إلى المقبض رغم التحذير",
+      "visual": "البطل يمد يده إلى المقبض رغم التحذير؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "لكنه كان قد اتخذ قراره.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -464,14 +464,14 @@
       ],
       "transition": "FADE",
       "subtitle": "لكنه كان قد اتخذ قراره.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B08-S01",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "الباب ينفتح على ممر جديد شديد النظافة",
+      "visual": "الباب ينفتح على ممر جديد شديد النظافة؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "خلف الباب لم يكن هناك الظلام الذي توقعه.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -479,14 +479,14 @@
       ],
       "transition": "FADE",
       "subtitle": "خلف الباب لم يكن هناك الظلام الذي توقعه.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B08-S02",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "نسخة أخرى من البطل تمر بعيدًا في الممر الجديد",
+      "visual": "نسخة أخرى من البطل تمر بعيدًا في الممر الجديد؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "رأى نسخة أخرى منه تمر في نهاية الممر.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -494,14 +494,14 @@
       ],
       "transition": "FADE",
       "subtitle": "رأى نسخة أخرى منه تمر في نهاية الممر.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B08-S03",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "النسخة الأخرى تلتفت للحظة ثم تختفي",
+      "visual": "النسخة الأخرى تلتفت للحظة ثم تختفي؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "توقفت النسخة ونظرت إليه قبل أن تختفي.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -509,14 +509,14 @@
       ],
       "transition": "FADE",
       "subtitle": "توقفت النسخة ونظرت إليه قبل أن تختفي.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     },
     {
       "id": "B08-S04",
       "shot_type": "EXTREME_CLOSE_UP",
       "camera": "PULL_BACK",
-      "visual": "لقطة نهائية: باب جديد يحمل الرقم 13 والبطل يقف أمامه",
+      "visual": "لقطة نهائية: باب جديد يحمل الرقم 13 والبطل يقف أمامه؛ إضاءة سينمائية موحدة واستمرارية شخصية ومكان عبر اللقطات",
       "voice": "وعندما رفع عينيه، كان أمام باب ثالثة عشرة من جديد.",
       "music": "DEEP_LOW",
       "sfx": [
@@ -524,7 +524,7 @@
       ],
       "transition": "FADE",
       "subtitle": "وعندما رفع عينيه، كان أمام باب ثالثة عشرة من جديد.",
-      "continuity": "CHARACTER+LOCATION+TIME",
+      "continuity": "CHARACTER+LOCATION+TIME+VISUAL+NARRATIVE+AUDIO",
       "duration_s": 18.75
     }
   ],
@@ -575,5 +575,32 @@
     "profile": "1920x1080@24",
     "audio": "ATMOSPHERIC_SYNTH_PENDING_VOICE",
     "status": "RENDER_WORKFLOW_READY"
-  }
+  },
+  "objective": "إظهار تطور Brain عبر فيلم رعب متكامل: حبكة وشخصيات واستمرارية بصرية وصوتية وإيقاع وإدارة مشاهد والتحقق النهائي.",
+  "capabilities_demonstrated": [
+    "reasoning",
+    "planning",
+    "memory",
+    "generalization",
+    "ambiguity",
+    "self_correction",
+    "tool_use",
+    "autonomy",
+    "failure_recovery",
+    "language",
+    "self_verification",
+    "causal_reasoning",
+    "long_horizon_execution",
+    "context_switching",
+    "working_memory",
+    "information_synthesis",
+    "hypothesis_testing",
+    "error_localization",
+    "resource_management",
+    "prioritization",
+    "decision_traceability",
+    "observability",
+    "continuous_improvement",
+    "novel_task_adaptation"
+  ]
 }
