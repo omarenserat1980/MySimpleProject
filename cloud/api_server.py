@@ -112,67 +112,27 @@ def _find_final_video(job: dict) -> Path | None:
 
 
 def _run_film_job(job_id: str, body: FilmRequest) -> None:
+    # Legacy file-based jobs now use the same verified reliability engine as CloudRuntime.
     log_path = FILM_JOBS / (job_id + ".log")
-    job = {
-        "id": job_id,
-        "status": "RUNNING",
-        "title": body.title,
-        "target_minutes": body.target_minutes,
-        "language": body.language,
-        "profile": "CINEMATIC V3 PRO",
-    }
+    job = {"id": job_id, "status": "RUNNING", "title": body.title,
+           "target_minutes": body.target_minutes, "language": body.language,
+           "profile": "CINEMATIC V3 PRO"}
     _save_job(job)
-    env = os.environ.copy()
-    env["FACTORY_ONE_SHOT"] = "1"
-    env["FACTORY_ALLOW_PRODUCTION"] = "1"
-    env["FACTORY_REQUIRE_REAL_MEDIA"] = "1"
-    env["FACTORY_ALLOW_LOCAL_FALLBACK"] = os.getenv("FACTORY_ALLOW_LOCAL_FALLBACK", "1")
-    env["FACTORY_MEDIA_ROUTE"] = os.getenv("FACTORY_MEDIA_ROUTE", "local_ffmpeg_cinematic")
-    env["FACTORY_DURATION_SECONDS"] = str(max(1, min(600, body.target_minutes * 60)))
-    base_output = Path(env.get("FACTORY_OUTPUT_DIR", "cinematic_output")).resolve()
-    job_output = base_output / ("job_" + job_id)
-    job_output.mkdir(parents=True, exist_ok=True)
-    env["FACTORY_OUTPUT_DIR"] = str(job_output)
-    env["LOCAL_MEDIA_DIR"] = str(job_output)
-    env["BRAIN_STATE_DIR"] = str(STATE.resolve())
-    env["FACTORY_STATE_PATH"] = str(job_output / "factory_state.json")
-    env["FACTORY_PROJECT_MANIFEST"] = str(job_output / "cinematic_project_manifest.json")
-    env["CINEMA_ENGINE_MANIFEST"] = str(job_output / "cinema_engine_v6_manifest.json")
-    env["FACTORY_TOPICS_JSON"] = json.dumps([{
-        "title": body.title,
-        "objective": body.title,
-        "language": body.language,
-        "route": "cinematic",
-    }], ensure_ascii=False)
-    env["FACTORY_OBJECTIVE"] = "Produce and verify the requested cinematic film: " + body.title
-    env.setdefault("LOCAL_MEDIA_DIR", env.get("FACTORY_OUTPUT_DIR", "cinematic_output"))
     try:
-        with open(log_path, "a", encoding="utf-8") as log:
-            p = subprocess.Popen(
-                ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
-                cwd=Path(__file__).resolve().parents[1],
-                env=env,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            rc = p.wait()
-        job["status"] = "COMPLETED" if rc == 0 else "FAILED"
-        job["return_code"] = rc
-        job["log"] = str(log_path.relative_to(STATE))
-        job["output_dir"] = env.get("FACTORY_OUTPUT_DIR", "cinematic_output")
-        if job["status"] == "COMPLETED":
-            candidate = Path(job["output_dir"]) / "final.mp4"
-            if candidate.is_file():
-                job["video_path"] = str(candidate)
-            video = _find_final_video(job)
-            if video:
-                job["video_name"] = video.name
-                job["video_ready"] = True
-            else:
-                job["status"] = "FAILED"
-                job["video_ready"] = False
-                job["error"] = "factory completed without a verified MP4 output"
+        from cloud.film_reliability import FilmReliabilityEngine
+        out = Path(os.getenv("FACTORY_OUTPUT_DIR", str(ROOT / "cinematic_output"))).resolve() / ("job_" + job_id)
+        result = FilmReliabilityEngine(out, max_attempts=3).run({
+            "title": body.title, "target_minutes": body.target_minutes,
+            "language": body.language, "objective": body.title, "route": "cinematic",
+        })
+        job["status"] = "COMPLETED" if result.get("ok") else "FAILED"
+        job["video_ready"] = bool(result.get("ok"))
+        job["video_path"] = result.get("video_path")
+        job["manifest_path"] = result.get("manifest_path")
+        job["verification"] = result.get("verification")
+        job["attempt_history"] = result.get("attempt_history")
+        if not result.get("ok"):
+            job["error"] = result.get("error", "verified production failed")
     except Exception as exc:
         job["status"] = "FAILED"
         job["error"] = f"{type(exc).__name__}: {exc}"
