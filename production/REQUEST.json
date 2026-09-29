@@ -1,10 +1,11 @@
 {
   "request": "CREATE_FILM",
-  "duration_seconds": 300,
+  "duration_seconds": 60,
   "resume": true,
   "youtube_publish": false,
   "quality_floor": 0.82,
-  "requested_at": "2026-09-28T18:11:00+03:00",
-  "reason": "full_brain_audit_and_cinematic_v3_pro_production_run",
-  "repair_generation": 0
+  "requested_at": "2026-09-29T18:07:09.965Z",
+  "reason": "free_only_local_flipbook_cinematic_production",
+  "repair_generation": 0,
+  "title": "آخر ضوء في المدينة"
 }
