@@ -29,10 +29,25 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core
           ffmpeg -version | head -n 1
       - name: Render Room 13 animatic
-        run: python brain_v12/movie_summary_factory/render_room13_animatic.py
+        run: |
+          set -o pipefail
+          python brain_v12/movie_summary_factory/render_room13_animatic.py | tee room13-render.log
+      - name: Report render progress
+        if: always()
+        run: |
+          echo "## Room 13 render progress" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f brain_v12/web/media/engine/room-13-progress.json ]; then
+            cat brain_v12/web/media/engine/room-13-progress.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "progress file unavailable" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f room13-render.log ]; then
+            tail -n 12 room13-render.log >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Probe output
         run: ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_name,width,height,r_frame_rate -of json brain_v12/web/media/engine/room-13-horror-10m-animatic.mp4
       - name: Render status
+        if: success()
         run: |
           echo "ROOM_13_RENDER_STATUS=COMPLETED" >> "$GITHUB_STEP_SUMMARY"
           echo "ROOM_13_RENDER_PERCENT=100" >> "$GITHUB_STEP_SUMMARY"
