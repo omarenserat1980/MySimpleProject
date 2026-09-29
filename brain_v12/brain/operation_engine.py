@@ -21,7 +21,7 @@ class OperationEngine:
     """Deterministic operation registry: prompt -> policy -> executor -> verification -> audit."""
 
     BASE = (
-        "Operate autonomously within declared permissions. "
+        "Operate autonomously within declared permissions. Do not create a new service unless explicitly requested. "
         "Inspect before changing. Preserve legacy. "
         "Do not invent evidence or claim success without verification. "
         "On failure, diagnose before retrying. "
