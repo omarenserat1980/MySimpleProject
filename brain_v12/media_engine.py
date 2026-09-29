@@ -10,6 +10,7 @@ import json
 import os
 import pathlib
 import shutil
+from . import brain_ffmpeg
 import subprocess
 import tempfile
 import threading
@@ -39,10 +40,11 @@ def _now() -> float:
 
 
 def _tool(name: str) -> str:
-    path = shutil.which(name)
-    if not path:
-        raise RuntimeError(f"{name.upper()}_NOT_INSTALLED")
-    return path
+    if name == "ffmpeg":
+        return brain_ffmpeg.ffmpeg()
+    if name == "ffprobe":
+        return brain_ffmpeg.ffprobe()
+    raise RuntimeError(f"UNSUPPORTED_MEDIA_TOOL:{name}")
 
 
 def _safe_name(name: str) -> str:
