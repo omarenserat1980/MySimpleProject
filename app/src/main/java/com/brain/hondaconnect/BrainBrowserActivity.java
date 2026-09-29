@@ -138,8 +138,8 @@ public class BrainBrowserActivity extends Activity {
             + "button{cursor:pointer}</style><div class='card'><div class='orb'>🧠</div>"
             + "<h1>BRAIN Browser</h1><p>متصفح BRAIN المدمج داخل Electronic Brain</p>"
             + "<input id='q' placeholder='ابحث أو اكتب عنوانًا' style='width:80%'><button onclick='go()'>فتح</button>"
-            + "<p>الوصول السريع</p><button onclick="location.href='http://127.0.0.1:8787/'">BRAIN Cloud Hub</button>"
-            + "<button onclick="location.href='https://github.com/omarenserat1980/MySimpleProject'">GitHub</button>"
+            + "<p>الوصول السريع</p><button onclick=\"location.href='http://127.0.0.1:8787/'\">BRAIN Cloud Hub</button>"
+            + "<button onclick=\"location.href='https://github.com/omarenserat1980/MySimpleProject'\">GitHub</button>"
             + "<script>function go(){let q=document.getElementById('q').value.trim();if(q)location.href='brain-search:'+encodeURIComponent(q)}</script>"
             + "</div></html>";
         web.loadDataWithBaseURL("https://brain.local/", home, "text/html", "UTF-8", null);
@@ -154,7 +154,7 @@ public class BrainBrowserActivity extends Activity {
         if (q.equalsIgnoreCase("brain://home") || q.equalsIgnoreCase("brain://")) { loadHome(); return; }
         String url;
         if (q.matches("(?i)^https?://.*")) url = q;
-        else if (q.matches("(?i)^[a-z0-9.-]+\.[a-z]{2,}(/.*)?$")) url = "https://" + q;
+        else if (q.matches("(?i)^[a-z0-9.-]+\\.[a-z]{2,}(/.*)?$")) url = "https://" + q;
         else {
             try { url = "https://www.google.com/search?q=" + URLEncoder.encode(q, "UTF-8"); }
             catch(Exception e) { url = "https://www.google.com/search?q=" + Uri.encode(q); }
