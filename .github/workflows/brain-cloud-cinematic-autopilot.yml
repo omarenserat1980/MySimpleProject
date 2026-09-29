@@ -89,8 +89,6 @@ jobs:
       - name: Brain autonomously chooses its capability demonstration
         run: python -m cloud.capability_demonstrator
 
-      - name: Run cinematic autopilot
-        run: python -m brain_v12.cinematic_autopilot
 
       - name: Show autopilot diagnostics
         if: always()
