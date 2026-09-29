@@ -70,9 +70,11 @@ class FilmReliabilityEngine:
     def _qc(self, video: Path) -> dict[str, Any]:
         if not video.is_file() or video.stat().st_size < 1024:
             return {"ok": False, "error": "missing_or_tiny_mp4"}
-        ffprobe = shutil.which("ffprobe") or str(ROOT / "brain_v12/bin/ffprobe")
-        if not Path(ffprobe).is_file() and shutil.which("ffprobe") is None:
-            return {"ok": False, "error": "ffprobe_unavailable"}
+        try:
+            from brain_v12 import brain_ffmpeg
+            ffprobe = brain_ffmpeg.ffprobe()
+        except Exception as exc:
+            return {"ok": False, "error": "ffprobe_unavailable", "details": str(exc)}
         probe = subprocess.run(
             [ffprobe, "-v", "error", "-show_entries",
              "format=duration,size,format_name",
