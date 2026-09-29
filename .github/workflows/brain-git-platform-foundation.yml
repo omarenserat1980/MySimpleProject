@@ -18,14 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Verify Git
-        run: git --version
-      - name: Run Brain-native service tests
-        working-directory: brain_git_platform
-        run: python -m unittest -v test_service.py
-      - name: Assert no GitHub runtime import
+      - name: Run Brain-native tests
+        run: python -m unittest discover -s brain_git_platform -p 'test_*.py' -v
+      - name: Assert GitHub is not a runtime dependency
         run: |
           if grep -RniE 'github\.com|api\.github\.com|PyGithub|GITHUB_TOKEN' brain_git_platform --exclude='*.md'; then
-            echo "GitHub runtime dependency detected in Brain Git Platform"
+            echo "GitHub runtime dependency detected"
             exit 1
           fi
