@@ -90,6 +90,19 @@ def validate_dimensions(evidence: list[Evidence]) -> None:
         raise ValueError(f"unknown benchmark dimensions: {sorted(unknown)}")
 
 
+def benchmark_plan() -> dict[str, int]:
+    base, remainder = divmod(TARGET_TESTS, len(DIMENSIONS))
+    return {name: base + (1 if i < remainder else 0) for i, name in enumerate(DIMENSIONS)}
+
+
+def validate_plan() -> None:
+    plan = benchmark_plan()
+    if sum(plan.values()) != TARGET_TESTS:
+        raise AssertionError('benchmark plan does not total 5000 tests')
+    if any(value <= 0 for value in plan.values()):
+        raise AssertionError('every capability must have executable tests')
+
+
 def main() -> None:
     print("BRAIN_HUMAN_LIKE_BENCHMARK=5000_TESTS")
     print(f"BRAIN_HUMAN_LIKE_TEST_WEIGHT_PERCENT={TEST_WEIGHT_PERCENT}")
