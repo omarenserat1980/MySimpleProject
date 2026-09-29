@@ -56,6 +56,14 @@ class Room13PipelineTests(unittest.TestCase):
         self.assertIn('"ar"', self.renderer)
         self.assertIn('"voiceover": True', self.renderer)
 
+    def test_media_health_gate_exists(self):
+        gate = ROOT / "brain_v12/movie_summary_factory/room13_media_health.py"
+        self.assertTrue(gate.is_file())
+        ast.parse(gate.read_text(encoding="utf-8"), filename=str(gate))
+        source = gate.read_text(encoding="utf-8")
+        for token in ("READY", "BLOCKED", "espeak-ng", "make_ppm", "ROOM13_QC_FAILED"):
+            self.assertIn(token, source)
+
     def test_brain_toolchain_is_required(self):
         self.assertIn("brain_ffmpeg", self.renderer)
         self.assertIn("brain_ffmpeg", self.qc)
