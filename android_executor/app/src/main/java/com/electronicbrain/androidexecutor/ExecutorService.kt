@@ -23,7 +23,7 @@ class ExecutorService : Service() {
         private const val CHANNEL = "electronic_brain_executor"
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","queue_status","queue_enqueue","film_create","termux_vps_preflight","termux_vps_deploy","termux_vps_health")
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","queue_status","queue_enqueue","film_create",)
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -118,9 +118,6 @@ class ExecutorService : Service() {
 
         return try {
             when (name) {
-                "termux_vps_preflight", "termux_vps_deploy", "termux_vps_health" -> {
-                    ok(JSONObject(runEmbeddedTerminal(name.removePrefix("termux_vps_"))))
-                }
                 "queue_status" -> {
                     val items = QueueStore(this).load()
                     ok(JSONObject()

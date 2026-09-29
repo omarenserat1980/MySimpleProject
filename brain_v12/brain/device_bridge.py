@@ -1,22 +1,22 @@
-"""Authenticated, allowlisted, persistent bridge between Brain V12 and a Termux device agent."""
+"""Deprecated optional device bridge. Brain Cloud does not depend on a device or Termux."""
 from __future__ import annotations
 import hashlib, hmac, os, time
 from uuid import uuid4
 
-AGENT_KEY_ENV = "TERMUX_AGENT_KEY"
-AGENT_KEY_SHA256_ENV = "TERMUX_AGENT_KEY_SHA256"
+AGENT_KEY_ENV = "BRAIN_AGENT_KEY"
+AGENT_KEY_SHA256_ENV = "BRAIN_AGENT_KEY_SHA256"
 
 HEARTBEAT_STALE = "STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS = {"status": {}, "python_version": {}, "termux_path": {}, "platform": {}, "termux_vps_preflight": {}, "termux_vps_deploy": {}, "termux_vps_health": {}}
+    ALLOWED_TASKS = {"status": {}, "python_version": {}, "platform": {}}
 
     def __init__(self, store):
         self.store = store
         self._last_seen = None
 
     def configured(self):
-        return bool(os.getenv(AGENT_KEY_ENV, "") or os.getenv(AGENT_KEY_SHA256_ENV, ""))
+        return False  # Cloud-only runtime: device agents are never required or activated.
 
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV, ""):
@@ -41,6 +41,7 @@ class DeviceBridge:
         return hmac.compare_digest(supplied_hash, expected_hash)
 
     def enqueue(self, task, params=None):
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         if task not in self.ALLOWED_TASKS:
             return {"ok": False, "status": "TASK_NOT_ALLOWED", "allowed": sorted(self.ALLOWED_TASKS)}
         item = {
@@ -56,6 +57,7 @@ class DeviceBridge:
     def poll(self, agent_id):
         if not agent_id:
             return {"ok": False, "status": "AGENT_ID_REQUIRED"}
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED"}
         self._last_seen = time.time()
         self.store.device_agent_touch(agent_id, self._last_seen)
         self.store.device_task_requeue_stale(max_age_seconds=int(os.getenv("TERMUX_TASK_STALE_SECONDS", "120")))
@@ -68,7 +70,7 @@ class DeviceBridge:
         now = time.time()
         self._last_seen = now
         self.store.device_agent_touch(agent_id, now)
-        return {"ok": True, "agent_id": agent_id, "last_seen": now}
+        return {"ok": False, "status": "DEVICE_EXECUTION_DISABLED", "agent_id": agent_id}
 
     def report(self, task_id, agent_id, ok, result=None, error=""):
         status = self.store.device_task_report(task_id, agent_id, ok, result or {}, error)

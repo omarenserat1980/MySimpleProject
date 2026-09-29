@@ -60,6 +60,9 @@ def status():
         "service": "BRAIN Cloud Hub",
         "mode": os.getenv("BRAIN_CLOUD_MODE", "internet-connected"),
         "role": "brain_cloud_native",
+        "runtime_mode": "cloud_only",
+        "device_required": False,
+        "termux_dependency": False,
         "goals": [g.strip() for g in os.getenv("BRAIN_GOALS", "").split(",") if g.strip()],
         "production_enabled": os.getenv("FACTORY_ALLOW_PRODUCTION", "0") == "1",
         "youtube_publish_enabled": os.getenv("FACTORY_ALLOW_YOUTUBE_PUBLISH", "0") == "1",
@@ -254,6 +257,9 @@ def platform():
         "role": "brain_cloud_native",
         "paid_render_dependency": False,
         "capabilities": ["services", "deploy", "restart", "logs", "health", "film_jobs", "ffmpeg", "qc"],
+        "runtime_mode": "cloud_only",
+        "device_required": False,
+        "termux_dependency": False,
         "executor": "local_docker" if os.getenv("BRAIN_DEPLOY_EXECUTOR", "none") == "local_docker" else "disabled",
     }
 

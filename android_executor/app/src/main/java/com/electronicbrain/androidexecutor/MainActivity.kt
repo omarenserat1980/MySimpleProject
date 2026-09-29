@@ -25,26 +25,6 @@ class MainActivity : ComponentActivity() {
             hint = "BRAIN_BASE_URL"
             setText(prefs.getString("brain_base_url", "http://127.0.0.1:8012"))
         }
-        val termuxBash = EditText(this).apply {
-            hint = "EMBEDDED_TERMUX_BASH"
-            setText(prefs.getString("termux_bash", ""))
-        }
-        val vpsHost = EditText(this).apply {
-            hint = "VPS_HOST"
-            setText(prefs.getString("vps_host", ""))
-        }
-        val vpsUser = EditText(this).apply {
-            hint = "VPS_USER"
-            setText(prefs.getString("vps_user", "root"))
-        }
-        val vpsPort = EditText(this).apply {
-            hint = "VPS_SSH_PORT"
-            setText(prefs.getString("vps_port", "22"))
-        }
-        val sshKey = EditText(this).apply {
-            hint = "SSH_KEY_PATH (local only)"
-            setText(prefs.getString("ssh_key_path", ""))
-        }
         val agentKey = EditText(this).apply {
             hint = "V12_AGENT_KEY"
             setText(prefs.getString("agent_key", ""))
@@ -60,11 +40,7 @@ class MainActivity : ComponentActivity() {
                 prefs.edit().putString("agent_id", agentId.text.toString().trim())
                     .putString("agent_key", agentKey.text.toString().trim())
                     .putString("brain_base_url", brainUrl.text.toString().trim())
-                    .putString("termux_bash", termuxBash.text.toString().trim())
-                    .putString("vps_host", vpsHost.text.toString().trim())
-                    .putString("vps_user", vpsUser.text.toString().trim())
-                    .putString("vps_port", vpsPort.text.toString().trim())
-                    .putString("ssh_key_path", sshKey.text.toString().trim()).apply()
+.apply()
                 if (Build.VERSION.SDK_INT >= 33)
                     ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
                 val i = Intent(this@MainActivity, ExecutorService::class.java)
@@ -92,12 +68,12 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 48, 32, 32)
             addView(TextView(this@MainActivity).apply {
-                text = "ELECTRONIC BRAIN\nPHONE-ONLY ANDROID EXECUTOR"
+                text = "ELECTRONIC BRAIN\nOPTIONAL ANDROID CLIENT"
                 textSize = 22f
             })
-            addView(agentId); addView(agentKey); addView(brainUrl); addView(termuxBash); addView(vpsHost); addView(vpsUser); addView(vpsPort); addView(sshKey); addView(start); addView(stop); addView(storage); addView(status)
+            addView(agentId); addView(agentKey); addView(brainUrl); addView(start); addView(stop); addView(storage); addView(status)
             addView(TextView(this@MainActivity).apply {
-                text = "Brain URL: configurable\nEmbedded Termux → VPS deployment\nOutput: /storage/emulated/0/Movies/ElectronicBrain/"
+                text = "Brain Cloud is the primary runtime.\nThis Android client is optional and never required for cloud operation."
                 textSize = 13f
             })
         })
