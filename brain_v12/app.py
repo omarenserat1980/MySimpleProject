@@ -143,7 +143,7 @@ def _quick_editor_validate(path:str, content:str):
     return {"ok":not errors,"path":path,"extension":ext,"errors":errors,"warnings":warnings}
 
 def _github_config():
-    return {"configured":bool(os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")),
+    return {"configured":bool(os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")),
             "repository":os.getenv("BRAIN_GITHUB_REPOSITORY") or os.getenv("GITHUB_REPOSITORY") or "omarenserat1980/MySimpleProject",
             "branch":os.getenv("BRAIN_GITHUB_BRANCH") or os.getenv("GITHUB_REF_NAME") or "main"}
 
