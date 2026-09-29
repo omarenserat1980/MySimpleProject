@@ -384,6 +384,37 @@ def media_timeline(body: MediaJobIn):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/api/media/visual-scene")
+def media_visual_scene(body: MediaJobIn):
+    """Render a deterministic Visual Engine scene into a media asset and optionally build an MP4."""
+    try:
+        spec = dict(body.spec or {})
+        scene = spec.get("scene")
+        if not isinstance(scene, dict):
+            prompt = str(spec.get("prompt") or "منظر طبيعي")
+            scene = visual_engine.compile_scene(prompt, str(spec.get("mode") or "auto"))
+        svg = visual_engine.render_svg(scene)
+        filename = media_engine._safe_name(str(spec.get("filename") or "brain-visual-scene.svg"))
+        if not filename.lower().endswith(".svg"):
+            filename += ".svg"
+        target = (media_engine.MEDIA_ROOT / filename).resolve()
+        if media_engine.MEDIA_ROOT not in target.parents:
+            raise ValueError("MEDIA_PATH_OUTSIDE_WORKSPACE")
+        target.write_text(svg, encoding="utf-8")
+        result = {"ok": True, "scene": scene, "svg": f"/media/{filename}", "filename": filename}
+        if bool(spec.get("render_mp4")):
+            duration = max(0.5, min(float(spec.get("duration") or 5), 120))
+            image_name = filename
+            # SVG is retained as the canonical editable asset; convert through the existing
+            # allowlisted slideshow operation only after a raster asset is supplied.
+            result["next_step"] = "RASTER_ASSET_REQUIRED"
+            result["duration"] = duration
+            result["timeline"] = visual_engine.scene_timeline(scene, duration)
+        return result
+    except (ValueError, OSError, TypeError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.post("/api/media/slideshow")
 def media_slideshow(body: MediaJobIn):
     try:
