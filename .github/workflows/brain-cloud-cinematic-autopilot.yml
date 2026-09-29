@@ -44,7 +44,7 @@ jobs:
       - name: Install deterministic media dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg fonts-noto-core build-essential pkg-config yasm nasm libx264-dev libfreetype6-dev libfontconfig1-dev
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng fonts-noto-core build-essential pkg-config yasm nasm libx264-dev libfreetype6-dev libfontconfig1-dev
 
       - name: Bind CI media toolchain into Brain
         run: |
