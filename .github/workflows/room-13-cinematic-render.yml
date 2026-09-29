@@ -33,7 +33,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -42,6 +42,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends fonts-noto-core
+      - name: Build Brain-native FFmpeg toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config yasm nasm libx264-dev libfreetype6-dev libfontconfig1-dev
+          rm -rf /tmp/ffmpeg-brain-src
+          git clone --depth 1 --branch n8.0.1 https://github.com/FFmpeg/FFmpeg.git /tmp/ffmpeg-brain-src
+          cd /tmp/ffmpeg-brain-src
+          ./configure --prefix="$GITHUB_WORKSPACE/brain_v12/bin" --bindir="$GITHUB_WORKSPACE/brain_v12/bin" --enable-gpl --enable-libx264 --enable-libfreetype --enable-libfontconfig --disable-debug --disable-doc
+          make -j"$(nproc)"
+          make install
+          test -x "$GITHUB_WORKSPACE/brain_v12/bin/ffmpeg"
+          test -x "$GITHUB_WORKSPACE/brain_v12/bin/ffprobe"
+          "$GITHUB_WORKSPACE/brain_v12/bin/ffmpeg" -version | head -n 1
+          "$GITHUB_WORKSPACE/brain_v12/bin/ffprobe" -version | head -n 1
       - name: Verify Brain media toolchain
         run: |
           python - <<'PY'
