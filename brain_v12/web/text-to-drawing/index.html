@@ -85,12 +85,20 @@ function render(s){
  }
  return `<svg ${common}><title>BRAIN Visual Engine: ${esc(s.text)}</title>${body}</svg>`;
 }
-function generate(){
+async function generate(){
  const text=promptEl.value.trim()||'منظر طبيعي';
- currentScene=scene(detect(text),text); currentSVG=render(currentScene);
+ const mode=modeEl.value;
+ try{
+  const res=await fetch('/api/visual-engine/compile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,mode})});
+  if(!res.ok) throw new Error('API_UNAVAILABLE');
+  const data=await res.json(); currentScene=data.scene; currentSVG=data.svg;
+  statusEl.textContent='✓ تم التحويل عبر BRAIN Visual Engine المحلي';
+ }catch(e){
+  currentScene=scene(detect(text),text); currentSVG=render(currentScene);
+  statusEl.textContent='✓ تم التحويل محليًا داخل المتصفح';
+ }
  preview.innerHTML=currentSVG; codeEl.textContent=currentSVG;
  metaEl.innerHTML='<span class="pill">المحرك: SVG</span><span class="pill">الوضع: '+currentScene.type+'</span><span class="pill">محلي: نعم</span><span class="pill">API خارجي: لا</span>';
- statusEl.textContent='✓ تم تحويل النص إلى مشهد وكود SVG';
 }
 function downloadBlob(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
 function downloadSVG(){if(!currentSVG)generate();downloadBlob('brain-scene.svg',currentSVG,'image/svg+xml')}
