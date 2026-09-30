@@ -1,0 +1,45 @@
+name: Brain 1000 Loop Continuous Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      loops:
+        description: "Review loops (1-1000)"
+        required: false
+        default: "1000"
+  schedule:
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-1000-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Run 1000-loop review and self-healing
+        env:
+          BRAIN_REVIEW_LOOPS: ${{ github.event.inputs.loops || '1000' }}
+          BRAIN_REVIEW_TIMEOUT: "60"
+          BRAIN_REVIEW_DELAY: "0"
+          BRAIN_REVIEW_PYTEST: "0"
+          BRAIN_CODE_GENERATOR_COMMAND: ${{ vars.BRAIN_CODE_GENERATOR_COMMAND }}
+        run: |
+          set -o pipefail
+          python brain_v12/self_healing/review_loop.py --loops "$BRAIN_REVIEW_LOOPS"
+
+      - name: Publish 1000-loop evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-1000-loop-evidence
+          path: .brain/state/
+          if-no-files-found: ignore
