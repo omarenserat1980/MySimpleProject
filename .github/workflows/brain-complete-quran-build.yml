@@ -1,0 +1,43 @@
+name: Brain Complete Quran Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "brain_v12/quran/**"
+
+jobs:
+  build-quran:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build every ayah
+        run: |
+          python3 brain_v12/quran/complete_quran_builder.py
+          cat .brain/quran/manifest.json
+
+      - name: Verify verse-by-verse output
+        run: |
+          test "$(wc -l < .brain/quran/verse_registry.jsonl)" -eq 6236
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          rows = [json.loads(x) for x in Path(".brain/quran/verse_registry.jsonl").read_text(encoding="utf-8").splitlines()]
+          assert len(rows) == 6236
+          assert rows[0]["verse_key"] == "1:1"
+          assert rows[-1]["verse_key"] == "114:6"
+          assert len({r["verse_key"] for r in rows}) == 6236
+          assert all(r["pipeline"]["text_registered"] for r in rows)
+          print("QURAN_COMPLETE_BUILD=VERIFIED")
+          print("VERIFIED_AYAH_COUNT=6236")
+          PY
+
+      - name: Upload Quran build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-quran-verse-build
+          path: .brain/quran/
