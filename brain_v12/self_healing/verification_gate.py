@@ -72,15 +72,19 @@ def main() -> int:
     ]
     if os.getenv("BRAIN_GATE_PYTEST", "1") == "1":
         gates.append(("pytest", [sys.executable, "-m", "pytest", "-q"]))
+    health = os.getenv("BRAIN_HEALTH_COMMAND", "").strip()
+    if health:
+        gates.append(("health", ["bash", "-lc", health]))
 
     results = [run(name, command, timeout) for name, command in gates]
     passed = all(item["passed"] for item in results)
     report = {
-        "schema": "brain-verification-gate/v1",
+        "schema": "brain-verification-gate/v2",
         "status": "VERIFIED" if passed else "FAILED",
         "verified_completed_allowed": passed,
         "created_at": now(),
         "gates": results,
+        "health_command_configured": bool(os.getenv("BRAIN_HEALTH_COMMAND", "").strip()),
     }
     STATE.mkdir(parents=True, exist_ok=True)
     EVIDENCE.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
