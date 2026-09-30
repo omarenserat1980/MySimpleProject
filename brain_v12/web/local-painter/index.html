@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Local Painter — النتيجة الفعلية</title>
+<style>
+body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:20px}
+.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:16px}
+h1{margin:0 0 8px}p{color:#9db0c4}.status{color:#62e6a5}
+.viewer{background:#fff;border-radius:14px;overflow:hidden;margin-top:14px}.viewer img{display:block;width:100%;height:auto}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+a,button{display:inline-block;border:1px solid #29445d;border-radius:10px;background:#12304a;color:#fff;padding:11px 15px;text-decoration:none}
+.meta{line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>🧠🎨 BRAIN Local Painter</h1>
+<p>صفحة عرض النتيجة الفعلية التي أنشأها الرسام المحلي داخل Brain.</p>
+<div id="status" class="status">جاري تحميل النتيجة...</div>
+</div>
+<div class="card">
+<div id="meta" class="meta"></div>
+<div class="viewer"><img id="art" alt="BRAIN Local Painter result"></div>
+<div class="row">
+<a id="open" target="_blank" rel="noopener">🖼️ فتح الصورة الأصلية</a>
+<a id="download" download>📥 تنزيل الصورة</a>
+<a href="/text-to-drawing/">🎨 العودة إلى الرسام</a>
+</div>
+</div>
+</div>
+<script>
+const q=new URLSearchParams(location.search);
+const src=q.get("src");
+const prompt=q.get("prompt")||"نتيجة رسم محلي";
+const art=document.getElementById("art"),open=document.getElementById("open"),download=document.getElementById("download");
+if(!src){document.getElementById("status").textContent="❌ لم يتم تمرير نتيجة رسم.";throw new Error("MISSING_SRC")}
+art.src=src;open.href=src;download.href=src;
+document.getElementById("meta").innerHTML="<b>الوصف:</b> "+escapeHtml(prompt)+"<br><b>المحرك:</b> BRAIN Local Painter<br><b>المصدر:</b> نتيجة محفوظة داخل Brain";
+art.onload=()=>document.getElementById("status").textContent="✅ تم تحميل النتيجة الفعلية بنجاح";
+art.onerror=()=>document.getElementById("status").textContent="❌ تعذر الوصول إلى ملف الرسم.";
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+</script>
+</body>
+</html>
