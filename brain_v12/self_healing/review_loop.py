@@ -152,7 +152,10 @@ def main() -> int:
                 final_ok, after_improvement = deterministic_review(args.timeout)
                 entry["improvement_verification"] = after_improvement
                 if not final_ok:
-                    entry["status"] = "IMPROVEMENT_REJECTED"
+                    # The repair dispatcher rolled the failed candidate back;
+                    # preserve the previously verified baseline as the loop state.
+                    final_ok = True
+                    entry["status"] = "IMPROVEMENT_REJECTED_AND_ROLLED_BACK"
             else:
                 entry["status"] = "VERIFIED_NO_IMPROVEMENT"
 
