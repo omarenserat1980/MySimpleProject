@@ -1,0 +1,22 @@
+name: Brain Economic Cycle
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/economic_connectors.py"
+      - "brain_v12/brain/payment_adapters.py"
+      - "brain_v12/brain/economic_cycle.py"
+      - "brain_v12/tests/test_economic_connectors.py"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m unittest brain_v12.tests.test_economic_connectors -v
+      - run: python -m brain_v12.brain.economic_cycle > /tmp/economic-cycle.json
+      - run: cat /tmp/economic-cycle.json
