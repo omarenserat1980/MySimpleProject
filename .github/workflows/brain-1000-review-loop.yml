@@ -1,10 +1,10 @@
-name: Brain Continuous Evolution 1000 Loop
+name: Brain Continuous Evolution Review
 
 on:
   workflow_dispatch:
     inputs:
       loops:
-        description: "Review loops per run (1-1000)"
+        description: "Review loops per hosted run (1-100000000; hosted runtime remains time-bounded)"
         required: false
         default: "1000"
   schedule:
@@ -30,6 +30,7 @@ jobs:
           BRAIN_REVIEW_LOOPS: ${{ github.event.inputs.loops || '1000' }}
           BRAIN_REVIEW_TIMEOUT: "60"
           BRAIN_CODE_GENERATOR_COMMAND: ${{ vars.BRAIN_CODE_GENERATOR_COMMAND }}
+          BRAIN_PROACTIVE_EVOLUTION: "0"
         run: |
           set -o pipefail
           python brain_v12/self_healing/review_loop.py --loops "$BRAIN_REVIEW_LOOPS"
