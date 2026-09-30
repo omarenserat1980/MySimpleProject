@@ -33,6 +33,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends ffmpeg
           python -m pip install --disable-pip-version-check Pillow
 
+      - name: Probe optional runtime
+        run: python brain_v12/brain/open_source_runtime.py
+
       - name: Render film
         run: |
           rm -rf /tmp/last-light
@@ -80,4 +83,5 @@ jobs:
             /tmp/last-light/ffprobe.json
             /tmp/last-light/film_manifest.json
             /tmp/last-light/VERIFIED_COMPLETED
+            brain6_artifacts/open_source_runtime_status.json
           if-no-files-found: error
