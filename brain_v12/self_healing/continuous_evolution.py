@@ -79,7 +79,14 @@ def main() -> int:
         raise SystemExit("--cycles must be >= 0")
 
     STATE.mkdir(parents=True, exist_ok=True)
-    cycle = 0
+    checkpoint = STATE / "evolution_checkpoint.json"
+    if checkpoint.is_file():
+        try:
+            cycle = int(json.loads(checkpoint.read_text(encoding="utf-8")).get("cycle", 0))
+        except Exception:
+            cycle = 0
+    else:
+        cycle = 0
 
     while args.cycles == 0 or cycle < args.cycles:
         cycle += 1
@@ -100,7 +107,15 @@ def main() -> int:
             except Exception as exc:
                 repair_code, repair_stdout, repair_stderr = 124, "", repr(exc)
 
-        status = "VERIFIED" if code == 0 else "REPAIR_ATTEMPTED"
+        if code != 0 and repair_code == 0:
+            try:
+                verify_code, verify_out, verify_err = run_review(1, args.timeout)
+                code = verify_code
+                stdout += "\nPOST_REPAIR_REVERIFY\n" + verify_out
+                stderr += "\nPOST_REPAIR_REVERIFY\n" + verify_err
+            except Exception as exc:
+                code, stdout, stderr = 124, stdout, stderr + "\nPOST_REPAIR_REVERIFY_ERROR=" + repr(exc)
+        status = "VERIFIED" if code == 0 else "FAILED"
         append_event({
             "schema": "brain-infinite-evolution/v2",
             "cycle": cycle,
@@ -115,11 +130,8 @@ def main() -> int:
             "repair_stderr": repair_stderr,
             "status": status,
         })
-        print(
-            f"BRAIN_EVOLUTION cycle={cycle} "
-            f"loops={args.loops_per_cycle} status={status}",
-            flush=True,
-        )
+        checkpoint.write_text(json.dumps({"schema":"brain-evolution-checkpoint/v1","cycle":cycle,"status":status,"updated_at":now(),"review_exit_code":code,"repair_exit_code":repair_code},ensure_ascii=False,indent=2),encoding="utf-8")
+        print(f"BRAIN_EVOLUTION cycle={cycle} loops={args.loops_per_cycle} status={status}",flush=True)
 
         if args.pause:
             time.sleep(args.pause)
