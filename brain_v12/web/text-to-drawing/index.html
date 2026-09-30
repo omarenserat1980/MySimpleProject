@@ -22,7 +22,7 @@ small{color:#91a8bb}@media(max-width:800px){.grid{grid-template-columns:1fr}}
 <p>محرك مجاني محلي: الوصف النصي يتحول إلى Scene JSON ثم SVG/HTML، مع تصدير JSON للربط مع BRAIN Media Engine. لا يحتاج API صور خارجي.</p>
 <textarea id="prompt">منظر جبلي عند الغروب مع شمس وشجرة وبحيرة وبيت صغير ونجوم</textarea>
 <div class="row">
-<select id="mode"><option value="auto">تلقائي</option><option value="landscape">منظر طبيعي</option><option value="city">مدينة</option><option value="robot">روبوت</option><option value="car">سيارة</option><option value="abstract">أشكال هندسية</option></select>
+<select id="mode"><option value="auto">تلقائي</option><option value="landscape">منظر طبيعي</option><option value="city">مدينة</option><option value="robot">روبوت</option><option value="car">سيارة</option><option value="abstract">أشكال هندسية</option><option value="green_mask">القناع الأخضر — BRAIN Original</option></select>
 <input id="duration" type="number" min="0.5" max="120" step="0.5" value="5" title="مدة المشهد بالثواني">
 <button onclick="generate()">🎨 توليد</button><button onclick="toggleAnimation()">▶️ حركة</button>
 <button onclick="downloadHTML()">💾 HTML</button><button onclick="downloadSVG()">⬇️ SVG</button><button onclick="downloadPNG()">🖼️ PNG</button>
