@@ -70,7 +70,7 @@ def main() -> int:
         ("compile", [sys.executable, "-m", "compileall", "-q", "brain_v12"]),
         ("self-test", [sys.executable, "brain_v12/self_healing/self_test.py"]),
         ("cloud-only-policy", [sys.executable, "brain_v12/self_healing/cloud_only_guard.py"]),
-        ("completion-audit", [sys.executable, "brain_v12/self_healing/completion_audit.py"]),
+        ("completion-audit", [sys.executable, "brain_v12/self_healing/completion_audit.py"]),\n        ("causal-evidence", [sys.executable, "brain_v12/causal/runtime_bridge.py"]),
     ]
     if os.getenv("BRAIN_GATE_PYTEST", "1") == "1":
         gates.append(("pytest", [sys.executable, "-m", "pytest", "-q"]))
