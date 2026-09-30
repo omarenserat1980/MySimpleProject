@@ -1,0 +1,28 @@
+name: Brain Local Worker CI
+on:
+  push:
+    paths: [brain_v12/local_worker/**, .github/workflows/brain-local-worker-ci.yml]
+  pull_request:
+    paths: [brain_v12/local_worker/**, .github/workflows/brain-local-worker-ci.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax
+        run: python3 -m py_compile brain_v12/local_worker/brain_local_worker.py brain_v12/local_worker/queue_job.py
+      - name: Safe local worker smoke test
+        run: |
+          export BRAIN_LOCAL_WORKER_ROOT="$RUNNER_TEMP/brain-local-worker"
+          python3 brain_v12/local_worker/queue_job.py python_version
+          timeout 8s python3 brain_v12/local_worker/brain_local_worker.py &
+          pid=$!
+          for i in $(seq 1 20); do
+            test -n "$(find "$BRAIN_LOCAL_WORKER_ROOT/completed" -name '*.json' -print -quit)" && break
+            sleep 0.25
+          done
+          test -n "$(find "$BRAIN_LOCAL_WORKER_ROOT/completed" -name '*.json' -print -quit)"
+          kill "$pid" 2>/dev/null || true
