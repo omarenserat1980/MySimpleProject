@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Safe filesystem-backed execution adapter for Brain Cloud."""
+"""Safe filesystem-backed execution adapter for Brain.
 
+The worker is provider-free and allowlisted. It can execute the Brain Local
+Painter without external image APIs.
+"""
 from __future__ import annotations
 import json, os, platform, shutil, subprocess, time
 from pathlib import Path
@@ -23,9 +26,10 @@ def safe_command_version(binary: str):
     if not path:
         return {"available": False, "binary": binary}
     out = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=10)
-    return {"available": out.returncode == 0, "binary": binary, "version": (out.stdout or out.stderr).splitlines()[0][:300]}
+    return {"available": out.returncode == 0, "binary": binary,
+            "version": (out.stdout or out.stderr).splitlines()[0][:300]}
 
-def execute(task: str):
+def execute(task: str, params: dict):
     if task == "python_version":
         return {"python": platform.python_version()}
     if task == "platform":
@@ -39,6 +43,23 @@ def execute(task: str):
     if task == "filesystem_probe":
         usage = shutil.disk_usage(Path.cwd())
         return {"free_bytes": usage.free, "total_bytes": usage.total}
+    if task == "brain_local_painter_draw":
+        prompt = str(params.get("prompt", "")).strip()
+        if not prompt:
+            raise ValueError("prompt_required")
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from brain_v12.brain.draw_gateway import draw_local
+        result = draw_local(prompt)
+        if not result.get("ok") or not result.get("verified") or not result.get("svg"):
+            raise ValueError("brain_local_painter_failed")
+        out_dir = Path.cwd() / "brain6_artifacts" / "local_painter"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"{int(time.time())}-scene.svg"
+        out.write_text(result["svg"], encoding="utf-8")
+        return {"provider": "brain_local_painter", "verified": True,
+                "prompt": prompt, "artifact": str(out), "format": "svg",
+                "scene": result.get("scene", {})}
     raise ValueError(f"task_not_allowlisted:{task}")
 
 def process(path: Path):
@@ -53,22 +74,15 @@ def process(path: Path):
         task = job.get("task")
         if not isinstance(task, str):
             raise ValueError("task_required")
-        result = {
-            "job_id": job.get("job_id", claimed.stem),
-            "worker_id": WORKER_ID,
-            "status": "VERIFIED",
-            "started_at": started,
-            "completed_at": utc(),
-            "evidence": execute(task),
-        }
+        result = {"job_id": job.get("job_id", claimed.stem), "worker_id": WORKER_ID,
+                  "status": "VERIFIED", "started_at": started, "completed_at": utc(),
+                  "evidence": execute(task, job.get("params", {}))}
         (COMPLETED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
         claimed.unlink(missing_ok=True)
     except Exception as exc:
-        result = {
-            "job_id": claimed.stem, "worker_id": WORKER_ID, "status": "FAILED",
-            "started_at": started, "completed_at": utc(),
-            "error": f"{type(exc).__name__}:{exc}",
-        }
+        result = {"job_id": claimed.stem, "worker_id": WORKER_ID, "status": "FAILED",
+                  "started_at": started, "completed_at": utc(),
+                  "error": f"{type(exc).__name__}:{exc}"}
         (FAILED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
         claimed.unlink(missing_ok=True)
 
