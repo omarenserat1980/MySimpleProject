@@ -9,3 +9,7 @@ target_link_libraries(brain_raster PRIVATE ZLIB::ZLIB)
 
 add_executable(bfml_compiler ../film_machine/bfml_compiler.cpp bytecode.cpp)
 target_compile_options(bfml_compiler PRIVATE -O3 -Wall -Wextra -Wpedantic)
+
+add_executable(brain_brc_render bytecode_renderer.cpp bytecode.cpp)
+target_compile_options(brain_brc_render PRIVATE -O3 -Wall -Wextra -Wpedantic)
+target_link_libraries(brain_brc_render PRIVATE ZLIB::ZLIB)
