@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Dependency-free tests for the Brain self-healing core."""
-from brain_v12.self_healing.supervisor import diagnose\nfrom brain_v12.causal.causal_engine import self_test as causal_engine_test
+from brain_v12.self_healing.supervisor import diagnose\nfrom brain_v12.causal.causal_engine import self_test as causal_engine_test, causal_audit
 
 
 def main() -> int:
-    causal_engine_test()\n    checks = [
+    causal_engine_test()\n    causal_audit()\n    checks = [
         ("missing-token", diagnose("", "GITHUB_TOKEN_REQUIRED", 2)),
         ("syntax", diagnose("", "SyntaxError: invalid syntax", 1)),
         ("network", diagnose("", "Connection reset by peer", 1)),
