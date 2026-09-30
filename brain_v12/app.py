@@ -1486,6 +1486,14 @@ def chatgpt_reply(message,cognitive_context=None):
 @app.post("/api/chat")
 def chat(body:Chat):
     message=body.message.strip()
+    draw_request = parse_human_draw_request(message)
+    if draw_request["ok"]:
+        draw_result = human_draw(Chat(message=message))
+        store.add_message("user", message)
+        store.event("DRAW_COMMAND", {"provider": draw_request["provider"], "prompt": draw_request["prompt"], "verified": draw_result.get("verified", False)})
+        if draw_result.get("ok"):
+            store.add_message("assistant", "تم إنشاء الصورة والتحقق منها. افتح الناتج من واجهة Brain.")
+        return {"ok": draw_result.get("ok", False), "type": "image", "draw": draw_result, "provider": draw_request["provider"]}
     if not message: return {"ok":False,"error":"EMPTY_MESSAGE"}
     store.add_message("user",message); store.event("PERCEPTION",{"message":message})
     goal=store.active_goal()
