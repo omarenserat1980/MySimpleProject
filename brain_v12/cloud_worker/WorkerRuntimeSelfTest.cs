@@ -6,6 +6,7 @@ public static class WorkerRuntimeSelfTest
     {
         var path = Path.Combine(Path.GetTempPath(), "brain-worker-registry-" + Guid.NewGuid().ToString("N") + ".json");
         Environment.SetEnvironmentVariable("BRAIN_WORKER_REGISTRY_PATH", path);
+        Environment.SetEnvironmentVariable("BRAIN_JOB_LEASE_PATH", Path.Combine(Path.GetTempPath(), "brain-worker-leases-" + Guid.NewGuid().ToString("N") + ".json"));
         try
         {
             var registry = new WorkerRegistry();
@@ -28,6 +29,7 @@ public static class WorkerRuntimeSelfTest
         {
             try { File.Delete(path); } catch { }
             Environment.SetEnvironmentVariable("BRAIN_WORKER_REGISTRY_PATH", null);
+            Environment.SetEnvironmentVariable("BRAIN_JOB_LEASE_PATH", null);
         }
     }
 }
