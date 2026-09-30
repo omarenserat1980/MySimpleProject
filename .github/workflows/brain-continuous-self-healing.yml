@@ -12,7 +12,7 @@ on:
         required: false
         default: "5"
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/5 * * * *"
   push:
     paths:
       - "brain_v12/**"
