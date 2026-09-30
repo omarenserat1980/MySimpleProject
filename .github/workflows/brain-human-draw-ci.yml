@@ -1,0 +1,32 @@
+name: Brain Human Draw CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/draw_gateway.py"
+      - "brain_v12/brain/openai_provider.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_draw_gateway.py"
+      - "brain_v12/tests/test_human_draw_api.py"
+      - ".github/workflows/brain-human-draw-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m compileall -q brain_v12
+      - name: Human draw tests
+        run: python -m unittest brain_v12.tests.test_draw_gateway brain_v12.tests.test_human_draw_api -v
+      - name: Visual engine tests
+        run: python -m unittest brain_v12.tests.test_text_to_drawing brain_v12.tests.test_visual_engine_api -v
