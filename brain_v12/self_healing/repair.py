@@ -24,6 +24,7 @@ def verify(actions: list[str]) -> tuple[bool, list[dict]]:
         "compile": [sys.executable, "-m", "compileall", "-q", "brain_v12"],
         "self-test": [sys.executable, "brain_v12/self_healing/self_test.py"],
         "tests": [sys.executable, "-m", "pytest", "-q"],
+        "gate": [sys.executable, "brain_v12/self_healing/verification_gate.py"],
     }
     results = []
     for name in actions:
