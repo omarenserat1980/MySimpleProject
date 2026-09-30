@@ -1,0 +1,44 @@
+name: Brain Cloud GCP Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/gcp
+    env:
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+      TF_VAR_region: ${{ vars.BRAIN_GCP_REGION }}
+      TF_VAR_zone: ${{ vars.BRAIN_GCP_ZONE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+      - name: Validate required inputs
+        run: |
+          test -n "$TF_VAR_project_id"
+          test -n "$TF_VAR_credentials_json"
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform plan -out=brain-gcp.tfplan
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve brain-gcp.tfplan
+      - name: Show host
+        if: inputs.action == 'apply'
+        run: terraform output
