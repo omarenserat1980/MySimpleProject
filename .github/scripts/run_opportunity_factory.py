@@ -19,6 +19,7 @@ from brain_v7.braincore_v2.revenue_target_engine import PATHS
 from brain_v12.brain.income_engine import IncomeEngine
 from brain_v12.brain.live_opportunity_researcher import LiveOpportunityResearcher
 from brain_v12.brain.memory import MemoryStore
+from brain_v12.brain.economic_ledger import EconomicLedger
 
 ROOT = Path(".")
 ARTIFACTS = ROOT / "brain6_artifacts"
@@ -129,6 +130,9 @@ def main() -> int:
         limit=500,
     )
     write_json("lifecycle_refresh.json", lifecycle)
+
+    ledger = EconomicLedger(str(ARTIFACTS / "economy" / "ledger.jsonl"))
+    write_json("economic_ledger_snapshot.json", ledger.snapshot())
 
     report = engine.lifecycle_report(limit=100)
     snapshot = engine.snapshot()

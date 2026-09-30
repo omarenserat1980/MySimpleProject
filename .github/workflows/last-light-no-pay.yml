@@ -7,6 +7,8 @@ on:
       - "cloud/last_light_movie.py"
       - "brain_v12/brain/open_source_runtime.py"
       - "brain_v12/brain/autonomy_control_plane.py"
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/film_supervisor.py"
       - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
 
@@ -38,10 +40,9 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          from brain_v12.brain.autonomy_control_plane import ControlPlane
-          cp=ControlPlane("brain6_artifacts/control_plane")
-          job=cp.create("film:last-light",["probe","plan","render","verify","manifest"],max_attempts=3,budget=5)
-          job=cp.start_attempt(job)
+          from brain_v12.brain.brain_supervisor import BrainSupervisor
+          s=BrainSupervisor("brain6_artifacts/supervisor",max_cycles=3)
+          job=s.create("film:last-light", budget=5)
           Path("brain6_artifacts/control_plane_job.json").write_text(json.dumps(job,ensure_ascii=False,indent=2))
           print(json.dumps(job,ensure_ascii=False))
           PY
@@ -74,27 +75,10 @@ jobs:
           print(json.dumps(result,ensure_ascii=False))
           PY
 
-      - name: Render film
+      - name: Autonomous Brain Supervisor - produce, verify, repair, retry
         run: |
           rm -rf /tmp/last-light
-          python cloud/last_light_movie.py --output /tmp/last-light --seconds 12 --fps 12
-
-      - name: Verify MP4 and streams
-        run: |
-          test -s /tmp/last-light/last_light_city.mp4
-          ffprobe -v error             -show_entries format=duration,size             -show_entries stream=codec_type,codec_name,width,height             -of json /tmp/last-light/last_light_city.mp4 | tee /tmp/last-light/ffprobe.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          data=json.loads(Path("/tmp/last-light/ffprobe.json").read_text())
-          streams=data.get("streams",[])
-          assert any(s.get("codec_type")=="video" for s in streams), "missing video stream"
-          assert any(s.get("codec_type")=="audio" for s in streams), "missing audio stream"
-          fmt=data.get("format",{})
-          assert float(fmt.get("duration",0))>0, "invalid duration"
-          assert int(fmt.get("size",0))>0, "empty MP4"
-          Path("/tmp/last-light/VERIFIED_COMPLETED").write_text("verified\n")
-          PY
+          python -m brain_v12.brain.film_supervisor
 
       - name: Checkpoint verified production
         run: |
@@ -104,7 +88,7 @@ jobs:
           from brain_v12.brain.autonomy_control_plane import ControlPlane
           cp=ControlPlane("brain6_artifacts/control_plane")
           job=json.loads(Path("brain6_artifacts/control_plane_job.json").read_text())
-          job=cp.checkpoint(job,4,{"mp4_verified":True})
+          job=cp.checkpoint(job,7,{"mp4_verified":True,"supervisor":"completed"})
           Path("brain6_artifacts/control_plane_job.json").write_text(json.dumps(job,ensure_ascii=False,indent=2))
           PY
 
@@ -146,4 +130,7 @@ jobs:
             brain6_artifacts/film_runtime_plan.json
             brain6_artifacts/control_plane_job.json
             brain6_artifacts/control_plane/events.jsonl
+            brain6_artifacts/supervisor/events.jsonl
+            brain6_artifacts/supervisor/state.json
+            brain6_artifacts/film_supervisor_trace.json
           if-no-files-found: error

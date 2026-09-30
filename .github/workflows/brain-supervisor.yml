@@ -1,0 +1,46 @@
+name: Brain Supervisor - Autonomy and Economic Safety
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/economic_ledger.py"
+      - "brain_v12/tests/test_brain_supervisor.py"
+      - "brain_v12/tests/test_economic_ledger.py"
+      - ".github/workflows/brain-supervisor.yml"
+
+concurrency:
+  group: brain-supervisor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest brain_v12.tests.test_brain_supervisor brain_v12.tests.test_economic_ledger -v
+      - name: Supervisor smoke test
+        run: python -m brain_v12.brain.brain_supervisor
+      - name: Economic ledger smoke test
+        run: python -m brain_v12.brain.economic_ledger
+      - name: Verify safety invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("brain6_artifacts/economy/ledger.jsonl")
+          # The smoke test does not create a verified receipt; therefore no
+          # revenue can be inferred from an empty ledger.
+          assert not p.exists() or p.read_text(encoding="utf-8").strip() == ""
+          print("Economic safety invariant verified.")
+          PY
