@@ -48,6 +48,7 @@ def deterministic_review(timeout: int) -> tuple[bool, dict]:
     ]
     if os.getenv("BRAIN_REVIEW_PYTEST", "0") == "1":
         commands.append([os.environ.get("PYTHON", "python"), "-m", "pytest", "-q"])
+    commands.append([os.environ.get("PYTHON", "python"), "brain_v12/self_healing/verification_gate.py"])
 
     ok = True
     for cmd in commands:
