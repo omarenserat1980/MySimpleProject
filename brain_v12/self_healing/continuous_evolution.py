@@ -34,10 +34,12 @@ def execute(cmd: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
 
 
 def run_review(loops: int, timeout: int) -> tuple[int, str, str]:
-    p = execute([
-        os.environ.get("PYTHON", "python"), str(REVIEW),
+    env = os.environ.copy()
+    env.setdefault("BRAIN_PROACTIVE_EVOLUTION", "1")
+    p = subprocess.run([
+        env.get("PYTHON", "python"), str(REVIEW),
         "--loops", str(loops), "--timeout", str(timeout)
-    ], timeout=max(timeout, 120) * min(loops, 100))
+    ], cwd=ROOT, env=env, text=True, capture_output=True, timeout=max(timeout, 120) * min(loops, 100))
     return p.returncode, p.stdout[-16000:], p.stderr[-16000:]
 
 
