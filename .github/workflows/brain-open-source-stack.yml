@@ -1,0 +1,47 @@
+name: Brain Open Source Stack - Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */12 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/open_source_stack.py"
+      - "brain_v12/brain/open_source_health.py"
+      - ".github/workflows/brain-open-source-stack.yml"
+
+concurrency:
+  group: brain-open-source-stack
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run capability health probe
+        run: python brain_v12/brain/open_source_health.py
+      - name: Validate registry
+        run: |
+          test -s brain6_artifacts/open_source_stack_status.json
+          python - <<'PY'
+          import json
+          p="brain6_artifacts/open_source_stack_status.json"
+          d=json.load(open(p,encoding="utf-8"))
+          assert len(d["components"]) >= 6
+          assert d["policy"]["no_download_of_large_models"] is True
+          print("Open-source stack registry:", len(d["components"]), "components")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brain-open-source-stack-status
+          path: brain6_artifacts/open_source_stack_status.json
+          retention-days: 30
