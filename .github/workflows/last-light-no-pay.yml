@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "cloud/last_light_movie.py"
+      - "brain_v12/brain/open_source_runtime.py"
       - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
 
