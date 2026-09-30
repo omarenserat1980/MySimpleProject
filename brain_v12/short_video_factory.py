@@ -38,6 +38,7 @@ OSS_COMPONENTS = (
     OSSComponent("BlueMagpie-TTS", "Taiwan", "Taiwan Mandarin/code-switching TTS", "Apache-2.0", "optional", "https://github.com/OpenFormosa/BlueMagpie-TTS"),
     OSSComponent("RHVoice", "Russia", "local Russian/multilingual TTS", "GPL-2.0/LGPL-2.1 core", "optional", "https://github.com/RHVoice/RHVoice"),
     OSSComponent("NileTTS", "Morocco research", "Arabic TTS training/inference research", "Apache-2.0", "research", "https://github.com/KickItLikeShika/NileTTS"),
+    OSSComponent("Chitralekha", "India", "video transcreation, subtitles and voice-over orchestration", "MIT", "optional", "https://github.com/AI4Bharat/Chitralekha"),
 )
 
 
