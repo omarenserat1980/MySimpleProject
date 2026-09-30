@@ -1689,7 +1689,7 @@ def human_draw(body: Chat):
         result.update({"filename": filename, "url": f"/media/drawings/{filename}", "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
-    result = draw_openai(prompt, openai_provider.generate_image, Path(os.path.join(ROOT, "web", "media", "generated")))
+    result = draw_openai(prompt, openai_provider.generate_image, pathlib.Path(os.path.join(ROOT, "web", "media", "generated")))
     if result.get("ok"):
         store.event("BRAIN_DRAW", {"provider": "openai", "prompt": prompt, "verified": result.get("verified", False)})
     return result
