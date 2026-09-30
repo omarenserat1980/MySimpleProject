@@ -40,7 +40,7 @@ def run_review(loops: int, timeout: int) -> tuple[int, str, str]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--loops-per-cycle", type=int,
-                    default=int(os.getenv("BRAIN_LOOPS_PER_CYCLE", "1000")))
+                    default=int(os.getenv("BRAIN_LOOPS_PER_CYCLE", "100000000")))
     ap.add_argument("--pause", type=float,
                     default=float(os.getenv("BRAIN_CYCLE_PAUSE_SECONDS", "5")))
     ap.add_argument("--timeout", type=int,
@@ -49,8 +49,8 @@ def main() -> int:
                     help="0 means forever")
     args = ap.parse_args()
 
-    if not 1 <= args.loops_per_cycle <= 1000:
-        raise SystemExit("--loops-per-cycle must be between 1 and 1000")
+    if not 1 <= args.loops_per_cycle <= 100000000:
+        raise SystemExit("--loops-per-cycle must be between 1 and 100000000")
     if args.cycles < 0:
         raise SystemExit("--cycles must be >= 0")
 
