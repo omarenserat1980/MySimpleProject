@@ -1,0 +1,8 @@
+{
+  "authority": "BRAIN_GIT_PRIMARY",
+  "external_mirror": "GITHUB_MIRROR",
+  "external_sync_default": "DISABLED",
+  "public_exposure_default": "DISABLED",
+  "required_controls": ["authentication", "audit", "backup", "verification"],
+  "sensitive_actions": ["mirror_push", "public_publish", "delete_repository", "change_access_policy"]
+}

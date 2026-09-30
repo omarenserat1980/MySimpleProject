@@ -1,0 +1,26 @@
+name: Brain Cloud Worker Build
+on:
+  push:
+    paths: [brain_v12/cloud_worker/**, .github/workflows/brain-cloud-worker-build.yml]
+  pull_request:
+    paths: [brain_v12/cloud_worker/**, .github/workflows/brain-cloud-worker-build.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build brain_v12/cloud_worker/BrainCloudWorker.csproj --configuration Release
+      - name: Build Docker host image
+        run: docker build -f brain_v12/cloud_worker/Dockerfile -t brain-cloud-worker:ci .
+      - name: Smoke-test container
+        run: |
+          docker run --rm -d --name brain-cloud-worker-smoke brain-cloud-worker:ci
+          sleep 5
+          docker logs brain-cloud-worker-smoke
+          docker rm -f brain-cloud-worker-smoke

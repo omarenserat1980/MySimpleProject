@@ -1,0 +1,27 @@
+services:
+  brain-git:
+    image: docker.gitea.com/gitea:1.27.3-rootless
+    container_name: brain-git
+    restart: unless-stopped
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      GITEA__database__DB_TYPE: sqlite3
+      GITEA__database__PATH: /var/lib/gitea/data/gitea.db
+      GITEA__server__ROOT_URL: http://brain-git:3000/
+      GITEA__server__DOMAIN: brain-git
+      GITEA__server__SSH_DOMAIN: brain-git
+      GITEA__server__START_SSH_SERVER: "true"
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__service__REQUIRE_SIGNIN_VIEW: "true"
+    volumes:
+      - brain-git-data:/var/lib/gitea
+      - brain-git-config:/etc/gitea
+    expose:
+      - "3000"
+      - "2222"
+
+volumes:
+  brain-git-data:
+  brain-git-config:

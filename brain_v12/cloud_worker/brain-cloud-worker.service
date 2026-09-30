@@ -1,0 +1,16 @@
+[Unit]
+Description=Electronic Brain Cloud Worker
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/MySimpleProject
+ExecStart=/usr/bin/docker compose -f brain_v12/cloud_worker/compose.yml up -d --build
+ExecStop=/usr/bin/docker compose -f brain_v12/cloud_worker/compose.yml down
+RemainAfterExit=yes
+TimeoutStartSec=0
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
