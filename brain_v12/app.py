@@ -1787,11 +1787,11 @@ def human_draw(body: Chat):
     prompt = request["prompt"]
     if request["provider"] == "local":
         result = draw_local(prompt)
-        filename = "brain-draw-" + uuid4().hex + ".svg"
+        filename = "brain-draw-" + uuid4().hex + ".png"
         media_dir = os.path.join(ROOT, "web", "media", "drawings")
         os.makedirs(media_dir, exist_ok=True)
-        with open(os.path.join(media_dir, filename), "w", encoding="utf-8") as fh:
-            fh.write(result["svg"])
+        with open(os.path.join(media_dir, filename), "wb") as fh:
+            fh.write(base64.b64decode(result["png_base64"]))
         result.update({"filename": filename, "url": f"/media/drawings/{filename}", "viewer_url": f"/local-painter/?src=/media/drawings/{filename}&prompt="+httpx.QueryParams({"prompt": prompt}).get("prompt",""), "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
