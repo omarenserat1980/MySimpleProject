@@ -1755,7 +1755,7 @@ def human_draw(body: Chat):
         os.makedirs(media_dir, exist_ok=True)
         with open(os.path.join(media_dir, filename), "w", encoding="utf-8") as fh:
             fh.write(result["svg"])
-        result.update({"filename": filename, "url": f"/media/drawings/{filename}", "display": True})
+        result.update({"filename": filename, "url": f"/media/drawings/{filename}", "viewer_url": f"/local-painter/?src=/media/drawings/{filename}&prompt="+httpx.QueryParams({"prompt": prompt}).get("prompt",""), "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
     result = draw_openai(prompt, openai_provider.generate_image, pathlib.Path(os.path.join(ROOT, "web", "media", "generated")))
