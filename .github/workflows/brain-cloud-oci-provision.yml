@@ -1,0 +1,43 @@
+name: Brain Cloud OCI Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/oci
+    env:
+      TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+      TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
+      TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+      TF_VAR_private_key: ${{ secrets.OCI_PRIVATE_KEY }}
+      TF_VAR_region: ${{ secrets.OCI_REGION }}
+      TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+      TF_VAR_ssh_public_key: ${{ secrets.BRAIN_SSH_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform plan -out=brain.tfplan
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve brain.tfplan
+      - name: Show host
+        if: inputs.action == 'apply'
+        run: terraform output
