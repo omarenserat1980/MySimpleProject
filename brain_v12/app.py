@@ -600,6 +600,7 @@ class ShortVideoJobIn(BaseModel):
     aspect: str = "9:16"
     lipsync: str = "auto"
     tts: str = "auto"
+    output: str = "brain-short-video.mp4"
 
 class VisualCompileIn(BaseModel):
     prompt: str
@@ -659,7 +660,7 @@ def short_video_lipsync_command(body: ShortVideoJobIn):
             lipsync=body.lipsync,
             tts=body.tts,
         )
-        output = body.spec.get("output", "brain-short-video.mp4") if hasattr(body, "spec") else "brain-short-video.mp4"
+        output = body.output
         return {"ok": True, "plan": plan, "command": short_video_factory.command_for_lipsync(plan, output)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
