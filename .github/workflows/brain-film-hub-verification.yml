@@ -1,0 +1,25 @@
+name: Brain Film Hub Verification
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "brain_v12/film_hub/**"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build Film Hub
+        run: dotnet build brain_v12/film_hub/FilmHub.csproj --configuration Release
+      - name: Verify Film Hub health contract
+        run: |
+          test -f brain_v12/film_hub/Program.cs
+          test -f brain_v12/film_hub/FilmHub.cs
+          grep -q 'video/mp4' brain_v12/film_hub/FilmHub.cs
+          grep -q 'enableRangeProcessing:true' brain_v12/film_hub/FilmHub.cs
+          echo "BRAIN_FILM_HUB_BUILD_VERIFIED"
