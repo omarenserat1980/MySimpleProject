@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "cloud/last_light_movie.py"
+      - "brain_v12/brain/open_source_runtime.py"
       - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
 
@@ -31,6 +32,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
           python -m pip install --disable-pip-version-check Pillow
+
+      - name: Probe optional runtime
+        run: python brain_v12/brain/open_source_runtime.py
+
+      - name: Select available runtime backend
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from brain_v12.brain.open_source_orchestrator import plan
+          status=json.loads(Path("brain6_artifacts/open_source_runtime_status.json").read_text())
+          result={"tasks":plan(["local_reasoning","video_generation","semantic_memory"],status),
+                  "fallback":"local_python_ffmpeg_renderer"}
+          Path("brain6_artifacts/film_runtime_plan.json").write_text(json.dumps(result,ensure_ascii=False,indent=2))
+          print(json.dumps(result,ensure_ascii=False))
+          PY
 
       - name: Render film
         run: |
@@ -79,4 +96,6 @@ jobs:
             /tmp/last-light/ffprobe.json
             /tmp/last-light/film_manifest.json
             /tmp/last-light/VERIFIED_COMPLETED
+            brain6_artifacts/open_source_runtime_status.json
+            brain6_artifacts/film_runtime_plan.json
           if-no-files-found: error
