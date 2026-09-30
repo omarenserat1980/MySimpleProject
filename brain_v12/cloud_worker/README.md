@@ -1,7 +1,22 @@
 # Brain Cloud Worker Runtime
-Long-running .NET Worker Service for Electronic Brain. Independent periodic workers are coordinated by the Brain Supervisor.
-Intervals: supervisor 5s; quality 10s; video/self-healing/health 15s; mining 30s; economic 5m; research 2h; architect 4h.
-Safety: no money movement, external publishing, application submission, contracts, or policy changes. Mining only coordinates explicitly registered user-owned workers and never mines in GitHub Actions. Video delegates to the existing film/control-plane implementation. Research and architecture workers observe/propose; repository verification remains required.
-Each tick is awaited before the next tick, preventing timer overlap. The runtime is cloud-ready but is NOT claimed live until a user-owned long-running host is connected.
-Build: dotnet build brain_v12/cloud_worker/BrainCloudWorker.csproj
-Run: dotnet run --project brain_v12/cloud_worker/BrainCloudWorker.csproj
+
+Long-running provider-neutral .NET Worker Service for Electronic Brain. Independent periodic workers are coordinated by the Brain Supervisor.
+
+## Runtime guarantees
+- Nine bounded BackgroundService workers use PeriodicTimer; each tick is awaited before the next tick.
+- Durable heartbeat is written atomically.
+- Worker registration is persisted in `/var/lib/brain/workers.json` by default.
+- Jobs use exclusive leases with renewal/release and expiry, preventing duplicate active ownership.
+- No external side effect is performed by the runtime by default; sensitive actions remain behind AuthorizationGate.
+- The runtime does not require Oracle Cloud, Google Cloud, Render, or paid media APIs.
+
+## Intervals
+Supervisor 5s; quality 10s; video/self-healing/health 15s; mining 30s; economic 5m; research 2h; architect 4h.
+
+## Self-test
+`dotnet run --project brain_v12/cloud_worker/BrainCloudWorker.csproj -- --self-test`
+
+The self-test verifies registration, heartbeat, duplicate-lease rejection, renewal, and release.
+
+## Hosting
+A real 24/7 worker requires a user-owned machine/host that stays online. GitHub-hosted runners are short-lived; self-hosted runners can provide persistent user-managed execution when configured and kept online.

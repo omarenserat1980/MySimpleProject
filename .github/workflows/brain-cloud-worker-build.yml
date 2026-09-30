@@ -16,6 +16,8 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet build brain_v12/cloud_worker/BrainCloudWorker.csproj --configuration Release
+      - name: Worker runtime self-test
+        run: dotnet run --project brain_v12/cloud_worker/BrainCloudWorker.csproj -- --self-test
       - name: Build Docker host image
         run: docker build -f brain_v12/cloud_worker/Dockerfile -t brain-cloud-worker:ci .
       - name: Smoke-test container
