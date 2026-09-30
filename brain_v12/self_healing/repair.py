@@ -14,6 +14,21 @@ import sys
 
 
 def main() -> int:
+    # If a code generator is configured, try evidence-driven patch generation first.
+    # A non-zero result falls back to deterministic local checks.
+    if os.getenv("BRAIN_CODE_GENERATOR_COMMAND"):
+        agent = subprocess.run(
+            [sys.executable, "brain_v12/self_healing/code_repair_agent.py"],
+            text=True,
+            capture_output=True,
+        )
+        if agent.stdout:
+            print(agent.stdout[-12000:])
+        if agent.returncode == 0:
+            print("REPAIR_GENERATED_PATCH=APPLIED")
+        elif agent.stderr:
+            print(agent.stderr[-12000:], file=sys.stderr)
+
     actions = os.getenv("BRAIN_REPAIR_ACTIONS", "compile,self-test").strip()
     allowed = {
         "compile": [sys.executable, "-m", "compileall", "-q", "brain_v12"],
