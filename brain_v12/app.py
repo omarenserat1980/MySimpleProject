@@ -22,6 +22,7 @@ from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
 from .brain.openai_provider import OpenAIProvider
+from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
 from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
@@ -1666,6 +1667,32 @@ def revoke(request:Request, body:Permission):
     return {"grants":cognitive.permissions.revoke(body.capability)}
 @app.post("/api/permissions/check")
 def permission_check(capabilities:list[str],approved:bool=False): return cognitive.permissions.check(capabilities,approved)
+
+@app.post("/api/draw")
+def human_draw(body: Chat):
+    """Human-friendly drawing command: «Brain، ارسم…».
+
+    Local drawing is the default and requires no external API. Explicitly
+    mentioning ChatGPT/OpenAI selects the optional server-side image provider.
+    """
+    request = parse_human_draw_request(body.message)
+    if not request["ok"]:
+        return {"ok": False, "error": "DRAW_COMMAND_NOT_DETECTED", "example": "Brain، ارسم لي مدينة مستقبلية ليلاً"}
+    prompt = request["prompt"]
+    if request["provider"] == "local":
+        result = draw_local(prompt)
+        filename = "brain-draw-" + uuid4().hex + ".svg"
+        media_dir = os.path.join(ROOT, "web", "media", "drawings")
+        os.makedirs(media_dir, exist_ok=True)
+        with open(os.path.join(media_dir, filename), "w", encoding="utf-8") as fh:
+            fh.write(result["svg"])
+        result.update({"filename": filename, "url": f"/media/drawings/{filename}", "display": True})
+        store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
+        return result
+    result = draw_openai(prompt, openai_provider.generate_image, Path(os.path.join(ROOT, "web", "media", "generated")))
+    if result.get("ok"):
+        store.event("BRAIN_DRAW", {"provider": "openai", "prompt": prompt, "verified": result.get("verified", False)})
+    return result
 
 @app.post("/api/image-factory/generate")
 def image_factory_generate(body:dict):
