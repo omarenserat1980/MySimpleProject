@@ -1,0 +1,22 @@
+name: Brain Authorization - Fail Closed and Economic Safety
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/authorization_gate.py"
+      - "brain_v12/brain/payout_planner.py"
+      - "brain_v12/tests/test_authorization_and_payout.py"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m unittest brain_v12.tests.test_authorization_and_payout -v
