@@ -171,7 +171,7 @@ def legacy_film_video(job_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="film job not found")
     job = json.loads(path.read_text(encoding="utf-8"))
-    if job.get("status") != "COMPLETED":
+    if job.get("status") not in {"COMPLETED", "VERIFIED_COMPLETED"}:
         raise HTTPException(status_code=409, detail="film is not verified complete")
     video = _find_final_video(job)
     if not video:
