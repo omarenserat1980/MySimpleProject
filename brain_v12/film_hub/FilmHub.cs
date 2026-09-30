@@ -23,6 +23,7 @@ public sealed class FilmHub {
     public Film? Get(string id)=>_films.TryGetValue(id,out var film)?film:null;
 }
 
+// Build-safe route handling: the route parameter remains `id`; the encoded display value is `filmId`.
 public static class FilmHubWeb {
     public static void MapFilmHub(WebApplication app,string mediaRoot) {
         Directory.CreateDirectory(mediaRoot);
