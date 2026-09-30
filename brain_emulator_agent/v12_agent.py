@@ -79,6 +79,23 @@ def execute(task, params):
             "png_base64": result["png_base64"],
         }, ""
 
+    if task == "brain_cpp_raster_test":
+        src = ROOT / "brain_v12" / "native" / "brain_raster_cpp"
+        build = src / "build"
+        out = ROOT / "brain6_artifacts" / "cpp_raster" / "brain-raster.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        cmake = subprocess.run(["cmake","-S",str(src),"-B",str(build)], capture_output=True,text=True,timeout=120)
+        if cmake.returncode != 0:
+            return False, {"stdout":cmake.stdout[-4000:],"stderr":cmake.stderr[-4000:]}, "CPP_CMAKE_FAILED"
+        build_run = subprocess.run(["cmake","--build",str(build),"--config","Release"], capture_output=True,text=True,timeout=600)
+        if build_run.returncode != 0:
+            return False, {"stdout":build_run.stdout[-4000:],"stderr":build_run.stderr[-4000:]}, "CPP_BUILD_FAILED"
+        exe = build / "brain_raster"
+        if not exe.exists(): exe = build / "Release" / "brain_raster"
+        run = subprocess.run([str(exe),str(out)],capture_output=True,text=True,timeout=120)
+        ok = run.returncode == 0 and out.exists() and out.stat().st_size > 128
+        return ok, {"verified":ok,"artifact":str(out),"stdout":run.stdout,"stderr":run.stderr}, "" if ok else "CPP_RASTER_FAILED"
+
     if task == "brain_machine_cinema_60m":
         title = str(params.get("title", "BRAIN — فيلم الآلة")).strip()
         script = ROOT / "brain_v12" / "machine_cinematic_factory.py"
