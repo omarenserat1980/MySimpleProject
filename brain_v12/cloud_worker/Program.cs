@@ -2,6 +2,7 @@ using BrainCloudWorker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddSingleton<WorkerHeartbeatStore>();
 builder.Services.AddSingleton<WorkerState>();
 builder.Services.AddHostedService<BrainSupervisorWorker>();
 builder.Services.AddHostedService<VideoWorker>();
