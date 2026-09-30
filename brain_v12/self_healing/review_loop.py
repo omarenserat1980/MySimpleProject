@@ -168,6 +168,10 @@ def main() -> int:
         if args.delay:
             time.sleep(args.delay)
 
+    (STATE / "1000_loop_report.json").write_text(json.dumps({
+        "compatibility_alias": "review_loop_report.json",
+        "created_at": now(),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
     report = {
         "schema": "brain-100m-review-loop/v2",
         "status": "VERIFIED_COMPLETED" if final_ok else "FAILED_REPAIR_CYCLE",
@@ -176,13 +180,13 @@ def main() -> int:
         "finished_at": now(),
         "history": history,
     }
-    (STATE / "1000_loop_report.json").write_text(
+    (STATE / "review_loop_report.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps({
         "status": report["status"],
         "loops_completed": len(history),
-        "report": str(STATE / "1000_loop_report.json"),
+        "report": str(STATE / "review_loop_report.json"),
     }, ensure_ascii=False))
     return 0 if final_ok else 1
 
