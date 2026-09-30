@@ -59,21 +59,24 @@ def execute(task, params):
         sys.path.insert(0, str(ROOT))
         from brain_v12.brain.draw_gateway import draw_local
         result = draw_local(prompt)
-        if not result.get("ok") or not result.get("verified") or not result.get("svg"):
+        if not result.get("ok") or not result.get("verified") or not result.get("png_base64"):
             return False, {"result": result}, "BRAIN_LOCAL_PAINTER_FAILED"
+        import base64
         out_dir = ROOT / "brain6_artifacts" / "local_painter"
         out_dir.mkdir(parents=True, exist_ok=True)
         safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in prompt[:40]).strip("_") or "scene"
-        out = out_dir / f"{int(time.time())}-{safe_id}.svg"
-        out.write_text(result["svg"], encoding="utf-8")
+        out = out_dir / f"{int(time.time())}-{safe_id}.png"
+        out.write_bytes(base64.b64decode(result["png_base64"], validate=True))
         return True, {
-            "provider": "brain_local_painter",
+            "provider": "brain_local_machine_raster",
             "verified": True,
             "prompt": prompt,
             "artifact": str(out),
-            "format": "svg",
+            "format": "png",
+            "renderer": "machine-raster",
+            "machine_commands": result.get("machine_commands", []),
             "scene": result.get("scene", {}),
-            "svg": result["svg"],
+            "png_base64": result["png_base64"],
         }, ""
 
     if task == "cinematic_factory_run":
