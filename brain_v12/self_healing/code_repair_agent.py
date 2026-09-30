@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evidence-driven code repair agent.
+"""Evidence-driven, reversible code repair agent.
 
-The generator prints a unified git diff. This agent validates and applies it only
-inside configured repair roots. Verification remains the supervisor's job.
+A configured generator must emit a unified git diff. The patch is validated,
+applied, and recorded so the supervisor can reverse it if verification fails.
 """
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 
 DEFAULT_ROOTS = ("brain_v12/", "tests/", "scripts/")
+STATE = Path(".brain/state")
+PATCH_FILE = STATE / "last_applied_patch.diff"
 
 
 def fail(message: str, code: int = 1) -> int:
@@ -105,8 +107,11 @@ def main() -> int:
         print(apply.stderr[-12000:], file=sys.stderr)
         return fail("CODE_REPAIR_APPLY_FAILED", apply.returncode)
 
+    STATE.mkdir(parents=True, exist_ok=True)
+    PATCH_FILE.write_text(diff + "\n", encoding="utf-8")
     print("CODE_REPAIR_APPLIED")
     print("CODE_REPAIR_FILES=" + ",".join(paths))
+    print("CODE_REPAIR_PATCH_FILE=" + str(PATCH_FILE))
     return 0
 
 
