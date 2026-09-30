@@ -1,0 +1,31 @@
+name: Brain Short Video Factory CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "brain_v12/short_video_factory.py"
+      - "brain_v12/tests/test_short_video_factory.py"
+      - "brain_v12/tests/test_short_video_api.py"
+      - "brain_v12/app.py"
+      - "brain_v12/media_engine.py"
+      - ".github/workflows/brain-short-video-ci.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Brain
+        run: python -m compileall -q brain_v12
+      - name: Short video factory tests
+        run: python -m unittest brain_v12.tests.test_short_video_factory brain_v12.tests.test_short_video_api -v
+      - name: Media engine tests
+        run: python -m unittest brain_v12.tests.test_media_engine -v
+      - name: Independent verification gate
+        env:
+          BRAIN_GATE_PYTEST: "0"
+        run: python brain_v12/self_healing/verification_gate.py
