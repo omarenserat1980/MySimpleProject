@@ -1,0 +1,57 @@
+name: Brain Free AI Radar - Discover and Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/free_ai_capability_registry.py"
+      - "brain_v12/brain/free_ai_radar.py"
+      - ".github/workflows/brain-free-ai-radar.yml"
+
+concurrency:
+  group: brain-free-ai-radar
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Discover and audit free AI capabilities
+        run: python brain_v12/brain/free_ai_radar.py
+
+      - name: Verify radar artifact
+        run: |
+          test -s brain6_artifacts/free_ai_capabilities.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("brain6_artifacts/free_ai_capabilities.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          assert d["classification"]["free_is_not_assumed_unlimited"] is True
+          assert isinstance(d["registry"], list) and d["registry"]
+          assert isinstance(d["official_source_audit"], list)
+          print("Free AI radar verified:", len(d["registry"]), "registered tools")
+          PY
+
+      - name: Upload radar report
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-free-ai-radar
+          path: brain6_artifacts/free_ai_capabilities.json
+          if-no-files-found: error
+          retention-days: 30
