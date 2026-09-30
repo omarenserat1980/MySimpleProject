@@ -39,22 +39,22 @@ public static class FilmHubWeb {
         app.MapGet("/films/{id}",async (string id,FilmHub hub, HttpContext ctx)=>{
             var f=hub.Get(id); if(f is null) return Results.NotFound();
             ctx.Response.ContentType="text/html; charset=utf-8";
-            await ctx.Response.WriteAsync($"""
-<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{System.Net.WebUtility.HtmlEncode(f.Title)} — Brain Film Hub</title>
-<style>
-body{{margin:0;background:#0b1017;color:#edf2f7;font-family:system-ui}}
-main{{max-width:1100px;margin:auto;padding:24px}}.player{{background:#000;border-radius:16px;overflow:hidden}}
-video{{width:100%;display:block;max-height:75vh}}.meta{{padding:20px 0}}.badge{{display:inline-block;padding:6px 10px;border-radius:999px;background:#183b2a;color:#8ff0b0}}
-a{{color:#8fc7ff}}
-</style></head><body><main>
-<p><a href="/film-hub/">← Brain Film Hub</a></p>
-<h1>{System.Net.WebUtility.HtmlEncode(f.Title)}</h1>
-<div class="player"><video controls preload="metadata" playsinline src="/api/films/{f.Id}/stream"></video></div>
-<div class="meta"><span class="badge">{f.Status}</span><p>Brain verified film · {f.CreatedUtc:u}</p></div>
-</main></body></html>
-""");
+            var title = System.Net.WebUtility.HtmlEncode(f.Title);
+            var id = System.Net.WebUtility.HtmlEncode(f.Id);
+            var status = System.Net.WebUtility.HtmlEncode(f.Status);
+            var created = System.Net.WebUtility.HtmlEncode(f.CreatedUtc.ToString("u"));
+            var html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">" +
+                "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+                "<title>" + title + " — Brain Film Hub</title>" +
+                "<style>body{margin:0;background:#0b1017;color:#edf2f7;font-family:system-ui}" +
+                "main{max-width:1100px;margin:auto;padding:24px}.player{background:#000;border-radius:16px;overflow:hidden}" +
+                "video{width:100%;display:block;max-height:75vh}.meta{padding:20px 0}.badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#183b2a;color:#8ff0b0}" +
+                "a{color:#8fc7ff}</style></head><body><main>" +
+                "<p><a href=\"/film-hub/\">← Brain Film Hub</a></p>" +
+                "<h1>" + title + "</h1><div class=\"player\"><video controls preload=\"metadata\" playsinline src=\"/api/films/" + id + "/stream\"></video></div>" +
+                "<div class=\"meta\"><span class=\"badge\">" + status + "</span><p>Brain verified film · " + created + "</p></div>" +
+                "</main></body></html>";
+            await ctx.Response.WriteAsync(html);
             return Results.Empty;
         });
         app.UseStaticFiles(new StaticFileOptions {
