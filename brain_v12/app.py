@@ -44,6 +44,7 @@ from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
 from . import visual_engine
+from . import short_video_factory
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -591,6 +592,15 @@ class MediaJobIn(BaseModel):
     operation: str
     spec: dict = {}
 
+class ShortVideoJobIn(BaseModel):
+    text: str
+    image: str
+    audio: str | None = None
+    duration: float | None = None
+    aspect: str = "9:16"
+    lipsync: str = "auto"
+    tts: str = "auto"
+
 class VisualCompileIn(BaseModel):
     prompt: str
     mode: str = "auto"
@@ -603,6 +613,56 @@ def visual_engine_compile(body: VisualCompileIn):
 @app.get("/api/visual-engine/health")
 def visual_engine_health():
     return {"ok": True, "engine": "BRAIN Visual Engine", "renderer": "SVG", "local": True, "external_api": False}
+
+
+@app.get("/api/short-video/health")
+def short_video_health():
+    return {
+        "ok": True,
+        "engine": "BRAIN Short Video Factory",
+        "status": short_video_factory.backend_status(),
+        "oss_components": short_video_factory.registry(),
+    }
+
+
+@app.post("/api/short-video/plan")
+def short_video_plan(body: ShortVideoJobIn):
+    try:
+        plan = short_video_factory.build_plan(
+            text=body.text,
+            image=body.image,
+            audio=body.audio,
+            duration=body.duration,
+            aspect=body.aspect,
+            lipsync=body.lipsync,
+            tts=body.tts,
+        )
+        store.event("SHORT_VIDEO_PLAN_CREATED", {
+            "lipsync_backend": plan["lipsync_backend"],
+            "tts_backend": plan["tts_backend"],
+            "duration": plan["duration"],
+        })
+        return {"ok": True, "plan": plan}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/short-video/lipsync-command")
+def short_video_lipsync_command(body: ShortVideoJobIn):
+    try:
+        plan = short_video_factory.build_plan(
+            text=body.text,
+            image=body.image,
+            audio=body.audio,
+            duration=body.duration,
+            aspect=body.aspect,
+            lipsync=body.lipsync,
+            tts=body.tts,
+        )
+        output = body.spec.get("output", "brain-short-video.mp4") if hasattr(body, "spec") else "brain-short-video.mp4"
+        return {"ok": True, "plan": plan, "command": short_video_factory.command_for_lipsync(plan, output)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.get("/api/media/health")
@@ -1795,3 +1855,4 @@ app.mount('/text-to-drawing', StaticFiles(directory=os.path.join(ROOT,'web','tex
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
+
