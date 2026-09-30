@@ -80,6 +80,28 @@ jobs:
           rm -rf /tmp/last-light
           python -m brain_v12.brain.film_supervisor
 
+      - name: Independent Brain Verification Gate
+        env:
+          BRAIN_GATE_PYTEST: "1"
+        run: python brain_v12/self_healing/verification_gate.py
+
+      - name: Independent artifact integrity gate
+        run: |
+          test -s /tmp/last-light/last_light_city.mp4
+          test -s /tmp/last-light/ffprobe.json
+          ffprobe -v error /tmp/last-light/last_light_city.mp4
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("/tmp/last-light/ffprobe.json").read_text())
+          streams=d.get("streams",[]); fmt=d.get("format",{})
+          assert any(s.get("codec_type")=="video" for s in streams)
+          assert any(s.get("codec_type")=="audio" for s in streams)
+          assert float(fmt.get("duration",0))>0
+          assert int(fmt.get("size",0))>1024
+          print("ARTIFACT_GATE=VERIFIED")
+          PY
+
       - name: Checkpoint verified production
         run: |
           python - <<'PY'
@@ -88,7 +110,7 @@ jobs:
           from brain_v12.brain.autonomy_control_plane import ControlPlane
           cp=ControlPlane("brain6_artifacts/control_plane")
           job=json.loads(Path("brain6_artifacts/control_plane_job.json").read_text())
-          job=cp.checkpoint(job,7,{"mp4_verified":True,"supervisor":"completed"})
+          job=cp.checkpoint(job,7,{"mp4_verified":True,"supervisor":"completed","independent_verification":"passed"})
           Path("brain6_artifacts/control_plane_job.json").write_text(json.dumps(job,ensure_ascii=False,indent=2))
           PY
 
