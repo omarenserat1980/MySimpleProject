@@ -8,7 +8,10 @@ on:
     branches: [main]
     paths:
       - "brain_v12/brain/open_source_runtime.py"
+      - "brain_v12/brain/open_source_adapters.py"
+      - "brain_v12/brain/open_source_orchestrator.py"
       - "brain_v12/tests/test_open_source_runtime.py"
+      - "brain_v12/tests/test_open_source_orchestrator.py"
       - ".github/workflows/brain-open-source-runtime.yml"
 
 concurrency:
@@ -30,7 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run runtime safety tests
-        run: python -m unittest discover -s brain_v12/tests -p 'test_open_source_runtime.py' -v
+        run: python -m unittest discover -s brain_v12/tests -p 'test_open_source_*.py' -v
       - name: Probe optional runtime
         run: python brain_v12/brain/open_source_runtime.py
       - name: Validate safe policy
