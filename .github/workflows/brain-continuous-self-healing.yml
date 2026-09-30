@@ -1,0 +1,54 @@
+name: Brain Continuous Self-Healing
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Brain command to run"
+        required: false
+        default: "python brain_v12/self_healing/self_test.py"
+      max_attempts:
+        description: "Maximum repair/verify cycles"
+        required: false
+        default: "5"
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/brain-continuous-self-healing.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-self-healing
+  cancel-in-progress: false
+
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Run verified self-healing loop
+        env:
+          BRAIN_MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '5' }}
+          BRAIN_BACKOFF_SECONDS: "2"
+          BRAIN_MAX_BACKOFF_SECONDS: "20"
+          BRAIN_REPAIR_COMMAND: "python brain_v12/self_healing/repair.py"
+          BRAIN_VERIFY_COMMAND: "python brain_v12/self_healing/self_test.py"
+        run: |
+          set -o pipefail
+          CMD="${{ github.event.inputs.command || 'python brain_v12/self_healing/self_test.py' }}"
+          python -m brain_v12.self_healing.supervisor             --command "$CMD"             --verify "$BRAIN_VERIFY_COMMAND"             --repair "$BRAIN_REPAIR_COMMAND"             --max-attempts "$BRAIN_MAX_ATTEMPTS"
+
+      - name: Publish healing state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-self-healing-state
+          path: .brain/state/
+          if-no-files-found: ignore
