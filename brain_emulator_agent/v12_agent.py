@@ -79,6 +79,21 @@ def execute(task, params):
             "png_base64": result["png_base64"],
         }, ""
 
+    if task == "brain_machine_cinema_60m":
+        title = str(params.get("title", "BRAIN — فيلم الآلة")).strip()
+        script = ROOT / "brain_v12" / "machine_cinematic_factory.py"
+        env = os.environ.copy()
+        env["BRAIN_FILM_TITLE"] = title
+        p = subprocess.run(["python", str(script)], cwd=str(ROOT), env=env,
+                           capture_output=True, text=True, timeout=24 * 60 * 60)
+        artifact = ROOT / "brain6_artifacts" / "machine_films" / "final.mp4"
+        manifest = ROOT / "brain6_artifacts" / "machine_films" / "manifest.json"
+        ok = p.returncode == 0 and artifact.exists() and manifest.exists()
+        return ok, {"status":"VERIFIED_COMPLETED" if ok else "FAILED",
+                     "title":title,"stdout":p.stdout[-12000:],"stderr":p.stderr[-6000:],
+                     "artifact":str(artifact),"manifest":str(manifest),
+                     "returncode":p.returncode}, "" if ok else "BRAIN_MACHINE_CINEMA_FAILED"
+
     if task == "cinematic_factory_run":
         script = ROOT / "brain_emulator_agent" / "cinematic_factory.py"
         p = subprocess.run(["python", str(script)], cwd=str(ROOT), capture_output=True,
