@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Safe filesystem-backed execution adapter for Brain Cloud."""
+
+from __future__ import annotations
+import json, os, platform, shutil, subprocess, time
+from pathlib import Path
+from datetime import datetime, timezone
+
+ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
+QUEUED, RUNNING, COMPLETED, FAILED = (ROOT / x for x in ("queued", "running", "completed", "failed"))
+WORKER_ID = os.environ.get("BRAIN_WORKER_ID", "brain-local-01")
+POLL = max(1.0, float(os.environ.get("BRAIN_LOCAL_WORKER_POLL_SECONDS", "2")))
+
+def utc():
+    return datetime.now(timezone.utc).isoformat()
+
+def setup():
+    for p in (QUEUED, RUNNING, COMPLETED, FAILED):
+        p.mkdir(parents=True, exist_ok=True)
+
+def safe_command_version(binary: str):
+    path = shutil.which(binary)
+    if not path:
+        return {"available": False, "binary": binary}
+    out = subprocess.run([path, "-version"], capture_output=True, text=True, timeout=10)
+    return {"available": out.returncode == 0, "binary": binary, "version": (out.stdout or out.stderr).splitlines()[0][:300]}
+
+def execute(task: str):
+    if task == "python_version":
+        return {"python": platform.python_version()}
+    if task == "platform":
+        return {"system": platform.system(), "release": platform.release(), "machine": platform.machine()}
+    if task == "brain_home":
+        return {"cwd": str(Path.cwd()), "home": str(Path.home())}
+    if task == "ffmpeg_version":
+        return safe_command_version("ffmpeg")
+    if task == "ffprobe_version":
+        return safe_command_version("ffprobe")
+    if task == "filesystem_probe":
+        usage = shutil.disk_usage(Path.cwd())
+        return {"free_bytes": usage.free, "total_bytes": usage.total}
+    raise ValueError(f"task_not_allowlisted:{task}")
+
+def process(path: Path):
+    claimed = RUNNING / path.name
+    try:
+        path.replace(claimed)
+    except FileNotFoundError:
+        return
+    started = utc()
+    try:
+        job = json.loads(claimed.read_text(encoding="utf-8"))
+        task = job.get("task")
+        if not isinstance(task, str):
+            raise ValueError("task_required")
+        result = {
+            "job_id": job.get("job_id", claimed.stem),
+            "worker_id": WORKER_ID,
+            "status": "VERIFIED",
+            "started_at": started,
+            "completed_at": utc(),
+            "evidence": execute(task),
+        }
+        (COMPLETED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        claimed.unlink(missing_ok=True)
+    except Exception as exc:
+        result = {
+            "job_id": claimed.stem, "worker_id": WORKER_ID, "status": "FAILED",
+            "started_at": started, "completed_at": utc(),
+            "error": f"{type(exc).__name__}:{exc}",
+        }
+        (FAILED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
+        claimed.unlink(missing_ok=True)
+
+def main():
+    setup()
+    print(f"Brain Local Worker {WORKER_ID} -> {ROOT}")
+    while True:
+        for path in sorted(QUEUED.glob("*.json")):
+            process(path)
+        time.sleep(POLL)
+
+if __name__ == "__main__":
+    main()
