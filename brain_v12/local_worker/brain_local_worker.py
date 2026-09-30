@@ -5,7 +5,7 @@ The worker is provider-free and allowlisted. It can execute the Brain Local
 Painter without external image APIs.
 """
 from __future__ import annotations
-import json, os, platform, shutil, subprocess, time
+import json, os, platform, shutil, subprocess, time, sys
 from pathlib import Path
 from datetime import datetime, timezone
 
