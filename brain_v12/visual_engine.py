@@ -7,7 +7,7 @@ feeding BRAIN Media Engine timelines.
 import html
 import re
 
-MODES={"landscape","city","robot","car","abstract"}
+MODES={"landscape","city","robot","car","abstract","green_mask"}
 
 PALETTES={
     "default":{"sky":"#8ed8ff","sun":"#ffd84d","ground":"#6ca85a","dark":"#263746"},
@@ -31,6 +31,7 @@ def detect_mode(text:str, mode:str="auto")->str:
     if re.search(r"روبوت|robot|android",t): return "robot"
     if re.search(r"سيارة|car|automobile|vehicle",t): return "car"
     if re.search(r"مدينة|city|مبنى|مباني|building|street",t): return "city"
+    if re.search(r"قناع أخضر|القناع الأخضر|green mask|mask",t): return "green_mask"
     if re.search(r"دائرة|مربع|مثلث|هندسي|abstract|geometric",t): return "abstract"
     return "landscape"
 
@@ -42,6 +43,13 @@ def detect_palette(text:str)->str:
 
 def _objects(text:str, selected:str):
     t=_low(text)
+    if selected=="green_mask":
+        out=["sky","street","hero","mask","magic","buildings"]
+        if _has(t,"مطر","rain"): out.append("rain")
+        if _has(t,"ليل","ليلي","night"): out.append("night")
+        if _has(t,"نادي","club","nightclub"): out.append("club")
+        if _has(t,"سطح","rooftop","roof"): out.append("rooftop")
+        return out
     if selected=="landscape":
         out=["sky","sun","mountains","ground"]
         if _has(t,"شجرة","شجر","tree","forest"): out.append("tree")
@@ -126,6 +134,27 @@ def render_svg(scene:dict)->str:
             body+=f'<rect x="{x}" y="{y}" width="110" height="{h}" fill="#{["526b82","3f566b","657c91"][i%3]}"/>'
         if "tower" in objects: body+='<rect x="455" y="110" width="95" height="260" fill="#71889d"/><path d="M455 110L502 45 550 110Z" fill="#51697d"/>'
         body+='<path d="M0 650L350 490H650L1000 650Z" fill="#303c48"/><path d="M500 650L500 520" stroke="#f5d76e" stroke-width="12" stroke-dasharray="30 25"/>'
+    elif typ=="green_mask":
+        night = "night" in objects
+        sky = "#07101f" if night else "#243f62"
+        body=f'<rect width="1000" height="650" fill="{sky}"/>'
+        body+='<circle cx="835" cy="105" r="48" fill="#d8e7f2" opacity=".9"/>'
+        body+='<path d="M0 650L300 470H700L1000 650Z" fill="#111822"/>'
+        body+='<rect x="120" y="250" width="150" height="220" fill="#182b3d"/><rect x="310" y="190" width="180" height="280" fill="#20374b"/><rect x="720" y="220" width="130" height="250" fill="#16293b"/>'
+        for x in [145,190,335,390,435,750,795]:
+            body+=f'<rect x="{x}" y="280" width="16" height="24" rx="3" fill="#f6d36a"/>'
+        body+='<circle cx="500" cy="295" r="72" fill="#55d63f" opacity=".24"/>'
+        body+='<path d="M452 445L470 330Q500 305 530 330L548 445Z" fill="#171b22"/><circle cx="500" cy="280" r="38" fill="#d7a37c"/>'
+        body+='<path d="M455 260Q500 205 545 260L536 315Q500 335 464 315Z" fill="#15191e"/>'
+        body+='<path d="M462 270Q500 235 538 270L532 304Q500 320 468 304Z" fill="#42d93c"/>'
+        body+='<ellipse cx="500" cy="285" rx="42" ry="17" fill="#0c1b13"/><circle cx="480" cy="285" r="7" fill="#d9ff5b"/><circle cx="520" cy="285" r="7" fill="#d9ff5b"/>'
+        body+='<path d="M430 370Q500 415 570 370" stroke="#51ff43" stroke-width="8" fill="none" opacity=".75"/>'
+        if "rain" in objects:
+            body+=''.join(f'<path d="M{x} {80+(x%5)*35}l-18 55" stroke="#8dd8ff" stroke-width="3" opacity=".55"/>' for x in range(40,980,55))
+        if "magic" in objects:
+            body+=''.join(f'<circle cx="{x}" cy="{y}" r="5" fill="#6cff4f" opacity=".8"/>' for x,y in [(380,220),(620,180),(680,340),(350,400),(650,440)])
+        if "club" in objects:
+            body+='<rect x="730" y="205" width="110" height="18" fill="#e44cff"/><circle cx="785" cy="205" r="35" fill="#e44cff" opacity=".18"/>'
     elif typ=="robot":
         body=f'<rect width="1000" height="650" fill="{palette["sky"]}"/><rect y="500" width="1000" height="150" fill="{palette["dark"]}"/>'
         body+='<rect x="360" y="220" width="280" height="220" rx="35" fill="#9aaabd"/><circle cx="440" cy="315" r="30" fill="#55d9ff"/><circle cx="560" cy="315" r="30" fill="#55d9ff"/><rect x="440" y="375" width="120" height="22" rx="11" fill="#243648"/><path d="M500 220V145" stroke="#9aaabd" stroke-width="14"/><circle cx="500" cy="125" r="22" fill="#ffd84d"/><rect x="300" y="260" width="60" height="150" rx="20" fill="#8799ad"/><rect x="640" y="260" width="60" height="150" rx="20" fill="#8799ad"/>'
