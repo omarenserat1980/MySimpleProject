@@ -606,6 +606,43 @@ class VisualCompileIn(BaseModel):
     prompt: str
     mode: str = "auto"
 
+class CloudPainterIn(BaseModel):
+    prompt: str
+    timeout: int = 30
+
+@app.post("/api/cloud/painter/draw")
+def cloud_painter_draw(request: Request, body: CloudPainterIn):
+    """Queue a real Brain Local Painter operation on the connected Brain Termux agent."""
+    require_control_key(request)
+    prompt = body.prompt.strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="PROMPT_REQUIRED")
+    timeout = min(max(int(body.timeout), 1), 120)
+    queued = device_bridge.enqueue("brain_local_painter_draw", {"prompt": prompt})
+    if not queued.get("ok"):
+        return queued
+    task_id = queued["task"]["task_id"]
+    store.event("BRAIN_CLOUD_PAINTER_QUEUED", {"task_id": task_id, "prompt": prompt})
+    result = device_bridge.wait_result(task_id, timeout=timeout)
+    if result.get("status") == "RESULT_TIMEOUT":
+        return {"ok": False, "status": "WAITING_FOR_BRAIN_TERMUX", "task_id": task_id,
+                "prompt": prompt, "next": f"/api/device/result/{task_id}"}
+    task = result.get("task") or {}
+    if task.get("status") != "COMPLETED" or not task.get("ok"):
+        return {"ok": False, "status": "PAINTER_FAILED", "task_id": task_id,
+                "error": task.get("error", "BRAIN_LOCAL_PAINTER_FAILED"), "task": task}
+    payload = task.get("result") or {}
+    evidence = payload.get("result") or payload
+    svg = evidence.get("svg", "")
+    verified = bool(evidence.get("verified")) and svg.lstrip().startswith("<svg") and svg.rstrip().endswith("</svg>")
+    if not verified:
+        return {"ok": False, "status": "MASTER_VERIFICATION_FAILED", "task_id": task_id}
+    store.event("BRAIN_CLOUD_PAINTER_VERIFIED", {"task_id": task_id, "prompt": prompt})
+    return {"ok": True, "status": "VERIFIED_COMPLETED", "engine": "Brain Local Painter",
+            "transport": "Brain Cloud -> Brain Termux", "task_id": task_id,
+            "prompt": prompt, "format": "svg", "svg": svg,
+            "scene": evidence.get("scene", {}), "artifact": evidence.get("artifact", "")}
+
 @app.post("/api/visual-engine/compile")
 def visual_engine_compile(body: VisualCompileIn):
     scene = visual_engine.compile_scene(body.prompt, body.mode)
