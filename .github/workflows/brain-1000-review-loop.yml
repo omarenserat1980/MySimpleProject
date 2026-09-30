@@ -31,8 +31,11 @@ jobs:
           BRAIN_REVIEW_TIMEOUT: "60"
           BRAIN_CODE_GENERATOR_COMMAND: ${{ vars.BRAIN_CODE_GENERATOR_COMMAND }}
           BRAIN_PROACTIVE_EVOLUTION: "0"
+          BRAIN_REVIEW_PYTEST: "1"
+          BRAIN_GATE_PYTEST: "1"
         run: |
           set -o pipefail
+          python brain_v12/self_healing/verification_gate.py
           python brain_v12/self_healing/review_loop.py --loops "$BRAIN_REVIEW_LOOPS"
 
       - name: Save evolution evidence
