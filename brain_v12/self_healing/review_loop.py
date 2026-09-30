@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Brain 1000-loop continuous code review and self-healing engine.
+"""Brain 100,000,000-loop continuous code review and self-healing engine.
 
 Each loop:
   REVIEW -> RUN -> VERIFY -> (FAIL => REPAIR => VERIFY) -> RECORD -> next loop
 
-The engine is intentionally bounded to 1000 review loops per invocation. A
+The engine is intentionally bounded to 100,000,000 review loops per invocation. A
 scheduler can invoke it again for continued operation. It never declares a
 repair successful merely because a patch was generated: verification must pass.
 """
@@ -123,6 +123,39 @@ def main() -> int:
             entry["status"] = "REPAIRED_AND_VERIFIED" if repaired and ok2 else "REPAIR_FAILED"
             final_ok = repaired and ok2
 
+        # After healthy verification, optionally request a proactive improvement.
+        # Every candidate still passes the same verification gate; failed
+        # candidates are rolled back by the repair dispatcher.
+        if final_ok and os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1":
+            improvement = {
+                "schema": "brain-improvement-context/v1",
+                "loop": i,
+                "created_at": now(),
+                "reason": "verified_state_improvement_review",
+                "review": entry["review"],
+                "verification": details,
+            }
+            improvement_file = STATE / "current_improvement.json"
+            improvement_file.write_text(
+                json.dumps(improvement, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            old_failure = os.environ.get("BRAIN_FAILURE_FILE")
+            os.environ["BRAIN_FAILURE_FILE"] = str(improvement_file)
+            improved, improvement_details = repair(args.timeout)
+            if old_failure is None:
+                os.environ.pop("BRAIN_FAILURE_FILE", None)
+            else:
+                os.environ["BRAIN_FAILURE_FILE"] = old_failure
+            entry["proactive_improvement"] = improvement_details
+            if improved:
+                final_ok, after_improvement = deterministic_review(args.timeout)
+                entry["improvement_verification"] = after_improvement
+                if not final_ok:
+                    entry["status"] = "IMPROVEMENT_REJECTED"
+            else:
+                entry["status"] = "VERIFIED_NO_IMPROVEMENT"
+
         entry["finished_at"] = now()
         history.append(entry)
         print(f"BRAIN_REVIEW_LOOP {i}/{args.loops} status={entry['status']}", flush=True)
@@ -132,7 +165,7 @@ def main() -> int:
             time.sleep(args.delay)
 
     report = {
-        "schema": "brain-1000-review-loop/v1",
+        "schema": "brain-100m-review-loop/v2",
         "status": "VERIFIED_COMPLETED" if final_ok else "FAILED_REPAIR_CYCLE",
         "loops_requested": args.loops,
         "loops_completed": len(history),
