@@ -16,3 +16,8 @@ Runtime identity:
 `BRAIN_CLOUD_MODE=cloud-only`
 `BRAIN_DEVICE_EXECUTION_ENABLED=0`
 `BRAIN_TERMUX_REQUIRED=0`
+
+
+## Enforced CI guard
+
+The repository provides `brain_v12/self_healing/cloud_only_guard.py` and the continuous verification workflow runs it. The guard rejects production files/workflows that introduce forbidden Termux/phone deployment requirements, while allowing legacy documentation and optional client tooling.
