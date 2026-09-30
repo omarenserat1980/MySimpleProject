@@ -31,6 +31,7 @@ class BrainSupervisor:
             "verify", "repair", "retry", "deliver"
         ]
         job=self.control.create(task, steps, max_attempts=self.max_cycles, budget=budget)
+        job=self.control.start_attempt(job)
         self._event(job["job_id"], "supervisor_created", {"steps":steps})
         return job
 
@@ -43,6 +44,14 @@ class BrainSupervisor:
         row["status"]=status
         row["updated_at"]=time.time()
         row["details"]=details or {}
+        phase_index={"discover":0,"plan":1,"select_backend":2,"execute":3,
+                     "verify":4,"repair":5,"retry":6,"deliver":7}.get(
+                         phase,row.get("step_index",0))
+        if phase_index >= row.get("step_index",0):
+            row=self.control.checkpoint(row, phase_index, row["details"])
+        if status in {"blocked","failed","completed"}:
+            row["status"]=status
+            self.control._append(self.control.jobs,row)
         self._event(row["job_id"], "phase", {"phase":phase,"status":status,"details":row["details"]})
         return row
 
