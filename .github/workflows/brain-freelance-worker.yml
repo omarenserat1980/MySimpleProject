@@ -1,0 +1,67 @@
+name: Brain Freelance Worker - Research and Prepare
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/run_opportunity_factory.py"
+      - "brain_v12/**"
+      - "brain_v7/**"
+      - ".github/workflows/brain-freelance-worker.yml"
+
+concurrency:
+  group: brain-freelance-worker
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  research-and-prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install httpx
+
+      - name: Run opportunity factory
+        env:
+          LIVE_SEARCH: "true"
+        run: |
+          python .github/scripts/run_opportunity_factory.py
+
+      - name: Verify freelance artifact
+        run: |
+          test -s brain6_artifacts/freelance_ready_offers.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("brain6_artifacts/freelance_ready_offers.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert data.get("policy", {}).get("external_submission") == "HUMAN_CONTROLLED"
+          assert data.get("policy", {}).get("payment_movement") == "HUMAN_CONTROLLED"
+          assert isinstance(data.get("offers"), list)
+          print("Freelance artifact verified:", data.get("count", 0), "offers")
+          PY
+
+      - name: Upload research artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-freelance-ready-offers
+          path: brain6_artifacts/
+          if-no-files-found: error
+          retention-days: 14
