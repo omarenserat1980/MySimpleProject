@@ -2,9 +2,9 @@ namespace BrainCloudWorker;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 public sealed record WorkerPulse(string WorkerId, DateTimeOffset At, string Status, string Detail);
-public sealed class WorkerState {
+public sealed class WorkerState(WorkerHeartbeatStore heartbeat) {
  private readonly object _gate=new(); private readonly List<WorkerPulse> _pulses=[];
- public void Record(string id,string status,string detail){lock(_gate){_pulses.Add(new(id,DateTimeOffset.UtcNow,status,detail));if(_pulses.Count>500)_pulses.RemoveRange(0,_pulses.Count-500);}}
+ public void Record(string id,string status,string detail){var pulse=new WorkerPulse(id,DateTimeOffset.UtcNow,status,detail);lock(_gate){_pulses.Add(pulse);if(_pulses.Count>500)_pulses.RemoveRange(0,_pulses.Count-500);} heartbeat.Write(new WorkerHeartbeat(id,pulse.At,status,detail));}
  public IReadOnlyList<WorkerPulse> Snapshot(){lock(_gate)return _pulses.ToArray();}
 }
 public abstract class BrainPeriodicWorker(string id,TimeSpan interval,WorkerState state,ILogger logger):BackgroundService {
