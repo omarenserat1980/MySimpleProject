@@ -51,14 +51,17 @@ def execute(task: str, params: dict):
         sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
         from brain_v12.brain.draw_gateway import draw_local
         result = draw_local(prompt)
-        if not result.get("ok") or not result.get("verified") or not result.get("svg"):
+        if not result.get("ok") or not result.get("verified") or not result.get("png_base64"):
             raise ValueError("brain_local_painter_failed")
+        import base64
         out_dir = Path.cwd() / "brain6_artifacts" / "local_painter"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / f"{int(time.time())}-scene.svg"
-        out.write_text(result["svg"], encoding="utf-8")
-        return {"provider": "brain_local_painter", "verified": True,
-                "prompt": prompt, "artifact": str(out), "format": "svg",
+        out = out_dir / f"{int(time.time())}-scene.png"
+        out.write_bytes(base64.b64decode(result["png_base64"], validate=True))
+        return {"provider": "brain_local_machine_raster", "verified": True,
+                "prompt": prompt, "artifact": str(out), "format": "png",
+                "renderer": "machine-raster",
+                "machine_commands": result.get("machine_commands", []),
                 "scene": result.get("scene", {})}
     raise ValueError(f"task_not_allowlisted:{task}")
 
