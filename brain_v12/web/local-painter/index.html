@@ -1,27 +1,18 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BRAIN Local Painter — العرض الفعلي</title>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Machine Raster Painter</title>
 <style>
-body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}.wrap{max-width:1100px;margin:auto;padding:20px}.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#9db0c4}.status{color:#62e6a5}.viewer{background:#fff;border-radius:14px;overflow:hidden;margin-top:14px;min-height:220px}.viewer img{display:block;width:100%;height:auto}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}a,button{display:inline-block;border:1px solid #29445d;border-radius:10px;background:#12304a;color:#fff;padding:11px 15px;text-decoration:none;cursor:pointer}textarea{width:100%;box-sizing:border-box;min-height:80px;border-radius:12px;border:1px solid #29445d;background:#08121e;color:#fff;padding:12px;font:inherit}.meta{line-height:1.9}
-</style></head>
-<body><div class="wrap">
-<div class="card"><h1>🧠🎨 BRAIN Local Painter</h1>
-<p>العرض المباشر لنتيجة محرك الرسم المحلي داخل Brain عبر <code>/api/draw</code>، بدون OpenAI أو API مدفوع.</p>
+body{margin:0;background:#050b14;color:#eef7ff;font-family:system-ui,sans-serif}.wrap{max-width:1100px;margin:auto;padding:20px}.card{background:#0b1726;border:1px solid #20364d;border-radius:18px;padding:18px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#9db0c4}.status{color:#62e6a5}.viewer{background:#fff;border-radius:14px;overflow:hidden;margin-top:14px;min-height:220px}.viewer img{display:block;width:100%;height:auto}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}a,button{border:1px solid #29445d;border-radius:10px;background:#12304a;color:#fff;padding:11px 15px;text-decoration:none;cursor:pointer}textarea{width:100%;box-sizing:border-box;min-height:80px;border-radius:12px;border:1px solid #29445d;background:#08121e;color:#fff;padding:12px;font:inherit}.meta{line-height:1.9}
+</style></head><body><div class="wrap">
+<div class="card"><h1>🧠⚙️ BRAIN Machine Raster Painter</h1>
+<p>الرسم المحلي الآن: Scene → تعليمات Raster منخفضة المستوى → Pixel Buffer → PNG. لا SVG ولا API خارجي.</p>
 <textarea id="prompt" placeholder="مثال: مدينة مستقبلية ليلاً بعد المطر"></textarea>
-<div class="row"><button id="draw">🎨 ارسم بواسطة Brain Local Painter</button></div>
-<div id="status" class="status">جاهز للرسم المحلي.</div></div>
-<div class="card"><div id="meta" class="meta"></div><div class="viewer"><img id="art" alt="BRAIN Local Painter result"></div>
-<div class="row"><a id="open" target="_blank" rel="noopener" hidden>🖼️ فتح SVG الأصلي</a><a id="download" download hidden>📥 تنزيل SVG</a><a href="/text-to-drawing/">🎨 العودة إلى الرسام</a></div></div>
-</div>
-<script>
-const q=new URLSearchParams(location.search), initial=q.get("prompt")||"", src=q.get("src");
-const promptEl=document.getElementById("prompt"), statusEl=document.getElementById("status"), meta=document.getElementById("meta"), art=document.getElementById("art"), open=document.getElementById("open"), download=document.getElementById("download");
-promptEl.value=initial;
-function showSvg(svg,prompt){const blob=new Blob([svg],{type:"image/svg+xml"}),url=URL.createObjectURL(blob);art.src=url;open.href=url;download.href=url;open.hidden=false;download.hidden=false;meta.innerHTML="<b>الوصف:</b> "+escapeHtml(prompt)+"<br><b>المحرك:</b> BRAIN Local Painter<br><b>المصدر:</b> /api/draw — local provider";art.onload=()=>statusEl.textContent="✅ تم عرض الناتج الفعلي من Brain Local Painter";}
-async function draw(){const prompt=promptEl.value.trim();if(!prompt){statusEl.textContent="❌ اكتب وصف المشهد أولاً.";return}statusEl.textContent="⏳ Brain يرسم الآن محلياً...";try{const r=await fetch("/api/draw",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:"Brain، ارسم "+prompt})});const data=await r.json();if(!data.ok||!data.svg)throw new Error(data.error||"DRAW_FAILED");showSvg(data.svg,prompt)}catch(e){statusEl.textContent="❌ تعذر الاتصال بمحرك Brain المحلي: "+e.message}}
-document.getElementById("draw").onclick=draw;
-if(src&&!initial){art.src=src;meta.textContent="نتيجة محفوظة داخل Brain";art.onload=()=>statusEl.textContent="✅ تم تحميل النتيجة المحفوظة"}if(initial)draw();
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+<div class="row"><button id="draw">⚙️ ارسم بلغة الآلة المحلية</button></div><div id="status" class="status">جاهز.</div></div>
+<div class="card"><div id="meta" class="meta"></div><div class="viewer"><img id="art" alt="BRAIN Machine Raster result"></div>
+<div class="row"><a id="open" target="_blank" rel="noopener" hidden>🖼️ فتح PNG</a><a id="download" download="brain-machine-raster.png" hidden>📥 تنزيل PNG</a><a href="/text-to-drawing/">🎨 العودة إلى الرسام</a></div></div>
+</div><script>
+const q=new URLSearchParams(location.search),initial=q.get("prompt")||"",src=q.get("src"),p=document.getElementById("prompt"),s=document.getElementById("status"),m=document.getElementById("meta"),art=document.getElementById("art"),open=document.getElementById("open"),down=document.getElementById("download");p.value=initial;
+function show(data,prompt){const bytes=atob(data.png_base64),u=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)u[i]=bytes.charCodeAt(i);const url=URL.createObjectURL(new Blob([u],{type:"image/png"}));art.src=url;open.href=url;down.href=url;open.hidden=false;down.hidden=false;m.innerHTML="<b>الوصف:</b> "+escapeHtml(prompt)+"<br><b>المحرك:</b> Brain Machine Raster Painter<br><b>الحالة:</b> VERIFIED_COMPLETED<br><b>التعليمات:</b> "+(data.machine_commands||[]).length+" أمر Raster";art.onload=()=>s.textContent="✅ تم الرسم وعرض PNG الحقيقي من محرك Brain المحلي";}
+async function draw(){const prompt=p.value.trim();if(!prompt){s.textContent="❌ اكتب وصفاً أولاً.";return}s.textContent="⏳ تنفيذ تعليمات الرسم منخفضة المستوى...";try{const r=await fetch("/api/draw",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:"Brain، ارسم "+prompt})});const d=await r.json();if(!d.ok||!d.png_base64)throw Error(d.error||"DRAW_FAILED");show(d,prompt)}catch(e){s.textContent="❌ "+e.message}}
+document.getElementById("draw").onclick=draw;if(initial)draw();if(src&&!initial){art.src=src;s.textContent="✅ تم تحميل PNG محفوظ"}function escapeHtml(x){return String(x).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 </script></body></html>
