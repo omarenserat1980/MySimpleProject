@@ -77,7 +77,7 @@ resource "oci_core_instance" "brain" {
     source_type = "image"
     source_id = data.oci_core_images.ubuntu.images[0].id
   }
-  metadata {
+  metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(file("cloud-init.sh"))
   }
