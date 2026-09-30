@@ -633,14 +633,20 @@ def cloud_painter_draw(request: Request, body: CloudPainterIn):
                 "error": task.get("error", "BRAIN_LOCAL_PAINTER_FAILED"), "task": task}
     payload = task.get("result") or {}
     evidence = payload.get("result") or payload
-    svg = evidence.get("svg", "")
-    verified = bool(evidence.get("verified")) and svg.lstrip().startswith("<svg") and svg.rstrip().endswith("</svg>")
+    png_b64 = evidence.get("png_base64", "")
+    try:
+        png = base64.b64decode(png_b64, validate=True)
+        verified = bool(evidence.get("verified")) and png.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and len(png) > 128
+    except Exception:
+        png = b""
+        verified = False
     if not verified:
         return {"ok": False, "status": "MASTER_VERIFICATION_FAILED", "task_id": task_id}
     store.event("BRAIN_CLOUD_PAINTER_VERIFIED", {"task_id": task_id, "prompt": prompt})
-    return {"ok": True, "status": "VERIFIED_COMPLETED", "engine": "Brain Local Painter",
+    return {"ok": True, "status": "VERIFIED_COMPLETED", "engine": "Brain Local Machine Raster Painter",
             "transport": "Brain Cloud -> Brain Termux", "task_id": task_id,
-            "prompt": prompt, "format": "svg", "svg": svg,
+            "prompt": prompt, "format": "png", "png_base64": png_b64,
+            "renderer": "machine-raster", "machine_commands": evidence.get("machine_commands", []),
             "scene": evidence.get("scene", {}), "artifact": evidence.get("artifact", "")}
 
 @app.post("/api/visual-engine/compile")
