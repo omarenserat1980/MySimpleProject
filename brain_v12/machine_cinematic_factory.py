@@ -52,8 +52,13 @@ def render_part(i,scene,png):
     # One machine-rendered keyframe becomes a 30s shot with deterministic
     # Ken-Burns motion. FFmpeg encodes the numbered image into video.
     vf=f"zoompan=z='min(zoom+0.0009,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={PART_SECONDS*FPS}:s={W}x{H}:fps={FPS},format=yuv420p"
-    run(["ffmpeg","-y","-loop","1","-i",str(img),"-vf",vf,"-t",str(PART_SECONDS),
-         "-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",str(mp4)],1200)
+    audio="amix=inputs=2:duration=longest,volume=0.18"
+    run(["ffmpeg","-y","-loop","1","-i",str(img),
+         "-f","lavfi","-i",f"sine=frequency={55+(i%8)*11}:sample_rate=48000:duration={PART_SECONDS}",
+         "-f","lavfi","-i",f"sine=frequency={110+(i%6)*22}:sample_rate=48000:duration={PART_SECONDS}",
+         "-vf",vf,"-af",audio,"-t",str(PART_SECONDS),
+         "-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",
+         "-c:a","aac","-b:a","192k","-shortest",str(mp4)],1200)
     return mp4
 
 def qc(path):
