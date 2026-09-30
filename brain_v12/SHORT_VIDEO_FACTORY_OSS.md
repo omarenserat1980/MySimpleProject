@@ -28,6 +28,7 @@ Human command
 | BlueMagpie-TTS | Taiwan Mandarin/code-switching TTS | Apache-2.0 |
 | RHVoice | Russian/local TTS | GPL/LGPL بحسب المكوّن |
 | NileTTS | Arabic TTS research | Apache-2.0 |
+| Chitralekha | video transcreation / subtitles / voice-over | MIT |
 
 * يجب فحص تراخيص النماذج التابعة/الـdependencies قبل أي استخدام إنتاجي.
 
