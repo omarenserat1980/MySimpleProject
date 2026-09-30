@@ -1,0 +1,52 @@
+name: Brain Quran Layer Audit
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "brain_v12/quran/**"
+      - ".github/workflows/brain-quran-layer-audit.yml"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Quran layer audit
+        run: |
+          python3 brain_v12/quran/quran_layer_audit.py
+
+      - name: Compile Quran modules
+        run: |
+          python3 -m compileall -q brain_v12/quran
+
+      - name: Run V12 self-test
+        run: |
+          BRAIN_GATE_PYTEST=1 python3 brain_v12/self_healing/self_test.py
+
+      - name: Independent verification gate
+        run: |
+          python3 brain_v12/self_healing/verification_gate.py
+
+      - name: Require Quran audit evidence
+        run: |
+          test -f .brain/state/quran_layer_audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path(".brain/state/quran_layer_audit.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          assert d["quran_reasoning_guard"] == "PASS"
+          assert d["ayah_knowledge_pipeline"] == "PASS"
+          assert d["knowledge_graph"] == "PASS"
+          print("QURAN_LAYER_AUDIT_EVIDENCE=VERIFIED")
+          PY
+
+      - name: Upload Quran evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-quran-layer-audit
+          path: .brain/state/
