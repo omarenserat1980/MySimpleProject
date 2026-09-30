@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(brain_raster LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_executable(brain_raster main.cpp)
+target_compile_options(brain_raster PRIVATE -O3 -Wall -Wextra -Wpedantic)
