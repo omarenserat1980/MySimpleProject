@@ -17,6 +17,8 @@ cd /opt/MySimpleProject
 cat >/var/lib/brain/host-status.json <<'EOF'
 {"status":"BOOTSTRAPPING","service":"brain-cloud-worker"}
 EOF
+docker compose -f brain_v12/brain_git/compose.yml up -d
+
 docker compose -f brain_v12/cloud_worker/compose.yml up -d --build
 install -m 0644 brain_v12/cloud_worker/brain-cloud-worker.service /etc/systemd/system/brain-cloud-worker.service
 systemctl daemon-reload
