@@ -86,12 +86,12 @@ def repair(timeout: int) -> tuple[bool, dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--loops", type=int, default=int(os.getenv("BRAIN_REVIEW_LOOPS", "1000")))
+    ap.add_argument("--loops", type=int, default=int(os.getenv("BRAIN_REVIEW_LOOPS", "100000000")))
     ap.add_argument("--delay", type=float, default=float(os.getenv("BRAIN_REVIEW_DELAY", "0")))
     ap.add_argument("--timeout", type=int, default=int(os.getenv("BRAIN_REVIEW_TIMEOUT", "120")))
     args = ap.parse_args()
-    if not 1 <= args.loops <= 1000:
-        raise SystemExit("--loops must be between 1 and 1000")
+    if not 1 <= args.loops <= 100000000:
+        raise SystemExit("--loops must be between 1 and 100000000")
 
     STATE.mkdir(parents=True, exist_ok=True)
     history = []
@@ -125,7 +125,7 @@ def main() -> int:
 
         entry["finished_at"] = now()
         history.append(entry)
-        print(f"BRAIN_REVIEW_LOOP {i}/1000 status={entry['status']}", flush=True)
+        print(f"BRAIN_REVIEW_LOOP {i}/{args.loops} status={entry['status']}", flush=True)
 
         # A successful loop is not the end: the requested review loop continues.
         if args.delay:
