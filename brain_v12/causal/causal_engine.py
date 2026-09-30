@@ -305,3 +305,70 @@ def self_test() -> None:
 if __name__ == "__main__":
     self_test()
     print("CAUSAL_ENGINE=PASS")
+
+
+@dataclass
+class CausalEvidence:
+    cause: str
+    effect: str
+    observed: int = 0
+    successes: int = 0
+    failures: int = 0
+    source: str = "runtime"
+
+    @property
+    def confidence(self) -> float:
+        return self.successes / self.observed if self.observed else 0.0
+
+
+class CausalEvidenceLedger:
+    """Append-only-in-memory evidence accumulator for observed outcomes."""
+
+    def __init__(self) -> None:
+        self.records: Dict[Tuple[str, str], CausalEvidence] = {}
+
+    def record(
+        self,
+        cause: str,
+        effect: str,
+        *,
+        success: bool,
+        source: str = "runtime",
+    ) -> CausalEvidence:
+        key = (cause, effect)
+        item = self.records.setdefault(
+            key, CausalEvidence(cause, effect, source=source)
+        )
+        item.observed += 1
+        if success:
+            item.successes += 1
+        else:
+            item.failures += 1
+        return item
+
+    def snapshot(self) -> List[Dict[str, object]]:
+        return [
+            {
+                "cause": r.cause,
+                "effect": r.effect,
+                "observed": r.observed,
+                "successes": r.successes,
+                "failures": r.failures,
+                "confidence": r.confidence,
+                "source": r.source,
+            }
+            for r in sorted(self.records.values(), key=lambda x: (x.cause, x.effect))
+        ]
+
+
+def causal_audit() -> None:
+    """Deterministic audit: graph + evidence ledger must remain internally valid."""
+    graph = build_cosmic_map()
+    ledger = CausalEvidenceLedger()
+    ledger.record("action", "outcome", success=True, source="verification")
+    ledger.record("action", "outcome", success=False, source="verification")
+    assert not graph.has_cycle()
+    assert len(graph.causal_paths("sunlight", "ecosystem")) == 1
+    snapshot = ledger.snapshot()
+    assert snapshot[0]["observed"] == 2
+    assert snapshot[0]["confidence"] == 0.5
