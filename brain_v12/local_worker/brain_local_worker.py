@@ -43,6 +43,20 @@ def execute(task: str, params: dict):
     if task == "filesystem_probe":
         usage = shutil.disk_usage(Path.cwd())
         return {"free_bytes": usage.free, "total_bytes": usage.total}
+    if task == "brain_machine_cinema_60m":
+        import subprocess
+        title = str(params.get("title", "BRAIN — فيلم الآلة")).strip()
+        env = os.environ.copy()
+        env["BRAIN_FILM_TITLE"] = title
+        script = Path(__file__).resolve().parents[1] / "machine_cinematic_factory.py"
+        p = subprocess.run([sys.executable, str(script)], cwd=str(Path(__file__).resolve().parents[2]),
+                           env=env, capture_output=True, text=True, timeout=24*60*60)
+        if p.returncode != 0:
+            raise RuntimeError("machine_cinema_failed:" + (p.stderr or p.stdout)[-4000:])
+        return {"provider":"brain_machine_cinema","verified":True,"status":"VERIFIED_COMPLETED",
+                "title":title,"stdout":p.stdout[-8000:],"artifact":str(Path(env.get("BRAIN_MACHINE_FILM_ROOT", Path.cwd()/"brain6_artifacts"/"machine_films"))/"final.mp4"),
+                "manifest":str(Path(env.get("BRAIN_MACHINE_FILM_ROOT", Path.cwd()/"brain6_artifacts"/"machine_films"))/"manifest.json")}
+
     if task == "brain_local_painter_draw":
         prompt = str(params.get("prompt", "")).strip()
         if not prompt:
