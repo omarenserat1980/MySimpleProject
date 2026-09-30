@@ -6,3 +6,6 @@ add_executable(brain_raster main.cpp bytecode.cpp)
 target_compile_options(brain_raster PRIVATE -O3 -Wall -Wextra -Wpedantic)
 find_package(ZLIB REQUIRED)
 target_link_libraries(brain_raster PRIVATE ZLIB::ZLIB)
+
+add_executable(bfml_compiler ../film_machine/bfml_compiler.cpp bytecode.cpp)
+target_compile_options(bfml_compiler PRIVATE -O3 -Wall -Wextra -Wpedantic)
