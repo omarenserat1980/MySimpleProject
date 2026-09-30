@@ -1,0 +1,54 @@
+name: Brain Master Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/**"
+      - "*.md"
+
+permissions:
+  contents: read
+
+jobs:
+  master-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source of truth
+        uses: actions/checkout@v4
+
+      - name: Compile entire Brain V12
+        run: python3 -m compileall -q brain_v12
+
+      - name: Master evidence-first audit
+        run: python3 brain_v12/master_audit.py
+
+      - name: Independent V12 self-test
+        run: BRAIN_GATE_PYTEST=1 python3 brain_v12/self_healing/self_test.py
+
+      - name: Independent verification gate
+        run: python3 brain_v12/self_healing/verification_gate.py
+
+      - name: Require audit evidence
+        run: |
+          test -f .brain/state/master_audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path(".brain/state/master_audit.json").read_text(encoding="utf-8"))
+          assert d["status"] in {"AUDITED", "FAILED"}
+          assert "runtime_checks" in d
+          print("MASTER_AUDIT_EVIDENCE=RECORDED")
+          print("QURAN_REGISTRY_STATUS="+d["quran_registry"]["status"])
+          print("WORKFLOW_COUNT="+str(d["workflow_count"]))
+          PY
+
+      - name: Upload master evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-master-audit-evidence
+          path: .brain/state/
+          if-no-files-found: warn
