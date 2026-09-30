@@ -1,0 +1,16 @@
+name: Brain Dispatcher CI
+on:
+  push:
+    paths: [brain_v12/brain/job_dispatcher.py, brain_v12/tests/test_job_dispatcher.py, .github/workflows/brain-dispatcher-ci.yml]
+  pull_request:
+    paths: [brain_v12/brain/job_dispatcher.py, brain_v12/tests/test_job_dispatcher.py, .github/workflows/brain-dispatcher-ci.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest brain_v12.tests.test_job_dispatcher
+      - run: python3 -m brain_v12.brain.job_dispatcher
