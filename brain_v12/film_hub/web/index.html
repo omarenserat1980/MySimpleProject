@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brain Film Hub</title>
+<style>body{font-family:system-ui;margin:0;background:#10151c;color:#eee}header{padding:24px;position:sticky;top:0;background:#151c25}main{padding:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}.card{background:#1b2430;border-radius:14px;padding:16px}.thumb{aspect-ratio:16/9;background:#27384a;border-radius:10px;display:grid;place-items:center;font-size:36px}button{padding:10px 14px;border:0;border-radius:9px}</style></head>
+<body><header><strong>🧠 BRAIN FILM HUB</strong></header><main><h1>Verified Films</h1><div id="films" class="grid"><div class="card"><div class="thumb">▶</div><h2>Brain Film Library</h2><p>Native films verified by Brain Master QC.</p></div></div></main>
+<script>
+async function load(){try{const r=await fetch('/api/films');if(!r.ok)return;const films=await r.json();document.getElementById('films').innerHTML=films.map(f=>'<article class="card"><div class="thumb">▶</div><h2>'+f.title+'</h2><p>'+f.status+'</p></article>').join('')}catch(e){}}
+load();
+</script></body></html>
