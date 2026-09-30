@@ -73,6 +73,7 @@ def execute(task, params):
             "artifact": str(out),
             "format": "svg",
             "scene": result.get("scene", {}),
+            "svg": result["svg"],
         }, ""
 
     if task == "cinematic_factory_run":
