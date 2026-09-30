@@ -166,7 +166,29 @@ def main() -> int:
                 # The repair command is deliberately explicit and replaceable.
                 # It may generate/edit code, but success is impossible without verification.
                 if args.repair:
-                    repair = run(args.repair, args.timeout)
+                    # Give the repair agent a bounded, secret-redacted failure report.
+                    # The agent can improve code based on concrete evidence rather than guessing.
+                    failure_report = state_dir / "current_failure.json"
+                    write_state(failure_report, {
+                        "schema": "brain-repair-context/v1",
+                        "attempt": n,
+                        "exit_code": item.exit_code,
+                        "diagnosis": item.diagnosis,
+                        "stdout": item.stdout[-12000:],
+                        "stderr": item.stderr[-12000:],
+                        "command": args.command,
+                        "verify_command": args.verify,
+                    })
+                    repair_env = os.environ.copy()
+                    repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
+                    repair = subprocess.run(
+                        args.repair,
+                        shell=True,
+                        text=True,
+                        capture_output=True,
+                        timeout=args.timeout,
+                        env=repair_env,
+                    )
                     item.repair_exit_code = repair.returncode
                     item.repair_stdout = repair.stdout[-12000:]
                     item.repair_stderr = repair.stderr[-12000:]
