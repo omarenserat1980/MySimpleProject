@@ -139,6 +139,7 @@ jobs:
           set -e
           test -f master/cinematic_master_qc.json
           test -f master/cinematic_repair_manifest.json
+          python brain_v12/cinematic_repair_loop.py --qc master/cinematic_master_qc.json --output master/cinematic_repair_contract.json || true
           if [ "$rc" -ne 0 ]; then
             echo "CINEMATIC_QC_FAILED: REPAIR_REQUIRED"
             cat master/cinematic_repair_manifest.json
@@ -167,5 +168,6 @@ jobs:
             master/qc.json
             master/cinematic_master_qc.json
             master/cinematic_repair_manifest.json
+            master/cinematic_repair_contract.json
             master/VERIFIED_COMPLETED
           retention-days: 7
