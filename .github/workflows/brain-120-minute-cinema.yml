@@ -71,3 +71,5 @@ jobs:
             brain6_artifacts/machine_films/manifest.json
             brain6_artifacts/machine_films/VERIFIED_COMPLETED
           retention-days: 7
+
+      # Brain production trigger marker: 240 x 30s = 7200 seconds.
