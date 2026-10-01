@@ -16,6 +16,7 @@ jobs:
           echo "BRAIN-0/1 verification revision:"
           git rev-parse HEAD
           test -f brain0/programs/verification_suite.py
+          test -f brain0/programs/self_developer_test.py
 
       - name: Compile
         run: python -m compileall -q brain0
@@ -31,3 +32,6 @@ jobs:
 
       - name: Dependency-free test suite
         run: PYTHONPATH=. python brain0/programs/verification_suite.py
+
+      - name: Brain-native development proof
+        run: PYTHONPATH=. python brain0/programs/self_developer_test.py
