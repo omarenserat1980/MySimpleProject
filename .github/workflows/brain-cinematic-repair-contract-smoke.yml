@@ -33,9 +33,15 @@ jobs:
           set -euxo pipefail
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng python3-pil gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
           command -v ffmpeg
           command -v espeak-ng
+          command -v gst-launch-1.0
+          command -v ges-launch-1.0
+          gst-launch-1.0 --version | head -n 1
+          ges-launch-1.0 --version 2>&1 | head -n 1
+          gst-inspect-1.0 x264enc >/dev/null
+          gst-inspect-1.0 voaacenc >/dev/null
           ffmpeg -version | head -n 1
           espeak-ng --version | head -n 1
 
