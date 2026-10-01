@@ -90,6 +90,36 @@ def cinematic_master_qc(final_path: Path, manifest_path: Path) -> dict:
     return evaluate(final_path, manifest_path)
 
 
+def apply_cinematic_repair_contract(manifest: dict) -> dict:
+    """Turn QC requirements into hard renderer constraints for the next attempt."""
+    qc = manifest.get("cinematic_master_qc") or {}
+    repair = qc.get("repair_manifest") or {}
+    requirements = set(repair.get("mandatory_requirements") or [])
+    contract = manifest.setdefault("cinematic_contract", {})
+    contract["repair_required"] = bool(requirements)
+    contract["mandatory_requirements"] = sorted(requirements)
+    contract["reject_on_missing_evidence"] = True
+    if "GENERATE_MATERIALLY_DIVERSE_VISUALS" in requirements:
+        contract["visual_diversity_required"] = True
+    if "REBUILD_DUPLICATE_SCENES" in requirements:
+        contract["duplicate_scene_policy"] = "reject"
+    if "REQUIRE_CAMERA_OR_ELEMENT_MOTION" in requirements:
+        contract["motion_required"] = True
+    if "REQUIRE_REAL_SCENE_TRANSITIONS" in requirements:
+        contract["transitions_required"] = True
+    if "REQUIRE_VOICE_NARRATION_ASSETS" in requirements:
+        contract["voice_required"] = True
+    if "REQUIRE_MUSIC_ASSETS" in requirements:
+        contract["music_required"] = True
+    if "REQUIRE_SFX_AMBIENCE_ASSETS" in requirements:
+        contract["sfx_required"] = True
+    if "INCREASE_VIDEO_ENCODING_QUALITY" in requirements:
+        contract["min_video_bitrate_bps"] = max(
+            int(contract.get("min_video_bitrate_bps", 0)), 800000
+        )
+    return manifest
+
+
 def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"):
     OUT.mkdir(parents=True, exist_ok=True)
     target=PARTS*PART_SECONDS
@@ -136,6 +166,8 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
     manifest["cinematic_master_qc"]=content_qc
     if content_qc["status"] != "CINEMATIC_QC_PASSED":
         manifest["status"]="REPAIR_REQUIRED"
+        manifest["cinematic_master_qc"]=content_qc
+        manifest=apply_cinematic_repair_contract(manifest)
         manifest["repair_manifest"]=content_qc.get("repair_manifest", {})
         (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
         (OUT/"cinematic_repair_manifest.json").write_text(
