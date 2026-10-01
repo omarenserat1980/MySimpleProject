@@ -22,3 +22,7 @@ def test_unrelated_text_is_not_a_command():
 
 def test_whitespace_and_case_normalization():
     assert is_continue("  CONTINUE AUTONOMOUSLY  ")
+
+
+def test_explicit_brain_command_alias():
+    assert is_continue("BRAIN_CONTINUE_AUTONOMOUSLY")
