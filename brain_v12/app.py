@@ -292,6 +292,10 @@ async def cinema_status():
             "started_at":run.get("run_started_at"),"updated_at":run.get("updated_at"),
             "brain_controlled":True}
 
+class BrainHubActionIn(BaseModel):
+    owner:str=""
+    repo:str=""
+
 class CinemaStartIn(BaseModel):
     ref:str="main"
 
@@ -374,10 +378,6 @@ class BrainHubPullIn(BaseModel):
     head:str
     base:str="main"
     body:str=""
-
-class BrainHubActionIn(BaseModel):
-    owner:str=""
-    repo:str=""
 
 class BrainHubDispatchIn(BaseModel):
     owner:str=""
