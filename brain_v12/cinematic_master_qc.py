@@ -284,6 +284,10 @@ def main() -> int:
     args = ap.parse_args()
     result = evaluate(Path(args.video), Path(args.manifest))
     Path(args.output).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    repair = build_repair_manifest(result)
+    repair_path = Path(args.output).with_name("cinematic_repair_manifest.json")
+    repair_path.write_text(json.dumps(repair, ensure_ascii=False, indent=2), encoding="utf-8")
+    result["repair_manifest"] = repair
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["status"] == "CINEMATIC_QC_PASSED" else 2
 
