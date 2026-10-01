@@ -52,18 +52,25 @@ def run(cmd, timeout=600):
         raise RuntimeError((p.stderr or p.stdout)[-4000:])
     return p
 
-def render_part(i, png):
+def render_part(i, png, repair_contract=None):
     part = OUT / "parts" / f"{i:03d}"; part.mkdir(parents=True, exist_ok=True)
     img = part / "machine.png"; img.write_bytes(png)
     mp4 = part / f"part-{i:03d}.mp4"
     frames = PART_SECONDS * FPS
-    vf = f"zoompan=z='min(zoom+0.0009,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p"
+    zoom = "min(zoom+0.0012,1.18)" if repair_contract and repair_contract.get("motion_required") else "min(zoom+0.0009,1.12)"
+    vf = f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p"
+    base=55+(i%8)*11
+    high=110+(i%6)*22
+    if repair_contract and repair_contract.get("audio_diversity_required"):
+        base += (i%5)*17
+        high += (i%7)*29
     audio = "[1:a][2:a]amix=inputs=2:duration=longest,volume=0.18[aout]"
+    bitrate = "1200k" if repair_contract and repair_contract.get("min_video_bitrate_bps",0)>=800000 else "800k"
     run(["ffmpeg","-y","-loop","1","-i",str(img),
-         "-f","lavfi","-i",f"sine=frequency={55+(i%8)*11}:sample_rate=48000:duration={PART_SECONDS}",
-         "-f","lavfi","-i",f"sine=frequency={110+(i%6)*22}:sample_rate=48000:duration={PART_SECONDS}",
+         "-f","lavfi","-i",f"sine=frequency={base}:sample_rate=48000:duration={PART_SECONDS}",
+         "-f","lavfi","-i",f"sine=frequency={high}:sample_rate=48000:duration={PART_SECONDS}",
          "-vf",vf,"-filter_complex",audio,"-map","0:v:0","-map","[aout]","-t",str(PART_SECONDS),
-         "-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",
+         "-c:v","libx264","-preset","medium","-b:v",bitrate,"-pix_fmt","yuv420p",
          "-c:a","aac","-b:a","192k","-shortest",str(mp4)],1200)
     return mp4
 
@@ -143,7 +150,7 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
     for i in range(START_PART,END_PART+1):
         title0,typ,extra=SHOTS[(i-1)%len(SHOTS)]
         scene,png,commands=scene_for(i,title0,typ,extra,repair_contract)
-        clip=render_part(i,png); q=qc(clip)
+        clip=render_part(i,png,repair_contract); q=qc(clip)
         if not(q["video"] and PART_SECONDS-1<=q["duration"]<=PART_SECONDS+1 and q["width"]==W and q["height"]==H):
             raise RuntimeError(f"PART_QC_FAILED:{i}:{q}")
         clips.append(clip)
