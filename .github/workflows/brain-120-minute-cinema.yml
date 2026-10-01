@@ -1,0 +1,73 @@
+name: BRAIN 120 Minute Cinema
+
+on:
+  push:
+    paths:
+      - 'brain_v12/machine_cinematic_factory.py'
+      - 'brain_v12/visual_engine.py'
+      - 'brain_v12/machine_raster_engine.py'
+      - '.github/workflows/brain-120-minute-cinema.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Verify Brain cinema source
+        run: |
+          python --version
+          test -f brain_v12/machine_cinematic_factory.py
+          test -f brain_v12/visual_engine.py
+          test -f brain_v12/machine_raster_engine.py
+          python -m py_compile brain_v12/machine_cinematic_factory.py
+
+      - name: Verify FFmpeg
+        run: |
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Produce 120-minute film with Brain
+        env:
+          BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
+          BRAIN_FILM_PARTS: "240"
+          BRAIN_FILM_PART_SECONDS: "30"
+        run: |
+          PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
+
+      - name: Master verification
+        run: |
+          test -f brain6_artifacts/machine_films/final.mp4
+          test -f brain6_artifacts/machine_films/manifest.json
+          test -f brain6_artifacts/machine_films/VERIFIED_COMPLETED
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("brain6_artifacts/machine_films/manifest.json").read_text())
+          assert m["status"]=="VERIFIED_COMPLETED"
+          assert m["parts"]==240
+          assert m["part_seconds"]==30
+          assert m["target_seconds"]==7200
+          q=m["master_qc"]
+          assert q["video"] is True
+          assert q["width"]==1000 and q["height"]==650
+          assert abs(q["duration"]-7200)<=10
+          print("BRAIN_120_MINUTE_MASTER_QC=VERIFIED")
+          print(json.dumps(q,ensure_ascii=False))
+          PY
+
+      - name: Upload verified film
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-120-minute-film
+          path: |
+            brain6_artifacts/machine_films/final.mp4
+            brain6_artifacts/machine_films/manifest.json
+            brain6_artifacts/machine_films/VERIFIED_COMPLETED
+          retention-days: 7
