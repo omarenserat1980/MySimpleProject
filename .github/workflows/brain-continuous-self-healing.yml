@@ -64,6 +64,7 @@ jobs:
           BRAIN_MAX_BACKOFF_SECONDS: "20"
           BRAIN_REPAIR_COMMAND: "python -m brain_v12.self_healing.repair"
           BRAIN_CODE_GENERATOR_COMMAND: "python -m brain_v12.self_healing.native_patch_generator"
+          # Native generator is bounded by the registry and Stage 7 verification gate.
           BRAIN_GATE_PYTEST: "1"
           BRAIN_COMMAND: ${{ github.event.inputs.brain_command || 'BRAIN_CONTINUE_AUTONOMOUSLY' }}
           BRAIN_AUTO_CONFIRM: ${{ github.event.inputs.auto_confirm || 'false' }}
