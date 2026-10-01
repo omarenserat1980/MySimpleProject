@@ -15,6 +15,7 @@ OUT = Path(os.environ.get("BRAIN_MACHINE_FILM_ROOT", ROOT / "brain6_artifacts" /
 FPS = int(os.environ.get("BRAIN_FILM_FPS", "24"))
 PARTS = max(1, int(os.environ.get("BRAIN_FILM_PARTS", "240")))
 PART_SECONDS = max(5, int(os.environ.get("BRAIN_FILM_PART_SECONDS", "30")))
+MEDIA_BACKEND = os.environ.get("BRAIN_MEDIA_BACKEND", "ffmpeg").lower().strip()
 START_PART = max(1, int(os.environ.get("BRAIN_FILM_START", "1")))
 END_PART = min(PARTS, int(os.environ.get("BRAIN_FILM_END", str(PARTS))))
 W, H = 1000, 650
@@ -57,17 +58,12 @@ def run(cmd, timeout=600):
     return p
 
 def render_part(i, png, repair_contract=None):
-    part = OUT / "parts" / f"{i:03d}"; part.mkdir(parents=True, exist_ok=True)
-    img = part / "machine.png"; img.write_bytes(png)
+    part = OUT / "parts" / f"{i:03d}"
+    part.mkdir(parents=True, exist_ok=True)
+    img = part / "machine.png"
+    img.write_bytes(png)
     mp4 = part / f"part-{i:03d}.mp4"
-    frames = PART_SECONDS * FPS
-    zoom = "min(zoom+0.0012,1.18)" if repair_contract and repair_contract.get("motion_required") else "min(zoom+0.0009,1.12)"
-    vf = f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p"
-    base=55+(i%8)*11
-    high=110+(i%6)*22
-    if repair_contract and repair_contract.get("audio_diversity_required"):
-        base += (i%5)*17
-        high += (i%7)*29
+
     voice_required = bool(repair_contract and repair_contract.get("voice_required"))
     music_required = bool(repair_contract and repair_contract.get("music_required"))
     sfx_required = bool(repair_contract and repair_contract.get("sfx_required"))
@@ -75,12 +71,28 @@ def render_part(i, png, repair_contract=None):
     music = part / "music.wav"
     sfx = part / "sfx.wav"
 
+    import shutil
+    speaker = shutil.which("espeak-ng") or shutil.which("espeak")
     if voice_required:
-        import shutil
-        speaker = shutil.which("espeak-ng") or shutil.which("espeak")
         if not speaker:
             raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING: install espeak-ng or provide voice assets")
         run([speaker, "-w", str(voice), f"Brain cinematic scene {i}."])
+
+    if MEDIA_BACKEND == "gstreamer":
+        from brain_v12 import gstreamer_backend
+        if not gstreamer_backend.available():
+            raise RuntimeError("GSTREAMER_REQUIRED: gst-launch-1.0 and ges-launch-1.0")
+        if music_required:
+            gstreamer_backend._make_tone(music, PART_SECONDS, 220 + (i % 5) * 37, "music")
+        if sfx_required:
+            gstreamer_backend._make_tone(sfx, PART_SECONDS, 110 + (i % 6) * 22, "sfx")
+        return gstreamer_backend.render_part(
+            img, mp4, PART_SECONDS, FPS, W, H,
+            voice if voice_required else None,
+            music if music_required else None,
+            sfx if sfx_required else None,
+        )
+
     if music_required:
         run(["ffmpeg","-y","-v","error","-f","lavfi","-i",
              f"sine=frequency={220+(i%5)*37}:sample_rate=48000:duration={PART_SECONDS}",
@@ -99,11 +111,14 @@ def render_part(i, png, repair_contract=None):
             audio_inputs.append(f"{idx}:a")
             idx += 1
     if not audio_inputs:
-        inputs += ["-f","lavfi","-i",f"sine=frequency={base}:sample_rate=48000:duration={PART_SECONDS}"]
+        inputs += ["-f","lavfi","-i",f"sine=frequency={55+(i%8)*11}:sample_rate=48000:duration={PART_SECONDS}"]
         audio_inputs.append(f"{idx}:a")
     mix="".join(f"[{x}]" for x in audio_inputs)
     audio=f"{mix}amix=inputs={len(audio_inputs)}:duration=longest,volume=0.22[aout]"
     bitrate = "1200k" if repair_contract and repair_contract.get("min_video_bitrate_bps",0)>=800000 else "800k"
+    zoom = "min(zoom+0.0012,1.18)" if repair_contract and repair_contract.get("motion_required") else "min(zoom+0.0009,1.12)"
+    frames = PART_SECONDS * FPS
+    vf = f"zoompan=z='{zoom}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p"
     run(["ffmpeg","-y",*inputs,"-vf",vf,"-filter_complex",audio,
          "-map","0:v:0","-map","[aout]","-t",str(PART_SECONDS),
          "-c:v","libx264","-preset","medium","-b:v",bitrate,"-pix_fmt","yuv420p",
