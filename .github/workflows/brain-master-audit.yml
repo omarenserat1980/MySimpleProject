@@ -26,7 +26,7 @@ jobs:
         run: python3 brain_v12/master_audit.py
 
       - name: Independent V12 self-test
-        run: BRAIN_GATE_PYTEST=1 python3 brain_v12/self_healing/self_test.py
+        run: BRAIN_GATE_PYTEST=1 python3 -m brain_v12.self_healing.self_test
 
       - name: Independent verification gate
         run: python3 brain_v12/self_healing/verification_gate.py
