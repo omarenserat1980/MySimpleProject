@@ -41,6 +41,9 @@ def main()->int:
         if PATCH_FILE.is_file() and not rollback(): return 3
         env["BRAIN_REPAIR_CANDIDATE"]=str(candidate)
         agent=subprocess.run([sys.executable,"brain_v12/self_healing/code_repair_agent.py"],cwd=ROOT,env=env,text=True,capture_output=True,timeout=int(os.getenv("BRAIN_GENERATOR_TIMEOUT","600")))
+        print("BRAIN_REPAIR_CANDIDATE_RESULT=" + str(candidate) + " exit=" + str(agent.returncode), flush=True)
+        print("BRAIN_REPAIR_AGENT_STDOUT=" + agent.stdout[-6000:], flush=True)
+        print("BRAIN_REPAIR_AGENT_STDERR=" + agent.stderr[-6000:], flush=True)
         if agent.returncode:
           continue
         ok,results=verify(actions)
