@@ -40,6 +40,7 @@ from .brain.device_bridge import DeviceBridge
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
 from .brain_git.service import BrainGitService
+from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
@@ -74,6 +75,7 @@ device_bridge=DeviceBridge(store)
 brain_supervisor=BrainSupervisor()
 brain_self_monitor=BrainSelfMonitor(ROOT)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
+brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -1304,6 +1306,20 @@ def device_report(request:Request, body:DeviceReport):
 def device_result(task_id:str):
     return device_bridge.result(task_id)
 
+
+@app.post("/api/brain-git/cinema/start")
+def brain_git_cinema_start():
+    repo_root=os.path.abspath(os.path.join(ROOT, ".."))
+    cmd=["python","brain_v12/machine_cinematic_factory.py"]
+    wf=brain_workflows.create("BRAIN 120 Minute Cinema",cmd,{"owner":"BRAIN_GIT_PRIMARY","verification":"VERIFIED_COMPLETED","external_github":False},repo_root)
+    threading.Thread(target=brain_workflows.run,args=(wf,),daemon=True).start()
+    return {"ok":True,"status":"QUEUED","workflow_id":wf["id"],"owner":"BRAIN_GIT_PRIMARY"}
+
+@app.get("/api/brain-git/cinema/status/{workflow_id}")
+def brain_git_cinema_status(workflow_id:str):
+    wf=brain_workflows.get(workflow_id)
+    if not wf: raise HTTPException(404,"WORKFLOW_NOT_FOUND")
+    return {"ok":True,"workflow":wf}
 
 @app.get("/api/brain/self-monitor")
 def brain_self_monitor_status():
