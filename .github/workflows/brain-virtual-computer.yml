@@ -13,9 +13,13 @@ on:
       - "brain_v12/WINDOWS_SERVER_2025_RUNBOOK.md"
       - "brain_v12/virtual_hardware/windows_server_backend.py"
       - "brain_v12/test_windows_server_backend.py"
-      - "brain_v12/brain/resource_manager.py brain_v12/brain/virtual_task_queue.py brain_v12/brain/durable_task_store.py"
+      - "brain_v12/brain/resource_manager.py brain_v12/brain/virtual_task_queue.py brain_v12/brain/durable_task_store.py brain_v12/brain/capability_registry.py brain_v12/brain/executor_adapter.py brain_v12/brain/failure_policy.py"
       - "brain_v12/test_resource_manager.py"
       - "brain_v12/app.py"
+      - "brain_v12/test_brain_execution_layers.py"
+      - "brain_v12/brain/failure_policy.py"
+      - "brain_v12/brain/executor_adapter.py"
+      - "brain_v12/brain/capability_registry.py"
       - "brain_v12/test_durable_task_store.py"
       - "brain_v12/brain/durable_task_store.py"
       - "brain_v12/test_virtual_task_queue.py"
@@ -38,7 +42,7 @@ jobs:
           python -m py_compile brain_v12/virtual_hardware/*.py brain_v12/blade_server.py brain_v12/brain/virtual_datacenter.py
       - name: Run Blade Server evidence tests
         run: |
-          python -m unittest brain_v12.test_blade_server brain_v12.test_virtual_system brain_v12.test_windows_server_vm brain_v12.test_windows_server_backend brain_v12.test_windows_completion_gate brain_v12.test_resource_manager brain_v12.test_virtual_task_queue brain_v12.test_durable_task_store -v
+          python -m unittest brain_v12.test_blade_server brain_v12.test_virtual_system brain_v12.test_windows_server_vm brain_v12.test_windows_server_backend brain_v12.test_windows_completion_gate brain_v12.test_resource_manager brain_v12.test_virtual_task_queue brain_v12.test_durable_task_store brain_v12.test_brain_execution_layers -v
       - name: Verify evidence contract
         run: |
           test -f brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
