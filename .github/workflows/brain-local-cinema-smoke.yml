@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Python compile
         run: |
-          python -m py_compile             brain_v12/machine_cinematic_factory.py             brain_v12/visual_engine.py             brain_v12/machine_raster_engine.py             brain_v12/brain/device_bridge.py             brain_v12/local_worker/brain_local_worker.py             brain_v12/tools/brain_emulator_agent.py
+          python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py brain_v12/brain/device_bridge.py brain_v12/local_worker/brain_local_worker.py brain_v12/tools/brain_emulator_agent.py
       - name: Local painter smoke
         run: |
           PYTHONPATH=. python - <<'PY'
@@ -38,6 +38,20 @@ jobs:
           assert len(commands)>0
           print("BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED")
           PY
+      - name: End-to-end one-shot factory smoke
+        env:
+          BRAIN_FILM_PARTS: "1"
+          BRAIN_FILM_PART_SECONDS: "5"
+          BRAIN_FILM_FPS: "8"
+          BRAIN_MACHINE_FILM_ROOT: "${{ runner.temp }}/brain-smoke"
+        run: |
+          PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
+          test -f "${BRAIN_MACHINE_FILM_ROOT}/final.mp4"
+          test -f "${BRAIN_MACHINE_FILM_ROOT}/manifest.json"
+          test -f "${BRAIN_MACHINE_FILM_ROOT}/VERIFIED_COMPLETED"
+          ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "${BRAIN_MACHINE_FILM_ROOT}/final.mp4"
+          echo "BRAIN_FACTORY_END_TO_END_SMOKE=VERIFIED"
+
       - name: Device task contract smoke
         run: |
           grep -q 'brain_machine_cinema_120m' brain_v12/brain/device_bridge.py
