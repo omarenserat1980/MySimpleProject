@@ -64,6 +64,10 @@ class BladeScheduler:
         required=set(required_capabilities or {"cpu"})
         requirement=resource_requirement or ResourceRequirement()
         task_id=task_id or f"task-{uuid4().hex[:12]}"
+        capability_blade=self.chassis.select(required,None,None)
+        if capability_blade is None:
+            return {"ok":False,"status":"NO_CAPABLE_BLADE","required":sorted(required),
+                    "requirement":requirement.__dict__,"task_id":task_id}
         blade=self.chassis.select(required,requirement,self.resources)
         if blade is None:
             return {"ok":False,"status":"NO_CAPABLE_RESOURCE","required":sorted(required),
