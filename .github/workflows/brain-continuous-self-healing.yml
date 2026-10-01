@@ -6,7 +6,7 @@ on:
       command:
         description: "Brain command to run"
         required: false
-        default: "python brain_v12/self_healing/self_test.py"
+        default: "python -m brain_v12.self_healing.self_test"
       max_attempts:
         description: "Maximum repair/verify cycles"
         required: false
@@ -49,7 +49,7 @@ jobs:
           BRAIN_GATE_PYTEST: "1"
         run: |
           set -euo pipefail
-          CMD="${{ github.event.inputs.command || 'python brain_v12/self_healing/self_test.py' }}"
+          CMD="${{ github.event.inputs.command || 'python -m brain_v12.self_healing.self_test' }}"
 
           python -m brain_v12.self_healing.supervisor             --command "$CMD"             --verify "python brain_v12/self_healing/verification_gate.py"             --repair "$BRAIN_REPAIR_COMMAND"             --max-attempts "$BRAIN_MAX_ATTEMPTS"
 
