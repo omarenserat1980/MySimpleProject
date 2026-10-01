@@ -27,11 +27,15 @@ jobs:
           - {shard: 4, start: 181, end: 240}
     steps:
       - uses: actions/checkout@v4
+      - name: Install media runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
       - name: Verify Brain source
         run: |
           python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
       - name: Render shard
         env:
           BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
