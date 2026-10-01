@@ -2,6 +2,12 @@ name: Brain Supervisor - Autonomy and Economic Safety
 
 on:
   workflow_dispatch:
+    inputs:
+      task:
+        description: "Task for Brain Cloud Runner"
+        required: false
+        default: "tests"
+        type: string
   workflow_run:
     workflows: ["BRAIN 120 Minute Cinema"]
     types: [completed]
@@ -26,6 +32,35 @@ permissions:
   actions: write
 
 jobs:
+  dispatch_cloud_task:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch Brain Cloud Runner
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TASK: ${{ inputs.task }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, urllib.request
+          task=os.environ.get("TASK","tests").strip().lower()
+          payload=json.dumps({"ref":"main","inputs":{"task":task}}).encode()
+          req=urllib.request.Request(
+              "https://api.github.com/repos/omarenserat1980/MySimpleProject/actions/workflows/brain-github-cloud.yml/dispatches",
+              data=payload,
+              headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],
+                       "Accept":"application/vnd.github+json",
+                       "X-GitHub-Api-Version":"2022-11-28",
+                       "Content-Type":"application/json"},
+              method="POST")
+          with urllib.request.urlopen(req) as resp:
+              print("BRAIN_CLOUD_DISPATCHED", resp.status, task)
+          PY
+
   health_and_recovery:
     runs-on: ubuntu-latest
     timeout-minutes: 10
