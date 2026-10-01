@@ -129,14 +129,43 @@ jobs:
             printf '%s\n' "RUN_ID=$run_id" "WORKFLOW=$workflow" "ATTEMPT=$attempt" "FAILURE_CLASS=$class"               >> brain6_artifacts/workflow_watchdog/actions.log
 
             case "$class" in
+              CODE_OR_TEST)
+                echo "REPAIR=BOUNDED_EXACT_PATCH_ENGINE"
+                if python -m brain_v12.brain.repair_engine "$log"; then
+                  if git status --porcelain --untracked-files=no | grep -q .; then
+                    changed="$(git diff --name-only)"
+                    if [ "$changed" = "brain_v12/verification/verification_suite.py" ]; then
+                      git diff --check
+                      git config user.name "Brain Repair Engine"
+                      git config user.email "brain-repair@users.noreply.github.com"
+                      git add brain_v12/verification/verification_suite.py
+                      git commit -m "brain: apply verified bounded repair"
+                      echo "REPAIR_COMMIT=$(git rev-parse HEAD)"
+                      workflow_path="$(gh workflow list --json name,path,state --limit 100 | python -c 'import json,sys; d=json.load(sys.stdin); n=sys.argv[1]; m=[x for x in d if x.get("name")==n and x.get("state")=="active"]; print(m[0]["path"] if m else "")' "$workflow")"
+                      if [ -n "$workflow_path" ]; then
+                        echo "RECOVERY=DISPATCH_NEW_COMMIT"
+                        gh workflow run "$workflow_path" --ref main || echo "DISPATCH_REQUEST_FAILED=$run_id"
+                      else
+                        echo "RECOVERY=PATCH_COMMITTED_NO_DISPATCHABLE_WORKFLOW"
+                      fi
+                    else
+                      echo "RECOVERY=PATCH_SCOPE_REJECTED"
+                      git checkout -- .
+                    fi
+                  else
+                    echo "RECOVERY=NO_SOURCE_CHANGE"
+                  fi
+                else
+                  echo "RECOVERY=REPAIR_NOT_APPLIED_OR_NOT_VALIDATED"
+                fi
+                ;;
               EXECUTION_INFRA|MEDIA_OR_VM_PIPELINE|INPUT_OR_ARTIFACT)
                 echo "RECOVERY=RERUN_FAILED_JOBS"
                 gh run rerun "$run_id" --failed || echo "RERUN_REQUEST_FAILED=$run_id"
                 ;;
-              CODE_OR_TEST|UNKNOWN|LOG_UNAVAILABLE)
+              UNKNOWN|LOG_UNAVAILABLE)
                 echo "RECOVERY=BOUNDED_RETRY_ONLY"
-                # Do not blindly mutate source code from an untrusted log.
-                # The Brain records the evidence and stops at the safe boundary.
+                # Do not mutate source code from an untrusted or unknown failure.
                 ;;
               *)
                 echo "RECOVERY=NO_AUTOMATIC_ACTION"
