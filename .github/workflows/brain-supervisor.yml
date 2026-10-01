@@ -72,15 +72,14 @@ jobs:
             echo "FAILURE_CLASS=UNKNOWN"
           fi
           grep -E "ERROR|Error|FAILED|failure|Traceback|Exception" supervisor-failure.log | tail -100 || true
-      - name: Safe repair - rerun only failed jobs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.event.workflow_run.id }}
+      - name: Hand off recovery to global Brain watchdog
         run: |
           set -euo pipefail
-          gh run rerun "$RUN_ID" --failed
-          echo "BRAIN_SUPERVISOR_ACTION=RERUN_FAILED_JOBS"
-          echo "BRAIN_SUPERVISOR_POLICY=BOUNDED_RETRY_ONLY"
+          mkdir -p brain6_artifacts/supervisor
+          echo "BRAIN_SUPERVISOR_ACTION=FAILURE_CLASSIFIED" > brain6_artifacts/supervisor/handoff.txt
+          echo "BRAIN_SUPERVISOR_RECOVERY=GLOBAL_WORKFLOW_WATCHDOG" >> brain6_artifacts/supervisor/handoff.txt
+          echo "BRAIN_SUPERVISOR_POLICY=BOUNDED_AUTONOMOUS_RECOVERY" >> brain6_artifacts/supervisor/handoff.txt
+          echo "RUN_ID=${{ github.event.workflow_run.id }}" >> brain6_artifacts/supervisor/handoff.txt
       - name: Record supervisor evidence
         run: |
           mkdir -p brain6_artifacts/supervisor
