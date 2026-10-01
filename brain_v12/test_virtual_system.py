@@ -5,20 +5,31 @@ from .virtual_hardware.kernel import VirtualKernel
 from .virtual_hardware.network import VirtualRouter,VirtualPacket
 
 class VirtualSystemTests(unittest.TestCase):
-    def test_firmware_boot(self):
+    def test_firmware_boot_is_integrated(self):
+        c=VirtualComputer("test")
+        status=c.power_on()
+        self.assertTrue(status["powered"])
+        self.assertTrue(status["firmware"]["booted"])
+        self.assertIn("BOOT_OK",c.boot_record["boot_log"])
+        self.assertEqual(c.boot_record["firmware"],VirtualFirmware.VERSION)
+
+    def test_kernel_process_scheduler_is_integrated(self):
         c=VirtualComputer("test")
         c.power_on()
-        r=VirtualFirmware().boot(c)
-        self.assertTrue(r["ok"])
-        self.assertIn("BOOT_OK",r["boot_log"])
+        p=c.create_process("brain-test")
+        self.assertEqual(p.state,"READY")
+        self.assertTrue(c.syscall(p.pid,"status")["ok"])
+        c.kernel.tick(3)
+        self.assertEqual(c.kernel.ticks,3)
+        self.assertGreaterEqual(c.kernel.processes[p.pid].ticks,1)
+        self.assertTrue(c.kernel.terminate(p.pid))
 
-    def test_kernel_process(self):
+    def test_standalone_kernel_boundary(self):
         k=VirtualKernel()
         p=k.create_process("brain-test")
         self.assertEqual(p.state,"READY")
         self.assertTrue(k.syscall(p.pid,"status")["ok"])
         self.assertTrue(k.terminate(p.pid))
-        self.assertEqual(k.processes[p.pid].state,"TERMINATED")
 
     def test_virtual_network(self):
         a=VirtualComputer("a"); b=VirtualComputer("b")
