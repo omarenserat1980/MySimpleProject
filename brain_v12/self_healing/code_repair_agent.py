@@ -32,12 +32,13 @@ def changed_paths(diff: str) -> list[str]:
 
 def main() -> int:
     failure = os.getenv("BRAIN_FAILURE_FILE")
+    context = os.getenv("BRAIN_REPAIR_CONTEXT", "failure")
     generator = os.getenv("BRAIN_CODE_GENERATOR_COMMAND")
-    if not failure:
+    if not failure and context != "improvement":
         return fail("CODE_REPAIR_FAILURE_FILE_MISSING", 2)
     if not generator:
         return fail("CODE_REPAIR_GENERATOR_NOT_CONFIGURED", 2)
-    if not Path(failure).is_file():
+    if failure and not Path(failure).is_file() and context != "improvement":
         return fail("CODE_REPAIR_FAILURE_FILE_NOT_FOUND", 2)
 
     roots = tuple(
@@ -64,7 +65,9 @@ def main() -> int:
         return fail("CODE_REPAIR_CONTRACT_MISSING", 2)
 
     env = os.environ.copy()
-    env["BRAIN_REPAIR_FAILURE_FILE"] = str(Path(failure))
+    if failure:
+        env["BRAIN_REPAIR_FAILURE_FILE"] = str(Path(failure))
+    env["BRAIN_REPAIR_CONTEXT"] = context
     env["BRAIN_GENERATOR_CANDIDATE_ID"] = candidate_id
     env.setdefault("BRAIN_REPAIR_CANDIDATE", os.getenv("BRAIN_REPAIR_CANDIDATE", "1"))
 
