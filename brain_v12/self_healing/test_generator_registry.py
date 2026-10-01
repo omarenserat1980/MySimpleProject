@@ -33,8 +33,8 @@ class GeneratorRegistryTests(unittest.TestCase):
 
     def test_filter_only_returns_registered_candidates(self):
         candidates = [
-            {"id": "package-invocation-consistency"},
-            {"id": "unknown-future-generator"},
+            {"id": "package-invocation-consistency", "file": "brain_v12/self_healing/review_loop.py"},
+            {"id": "unknown-future-generator", "file": "brain_v12/self_healing/review_loop.py"},
         ]
         self.assertEqual(
             supported_candidates(candidates),
