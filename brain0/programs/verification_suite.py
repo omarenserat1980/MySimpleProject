@@ -20,7 +20,7 @@ def main():
     )
 
     vm = BrainVM()
-    r = vm.run(p)
+    r = vm.run(max_steps=1000)
     assert r["status"] == "VERIFIED_COMPLETED"
     assert r["registers"][1] == 12
 
