@@ -29,6 +29,18 @@ PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
 
 def progress(stage: int, total: int, name: str, status: str, detail: str = "") -> None:
     WORK.mkdir(parents=True, exist_ok=True)
+    payload = {"stage": stage, "total_stages": total, "percent": round(stage * 100 / total), "name": name, "status": status, "detail": detail}
+    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n=== CINEMATIC QUALITY GATE {payload['percent']}% | {status} | {name} ===")
+    print(f"DETAIL: {detail}")
+    filled = max(1, stage * 20 // total)
+    print(f"PROGRESS: [{'#' * filled}{'.' * (20 - filled)}] {payload['percent']}%")
+    print(f"GATE_STATUS={status}")
+PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
+
+
+def progress(stage: int, total: int, name: str, status: str, detail: str = "") -> None:
+    WORK.mkdir(parents=True, exist_ok=True)
     payload = {
         "stage": stage,
         "total_stages": total,
@@ -60,6 +72,7 @@ def main() -> int:
         raise RuntimeError("FFMPEG_REQUIRED")
     if not (shutil.which("espeak-ng") or shutil.which("espeak")):
         raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING")
+    progress(1, total, "Preflight", "PASSED", "Required executors are available")
 
     progress(1, total, "Preflight", "PASSED", "Required executors are available")
     shutil.rmtree(WORK, ignore_errors=True)
@@ -75,6 +88,7 @@ def main() -> int:
             ]
         }
     }
+    progress(2, total, "Repair contract compilation", "RUNNING", "Compiling mandatory repair requirements")
     progress(2, total, "Repair contract compilation", "RUNNING", "Compiling mandatory repair requirements")
     qc_path = WORK / "qc.json"
     qc_path.write_text(json.dumps(qc), encoding="utf-8")
@@ -174,6 +188,7 @@ def main() -> int:
     progress(6, total, "Negative continuity gate", "PASSED", "Broken continuity was correctly rejected")
 
     progress(7, total, "Negative duplicate-scene gate", "RUNNING", "Injecting duplicate scene identity and verifying rejection")
+    progress(6, total, "Negative continuity gate", "RUNNING", "Verifying broken continuity is rejected")
     duplicate = copy.deepcopy(manifest)
     duplicate["parts_manifest"][1]["scene"] = copy.deepcopy(duplicate["parts_manifest"][0]["scene"])
     duplicate["parts_manifest"][1]["scene"]["scene_id"] = duplicate["parts_manifest"][0]["scene"]["scene_id"]
@@ -204,6 +219,7 @@ def main() -> int:
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     progress(8, total, "Gate evidence publication", "PASSED", "CINEMATIC_QUALITY_GATE evidence written; production promotion remains separate")
+    progress(8, total, "Gate evidence publication", "PASSED", "Gate evidence written; production promotion remains separate")
     print("CINEMATIC_QUALITY_GATE_PASSED")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
