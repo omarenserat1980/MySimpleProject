@@ -36,7 +36,7 @@ jobs:
       - name: Install media runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg espeak-ng python3-pil gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
+          sudo apt-get install -y ffmpeg espeak-ng python3-pil python3-gi gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 gir1.2-ges-1.0 gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           gst-launch-1.0 --version | head -n 1
@@ -44,6 +44,12 @@ jobs:
       - name: Verify Brain source
         run: |
           python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py brain_v12/gstreamer_backend.py
+          python - <<'PY'
+          import gi
+          gi.require_version("GES", "1.0")
+          from gi.repository import GES, Gst
+          print("GES_PYTHON_OK")
+          PY
       - name: Render shard
         env:
           BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
