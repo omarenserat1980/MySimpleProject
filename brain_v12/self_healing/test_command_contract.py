@@ -18,3 +18,7 @@ def test_continue_aliases():
 
 def test_unrelated_text_is_not_a_command():
     assert not is_continue("افحص فقط")
+
+
+def test_whitespace_and_case_normalization():
+    assert is_continue("  CONTINUE AUTONOMOUSLY  ")
