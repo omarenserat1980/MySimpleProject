@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PROPOSAL = ROOT / ".brain" / "state" / "current_improvement.json"
-TARGET = re.compile(r'(["\'])(brain_v12/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+)\.py\1')
+TARGET = re.compile(r'(["\'])(brain_v12/[^"\']+)\.py\1')
 
 
 def build_patch(old: str, path: str, line_no: int, finding: str) -> str | None:
