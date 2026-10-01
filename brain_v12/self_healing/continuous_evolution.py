@@ -93,6 +93,8 @@ def main() -> int:
 
         try:
             code, stdout, stderr = run_review(args.loops_per_cycle, args.timeout)
+            print("BRAIN_EVOLUTION_REVIEW_STDOUT=" + stdout[-12000:], flush=True)
+            print("BRAIN_EVOLUTION_REVIEW_STDERR=" + stderr[-12000:], flush=True)
         except Exception as exc:
             code, stdout, stderr = 124, "", repr(exc)
 
