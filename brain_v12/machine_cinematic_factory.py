@@ -84,6 +84,12 @@ def machine_bits(commands):
                     bits.append("".join(f"{int(v) & 0xffffffff:032b}" for v in point))
     return "".join(bits)
 
+def cinematic_master_qc(final_path: Path, manifest_path: Path) -> dict:
+    """Run the independent content gate; technical QC alone cannot promote a film."""
+    from brain_v12.cinematic_master_qc import evaluate
+    return evaluate(final_path, manifest_path)
+
+
 def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"):
     OUT.mkdir(parents=True, exist_ok=True)
     target=PARTS*PART_SECONDS
@@ -115,10 +121,26 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
     run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(final)],3600)
     final_qc=qc(final); tolerance=max(2.0,min(10.0,target*0.01))
     if not(final_qc["video"] and abs(final_qc["duration"]-target)<=tolerance and final_qc["width"]==W and final_qc["height"]==H):
+        manifest["status"]="TECHNICAL_QC_FAILED"; manifest["final"]=str(final); manifest["master_qc"]=final_qc
+        (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
         raise RuntimeError(f"MASTER_QC_FAILED:{final_qc}")
-    manifest["status"]="VERIFIED_COMPLETED"; manifest["final"]=str(final); manifest["master_qc"]=final_qc
+    manifest["status"]="MASTER_QC"; manifest["final"]=str(final); manifest["master_qc"]=final_qc
+    manifest["cinematic_contract"]={
+        "text_overlay_policy":"deny",
+        "continuity_required":True,
+        "audio_classes_required":["voice","music","sfx"],
+    }
+    manifest_path=OUT/"manifest.json"
+    manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+    content_qc=cinematic_master_qc(final, manifest_path)
+    manifest["cinematic_master_qc"]=content_qc
+    if content_qc["status"] != "CINEMATIC_QC_PASSED":
+        manifest["status"]="CINEMATIC_QC_FAILED"
+        (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+        return manifest
+    manifest["status"]="VERIFIED_COMPLETED"
     (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
-    (OUT/"VERIFIED_COMPLETED").write_text("BRAIN MACHINE CINEMA VERIFIED — 120 MINUTES\n",encoding="utf-8")
+    (OUT/"VERIFIED_COMPLETED").write_text("BRAIN CINEMATIC MASTER VERIFIED — 120 MINUTES\n",encoding="utf-8")
     return manifest
 
 if __name__=="__main__":
