@@ -229,9 +229,23 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         return manifest
     final=OUT/"final.mp4"
     transitions_required = bool(repair_contract and repair_contract.get("transitions_required"))
-    if transitions_required and len(clips) > 1:
-        # Render a deterministic crossfade chain so transitions are real timeline events,
-        # not merely declared metadata. Audio is preserved from the clips.
+    if MEDIA_BACKEND == "gstreamer":
+        from brain_v12 import gstreamer_backend
+        if not gstreamer_backend.available():
+            raise RuntimeError("GSTREAMER_REQUIRED: gst-launch-1.0 and ges-launch-1.0")
+        transition_duration = 0.5 if transitions_required and len(clips) > 1 else 0.0
+        gstreamer_backend.render_timeline(
+            clips, final, PART_SECONDS, transition=transition_duration or 0.1
+        )
+        if transitions_required and len(clips) > 1:
+            manifest["timeline_transitions"]={
+                "type":"gstreamer-crossfade",
+                "duration_seconds":0.5,
+                "count":len(clips)-1
+            }
+        else:
+            manifest["timeline_transitions"]={"type":"gstreamer-concat","count":0}
+    elif transitions_required and len(clips) > 1:
         current = clips[0]
         for j, nxt in enumerate(clips[1:], start=1):
             merged = OUT / "parts" / f"transition-{j:03d}.mp4"
