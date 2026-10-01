@@ -181,11 +181,22 @@ def main() -> int:
             candidate_count = int(improvement.get("candidate_count", 0) or 0)
             mode = str(improvement.get("mode", "PROPOSAL_ONLY"))
             generator_configured = bool(os.getenv("BRAIN_CODE_GENERATOR_COMMAND"))
-            eligible = candidate_count > 0 and mode == "GENERATOR_ELIGIBLE" and generator_configured
+            supported_ids = {"package-invocation-consistency"}
+            supported_candidates = [
+                c for c in improvement.get("candidates", [])
+                if c.get("id") in supported_ids
+            ]
+            eligible = (
+                candidate_count > 0
+                and bool(supported_candidates)
+                and mode == "GENERATOR_ELIGIBLE"
+                and generator_configured
+            )
             entry["improvement_eligibility"] = {
                 "candidate_count": candidate_count,
                 "mode": mode,
                 "generator_configured": generator_configured,
+                "supported_candidate_count": len(supported_candidates),
                 "eligible": eligible,
             }
 
