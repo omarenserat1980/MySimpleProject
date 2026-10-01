@@ -221,6 +221,7 @@ def main() -> int:
                 else:
                     os.environ["BRAIN_FAILURE_FILE"] = old_failure
                 entry["proactive_improvement"] = improvement_details
+                print("BRAIN_PROACTIVE_IMPROVEMENT=" + json.dumps(improvement_details, ensure_ascii=False, sort_keys=True), flush=True)
                 if improved:
                     final_ok, after_improvement = deterministic_review(args.timeout)
                     entry["improvement_verification"] = after_improvement
