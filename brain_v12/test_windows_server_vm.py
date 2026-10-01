@@ -28,7 +28,8 @@ class WindowsServerVMTests(unittest.TestCase):
             f.write(b"WINDOWS-SERVER-2025-MEDIA-TEST")
             path=f.name
         try:
-            digest=hashlib.sha256(open(path,"rb").read()).hexdigest()
+            with open(path,"rb") as media:
+                digest=hashlib.sha256(media.read()).hexdigest()
             image=OSImage("Windows Server","2025","x86_64","ISO_OR_VHD",path,digest)
             self.assertTrue(image.inspect()["verified"])
         finally:
