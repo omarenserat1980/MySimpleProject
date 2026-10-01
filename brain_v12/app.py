@@ -39,6 +39,7 @@ from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
+from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
@@ -1320,6 +1321,11 @@ def brain_git_cinema_status(workflow_id:str):
     wf=brain_workflows.get(workflow_id)
     if not wf: raise HTTPException(404,"WORKFLOW_NOT_FOUND")
     return {"ok":True,"workflow":wf}
+
+@app.get("/api/brain/cinema/completion")
+def brain_cinema_completion():
+    root=os.getenv("BRAIN_MACHINE_FILM_ROOT", os.path.join(os.path.dirname(ROOT), "brain6_artifacts", "machine_films"))
+    return FilmCompletionGate(root).check()
 
 @app.get("/api/brain/self-monitor")
 def brain_self_monitor_status():
