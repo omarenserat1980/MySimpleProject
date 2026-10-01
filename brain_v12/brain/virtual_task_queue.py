@@ -61,12 +61,12 @@ class VirtualTaskQueue:
             blade=self._find_blade(task)
             if blade is None:
                 task.status="WAITING"; return
-            claimed=self.store.claim(task.task_id,blade.blade_id,300)
-            if claimed is None:
-                task.status="WAITING"; return
             reservation=self.resources.reserve(blade,task.task_id,task.requirement)
             if not reservation["ok"]:
-                self.store.recover_expired()
+                task.status="WAITING"; return
+            claimed=self.store.claim(task.task_id,blade.blade_id,300)
+            if claimed is None:
+                self.resources.release(task.task_id)
                 task.status="WAITING"; return
             task.status="RUNNING"; task.blade_id=blade.blade_id
             task.lease_id=claimed["lease_id"]; task.lease_expires_at=claimed["lease_expires_at"]
