@@ -58,3 +58,5 @@ jobs:
           name: brain-cinematic-quality-gate-evidence
           path: /tmp/brain-cinematic-quality-gate/
           if-no-files-found: warn
+
+# BRAIN_AUTORUN_PROBE: trigger the real GStreamer gate on branch push.
