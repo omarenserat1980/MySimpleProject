@@ -64,9 +64,7 @@ def png_bytes(buf:PixelBuffer):
     for y in range(buf.h):
         rows.append(b"\x00"+bytes(buf.px[y*buf.w*4:(y+1)*buf.w*4]))
     raw=zlib.compress(b"".join(rows),9)
-    return b"\x89PNG\r
-\x1a
-"+_chunk(b"IHDR",struct.pack(">IIBBBBB",buf.w,buf.h,8,6,0,0,0))+_chunk(b"IDAT",raw)+_chunk(b"IEND",b"")
+    return b"\x89PNG\r\n\x1a\n"+_chunk(b"IHDR",struct.pack(">IIBBBBB",buf.w,buf.h,8,6,0,0,0))+_chunk(b"IDAT",raw)+_chunk(b"IEND",b"")
 
 def compile_machine_commands(scene:dict):
     typ=scene.get("type","landscape"); pal=scene.get("palette","default"); objects=scene.get("objects",[])
