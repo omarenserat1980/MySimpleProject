@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from .service import BrainGitError, BrainGitService
+import time
 
 class RepoIn(BaseModel):
     name:str
@@ -16,6 +17,12 @@ class CommitIn(BaseModel):
 class BranchIn(BaseModel):
     branch:str
     from_ref:str=""
+
+class WorkflowIn(BaseModel):
+    name:str="brain-cinema"
+    command:list[str]=[]
+    metadata:dict={}
+
 
 def router(service:BrainGitService|None=None):
     svc=service or BrainGitService()
@@ -49,6 +56,29 @@ def router(service:BrainGitService|None=None):
     def fsck(name:str):
         try:return svc.fsck(name)
         except BrainGitError as e: raise HTTPException(404,str(e))
+    @r.post("/workflows")
+    def create_workflow(body:WorkflowIn):
+        wf_id=f"brain-wf-{int(time.time()*1000)}"
+        service.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
+        import json
+        p=service.root/"workflows"/f"{wf_id}.json"
+        p.write_text(json.dumps({"id":wf_id,"name":body.name,"status":"QUEUED","created_at":time.time(),"command":body.command,"metadata":body.metadata},ensure_ascii=False,indent=2),encoding="utf-8")
+        return {"ok":True,"workflow":{"id":wf_id,"name":body.name,"status":"QUEUED"}}
+    @r.get("/workflows")
+    def workflows():
+        d=service.root/"workflows"; items=[]
+        if d.exists():
+            import json
+            for p in sorted(d.glob("*.json"),reverse=True):
+                try: items.append(json.loads(p.read_text(encoding="utf-8")))
+                except Exception: pass
+        return {"ok":True,"workflows":items}
+    @r.get("/workflows/{workflow_id}")
+    def workflow(workflow_id:str):
+        import json
+        p=service.root/"workflows"/f"{workflow_id}.json"
+        if not p.exists(): raise HTTPException(404,"WORKFLOW_NOT_FOUND")
+        return {"ok":True,"workflow":json.loads(p.read_text(encoding="utf-8"))}
     @r.get("/audit")
     def audit(repository:str|None=None): return {"ok":True,"audit":svc.audit(repository)}
     return r
