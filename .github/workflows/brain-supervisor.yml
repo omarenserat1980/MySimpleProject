@@ -17,8 +17,43 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
+  self_heal:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Diagnose failed cinematic run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          echo "=== BRAIN SUPERVISOR: FAILURE DETECTED ==="
+          gh run view "$RUN_ID" --json status,conclusion,jobs,headSha
+          gh run view "$RUN_ID" --log-failed > supervisor-failure.log || true
+          grep -E "ERROR|Error|FAILED|failure|Traceback|Exception" supervisor-failure.log | tail -100 || true
+      - name: Safe repair - rerun only failed jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          gh run rerun "$RUN_ID" --failed
+          echo "BRAIN_SUPERVISOR_ACTION=RERUN_FAILED_JOBS"
+      - name: Record supervisor evidence
+        run: |
+          mkdir -p brain6_artifacts/supervisor
+          printf '%s\n' "FAILURE_DETECTED" "ACTION=RERUN_FAILED_JOBS" "RUN_ID=${{ github.event.workflow_run.id }}" > brain6_artifacts/supervisor/evidence.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brain-supervisor-evidence-${{ github.event.workflow_run.id }}
+          path: brain6_artifacts/supervisor/evidence.txt
+          retention-days: 7
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
