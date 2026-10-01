@@ -184,6 +184,26 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
     character_bible = manifest.get("character_bible") or declared.get("character_bible") or {}
     world_bible = manifest.get("world_bible") or declared.get("world_bible") or {}
     continuity_declared = bool(character_bible or world_bible or declared.get("continuity"))
+    continuity_anchors = []
+    continuity_valid = True
+    for item in parts:
+        scene = item.get("scene") or {}
+        chars = tuple(scene.get("character_ids") or item.get("character_ids") or [])
+        world = scene.get("world_id") or item.get("world_id")
+        anchor = scene.get("continuity_anchor") or item.get("continuity_anchor")
+        continuity_anchors.append((chars, world, anchor))
+        if not chars or not world or not anchor:
+            continuity_valid = False
+    if continuity_anchors:
+        first_chars, first_world, _ = continuity_anchors[0]
+        if not first_chars or not first_world:
+            continuity_valid = False
+        for chars, world, anchor in continuity_anchors[1:]:
+            if tuple(chars) != tuple(first_chars) or world != first_world:
+                continuity_valid = False
+            if not anchor:
+                continuity_valid = False
+    continuity_evidence = continuity_declared and continuity_valid and bool(parts)
 
     text_policy = declared.get("text_overlay_policy", "deny")
     text_evidence = bool(manifest.get("text_overlay_qc") or declared.get("text_overlay_qc"))
@@ -198,7 +218,7 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
         "image_presence": len(frames) >= 8 and unique_hashes >= 4,
         "motion": mean_motion >= float(os.getenv("BRAIN_CINEMATIC_MIN_MOTION", "0.015")),
         "scene_transitions": transition_count >= int(os.getenv("BRAIN_CINEMATIC_MIN_TRANSITIONS", "8")),
-        "character_story_continuity": continuity_declared,
+        "character_story_continuity": continuity_evidence,
         "audio_stream": a is not None,
         "voice_evidence": declared_audio_classes["voice"],
         "music_evidence": declared_audio_classes["music"],
