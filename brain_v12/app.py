@@ -1376,6 +1376,18 @@ def brain_task_submit(request:Request, body:dict):
         body.get("task_id"),
     )
 
+@app.post("/api/brain/tasks/{task_id}/heartbeat")
+def brain_task_heartbeat(request:Request, task_id:str, body:dict):
+    require_control_key(request)
+    return brain_datacenter.task_queue.heartbeat(task_id, body.get("lease_id"))
+
+@app.post("/api/brain/tasks/recover")
+def brain_tasks_recover(request:Request):
+    require_control_key(request)
+    recovered=brain_datacenter.task_queue.recover_expired()
+    brain_datacenter.task_queue.pump()
+    return {"ok":True,"status":"RECOVERED","task_ids":recovered}
+
 @app.get("/api/brain/tasks/{task_id}")
 def brain_task_status(task_id:str):
     return brain_datacenter.task_status(task_id)
