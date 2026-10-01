@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import uuid4
 from .virtual_hardware.computer import VirtualComputer
+from .brain.resource_manager import ResourceManager, ResourceRequirement
 
 @dataclass
 class BladeServer:
@@ -44,16 +45,35 @@ class BladeChassis:
         return {"name":self.name,"blade_count":len(self.blades),"online":sum(b.state=="ONLINE" for b in self.blades.values()),
                 "blades":[b.status() for b in self.blades.values()]}
 
-    def select(self,required_capabilities:set[str]):
-        candidates=[b for b in self.blades.values() if b.state=="ONLINE" and required_capabilities.issubset(b.capabilities)]
-        return candidates[0] if candidates else None
+    def select(self,required_capabilities:set[str], requirement:ResourceRequirement|None=None, resource_manager=None):
+        candidates=[b for b in self.blades.values()
+                    if b.state=="ONLINE" and required_capabilities.issubset(b.capabilities)
+                    and (resource_manager is None or requirement is None or resource_manager.can_allocate(b,requirement))]
+        if not candidates:
+            return None
+        if resource_manager:
+            return max(candidates, key=lambda b:(resource_manager.snapshot(b)["ram"]["free_bytes"],
+                                                resource_manager.snapshot(b)["storage"]["free_bytes"]))
+        return candidates[0]
 
 class BladeScheduler:
-    def __init__(self,chassis:BladeChassis):
+    def __init__(self,chassis:BladeChassis,resource_manager=None):
         self.chassis=chassis
-    def dispatch(self,program,required_capabilities=None,max_cycles=10000):
+        self.resources=resource_manager or ResourceManager()
+    def dispatch(self,program,required_capabilities=None,max_cycles=10000,task_id=None,resource_requirement=None):
         required=set(required_capabilities or {"cpu"})
-        blade=self.chassis.select(required)
-        if blade is None: return {"ok":False,"status":"NO_CAPABLE_BLADE","required":sorted(required)}
-        result=blade.execute(program,max_cycles)
-        return {"ok":True,"status":"COMPLETED","blade_id":blade.blade_id,"result":result}
+        requirement=resource_requirement or ResourceRequirement()
+        task_id=task_id or f"task-{uuid4().hex[:12]}"
+        blade=self.chassis.select(required,requirement,self.resources)
+        if blade is None:
+            return {"ok":False,"status":"NO_CAPABLE_RESOURCE","required":sorted(required),
+                    "requirement":requirement.__dict__,"task_id":task_id}
+        reservation=self.resources.reserve(blade,task_id,requirement)
+        if not reservation["ok"]:
+            return {"ok":False,"status":"RESOURCE_RESERVATION_FAILED","reservation":reservation}
+        try:
+            result=blade.execute(program,max_cycles)
+            return {"ok":True,"status":"COMPLETED","blade_id":blade.blade_id,
+                    "task_id":task_id,"reservation":reservation,"result":result}
+        finally:
+            self.resources.release(task_id)
