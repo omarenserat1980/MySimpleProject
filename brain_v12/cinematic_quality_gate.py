@@ -27,36 +27,6 @@ CONTRACT = WORK / "repair-contract.json"
 PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
 
 
-def progress(stage: int, total: int, name: str, status: str, detail: str = "") -> None:
-    WORK.mkdir(parents=True, exist_ok=True)
-    payload = {"stage": stage, "total_stages": total, "percent": round(stage * 100 / total), "name": name, "status": status, "detail": detail}
-    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n=== CINEMATIC QUALITY GATE {payload['percent']}% | {status} | {name} ===")
-    print(f"DETAIL: {detail}")
-    filled = max(1, stage * 20 // total)
-    print(f"PROGRESS: [{'#' * filled}{'.' * (20 - filled)}] {payload['percent']}%")
-    print(f"GATE_STATUS={status}")
-PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
-
-
-def progress(stage: int, total: int, name: str, status: str, detail: str = "") -> None:
-    WORK.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "stage": stage,
-        "total_stages": total,
-        "percent": round(stage * 100 / total),
-        "name": name,
-        "status": status,
-        "detail": detail,
-    }
-    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n=== CINEMATIC QUALITY GATE {payload['percent']}% | {status} | {name} ===")
-    if detail:
-        print(f"DETAIL: {detail}")
-    print(f"PROGRESS: [{('=' * max(1, stage * 20 // total))}{'.' * max(0, 20 - stage * 20 // total)}] {payload['percent']}%")
-    print(f"GATE_STATUS={status}")
-
-
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
     p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
     if p.returncode:
