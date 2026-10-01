@@ -246,6 +246,53 @@ async def brain_hub_issues(owner:str="",repo:str="",state:str="open"):
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"issues":[{"number":x["number"],"title":x["title"],"state":x["state"],"labels":[l["name"] for l in x.get("labels",[])],"user":(x.get("user") or {}).get("login"),"html_url":x.get("html_url"),"pull_request":bool(x.get("pull_request"))} for x in r.json()]}
 
+@app.get("/api/cinema/status")
+async def cinema_status():
+    """Human-facing cinema control/status; GitHub Actions stays behind Brain."""
+    full=_github_repo()
+    async with httpx.AsyncClient(timeout=20) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",
+                           headers=_github_headers(),
+                           params={"per_page":50})
+    if r.status_code>=400:
+        raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
+    runs=r.json().get("workflow_runs",[])
+    target=[x for x in runs if x.get("name")=="BRAIN 120 Minute Cinema"]
+    run=target[0] if target else None
+    if not run:
+        return {"ok":True,"state":"IDLE","progress":0,"message":"لم يبدأ إنتاج الفيلم بعد."}
+    status=run.get("status")
+    conclusion=run.get("conclusion")
+    if status=="completed" and conclusion=="success":
+        state="VERIFIED_PENDING_ARTIFACT"
+    elif status=="completed":
+        state="FAILED"
+    elif status in {"queued","waiting"}:
+        state="QUEUED"
+    else:
+        state="RUNNING"
+    return {"ok":True,"state":state,"progress":100 if state=="VERIFIED_PENDING_ARTIFACT" else 0,
+            "run_id":run.get("id"),"status":status,"conclusion":conclusion,
+            "started_at":run.get("run_started_at"),"updated_at":run.get("updated_at"),
+            "brain_controlled":True}
+
+class CinemaStartIn(BaseModel):
+    ref:str="main"
+
+@app.post("/api/cinema/start")
+async def cinema_start(request:Request, body:CinemaStartIn=CinemaStartIn()):
+    require_control_key(request)
+    full=_github_repo()
+    workflow="brain-120-minute-cinema.yml"
+    payload={"ref":body.ref.strip() or "main"}
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.post(f"https://api.github.com/repos/{full}/actions/workflows/{workflow}/dispatches",
+                            headers=_github_headers(),json=payload)
+    if r.status_code not in (201,202,204):
+        raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
+    store.event("BRAIN_CINEMA_STARTED",{"repository":full,"workflow":workflow,"ref":payload["ref"]})
+    return {"ok":True,"state":"QUEUED","message":"تم إرسال فيلم الساعتين إلى Brain Cinema Factory.","brain_controlled":True}
+
 @app.get("/api/brain-hub/actions")
 async def brain_hub_actions(owner:str="",repo:str="",per_page:int=20):
     full=owner and f"{owner}/{repo}" or _github_repo()
