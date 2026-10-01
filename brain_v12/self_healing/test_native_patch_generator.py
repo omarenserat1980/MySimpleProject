@@ -11,8 +11,6 @@ class NativePatchGeneratorTests(unittest.TestCase):
         finding = source.strip()
         patch = build_patch(source, "brain_v12/self_healing/example.py", 1, finding)
         self.assertIsNotNone(patch)
-        self.assertIn('" -m"', patch.replace('"-m"', '" -m"')) if False else None
-        self.assertIn('" -m"', patch.replace('"-m"', '" -m"')) if False else None
         self.assertIn('"-m", "brain_v12.self_healing.self_test"', patch)
         self.assertIsNone(build_patch(source, "brain_v12/self_healing/example.py", 2, finding))
         self.assertIsNone(build_patch(source, "brain_v12/self_healing/example.py", 1, "wrong"))
