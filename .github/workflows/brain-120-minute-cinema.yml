@@ -89,9 +89,13 @@ jobs:
           mkdir -p master/parts
           find shards -type f -name 'part-*.mp4' -print0 | sort -zV | xargs -0 -I{} cp "{}" master/parts/
           test "$(find master/parts -type f -name 'part-*.mp4' | wc -l)" -eq 240
-          find master/parts -type f -name 'part-*.mp4' -printf '%f\n' | sort -V | awk '{print "file \x27parts/" $0 "\x27"}' > master/concat.txt
-          test "$(wc -l < master/concat.txt)" -eq 240
-          ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
+          test "$(find master/parts -type f -name 'part-*.mp4' | wc -l)" -eq 240
+          PYTHONPATH=. python - <<'PY'
+          from pathlib import Path
+          from brain_v12.gstreamer_backend import render_timeline
+          clips=sorted(Path("master/parts").glob("part-*.mp4"), key=lambda p:int(p.stem.split("-")[-1]))
+          render_timeline(clips, Path("master/final.mp4"), duration=30.0, transition=0.5)
+          PY
       - name: Master QC
         run: |
           ffprobe -v error -show_entries format=duration,size,bit_rate -show_entries stream=codec_type,codec_name,width,height,bit_rate -of json master/final.mp4 > master/qc.json
