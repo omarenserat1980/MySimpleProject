@@ -1,0 +1,46 @@
+name: BRAIN Local Cinema Smoke
+
+on:
+  push:
+    paths:
+      - 'brain_v12/machine_cinematic_factory.py'
+      - 'brain_v12/visual_engine.py'
+      - 'brain_v12/machine_raster_engine.py'
+      - 'brain_v12/brain/device_bridge.py'
+      - 'brain_v12/local_worker/brain_local_worker.py'
+      - 'brain_v12/tools/brain_emulator_agent.py'
+      - '.github/workflows/brain-local-cinema-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python compile
+        run: |
+          python -m py_compile             brain_v12/machine_cinematic_factory.py             brain_v12/visual_engine.py             brain_v12/machine_raster_engine.py             brain_v12/brain/device_bridge.py             brain_v12/local_worker/brain_local_worker.py             brain_v12/tools/brain_emulator_agent.py
+      - name: Local painter smoke
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          from brain_v12.visual_engine import compile_scene
+          from brain_v12.machine_raster_engine import render_machine
+          s=compile_scene("مدينة ليلية مع قناع أخضر ومطر", "green_mask")
+          png,commands=render_machine(s)
+          assert s["local"] is True
+          assert s["external_api"] is False
+          assert png.startswith(b"\x89PNG\r\n\x1a\n")
+          assert len(png)>10000
+          assert len(commands)>0
+          print("BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED")
+          PY
+      - name: Device task contract smoke
+        run: |
+          grep -q 'brain_machine_cinema_120m' brain_v12/brain/device_bridge.py
+          grep -q 'brain_machine_cinema_120m' brain_v12/local_worker/brain_local_worker.py
+          grep -q 'V12_POLL_SECONDS' brain_v12/tools/brain_emulator_agent.py
+          echo "BRAIN_DEVICE_CONTRACT=VERIFIED"
