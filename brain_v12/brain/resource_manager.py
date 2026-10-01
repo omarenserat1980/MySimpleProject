@@ -60,13 +60,23 @@ class ResourceManager:
             },
         }
 
+    def reserved_for_blade(self, blade_id: str) -> ResourceRequirement:
+        total = ResourceRequirement(cpu_cores=0)
+        for item in self.reservations.values():
+            if getattr(item, "blade_id", None) == blade_id:
+                total.cpu_cores += item.cpu_cores
+                total.ram_bytes += item.ram_bytes
+                total.storage_bytes += item.storage_bytes
+        return total
+
     def can_allocate(self, blade, requirement: ResourceRequirement) -> bool:
         r = self.snapshot(blade)
+        reserved = self.reserved_for_blade(blade.blade_id)
         return (
             blade.state == "ONLINE"
-            and requirement.cpu_cores <= r["cpu"]["cores"]
-            and requirement.ram_bytes <= r["ram"]["free_bytes"]
-            and requirement.storage_bytes <= r["storage"]["free_bytes"]
+            and requirement.cpu_cores + reserved.cpu_cores <= r["cpu"]["cores"]
+            and requirement.ram_bytes + reserved.ram_bytes <= r["ram"]["free_bytes"]
+            and requirement.storage_bytes + reserved.storage_bytes <= r["storage"]["free_bytes"]
             and (not requirement.network or r["network"]["available"])
             and (not requirement.gpu or r["gpu"]["available"])
         )
@@ -76,6 +86,7 @@ class ResourceManager:
             return {"ok": True, "status": "ALREADY_RESERVED", "task_id": task_id}
         if not self.can_allocate(blade, requirement):
             return {"ok": False, "status": "INSUFFICIENT_RESOURCES", "task_id": task_id}
+        requirement.blade_id = blade.blade_id
         self.reservations[task_id] = requirement
         return {"ok": True, "status": "RESERVED", "task_id": task_id, "blade_id": blade.blade_id}
 
