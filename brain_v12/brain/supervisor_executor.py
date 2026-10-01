@@ -8,8 +8,8 @@ class SupervisorExecutor:
         self.queue=queue
         self.failures=FailurePolicy()
 
-    def submit(self, program, capabilities=None, requirement=None, task_id=None):
-        task=self.queue.submit(program,capabilities,requirement,task_id)
+    def submit(self, program, capabilities=None, requirement=None, task_id=None, idempotency_key=None):
+        task=self.queue.submit(program,capabilities,requirement,task_id,idempotency_key)
         return {"ok":True,"task_id":task.task_id,"status":task.status}
 
     def inspect(self, task_id, attempt=1, max_attempts=3):
