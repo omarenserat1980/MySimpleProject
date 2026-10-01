@@ -66,8 +66,8 @@ def render_part(image: Path, output: Path, duration: float, fps: int,
     if not audio_paths:
         raise RuntimeError("GSTREAMER_AUDIO_INPUT_REQUIRED")
     pipeline = (
-        f'imagesequencesrc location="{work}/frame-%05d.png" start-index=0 '
-        f'stop-index={frames-1} framerate={fps}/1 ! videoconvert ! videoscale ! '
+        f'multifilesrc location="{work}/frame-%05d.png" start-index=0 '
+        f'stop-index={frames-1} caps="image/png,framerate={fps}/1" ! pngdec ! videoconvert ! videoscale ! '
         f'video/x-raw,width={width},height={height},framerate={fps}/1 ! '
         'x264enc bitrate=1200 speed-preset=medium tune=zerolatency ! '
         'h264parse ! mux.video_0 '
