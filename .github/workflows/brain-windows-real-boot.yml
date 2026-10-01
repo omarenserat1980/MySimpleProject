@@ -52,11 +52,25 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf /tmp/brain-ws-oem
-          mkdir -p /tmp/brain-ws-oem/'$OEM$'/'$'/'Setup/Scripts
-          cp brain_v12/windows_boot_evidence.ps1 /tmp/brain-ws-oem/'$OEM$'/'$'/'Setup/Scripts/brain-windows-evidence.ps1
-          cp brain_v12/windows_setupcomplete.cmd /tmp/brain-ws-oem/'$OEM$'/'$'/'Setup/Scripts/SetupComplete.cmd
+          oem_root='/tmp/brain-ws-oem/\$OEM\$'
+          mkdir -p "$oem_root/\$1/Setup/Scripts"
+          cp brain_v12/windows_boot_evidence.ps1 "$oem_root/\$1/Setup/Scripts/brain-windows-evidence.ps1"
+          cp brain_v12/windows_setupcomplete.cmd "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          test -f "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          echo "OEM_EVIDENCE_TREE_READY"
 
-          cat > /tmp/brain-ws-oem/Autounattend.xml <<'XML'
+          image_index="$(awk '
+            /^Index: / { idx=$2 }
+            /^Name: / {
+              name=$0
+              sub(/^Name: /,"",name)
+              if (name ~ /Windows Server 2025|SERVERSTANDARD|SERVERDATACENTER/) { print idx; exit }
+            }
+          ' wim-info.txt)"
+          test -n "$image_index"
+          echo "WINDOWS_SERVER_IMAGE_INDEX=$image_index"
+
+          cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
           <?xml version="1.0" encoding="utf-8"?>
           <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
             <settings pass="windowsPE">
@@ -84,7 +98,7 @@ jobs:
                 <ImageInstall>
                   <OSImage>
                     <InstallFrom>
-                      <MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>1</Value></MetaData>
+                      <MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>$image_index</Value></MetaData>
                     </InstallFrom>
                     <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>
                   </OSImage>
@@ -100,7 +114,12 @@ jobs:
           </unattend>
           XML
 
-          xorriso -indev windows-server-2025.iso             -outdev brain-windows-server-2025-proof.iso             -boot_image any replay             -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml             -map /tmp/brain-ws-oem/'$OEM$' '/sources/$OEM$'             -commit
+          xorriso -indev windows-server-2025.iso \
+            -outdev brain-windows-server-2025-proof.iso \
+            -boot_image any replay \
+            -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
+            -map "$oem_root" '/sources/$OEM$' \
+            -commit
           test -s brain-windows-server-2025-proof.iso
           sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
 
