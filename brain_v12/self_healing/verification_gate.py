@@ -60,7 +60,7 @@ def main() -> int:
         ("compile", [sys.executable, "-m", "compileall", "-q", "brain_v12"]),
         # Run package modules so brain_v12 imports resolve consistently in CI.
         ("self-test", [sys.executable, "-m", "brain_v12.self_healing.self_test"]),
-        ("cloud-only-policy", [sys.executable, "brain_v12/self_healing/cloud_only_guard.py"]),
+        ("cloud-only-policy", [sys.executable, "-m", "brain_v12.self_healing.cloud_only_guard"]),
         ("completion-audit", [sys.executable, "brain_v12/self_healing/completion_audit.py"]),
         ("causal-evidence", [sys.executable, "-m", "brain_v12.causal.runtime_bridge"]),
     ]
