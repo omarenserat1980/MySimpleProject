@@ -279,6 +279,37 @@ async def cinema_status():
 class CinemaStartIn(BaseModel):
     ref:str="main"
 
+@app.post("/api/cinema/stop")
+async def cinema_stop(request:Request, body:BrainHubActionIn=BrainHubActionIn()):
+    require_control_key(request)
+    full=_github_repo()
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(),params={"per_page":20})
+        if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
+        runs=[x for x in r.json().get("workflow_runs",[]) if x.get("name")=="BRAIN 120 Minute Cinema" and x.get("status") in {"queued","in_progress","waiting"}]
+        stopped=[]
+        for run in runs:
+            q=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run['id']}/cancel",headers=_github_headers())
+            if q.status_code in (202,204): stopped.append(run["id"])
+    store.event("BRAIN_CINEMA_STOPPED",{"runs":stopped})
+    return {"ok":True,"state":"STOP_REQUESTED","runs":stopped}
+
+@app.post("/api/cinema/retry")
+async def cinema_retry(request:Request, body:BrainHubActionIn=BrainHubActionIn()):
+    require_control_key(request)
+    full=_github_repo()
+    async with httpx.AsyncClient(timeout=30) as client:
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(),params={"per_page":20})
+        if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
+        runs=[x for x in r.json().get("workflow_runs",[]) if x.get("name")=="BRAIN 120 Minute Cinema"]
+        if not runs: return {"ok":False,"state":"NO_RUN"}
+        run=runs[0]
+        q=await client.post(f"https://api.github.com/repos/{full}/actions/runs/{run['id']}/rerun-failed-jobs",headers=_github_headers())
+    if q.status_code not in (201,202,204):
+        raise HTTPException(status_code=q.status_code,detail=q.text[:2000])
+    store.event("BRAIN_CINEMA_RETRY_REQUESTED",{"run_id":run["id"]})
+    return {"ok":True,"state":"RETRY_REQUESTED","run_id":run["id"]}
+
 @app.post("/api/cinema/start")
 async def cinema_start(request:Request, body:CinemaStartIn=CinemaStartIn()):
     require_control_key(request)
