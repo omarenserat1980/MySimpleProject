@@ -138,8 +138,10 @@ jobs:
           rc=$?
           set -e
           test -f master/cinematic_master_qc.json
+          test -f master/cinematic_repair_manifest.json
           if [ "$rc" -ne 0 ]; then
-            echo "CONTENT_QC_FAILED: VERIFIED_COMPLETED is forbidden"
+            echo "CINEMATIC_QC_FAILED: REPAIR_REQUIRED"
+            cat master/cinematic_repair_manifest.json
             exit "$rc"
           fi
       - name: Promote only after cinematic QC
@@ -164,5 +166,6 @@ jobs:
             master/manifest.json
             master/qc.json
             master/cinematic_master_qc.json
+            master/cinematic_repair_manifest.json
             master/VERIFIED_COMPLETED
           retention-days: 7
