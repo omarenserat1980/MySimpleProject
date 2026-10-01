@@ -2,6 +2,12 @@ name: Brain GitHub Cloud - Free Linux Control Plane
 
 on:
   workflow_dispatch:
+    inputs:
+      task:
+        description: "Brain task to execute"
+        required: false
+        default: "health"
+        type: string
   schedule:
     - cron: "*/30 * * * *"
   push:
@@ -54,6 +60,18 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           python -m pip install -r brain_v12/requirements.txt
+
+      - name: Resolve Brain task
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json, os
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
+              event=json.load(f)
+          task=(event.get("inputs") or {}).get("task") or "health"
+          print("BRAIN_TASK=" + task)
+          PY
+          echo "BRAIN_TASK=$BRAIN_TASK"
 
       - name: Audit runtime
         run: |
@@ -110,7 +128,8 @@ jobs:
             "arch": "$RUNNER_ARCH",
             "persistent_vm": false,
             "billing_model": "github-hosted-standard-runner",
-            "next_layer": "brain task executor"
+            "next_layer": "brain task executor",
+            "executor_contract": "task resolved from workflow_dispatch input"
           }
           EOF
           cat brain6_artifacts/github_cloud/evidence.json
