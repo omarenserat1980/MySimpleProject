@@ -77,6 +77,30 @@ def classify(run: dict) -> str:
     return "OTHER"
 
 
+def run_development_cycle() -> dict:
+    """Run one bounded Brain review/repair/improvement cycle."""
+    command = [
+        os.getenv("PYTHON", "python"),
+        "-m",
+        "brain_v12.self_healing.review_loop",
+        "--loops", "1",
+        "--timeout", os.getenv("BRAIN_REVIEW_TIMEOUT", "120"),
+    ]
+    env = os.environ.copy()
+    env.setdefault("BRAIN_PROACTIVE_EVOLUTION", "1")
+    try:
+        p = subprocess.run(
+            command, cwd=Path.cwd(), env=env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180
+        )
+        return {
+            "exit_code": p.returncode,
+            "status": "VERIFIED" if p.returncode == 0 else "FAILED",
+            "output": p.stdout[-12000:],
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {"exit_code": 124, "status": "TIMEOUT", "output": str(exc)}
+
 def inspect_once() -> int:
     state = load_state()
     raw = run_gh(
@@ -122,7 +146,19 @@ def inspect_once() -> int:
         )
         changed += 1
 
-    # Bound state growth while retaining recent decisions.
+    # Every 120-second cycle also runs one bounded local development review.
+    # It repairs verified failures and, when a code generator is configured,
+    # evaluates proactive improvement candidates with rollback on failure.
+    development = run_development_cycle()
+    state["last_development_cycle"] = {
+        "timestamp": now(),
+        **development,
+    }
+    write_log(
+        f"DEVELOPMENT_CYCLE status={development['status']} "
+        f"exit_code={development['exit_code']}"
+    )
+
     if len(state["seen"]) > 500:
         items = list(state["seen"].items())[-500:]
         state["seen"] = dict(items)
