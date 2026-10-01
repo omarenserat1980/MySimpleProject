@@ -246,6 +246,36 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
     }
 
 
+REPAIR_MAP = {
+    "scene_count": "INCREASE_DISTINCT_SCENE_COUNT",
+    "visual_diversity": "GENERATE_MATERIALLY_DIVERSE_VISUALS",
+    "image_presence": "REQUIRE_REAL_IMAGE_OR_DRAWING_ASSETS",
+    "motion": "REQUIRE_CAMERA_OR_ELEMENT_MOTION",
+    "scene_transitions": "REQUIRE_REAL_SCENE_TRANSITIONS",
+    "character_story_continuity": "REQUIRE_SCENE_CHARACTER_WORLD_BIBLES",
+    "voice_evidence": "REQUIRE_VOICE_NARRATION_ASSETS",
+    "music_evidence": "REQUIRE_MUSIC_ASSETS",
+    "sfx_evidence": "REQUIRE_SFX_AMBIENCE_ASSETS",
+    "audio_diversity": "REBUILD_REPEATED_TONE_AUDIO",
+    "black_frames": "REPLACE_BLACK_SEGMENTS",
+    "frozen_frames": "REBUILD_FROZEN_SEGMENTS",
+    "duplicate_scene_detection": "REBUILD_DUPLICATE_SCENES",
+    "text_overlay_check": "REMOVE_UNINTENDED_TEXT_OVERLAYS",
+    "bitrate_sanity": "INCREASE_VIDEO_ENCODING_QUALITY",
+    "manifest_video_consistency": "REPAIR_MANIFEST_RENDER_ALIGNMENT",
+}
+
+def build_repair_manifest(qc: dict[str, Any]) -> dict[str, Any]:
+    failures = qc.get("failure_reasons", [])
+    requirements = [REPAIR_MAP.get(x, "MANUAL_REVIEW:" + x) for x in failures]
+    return {
+        "status": "REPAIR_REQUIRED" if failures else "NO_REPAIR_REQUIRED",
+        "source_gate": "CINEMATIC_MASTER_QC",
+        "failure_reasons": failures,
+        "mandatory_requirements": requirements,
+        "blocking": bool(failures),
+    }
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True)
