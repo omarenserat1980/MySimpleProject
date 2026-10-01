@@ -12,9 +12,9 @@ def run(cmd:list[str], env=None)->subprocess.CompletedProcess[str]:
 def verify(actions:list[str])->tuple[bool,list[dict]]:
     allowed={
       "compile":[sys.executable,"-m","compileall","-q","brain_v12"],
-      "self-test":[sys.executable,"brain_v12/self_healing/self_test.py"],
+      "self-test":[sys.executable,"-m","brain_v12.self_healing.self_test"],
       "tests":[sys.executable,"-m","pytest","-q"],
-      "gate":[sys.executable,"brain_v12/self_healing/verification_gate.py"],
+      "gate":[sys.executable,"-m","brain_v12.self_healing.verification_gate"],
     }
     out=[]
     for name in actions:
