@@ -1,6 +1,7 @@
 import tempfile, unittest
 from pathlib import Path
 from .service import BrainGitService, BrainGitError
+from .file_browser import BrainGitFileBrowser
 
 class BrainGitServiceTests(unittest.TestCase):
     def test_repository_lifecycle_and_integrity(self):
@@ -10,6 +11,9 @@ class BrainGitServiceTests(unittest.TestCase):
             self.assertEqual(r["name"],"proof")
             self.assertEqual(s.repository("proof")["name"],"proof")
             self.assertTrue(s.fsck("proof")["ok"])
+            browser=BrainGitFileBrowser(s)
+            self.assertIn("README.md",browser.tree("proof","main"))
+            self.assertEqual(browser.file("proof","README.md","main")["content"],"Brain Git proof")
             self.assertEqual(len(s.audit("proof")),1)
             out=s.commit_files("proof",{"README.md":"Brain Git proof\\n"},"initial proof","main")
             self.assertEqual(len(out["sha"]),40)
