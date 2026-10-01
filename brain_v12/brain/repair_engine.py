@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 import subprocess
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -27,7 +26,7 @@ class RepairEngine:
     registered recipe.
     """
 
-    RECIPES = (
+    ACTIONS = {\n        "EXECUTION_INFRA": "RERUN_FAILED_JOBS",\n        "MEDIA_OR_VM_PIPELINE": "RERUN_OR_FALLBACK_MEDIA",\n        "INPUT_OR_ARTIFACT": "REBUILD_ARTIFACT",\n        "DEPENDENCY_OR_IMPORT": "BLOCK_FOR_REVIEW",\n    }\n\n    RECIPES = (
         {
             "name": "verification_vm_load",
             "patterns": (r"not enough values to unpack", r"verification_suite\.py"),
