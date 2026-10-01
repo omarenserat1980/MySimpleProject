@@ -11,6 +11,14 @@ class ImprovementEligibilityContractTests(unittest.TestCase):
         self.assertIn('mode == "GENERATOR_ELIGIBLE"', source)
         self.assertIn("generator_configured", source)
 
+
+    def test_discovery_detects_sys_executable_package_invocation(self):
+        from brain_v12.self_healing.improvement_engine import discover
+        candidates = discover()
+        matches = [c for c in candidates if c.get("id") == "package-invocation-consistency"]
+        self.assertTrue(matches)
+        self.assertTrue(any(c.get("file") == "brain_v12/self_healing/verification_gate.py" for c in matches))
+
     def test_generator_is_not_called_inside_ineligible_branch(self):
         source = Path("brain_v12/self_healing/review_loop.py").read_text(encoding="utf-8")
         not_applied = source.index('entry["proactive_improvement"] = {')
