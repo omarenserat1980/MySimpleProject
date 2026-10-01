@@ -2,6 +2,9 @@ name: Brain Supervisor - Autonomy and Economic Safety
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["BRAIN 120 Minute Cinema"]
+    types: [completed]
   push:
     branches: [main]
     paths:
@@ -56,6 +59,18 @@ jobs:
           echo "=== BRAIN SUPERVISOR: FAILURE DETECTED ==="
           gh run view "$RUN_ID" --json status,conclusion,jobs,headSha
           gh run view "$RUN_ID" --log-failed > supervisor-failure.log || true
+          echo "=== FAILURE CLASSIFICATION ==="
+          if grep -Eqi "No such file|not found|No input|cannot open" supervisor-failure.log; then
+            echo "FAILURE_CLASS=INPUT_OR_ARTIFACT"
+          elif grep -Eqi "ffmpeg|ffprobe|filter|concat|codec|mux" supervisor-failure.log; then
+            echo "FAILURE_CLASS=MEDIA_PIPELINE"
+          elif grep -Eqi "timeout|timed out|runner|queued" supervisor-failure.log; then
+            echo "FAILURE_CLASS=EXECUTION_INFRA"
+          elif grep -Eqi "python|Traceback|Exception|SyntaxError|ModuleNotFoundError" supervisor-failure.log; then
+            echo "FAILURE_CLASS=CODE_OR_DEPENDENCY"
+          else
+            echo "FAILURE_CLASS=UNKNOWN"
+          fi
           grep -E "ERROR|Error|FAILED|failure|Traceback|Exception" supervisor-failure.log | tail -100 || true
       - name: Safe repair - rerun only failed jobs
         env:
@@ -65,6 +80,7 @@ jobs:
           set -euo pipefail
           gh run rerun "$RUN_ID" --failed
           echo "BRAIN_SUPERVISOR_ACTION=RERUN_FAILED_JOBS"
+          echo "BRAIN_SUPERVISOR_POLICY=BOUNDED_RETRY_ONLY"
       - name: Record supervisor evidence
         run: |
           mkdir -p brain6_artifacts/supervisor
