@@ -34,6 +34,8 @@ def path_allowed(path: str, candidate_id: str) -> bool:
     if not item:
         return False
     normalized = path.replace("\\", "/")
+    if normalized.split("/")[-1].startswith("test_"):
+        return False
     if normalized.startswith("/") or ".." in normalized.split("/"):
         return False
     return any(normalized == root.rstrip("/") or normalized.startswith(root) for root in item["roots"])
