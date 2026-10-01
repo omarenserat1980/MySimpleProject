@@ -8,8 +8,8 @@ from brain_v12.virtual_hardware.windows_server import WindowsServerVM
 class WindowsServerVMTests(unittest.TestCase):
     def test_sparse_disk(self):
         d=VirtualDisk(64*1024,4096)
-        d.write(4090,b"brain")
-        self.assertEqual(d.read(4090,5),b"brain")
+        d.write(4094,b"brain")
+        self.assertEqual(d.read(4094,5),b"brain")
         self.assertEqual(d.blocks.__len__(),2)
 
     def test_x86_64_subset(self):
