@@ -26,7 +26,10 @@ class DeviceBridge:
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
         task=self.store.device_task_claim(agent_id); return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
-    def heartbeat(self,agent_id): self.store.device_agent_touch(agent_id); self._last_seen=time.time(); return {"ok":True,"status":"HEARTBEAT","agent_id":agent_id}
+    def heartbeat(self,agent_id,metadata=None):
+        self.store.device_agent_touch(agent_id)
+        self._last_seen=time.time()
+        return {"ok":True,"status":"HEARTBEAT","agent_id":agent_id,"metadata":metadata or {}}
     def report(self,task_id,agent_id,ok,result=None,error=""):
         status=self.store.device_task_report(task_id,agent_id,ok,result or {},error)
         if status is None:return {"ok":False,"status":"TASK_NOT_FOUND"}
@@ -65,6 +68,8 @@ class DeviceBridge:
         for item in self.store.device_agents():
             if item["agent_id"]==agent_id:return max(0.,time.time()-float(item["last_seen"]))
         return None
+    def recover_stale(self):
+        return self.requeue_stale(max_age_seconds=max(30,int(os.getenv("DEVICE_TASK_STALE_SECONDS","120"))))
     def status(self):
         counts=self.store.device_task_counts()
         return {"ok":True,"configured":self.configured(),"auth_env":AGENT_KEY_ENV,"auth_mode":self.auth_mode(),"queued":counts.get("QUEUED",0),"pending":counts.get("CLAIMED",0),"completed":counts.get("COMPLETED",0),"failed":counts.get("FAILED",0),"last_agent_seen":self._last_seen,"agents":self.agent_status()}
