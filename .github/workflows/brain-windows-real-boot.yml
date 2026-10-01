@@ -114,7 +114,7 @@ jobs:
             -outdev brain-windows-server-2025-proof.iso \
             -boot_image any replay \
             -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
-            -map /tmp/brain-ws-oem/\$OEM\$ '/sources/\$OEM\
+            -map /tmp/brain-ws-oem/\$OEM\$ '/sources/$OEM$' \\
         run: |
           qemu-img create -f qcow2 windows-server-2025.qcow2 64G
           truncate -s 64M windows-evidence.img
