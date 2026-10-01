@@ -196,6 +196,11 @@ def main() -> int:
                 "supported_candidate_count": len(eligible_candidates),
                 "eligible": eligible,
             }
+            print(
+                "BRAIN_IMPROVEMENT_ELIGIBILITY "
+                + json.dumps(entry["improvement_eligibility"], ensure_ascii=False, sort_keys=True),
+                flush=True,
+            )
 
             if not eligible:
                 entry["proactive_improvement"] = {
