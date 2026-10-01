@@ -11,6 +11,10 @@ on:
         description: "Maximum repair/verify cycles"
         required: false
         default: "5"
+      continue_cycles:
+        description: "Bounded autonomous cycles requested by the Brain command"
+        required: false
+        default: "3"
       brain_command:
         description: "Normalized Brain command from the human command contract"
         required: false
@@ -59,7 +63,11 @@ jobs:
           BRAIN_AUTO_CONFIRM: ${{ github.event.inputs.auto_confirm || 'false' }}
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.review_loop --loops 1 --timeout 120
+          python -m brain_v12.self_healing.continuous_evolution \
+            --cycles "${{ github.event.inputs.continue_cycles || '3' }}" \
+            --loops-per-cycle 1 \
+            --timeout 120 \
+            --pause 2
 
       - name: Stage 7 - Self-Healing Gate
         if: always()
