@@ -78,7 +78,7 @@ def render_part(image: Path, output: Path, duration: float, fps: int,
             f'audio/x-raw,rate=48000,channels=2 ! queue ! mixer.sink_{idx} '
         )
     pipeline += (
-        'audiomixer name=mixer ! audioconvert ! audioresample ! '
+        'audiomixer name=mixer latency=0 ! audioconvert ! audioresample ! '
         'voaacenc bitrate=192000 ! aacparse ! mux.audio_0 '
         f'mp4mux name=mux ! filesink location="{output}"'
     )
@@ -94,16 +94,48 @@ def render_timeline(clips: Iterable[Path], output: Path, duration: float,
     clips = list(clips)
     if not clips:
         raise ValueError("GSTREAMER_TIMELINE_EMPTY")
-    args = [ges, "-o", str(output)]
-    start = 0.0
+    # Use GES as the timeline engine through its Python GObject API when available.
+    # This avoids relying on shell-only +clip/+transition syntax.
+    try:
+        import gi
+        gi.require_version("GES", "1.0")
+        from gi.repository import GES, Gst
+    except Exception as exc:
+        raise RuntimeError("GSTREAMER_GES_PYTHON_BINDINGS_REQUIRED") from exc
+    Gst.init(None)
+    GES.init()
+    timeline = GES.Timeline.new()
+    layer = GES.Layer.new()
+    timeline.add_layer(layer)
     for i, clip in enumerate(clips):
-        args += ["+clip", str(clip), f"start={int(start * 1_000_000_000)}"]
-        if i < len(clips) - 1:
-            start += duration - transition
-            args += ["+transition", "crossfade", f"duration={int(transition * 1_000_000_000)}"]
-        else:
-            start += duration
-    _run(args, max(600, int(start * 60) + 600))
+        asset = GES.UriClipAsset.request_asset(clip.resolve().as_uri())
+        ges_clip = layer.add_asset(asset, int((i * (duration - transition)) * Gst.SECOND),
+                                   0, int(duration * Gst.SECOND), GES.TrackType.UNKNOWN)
+        if ges_clip is None:
+            raise RuntimeError(f"GSTREAMER_GES_ADD_CLIP_FAILED:{clip}")
+    pipeline = GES.Pipeline.new("brain-master")
+    pipeline.set_timeline(timeline)
+    pipeline.set_state(Gst.State.PLAYING)
+    bus = pipeline.get_bus()
+    end = max(600, int((duration * len(clips)) * 60) + 600)
+    import time
+    deadline = time.time() + end
+    while time.time() < deadline:
+        msg = bus.timed_pop_filtered(Gst.SECOND, Gst.MessageType.ERROR | Gst.MessageType.EOS)
+        if msg:
+            if msg.type == Gst.MessageType.ERROR:
+                err, dbg = msg.parse_error()
+                pipeline.set_state(Gst.State.NULL)
+                raise RuntimeError(f"GSTREAMER_GES_TIMELINE_ERROR:{err}:{dbg}")
+            if msg.type == Gst.MessageType.EOS:
+                break
+    else:
+        pipeline.set_state(Gst.State.NULL)
+        raise RuntimeError("GSTREAMER_GES_TIMELINE_TIMEOUT")
+    pipeline.set_state(Gst.State.NULL)
+    # GES pipeline output is configured by the project render settings; verify it.
+    if not output.is_file() or output.stat().st_size == 0:
+        raise RuntimeError("GSTREAMER_TIMELINE_EMPTY_OUTPUT")
     if not output.is_file() or output.stat().st_size == 0:
         raise RuntimeError("GSTREAMER_TIMELINE_EMPTY_OUTPUT")
     return output
