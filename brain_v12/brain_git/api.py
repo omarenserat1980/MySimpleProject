@@ -1,6 +1,7 @@
 """Brain-native HTTP API for Git repositories."""
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from ..brain.control_auth import require_control_key
 from pydantic import BaseModel, Field
 from .service import BrainGitError, BrainGitService
 from .file_browser import BrainGitFileBrowser
@@ -34,7 +35,8 @@ def router(service:BrainGitService|None=None):
     @r.get("/repositories")
     def repositories(): return {"ok":True,"repositories":svc.list_repositories()}
     @r.post("/repositories")
-    def create(body:RepoIn):
+    def create(request:Request,body:RepoIn):
+        require_control_key(request)
         try:return {"ok":True,"repository":svc.create_repository(body.name,body.private)}
         except BrainGitError as e: raise HTTPException(400,str(e))
     @r.get("/repositories/{name}")
@@ -42,11 +44,13 @@ def router(service:BrainGitService|None=None):
         try:return {"ok":True,"repository":svc.repository(name),"branches":svc.branches(name)}
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.post("/repositories/{name}/branches")
-    def branch(name:str,body:BranchIn):
+    def branch(request:Request,name:str,body:BranchIn):
+        require_control_key(request)
         try:return {"ok":True,"branches":svc.create_branch(name,body.branch,body.from_ref)}
         except BrainGitError as e: raise HTTPException(400,str(e))
     @r.post("/repositories/{name}/commits")
-    def commit(name:str,body:CommitIn):
+    def commit(request:Request,name:str,body:CommitIn):
+        require_control_key(request)
         try:return {"ok":True,"commit":svc.commit_files(name,body.files,body.message,body.branch)}
         except BrainGitError as e: raise HTTPException(400,str(e))
     @r.get("/repositories/{name}/tree")
@@ -62,7 +66,8 @@ def router(service:BrainGitService|None=None):
         try:return svc.fsck(name)
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.post("/workflows")
-    def create_workflow(body:WorkflowIn):
+    def create_workflow(request:Request,body:WorkflowIn):
+        require_control_key(request)
         wf_id=f"brain-wf-{int(time.time()*1000)}"
         service.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
         import json
