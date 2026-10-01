@@ -222,6 +222,9 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
         "video_bitrate_bps": video_bitrate,
     }
     passed = all(checks.values())
+    repair_manifest = build_repair_manifest({
+        "failure_reasons": [k for k, ok in checks.items() if not ok]
+    })
     return {
         "status": "CINEMATIC_QC_PASSED" if passed else "CINEMATIC_QC_FAILED",
         "gate": "CINEMATIC_MASTER_QC",
@@ -243,6 +246,7 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
         "text_overlay_policy": text_policy,
         "continuity_evidence_present": continuity_declared,
         "failure_reasons": [k for k, ok in checks.items() if not ok],
+        "repair_manifest": repair_manifest,
     }
 
 
