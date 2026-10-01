@@ -13,7 +13,7 @@ def verify(actions:list[str])->tuple[bool,list[dict]]:
     allowed={
       "compile":[sys.executable,"-m","compileall","-q","brain_v12"],
       "self-test":[sys.executable,"-m","brain_v12.self_healing.self_test"],
-      "tests":[sys.executable,"-m","pytest","-q"],
+      "tests":[sys.executable,"-m","unittest","discover","-s","brain_v12","-p","test_*.py"],
       "gate":[sys.executable,"-m","brain_v12.self_healing.verification_gate"],
     }
     out=[]
