@@ -82,8 +82,9 @@ jobs:
         run: |
           mkdir -p master/parts
           find shards -type f -name 'part-*.mp4' -print0 | sort -zV | xargs -0 -I{} cp "{}" master/parts/
-          find master/parts -type f -name 'part-*.mp4' | sort -V | awk '{print "file \x27" $0 "\x27"}' > master/concat.txt
           test "$(find master/parts -type f -name 'part-*.mp4' | wc -l)" -eq 240
+          find master/parts -type f -name 'part-*.mp4' -printf '%f\n' | sort -V | awk '{print "file \x27parts/" $0 "\x27"}' > master/concat.txt
+          test "$(wc -l < master/concat.txt)" -eq 240
           ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
       - name: Master QC
         run: |
