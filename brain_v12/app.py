@@ -1392,6 +1392,15 @@ def brain_tasks_recover(request:Request):
 def brain_task_status(task_id:str):
     return brain_datacenter.task_status(task_id)
 
+@app.get("/api/brain/capabilities")
+def brain_capabilities():
+    from .brain.capability_registry import CapabilityRegistry
+    registry=CapabilityRegistry()
+    for blade in brain_datacenter.chassis.blades.values():
+        registry.register(blade.blade_id,blade.capabilities,{"state":blade.state})
+        if blade.state!="ONLINE": registry.offline(blade.blade_id)
+    return registry.status()
+
 @app.get("/api/brain/tasks")
 def brain_tasks():
     return brain_datacenter.queue_status()
