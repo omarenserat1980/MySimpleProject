@@ -14,6 +14,8 @@ OUT = Path(os.environ.get("BRAIN_MACHINE_FILM_ROOT", ROOT / "brain6_artifacts" /
 FPS = int(os.environ.get("BRAIN_FILM_FPS", "24"))
 PARTS = max(1, int(os.environ.get("BRAIN_FILM_PARTS", "240")))
 PART_SECONDS = max(5, int(os.environ.get("BRAIN_FILM_PART_SECONDS", "30")))
+START_PART = max(1, int(os.environ.get("BRAIN_FILM_START", "1")))
+END_PART = min(PARTS, int(os.environ.get("BRAIN_FILM_END", str(PARTS))))
 W, H = 1000, 650
 
 SHOTS = [
@@ -73,7 +75,9 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
               "binary_model":"integer pixel operations + PNG bytes","parts":PARTS,
               "part_seconds":PART_SECONDS,"target_seconds":target,"fps":FPS,"parts_manifest":[]}
     clips=[]
-    for i in range(1,PARTS+1):
+    if START_PART > END_PART:
+        raise ValueError(f"invalid_part_range:{START_PART}:{END_PART}")
+    for i in range(START_PART,END_PART+1):
         title0,typ,extra=SHOTS[(i-1)%len(SHOTS)]
         scene,png,commands=scene_for(i,title0,typ,extra)
         clip=render_part(i,png); q=qc(clip)
@@ -85,6 +89,12 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         (OUT/"manifest.partial.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
     concat=OUT/"concat.txt"
     concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in clips),encoding="utf-8")
+    if START_PART != 1 or END_PART != PARTS or os.environ.get("BRAIN_FILM_SHARD_ONLY","0")=="1":
+        manifest["status"]="SHARD_COMPLETED"
+        manifest["range"]={"start":START_PART,"end":END_PART}
+        manifest["final"]=None
+        (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+        return manifest
     final=OUT/"final.mp4"
     run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(final)],3600)
     final_qc=qc(final); tolerance=max(2.0,min(10.0,target*0.01))
