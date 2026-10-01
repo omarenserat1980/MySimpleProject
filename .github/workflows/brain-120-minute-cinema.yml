@@ -13,63 +13,93 @@ permissions:
   contents: read
 
 jobs:
-  produce:
+  render:
+    name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {shard: 1, start: 1, end: 60}
+          - {shard: 2, start: 61, end: 120}
+          - {shard: 3, start: 121, end: 180}
+          - {shard: 4, start: 181, end: 240}
     steps:
-      - name: Checkout Brain
-        uses: actions/checkout@v4
-
-      - name: Verify Brain cinema source
+      - uses: actions/checkout@v4
+      - name: Verify Brain source
         run: |
-          python --version
-          test -f brain_v12/machine_cinematic_factory.py
-          test -f brain_v12/visual_engine.py
-          test -f brain_v12/machine_raster_engine.py
-          python -m py_compile brain_v12/machine_cinematic_factory.py
-
-      - name: Verify FFmpeg
-        run: |
+          python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-
-      - name: Produce 120-minute film with Brain
+      - name: Render shard
         env:
           BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
           BRAIN_FILM_PARTS: "240"
           BRAIN_FILM_PART_SECONDS: "30"
+          BRAIN_FILM_START: "${{ matrix.start }}"
+          BRAIN_FILM_END: "${{ matrix.end }}"
+          BRAIN_FILM_SHARD_ONLY: "1"
         run: |
           PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
-
-      - name: Master verification
-        run: |
-          test -f brain6_artifacts/machine_films/final.mp4
           test -f brain6_artifacts/machine_films/manifest.json
-          test -f brain6_artifacts/machine_films/VERIFIED_COMPLETED
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          m=json.loads(Path("brain6_artifacts/machine_films/manifest.json").read_text())
-          assert m["status"]=="VERIFIED_COMPLETED"
-          assert m["parts"]==240
-          assert m["part_seconds"]==30
-          assert m["target_seconds"]==7200
-          q=m["master_qc"]
-          assert q["video"] is True
-          assert q["width"]==1000 and q["height"]==650
-          assert abs(q["duration"]-7200)<=10
-          print("BRAIN_120_MINUTE_MASTER_QC=VERIFIED")
-          print(json.dumps(q,ensure_ascii=False))
-          PY
-
-      - name: Upload verified film
+          grep -q '"status": "SHARD_COMPLETED"' brain6_artifacts/machine_films/manifest.json
+      - name: Upload shard
         uses: actions/upload-artifact@v4
         with:
-          name: brain-120-minute-film
-          path: |
-            brain6_artifacts/machine_films/final.mp4
-            brain6_artifacts/machine_films/manifest.json
-            brain6_artifacts/machine_films/VERIFIED_COMPLETED
-          retention-days: 7
+          name: brain-cinema-shard-${{ matrix.shard }}
+          path: brain6_artifacts/machine_films
+          retention-days: 2
 
-      # Brain production trigger marker: 240 x 30s = 7200 seconds.
+  assemble:
+    name: Assemble and verify master
+    needs: render
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: brain-cinema-shard-*
+          path: shards
+          merge-multiple: false
+      - name: Assemble master
+        run: |
+          mkdir -p master/parts
+          find shards -type f -name 'part-*.mp4' -print0 | sort -zV | xargs -0 -I{} cp "{}" master/parts/
+          find master/parts -type f -name 'part-*.mp4' | sort -V | awk '{print "file \x27" $0 "\x27"}' > master/concat.txt
+          test "$(find master/parts -type f -name 'part-*.mp4' | wc -l)" -eq 240
+          ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
+      - name: Master QC
+        run: |
+          ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height -of json master/final.mp4 > master/qc.json
+          python - <<'PY'
+          import json
+          q=json.load(open("master/qc.json"))
+          duration=float(q["format"]["duration"])
+          streams=q["streams"]
+          video=[s for s in streams if s.get("codec_type")=="video"][0]
+          assert 7190 <= duration <= 7210, duration
+          assert video["width"]==1000 and video["height"]==650
+          print("BRAIN_120_MINUTE_MASTER_QC=VERIFIED", duration)
+          PY
+          printf 'BRAIN MACHINE CINEMA VERIFIED — 120 MINUTES\n' > master/VERIFIED_COMPLETED
+      - name: Build master manifest
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          q=json.load(open("master/qc.json"))
+          manifest={"status":"VERIFIED_COMPLETED","title":"BRAIN — الفيلم السينمائي الطويل","parts":240,"part_seconds":30,"target_seconds":7200,"master_qc":q,"renderer":"Brain Machine Raster Painter","external_api":False}
+          pathlib.Path("master/manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+          PY
+      - name: Upload verified master
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-120-minute-verified-master
+          path: |
+            master/final.mp4
+            master/manifest.json
+            master/qc.json
+            master/VERIFIED_COMPLETED
+          retention-days: 7
