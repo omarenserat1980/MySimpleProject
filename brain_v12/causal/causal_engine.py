@@ -295,7 +295,7 @@ def self_test() -> None:
     assert result["chemical_reactions"] == 30.0
 
     try:
-        g.add_edge("outcome", "energy")
+        g.add_edge("outcome", "action")
     except ValueError:
         pass
     else:
