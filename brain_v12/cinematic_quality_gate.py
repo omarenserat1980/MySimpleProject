@@ -29,8 +29,7 @@ CONTRACT = WORK / "repair-contract.json"
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
     p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
     if p.returncode:
-        raise RuntimeError((p.stdout + "
-" + p.stderr)[-8000:])
+        raise RuntimeError((p.stdout + "\\n" + p.stderr)[-8000:])
     return p
 
 
