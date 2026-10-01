@@ -26,7 +26,7 @@ def is_supported(candidate_id: str) -> bool:
 
 
 def supported_candidates(candidates: list[dict]) -> list[dict]:
-    return [c for c in candidates if is_supported(str(c.get("id", "")))]
+    return [c for c in candidates if candidate_valid(c)]
 
 
 def path_allowed(path: str, candidate_id: str) -> bool:
