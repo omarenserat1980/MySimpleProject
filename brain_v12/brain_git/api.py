@@ -1,7 +1,7 @@
 """Brain-native HTTP API for Git repositories."""
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from .service import BrainGitError, BrainGitService
 from .file_browser import BrainGitFileBrowser
 import time
@@ -21,8 +21,8 @@ class BranchIn(BaseModel):
 
 class WorkflowIn(BaseModel):
     name:str="brain-cinema"
-    command:list[str]=[]
-    metadata:dict={}
+    command:list[str]=Field(default_factory=list)
+    metadata:dict=Field(default_factory=dict)
 
 
 def router(service:BrainGitService|None=None):
