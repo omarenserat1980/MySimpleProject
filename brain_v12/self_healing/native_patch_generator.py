@@ -16,6 +16,28 @@ PROPOSAL = ROOT / ".brain" / "state" / "current_improvement.json"
 TARGET = re.compile(r'(["\'])(brain_v12/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+)\.py\1')
 
 
+def build_patch(old: str, path: str, line_no: int, finding: str) -> str | None:
+    lines = old.splitlines(keepends=True)
+    if line_no < 1 or line_no > len(lines):
+        return None
+    line = lines[line_no - 1]
+    if finding and finding.strip() != line.strip():
+        return None
+    if "self_healing" not in line or "python" not in line:
+        return None
+    match = TARGET.search(line)
+    if not match:
+        return None
+    module = match.group(2).replace("/", ".")
+    replacement = '"-m", "' + module + '"'
+    new_line = line[:match.start()] + replacement + line[match.end():]
+    if new_line == line:
+        return None
+    new_lines = list(lines)
+    new_lines[line_no - 1] = new_line
+    return "".join(difflib.unified_diff(lines, new_lines, fromfile="a/" + path, tofile="b/" + path))
+
+
 def main() -> int:
     if not PROPOSAL.is_file():
         print("NATIVE_GENERATOR_NO_PROPOSAL")
@@ -34,29 +56,13 @@ def main() -> int:
         return 2
 
     old = target.read_text(encoding="utf-8")
-    changed = False
-    output = []
-    for line in old.splitlines(keepends=True):
-        match = TARGET.search(line)
-        if match and "self_healing" in line and "python" in line:
-            module = match.group(2).replace("/", ".")
-            replacement = '"-m", "' + module + '"'
-            new_line = line[:match.start()] + replacement + line[match.end():]
-            changed = changed or new_line != line
-            output.append(new_line)
-        else:
-            output.append(line)
-
-    if not changed:
-        print("NATIVE_GENERATOR_NO_APPLICABLE_CHANGE")
+    line_no = int(candidate.get("line", 0) or 0)
+    finding = str(candidate.get("finding", ""))
+    patch = build_patch(old, path, line_no, finding)
+    if patch is None:
+        print("NATIVE_GENERATOR_CANDIDATE_MISMATCH")
         return 2
 
-    patch = "".join(difflib.unified_diff(
-        old.splitlines(keepends=True),
-        "".join(output).splitlines(keepends=True),
-        fromfile="a/" + path,
-        tofile="b/" + path,
-    ))
     if not patch.strip():
         print("NATIVE_GENERATOR_EMPTY_PATCH")
         return 2
