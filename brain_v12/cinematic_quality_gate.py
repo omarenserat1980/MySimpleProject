@@ -113,7 +113,7 @@ def main() -> int:
     assert transitions.get("type") == "xfade"
     assert transitions.get("count") == 1
 
-    cinematic = manifest.get("cinematic_master_qc") or {}
+    cinematic = manifest.get("cinematic_master_qc") or {}\n    if not cinematic:\n        from brain_v12.cinematic_master_qc import evaluate\n        cinematic = evaluate(final, manifest_path)
     assert cinematic.get("status") == "CINEMATIC_QC_FAILED"
     checks = cinematic.get("checks") or {}
     for key in ("voice_evidence", "music_evidence", "sfx_evidence",
