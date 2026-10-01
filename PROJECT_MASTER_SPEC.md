@@ -36,10 +36,35 @@ discover -> plan -> select_backend -> execute -> verify -> repair -> retry -> de
 Recovery is bounded by attempt/cycle limits and uses classified failures rather than blind reruns.
 
 ## 6. Cinematic verification
-A movie is not considered production-complete because a workflow succeeds. The intended evidence chain is:
-Render -> QC -> FFmpeg -> Master QC -> final.mp4 -> VERIFIED_COMPLETED
+A movie is not considered production-complete because a workflow succeeds or because
+technical media validation passes. The required evidence chain is:
 
-The final state requires a real artifact plus machine-readable media evidence.
+Story -> Scene Bible -> Character/World Bible -> Visual Scene Generation ->
+Voice -> Music -> SFX/Ambience -> Motion -> Edit/Master ->
+Technical Master QC -> CINEMATIC_MASTER_QC -> final.mp4 -> VERIFIED_COMPLETED
+
+Technical QC and Cinematic QC are separate gates.
+
+The cinematic gate must inspect, at minimum:
+- scene count and manifest/video consistency
+- visual diversity and duplicate-scene ratio
+- real image/frame presence
+- motion and scene transitions
+- character/story/world continuity evidence
+- voice, music and SFX evidence
+- audio diversity and tone-only detection
+- black/frozen frame detection
+- subtitle/text-overlay policy evidence
+- bitrate/quality sanity
+- story/scene manifest consistency
+
+Allowed production states include:
+RENDERING -> TECHNICALLY_VALID -> CONTENT_QC_FAILED | CINEMATIC_QC_FAILED |
+REPAIR_REQUIRED -> MASTER_QC -> VERIFIED_COMPLETED
+
+VERIFIED_COMPLETED is forbidden unless both the technical master QC and
+CINEMATIC_MASTER_QC pass. Missing content evidence is a gate failure, not
+an assumption of quality.
 
 ## 7. Cloud execution
 GitHub Actions provides ephemeral Linux runners. They are not persistent virtual machines. Persistent state must therefore be stored in repository artifacts/state or another explicitly configured durable layer.
