@@ -33,7 +33,7 @@ class BrainVirtualDatacenter:
         return self.scheduler.dispatch(program,required_capabilities,max_cycles)
 
     def submit_task(self,program,required_capabilities=None,requirement=None,task_id=None,idempotency_key=None):
-        return self.supervisor_executor.submit(program,required_capabilities,requirement,task_id)
+        return self.supervisor_executor.submit(program,required_capabilities,requirement,task_id,idempotency_key)
 
     def inspect_task(self,task_id,attempt=1,max_attempts=3):
         return self.supervisor_executor.inspect(task_id,attempt,max_attempts)
