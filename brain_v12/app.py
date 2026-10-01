@@ -38,6 +38,7 @@ from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_supervisor import BrainSupervisor
+from .brain_git.service import BrainGitService
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
@@ -70,6 +71,7 @@ income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
 device_bridge=DeviceBridge(store)
 brain_supervisor=BrainSupervisor()
+brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -93,6 +95,8 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+from .brain_git.api import router as brain_git_router
+app.include_router(brain_git_router(brain_git))
 
 @app.middleware("http")
 async def no_cache(request, call_next):
