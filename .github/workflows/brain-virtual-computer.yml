@@ -10,6 +10,9 @@ on:
       - "brain_v12/test_blade_server.py"
       - "brain_v12/test_windows_server_vm.py"
       - "brain_v12/WINDOWS_SERVER_2025_ARCHITECTURE.md"
+      - "brain_v12/WINDOWS_SERVER_2025_RUNBOOK.md"
+      - "brain_v12/virtual_hardware/windows_server_backend.py"
+      - "brain_v12/test_windows_server_backend.py"
 
 permissions:
   contents: read
@@ -28,11 +31,13 @@ jobs:
           python -m py_compile brain_v12/virtual_hardware/*.py brain_v12/blade_server.py brain_v12/brain/virtual_datacenter.py
       - name: Run Blade Server evidence tests
         run: |
-          python -m unittest brain_v12.test_blade_server brain_v12.test_virtual_system brain_v12.test_windows_server_vm -v
+          python -m unittest brain_v12.test_blade_server brain_v12.test_virtual_system brain_v12.test_windows_server_vm brain_v12.test_windows_server_backend -v
       - name: Verify evidence contract
         run: |
           test -f brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
           test -f brain_v12/WINDOWS_SERVER_2025_ARCHITECTURE.md
+          test -f brain_v12/WINDOWS_SERVER_2025_RUNBOOK.md
+          python -m py_compile brain_v12/virtual_hardware/windows_server_backend.py
           grep -q "X86_64CPU" brain_v12/WINDOWS_SERVER_2025_ARCHITECTURE.md
           grep -q "WINDOWS_BOOT_VERIFIED" brain_v12/WINDOWS_SERVER_2025_ARCHITECTURE.md
           grep -q "VirtualCPU" brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
