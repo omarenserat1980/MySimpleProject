@@ -32,7 +32,7 @@ on:
       - ".github/workflows/brain-continuous-self-healing.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: brain-self-healing
@@ -107,6 +107,34 @@ jobs:
           print("STAGE_7_SELF_HEALING_GATE=PASS")
           print("VERIFIED_COMPLETED=AUTHORIZED")
           PY
+
+      - name: Persist Verified Repair
+        if: success()
+        run: |
+          set -euo pipefail
+          if test ! -f .brain/state/last_applied_patch.diff; then
+            echo "BRAIN_VERIFIED_REPAIR_COMMIT=SKIPPED_NO_PATCH"
+            exit 0
+          fi
+          git diff --check
+          changed="$(git diff --name-only)"
+          test -n "$changed"
+          while IFS= read -r path; do
+            case "$path" in
+              brain_v12/*|tests/*|scripts/*) ;;
+              *) echo "BRAIN_REPAIR_COMMIT_FORBIDDEN_PATH=$path"; exit 2 ;;
+            esac
+          done <<< "$changed"
+          git config user.name "brain-autonomous-repair"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- $changed
+          if git diff --cached --quiet; then
+            echo "BRAIN_VERIFIED_REPAIR_COMMIT=SKIPPED_NO_GIT_DIFF"
+            exit 0
+          fi
+          git commit -m "brain: persist verified self-healing repair"
+          git push origin HEAD:main
+          echo "BRAIN_VERIFIED_REPAIR_COMMIT=PUSHED"
 
       - name: Publish healing evidence
         if: always()
