@@ -27,6 +27,17 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def continue_autonomously() -> bool:
+    """Return whether the Brain received its explicit continuation directive.
+
+    The directive is intentionally opt-in. It means continue through the safe
+    observe -> diagnose -> execute -> verify -> repair -> retry cycle, never
+    bypassing verification or safety gates.
+    """
+    raw = os.getenv("BRAIN_COMMAND", "").strip().upper()
+    return raw in {"BRAIN_CONTINUE_AUTONOMOUSLY", "CONTINUE_AUTONOMOUSLY", "CONTINUE"}
+
+
 def run(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
 
@@ -97,9 +108,11 @@ def main() -> int:
     STATE.mkdir(parents=True, exist_ok=True)
     history = []
     final_ok = True
+    autonomous = continue_autonomously()
+    if autonomous:
+        print("BRAIN_COMMAND=CONTINUE_AUTONOMOUSLY", flush=True)
 
-    for i in range(1, args.loops + 1):
-        entry = {"loop": i, "started_at": now(), "review": review_files()}
+    for i in range(1, args.loops + 1):        entry = {"loop": i, "started_at": now(), "review": review_files()}
         ok, details = deterministic_review(args.timeout)
         entry["verification"] = details
         entry["status"] = "VERIFIED"
@@ -124,7 +137,7 @@ def main() -> int:
             entry["status"] = "REPAIRED_AND_VERIFIED" if repaired and ok2 else "REPAIR_FAILED"
             final_ok = repaired and ok2
 
-        if final_ok and os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1":
+        if final_ok and (autonomous or os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1"):
             # First discover deterministic, evidence-backed opportunities.
             discovery = run(
                 [os.environ.get("PYTHON", "python"), "-m",
