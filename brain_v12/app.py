@@ -1832,7 +1832,62 @@ def chat(body:Chat):
         if draw_result.get("ok"):
             store.add_message("assistant", "تم إنشاء الصورة والتحقق منها. افتح الناتج من واجهة Brain.")
         return {"ok": draw_result.get("ok", False), "type": "image", "draw": draw_result, "provider": draw_request["provider"]}
+
     if not message: return {"ok":False,"error":"EMPTY_MESSAGE"}
+
+    # Human continuation is a bounded Brain command, not arbitrary shell execution.
+    from .self_healing.command_contract import parse as parse_brain_command
+    brain_command = parse_brain_command(message)
+    if brain_command and brain_command.autonomous:
+        repo = _github_repo()
+        workflow = "brain-continuous-self-healing.yml"
+        ref = os.getenv("BRAIN_GITHUB_BRANCH") or "main"
+        token = os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        if not token:
+            store.event("BRAIN_CONTINUE_DISPATCH_BLOCKED", {"reason": "GITHUB_TOKEN_NOT_CONFIGURED", "command": brain_command.name})
+            return {"ok": False, "status": "BLOCKED", "command": brain_command.name, "reason": "GITHUB_TOKEN_NOT_CONFIGURED"}
+        try:
+            async def _dispatch():
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.post(
+                        f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches",
+                        headers=_github_headers(),
+                        json={
+                            "ref": ref,
+                            "inputs": {
+                                "brain_command": brain_command.name,
+                                "auto_confirm": "false",
+                            },
+                        },
+                    )
+                return response
+            # FastAPI sync handlers may not await; run the small network call explicitly.
+            import asyncio
+            response = asyncio.run(_dispatch())
+            if response.status_code not in (201, 202, 204):
+                store.event("BRAIN_CONTINUE_DISPATCH_FAILED", {"status_code": response.status_code, "detail": response.text[:500]})
+                return {"ok": False, "status": "DISPATCH_FAILED", "command": brain_command.name, "status_code": response.status_code}
+            store.add_message("user", message)
+            store.event("BRAIN_CONTINUE_DISPATCHED", {
+                "command": brain_command.name,
+                "workflow": workflow,
+                "ref": ref,
+                "repository": repo,
+            })
+            reply = "تم تحويل «أكمل» إلى دورة Brain ذاتية محدودة: فحص → تشخيص → إصلاح آمن → تحقق → دليل. لن يُقبل أي تغيير غير مُتحقق منه."
+            store.add_message("assistant", reply)
+            return {
+                "ok": True,
+                "status": "DISPATCHED",
+                "command": brain_command.name,
+                "workflow": workflow,
+                "ref": ref,
+                "repository": repo,
+                "reply": reply,
+            }
+        except Exception as exc:
+            store.event("BRAIN_CONTINUE_DISPATCH_FAILED", {"error": str(exc)[:1000], "command": brain_command.name})
+            return {"ok": False, "status": "DISPATCH_FAILED", "command": brain_command.name, "error": str(exc)[:500]}
     store.add_message("user",message); store.event("PERCEPTION",{"message":message})
     goal=store.active_goal()
     if not goal: store.add_goal(message,.8); goal=store.active_goal()
