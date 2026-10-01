@@ -10,6 +10,7 @@ on:
       - 'brain_v12/machine_cinematic_factory.py'
       - 'brain_v12/visual_engine.py'
       - 'brain_v12/machine_raster_engine.py'
+      - 'brain_v12/cinematic_master_qc.py'
       - '.github/workflows/brain-120-minute-cinema.yml'
   workflow_dispatch:
 
@@ -88,25 +89,71 @@ jobs:
           ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
       - name: Master QC
         run: |
-          ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height -of json master/final.mp4 > master/qc.json
+          ffprobe -v error -show_entries format=duration,size,bit_rate -show_entries stream=codec_type,codec_name,width,height,bit_rate -of json master/final.mp4 > master/qc.json
           python - <<'PY'
           import json
           q=json.load(open("master/qc.json"))
           duration=float(q["format"]["duration"])
           streams=q["streams"]
           video=[s for s in streams if s.get("codec_type")=="video"][0]
+          audio=[s for s in streams if s.get("codec_type")=="audio"]
           assert 7190 <= duration <= 7210, duration
           assert video["width"]==1000 and video["height"]==650
-          print("BRAIN_120_MINUTE_MASTER_QC=VERIFIED", duration)
+          assert audio, "AUDIO_STREAM_MISSING"
+          print("BRAIN_120_MINUTE_MASTER_QC=TECHNICALLY_VALID", duration)
           PY
-          printf 'BRAIN MACHINE CINEMA VERIFIED — 120 MINUTES\n' > master/VERIFIED_COMPLETED
-      - name: Build master manifest
+      - name: Build content manifest
         run: |
           python - <<'PY'
           import json, pathlib
-          q=json.load(open("master/qc.json"))
-          manifest={"status":"VERIFIED_COMPLETED","title":"BRAIN — الفيلم السينمائي الطويل","parts":240,"part_seconds":30,"target_seconds":7200,"master_qc":q,"renderer":"Brain Machine Raster Painter","external_api":False}
+          manifests=sorted(pathlib.Path("shards").glob("*/manifest.json"))
+          parts=[]
+          for p in manifests:
+              m=json.loads(p.read_text(encoding="utf-8"))
+              parts.extend(m.get("parts_manifest", []))
+          parts.sort(key=lambda x:int(x.get("part", 0)))
+          assert len(parts)==240, len(parts)
+          manifest={
+              "status":"MASTER_QC",
+              "title":"BRAIN — الفيلم السينمائي الطويل",
+              "parts":240,
+              "part_seconds":30,
+              "target_seconds":7200,
+              "parts_manifest":parts,
+              "master_qc":json.load(open("master/qc.json")),
+              "renderer":"Brain Machine Raster Painter",
+              "external_api":False,
+              "cinematic_contract":{
+                  "text_overlay_policy":"deny",
+                  "continuity_required":True,
+                  "audio_classes_required":["voice","music","sfx"],
+              },
+          }
           pathlib.Path("master/manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+          PY
+      - name: CINEMATIC_MASTER_QC
+        run: |
+          set +e
+          python brain_v12/cinematic_master_qc.py             --video master/final.mp4             --manifest master/manifest.json             --output master/cinematic_master_qc.json
+          rc=$?
+          set -e
+          test -f master/cinematic_master_qc.json
+          if [ "$rc" -ne 0 ]; then
+            echo "CONTENT_QC_FAILED: VERIFIED_COMPLETED is forbidden"
+            exit "$rc"
+          fi
+      - name: Promote only after cinematic QC
+        run: |
+          python - <<'PY'
+          import json, pathlib
+          p=pathlib.Path("master/manifest.json")
+          m=json.loads(p.read_text(encoding="utf-8"))
+          qc=json.loads(pathlib.Path("master/cinematic_master_qc.json").read_text(encoding="utf-8"))
+          assert qc["status"]=="CINEMATIC_QC_PASSED"
+          m["cinematic_master_qc"]=qc
+          m["status"]="VERIFIED_COMPLETED"
+          p.write_text(json.dumps(m,ensure_ascii=False,indent=2))
+          pathlib.Path("master/VERIFIED_COMPLETED").write_text("BRAIN CINEMATIC MASTER VERIFIED — 120 MINUTES\n",encoding="utf-8")
           PY
       - name: Upload verified master
         uses: actions/upload-artifact@v4
@@ -116,5 +163,6 @@ jobs:
             master/final.mp4
             master/manifest.json
             master/qc.json
+            master/cinematic_master_qc.json
             master/VERIFIED_COMPLETED
           retention-days: 7
