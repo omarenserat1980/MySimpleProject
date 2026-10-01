@@ -2,6 +2,7 @@ from __future__ import annotations
 from ..blade_server import BladeChassis, BladeScheduler
 from ..virtual_hardware.windows_server import WindowsServerVM
 from .resource_manager import ResourceManager, ResourceRequirement
+from .virtual_task_queue import VirtualTaskQueue
 
 class BrainVirtualDatacenter:
     """Brain-owned virtual datacenter: chassis + blades + resource management."""
@@ -11,6 +12,7 @@ class BrainVirtualDatacenter:
         self.scheduler=BladeScheduler(self.chassis)
         self.resource_manager=ResourceManager()
         self.windows_vms={}
+        self.task_queue=VirtualTaskQueue(self.chassis,self.resource_manager)
 
     def provision(self,count:int=1,capabilities=None):
         blades=[]
@@ -22,6 +24,19 @@ class BrainVirtualDatacenter:
 
     def run(self,program,required_capabilities=None,max_cycles=10000):
         return self.scheduler.dispatch(program,required_capabilities,max_cycles)
+
+    def submit_task(self,program,required_capabilities=None,requirement=None,task_id=None):
+        task=self.task_queue.submit(program,required_capabilities,requirement,task_id)
+        return {"ok":True,"task_id":task.task_id,"status":task.status,"blade_id":task.blade_id}
+
+    def task_status(self,task_id):
+        task=self.task_queue.get(task_id)
+        if task is None:
+            return {"ok":False,"status":"TASK_NOT_FOUND","task_id":task_id}
+        return {"ok":True,"task":task.__dict__}
+
+    def queue_status(self):
+        return self.task_queue.status()
 
     def resources(self):
         return self.resource_manager.cluster(self.chassis)
