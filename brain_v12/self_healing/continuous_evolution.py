@@ -142,6 +142,13 @@ def main() -> int:
             encoding="utf-8",
         )
         print(f"BRAIN_EVOLUTION cycle={cycle} loops={args.loops_per_cycle} status={status}", flush=True)
+        if code != 0:
+            print("BRAIN_EVOLUTION_REVIEW_STDOUT=" + stdout[-4000:], flush=True)
+            print("BRAIN_EVOLUTION_REVIEW_STDERR=" + stderr[-4000:], flush=True)
+            if repair_code is not None:
+                print("BRAIN_EVOLUTION_REPAIR_EXIT=" + str(repair_code), flush=True)
+                print("BRAIN_EVOLUTION_REPAIR_STDOUT=" + repair_stdout[-4000:], flush=True)
+                print("BRAIN_EVOLUTION_REPAIR_STDERR=" + repair_stderr[-4000:], flush=True)
 
         if code != 0:
             return code
