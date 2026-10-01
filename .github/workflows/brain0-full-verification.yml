@@ -10,13 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify checked-out revision
+        run: |
+          echo "BRAIN-0/1 verification revision:"
+          git rev-parse HEAD
+          test -f brain0/programs/verification_suite.py
+
       - name: Compile
         run: python -m compileall -q brain0
+
       - name: Core proof
         run: PYTHONPATH=. python brain0/programs/self_test.py
+
       - name: Supervisor proof
         run: PYTHONPATH=. python brain0/programs/supervisor_test.py
+
       - name: Runtime proof
         run: PYTHONPATH=. python brain0/programs/runtime_test.py
+
       - name: Dependency-free test suite
         run: PYTHONPATH=. python brain0/programs/verification_suite.py
