@@ -38,7 +38,7 @@ class GeneratorRegistryTests(unittest.TestCase):
         ]
         self.assertEqual(
             supported_candidates(candidates),
-            [{"id": "package-invocation-consistency"}],
+            [{"id": "package-invocation-consistency", "file": "brain_v12/self_healing/review_loop.py"}],
         )
 
 
