@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 mkdir -p brain6_artifacts/workflow_watchdog
 export BRAIN_GITHUB_REPO="${BRAIN_GITHUB_REPO:-omarenserat1980/MySimpleProject}"
-export BRAIN_WATCHDOG_SECONDS="${BRAIN_WATCHDOG_SECONDS:-60}"
+export BRAIN_WATCHDOG_SECONDS="${BRAIN_WATCHDOG_SECONDS:-120}"
 export BRAIN_WATCHDOG_MAX_ATTEMPTS="${BRAIN_WATCHDOG_MAX_ATTEMPTS:-3}"
 nohup python -m brain_v12.brain.brain_minute_watchdog \
   >> brain6_artifacts/workflow_watchdog/minute-watchdog.stdout.log 2>&1 &
