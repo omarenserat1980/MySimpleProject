@@ -120,3 +120,116 @@ jobs:
           sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
 
 
+
+      - name: Prepare virtual blade storage
+        run: |
+          set -euo pipefail
+          qemu-img create -f qcow2 windows-server-2025.qcow2 64G
+          truncate -s 64M windows-evidence.img
+          mkfs.vfat -n BRAIN_EVIDENCE windows-evidence.img
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+
+      - name: Boot and install Windows Server 2025
+        env:
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout "$BOOT_TIMEOUT"m qemu-system-x86_64 \
+            -machine q35,accel=tcg -cpu max -m 4G -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
+            -device ich9-ahci,id=sata \
+            -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk \
+            -device ide-hd,bus=sata.2,drive=osdisk \
+            -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
+            -device ide-hd,bus=sata.3,drive=evidence \
+            -nic user,model=e1000 -cdrom brain-windows-server-2025-proof.iso -boot order=d \
+            -display none -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
+            > qemu-console.log 2>&1 &
+          QPID=$!
+          deadline=$((SECONDS + BOOT_TIMEOUT*60))
+          found=0
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
+              found=1
+              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
+              break
+            fi
+            if ! kill -0 "$QPID" 2>/dev/null; then
+              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$found" -ne 1 ]; then
+            tail -200 qemu-console.log || true
+            tail -200 qemu-serial.log || true
+            exit 1
+          fi
+          python - <<'PY'
+          import json,socket,time
+          s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+          s.connect("qmp.sock")
+          for o in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
+              s.sendall((json.dumps(o)+"\r\n").encode()); time.sleep(.5)
+          s.close()
+          PY
+          sleep 15
+          kill "$QPID" 2>/dev/null || true
+          wait "$QPID" 2>/dev/null || true
+
+      - name: Read guest evidence and apply independent completion gate
+        run: |
+          set -euo pipefail
+          mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
+          python - <<'PY'
+          import json,pathlib
+          e=json.loads(pathlib.Path("windows-boot-evidence.json").read_text(encoding="utf-8-sig"))
+          assert e["status"]=="WINDOWS_BOOT_VERIFIED", e
+          assert e["guest"]["os"]=="Windows Server 2025", e
+          assert e["guest"]["architecture"]=="AMD64", e
+          assert e["guest"]["boot_verified"] is True, e
+          assert e["network"]["adapter_up"] is True, e
+          assert e["network"]["internet_443"] is True, e
+          assert e["storage"]["filesystem"], e
+          e["guest"]["architecture"]="x86_64"
+          e["media"]={"sha256":pathlib.Path("windows-server-2025.iso.sha256").read_text().split()[0]}
+          e["uefi"]={"ready":True,"firmware":"OVMF"}
+          e["cpu"]={"x86_64":True,"backend":"qemu-system-x86_64"}
+          e["network"]["host_backend"]="qemu-user"
+          e["storage"]["host_disk"]="windows-server-2025.qcow2"
+          e["qemu_status"]="QEMU_EXITED"
+          pathlib.Path("windows-combined-evidence.json").write_text(json.dumps(e,indent=2,sort_keys=True))
+          from brain_v12.brain.windows_completion_gate import WindowsCompletionGate
+          r=WindowsCompletionGate().verify(e)
+          pathlib.Path("windows-completion-gate.json").write_text(json.dumps(r,indent=2,sort_keys=True))
+          print(json.dumps(r,indent=2,sort_keys=True))
+          assert r["status"]=="WINDOWS_BOOT_VERIFIED", r
+          print("WINDOWS_SERVER_2025_REAL_BOOT=VERIFIED")
+          print("EVIDENCE_SHA256="+r["evidence_sha256"])
+          PY
+
+      - name: Upload immutable Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-windows-server-2025-real-boot-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            windows-server-2025.iso.sha256
+            proof-iso.sha256
+            wim-info.txt
+            windows-image-index.txt
+            windows-boot-evidence.json
+            windows-combined-evidence.json
+            windows-completion-gate.json
+            qemu-console.log
+            qemu-serial.log
+
+      - name: Final Windows evidence gate
+        run: |
+          set -euo pipefail
+          test -f windows-completion-gate.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
