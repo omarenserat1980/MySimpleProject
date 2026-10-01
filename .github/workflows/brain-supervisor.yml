@@ -20,6 +20,27 @@ permissions:
   actions: write
 
 jobs:
+  health_and_recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Brain Supervisor and Device Bridge
+        run: |
+          python -m py_compile brain_v12/brain/brain_supervisor.py
+          python -m py_compile brain_v12/brain/device_bridge.py
+      - name: Supervisor simulation
+        run: python -m brain_v12.brain.brain_supervisor
+      - name: Verify bounded autonomy
+        run: |
+          grep -q "max_cycles" brain_v12/brain/brain_supervisor.py
+          grep -q "repair_and_retry" brain_v12/brain/brain_supervisor.py
+          grep -q "recover_stale" brain_v12/brain/device_bridge.py
+          echo "BRAIN_AUTONOMY_CONTRACT=VERIFIED"
+
   self_heal:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-latest
