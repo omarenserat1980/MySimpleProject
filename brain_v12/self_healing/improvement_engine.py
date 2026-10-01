@@ -23,7 +23,7 @@ PY_ROOTS = tuple(
     x.strip() for x in os.getenv("BRAIN_REVIEW_ROOTS", "brain_v12,tests,scripts").split(",")
     if x.strip()
 )
-DIRECT_SCRIPT = re.compile(r'\[?["\'](?:python|python3)["\']\s*,\s*["\'][^"\']+\.py["\']')
+DIRECT_SCRIPT = re.compile(r'(?:["\'](?:python|python3)["\']|sys\.executable)\s*,\s*["\'][^"\']+\.py["\']')
 
 
 def now() -> str:
