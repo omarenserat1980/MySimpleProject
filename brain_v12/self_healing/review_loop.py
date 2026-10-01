@@ -125,15 +125,37 @@ def main() -> int:
             final_ok = repaired and ok2
 
         if final_ok and os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1":
-            improvement = {
-                "schema": "brain-improvement-context/v1",
-                "loop": i,
-                "created_at": now(),
-                "reason": "verified_state_improvement_review",
-                "review": entry["review"],
-                "verification": details,
+            # First discover deterministic, evidence-backed opportunities.
+            discovery = run(
+                [os.environ.get("PYTHON", "python"), "-m",
+                 "brain_v12.self_healing.improvement_engine"],
+                timeout=args.timeout,
+            )
+            entry["improvement_discovery"] = {
+                "exit_code": discovery.returncode,
+                "stdout": discovery.stdout[-6000:],
+                "stderr": discovery.stderr[-6000:],
             }
             improvement_file = STATE / "current_improvement.json"
+            try:
+                improvement = json.loads(improvement_file.read_text(encoding="utf-8"))
+            except Exception:
+                improvement = {
+                    "schema": "brain-improvement-context/v2",
+                    "loop": i,
+                    "created_at": now(),
+                    "reason": "verified_state_improvement_review",
+                    "review": entry["review"],
+                    "verification": details,
+                    "discovery_failed": True,
+                }
+                improvement_file.write_text(
+                    json.dumps(improvement, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            improvement["loop"] = i
+            improvement["review"] = entry["review"]
+            improvement["verification"] = details
             improvement_file.write_text(
                 json.dumps(improvement, ensure_ascii=False, indent=2),
                 encoding="utf-8",
