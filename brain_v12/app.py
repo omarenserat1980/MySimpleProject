@@ -1364,6 +1364,26 @@ def brain_windows_qemu_inspect(request:Request, body:dict):
     return backend.inspect()
 
 
+@app.post("/api/brain/tasks/submit")
+def brain_task_submit(request:Request, body:dict):
+    require_control_key(request)
+    from .brain.resource_manager import ResourceRequirement
+    requirement=ResourceRequirement(**(body.get("resources") or {}))
+    return brain_datacenter.submit_task(
+        body.get("program") or [("HALT",)],
+        body.get("required_capabilities"),
+        requirement,
+        body.get("task_id"),
+    )
+
+@app.get("/api/brain/tasks/{task_id}")
+def brain_task_status(task_id:str):
+    return brain_datacenter.task_status(task_id)
+
+@app.get("/api/brain/tasks")
+def brain_tasks():
+    return brain_datacenter.queue_status()
+
 @app.get("/api/brain/resources")
 def brain_resources():
     return brain_datacenter.resources()
