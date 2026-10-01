@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Infinite Brain code-evolution supervisor.
+"""Bounded or persistent Brain code-evolution supervisor.
 
-Each cycle performs up to 100,000,000 review iterations. A failed verification
-creates evidence and invokes the repair engine. A repair is accepted only after
-the verification gate passes. The outer cycle never ends unless explicitly
-limited with --cycles.
-
-This process is designed for a persistent Brain runtime. GitHub Actions should
-use the bounded review_loop.py because hosted jobs have finite lifetimes.
+Each cycle performs a verified review. A failed review gets a repair
+opportunity and a post-repair verification. Hosted automation should use a
+small bounded --cycles value; a persistent Brain runtime may use --cycles 0.
 """
 from __future__ import annotations
 
@@ -21,26 +17,30 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
-REVIEW = ROOT / "brain_v12" / "self_healing" / "review_loop.py"
-REPAIR = ROOT / "brain_v12" / "self_healing" / "repair.py"
+REVIEW = "brain_v12.self_healing.review_loop"
+REPAIR = "brain_v12.self_healing.repair"
 
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def execute(cmd: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
+def run_module(module: str, args: list[str], timeout: int) -> tuple[int, str, str]:
+    env = os.environ.copy()
+    env.setdefault("BRAIN_PROACTIVE_EVOLUTION", "1")
+    p = subprocess.run(
+        [env.get("PYTHON", "python"), "-m", module, *args],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+    )
+    return p.returncode, p.stdout[-16000:], p.stderr[-16000:]
 
 
 def run_review(loops: int, timeout: int) -> tuple[int, str, str]:
-    env = os.environ.copy()
-    env.setdefault("BRAIN_PROACTIVE_EVOLUTION", "1")
-    p = subprocess.run([
-        env.get("PYTHON", "python"), str(REVIEW),
-        "--loops", str(loops), "--timeout", str(timeout)
-    ], cwd=ROOT, env=env, text=True, capture_output=True, timeout=max(timeout, 120) * min(loops, 100))
-    return p.returncode, p.stdout[-16000:], p.stderr[-16000:]
+    return run_module(REVIEW, ["--loops", str(loops), "--timeout", str(timeout)], max(timeout, 120) * min(loops, 100))
 
 
 def repair_after_failure(timeout: int) -> tuple[int, str, str]:
@@ -48,29 +48,28 @@ def repair_after_failure(timeout: int) -> tuple[int, str, str]:
     env = os.environ.copy()
     env["BRAIN_FAILURE_FILE"] = str(failure)
     p = subprocess.run(
-        [env.get("PYTHON", "python"), str(REPAIR)],
-        cwd=ROOT, env=env, text=True, capture_output=True, timeout=timeout
+        [env.get("PYTHON", "python"), "-m", REPAIR],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
     )
     return p.returncode, p.stdout[-12000:], p.stderr[-12000:]
 
 
 def append_event(event: dict) -> None:
     STATE.mkdir(parents=True, exist_ok=True)
-    path = STATE / "continuous_evolution_history.jsonl"
-    with path.open("a", encoding="utf-8") as f:
+    with (STATE / "continuous_evolution_history.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--loops-per-cycle", type=int,
-                    default=int(os.getenv("BRAIN_LOOPS_PER_CYCLE", "100000000")))
-    ap.add_argument("--pause", type=float,
-                    default=float(os.getenv("BRAIN_CYCLE_PAUSE_SECONDS", "5")))
-    ap.add_argument("--timeout", type=int,
-                    default=int(os.getenv("BRAIN_REVIEW_TIMEOUT", "120")))
-    ap.add_argument("--cycles", type=int, default=0,
-                    help="0 = infinite cycles")
+    ap.add_argument("--loops-per-cycle", type=int, default=int(os.getenv("BRAIN_LOOPS_PER_CYCLE", "1")))
+    ap.add_argument("--pause", type=float, default=float(os.getenv("BRAIN_CYCLE_PAUSE_SECONDS", "5")))
+    ap.add_argument("--timeout", type=int, default=int(os.getenv("BRAIN_REVIEW_TIMEOUT", "120")))
+    ap.add_argument("--cycles", type=int, default=0, help="0 = infinite cycles")
     args = ap.parse_args()
 
     if not 1 <= args.loops_per_cycle <= 100000000:
@@ -80,12 +79,9 @@ def main() -> int:
 
     STATE.mkdir(parents=True, exist_ok=True)
     checkpoint = STATE / "evolution_checkpoint.json"
-    if checkpoint.is_file():
-        try:
-            cycle = int(json.loads(checkpoint.read_text(encoding="utf-8")).get("cycle", 0))
-        except Exception:
-            cycle = 0
-    else:
+    try:
+        cycle = int(json.loads(checkpoint.read_text(encoding="utf-8")).get("cycle", 0)) if checkpoint.is_file() else 0
+    except Exception:
         cycle = 0
 
     while args.cycles == 0 or cycle < args.cycles:
@@ -100,7 +96,6 @@ def main() -> int:
         except Exception as exc:
             code, stdout, stderr = 124, "", repr(exc)
 
-        # A failed review cycle gets an additional repair opportunity.
         if code != 0:
             try:
                 repair_code, repair_stdout, repair_stderr = repair_after_failure(args.timeout)
@@ -115,9 +110,10 @@ def main() -> int:
                 stderr += "\nPOST_REPAIR_REVERIFY\n" + verify_err
             except Exception as exc:
                 code, stdout, stderr = 124, stdout, stderr + "\nPOST_REPAIR_REVERIFY_ERROR=" + repr(exc)
+
         status = "VERIFIED" if code == 0 else "FAILED"
         append_event({
-            "schema": "brain-infinite-evolution/v2",
+            "schema": "brain-infinite-evolution/v3",
             "cycle": cycle,
             "started_at": started,
             "finished_at": now(),
@@ -130,9 +126,25 @@ def main() -> int:
             "repair_stderr": repair_stderr,
             "status": status,
         })
-        checkpoint.write_text(json.dumps({"schema":"brain-evolution-checkpoint/v1","cycle":cycle,"status":status,"updated_at":now(),"review_exit_code":code,"repair_exit_code":repair_code},ensure_ascii=False,indent=2),encoding="utf-8")
-        print(f"BRAIN_EVOLUTION cycle={cycle} loops={args.loops_per_cycle} status={status}",flush=True)
+        checkpoint.write_text(
+            json.dumps(
+                {
+                    "schema": "brain-evolution-checkpoint/v2",
+                    "cycle": cycle,
+                    "status": status,
+                    "updated_at": now(),
+                    "review_exit_code": code,
+                    "repair_exit_code": repair_code,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        print(f"BRAIN_EVOLUTION cycle={cycle} loops={args.loops_per_cycle} status={status}", flush=True)
 
+        if code != 0:
+            return code
         if args.pause:
             time.sleep(args.pause)
 
