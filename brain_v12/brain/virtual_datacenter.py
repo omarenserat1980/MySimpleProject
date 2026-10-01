@@ -1,13 +1,15 @@
 from __future__ import annotations
 from ..blade_server import BladeChassis, BladeScheduler
 from ..virtual_hardware.windows_server import WindowsServerVM
+from .resource_manager import ResourceManager, ResourceRequirement
 
 class BrainVirtualDatacenter:
-    """Brain-owned virtual datacenter: chassis + blades + guest-OS provisioning."""
+    """Brain-owned virtual datacenter: chassis + blades + resource management."""
     def __init__(self,name="BRAIN-DATACENTER-01"):
         self.name=name
         self.chassis=BladeChassis()
         self.scheduler=BladeScheduler(self.chassis)
+        self.resource_manager=ResourceManager()
         self.windows_vms={}
 
     def provision(self,count:int=1,capabilities=None):
@@ -20,6 +22,26 @@ class BrainVirtualDatacenter:
 
     def run(self,program,required_capabilities=None,max_cycles=10000):
         return self.scheduler.dispatch(program,required_capabilities,max_cycles)
+
+    def resources(self):
+        return self.resource_manager.cluster(self.chassis)
+
+    def blade_resources(self,blade_id):
+        blade=self.chassis.blades.get(blade_id)
+        if blade is None:
+            return {"ok":False,"status":"BLADE_NOT_FOUND","blade_id":blade_id}
+        return {"ok":True,"resource":self.resource_manager.snapshot(blade)}
+
+    def reserve_resources(self,blade_id,task_id,requirement):
+        blade=self.chassis.blades.get(blade_id)
+        if blade is None:
+            return {"ok":False,"status":"BLADE_NOT_FOUND","blade_id":blade_id}
+        if isinstance(requirement,dict):
+            requirement=ResourceRequirement(**requirement)
+        return self.resource_manager.reserve(blade,task_id,requirement)
+
+    def release_resources(self,task_id):
+        return self.resource_manager.release(task_id)
 
     def provision_windows_server_2025(self, blade_id=None, image_path=None, sha256=None,
                                       ram_bytes=4*1024*1024*1024,
@@ -45,4 +67,5 @@ class BrainVirtualDatacenter:
     def status(self):
         s=self.chassis.status()
         return {"ok":True,"name":self.name,"status":"ONLINE" if s["online"] else "EMPTY",
-                "chassis":s,"windows_vms":[vm.status() for vm in self.windows_vms.values()]}
+                "chassis":s,"resources":self.resources(),
+                "windows_vms":[vm.status() for vm in self.windows_vms.values()]}
