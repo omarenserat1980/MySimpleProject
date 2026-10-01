@@ -12,6 +12,13 @@ class SupervisorTests(unittest.TestCase):
             self.assertIn('"repair"',events)
             self.assertIn('"retry"',events)
 
+    def test_next_action_uses_verification_evidence(self):
+        with tempfile.TemporaryDirectory() as d:
+            s=BrainSupervisor(root=d,max_cycles=2)
+            job=s.create("film")
+            self.assertEqual(s.next_action(job, {"ok": True})["action"], "deliver")
+            self.assertEqual(s.next_action(job, {"ok": False})["action"], "retry_backend")
+
     def test_external_actions_require_gate(self):
         with tempfile.TemporaryDirectory() as d:
             s=BrainSupervisor(root=d)
