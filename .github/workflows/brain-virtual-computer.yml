@@ -1,0 +1,29 @@
+name: Brain Virtual Computer
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile virtual hardware
+        run: |
+          python -m py_compile brain_v12/virtual_hardware/*.py brain_v12/blade_server.py brain_v12/brain/virtual_datacenter.py
+      - name: Run Blade Server evidence tests
+        run: |
+          python -m unittest brain_v12.test_blade_server -v
+      - name: Verify evidence contract
+        run: |
+          test -f brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
+          grep -q "VirtualCPU" brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
+          grep -q "BladeScheduler" brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
+          echo "BRAIN_VIRTUAL_COMPUTER_CONTRACT=VERIFIED"
