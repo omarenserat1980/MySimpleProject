@@ -1223,7 +1223,13 @@ def device_result(task_id:str):
 
 @app.get("/api/supervisor/status")
 def supervisor_status():
-    return brain_supervisor.snapshot(brain_supervisor.create("status_check"), {"verified": True})
+    return {
+        "ok": True,
+        "supervisor": "READY",
+        "device_agnostic": True,
+        "control_loop": ["discover","plan","select_backend","execute","verify","repair","retry","deliver"],
+        "max_cycles": brain_supervisor.max_cycles,
+    }
 
 @app.post("/api/supervisor/run")
 def supervisor_run(request:Request, body:dict):
