@@ -5,7 +5,7 @@ from uuid import uuid4
 AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; HEARTBEAT_STALE="STALE"
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"cinematic_room13_render":{},
-                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{}}
+                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
     def __init__(self,store): self.store=store; self._last_seen=None
     def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
     def auth_mode(self):
@@ -41,7 +41,7 @@ class DeviceBridge:
         task,result=item.get("task"),item.get("result") or {}
         if task=="python_version":
             stdout=str(result.get("stdout","")).strip(); exit_code=result.get("returncode",result.get("exit_code")); verified=bool(stdout) and exit_code in (None,0)
-        elif task=="brain_machine_cinema_60m":
+        elif task in ("brain_machine_cinema_60m","brain_machine_cinema_120m"):
             evidence=result.get("result") or result
             verified=bool(result.get("ok") and evidence.get("status")=="VERIFIED_COMPLETED" and evidence.get("final"))
         else: verified=bool(item.get("ok"))
