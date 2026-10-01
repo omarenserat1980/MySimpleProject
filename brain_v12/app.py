@@ -1363,6 +1363,15 @@ def brain_windows_qemu_inspect(request:Request, body:dict):
     )
     return backend.inspect()
 
+
+@app.get("/api/brain/resources")
+def brain_resources():
+    return brain_datacenter.resources()
+
+@app.get("/api/brain/resources/{blade_id}")
+def brain_blade_resources(blade_id: str):
+    return brain_datacenter.blade_resources(blade_id)
+
 @app.get("/api/brain/cinema/completion")
 def brain_cinema_completion():
     root=os.getenv("BRAIN_MACHINE_FILM_ROOT", os.path.join(os.path.dirname(ROOT), "brain6_artifacts", "machine_films"))
