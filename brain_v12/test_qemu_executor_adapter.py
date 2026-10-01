@@ -17,6 +17,6 @@ class QemuAdapterTests(unittest.TestCase):
 
     def test_backend_command_contract_still_exists(self):
         backend=QemuWindowsBackend(disk_path="disk.img",iso_path="server.iso")
-        self.assertEqual(backend.command()[-2:],["-cdrom","server.iso"] if False else ["-boot","order=d"])
+        self.assertEqual(backend.command()[-4:],["-cdrom","server.iso","-boot","order=d"])
 
 if __name__=="__main__": unittest.main()
