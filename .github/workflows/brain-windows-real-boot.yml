@@ -412,3 +412,363 @@ jobs:
           test -f windows-completion-gate.json
           grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
           echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
+
+          mkdir -p "$oem_root/\$1/Setup/Scripts"
+          cp brain_v12/windows_boot_evidence.ps1 "$oem_root/\$1/Setup/Scripts/brain-windows-evidence.ps1"
+          cp brain_v12/windows_setupcomplete.cmd "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          test -f "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          echo "OEM_EVIDENCE_TREE_READY"
+
+          image_index="$(awk '
+            /^Index: / { idx=$2 }
+            /^Name: / {
+              name=$0
+              sub(/^Name: /,"",name)
+              if (name ~ /Windows Server 2025|SERVERSTANDARD|SERVERDATACENTER/) { print idx; exit }
+            }
+          ' wim-info.txt)"
+          test -n "$image_index"
+          echo "WINDOWS_SERVER_IMAGE_INDEX=$image_index"
+
+          cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <settings pass="windowsPE">
+              <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <SetupUILanguage><UILanguage>en-US</UILanguage></SetupUILanguage>
+                <InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale>
+              </component>
+              <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <DiskConfiguration>
+                  <Disk wcm:action="add">
+                    <DiskID>0</DiskID><WillWipeDisk>true</WillWipeDisk>
+                    <CreatePartitions>
+                      <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>100</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+                    </CreatePartitions>
+                    <ModifyPartitions>
+                      <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Windows</Label><Letter>C</Letter></ModifyPartition>
+                    </ModifyPartitions>
+                  </Disk>
+                  <WillShowUI>OnError</WillShowUI>
+                </DiskConfiguration>
+                <ImageInstall>
+                  <OSImage>
+                    <InstallFrom>
+                      <MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>$image_index</Value></MetaData>
+                    </InstallFrom>
+                    <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>
+                  </OSImage>
+                </ImageInstall>
+                <UserData><AcceptEula>true</AcceptEula></UserData>
+              </component>
+            </settings>
+            <settings pass="oobeSystem">
+              <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+              </component>
+            </settings>
+          </unattend>
+          XML
+
+          xorriso -indev windows-server-2025.iso \
+            -outdev brain-windows-server-2025-proof.iso \
+            -boot_image any replay \
+            -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
+            -map "$oem_root" '/sources/$OEM$' \
+            -commit
+          test -s brain-windows-server-2025-proof.iso
+          sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
+
+      - name: Prepare virtual blade storage
+        run: |
+          qemu-img create -f qcow2 windows-server-2025.qcow2 64G
+          truncate -s 64M windows-evidence.img
+          mkfs.vfat -n BRAIN_EVIDENCE windows-evidence.img
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+          ls -lh windows-server-2025.qcow2 windows-evidence.img OVMF_VARS.fd
+
+      - name: Boot and install Windows Server 2025
+        env:
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout "${BOOT_TIMEOUT}m" qemu-system-x86_64             -machine q35,accel=tcg             -cpu max             -m 4G             -smp 2             -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd             -drive if=pflash,format=raw,file=OVMF_VARS.fd             -device ich9-ahci,id=sata             -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk             -device ide-hd,bus=sata.2,drive=osdisk             -drive file=windows-evidence.img,format=raw,if=none,id=evidence             -device ide-hd,bus=sata.3,drive=evidence             -nic user,model=e1000             -cdrom brain-windows-server-2025-proof.iso             -boot order=d             -display none             -qmp unix:qmp.sock,server=on,wait=off             -serial file:qemu-serial.log             > qemu-console.log 2>&1 &
+          QPID=$!
+          echo "$QPID" > qemu.pid
+
+          deadline=$((SECONDS + BOOT_TIMEOUT*60))
+          found=0
+          while [ $SECONDS -lt $deadline ]; do
+            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
+              found=1
+              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
+              break
+            fi
+            if ! kill -0 "$QPID" 2>/dev/null; then
+              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "WINDOWS_BOOT_VERIFIED evidence was not produced by the guest."
+            tail -200 qemu-console.log || true
+            tail -200 qemu-serial.log || true
+            exit 1
+          fi
+
+          python - <<'PY'
+          import json, socket, time
+          s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+          s.connect("qmp.sock")
+          def cmd(o):
+              s.sendall((json.dumps(o)+"\r\n").encode())
+              time.sleep(.5)
+              try: return s.recv(65535)
+              except: return b""
+          cmd({"execute":"qmp_capabilities"})
+          cmd({"execute":"system_powerdown"})
+          s.close()
+          PY
+          sleep 15
+          kill "$(cat qemu.pid)" 2>/dev/null || true
+          wait "$(cat qemu.pid)" 2>/dev/null || true
+
+      - name: Read guest evidence and apply independent completion gate
+        run: |
+          set -euo pipefail
+          mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
+          python - <<'PY'
+          import json, hashlib, pathlib
+          p=pathlib.Path("windows-boot-evidence.json")
+          e=json.loads(p.read_text(encoding="utf-8-sig"))
+          assert e["status"]=="WINDOWS_BOOT_VERIFIED"
+          assert e["guest"]["os"]=="Windows Server 2025"
+          assert e["guest"]["architecture"]=="AMD64"
+          assert e["guest"]["boot_verified"] is True
+          assert e["network"]["adapter_up"] is True
+          assert e["storage"]["filesystem"]
+          e["guest"]["architecture"]="x86_64"
+          e["media"]={"sha256":pathlib.Path("windows-server-2025.iso.sha256").read_text().split()[0]}
+          e["uefi"]={"ready":True,"firmware":"OVMF"}
+          e["cpu"]={"x86_64":True,"backend":"qemu-system-x86_64"}
+          e["network"]["host_backend"]="qemu-user"
+          e["storage"]["host_disk"]="windows-server-2025.qcow2"
+          e["qemu_status"]="QEMU_EXITED"
+          pathlib.Path("windows-combined-evidence.json").write_text(json.dumps(e,indent=2,sort_keys=True))
+          from brain_v12.brain.windows_completion_gate import WindowsCompletionGate
+          r=WindowsCompletionGate().verify(e)
+          pathlib.Path("windows-completion-gate.json").write_text(json.dumps(r,indent=2,sort_keys=True))
+          print(json.dumps(r,indent=2,sort_keys=True))
+          assert r["status"]=="WINDOWS_BOOT_VERIFIED", r
+          print("WINDOWS_SERVER_2025_REAL_BOOT=VERIFIED")
+          print("EVIDENCE_SHA256="+r["evidence_sha256"])
+          PY
+
+      - name: Upload immutable Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-windows-server-2025-real-boot-evidence
+          if-no-files-found: warn
+          path: |
+            windows-server-2025.iso.sha256
+            proof-iso.sha256
+            wim-info.txt
+            windows-boot-evidence.json
+            windows-combined-evidence.json
+            windows-completion-gate.json
+            qemu-console.log
+            qemu-serial.log
+
+      - name: Final Windows evidence gate
+        run: |
+          test -f windows-completion-gate.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
+
+          mkdir -p "$oem_root/\$1/Setup/Scripts"
+          cp brain_v12/windows_boot_evidence.ps1 "$oem_root/\$1/Setup/Scripts/brain-windows-evidence.ps1"
+          cp brain_v12/windows_setupcomplete.cmd "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          test -f "$oem_root/\$1/Setup/Scripts/SetupComplete.cmd"
+          echo "OEM_EVIDENCE_TREE_READY"
+
+          image_index="$(awk '
+            /^Index: / { idx=$2 }
+            /^Name: / {
+              name=$0
+              sub(/^Name: /,"",name)
+              if (name ~ /Windows Server 2025|SERVERSTANDARD|SERVERDATACENTER/) { print idx; exit }
+            }
+          ' wim-info.txt)"
+          test -n "$image_index"
+          echo "WINDOWS_SERVER_IMAGE_INDEX=$image_index"
+
+          cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <settings pass="windowsPE">
+              <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <SetupUILanguage><UILanguage>en-US</UILanguage></SetupUILanguage>
+                <InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale>
+              </component>
+              <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <DiskConfiguration>
+                  <Disk wcm:action="add">
+                    <DiskID>0</DiskID><WillWipeDisk>true</WillWipeDisk>
+                    <CreatePartitions>
+                      <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>100</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+                    </CreatePartitions>
+                    <ModifyPartitions>
+                      <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Windows</Label><Letter>C</Letter></ModifyPartition>
+                    </ModifyPartitions>
+                  </Disk>
+                  <WillShowUI>OnError</WillShowUI>
+                </DiskConfiguration>
+                <ImageInstall>
+                  <OSImage>
+                    <InstallFrom>
+                      <MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>$image_index</Value></MetaData>
+                    </InstallFrom>
+                    <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>
+                  </OSImage>
+                </ImageInstall>
+                <UserData><AcceptEula>true</AcceptEula></UserData>
+              </component>
+            </settings>
+            <settings pass="oobeSystem">
+              <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+              </component>
+            </settings>
+          </unattend>
+          XML
+
+          xorriso -indev windows-server-2025.iso \
+            -outdev brain-windows-server-2025-proof.iso \
+            -boot_image any replay \
+            -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
+            -map "$oem_root" '/sources/$OEM$' \
+            -commit
+          test -s brain-windows-server-2025-proof.iso
+          sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
+
+      - name: Prepare virtual blade storage
+        run: |
+          qemu-img create -f qcow2 windows-server-2025.qcow2 64G
+          truncate -s 64M windows-evidence.img
+          mkfs.vfat -n BRAIN_EVIDENCE windows-evidence.img
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+          ls -lh windows-server-2025.qcow2 windows-evidence.img OVMF_VARS.fd
+
+      - name: Boot and install Windows Server 2025
+        env:
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout "${BOOT_TIMEOUT}m" qemu-system-x86_64             -machine q35,accel=tcg             -cpu max             -m 4G             -smp 2             -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd             -drive if=pflash,format=raw,file=OVMF_VARS.fd             -device ich9-ahci,id=sata             -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk             -device ide-hd,bus=sata.2,drive=osdisk             -drive file=windows-evidence.img,format=raw,if=none,id=evidence             -device ide-hd,bus=sata.3,drive=evidence             -nic user,model=e1000             -cdrom brain-windows-server-2025-proof.iso             -boot order=d             -display none             -qmp unix:qmp.sock,server=on,wait=off             -serial file:qemu-serial.log             > qemu-console.log 2>&1 &
+          QPID=$!
+          echo "$QPID" > qemu.pid
+
+          deadline=$((SECONDS + BOOT_TIMEOUT*60))
+          found=0
+          while [ $SECONDS -lt $deadline ]; do
+            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
+              found=1
+              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
+              break
+            fi
+            if ! kill -0 "$QPID" 2>/dev/null; then
+              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "WINDOWS_BOOT_VERIFIED evidence was not produced by the guest."
+            tail -200 qemu-console.log || true
+            tail -200 qemu-serial.log || true
+            exit 1
+          fi
+
+          python - <<'PY'
+          import json, socket, time
+          s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+          s.connect("qmp.sock")
+          def cmd(o):
+              s.sendall((json.dumps(o)+"\r\n").encode())
+              time.sleep(.5)
+              try: return s.recv(65535)
+              except: return b""
+          cmd({"execute":"qmp_capabilities"})
+          cmd({"execute":"system_powerdown"})
+          s.close()
+          PY
+          sleep 15
+          kill "$(cat qemu.pid)" 2>/dev/null || true
+          wait "$(cat qemu.pid)" 2>/dev/null || true
+
+      - name: Read guest evidence and apply independent completion gate
+        run: |
+          set -euo pipefail
+          mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
+          python - <<'PY'
+          import json, hashlib, pathlib
+          p=pathlib.Path("windows-boot-evidence.json")
+          e=json.loads(p.read_text(encoding="utf-8-sig"))
+          assert e["status"]=="WINDOWS_BOOT_VERIFIED"
+          assert e["guest"]["os"]=="Windows Server 2025"
+          assert e["guest"]["architecture"]=="AMD64"
+          assert e["guest"]["boot_verified"] is True
+          assert e["network"]["adapter_up"] is True
+          assert e["storage"]["filesystem"]
+          e["guest"]["architecture"]="x86_64"
+          e["media"]={"sha256":pathlib.Path("windows-server-2025.iso.sha256").read_text().split()[0]}
+          e["uefi"]={"ready":True,"firmware":"OVMF"}
+          e["cpu"]={"x86_64":True,"backend":"qemu-system-x86_64"}
+          e["network"]["host_backend"]="qemu-user"
+          e["storage"]["host_disk"]="windows-server-2025.qcow2"
+          e["qemu_status"]="QEMU_EXITED"
+          pathlib.Path("windows-combined-evidence.json").write_text(json.dumps(e,indent=2,sort_keys=True))
+          from brain_v12.brain.windows_completion_gate import WindowsCompletionGate
+          r=WindowsCompletionGate().verify(e)
+          pathlib.Path("windows-completion-gate.json").write_text(json.dumps(r,indent=2,sort_keys=True))
+          print(json.dumps(r,indent=2,sort_keys=True))
+          assert r["status"]=="WINDOWS_BOOT_VERIFIED", r
+          print("WINDOWS_SERVER_2025_REAL_BOOT=VERIFIED")
+          print("EVIDENCE_SHA256="+r["evidence_sha256"])
+          PY
+
+      - name: Upload immutable Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-windows-server-2025-real-boot-evidence
+          if-no-files-found: warn
+          path: |
+            windows-server-2025.iso.sha256
+            proof-iso.sha256
+            wim-info.txt
+            windows-boot-evidence.json
+            windows-combined-evidence.json
+            windows-completion-gate.json
+            qemu-console.log
+            qemu-serial.log
+
+      - name: Final Windows evidence gate
+        run: |
+          test -f windows-completion-gate.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
