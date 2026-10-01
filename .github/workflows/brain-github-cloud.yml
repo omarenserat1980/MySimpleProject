@@ -50,10 +50,11 @@ jobs:
       - name: Install media toolchain
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
+          espeak-ng --version | head -n 1
 
       - name: Install Brain Python dependencies
         run: |
