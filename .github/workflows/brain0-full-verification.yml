@@ -18,5 +18,7 @@ jobs:
         run: PYTHONPATH=. python brain0/programs/supervisor_test.py
       - name: Runtime proof
         run: PYTHONPATH=. python brain0/programs/runtime_test.py
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check -q pytest
       - name: Tests
         run: python -m pytest -q brain0/tests
