@@ -52,6 +52,11 @@ jobs:
       - name: Validate Minute Watchdog
         run: python -m unittest brain_v12.brain.test_brain_minute_watchdog -v
 
+      - name: Validate Self-Healing Contracts
+        run: |
+          set -euo pipefail
+          python -m unittest brain_v12.self_healing.test_command_contract brain_v12.self_healing.test_generator_registry brain_v12.self_healing.test_improvement_eligibility brain_v12.self_healing.test_native_patch_generator -v
+
       - name: Run Brain Supervisor + Self-Healing
         env:
           BRAIN_MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '5' }}
