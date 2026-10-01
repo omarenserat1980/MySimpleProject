@@ -29,6 +29,7 @@ jobs:
     env:
       BRAIN_CLOUD_MODE: github-actions
       BRAIN_TASK: health
+      BRAIN_FFMPEG_BIN: /usr/bin/ffmpeg
     steps:
       - name: Checkout Brain source of truth
         uses: actions/checkout@v4
@@ -48,6 +49,12 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
+      - name: Install Brain Python dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r brain_v12/requirements.txt
+
       - name: Audit runtime
         run: |
           set -euo pipefail
@@ -63,6 +70,7 @@ jobs:
             echo "arch=$RUNNER_ARCH"
             echo "python=$(python --version)"
             echo "ffmpeg=$(ffmpeg -version | head -n 1)"
+            echo "brain_ffmpeg=$BRAIN_FFMPEG_BIN"
           } | tee brain6_artifacts/github_cloud/runtime.txt
           git status --short
           git log -1 --oneline
