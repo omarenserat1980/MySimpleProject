@@ -55,6 +55,25 @@ class BrainSupervisor:
         self._event(row["job_id"], "phase", {"phase":phase,"status":status,"details":row["details"]})
         return row
 
+    def next_action(self, job, verification):
+        """Return the next bounded action from real verification evidence."""
+        if verification.get("verified") or verification.get("ok"):
+            return {"action":"deliver","reason":"verified"}
+        if job.get("attempts",0) >= job.get("max_attempts",self.max_cycles):
+            return {"action":"blocked","reason":"attempt_limit"}
+        return self.decide_repair(verification)
+
+    def repair_and_retry(self, job, verification):
+        action=self.next_action(job, verification)
+        if action["action"]=="deliver":
+            return self.transition(job,"deliver",status="completed",details=action)
+        if action["action"]=="blocked":
+            return self.transition(job,"blocked",status="blocked",details=action)
+        repaired=self.transition(job,"repair",details=action)
+        retried=self.control.start_attempt(repaired)
+        self._event(retried["job_id"],"repair_retry_started",action)
+        return self.transition(retried,"retry",details={"action":action["action"]})
+
     def decide_repair(self, verification):
         if verification.get("ok"):
             return {"action":"none","reason":"verified"}
