@@ -2,6 +2,9 @@ name: Brain Cinematic Repair Contract Smoke
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'brain/cinematic-master-qc-v1'
 
 jobs:
   smoke:
