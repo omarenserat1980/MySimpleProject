@@ -113,6 +113,18 @@ jobs:
             echo "No brain_v12/tests directory; compile gate remains authoritative."
           fi
 
+      - name: Verify task result evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f brain6_artifacts/github_cloud/task_result.json
+          python - <<'PY'
+          import json
+          p="brain6_artifacts/github_cloud/task_result.json"
+          d=json.load(open(p, encoding="utf-8"))
+          print(json.dumps(d, indent=2))
+          PY
+
       - name: Verify toolchain
         run: |
           set -euo pipefail
