@@ -10,6 +10,7 @@ jobs:
   cinematic-quality-gate:
     name: CINEMATIC QUALITY GATE
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -23,14 +24,20 @@ jobs:
             brain_v12/machine_cinematic_factory.py
 
       - name: Install FFmpeg and local voice generator
+        timeout-minutes: 5
         run: |
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update -y
-          sudo apt-get install -y ffmpeg espeak-ng
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
           command -v ffmpeg
+          command -v espeak-ng
           ffmpeg -version | head -n 1
+          espeak-ng --version | head -n 1
 
       - name: Execute unified Cinematic Quality Gate
         run: |
+          set -euxo pipefail
           python brain_v12/cinematic_quality_gate.py
 
       - name: Publish gate evidence
