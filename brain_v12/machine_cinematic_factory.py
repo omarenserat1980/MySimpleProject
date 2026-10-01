@@ -135,8 +135,13 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
     content_qc=cinematic_master_qc(final, manifest_path)
     manifest["cinematic_master_qc"]=content_qc
     if content_qc["status"] != "CINEMATIC_QC_PASSED":
-        manifest["status"]="CINEMATIC_QC_FAILED"
+        manifest["status"]="REPAIR_REQUIRED"
+        manifest["repair_manifest"]=content_qc.get("repair_manifest", {})
         (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+        (OUT/"cinematic_repair_manifest.json").write_text(
+            json.dumps(content_qc.get("repair_manifest", {}), ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
         return manifest
     manifest["status"]="VERIFIED_COMPLETED"
     (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
