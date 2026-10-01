@@ -5,7 +5,7 @@ metadata, authorization boundaries, audit records, and workflow integration.
 GitHub is not required by this module.
 """
 from __future__ import annotations
-import hashlib, json, os, sqlite3, subprocess, time
+import hashlib, json, os, sqlite3, subprocess, time, tempfile, shutil
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +49,30 @@ class BrainGitService:
     def list_repositories(self):
         with self._db() as c:return [dict(x) for x in c.execute("SELECT * FROM repositories ORDER BY created_at DESC")]
     def _path(self,name): return Path(self.repository(name)["path"])
+    def create_branch(self,name,branch,from_ref=""): 
+        repo=self._path(name); base=from_ref.strip() or ""
+        args=["branch",branch]
+        if base: args.append(base)
+        self._run(args,cwd=repo); self._audit("branch.create",name,{"branch":branch,"from":base or "HEAD"}); return self.branches(name)
+    def commit_files(self,name,files,message,branch="main",author_name="Brain",author_email="brain@localhost"):
+        repo=self._path(name)
+        with tempfile.TemporaryDirectory() as d:
+            work=Path(d)/"work"; self._run(["clone",str(repo),str(work)])
+            if branch:
+                self._run(["checkout","-B",branch],cwd=work)
+            for rel,content in files.items():
+                p=work/rel; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(content,encoding="utf-8")
+            self._run(["add","--all"],cwd=work)
+            env=dict(os.environ, GIT_AUTHOR_NAME=author_name,GIT_AUTHOR_EMAIL=author_email,GIT_COMMITTER_NAME=author_name,GIT_COMMITTER_EMAIL=author_email)
+            p=subprocess.run(["git","commit","-m",message],cwd=work,text=True,capture_output=True,env=env)
+            if p.returncode and "nothing to commit" not in p.stdout+p.stderr: raise BrainGitError(p.stderr.strip())
+            sha=self._run(["rev-parse","HEAD"],cwd=work)
+            self._run(["push","origin",f"HEAD:refs/heads/{branch}"],cwd=work)
+        self._audit("commit.create",name,{"branch":branch,"sha":sha,"files":sorted(files),"message":message})
+        return {"sha":sha,"branch":branch,"files":sorted(files)}
+    def read_file_at(self,name,path,ref="HEAD"):
+        data=self._run(["show",f"{ref}:{path}"],cwd=self._path(name)); return data
+
     def branches(self,name):
         out=self._run(["for-each-ref","--format=%(refname:short) %(objectname)","refs/heads"],cwd=self._path(name))
         return [{"name":x.split()[0],"sha":x.split()[1]} for x in out.splitlines() if x.strip()]
