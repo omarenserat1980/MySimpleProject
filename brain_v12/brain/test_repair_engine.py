@@ -23,7 +23,7 @@ class RepairEngineTests(unittest.TestCase):
     def test_exact_patch_rolls_back_when_validation_fails(self):
         engine = RepairEngine()
         with tempfile.TemporaryDirectory() as d:
-            p = Path(d) / "brain_v12/verification"
+            p = Path(d) / "brain0/programs"
             p.mkdir(parents=True)
             f = p / "verification_suite.py"
             original = "vm = BrainVM()\nr = vm.run(max_steps=1000)"
