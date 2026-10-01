@@ -178,22 +178,44 @@ def main() -> int:
                 json.dumps(improvement, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            old_failure = os.environ.get("BRAIN_FAILURE_FILE")
-            os.environ["BRAIN_FAILURE_FILE"] = str(improvement_file)
-            improved, improvement_details = repair(args.timeout)
-            if old_failure is None:
-                os.environ.pop("BRAIN_FAILURE_FILE", None)
-            else:
-                os.environ["BRAIN_FAILURE_FILE"] = old_failure
-            entry["proactive_improvement"] = improvement_details
-            if improved:
-                final_ok, after_improvement = deterministic_review(args.timeout)
-                entry["improvement_verification"] = after_improvement
-                if not final_ok:
-                    final_ok = True
-                    entry["status"] = "IMPROVEMENT_REJECTED_AND_ROLLED_BACK"
-            else:
+            candidate_count = int(improvement.get("candidate_count", 0) or 0)
+            mode = str(improvement.get("mode", "PROPOSAL_ONLY"))
+            generator_configured = bool(os.getenv("BRAIN_CODE_GENERATOR_COMMAND"))
+            eligible = candidate_count > 0 and mode == "GENERATOR_ELIGIBLE" and generator_configured
+            entry["improvement_eligibility"] = {
+                "candidate_count": candidate_count,
+                "mode": mode,
+                "generator_configured": generator_configured,
+                "eligible": eligible,
+            }
+
+            if not eligible:
+                entry["proactive_improvement"] = {
+                    "status": "NOT_APPLIED",
+                    "reason": (
+                        "no_safe_candidate"
+                        if candidate_count == 0
+                        else "generator_not_eligible"
+                    ),
+                }
                 entry["status"] = "VERIFIED_NO_IMPROVEMENT"
+            else:
+                old_failure = os.environ.get("BRAIN_FAILURE_FILE")
+                os.environ["BRAIN_FAILURE_FILE"] = str(improvement_file)
+                improved, improvement_details = repair(args.timeout)
+                if old_failure is None:
+                    os.environ.pop("BRAIN_FAILURE_FILE", None)
+                else:
+                    os.environ["BRAIN_FAILURE_FILE"] = old_failure
+                entry["proactive_improvement"] = improvement_details
+                if improved:
+                    final_ok, after_improvement = deterministic_review(args.timeout)
+                    entry["improvement_verification"] = after_improvement
+                    if not final_ok:
+                        final_ok = True
+                        entry["status"] = "IMPROVEMENT_REJECTED_AND_ROLLED_BACK"
+                else:
+                    entry["status"] = "VERIFIED_NO_IMPROVEMENT"
 
         entry["finished_at"] = now()
         history.append(entry)
