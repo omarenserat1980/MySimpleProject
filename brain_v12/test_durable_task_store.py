@@ -24,7 +24,7 @@ class DurableTaskStoreTests(unittest.TestCase):
         with db.lock:
             db.db.execute("UPDATE tasks SET lease_expires_at=? WHERE task_id=?", (time.time()-1,"t2"))
             db.db.commit()
-        self.assertEqual(db.recover_expired(),1)
+        self.assertEqual(len(db.recover_expired()),1)
         self.assertEqual(db.get("t2")["status"],"QUEUED")
 
 if __name__=="__main__":
