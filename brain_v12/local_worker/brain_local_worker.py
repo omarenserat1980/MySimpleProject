@@ -43,7 +43,7 @@ def execute(task: str, params: dict):
     if task == "filesystem_probe":
         usage = shutil.disk_usage(Path.cwd())
         return {"free_bytes": usage.free, "total_bytes": usage.total}
-    if task == "brain_machine_cinema_60m":
+    if task in ("brain_machine_cinema_60m", "brain_machine_cinema_120m"):
         import subprocess
         title = str(params.get("title", "BRAIN — فيلم الآلة")).strip()
         env = os.environ.copy()
