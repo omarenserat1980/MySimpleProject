@@ -214,15 +214,17 @@ def main() -> int:
                 entry["status"] = "VERIFIED_NO_IMPROVEMENT"
             else:
                 old_failure = os.environ.get("BRAIN_FAILURE_FILE")
+                old_context = os.environ.get("BRAIN_REPAIR_CONTEXT")
                 os.environ["BRAIN_FAILURE_FILE"] = str(improvement_file)
-                improved, improvement_details = repair(args.timeout)
+                os.environ["BRAIN_REPAIR_CONTEXT"] = "improvement"
                 if old_failure is None:
                     os.environ.pop("BRAIN_FAILURE_FILE", None)
                 else:
                     os.environ["BRAIN_FAILURE_FILE"] = old_failure
-                entry["proactive_improvement"] = improvement_details
-                print("BRAIN_PROACTIVE_IMPROVEMENT=" + json.dumps(improvement_details, ensure_ascii=False, sort_keys=True), flush=True)
-                if improved:
+                if old_context is None:
+                    os.environ.pop("BRAIN_REPAIR_CONTEXT", None)
+                else:
+                    os.environ["BRAIN_REPAIR_CONTEXT"] = old_context
                     final_ok, after_improvement = deterministic_review(args.timeout)
                     entry["improvement_verification"] = after_improvement
                     if not final_ok:
