@@ -33,6 +33,7 @@ jobs:
         env:
           ISO_URL: ${{ inputs.iso_url }}
         run: |
+          set -euo pipefail
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
           test -s windows-server-2025.iso
           xorriso -indev windows-server-2025.iso -toc 2>&1 | tee iso-toc.txt
@@ -41,11 +42,30 @@ jobs:
 
       - name: Inspect Windows image
         run: |
+          set -euo pipefail
           sudo mkdir -p /mnt/ws
           sudo mount -o loop,ro windows-server-2025.iso /mnt/ws
+          trap 'sudo umount /mnt/ws || true' EXIT
           test -f /mnt/ws/sources/install.wim
           wimlib-imagex info /mnt/ws/sources/install.wim | tee wim-info.txt
           grep -Eq 'Windows Server 2025|SERVERSTANDARD' wim-info.txt
+          image_index="$(
+            awk '
+              /^Index:/ {idx=$2}
+              /^Name:[[:space:]]+Windows Server 2025 SERVERDATACENTER$/ {print idx; exit}
+            ' wim-info.txt
+          )"
+          if [ -z "$image_index" ]; then
+            image_index="$(
+              awk '
+                /^Index:/ {idx=$2}
+                /^Name:[[:space:]]+Windows Server 2025 SERVERSTANDARD$/ {print idx; exit}
+              ' wim-info.txt
+            )"
+          fi
+          test -n "$image_index"
+          printf 'IMAGE_INDEX=%s\n' "$image_index" | tee windows-image-index.txt
+          echo "Selected Windows Server 2025 image index: $image_index"
 
       - name: Build evidence-enabled unattended media
         shell: bash
@@ -53,10 +73,11 @@ jobs:
           set -euo pipefail
           image_index="$(cut -d= -f2 windows-image-index.txt)"
           test -n "$image_index"
+          sudo umount /mnt/ws 2>/dev/null || true
           rm -rf /tmp/brain-ws-oem
           python - <<'PY'
           from pathlib import Path
-          root = Path("/tmp/brain-ws-oem") / "$OEM$" / "$" / "Setup" / "Scripts"
+          root = Path("/tmp/brain-ws-oem") / "$OEM$" / "$$" / "Setup" / "Scripts"
           root.mkdir(parents=True, exist_ok=True)
           print(root)
           PY
@@ -64,7 +85,6 @@ jobs:
           test -d "$oem_scripts"
           cp brain_v12/windows_boot_evidence.ps1 "$oem_scripts/brain-windows-evidence.ps1"
           cp brain_v12/windows_setupcomplete.cmd "$oem_scripts/SetupComplete.cmd"
-          test -f "$oem_scripts/SetupComplete.cmd"
 
           cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
           <?xml version="1.0" encoding="utf-8"?>
@@ -114,12 +134,10 @@ jobs:
             -outdev brain-windows-server-2025-proof.iso \
             -boot_image any replay \
             -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
-            -map /tmp/brain-ws-oem/\$OEM\$ '/sources/$OEM$' \
+            -map /tmp/brain-ws-oem/\$OEM\$ '/sources/\$OEM\$' \
             -commit
           test -s brain-windows-server-2025-proof.iso
           sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
-
-
 
       - name: Prepare virtual blade storage
         run: |
