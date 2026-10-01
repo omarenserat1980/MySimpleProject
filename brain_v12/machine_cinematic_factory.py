@@ -17,6 +17,7 @@ PART_SECONDS = max(5, int(os.environ.get("BRAIN_FILM_PART_SECONDS", "30")))
 START_PART = max(1, int(os.environ.get("BRAIN_FILM_START", "1")))
 END_PART = min(PARTS, int(os.environ.get("BRAIN_FILM_END", str(PARTS))))
 W, H = 1000, 650
+REPAIR_CONTRACT_PATH = Path(os.environ.get('BRAIN_CINEMATIC_REPAIR_CONTRACT', '')) if os.environ.get('BRAIN_CINEMATIC_REPAIR_CONTRACT') else None
 
 SHOTS = [
     ("الفجر", "landscape", "sunrise"), ("الطريق", "car", "road"),
@@ -27,7 +28,7 @@ SHOTS = [
     ("المطاردة", "car", "highway"), ("السطح", "green_mask", "rooftop"),
 ]
 
-def scene_for(i, title, typ, extra):
+def scene_for(i, title, typ, extra, repair_contract=None):
     palette = "night" if i % 5 == 0 or extra == "night" else ("sunset" if i % 7 == 0 else "default")
     words = {"landscape":"منظر طبيعي سينمائي","city":"مدينة سينمائية","car":"مطاردة سيارة سينمائية",
              "robot":"روبوت سينمائي","green_mask":"بطل القناع الأخضر في مشهد سينمائي"}
@@ -36,6 +37,12 @@ def scene_for(i, title, typ, extra):
     from brain_v12.machine_raster_engine import render_machine
     scene = visual_engine.compile_scene(prompt, typ)
     scene["palette"] = palette
+    scene["scene_id"] = f"{typ}:{extra}:{i}"
+    scene["variant"] = i
+    if repair_contract:
+        scene["cinematic_repair_contract"] = repair_contract
+        if repair_contract.get("visual_diversity_required"):
+            scene["variant"] = i * 17
     png, commands = render_machine(scene)
     return scene, png, commands
 
@@ -122,16 +129,20 @@ def apply_cinematic_repair_contract(manifest: dict) -> dict:
 
 def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"):
     OUT.mkdir(parents=True, exist_ok=True)
+    repair_contract = None
+    contract_path = REPAIR_CONTRACT_PATH or (OUT / "cinematic_repair_contract.json")
+    if contract_path.exists():
+        repair_contract = json.loads(contract_path.read_text(encoding="utf-8"))
     target=PARTS*PART_SECONDS
     manifest={"title":title,"renderer":"Brain Machine Raster Painter",
-              "binary_model":"deterministic 0/1 raster instruction stream -> PNG bytes -> H.264 film","machine_language":"BRAIN-Raster-0/1","binary_instruction_encoding":"opcode + integer operands encoded as bits","parts":PARTS,
+              "binary_model":"deterministic 0/1 raster instruction stream -> PNG bytes -> H.264 film","machine_language":"BRAIN-Raster-0/1","binary_instruction_encoding":"opcode + integer operands encoded as bits","parts":PARTS,"repair_contract":repair_contract,
               "part_seconds":PART_SECONDS,"target_seconds":target,"fps":FPS,"parts_manifest":[]}
     clips=[]
     if START_PART > END_PART:
         raise ValueError(f"invalid_part_range:{START_PART}:{END_PART}")
     for i in range(START_PART,END_PART+1):
         title0,typ,extra=SHOTS[(i-1)%len(SHOTS)]
-        scene,png,commands=scene_for(i,title0,typ,extra)
+        scene,png,commands=scene_for(i,title0,typ,extra,repair_contract)
         clip=render_part(i,png); q=qc(clip)
         if not(q["video"] and PART_SECONDS-1<=q["duration"]<=PART_SECONDS+1 and q["width"]==W and q["height"]==H):
             raise RuntimeError(f"PART_QC_FAILED:{i}:{q}")
