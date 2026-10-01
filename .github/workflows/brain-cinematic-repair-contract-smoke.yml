@@ -1,4 +1,4 @@
-name: Brain Cinematic Repair Contract Smoke
+name: BRAIN Cinematic Quality Gate
 
 on:
   workflow_dispatch:
@@ -7,128 +7,34 @@ on:
       - 'brain/cinematic-master-qc-v1'
 
 jobs:
-  smoke:
+  cinematic-quality-gate:
+    name: CINEMATIC QUALITY GATE
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate Python syntax
-        run: |
-          python -m py_compile             brain_v12/cinematic_master_qc.py             brain_v12/cinematic_repair_loop.py             brain_v12/machine_raster_engine.py             brain_v12/machine_cinematic_factory.py
-      - name: Validate repair contract compiler
-        run: |
-          cat > /tmp/qc.json <<'JSON'
-          {
-            "repair_manifest": {
-              "mandatory_requirements": [
-                "INCREASE_DISTINCT_SCENE_COUNT",
-                "GENERATE_MATERIALLY_DIVERSE_VISUALS",
-                "REBUILD_DUPLICATE_SCENES",
-                "REQUIRE_CAMERA_OR_ELEMENT_MOTION"
-              ]
-            }
-          }
-          JSON
-          python brain_v12/cinematic_repair_loop.py --qc /tmp/qc.json --output /tmp/contract.json
-          python - <<'PY'
-          import json
-          c=json.load(open("/tmp/contract.json"))
-          assert c["status"]=="REPAIR_REQUIRED"
-          assert c["min_distinct_scenes"]==24
-          assert c["visual_diversity_required"] is True
-          assert c["duplicate_scene_policy"]=="reject"
-          assert c["motion_required"] is True
-          print("REPAIR_CONTRACT_OK")
-          PY
-      - name: Render two materially different machine scenes
-        run: |
-          python - <<'PY'
-          import hashlib
-          from brain_v12.machine_raster_engine import render_machine
-          a={"type":"landscape","palette":"default","scene_id":"smoke:1","variant":1,"objects":["sun","stars","tree"]}
-          b={"type":"landscape","palette":"default","scene_id":"smoke:2","variant":17,"objects":["sun","stars","tree"]}
-          pa,_=render_machine(a); pb,_=render_machine(b)
-          assert hashlib.sha256(pa).hexdigest()!=hashlib.sha256(pb).hexdigest()
-          print("VISUAL_VARIATION_OK")
-          PY
 
-      - name: Verify duplicate-scene gate rejects repeated scene signatures
+      - name: Validate gate source
         run: |
-          python - <<'PY'
-          import json, copy
-          from pathlib import Path
-          from brain_v12.cinematic_master_qc import evaluate
-          src=json.load(open("/tmp/brain-smoke/manifest.json"))
-          broken=copy.deepcopy(src)
-          broken["parts_manifest"][1]["scene"]=copy.deepcopy(broken["parts_manifest"][0]["scene"])
-          broken["parts_manifest"][1]["scene"]["scene_id"]=broken["parts_manifest"][0]["scene"]["scene_id"]
-          mp=Path("/tmp/duplicate-manifest.json")
-          mp.write_text(json.dumps(broken), encoding="utf-8")
-          out=evaluate(Path("/tmp/brain-smoke/final.mp4"), mp)
-          assert out["checks"]["duplicate_scene_detection"] is False
-          assert "REBUILD_DUPLICATE_SCENES" in out["repair_manifest"]["mandatory_requirements"]
-          print("DUPLICATE_SCENE_NEGATIVE_GATE_OK")
-          PY
+          python -m py_compile \
+            brain_v12/cinematic_quality_gate.py \
+            brain_v12/cinematic_master_qc.py \
+            brain_v12/cinematic_repair_loop.py \
+            brain_v12/machine_raster_engine.py \
+            brain_v12/machine_cinematic_factory.py
 
-      - name: Verify continuity gate rejects broken scene identity
-        run: |
-          python - <<'PY'
-          import json, copy, os, tempfile
-          from pathlib import Path
-          from brain_v12.cinematic_master_qc import evaluate
-          src=json.load(open("/tmp/brain-smoke/manifest.json"))
-          broken=copy.deepcopy(src)
-          broken["parts_manifest"][1]["scene"]["world_id"]="BROKEN-WORLD"
-          broken["parts_manifest"][1]["scene"]["continuity_anchor"]="broken"
-          mp=Path("/tmp/broken-manifest.json")
-          mp.write_text(json.dumps(broken), encoding="utf-8")
-          out=evaluate(Path("/tmp/brain-smoke/final.mp4"), mp)
-          assert out["checks"]["character_story_continuity"] is False
-          assert "REQUIRE_SCENE_CHARACTER_WORLD_BIBLES" in out["repair_manifest"]["mandatory_requirements"]
-          print("CONTINUITY_NEGATIVE_GATE_OK")
-          PY
-
-      - name: Execute repaired audio render
+      - name: Install local voice generator
         run: |
           sudo apt-get update -y
           sudo apt-get install -y espeak-ng
-          cat > /tmp/repair-contract.json <<'JSON'
-          {
-            "status": "REPAIR_REQUIRED",
-            "reject_on_missing_evidence": true,
-            "mandatory_requirements": [
-              "REQUIRE_VOICE_NARRATION_ASSETS",
-              "REQUIRE_MUSIC_ASSETS",
-              "REQUIRE_SFX_AMBIENCE_ASSETS",
-              "REQUIRE_CAMERA_OR_ELEMENT_MOTION"
-            ],
-            "voice_required": true,
-            "music_required": true,
-            "sfx_required": true,
-            "motion_required": true,
-            "min_video_bitrate_bps": 800000
-          }
-          JSON
-          rm -rf /tmp/brain-smoke
-          BRAIN_MACHINE_FILM_ROOT=/tmp/brain-smoke           BRAIN_FILM_PARTS=2           BRAIN_FILM_START=1           BRAIN_FILM_END=2           BRAIN_FILM_PART_SECONDS=2           BRAIN_CINEMATIC_REPAIR_CONTRACT=/tmp/repair-contract.json           python brain_v12/machine_cinematic_factory.py > /tmp/factory-output.json
-          test -s /tmp/brain-smoke/parts/001/voice.wav
-          test -s /tmp/brain-smoke/parts/001/music.wav
-          test -s /tmp/brain-smoke/parts/001/sfx.wav
-          test -s /tmp/brain-smoke/parts/001/part-001.mp4
-          ffprobe -v error -select_streams a -show_entries stream=codec_type             -of csv=p=0 /tmp/brain-smoke/parts/001/part-001.mp4 | grep -qx audio
-          python - <<'PY'
-          import json, os
-          m=json.load(open("/tmp/brain-smoke/manifest.json"))
-          a=m["parts_manifest"][0]["audio_assets"]
-          assert all(a[k] and os.path.getsize(a[k]) > 0 for k in ("voice","music","sfx"))
-          assert m["cinematic_master_qc"]["status"] == "CINEMATIC_QC_FAILED"
-          assert m["timeline_transitions"]["type"] == "xfade"
-          assert m["timeline_transitions"]["count"] == 1
-          req=set(m["cinematic_master_qc"]["repair_manifest"]["mandatory_requirements"])
-          assert "REQUIRE_REAL_SCENE_TRANSITIONS" not in req
-          assert "REQUIRE_VOICE_NARRATION_ASSETS" not in req
-          assert "REQUIRE_MUSIC_ASSETS" not in req
-          assert "REQUIRE_SFX_AMBIENCE_ASSETS" not in req
-          print("AUDIO_ASSET_MANIFEST_OK")
-          print("CINEMATIC_GATE_EXECUTED_OK")
-          PY
-          echo "REPAIRED_AUDIO_RENDER_OK"
+
+      - name: Execute unified Cinematic Quality Gate
+        run: |
+          python brain_v12/cinematic_quality_gate.py
+
+      - name: Publish gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-cinematic-quality-gate-evidence
+          path: /tmp/brain-cinematic-quality-gate/
+          if-no-files-found: warn
