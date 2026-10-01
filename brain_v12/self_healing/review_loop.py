@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .command_contract import is_continue
+from .generator_registry import supported_candidates
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
