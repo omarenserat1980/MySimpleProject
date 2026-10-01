@@ -6,7 +6,7 @@ on:
       iso_url:
         description: "Direct Microsoft Windows Server 2025 x64 ISO URL after registration"
         required: true
-        default: "https://aka.ms/WinServ2025iso-enus"
+        default: "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us"
         type: string
       timeout_minutes:
         description: "Maximum guest boot/install time"
