@@ -45,6 +45,8 @@ from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
+from .brain.evidence_store import EvidenceStore
+from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .movie_summary_factory.engine import create_job, mark_stage
@@ -80,6 +82,8 @@ brain_self_monitor=BrainSelfMonitor(ROOT)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
+evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
+verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -2119,6 +2123,28 @@ def agent_execute(request:Request, body:Exec):
 @app.post("/api/builder/plan")
 def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
+
+@app.get("/api/brain/recovery")
+def brain_recovery():
+    recovered=brain_datacenter.task_queue.recover_expired()
+    return {"ok":True,"status":"RECOVERY_COMPLETE","recovered":recovered,"queue":brain_datacenter.queue_status()}
+
+@app.post("/api/brain/tasks/{task_id}/verify")
+def brain_task_verify(task_id:str):
+    task=brain_datacenter.task_queue.get(task_id)
+    result=verification_engine.verify_execution(task)
+    store.event("BRAIN_TASK_VERIFICATION",{"task_id":task_id,"status":result.get("status"),"evidence_id":result.get("evidence_id")})
+    return result
+
+@app.get("/api/brain/evidence/{evidence_id}")
+def brain_evidence(evidence_id:str):
+    item=evidence_store.get(evidence_id)
+    if item is None: raise HTTPException(status_code=404,detail="EVIDENCE_NOT_FOUND")
+    return item
+
+@app.get("/api/brain/evidence/task/{task_id}")
+def brain_task_evidence(task_id:str):
+    return {"ok":True,"task_id":task_id,"evidence":evidence_store.for_task(task_id)}
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
