@@ -75,6 +75,12 @@ class DurableTaskStore:
               WHERE task_id=? AND status='RUNNING'""",(status,json.dumps(result,ensure_ascii=False),error,now,task_id))
             self.db.commit(); return self.get(task_id)
 
+    def requeue(self,task_id):
+        now=time.time()
+        with self.lock:
+            cur=self.db.execute("UPDATE tasks SET status='QUEUED',blade_id=NULL,lease_id=NULL,lease_expires_at=NULL,updated_at=? WHERE task_id=? AND status='RUNNING'",(now,task_id))
+            self.db.commit(); return cur.rowcount==1
+
     def recover_expired(self):
         now=time.time()
         with self.lock:
