@@ -1,0 +1,22 @@
+name: BRAIN-0-1 Full Verification
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'brain0/**'
+      - '.github/workflows/brain0-full-verification.yml'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: python -m compileall -q brain0
+      - name: Core proof
+        run: PYTHONPATH=. python brain0/programs/self_test.py
+      - name: Supervisor proof
+        run: PYTHONPATH=. python brain0/programs/supervisor_test.py
+      - name: Runtime proof
+        run: PYTHONPATH=. python brain0/programs/runtime_test.py
+      - name: Tests
+        run: python -m pytest -q brain0/tests
