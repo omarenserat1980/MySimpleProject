@@ -188,7 +188,6 @@ def main() -> int:
     progress(6, total, "Negative continuity gate", "PASSED", "Broken continuity was correctly rejected")
 
     progress(7, total, "Negative duplicate-scene gate", "RUNNING", "Injecting duplicate scene identity and verifying rejection")
-    progress(6, total, "Negative continuity gate", "RUNNING", "Verifying broken continuity is rejected")
     duplicate = copy.deepcopy(manifest)
     duplicate["parts_manifest"][1]["scene"] = copy.deepcopy(duplicate["parts_manifest"][0]["scene"])
     duplicate["parts_manifest"][1]["scene"]["scene_id"] = duplicate["parts_manifest"][0]["scene"]["scene_id"]
@@ -226,4 +225,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        WORK.mkdir(parents=True, exist_ok=True)
+        failed = {"status": "FAILED", "error_type": type(exc).__name__, "error": str(exc)[-4000:]}
+        (WORK / "CINEMATIC_QUALITY_GATE_FAILURE.json").write_text(json.dumps(failed, ensure_ascii=False, indent=2), encoding="utf-8")
+        print("\n=== CINEMATIC QUALITY GATE | FAILED ===")
+        print("FAILURE: " + type(exc).__name__ + ": " + str(exc)[-4000:])
+        print("GATE_STATUS=FAILED")
+        raise
