@@ -19,21 +19,32 @@ class RepairPlan:
 
 
 class RepairEngine:
-    """Bounded, allowlisted repair planner.
+    """Bounded allowlisted repair planner with exact-match patches only."""
 
-    It never invents arbitrary source edits. A source repair is allowed only
-    when the error signature, target path, and exact old text all match a
-    registered recipe.
-    """
+    ACTIONS = {
+        "EXECUTION_INFRA": "RERUN_FAILED_JOBS",
+        "MEDIA_OR_VM_PIPELINE": "RERUN_OR_FALLBACK_MEDIA",
+        "INPUT_OR_ARTIFACT": "REBUILD_ARTIFACT",
+        "DEPENDENCY_OR_IMPORT": "BLOCK_FOR_REVIEW",
+    }
 
-    ACTIONS = {\n        "EXECUTION_INFRA": "RERUN_FAILED_JOBS",\n        "MEDIA_OR_VM_PIPELINE": "RERUN_OR_FALLBACK_MEDIA",\n        "INPUT_OR_ARTIFACT": "REBUILD_ARTIFACT",\n        "DEPENDENCY_OR_IMPORT": "BLOCK_FOR_REVIEW",\n    }\n\n    RECIPES = (
+    RECIPES = (
         {
             "name": "verification_vm_load",
-            "patterns": (r"not enough values to unpack", r"verification_suite\.py"),
-            "path": "brain_v12/verification/verification_suite.py",
+            "patterns": (
+                r"not enough values to unpack",
+                r"verification_suite\.py",
+            ),
+            "path": "brain0/programs/verification_suite.py",
             "old": "vm = BrainVM()\nr = vm.run(max_steps=1000)",
             "new": "vm = BrainVM()\nvm.load(p)\nr = vm.run(max_steps=1000)",
-            "test": ("python", "-m", "unittest", "brain_v12.verification.verification_suite", "-v"),
+            "test": (
+                "python",
+                "-m",
+                "unittest",
+                "brain0.programs.verification_suite",
+                "-v",
+            ),
         },
     )
 
@@ -56,7 +67,7 @@ class RepairEngine:
     def plan(self, log: str) -> RepairPlan:
         classification = self.diagnose(log)
         for recipe in self.RECIPES:
-            if all(re.search(p, log or "", re.I) for p in recipe["patterns"]):
+            if all(re.search(pattern, log or "", re.I) for pattern in recipe["patterns"]):
                 return RepairPlan(
                     classification=classification,
                     action="APPLY_EXACT_PATCH",
@@ -68,24 +79,22 @@ class RepairEngine:
                     test_command=tuple(recipe["test"]),
                 )
 
-        action = {
-            "EXECUTION_INFRA": "RERUN_FAILED_JOBS",
-            "MEDIA_OR_VM_PIPELINE": "FALLBACK_OR_RERUN",
-            "INPUT_OR_ARTIFACT": "REBUILD_ARTIFACT",
-            "DEPENDENCY_OR_IMPORT": "BLOCK_FOR_REVIEW",
-        }.get(classification, "BLOCK_FOR_REVIEW")
-        return RepairPlan(classification, action, "MEDIUM" if action != "BLOCK_FOR_REVIEW" else "LOW", False)
+        action = self.ACTIONS.get(classification, "BLOCK_FOR_REVIEW")
+        return RepairPlan(
+            classification,
+            action,
+            "MEDIUM" if action != "BLOCK_FOR_REVIEW" else "LOW",
+            False,
+        )
 
     def apply(self, root: str | Path, plan: RepairPlan) -> bool:
         if not plan.safe or plan.action != "APPLY_EXACT_PATCH" or not plan.path:
             return False
         target = Path(root) / plan.path
-        if not target.is_file():
+        if not target.is_file() or not plan.old or not plan.new:
             return False
         text = target.read_text(encoding="utf-8")
-        if plan.old not in text:
-            return False
-        if plan.new in text:
+        if plan.old not in text or plan.new in text:
             return False
         target.write_text(text.replace(plan.old, plan.new, 1), encoding="utf-8")
         return True
@@ -112,7 +121,6 @@ class RepairEngine:
         except (OSError, subprocess.SubprocessError):
             ok = False
         if not ok:
-            # Roll back only the exact replacement we made.
             target = Path(root) / str(plan.path)
             text = target.read_text(encoding="utf-8")
             if plan.new and plan.old and plan.new in text:
@@ -129,8 +137,7 @@ def main() -> int:
     args = parser.parse_args()
 
     log = Path(args.log_file).read_text(encoding="utf-8", errors="replace")
-    engine = RepairEngine()
-    plan, ok = engine.repair(args.root, log)
+    plan, ok = RepairEngine().repair(args.root, log)
     print(f"REPAIR_CLASSIFICATION={plan.classification}")
     print(f"REPAIR_ACTION={plan.action}")
     print(f"REPAIR_SAFE={plan.safe}")
