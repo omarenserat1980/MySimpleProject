@@ -23,7 +23,7 @@ def build_patch(old: str, path: str, line_no: int, finding: str) -> str | None:
     line = lines[line_no - 1]
     if finding and finding.strip() != line.strip():
         return None
-    if "self_healing" not in line or "python" not in line:
+    if "self_healing" not in line or ("python" not in line and "sys.executable" not in line):
         return None
     match = TARGET.search(line)
     if not match:
