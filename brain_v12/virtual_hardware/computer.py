@@ -6,6 +6,8 @@ from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
 from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
+from .filesystem import VirtualFilesystem
+from .bootloader import VirtualBootloader
 
 @dataclass
 class VirtualComputer:
@@ -25,6 +27,8 @@ class VirtualComputer:
         self.gpu=VirtualGPU(self.gpu_width,self.gpu_height)
         self.firmware=VirtualFirmware()
         self.kernel=VirtualKernel()
+        self.filesystem=VirtualFilesystem(self.storage)
+        self.bootloader=VirtualBootloader()
         for n,d in [("cpu",self.cpu),("ram",self.ram),("storage",self.storage),("nic",self.nic),("gpu",self.gpu)]:
             self.bus.attach(n,d)
         self.powered=False
@@ -37,6 +41,10 @@ class VirtualComputer:
         self.cpu.reset()
         self.kernel.reset()
         self.boot_record=self.firmware.boot(self)
+        self.boot_record["bootloader"]=self.bootloader.load(self)
+        if not self.boot_record["bootloader"].get("ok"):
+            self.powered=False
+            raise RuntimeError("BOOTLOADER_FAILED")
         if not self.boot_record.get("ok"):
             self.powered=False
             raise RuntimeError("FIRMWARE_BOOT_FAILED")
@@ -61,6 +69,8 @@ class VirtualComputer:
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
                 "firmware":{"version":self.firmware.VERSION,"booted":bool(self.boot_record and self.boot_record.get("ok"))},
+                "bootloader":self.bootloader.VERSION,
+                "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
                 "cpu":{"pc":self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted},
                 "ram":{"size":self.ram.size},
