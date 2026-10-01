@@ -1,0 +1,20 @@
+name: BRAIN-0-1 Self Test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'brain0/**'
+      - '.github/workflows/brain0-self-test.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax
+        run: python -m compileall -q brain0
+      - name: Binary core self-test
+        run: PYTHONPATH=. python brain0/programs/self_test.py
+      - name: Pytest core
+        run: python -m pytest -q brain0/tests/test_core.py
