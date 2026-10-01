@@ -88,7 +88,7 @@ def repair(timeout: int) -> tuple[bool, dict]:
     env["BRAIN_FAILURE_FILE"] = str(failure)
     try:
         p = subprocess.run(
-            [env.get("PYTHON", "python"), "brain_v12/self_healing/repair.py"],
+            [env.get("PYTHON", "python"), "-m", "brain_v12.self_healing.repair"],
             cwd=ROOT, env=env, text=True, capture_output=True, timeout=timeout
         )
         return p.returncode == 0, {
@@ -116,7 +116,8 @@ def main() -> int:
     if autonomous:
         print("BRAIN_COMMAND=CONTINUE_AUTONOMOUSLY", flush=True)
 
-    for i in range(1, args.loops + 1):        entry = {"loop": i, "started_at": now(), "review": review_files()}
+    for i in range(1, args.loops + 1):
+        entry = {"loop": i, "started_at": now(), "review": review_files()}
         ok, details = deterministic_review(args.timeout)
         entry["verification"] = details
         entry["status"] = "VERIFIED"
