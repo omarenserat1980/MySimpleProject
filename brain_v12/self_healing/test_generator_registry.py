@@ -14,6 +14,23 @@ class GeneratorRegistryTests(unittest.TestCase):
     def test_known_generator_is_explicit(self):
         self.assertIn("package-invocation-consistency", SUPPORTED_GENERATORS)
 
+    def test_contract_declares_verification_and_scope(self):
+        spec = SUPPORTED_GENERATORS["package-invocation-consistency"]
+        self.assertEqual(spec["max_changed_files"], 1)
+        self.assertIn("gate", spec["verification"])
+        self.assertTrue(spec["roots"])
+
+    def test_candidate_path_must_match_contract_scope(self):
+        from brain_v12.self_healing.generator_registry import candidate_valid
+        self.assertTrue(candidate_valid({
+            "id": "package-invocation-consistency",
+            "file": "brain_v12/self_healing/review_loop.py",
+        }))
+        self.assertFalse(candidate_valid({
+            "id": "package-invocation-consistency",
+            "file": "../outside.py",
+        }))
+
     def test_filter_only_returns_registered_candidates(self):
         candidates = [
             {"id": "package-invocation-consistency"},
