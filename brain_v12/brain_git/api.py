@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from .service import BrainGitError, BrainGitService
+from .file_browser import BrainGitFileBrowser
 import time
 
 class RepoIn(BaseModel):
@@ -48,6 +49,10 @@ def router(service:BrainGitService|None=None):
     def commit(name:str,body:CommitIn):
         try:return {"ok":True,"commit":svc.commit_files(name,body.files,body.message,body.branch)}
         except BrainGitError as e: raise HTTPException(400,str(e))
+    @r.get("/repositories/{name}/tree")
+    def tree(name:str,ref:str="HEAD",prefix:str=""):
+        try:return {"ok":True,"repository":name,"ref":ref,"files":BrainGitFileBrowser(svc).tree(name,ref,prefix)}
+        except BrainGitError as e: raise HTTPException(404,str(e))
     @r.get("/repositories/{name}/file")
     def file(name:str,path:str,ref:str="HEAD"):
         try:return {"ok":True,"path":path,"ref":ref,"content":svc.read_file_at(name,path,ref)}
