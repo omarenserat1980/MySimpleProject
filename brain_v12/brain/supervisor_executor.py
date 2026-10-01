@@ -1,5 +1,6 @@
 from __future__ import annotations
 from .failure_policy import FailurePolicy
+from .verification_engine import VerificationEngine
 
 class SupervisorExecutor:
     """Verification-driven bridge: execute, classify failure, and return bounded repair guidance."""
@@ -7,6 +8,7 @@ class SupervisorExecutor:
         self.supervisor=supervisor
         self.queue=queue
         self.failures=FailurePolicy()
+        self.verifier=VerificationEngine()
 
     def submit(self, program, capabilities=None, requirement=None, task_id=None, idempotency_key=None):
         task=self.queue.submit(program,capabilities,requirement,task_id,idempotency_key)
@@ -17,7 +19,8 @@ class SupervisorExecutor:
         if task is None:
             return {"ok":False,"status":"TASK_NOT_FOUND"}
         if task.status=="COMPLETED":
-            return {"ok":True,"status":"VERIFIED_PENDING_EXTERNAL_GATE","task_id":task_id,"result":task.result}
+            verification=self.verifier.verify_execution(task)
+            return {**verification,"task_id":task_id,"result":task.result}
         if task.status=="FAILED":
             error=(task.result or {}).get("error","execution_failed")
             decision=self.failures.decide(error,attempt,max_attempts)
