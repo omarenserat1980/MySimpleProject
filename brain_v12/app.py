@@ -38,6 +38,7 @@ from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_supervisor import BrainSupervisor
+from .brain.brain_self_monitor import BrainSelfMonitor
 from .brain_git.service import BrainGitService
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
@@ -71,6 +72,7 @@ income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
 device_bridge=DeviceBridge(store)
 brain_supervisor=BrainSupervisor()
+brain_self_monitor=BrainSelfMonitor(ROOT)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
@@ -1302,6 +1304,10 @@ def device_report(request:Request, body:DeviceReport):
 def device_result(task_id:str):
     return device_bridge.result(task_id)
 
+
+@app.get("/api/brain/self-monitor")
+def brain_self_monitor_status():
+    return brain_self_monitor.snapshot()
 
 @app.get("/api/supervisor/status")
 def supervisor_status():
