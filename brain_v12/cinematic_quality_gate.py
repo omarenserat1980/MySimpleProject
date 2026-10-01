@@ -29,7 +29,8 @@ CONTRACT = WORK / "repair-contract.json"
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
     p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
     if p.returncode:
-        raise RuntimeError((p.stdout + "\n" + p.stderr)[-8000:])
+        raise RuntimeError((p.stdout + "
+" + p.stderr)[-8000:])
     return p
 
 
@@ -97,7 +98,8 @@ def main() -> int:
         cwd=ROOT, env=env, text=True, capture_output=True, timeout=3600,
     )
     if p.returncode:
-        raise RuntimeError((p.stdout + "\n" + p.stderr)[-12000:])
+        raise RuntimeError((p.stdout + "
+" + p.stderr)[-12000:])
 
     manifest_path = WORK / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
@@ -113,7 +115,10 @@ def main() -> int:
     assert transitions.get("type") == "xfade"
     assert transitions.get("count") == 1
 
-    cinematic = manifest.get("cinematic_master_qc") or {}\n    if not cinematic:\n        from brain_v12.cinematic_master_qc import evaluate\n        cinematic = evaluate(final, manifest_path)
+    cinematic = manifest.get("cinematic_master_qc") or {}
+    if not cinematic:
+        from brain_v12.cinematic_master_qc import evaluate
+        cinematic = evaluate(final, manifest_path)
     assert cinematic.get("status") == "CINEMATIC_QC_FAILED"
     checks = cinematic.get("checks") or {}
     for key in ("voice_evidence", "music_evidence", "sfx_evidence",
