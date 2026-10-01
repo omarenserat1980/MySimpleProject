@@ -73,7 +73,7 @@ jobs:
           }
           JSON
           rm -rf /tmp/brain-smoke
-          BRAIN_MACHINE_FILM_ROOT=/tmp/brain-smoke           BRAIN_FILM_PARTS=1           BRAIN_FILM_START=1           BRAIN_FILM_END=1           BRAIN_FILM_PART_SECONDS=5           BRAIN_CINEMATIC_REPAIR_CONTRACT=/tmp/repair-contract.json           python brain_v12/machine_cinematic_factory.py > /tmp/factory-output.json
+          BRAIN_MACHINE_FILM_ROOT=/tmp/brain-smoke           BRAIN_FILM_PARTS=2           BRAIN_FILM_START=1           BRAIN_FILM_END=2           BRAIN_FILM_PART_SECONDS=2           BRAIN_CINEMATIC_REPAIR_CONTRACT=/tmp/repair-contract.json           python brain_v12/machine_cinematic_factory.py > /tmp/factory-output.json
           test -s /tmp/brain-smoke/parts/001/voice.wav
           test -s /tmp/brain-smoke/parts/001/music.wav
           test -s /tmp/brain-smoke/parts/001/sfx.wav
@@ -85,7 +85,10 @@ jobs:
           a=m["parts_manifest"][0]["audio_assets"]
           assert all(a[k] and os.path.getsize(a[k]) > 0 for k in ("voice","music","sfx"))
           assert m["cinematic_master_qc"]["status"] == "CINEMATIC_QC_FAILED"
+          assert m["timeline_transitions"]["type"] == "xfade"
+          assert m["timeline_transitions"]["count"] == 1
           req=set(m["cinematic_master_qc"]["repair_manifest"]["mandatory_requirements"])
+          assert "REQUIRE_REAL_SCENE_TRANSITIONS" not in req
           assert "REQUIRE_VOICE_NARRATION_ASSETS" not in req
           assert "REQUIRE_MUSIC_ASSETS" not in req
           assert "REQUIRE_SFX_AMBIENCE_ASSETS" not in req
