@@ -1,0 +1,10 @@
+<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>GitHub Brain — ملفات Brain</title>
+<style>body{font-family:system-ui;max-width:1100px;margin:auto;padding:24px}button,input{padding:9px;margin:4px}#files{line-height:1.9}pre{white-space:pre-wrap;background:#111;color:#eee;padding:16px;border-radius:8px}li{cursor:pointer}</style>
+<h1>🧠 GitHub Brain — ملفات Brain</h1>
+<p>هذه الواجهة تقرأ من Brain Git API، وليست من GitHub الخارجي.</p>
+<input id="repo" value="electronic-brain"><input id="ref" value="HEAD"><button onclick="load()">عرض الملفات</button>
+<ul id="files"></ul><h2 id="title"></h2><pre id="content"></pre>
+<script>
+async function load(){const r=repo.value,ref0=ref.value;const x=await fetch('/api/brain-git/repositories/'+encodeURIComponent(r)+'/tree?ref='+encodeURIComponent(ref0));const d=await x.json();files.innerHTML='';(d.files||[]).forEach(p=>{const li=document.createElement('li');li.textContent='📄 '+p;li.onclick=()=>openFile(r,ref0,p);files.appendChild(li)})}
+async function openFile(r,ref0,p){const x=await fetch('/api/brain-git/repositories/'+encodeURIComponent(r)+'/file?ref='+encodeURIComponent(ref0)+'&path='+encodeURIComponent(p));const d=await x.json();title.textContent=p+' @ '+ref0;content.textContent=d.content||d.detail||''}
+</script></html>
