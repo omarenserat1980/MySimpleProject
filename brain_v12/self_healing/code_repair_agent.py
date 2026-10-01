@@ -3,6 +3,7 @@
 from __future__ import annotations
 import os, subprocess, sys
 from pathlib import Path
+from brain_v12.self_healing.generator_registry import candidate_valid, contract
 DEFAULT_ROOTS=("brain_v12/","tests/","scripts/")
 STATE=Path(".brain/state"); PATCH_FILE=STATE/"last_applied_patch.diff"
 
@@ -21,7 +22,7 @@ def main()->int:
     if not failure: return fail("CODE_REPAIR_FAILURE_FILE_MISSING",2)
     if not generator: return fail("CODE_REPAIR_GENERATOR_NOT_CONFIGURED",2)
     if not Path(failure).is_file(): return fail("CODE_REPAIR_FAILURE_FILE_NOT_FOUND",2)
-    roots=tuple(x.strip().replace("\\","/") for x in os.getenv("BRAIN_REPAIR_ROOTS",",".join(DEFAULT_ROOTS)).split(",") if x.strip())
+    roots=tuple(x.strip().replace("\\","/") for x in os.getenv("BRAIN_REPAIR_ROOTS",",".join(DEFAULT_ROOTS)).split(",") if x.strip())\n    proposal=Path(".brain/state/current_improvement.json")\n    if not proposal.is_file(): return fail("CODE_REPAIR_PROPOSAL_MISSING",2)\n    import json\n    try: data=json.loads(proposal.read_text(encoding="utf-8"))\n    except Exception: return fail("CODE_REPAIR_PROPOSAL_INVALID",2)\n    candidates=[c for c in data.get("candidates",[]) if candidate_valid(c)]\n    if not candidates: return fail("CODE_REPAIR_NO_CONTRACT_VALID_CANDIDATE",2)\n    candidate_id=str(candidates[0].get("id"))\n    spec=contract(candidate_id)\n    if not spec: return fail("CODE_REPAIR_CONTRACT_MISSING",2)\n    env["BRAIN_GENERATOR_CANDIDATE_ID"]=candidate_id
     env=os.environ.copy(); env["BRAIN_REPAIR_FAILURE_FILE"]=str(Path(failure))
     env.setdefault("BRAIN_REPAIR_CANDIDATE",os.getenv("BRAIN_REPAIR_CANDIDATE","1"))
     try: p=subprocess.run(generator,shell=True,text=True,capture_output=True,timeout=int(os.getenv("BRAIN_GENERATOR_TIMEOUT","600")),env=env)
@@ -32,7 +33,7 @@ def main()->int:
     paths=changed_paths(diff)
     if not paths: return fail("CODE_REPAIR_NO_CHANGED_FILES",2)
     forbidden=[x for x in paths if Path(x).is_absolute() or not any(x==r.rstrip("/") or x.startswith(r) for r in roots)]
-    if forbidden: return fail("CODE_REPAIR_FORBIDDEN_PATHS="+",".join(forbidden),2)
+    if forbidden: return fail("CODE_REPAIR_FORBIDDEN_PATHS="+",".join(forbidden),2)\n    if len(paths) > int(spec.get("max_changed_files", 1)): return fail("CODE_REPAIR_TOO_MANY_CHANGED_FILES",2)\n    contract_roots=tuple(spec.get("roots",()))\n    contract_forbidden=[x for x in paths if not any(x==r.rstrip("/") or x.startswith(r) for r in contract_roots)]\n    if contract_forbidden: return fail("CODE_REPAIR_CONTRACT_PATHS="+",".join(contract_forbidden),2)
     check=subprocess.run(["git","apply","--check","--whitespace=error-all","-"],input=diff,text=True,capture_output=True)
     if check.returncode: return fail("CODE_REPAIR_PATCH_REJECTED",2)
     apply=subprocess.run(["git","apply","--whitespace=error-all","-"],input=diff,text=True,capture_output=True)
