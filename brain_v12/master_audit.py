@@ -79,7 +79,7 @@ def main() -> int:
     for name, cmd in {
         "python_compile": [sys.executable, "-m", "compileall", "-q", "brain_v12"],
         "quran_layer_audit": [sys.executable, "brain_v12/quran/quran_layer_audit.py"],
-        "v12_self_test": [sys.executable, "brain_v12/self_healing/self_test.py"],
+        # Run as a package so imports such as `from brain_v12...` resolve in CI.\n        "v12_self_test": [sys.executable, "-m", "brain_v12.self_healing.self_test"],
     }.items():
         result = run(cmd)
         report["runtime_checks"][name] = result
