@@ -41,6 +41,10 @@ jobs:
           command -v ges-launch-1.0
           gst-launch-1.0 --version | head -n 1
           ges-launch-1.0 --version 2>&1 | head -n 1 || true
+          gst-inspect-1.0 multifilesrc >/dev/null
+          gst-inspect-1.0 pngdec >/dev/null
+          gst-inspect-1.0 audiomixer >/dev/null
+          gst-inspect-1.0 mp4mux >/dev/null
           gst-inspect-1.0 x264enc >/dev/null
           gst-inspect-1.0 voaacenc >/dev/null
           ffmpeg -version | head -n 1
