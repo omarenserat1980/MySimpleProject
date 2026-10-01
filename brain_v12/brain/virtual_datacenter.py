@@ -68,6 +68,11 @@ class BrainVirtualDatacenter:
             blade_id=online[0].blade_id
         if blade_id not in self.chassis.blades:
             return {"ok":False,"status":"BLADE_NOT_FOUND","blade_id":blade_id}
+        blade=self.chassis.blades[blade_id]
+        requirement=ResourceRequirement(ram_bytes=ram_bytes,storage_bytes=disk_bytes)
+        if not self.resource_manager.can_allocate(blade,requirement):
+            return {"ok":False,"status":"INSUFFICIENT_RESOURCES","blade_id":blade_id,
+                    "required":{"ram_bytes":ram_bytes,"storage_bytes":disk_bytes}}
         vm=WindowsServerVM(f"{blade_id}-windows-2025",ram_bytes,disk_bytes)
         media=vm.attach_windows_server_2025(image_path,sha256)
         self.windows_vms[vm.name]=vm
