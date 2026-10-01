@@ -120,7 +120,7 @@ def main() -> int:
         capture_output=True,
     )
     if check.returncode:
-        return fail("CODE_REPAIR_PATCH_REJECTED", 2)
+        return fail("CODE_REPAIR_PATCH_REJECTED: " + check.stderr.strip(), 2)
 
     applied = subprocess.run(
         ["git", "apply", "--whitespace=error-all", "-"],
