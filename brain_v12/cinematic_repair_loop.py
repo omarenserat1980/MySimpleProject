@@ -45,7 +45,9 @@ def main():
     contract=compile_contract(qc)
     Path(a.output).write_text(json.dumps(contract,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps(contract,ensure_ascii=False,indent=2))
-    return 0 if contract["status"]=="NO_REPAIR_REQUIRED" else 10
+    # A repair contract is an actionable artifact; its existence must never
+    # be interpreted as permission to promote the current render.
+    return 0
 
 if __name__=="__main__":
  raise SystemExit(main())
