@@ -226,7 +226,7 @@ def evaluate(video: Path, manifest_path: Path) -> dict[str, Any]:
         "audio_diversity": not audio_metrics(video, duration).get("tone_like", False),
         "black_frames": black_ratio <= float(os.getenv("BRAIN_CINEMATIC_MAX_BLACK_RATIO", "0.01")),
         "frozen_frames": (frozen_count / max(len(adjacent_diffs), 1)) <= float(os.getenv("BRAIN_CINEMATIC_MAX_FROZEN_RATIO", "0.15")),
-        "duplicate_scene_detection": duplicate_ratio <= float(os.getenv("BRAIN_CINEMATIC_MAX_DUPLICATE_RATIO", "0.50")),
+        "duplicate_scene_detection": (duplicate_ratio <= float(os.getenv("BRAIN_CINEMATIC_MAX_DUPLICATE_RATIO", "0.50")) and unique_scene_sigs == scene_count),
         "text_overlay_check": text_check,
         "bitrate_sanity": video_bitrate >= int(os.getenv("BRAIN_CINEMATIC_MIN_VIDEO_BITRATE", "800000")),
         "manifest_video_consistency": scene_count == int(manifest.get("parts", scene_count)) if manifest.get("parts") is not None else scene_count > 0,
