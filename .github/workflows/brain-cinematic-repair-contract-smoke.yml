@@ -1,6 +1,7 @@
 name: BRAIN Cinematic Quality Gate
 
 on:
+  concurrency: brain-cinematic-quality-gate
   workflow_dispatch:
   push:
     branches:
