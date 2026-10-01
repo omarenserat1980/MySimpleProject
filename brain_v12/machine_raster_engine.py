@@ -115,13 +115,28 @@ def compile_machine_commands(scene:dict):
         cmds += [("CIRCLE",250,300,120,"#ffcf4a"),("POLY",[(500,150),(650,430),(350,430)],"#55c7a5"),("RECT",700,210,870,380,"#d85b74")]
     return cmds
 
+def _apply_film_grain(buf:PixelBuffer, scene:dict):
+    """Add deterministic low-amplitude texture so flat scenes retain visible detail."""
+    seed=int(hashlib.sha256(str(scene.get("scene_id", scene.get("title", ""))).encode("utf-8")).hexdigest()[:8],16)
+    state=seed or 1
+    px=buf.px
+    for y in range(0, buf.h, 2):
+        for x in range((y // 2) & 1, buf.w, 2):
+            state=(1664525*state+1013904223)&0xffffffff
+            delta=((state >> 29)&7)-3
+            i=(y*buf.w+x)*4
+            for k in range(3):
+                px[i+k]=max(0,min(255,px[i+k]+delta))
+
 def render_machine(scene:dict):
     """Render a deterministic, materially varied raster scene."""
     buf=PixelBuffer()
-    for cmd in compile_machine_commands(scene):
+    commands=compile_machine_commands(scene)
+    for cmd in commands:
         op=cmd[0]
         if op=="RECT": buf.rect(*cmd[1:])
         elif op=="CIRCLE": buf.circle(*cmd[1:])
         elif op=="LINE": buf.line(*cmd[1:])
         elif op=="POLY": buf.polygon(*cmd[1:])
-    return png_bytes(buf), compile_machine_commands(scene)
+    _apply_film_grain(buf, scene)
+    return png_bytes(buf), commands
