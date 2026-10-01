@@ -1,11 +1,14 @@
 name: BRAIN Cinematic Quality Gate
 
 on:
-  concurrency: brain-cinematic-quality-gate
   workflow_dispatch:
   push:
     branches:
       - 'brain/cinematic-master-qc-v1'
+
+concurrency:
+  group: brain-cinematic-quality-gate
+  cancel-in-progress: true
 
 jobs:
   cinematic-quality-gate:
