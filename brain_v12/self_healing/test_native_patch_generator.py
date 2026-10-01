@@ -15,6 +15,13 @@ class NativePatchGeneratorTests(unittest.TestCase):
         self.assertIsNone(build_patch(source, "brain_v12/self_healing/example.py", 2, finding))
         self.assertIsNone(build_patch(source, "brain_v12/self_healing/example.py", 1, "wrong"))
 
+    def test_build_patch_supports_sys_executable(self):
+        from brain_v12.self_healing.native_patch_generator import build_patch
+        source = 'subprocess.run([sys.executable, "brain_v12/self_healing/self_test.py"])\\n'
+        patch = build_patch(source, "brain_v12/self_healing/example.py", 1, source.strip())
+        self.assertIsNotNone(patch)
+        self.assertIn('sys.executable, "-m", "brain_v12.self_healing.self_test"', patch)
+
     def test_generator_module_compiles(self):
         path = Path("brain_v12/self_healing/native_patch_generator.py")
         result = subprocess.run(
