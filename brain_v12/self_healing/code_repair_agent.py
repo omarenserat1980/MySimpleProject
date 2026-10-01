@@ -86,7 +86,7 @@ def main() -> int:
     if p.returncode:
         return fail(f"CODE_REPAIR_GENERATOR_FAILED={p.returncode}", p.returncode)
 
-    diff = p.stdout.strip()
+    diff = p.stdout
     if not (diff.startswith("diff --git ") or diff.startswith("--- ")):
         return fail("CODE_REPAIR_INVALID_DIFF_FORMAT", 2)
 
