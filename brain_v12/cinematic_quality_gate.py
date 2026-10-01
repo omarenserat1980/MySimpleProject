@@ -69,7 +69,9 @@ def main() -> int:
     WORK.mkdir(parents=True, exist_ok=True)
     progress(0, total, "Preflight", "RUNNING", "Checking FFmpeg/ffprobe and local voice generator")
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
-        raise RuntimeError("FFMPEG_REQUIRED")
+        raise RuntimeError("FFMPEG_REQUIRED_FOR_QC_ORACLE")
+    if not shutil.which("gst-launch-1.0") or not shutil.which("ges-launch-1.0"):
+        raise RuntimeError("GSTREAMER_REQUIRED_FOR_MEDIA_BACKEND")
     if not (shutil.which("espeak-ng") or shutil.which("espeak")):
         raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING")
     progress(1, total, "Preflight", "PASSED", "Required executors are available")
@@ -125,6 +127,7 @@ def main() -> int:
 
     env = os.environ.copy()
     env.update({
+        "BRAIN_MEDIA_BACKEND": "gstreamer",
         "BRAIN_MACHINE_FILM_ROOT": str(WORK),
         "BRAIN_FILM_PARTS": "2",
         "BRAIN_FILM_START": "1",
