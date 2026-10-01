@@ -209,7 +209,26 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
         return manifest
     final=OUT/"final.mp4"
-    run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(final)],3600)
+    transitions_required = bool(repair_contract and repair_contract.get("transitions_required"))
+    if transitions_required and len(clips) > 1:
+        # Render a deterministic crossfade chain so transitions are real timeline events,
+        # not merely declared metadata. Audio is preserved from the clips.
+        current = clips[0]
+        for j, nxt in enumerate(clips[1:], start=1):
+            merged = OUT / "parts" / f"transition-{j:03d}.mp4"
+            offset = max(PART_SECONDS - 0.5, 0.1)
+            run(["ffmpeg","-y","-i",str(current),"-i",str(nxt),
+                 "-filter_complex",
+                 f"[0:v][1:v]xfade=transition=fade:duration=0.5:offset={offset}[v];"
+                 f"[0:a][1:a]acrossfade=d=0.5:c1=tri:c2=tri[a]",
+                 "-map","[v]","-map","[a]","-c:v","libx264","-preset","medium",
+                 "-b:v","1200k","-c:a","aac","-b:a","192k",str(merged)],1800)
+            current = merged
+        import shutil
+        shutil.copyfile(current, final)
+        manifest["timeline_transitions"]={"type":"xfade","duration_seconds":0.5,"count":len(clips)-1}
+    else:
+        run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(final)],3600)
     final_qc=qc(final); tolerance=max(2.0,min(10.0,target*0.01))
     if not(final_qc["video"] and abs(final_qc["duration"]-target)<=tolerance and final_qc["width"]==W and final_qc["height"]==H):
         manifest["status"]="TECHNICAL_QC_FAILED"; manifest["final"]=str(final); manifest["master_qc"]=final_qc
