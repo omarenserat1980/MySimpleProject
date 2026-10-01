@@ -24,6 +24,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORK = Path(os.environ.get("BRAIN_CQG_ROOT", "/tmp/brain-cinematic-quality-gate"))
 CONTRACT = WORK / "repair-contract.json"
+PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
+
+
+def progress(stage: int, total: int, name: str, status: str, detail: str = "") -> None:
+    WORK.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "stage": stage,
+        "total_stages": total,
+        "percent": round(stage * 100 / total),
+        "name": name,
+        "status": status,
+        "detail": detail,
+    }
+    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n=== CINEMATIC QUALITY GATE {payload['percent']}% | {status} | {name} ===")
+    if detail:
+        print(f"DETAIL: {detail}")
+    print(f"PROGRESS: [{('=' * max(1, stage * 20 // total))}{'.' * max(0, 20 - stage * 20 // total)}] {payload['percent']}%")
+    print(f"GATE_STATUS={status}")
 
 
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
@@ -34,11 +53,15 @@ def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]
 
 
 def main() -> int:
+    total = 8
+    WORK.mkdir(parents=True, exist_ok=True)
+    progress(0, total, "Preflight", "RUNNING", "Checking FFmpeg/ffprobe and local voice generator")
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         raise RuntimeError("FFMPEG_REQUIRED")
     if not (shutil.which("espeak-ng") or shutil.which("espeak")):
         raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING")
 
+    progress(1, total, "Preflight", "PASSED", "Required executors are available")
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
 
@@ -52,6 +75,7 @@ def main() -> int:
             ]
         }
     }
+    progress(2, total, "Repair contract compilation", "RUNNING", "Compiling mandatory repair requirements")
     qc_path = WORK / "qc.json"
     qc_path.write_text(json.dumps(qc), encoding="utf-8")
     contract_out = WORK / "compiled-contract.json"
@@ -63,6 +87,7 @@ def main() -> int:
     assert compiled["visual_diversity_required"] is True
     assert compiled["duplicate_scene_policy"] == "reject"
     assert compiled["motion_required"] is True
+    progress(2, total, "Repair contract compilation", "PASSED", "Mandatory renderer requirements compiled")
 
     render_contract = {
         "status": "REPAIR_REQUIRED",
@@ -82,6 +107,7 @@ def main() -> int:
         "min_video_bitrate_bps": 800000,
     }
     CONTRACT.write_text(json.dumps(render_contract), encoding="utf-8")
+    progress(3, total, "Evidence-aware smoke render", "RUNNING", "Rendering 2 short parts with voice/music/SFX/motion/transitions")
 
     env = os.environ.copy()
     env.update({
@@ -98,7 +124,9 @@ def main() -> int:
     )
     if p.returncode:
         raise RuntimeError((p.stdout + "\n" + p.stderr)[-12000:])
+    progress(3, total, "Evidence-aware smoke render", "PASSED", "Smoke render completed")
 
+    progress(4, total, "Audio and transition evidence", "RUNNING", "Checking voice, music, SFX and xfade evidence")
     manifest_path = WORK / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     final = Path(manifest["final"])
@@ -112,7 +140,9 @@ def main() -> int:
     transitions = manifest.get("timeline_transitions") or {}
     assert transitions.get("type") == "xfade"
     assert transitions.get("count") == 1
+    progress(4, total, "Audio and transition evidence", "PASSED", "Voice/music/SFX assets and real xfade transition verified")
 
+    progress(5, total, "Independent Cinematic Master QC", "RUNNING", "Evaluating the short render without granting production promotion")
     cinematic = manifest.get("cinematic_master_qc") or {}
     if not cinematic:
         from brain_v12.cinematic_master_qc import evaluate
@@ -128,7 +158,9 @@ def main() -> int:
                    "scene_transitions", "character_story_continuity",
                    "manifest_video_consistency"):
             assert checks.get(key) is True, key
+    progress(5, total, "Independent Cinematic Master QC", "PASSED", "Expected smoke limitations are rejected while required evidence checks pass")
 
+    progress(6, total, "Negative continuity gate", "RUNNING", "Injecting broken continuity and verifying rejection")
     from brain_v12.cinematic_master_qc import evaluate
 
     broken = copy.deepcopy(manifest)
@@ -139,7 +171,9 @@ def main() -> int:
     bad = evaluate(final, broken_path)
     assert bad["checks"]["character_story_continuity"] is False
     assert "REQUIRE_SCENE_CHARACTER_WORLD_BIBLES" in bad["repair_manifest"]["mandatory_requirements"]
+    progress(6, total, "Negative continuity gate", "PASSED", "Broken continuity was correctly rejected")
 
+    progress(7, total, "Negative duplicate-scene gate", "RUNNING", "Injecting duplicate scene identity and verifying rejection")
     duplicate = copy.deepcopy(manifest)
     duplicate["parts_manifest"][1]["scene"] = copy.deepcopy(duplicate["parts_manifest"][0]["scene"])
     duplicate["parts_manifest"][1]["scene"]["scene_id"] = duplicate["parts_manifest"][0]["scene"]["scene_id"]
@@ -148,7 +182,9 @@ def main() -> int:
     dup = evaluate(final, duplicate_path)
     assert dup["checks"]["duplicate_scene_detection"] is False
     assert "REBUILD_DUPLICATE_SCENES" in dup["repair_manifest"]["mandatory_requirements"]
+    progress(7, total, "Negative duplicate-scene gate", "PASSED", "Duplicate scene was correctly rejected")
 
+    progress(8, total, "Gate evidence publication", "RUNNING", "Writing machine-readable gate evidence")
     result = {
         "status": "CINEMATIC_QUALITY_GATE_PASSED",
         "scope": [
@@ -167,6 +203,7 @@ def main() -> int:
     (WORK / "CINEMATIC_QUALITY_GATE.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    progress(8, total, "Gate evidence publication", "PASSED", "CINEMATIC_QUALITY_GATE evidence written; production promotion remains separate")
     print("CINEMATIC_QUALITY_GATE_PASSED")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
