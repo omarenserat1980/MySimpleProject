@@ -6,7 +6,7 @@ Default contract: 120 minutes = 240 x 30-second verified shots.
 Override BRAIN_FILM_PARTS / BRAIN_FILM_PART_SECONDS for controlled runs.
 """
 from __future__ import annotations
-import json, os, subprocess
+import json, os, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
