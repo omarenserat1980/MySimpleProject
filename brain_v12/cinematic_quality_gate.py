@@ -97,8 +97,7 @@ def main() -> int:
         cwd=ROOT, env=env, text=True, capture_output=True, timeout=3600,
     )
     if p.returncode:
-        raise RuntimeError((p.stdout + "
-" + p.stderr)[-12000:])
+        raise RuntimeError((p.stdout + "\n" + p.stderr)[-12000:])
 
     manifest_path = WORK / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
