@@ -79,4 +79,17 @@ jobs:
           test -s /tmp/brain-smoke/parts/001/sfx.wav
           test -s /tmp/brain-smoke/parts/001/part-001.mp4
           ffprobe -v error -select_streams a -show_entries stream=codec_type             -of csv=p=0 /tmp/brain-smoke/parts/001/part-001.mp4 | grep -qx audio
+          python - <<'PY'
+          import json, os
+          m=json.load(open("/tmp/brain-smoke/manifest.json"))
+          a=m["parts_manifest"][0]["audio_assets"]
+          assert all(a[k] and os.path.getsize(a[k]) > 0 for k in ("voice","music","sfx"))
+          assert m["cinematic_master_qc"]["status"] == "CINEMATIC_QC_FAILED"
+          req=set(m["cinematic_master_qc"]["repair_manifest"]["mandatory_requirements"])
+          assert "REQUIRE_VOICE_NARRATION_ASSETS" not in req
+          assert "REQUIRE_MUSIC_ASSETS" not in req
+          assert "REQUIRE_SFX_AMBIENCE_ASSETS" not in req
+          print("AUDIO_ASSET_MANIFEST_OK")
+          print("CINEMATIC_GATE_EXECUTED_OK")
+          PY
           echo "REPAIRED_AUDIO_RENDER_OK"
