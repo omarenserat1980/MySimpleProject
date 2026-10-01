@@ -37,7 +37,31 @@ class BladeExecutorAdapter(ExecutorAdapter):
     def execute(self, task):
         started=time()
         try:
-            result=self.blade.execute(task.program,task.max_cycles)
+            result=self.blade.execute(task.program,getattr(task,'max_cycles',10000))
             return ExecutionResult(True,"COMPLETED",self.executor_id,result,started,time())
         except Exception as exc:
             return ExecutionResult(False,"FAILED",self.executor_id,{"error":str(exc)},started,time())
+
+
+class QemuWindowsExecutorAdapter(ExecutorAdapter):
+    executor_type="qemu-windows"
+
+    def __init__(self, backend):
+        super().__init__("qemu-windows")
+        self.backend=backend
+
+    def capabilities(self):
+        return {"x86_64","windows-server-2025","network","storage"}
+
+    def execute(self, task):
+        started=time()
+        try:
+            result=self.backend.run(
+                install=getattr(task,"install",True),
+                timeout=getattr(task,"timeout",300),
+            )
+            ok=bool(result.get("guest",{}).get("boot_verified"))
+            status="GUEST_BOOT_VERIFIED" if ok else result.get("status","QEMU_FAILED")
+            return ExecutionResult(ok,status,self.executor_id,result,started,time())
+        except Exception as exc:
+            return ExecutionResult(False,"QEMU_EXECUTOR_ERROR",self.executor_id,{"error":str(exc)},started,time())
