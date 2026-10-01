@@ -9,7 +9,7 @@ def main() -> int:
     causal_audit()
     quran_reasoning_test()
     checks = [
-        ("missing-token", diagnose("", "GITHUB_TOKEN_REQUIRED", 2)),
+        ("missing-token", diagnose("", "github_token_or_gh_token_required", 2)),
         ("syntax", diagnose("", "SyntaxError: invalid syntax", 1)),
         ("network", diagnose("", "Connection reset by peer", 1)),
         ("dependency", diagnose("", "ModuleNotFoundError: No module named x", 1)),
