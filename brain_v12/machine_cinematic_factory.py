@@ -64,12 +64,44 @@ def render_part(i, png, repair_contract=None):
     if repair_contract and repair_contract.get("audio_diversity_required"):
         base += (i%5)*17
         high += (i%7)*29
-    audio = "[1:a][2:a]amix=inputs=2:duration=longest,volume=0.18[aout]"
+    voice_required = bool(repair_contract and repair_contract.get("voice_required"))
+    music_required = bool(repair_contract and repair_contract.get("music_required"))
+    sfx_required = bool(repair_contract and repair_contract.get("sfx_required"))
+    voice = part / "voice.wav"
+    music = part / "music.wav"
+    sfx = part / "sfx.wav"
+
+    if voice_required:
+        import shutil
+        speaker = shutil.which("espeak-ng") or shutil.which("espeak")
+        if not speaker:
+            raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING: install espeak-ng or provide voice assets")
+        run([speaker, "-w", str(voice), f"Brain cinematic scene {i}."])
+    if music_required:
+        run(["ffmpeg","-y","-v","error","-f","lavfi","-i",
+             f"sine=frequency={220+(i%5)*37}:sample_rate=48000:duration={PART_SECONDS}",
+             "-af","aecho=0.8:0.9:80:0.2,lowpass=f=1400",str(music)],120)
+    if sfx_required:
+        run(["ffmpeg","-y","-v","error","-f","lavfi","-i",
+             f"anoisesrc=color=pink:amplitude=0.035:sample_rate=48000:duration={PART_SECONDS}",
+             "-af","highpass=f=900,lowpass=f=5000",str(sfx)],120)
+
+    inputs=["-loop","1","-i",str(img)]
+    audio_inputs=[]
+    idx=1
+    for required, path in ((voice_required, voice), (music_required, music), (sfx_required, sfx)):
+        if required:
+            inputs += ["-i",str(path)]
+            audio_inputs.append(f"{idx}:a")
+            idx += 1
+    if not audio_inputs:
+        inputs += ["-f","lavfi","-i",f"sine=frequency={base}:sample_rate=48000:duration={PART_SECONDS}"]
+        audio_inputs.append(f"{idx}:a")
+    mix="".join(f"[{x}]" for x in audio_inputs)
+    audio=f"{mix}amix=inputs={len(audio_inputs)}:duration=longest,volume=0.22[aout]"
     bitrate = "1200k" if repair_contract and repair_contract.get("min_video_bitrate_bps",0)>=800000 else "800k"
-    run(["ffmpeg","-y","-loop","1","-i",str(img),
-         "-f","lavfi","-i",f"sine=frequency={base}:sample_rate=48000:duration={PART_SECONDS}",
-         "-f","lavfi","-i",f"sine=frequency={high}:sample_rate=48000:duration={PART_SECONDS}",
-         "-vf",vf,"-filter_complex",audio,"-map","0:v:0","-map","[aout]","-t",str(PART_SECONDS),
+    run(["ffmpeg","-y",*inputs,"-vf",vf,"-filter_complex",audio,
+         "-map","0:v:0","-map","[aout]","-t",str(PART_SECONDS),
          "-c:v","libx264","-preset","medium","-b:v",bitrate,"-pix_fmt","yuv420p",
          "-c:a","aac","-b:a","192k","-shortest",str(mp4)],1200)
     return mp4
