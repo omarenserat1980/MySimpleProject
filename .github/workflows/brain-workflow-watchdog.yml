@@ -1,0 +1,157 @@
+name: Brain Global Workflow Watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: brain-global-workflow-watchdog
+  cancel-in-progress: true
+
+jobs:
+  observe-and-recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect recent workflow failures
+        id: inspect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p brain6_artifacts/workflow_watchdog
+          gh run list --limit 50 --json databaseId,status,conclusion,workflowName,attempt,headSha,createdAt,updatedAt             > brain6_artifacts/workflow_watchdog/recent-runs.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data=json.loads(Path("brain6_artifacts/workflow_watchdog/recent-runs.json").read_text())
+          rows=[]
+          for r in data:
+              if r.get("workflowName") == "Brain Global Workflow Watchdog":
+                  continue
+              if r.get("status") != "completed":
+                  continue
+              if r.get("conclusion") not in {"failure","timed_out"}:
+                  continue
+              rows.append({
+                  "run_id": r.get("databaseId"),
+                  "workflow": r.get("workflowName"),
+                  "attempt": int(r.get("attempt") or 1),
+                  "head_sha": r.get("headSha"),
+                  "created_at": r.get("createdAt"),
+                  "updated_at": r.get("updatedAt"),
+              })
+          Path("brain6_artifacts/workflow_watchdog/failures.json").write_text(
+              json.dumps(rows,indent=2), encoding="utf-8"
+          )
+          print(f"FAILURES_OBSERVED={len(rows)}")
+          for row in rows:
+              print(json.dumps(row, sort_keys=True))
+          PY
+
+      - name: Diagnose and apply bounded recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failures="brain6_artifacts/workflow_watchdog/failures.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          rows=json.loads(Path("brain6_artifacts/workflow_watchdog/failures.json").read_text())
+          retry=[]
+          blocked=[]
+          for r in rows:
+              # GitHub permits many re-runs, but Brain deliberately caps automatic
+              # recovery to three attempts for a single run.
+              if r["attempt"] < 3:
+                  retry.append(r)
+              else:
+                  blocked.append(r)
+
+          Path("brain6_artifacts/workflow_watchdog/retry.json").write_text(
+              json.dumps(retry,indent=2), encoding="utf-8"
+          )
+          Path("brain6_artifacts/workflow_watchdog/blocked.json").write_text(
+              json.dumps(blocked,indent=2), encoding="utf-8"
+          )
+          print(f"AUTO_RETRY_CANDIDATES={len(retry)}")
+          print(f"BOUNDED_BLOCKED={len(blocked)}")
+          PY
+
+          while IFS= read -r row; do
+            run_id="$(python -c 'import json,sys; print(json.load(sys.stdin)["run_id"])' <<< "$row")"
+            workflow="$(python -c 'import json,sys; print(json.load(sys.stdin)["workflow"])' <<< "$row")"
+            attempt="$(python -c 'import json,sys; print(json.load(sys.stdin)["attempt"])' <<< "$row")"
+
+            echo "=== BRAIN FAILURE OBSERVED ==="
+            echo "WORKFLOW=$workflow RUN_ID=$run_id ATTEMPT=$attempt"
+
+            if gh run view "$run_id" --json status,conclusion,jobs,headSha > "brain6_artifacts/workflow_watchdog/run-$run_id.json"; then
+              gh run view "$run_id" --log-failed > "brain6_artifacts/workflow_watchdog/run-$run_id.log" || true
+            fi
+
+            log="brain6_artifacts/workflow_watchdog/run-$run_id.log"
+            if [ -s "$log" ]; then
+              if grep -Eqi "No such file|cannot open|No input|artifact.*not found" "$log"; then
+                class="INPUT_OR_ARTIFACT"
+              elif grep -Eqi "ffmpeg|ffprobe|concat|codec|mux|qemu|xorriso" "$log"; then
+                class="MEDIA_OR_VM_PIPELINE"
+              elif grep -Eqi "timeout|timed out|runner|queued|rate limit|503|502" "$log"; then
+                class="EXECUTION_INFRA"
+              elif grep -Eqi "Traceback|SyntaxError|ModuleNotFoundError|ImportError|AssertionError|FAILED" "$log"; then
+                class="CODE_OR_TEST"
+              else
+                class="UNKNOWN"
+              fi
+            else
+              class="LOG_UNAVAILABLE"
+            fi
+
+            printf '%s\n' "RUN_ID=$run_id" "WORKFLOW=$workflow" "ATTEMPT=$attempt" "FAILURE_CLASS=$class"               >> brain6_artifacts/workflow_watchdog/actions.log
+
+            case "$class" in
+              EXECUTION_INFRA|MEDIA_OR_VM_PIPELINE|INPUT_OR_ARTIFACT)
+                echo "RECOVERY=RERUN_FAILED_JOBS"
+                gh run rerun "$run_id" --failed || echo "RERUN_REQUEST_FAILED=$run_id"
+                ;;
+              CODE_OR_TEST|UNKNOWN|LOG_UNAVAILABLE)
+                echo "RECOVERY=BOUNDED_RETRY_ONLY"
+                # Do not blindly mutate source code from an untrusted log.
+                # The Brain records the evidence and stops at the safe boundary.
+                ;;
+              *)
+                echo "RECOVERY=NO_AUTOMATIC_ACTION"
+                ;;
+            esac
+          done < <(python - <<'PY'
+          import json
+          for r in json.load(open("brain6_artifacts/workflow_watchdog/retry.json")):
+              print(json.dumps(r))
+          PY
+          )
+
+          {
+            echo "BRAIN_GLOBAL_WATCHDOG=ACTIVE"
+            echo "POLICY=BOUNDED_AUTONOMOUS_RECOVERY"
+            echo "MAX_AUTOMATIC_ATTEMPTS=3"
+          } > brain6_artifacts/workflow_watchdog/contract.txt
+
+      - name: Upload Brain workflow evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-workflow-watchdog-${{ github.run_id }}
+          path: brain6_artifacts/workflow_watchdog/
+          retention-days: 14
