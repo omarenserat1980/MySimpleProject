@@ -11,6 +11,7 @@ on:
       - 'brain_v12/visual_engine.py'
       - 'brain_v12/machine_raster_engine.py'
       - 'brain_v12/cinematic_master_qc.py'
+      - 'brain_v12/gstreamer_backend.py'
       - '.github/workflows/brain-120-minute-cinema.yml'
   workflow_dispatch:
 
@@ -35,12 +36,14 @@ jobs:
       - name: Install media runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg espeak-ng python3-pil gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
+          gst-launch-1.0 --version | head -n 1
+          ges-launch-1.0 --version 2>&1 | head -n 1 || true
       - name: Verify Brain source
         run: |
-          python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py
+          python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py brain_v12/gstreamer_backend.py
       - name: Render shard
         env:
           BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
@@ -49,6 +52,7 @@ jobs:
           BRAIN_FILM_START: "${{ matrix.start }}"
           BRAIN_FILM_END: "${{ matrix.end }}"
           BRAIN_FILM_SHARD_ONLY: "1"
+          BRAIN_MEDIA_BACKEND: "gstreamer"
         run: |
           PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
           test -f brain6_artifacts/machine_films/manifest.json
@@ -70,9 +74,10 @@ jobs:
       - name: Install media runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
+          ges-launch-1.0 --version 2>&1 | head -n 1 || true
       - name: Download shards
         uses: actions/download-artifact@v4
         with:
