@@ -51,7 +51,7 @@ class DurableTaskStore:
             return [dict(r) for r in rows]
 
     def claim(self,task_id,blade_id,lease_seconds=300):
-        now=time.time(); lease=now+max(5,int(lease_seconds)); lease_id=uuid4().hex
+        now=time.time(); lease=now+max(1,int(lease_seconds)); lease_id=uuid4().hex
         with self.lock:
             cur=self.db.execute("""UPDATE tasks SET status='RUNNING',blade_id=?,lease_id=?,lease_expires_at=?,updated_at=?,attempt=attempt+1
               WHERE task_id=? AND status IN ('QUEUED','WAITING')""",(blade_id,lease_id,lease,now,task_id))
