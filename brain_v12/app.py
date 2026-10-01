@@ -37,6 +37,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.brain_supervisor import BrainSupervisor
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.youtube_oauth import YouTubeOAuth
@@ -68,6 +69,7 @@ live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 problem_solver=ProblemSolver(cognitive)
 device_bridge=DeviceBridge(store)
+brain_supervisor=BrainSupervisor()
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -1218,6 +1220,27 @@ def device_report(request:Request, body:DeviceReport):
 def device_result(task_id:str):
     return device_bridge.result(task_id)
 
+
+@app.get("/api/supervisor/status")
+def supervisor_status():
+    return brain_supervisor.snapshot(brain_supervisor.create("status_check"), {"verified": True})
+
+@app.post("/api/supervisor/run")
+def supervisor_run(request:Request, body:dict):
+    require_control_key(request)
+    task=str(body.get("task","")).strip()
+    if not task:
+        raise HTTPException(status_code=400, detail="TASK_REQUIRED")
+    params=body.get("params") or {}
+    job=brain_supervisor.create(task)
+    store.event("BRAIN_SUPERVISOR_RUN_REQUESTED", {"job_id":job.get("job_id"),"task":task})
+    return {"ok":True,"status":"STARTED","job":job,"next":"poll device queue"}
+
+@app.post("/api/supervisor/verify/{task_id}")
+def supervisor_verify(task_id:str):
+    result=device_bridge.verify_result(task_id)
+    store.event("BRAIN_SUPERVISOR_VERIFY", {"task_id":task_id,"verified":result.get("verified",False)})
+    return result
 
 @app.get("/api/agent-gateway/diagnostics")
 def agent_gateway_diagnostics():
