@@ -1,0 +1,49 @@
+name: Brain Cinematic Repair Contract Smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile             brain_v12/cinematic_master_qc.py             brain_v12/cinematic_repair_loop.py             brain_v12/machine_raster_engine.py             brain_v12/machine_cinematic_factory.py
+      - name: Validate repair contract compiler
+        run: |
+          cat > /tmp/qc.json <<'JSON'
+          {
+            "repair_manifest": {
+              "mandatory_requirements": [
+                "INCREASE_DISTINCT_SCENE_COUNT",
+                "GENERATE_MATERIALLY_DIVERSE_VISUALS",
+                "REBUILD_DUPLICATE_SCENES",
+                "REQUIRE_CAMERA_OR_ELEMENT_MOTION"
+              ]
+            }
+          }
+          JSON
+          python brain_v12/cinematic_repair_loop.py --qc /tmp/qc.json --output /tmp/contract.json
+          python - <<'PY'
+          import json
+          c=json.load(open("/tmp/contract.json"))
+          assert c["status"]=="REPAIR_REQUIRED"
+          assert c["min_distinct_scenes"]==24
+          assert c["visual_diversity_required"] is True
+          assert c["duplicate_scene_policy"]=="reject"
+          assert c["motion_required"] is True
+          print("REPAIR_CONTRACT_OK")
+          PY
+      - name: Render two materially different machine scenes
+        run: |
+          python - <<'PY'
+          import hashlib
+          from brain_v12.machine_raster_engine import render_machine
+          a={"type":"landscape","palette":"default","scene_id":"smoke:1","variant":1,"objects":["sun","stars","tree"]}
+          b={"type":"landscape","palette":"default","scene_id":"smoke:2","variant":17,"objects":["sun","stars","tree"]}
+          pa,_=render_machine(a); pb,_=render_machine(b)
+          assert hashlib.sha256(pa).hexdigest()!=hashlib.sha256(pb).hexdigest()
+          print("VISUAL_VARIATION_OK")
+          PY
