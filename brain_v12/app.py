@@ -44,6 +44,8 @@ from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
+from .brain.virtual_datacenter import BrainVirtualDatacenter
+from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
@@ -77,6 +79,7 @@ brain_supervisor=BrainSupervisor()
 brain_self_monitor=BrainSelfMonitor(ROOT)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
+brain_datacenter=BrainVirtualDatacenter()
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -1321,6 +1324,44 @@ def brain_git_cinema_status(workflow_id:str):
     wf=brain_workflows.get(workflow_id)
     if not wf: raise HTTPException(404,"WORKFLOW_NOT_FOUND")
     return {"ok":True,"workflow":wf}
+
+@app.post("/api/brain/windows/provision")
+def brain_windows_provision(request:Request, body:dict):
+    require_control_key(request)
+    count=int(body.get("blades",1))
+    capabilities=body.get("capabilities")
+    provision=brain_datacenter.provision(count,capabilities)
+    blade_id=body.get("blade_id")
+    result=brain_datacenter.provision_windows_server_2025(
+        blade_id=blade_id,
+        image_path=body.get("image_path"),
+        sha256=body.get("sha256"),
+        ram_bytes=int(body.get("ram_bytes",4*1024*1024*1024)),
+        disk_bytes=int(body.get("disk_bytes",64*1024*1024*1024))
+    )
+    return {"ok":True,"provision":provision,"windows":result}
+
+@app.post("/api/brain/windows/boot/{vm_name}")
+def brain_windows_boot(request:Request, vm_name:str):
+    require_control_key(request)
+    return brain_datacenter.boot_windows_server_2025(vm_name)
+
+@app.get("/api/brain/windows/status")
+def brain_windows_status():
+    return brain_datacenter.status()
+
+@app.post("/api/brain/windows/qemu/inspect")
+def brain_windows_qemu_inspect(request:Request, body:dict):
+    require_control_key(request)
+    backend=QemuWindowsBackend(
+        qemu_binary=body.get("qemu_binary","qemu-system-x86_64"),
+        memory=body.get("memory","4G"),
+        cpus=int(body.get("cpus",2)),
+        machine=body.get("machine","q35"),
+        disk_path=body.get("disk_path"),
+        iso_path=body.get("iso_path")
+    )
+    return backend.inspect()
 
 @app.get("/api/brain/cinema/completion")
 def brain_cinema_completion():
