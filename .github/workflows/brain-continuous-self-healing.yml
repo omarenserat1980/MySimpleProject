@@ -75,6 +75,19 @@ jobs:
             --timeout 120 \
             --pause 2
 
+      - name: Report Applied Repair Evidence
+        if: always()
+        run: |
+          set -euo pipefail
+          if test -f .brain/state/last_applied_patch.diff; then
+            echo "CODE_REPAIR_PATCH_PRESENT=true"
+            git diff --check
+            git diff --stat
+            echo "CODE_REPAIR_PATCH_LINES=$(wc -l < .brain/state/last_applied_patch.diff)"
+          else
+            echo "CODE_REPAIR_PATCH_PRESENT=false"
+          fi
+
       - name: Stage 7 - Self-Healing Gate
         if: always()
         env:
