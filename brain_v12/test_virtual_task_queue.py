@@ -1,5 +1,6 @@
 import time
 import unittest
+import tempfile
 from .blade_server import BladeChassis
 from .brain.resource_manager import ResourceManager, ResourceRequirement
 from .brain.virtual_task_queue import VirtualTaskQueue
@@ -10,10 +11,12 @@ class VirtualTaskQueueTests(unittest.TestCase):
         self.blade=self.chassis.create_blade({"cpu","ram"},ram_size=1024)
         self.blade.power_on()
         self.resources=ResourceManager()
-        self.queue=VirtualTaskQueue(self.chassis,self.resources,max_workers=2)
+        self.temp=tempfile.TemporaryDirectory()
+        self.queue=VirtualTaskQueue(self.chassis,self.resources,max_workers=2,store_path=self.temp.name+"/tasks.db")
 
     def tearDown(self):
         self.queue.shutdown()
+        self.temp.cleanup()
 
     def wait(self, task_id):
         deadline=time.time()+2
