@@ -18,6 +18,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .command_contract import is_continue
+
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
 PY_ROOTS = ("brain_v12", "tests", "scripts")
@@ -34,8 +36,10 @@ def continue_autonomously() -> bool:
     observe -> diagnose -> execute -> verify -> repair -> retry cycle, never
     bypassing verification or safety gates.
     """
-    raw = os.getenv("BRAIN_COMMAND", "").strip().upper()
-    return raw in {"BRAIN_CONTINUE_AUTONOMOUSLY", "CONTINUE_AUTONOMOUSLY", "CONTINUE"}
+    raw = os.getenv("BRAIN_COMMAND", "").strip()
+    if raw == "BRAIN_CONTINUE_AUTONOMOUSLY":
+        return True
+    return is_continue(raw)
 
 
 def run(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess[str]:
