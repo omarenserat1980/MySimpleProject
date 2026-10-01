@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Free local one-minute watchdog for Electronic Brain.
+"""Free local 120-second watchdog for Electronic Brain.
 
 This process is intentionally independent from scheduled GitHub Actions.
 Run it on Brain/Termux or another always-on executor.
@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject")
-INTERVAL = max(30, int(os.getenv("BRAIN_WATCHDOG_SECONDS", "60")))
+INTERVAL = max(30, int(os.getenv("BRAIN_WATCHDOG_SECONDS", "120")))
 MAX_ATTEMPTS = max(1, int(os.getenv("BRAIN_WATCHDOG_MAX_ATTEMPTS", "3")))
 STATE = Path(os.getenv("BRAIN_WATCHDOG_STATE", "brain6_artifacts/workflow_watchdog/minute-state.json"))
 LOG = Path(os.getenv("BRAIN_WATCHDOG_LOG", "brain6_artifacts/workflow_watchdog/minute-watchdog.log"))
