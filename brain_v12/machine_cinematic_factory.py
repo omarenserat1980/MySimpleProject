@@ -10,6 +10,7 @@ import json, os, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 OUT = Path(os.environ.get("BRAIN_MACHINE_FILM_ROOT", ROOT / "brain6_artifacts" / "machine_films"))
 FPS = int(os.environ.get("BRAIN_FILM_FPS", "24"))
 PARTS = max(1, int(os.environ.get("BRAIN_FILM_PARTS", "240")))
