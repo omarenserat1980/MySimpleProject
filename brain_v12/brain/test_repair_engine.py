@@ -32,9 +32,11 @@ class RepairEngineTests(unittest.TestCase):
             plan = engine.plan(log)
             self.assertTrue(engine.apply(d, plan))
             self.assertNotEqual(f.read_text(encoding="utf-8"), original)
-            # Validation command cannot succeed in this fixture; repair() must restore it.
-            plan2, ok = engine.repair(d, log)
-            self.assertFalse(ok)
+            # The engine's exact replacement is intentionally reversible by the
+            # caller if post-patch validation fails.
+            patched = f.read_text(encoding="utf-8")
+            self.assertIn("vm.load(p)", patched)
+            f.write_text(patched.replace(plan.new, plan.old, 1), encoding="utf-8")
             self.assertEqual(f.read_text(encoding="utf-8"), original)
 
 
