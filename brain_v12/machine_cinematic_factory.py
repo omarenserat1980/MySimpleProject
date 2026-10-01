@@ -187,7 +187,13 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
             raise RuntimeError(f"PART_QC_FAILED:{i}:{q}")
         clips.append(clip)
         manifest["parts_manifest"].append({"part":i,"title":title0,"scene":scene,
-            "machine_instruction_count":len(commands),"machine_bits_sha256":__import__("hashlib").sha256(machine_bits(commands).encode()).hexdigest(),"video":str(clip),"qc":q})
+            "machine_instruction_count":len(commands),"machine_bits_sha256":__import__("hashlib").sha256(machine_bits(commands).encode()).hexdigest(),"video":str(clip),
+            "audio_assets": {
+                "voice": str(OUT / "parts" / f"{i:03d}" / "voice.wav") if repair_contract and repair_contract.get("voice_required") else None,
+                "music": str(OUT / "parts" / f"{i:03d}" / "music.wav") if repair_contract and repair_contract.get("music_required") else None,
+                "sfx": str(OUT / "parts" / f"{i:03d}" / "sfx.wav") if repair_contract and repair_contract.get("sfx_required") else None,
+            },
+            "qc":q})
         (OUT/"manifest.partial.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
     concat=OUT/"concat.txt"
     concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in clips),encoding="utf-8")
@@ -209,6 +215,11 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         "text_overlay_policy":"deny",
         "continuity_required":True,
         "audio_classes_required":["voice","music","sfx"],
+        "audio": {
+            "voice": bool(repair_contract and repair_contract.get("voice_required")),
+            "music": bool(repair_contract and repair_contract.get("music_required")),
+            "sfx": bool(repair_contract and repair_contract.get("sfx_required")),
+        },
     }
     manifest_path=OUT/"manifest.json"
     manifest_path.write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
