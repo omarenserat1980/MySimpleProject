@@ -1,0 +1,115 @@
+name: Brain GitHub Cloud - Free Linux Control Plane
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/brain-github-cloud.yml"
+      - "PROJECT_MASTER_SPEC.md"
+      - "PROJECT_ROADMAP.md"
+      - "DECISIONS.md"
+
+concurrency:
+  group: brain-github-cloud
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  brain-cloud:
+    name: Brain Cloud Linux Runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BRAIN_CLOUD_MODE: github-actions
+      BRAIN_TASK: health
+    steps:
+      - name: Checkout Brain source of truth
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prepare Linux runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install media toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
+      - name: Audit runtime
+        run: |
+          set -euo pipefail
+          mkdir -p brain6_artifacts/github_cloud
+          {
+            echo "state=RUNNER_READY"
+            echo "mode=$BRAIN_CLOUD_MODE"
+            echo "task=$BRAIN_TASK"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "commit=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF_NAME"
+            echo "os=$RUNNER_OS"
+            echo "arch=$RUNNER_ARCH"
+            echo "python=$(python --version)"
+            echo "ffmpeg=$(ffmpeg -version | head -n 1)"
+          } | tee brain6_artifacts/github_cloud/runtime.txt
+          git status --short
+          git log -1 --oneline
+
+      - name: Compile Brain
+        run: |
+          set -euo pipefail
+          python -m compileall -q brain_v12
+
+      - name: Run Brain tests
+        run: |
+          set -euo pipefail
+          if [ -d brain_v12/tests ]; then
+            python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
+          else
+            echo "No brain_v12/tests directory; compile gate remains authoritative."
+          fi
+
+      - name: Verify toolchain
+        run: |
+          set -euo pipefail
+          for tool in ffmpeg ffprobe git python; do
+            command -v "$tool" >/dev/null || { echo "MISSING=$tool"; exit 1; }
+          done
+
+      - name: Write evidence
+        run: |
+          set -euo pipefail
+          cat > brain6_artifacts/github_cloud/evidence.json <<EOF
+          {
+            "state": "VERIFIED_RUNNER_READY",
+            "mode": "github-actions",
+            "task": "$BRAIN_TASK",
+            "run_id": "$GITHUB_RUN_ID",
+            "commit": "$GITHUB_SHA",
+            "os": "$RUNNER_OS",
+            "arch": "$RUNNER_ARCH",
+            "persistent_vm": false,
+            "billing_model": "github-hosted-standard-runner",
+            "next_layer": "brain task executor"
+          }
+          EOF
+          cat brain6_artifacts/github_cloud/evidence.json
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-github-cloud-evidence
+          path: brain6_artifacts/github_cloud/
+          retention-days: 1
