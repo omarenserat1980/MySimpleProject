@@ -98,6 +98,11 @@ jobs:
           set -euo pipefail
           python -m compileall -q brain_v12
 
+      - name: Execute Brain task
+        run: |
+          set -euo pipefail
+          python brain_v12/ci/brain_runner.py
+
       - name: Run Brain tests
         run: |
           set -euo pipefail
@@ -113,6 +118,12 @@ jobs:
           for tool in ffmpeg ffprobe git python; do
             command -v "$tool" >/dev/null || { echo "MISSING=$tool"; exit 1; }
           done
+
+      - name: Verify task evidence
+        run: |
+          set -euo pipefail
+          test -f brain6_artifacts/github_cloud/task_result.json
+          cat brain6_artifacts/github_cloud/task_result.json
 
       - name: Write evidence
         run: |
