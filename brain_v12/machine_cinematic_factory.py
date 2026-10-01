@@ -51,11 +51,11 @@ def render_part(i, png):
     mp4 = part / f"part-{i:03d}.mp4"
     frames = PART_SECONDS * FPS
     vf = f"zoompan=z='min(zoom+0.0009,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p"
-    audio = "amix=inputs=2:duration=longest,volume=0.18"
+    audio = "[1:a][2:a]amix=inputs=2:duration=longest,volume=0.18[aout]"
     run(["ffmpeg","-y","-loop","1","-i",str(img),
          "-f","lavfi","-i",f"sine=frequency={55+(i%8)*11}:sample_rate=48000:duration={PART_SECONDS}",
          "-f","lavfi","-i",f"sine=frequency={110+(i%6)*22}:sample_rate=48000:duration={PART_SECONDS}",
-         "-vf",vf,"-af",audio,"-t",str(PART_SECONDS),
+         "-vf",vf,"-filter_complex",audio,"-map","0:v:0","-map","[aout]","-t",str(PART_SECONDS),
          "-c:v","libx264","-preset","medium","-crf","18","-pix_fmt","yuv420p",
          "-c:a","aac","-b:a","192k","-shortest",str(mp4)],1200)
     return mp4
