@@ -12,6 +12,10 @@ class VirtualSystemTests(unittest.TestCase):
         self.assertTrue(status["firmware"]["booted"])
         self.assertIn("BOOT_OK",c.boot_record["boot_log"])
         self.assertEqual(c.boot_record["firmware"],VirtualFirmware.VERSION)
+        self.assertEqual(c.boot_record["bootloader"]["status"],"KERNEL_OPTIONAL")
+        c.filesystem.write("/boot/kernel.bin",b"KERNEL")
+        self.assertTrue(c.filesystem.exists("/boot/kernel.bin"))
+        self.assertEqual(c.filesystem.read("/boot/kernel.bin"),b"KERNEL")
 
     def test_kernel_process_scheduler_is_integrated(self):
         c=VirtualComputer("test")
