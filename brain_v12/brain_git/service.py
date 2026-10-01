@@ -38,6 +38,17 @@ class BrainGitService:
         path=self.repos/f"{name}.git"
         if path.exists(): raise BrainGitError("REPOSITORY_EXISTS")
         self._run(["init","--bare",str(path)])
+        # Seed an explicit initial commit so HEAD/main and the browser are immediately usable.
+        with tempfile.TemporaryDirectory() as d:
+            work=Path(d)/"seed"
+            self._run(["clone",str(path),str(work)])
+            self._run(["checkout","-B","main"],cwd=work)
+            (work/"README.md").write_text("Brain Git repository\n",encoding="utf-8")
+            self._run(["add","README.md"],cwd=work)
+            env=dict(os.environ,GIT_AUTHOR_NAME="Brain",GIT_AUTHOR_EMAIL="brain@localhost",GIT_COMMITTER_NAME="Brain",GIT_COMMITTER_EMAIL="brain@localhost")
+            p=subprocess.run(["git","commit","-m","initialize Brain Git repository"],cwd=work,text=True,capture_output=True,env=env)
+            if p.returncode: raise BrainGitError(p.stderr.strip() or p.stdout.strip())
+            self._run(["push","origin","HEAD:refs/heads/main"],cwd=work)
         repo_id=hashlib.sha256(name.encode()).hexdigest()[:24]
         with self._db() as c:c.execute("INSERT INTO repositories VALUES(?,?,?,?,?)",(repo_id,name,str(path),int(private),time.time()))
         self._audit("repository.create",name,{"private":bool(private)})
