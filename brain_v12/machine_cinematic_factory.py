@@ -68,11 +68,27 @@ def qc(path):
             "width":next((s.get("width") for s in streams if s.get("codec_type")=="video"),None),
             "height":next((s.get("height") for s in streams if s.get("codec_type")=="video"),None)}
 
+def machine_bits(commands):
+    """Deterministic 0/1 representation of the raster instruction stream."""
+    opcodes = {"RECT":1,"CIRCLE":2,"LINE":3,"POLY":4}
+    bits=[]
+    for cmd in commands:
+        bits.append(f"{opcodes.get(cmd[0],0):08b}")
+        for value in cmd[1:]:
+            if isinstance(value, (int,float)):
+                bits.append(f"{int(value) & 0xffffffff:032b}")
+            elif isinstance(value,str):
+                bits.append("".join(f"{b:08b}" for b in value.encode("utf-8")))
+            elif isinstance(value,list):
+                for point in value:
+                    bits.append("".join(f"{int(v) & 0xffffffff:032b}" for v in point))
+    return "".join(bits)
+
 def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"):
     OUT.mkdir(parents=True, exist_ok=True)
     target=PARTS*PART_SECONDS
     manifest={"title":title,"renderer":"Brain Machine Raster Painter",
-              "binary_model":"integer pixel operations + PNG bytes","parts":PARTS,
+              "binary_model":"deterministic 0/1 raster instruction stream -> PNG bytes -> H.264 film","machine_language":"BRAIN-Raster-0/1","binary_instruction_encoding":"opcode + integer operands encoded as bits","parts":PARTS,
               "part_seconds":PART_SECONDS,"target_seconds":target,"fps":FPS,"parts_manifest":[]}
     clips=[]
     if START_PART > END_PART:
@@ -85,7 +101,7 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
             raise RuntimeError(f"PART_QC_FAILED:{i}:{q}")
         clips.append(clip)
         manifest["parts_manifest"].append({"part":i,"title":title0,"scene":scene,
-            "machine_instruction_count":len(commands),"video":str(clip),"qc":q})
+            "machine_instruction_count":len(commands),"machine_bits_sha256":__import__("hashlib").sha256(machine_bits(commands).encode()).hexdigest(),"video":str(clip),"qc":q})
         (OUT/"manifest.partial.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
     concat=OUT/"concat.txt"
     concat.write_text("".join(f"file '{p.as_posix()}'\n" for p in clips),encoding="utf-8")
