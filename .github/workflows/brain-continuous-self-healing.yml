@@ -19,14 +19,6 @@ on:
         description: "Explicit workflow acknowledgement flag; never bypasses verification"
         required: false
         default: "false"
-      brain_command:
-        description: "Normalized Brain command from the human command contract"
-        required: false
-        default: "BRAIN_CONTINUE_AUTONOMOUSLY"
-      auto_confirm:
-        description: "Explicit workflow acknowledgement flag; never bypasses verification"
-        required: false
-        default: "false"
   schedule:
     - cron: "*/5 * * * *"
   push:
