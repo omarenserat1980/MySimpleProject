@@ -16,6 +16,7 @@ class VirtualTask:
     status: str = "QUEUED"
     blade_id: str | None = None
     lease_id: str | None = None
+    lease_expires_at: float | None = None
     created_at: float = field(default_factory=time)
     started_at: float | None = None
     finished_at: float | None = None
@@ -71,6 +72,7 @@ class VirtualTaskQueue:
             task.status="RUNNING"
             task.blade_id=blade.blade_id
             task.lease_id=uuid4().hex
+            task.lease_expires_at=time()+300
             task.started_at=time()
         self.pool.submit(self._execute, task_id, blade)
 
@@ -82,17 +84,42 @@ class VirtualTaskQueue:
             with self.lock:
                 task.result=result
                 task.status="COMPLETED"
+                task.lease_expires_at=None
                 task.finished_at=time()
         except Exception as exc:
             with self.lock:
                 task.result={"ok":False,"error":str(exc)}
                 task.status="FAILED"
+                task.lease_expires_at=None
                 task.finished_at=time()
         finally:
             self.resources.release(task_id)
             self.pump()
 
+    def heartbeat(self, task_id, lease_id):
+        with self.lock:
+            task=self.tasks.get(task_id)
+            if task is None or task.status != "RUNNING" or task.lease_id != lease_id:
+                return {"ok":False,"status":"LEASE_INVALID"}
+            task.lease_expires_at=time()+300
+            return {"ok":True,"status":"HEARTBEAT","task_id":task_id}
+
+    def recover_expired(self):
+        now=time()
+        recovered=[]
+        with self.lock:
+            for task in self.tasks.values():
+                if task.status=="RUNNING" and task.lease_expires_at and task.lease_expires_at < now:
+                    self.resources.release(task.task_id)
+                    task.status="QUEUED"
+                    task.blade_id=None
+                    task.lease_id=None
+                    task.lease_expires_at=None
+                    recovered.append(task.task_id)
+        return recovered
+
     def pump(self):
+        self.recover_expired()
         for task_id in list(self.tasks):
             self._schedule(task_id)
 
