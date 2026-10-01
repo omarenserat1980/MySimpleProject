@@ -36,4 +36,23 @@ class BladeServerTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"],"NO_CAPABLE_BLADE")
 
+    def test_resource_aware_selection(self):
+        chassis=BladeChassis()
+        small=chassis.create_blade({"cpu","ram"},ram_size=64)
+        large=chassis.create_blade({"cpu","ram"},ram_size=1024)
+        small.power_on(); large.power_on()
+        from .brain.resource_manager import ResourceRequirement
+        result=BladeScheduler(chassis).dispatch([("HALT",)], {"cpu","ram"}, resource_requirement=ResourceRequirement(ram_bytes=512))
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["blade_id"], large.blade_id)
+
+    def test_resource_shortage_is_rejected(self):
+        chassis=BladeChassis()
+        blade=chassis.create_blade({"cpu","ram"},ram_size=64)
+        blade.power_on()
+        from .brain.resource_manager import ResourceRequirement
+        result=BladeScheduler(chassis).dispatch([("HALT",)], {"cpu"}, resource_requirement=ResourceRequirement(ram_bytes=128))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "NO_CAPABLE_RESOURCE")
+
 if __name__=="__main__": unittest.main()
