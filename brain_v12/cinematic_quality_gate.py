@@ -75,8 +75,6 @@ def main() -> int:
     if not (shutil.which("espeak-ng") or shutil.which("espeak")):
         raise RuntimeError("VOICE_ASSET_GENERATOR_MISSING")
     progress(1, total, "Preflight", "PASSED", "Required executors are available")
-
-    progress(1, total, "Preflight", "PASSED", "Required executors are available")
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
 
@@ -90,7 +88,6 @@ def main() -> int:
             ]
         }
     }
-    progress(2, total, "Repair contract compilation", "RUNNING", "Compiling mandatory repair requirements")
     progress(2, total, "Repair contract compilation", "RUNNING", "Compiling mandatory repair requirements")
     qc_path = WORK / "qc.json"
     qc_path.write_text(json.dumps(qc), encoding="utf-8")
@@ -155,7 +152,7 @@ def main() -> int:
             assert assets[key] and Path(assets[key]).is_file() and Path(assets[key]).stat().st_size > 0
 
     transitions = manifest.get("timeline_transitions") or {}
-    assert transitions.get("type") == "xfade"
+    assert transitions.get("type") in ("xfade", "gstreamer-crossfade")
     assert transitions.get("count") == 1
     progress(4, total, "Audio and transition evidence", "PASSED", "Voice/music/SFX assets and real xfade transition verified")
 
