@@ -64,11 +64,16 @@ def png_bytes(buf:PixelBuffer):
     for y in range(buf.h):
         rows.append(b"\x00"+bytes(buf.px[y*buf.w*4:(y+1)*buf.w*4]))
     raw=zlib.compress(b"".join(rows),9)
-    return b"\x89PNG\r\n\x1a\n"+_chunk(b"IHDR",struct.pack(">IIBBBBB",buf.w,buf.h,8,6,0,0,0))+_chunk(b"IDAT",raw)+_chunk(b"IEND",b"")
+    return b"\x89PNG\r
+\x1a
+"+_chunk(b"IHDR",struct.pack(">IIBBBBB",buf.w,buf.h,8,6,0,0,0))+_chunk(b"IDAT",raw)+_chunk(b"IEND",b"")
 
 def compile_machine_commands(scene:dict):
     typ=scene.get("type","landscape"); pal=scene.get("palette","default"); objects=scene.get("objects",[])
-    seed_text=str(scene.get("scene_id", scene.get("title", "")))+"|"+str(scene.get("variant", 0))\n    seed=int(hashlib.sha256(seed_text.encode("utf-8")).hexdigest()[:8],16)\n    dx=(seed % 121)-60; dy=((seed >> 8) % 61)-30\n    sun_r=45+((seed >> 16) % 31)
+    seed_text=str(scene.get("scene_id", scene.get("title", "")))+"|"+str(scene.get("variant", 0))
+    seed=int(hashlib.sha256(seed_text.encode("utf-8")).hexdigest()[:8],16)
+    dx=(seed % 121)-60; dy=((seed >> 8) % 61)-30
+    sun_r=45+((seed >> 16) % 31)
     sky={"default":"#8ed8ff","night":"#101827","sunset":"#d97a6d"}.get(pal,"#8ed8ff")
     ground={"default":"#6ca85a","night":"#263746","sunset":"#5f8057"}.get(pal,"#6ca85a")
     cmds=[("RECT",0,0,W,H,sky)]
