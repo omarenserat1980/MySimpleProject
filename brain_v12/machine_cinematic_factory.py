@@ -38,6 +38,9 @@ def scene_for(i, title, typ, extra, repair_contract=None):
     scene = visual_engine.compile_scene(prompt, typ)
     scene["palette"] = palette
     scene["scene_id"] = f"{typ}:{extra}:{i}"
+    scene["character_ids"] = ["brain-machine-protagonist-v1"]
+    scene["world_id"] = "brain-machine-cinematic-world-v1"
+    scene["continuity_anchor"] = "brain-machine-protagonist-v1@brain-machine-cinematic-world-v1"
     scene["variant"] = i
     if repair_contract:
         scene["cinematic_repair_contract"] = repair_contract
