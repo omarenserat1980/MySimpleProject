@@ -49,6 +49,7 @@ def main()->int:
         ok,results=verify(actions)
         evidence={"candidate":candidate,"verified":ok,"verification":results}
         (ROOT/".brain"/"state"/"last_repair_candidate.json").write_text(json.dumps(evidence,ensure_ascii=False,indent=2),encoding="utf-8")
+        print("BRAIN_REPAIR_VERIFICATION=" + json.dumps(evidence, ensure_ascii=False, sort_keys=True), flush=True)
         if ok:
           print("REPAIR_DISPATCH=VERIFIED"); return 0
         if not rollback(): return 3
