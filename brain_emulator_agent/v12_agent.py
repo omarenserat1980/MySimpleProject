@@ -14,23 +14,34 @@ import json
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from uuid import uuid4
 
-BRAIN_URL = os.environ["BRAIN_URL"].rstrip("/")
-AGENT_KEY = os.environ["BRAIN_EMULATOR_KEY"]
-AGENT_ID = os.getenv("BRAIN_EMULATOR_ID", "android-brain-emulator-v12")
+BRAIN_URL = (os.getenv("BRAIN_URL") or os.getenv("V12_BRAIN_URL") or "").rstrip("/")
+KEY_FILE = os.getenv("BRAIN_EMULATOR_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or ""
+AGENT_KEY = (os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("V12_AGENT_KEY") or "").strip()
+if not AGENT_KEY and KEY_FILE:
+    try:
+        AGENT_KEY = Path(KEY_FILE).expanduser().read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+AGENT_ID = os.getenv("BRAIN_EMULATOR_ID") or os.getenv("V12_AGENT_ID") or ("agent-" + uuid4().hex[:12])
 MAX_TASKS_PER_RUN = max(1, int(os.getenv("BRAIN_EMULATOR_MAX_TASKS_PER_RUN", "100")))
 STOP_ON_ERROR = os.getenv("BRAIN_EMULATOR_STOP_ON_ERROR", "false").lower() == "true"
-POLL_SECONDS = max(1, int(os.getenv("BRAIN_EMULATOR_POLL_SECONDS", "2")))
+POLL_SECONDS = max(1, int(os.getenv("BRAIN_EMULATOR_POLL_SECONDS") or os.getenv("V12_POLL_SECONDS") or "5"))
 HEARTBEAT_SECONDS = max(5, int(os.getenv("BRAIN_EMULATOR_HEARTBEAT_SECONDS", "10")))
 REQUEST_TIMEOUT = max(5, int(os.getenv("BRAIN_EMULATOR_REQUEST_TIMEOUT", "30")))
 ROOT = Path(__file__).resolve().parent.parent
 
 def request(method, path, payload=None, params=None):
+    if not BRAIN_URL:
+        raise RuntimeError("BRAIN_URL_OR_V12_BRAIN_URL_REQUIRED")
+    if not AGENT_KEY:
+        raise RuntimeError("BRAIN_EMULATOR_KEY_OR_V12_AGENT_KEY_REQUIRED")
     url = f"{BRAIN_URL}{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
     data = None
-    hdrs = {"X-V12-Agent-Key": AGENT_KEY}
+    hdrs = {"X-V12-Agent-Key": AGENT_KEY, "X-V12-Agent-Id": AGENT_ID, "User-Agent": "Brain-Termux-Emulator/1.0"}
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         hdrs["Content-Type"] = "application/json"
@@ -146,7 +157,7 @@ def main():
             now = time.time()
             if now - last_heartbeat >= HEARTBEAT_SECONDS:
                 try:
-                    request("POST", "/api/device/heartbeat", payload={"agent_id": AGENT_ID})
+                    request("POST", "/api/device/heartbeat", payload={"agent_id": AGENT_ID, "metadata": {"platform": platform.platform(), "python": platform.python_version()}})
                 except Exception as heartbeat_error:
                     print(f"[Brain-Termux] HEARTBEAT_FAILURE: {heartbeat_error}")
                 last_heartbeat = now
