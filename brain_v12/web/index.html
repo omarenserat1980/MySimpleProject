@@ -511,4 +511,16 @@ loadFactoryDictionary();
 <div class="commandPalette" id="commandPalette" onclick="if(event.target===this)closeCommandPalette()">
  <div class="commandBox"><input class="commandInput" id="commandInput" placeholder="قل للعقل ما تريد..." oninput="filterCommands(this.value)" onkeydown="if(event.key==='Enter'){navigateByHumanIntent(this.value);closeCommandPalette()}if(event.key==='Escape')closeCommandPalette()">
  <div class="commandList" id="commandList"></div></div>
-</div></body></html>
+</div><section id="brainCinemaPanel" style="margin:16px 0;padding:18px;border:1px solid #20334a;border-radius:18px;background:#0b1422">
+<h2>🎬 مصنع Brain السينمائي — ساعتان</h2>
+<div id="cinemaState">الحالة: جاهز</div>
+<div style="height:10px;background:#20334a;border-radius:8px;margin:12px 0"><div id="cinemaProgress" style="height:100%;width:0%;background:#43e0a1;border-radius:8px"></div></div>
+<button id="cinemaStart" style="padding:10px 16px;border:0;border-radius:12px">▶ تشغيل الفيلم</button>
+<span id="cinemaHint" style="margin-right:10px;color:#91a5bc">لا تحتاج لفتح GitHub Actions.</span>
+</section>
+<script>
+(()=>{const state=document.getElementById('cinemaState'),bar=document.getElementById('cinemaProgress'),btn=document.getElementById('cinemaStart');
+async function refresh(){try{const r=await fetch('/api/cinema/status');const x=await r.json();state.textContent='الحالة: '+(x.state||'UNKNOWN')+(x.run_id?' — Brain Run '+x.run_id:'');bar.style.width=(x.progress||0)+'%';if(x.state==='VERIFIED_PENDING_ARTIFACT')state.textContent+=' — Master QC مكتمل، جاري تجهيز الفيلم';}catch(e){state.textContent='الحالة: تعذر الاتصال بـBrain';}}
+btn.onclick=async()=>{btn.disabled=true;try{const r=await fetch('/api/cinema/start',{method:'POST',headers:{'Content-Type':'application/json','X-BRAIN-CONTROL-KEY':window.BRAIN_CONTROL_KEY||''},body:JSON.stringify({ref:'main'})});const x=await r.json();state.textContent=x.message||x.state||'تم الإرسال';}finally{setTimeout(()=>{btn.disabled=false;refresh()},1500)}};refresh();setInterval(refresh,15000)})();
+</script>
+</body></html>
