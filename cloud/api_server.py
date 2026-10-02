@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from cloud.deploy_engine import DeployError, deploy, docker_available, logs, restart, status as docker_status, stop
 from cloud.runtime_orchestrator import CloudRuntime
+from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -533,3 +534,73 @@ def service_logs(name: str, tail: int = 200):
         return {"ok": True, **logs(name, tail=tail)}
     except DeployError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
+
+
+class ApprovalCreateRequest(BaseModel):
+    subject: str
+    reason: str
+    risk: str = "MEDIUM"
+    requested_action: str = "APPROVE"
+    recipient_email: str | None = None
+    evidence: list[dict] = []
+    source_type: str = "BRAIN"
+    source_id: str | None = None
+    metadata: dict = {}
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: str
+    actor: str
+    note: str = ""
+
+
+@app.get("/v1/diwan/approvals", dependencies=[Depends(require_auth)])
+def diwan_approvals(status_filter: str = "PENDING", limit: int = 100):
+    return {"ok": True, "system": "BRAIN_DIWAN", "approvals": list_approvals(status_filter, limit)}
+
+
+@app.get("/v1/diwan/approvals/{approval_id}", dependencies=[Depends(require_auth)])
+def diwan_approval(approval_id: str):
+    approval = get_approval(approval_id)
+    if not approval:
+        raise HTTPException(status_code=404, detail="approval not found")
+    return {"ok": True, "system": "BRAIN_DIWAN", "approval": approval}
+
+
+@app.post("/v1/diwan/approvals", dependencies=[Depends(require_auth)])
+def create_diwan_approval(body: ApprovalCreateRequest):
+    if not body.subject.strip() or not body.reason.strip():
+        raise HTTPException(status_code=400, detail="subject and reason are required")
+    approval = create_approval(
+        subject=body.subject,
+        reason=body.reason,
+        risk=body.risk,
+        requested_action=body.requested_action,
+        recipient_email=body.recipient_email,
+        evidence=body.evidence,
+        source_type=body.source_type,
+        source_id=body.source_id,
+        metadata=body.metadata,
+    )
+    return {"ok": True, "system": "BRAIN_DIWAN", "approval": approval}
+
+
+@app.post("/v1/diwan/approvals/{approval_id}/decision", dependencies=[Depends(require_auth)])
+def decide_diwan_approval(approval_id: str, body: ApprovalDecisionRequest):
+    try:
+        approval = decide_approval(
+            approval_id,
+            decision=body.decision,
+            actor=body.actor,
+            note=body.note,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"ok": True, "system": "BRAIN_DIWAN", "approval": approval}
+
+
+@app.get("/v1/diwan/notifications", dependencies=[Depends(require_auth)])
+def diwan_notifications(limit: int = 100):
+    return {"ok": True, "system": "BRAIN_DIWAN", "notifications": notification_status(limit)}
