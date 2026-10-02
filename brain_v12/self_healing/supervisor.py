@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Sequence
 
 from brain_v12.self_healing.reflection_agent import ReflectionAgent
+from brain_v12.self_healing.brain_reasoning_loop import BrainReasoningLoop
 from brain_v12.self_healing.reflection_actions import ReflectionActionRegistry, ActionResult, command_action
 
 
@@ -52,6 +53,7 @@ class Attempt:
     verified: bool = False
     reflection_questions: list[str] | None = None
     reflection_actions: list[str] | None = None
+    reflection_answers: list[str] | None = None
 
 
 def utc_now() -> str:
@@ -125,6 +127,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--state", default=os.getenv("BRAIN_STATE_DIR", ".brain/state"))
     p.add_argument("--continue-on-success", action="store_true")
     p.add_argument("--reflection-turns", type=int, default=int(os.getenv("BRAIN_REFLECTION_TURNS", "3")))
+    p.add_argument("--chatgpt-reflection", action="store_true", default=os.getenv("BRAIN_CHATGPT_REFLECTION", "1") == "1")
     return p.parse_args()
 
 
