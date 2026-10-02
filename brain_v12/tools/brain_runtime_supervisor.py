@@ -155,6 +155,17 @@ def main():
             })
             print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
 
+            if not verified:
+                repair = repair_from_evidence(
+                    json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
+                )
+                record({"cycle": cycle, "event": "repair", "goal": goal, **repair})
+                print(f"JET_BRAIN_CYCLE {cycle} REPAIR={repair.get('status')}", flush=True)
+
+            prediction = evolve_from_evidence()
+            record({"cycle": cycle, "event": "prediction_refresh", "ok": prediction["ok"]})
+            print(f"JET_BRAIN_CYCLE {cycle} PREDICTION_REFRESH={'PASS' if prediction['ok'] else 'FAIL'}", flush=True)
+
             status = request("GET", "/api/device/status")
             if int(status.get("queued", 0)) == 0 and int(status.get("pending", 0)) == 0:
                 test = enqueue_self_test()
