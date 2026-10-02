@@ -64,9 +64,14 @@ def render_part(i, png, repair_contract=None):
     img.write_bytes(png)
     mp4 = part / f"part-{i:03d}.mp4"
 
-    voice_required = bool(repair_contract and repair_contract.get("voice_required"))
-    music_required = bool(repair_contract and repair_contract.get("music_required"))
-    sfx_required = bool(repair_contract and repair_contract.get("sfx_required"))
+    # GStreamer production always carries explicit voice/music/SFX evidence.
+    # The repair contract may strengthen requirements, but it must not make
+    # the first production pass fail merely because the contract is created
+    # later by Master QC.
+    gstreamer_audio_required = MEDIA_BACKEND == "gstreamer"
+    voice_required = gstreamer_audio_required or bool(repair_contract and repair_contract.get("voice_required"))
+    music_required = gstreamer_audio_required or bool(repair_contract and repair_contract.get("music_required"))
+    sfx_required = gstreamer_audio_required or bool(repair_contract and repair_contract.get("sfx_required"))
     voice = part / "voice.wav"
     music = part / "music.wav"
     sfx = part / "sfx.wav"
@@ -213,9 +218,9 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         manifest["parts_manifest"].append({"part":i,"title":title0,"scene":scene,
             "machine_instruction_count":len(commands),"machine_bits_sha256":__import__("hashlib").sha256(machine_bits(commands).encode()).hexdigest(),"video":str(clip),
             "audio_assets": {
-                "voice": str(OUT / "parts" / f"{i:03d}" / "voice.wav") if repair_contract and repair_contract.get("voice_required") else None,
-                "music": str(OUT / "parts" / f"{i:03d}" / "music.wav") if repair_contract and repair_contract.get("music_required") else None,
-                "sfx": str(OUT / "parts" / f"{i:03d}" / "sfx.wav") if repair_contract and repair_contract.get("sfx_required") else None,
+                "voice": str(OUT / "parts" / f"{i:03d}" / "voice.wav") if (MEDIA_BACKEND == "gstreamer" or repair_contract and repair_contract.get("voice_required")) else None,
+                "music": str(OUT / "parts" / f"{i:03d}" / "music.wav") if (MEDIA_BACKEND == "gstreamer" or repair_contract and repair_contract.get("music_required")) else None,
+                "sfx": str(OUT / "parts" / f"{i:03d}" / "sfx.wav") if (MEDIA_BACKEND == "gstreamer" or repair_contract and repair_contract.get("sfx_required")) else None,
             },
             "qc":q})
         (OUT/"manifest.partial.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
