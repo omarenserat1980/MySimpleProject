@@ -1,0 +1,32 @@
+name: Brain Media Campaign Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  campaign-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run campaign smoke test
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/media/*.py
+          python - <<'PY'
+          from brain_v12.media.media_factory import MediaFactory
+          brand={"company_name":"Electronic Brain","products":["Electronic Brain"],"prohibited_claims":[]}
+          project={
+              "name":"Electronic Brain Media Factory",
+              "summary":"A verified company project update.",
+              "evidence":["source repository","quality gate"]
+          }
+          result=MediaFactory(brand).create_campaign(project)
+          assert result["status"] == "READY_FOR_REVIEW", result
+          assert result["publication"]["status"] == "REQUIRES_AUTHORIZATION", result
+          assert len(result["plan"]["assets"]) == 4, result
+          print("MEDIA_CAMPAIGN_SMOKE=PASS")
+          print(result)
+          PY
