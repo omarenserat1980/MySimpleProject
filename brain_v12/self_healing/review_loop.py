@@ -20,6 +20,7 @@ from pathlib import Path
 
 from .command_contract import is_continue
 from .generator_registry import supported_candidates
+from .predictive_failure_engine import predict
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
@@ -164,6 +165,17 @@ def main() -> int:
 
     for i in range(1, args.loops + 1):
         entry = {"loop": i, "started_at": now(), "review": review_files()}
+        # Predict known failure modes before the main verification cycle.
+        # Prediction is advisory evidence; it never bypasses the verification gate.
+        try:
+            entry["predictive_preflight"] = predict()
+        except Exception as exc:
+            entry["predictive_preflight"] = {
+                "schema": "brain-predictive-failure/v1",
+                "status": "PREDICTOR_ERROR",
+                "predicted_failure_count": 0,
+                "error": repr(exc),
+            }
         ok, details = deterministic_review(args.timeout)
         entry["verification"] = details
         entry["status"] = "VERIFIED"
