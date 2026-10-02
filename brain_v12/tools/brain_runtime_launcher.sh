@@ -10,7 +10,14 @@ export V12_BRAIN_URL="\${BRAIN_URL:-http://127.0.0.1:8012}"
 export V12_AGENT_ID="\${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="\${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="\${V12_AGENT_KEY_FILE}"
-if [ ! -s "$V12_AGENT_KEY_FILE" ]; then echo "BRAIN_RUNTIME_ERROR: AGENT_KEY_FILE_MISSING" >&2; exit 41; fi
+mkdir -p "$(dirname "$V12_AGENT_KEY_FILE")"
+if [ ! -s "$V12_AGENT_KEY_FILE" ]; then
+  echo "JET_BRAIN_AUTH missing_key_creating_local_key" >&2
+  PYTHON_BOOT="$(command -v python3 || command -v python || true)"
+  if [ -z "$PYTHON_BOOT" ]; then echo "BRAIN_RUNTIME_ERROR: PYTHON_NOT_FOUND" >&2; exit 42; fi
+  "$PYTHON_BOOT" -c 'import secrets,os; p=os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]); open(p,"w",encoding="utf-8").write(secrets.token_urlsafe(48)+"\n"); os.chmod(p,0o600)'
+fi
+if [ ! -s "$V12_AGENT_KEY_FILE" ]; then echo "BRAIN_RUNTIME_ERROR: AGENT_KEY_CREATE_FAILED" >&2; exit 41; fi
 export BRAIN_EMULATOR_KEY="$(cat "$V12_AGENT_KEY_FILE")"
 export PYTHONPATH="$ROOT:\${PYTHONPATH:-}"
 PYTHON="\${V12_PYTHON_EXECUTABLE:-$(command -v python3 || command -v python)}"
