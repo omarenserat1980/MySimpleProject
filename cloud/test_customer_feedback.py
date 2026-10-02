@@ -19,3 +19,16 @@ def test_invalid_rating(tmp_path):
     try: FeedbackStore(tmp_path).create(customer_id=None,rating=6,category="X",body="bad")
     except ValueError: pass
     else: raise AssertionError("invalid rating accepted")
+
+
+def test_resolved_feedback_creates_improvement_task(tmp_path):
+    from cloud.customer_feedback import improvement_from_feedback
+    s=FeedbackStore(tmp_path)
+    f=s.create(customer_id="c1",rating=2,category="RELIABILITY",body="failed twice")
+    f.transition(FeedbackState.TRIAGED,"brain")
+    f.transition(FeedbackState.IN_PROGRESS,"brain")
+    f.transition(FeedbackState.RESOLVED,"brain","case://verified")
+    task=improvement_from_feedback(f)
+    assert task.feedback_id == f.feedback_id
+    assert task.priority == "HIGH"
+    assert task.evidence_ref == "case://verified"
