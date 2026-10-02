@@ -20,11 +20,18 @@ class ActionResult:
 class ReflectionActionRegistry:
     def __init__(self) -> None:
         self._actions: dict[str, Callable[[], ActionResult]] = {}
+        self._descriptions: dict[str, str] = {}
 
-    def register(self, action_id: str, action: Callable[[], ActionResult]) -> None:
+    def register(
+        self,
+        action_id: str,
+        action: Callable[[], ActionResult],
+        description: str = "",
+    ) -> None:
         if not action_id or action_id in self._actions:
             raise ValueError("invalid_or_duplicate_action_id")
         self._actions[action_id] = action
+        self._descriptions[action_id] = str(description)
 
     def execute(self, action_id: str) -> ActionResult:
         action = self._actions.get(action_id)
@@ -34,6 +41,9 @@ class ReflectionActionRegistry:
 
     def ids(self) -> list[str]:
         return sorted(self._actions)
+
+    def descriptions(self) -> dict[str, str]:
+        return {key: self._descriptions.get(key, "") for key in self.ids()}
 
 def command_action(action_id: str, argv: Sequence[str], timeout: int = 120, env: dict[str, str] | None = None) -> Callable[[], ActionResult]:
     if not argv or timeout < 1 or timeout > 900:
@@ -49,8 +59,9 @@ def command_action(action_id: str, argv: Sequence[str], timeout: int = 120, env:
 
 def self_test() -> None:
     reg = ReflectionActionRegistry()
-    reg.register("safe-test", lambda: ActionResult("safe-test", True, 0, "PASS", ""))
+    reg.register("safe-test", lambda: ActionResult("safe-test", True, 0, "PASS", ""), "Run the safe action self-test.")
     assert reg.execute("safe-test").ok
+    assert reg.descriptions()["safe-test"] == "Run the safe action self-test."
     denied = reg.execute("not-registered")
     assert denied.error == "ACTION_NOT_ALLOWED"
     assert asdict(denied)["action_id"] == "not-registered"
