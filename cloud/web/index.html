@@ -46,7 +46,10 @@
 <article class="panel wide"><h2>👤 Customer Portal</h2>
 <p>طلب خدمة جديد. البيانات لا تُعتبر عميلاً فعلياً أو عقداً حتى تصل إلى API وتُسجل الأدلة المطلوبة.</p>
 <form id="customerRequest" class="customerForm">
-<label>الاسم<input id="customerName" required maxlength="120"></label>
+<label>نوع العميل<select id="customerType" required><option value="INDIVIDUAL">فرد</option><option value="SOLE_PROPRIETOR">صاحب عمل فردي</option><option value="COMPANY">شركة</option><option value="ORGANIZATION">مؤسسة / منظمة</option><option value="GOVERNMENT">جهة حكومية</option><option value="PARTNER">شريك</option></select></label>
+<label>الاسم / الاسم القانوني<input id="customerName" required maxlength="160"></label>
+<label id="entityRegWrap" hidden>رقم التسجيل / معرف الجهة<input id="entityRegistration" maxlength="120"></label>
+<label id="representativeWrap" hidden>الممثل المفوض<input id="authorizedRepresentative" maxlength="160"></label>
 <label>الخدمة<input id="customerService" required maxlength="160" placeholder="مثال: أتمتة سير عمل"></label>
 <label>وصف الحاجة<textarea id="customerNeed" required maxlength="2000"></textarea></label>
 <label class="check"><input id="customerMarketing" type="checkbox"> أوافق على استخدام بياناتي لأغراض التسويق</label>
