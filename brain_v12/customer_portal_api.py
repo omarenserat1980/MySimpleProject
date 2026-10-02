@@ -8,6 +8,8 @@ No external message is sent by this module.
 from __future__ import annotations
 
 import hashlib
+
+from .customer_cases import CustomerCaseStore
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -98,6 +100,7 @@ class LeadStore:
 def create_app(store: LeadStore | None = None) -> FastAPI:
     app = FastAPI(title="Electronic Brain Customer Portal API", version="1.0")
     lead_store = store or LeadStore()
+    case_store = CustomerCaseStore()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -105,7 +108,9 @@ def create_app(store: LeadStore | None = None) -> FastAPI:
 
     @app.post("/v1/leads", response_model=LeadOut, status_code=201)
     def create_lead(lead: LeadIn) -> LeadOut:
-        return lead_store.create(lead)
+        created = lead_store.create(lead)
+        case_id = case_store.create_case(created.id)
+        return created.model_copy(update={"status": f"NEW|CASE:{case_id}"})
 
     @app.get("/v1/leads/{lead_id}", response_model=LeadOut)
     def get_lead(lead_id: int) -> LeadOut:
