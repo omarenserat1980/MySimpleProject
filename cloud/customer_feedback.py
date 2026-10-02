@@ -93,3 +93,26 @@ class FeedbackStore:
             try: out.append(self.get(p.stem))
             except Exception: continue
         return out
+
+
+@dataclass
+class ImprovementTask:
+    feedback_id: str
+    title: str
+    category: str
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    priority: str = "NORMAL"
+    state: str = "OPEN"
+    created_at: str = field(default_factory=now_iso)
+    evidence_ref: str | None = None
+
+def improvement_from_feedback(feedback: Feedback, evidence_ref: str | None = None) -> ImprovementTask:
+    if feedback.state not in {FeedbackState.RESPONDED, FeedbackState.RESOLVED, FeedbackState.CLOSED}:
+        raise ValueError("feedback must be responded/resolved/closed before improvement task creation")
+    return ImprovementTask(
+        feedback_id=feedback.feedback_id,
+        title=f"Improve: {feedback.category}",
+        category=feedback.category,
+        priority="HIGH" if feedback.rating is not None and feedback.rating <= 2 else "NORMAL",
+        evidence_ref=evidence_ref or feedback.evidence_ref,
+    )
