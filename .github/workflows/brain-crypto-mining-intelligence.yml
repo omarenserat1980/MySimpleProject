@@ -8,17 +8,16 @@ on:
       - "brain_v12/business/crypto_mining_data.py"
       - "brain_v12/business/crypto_market_snapshot.py"
       - "brain_v12/business/test_crypto_market_snapshot.py"
+      - "brain_v12/business/crypto_live_collector.py"
       - ".github/workflows/brain-crypto-mining-intelligence.yml"
+  schedule:
+    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       electricity_usd_kwh:
         description: "Electricity cost in USD/kWh"
         required: true
         default: "0.05"
-      hashprice_usd_per_th_day:
-        description: "Observed BTC hashprice in USD/TH/day"
-        required: true
-        default: "0.04"
       hashrate_th:
         description: "Machine hashrate in TH/s"
         required: true
@@ -45,32 +44,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run unit tests
+      - name: Run tests
         run: |
           set -euo pipefail
-          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py
-          python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py
+          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py brain_v12/business/crypto_live_collector.py
+          python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py brain_v12/business/test_crypto_market_snapshot.py
 
-      - name: Generate evidence report
+      - name: Collect live public market data
         env:
-          ELECTRICITY_USD_KWH: ${{ inputs.electricity_usd_kwh }}
-          HASHPRICE_USD_PER_TH_DAY: ${{ inputs.hashprice_usd_per_th_day }}
-          HASHRATE_TH: ${{ inputs.hashrate_th }}
-          EFFICIENCY_J_TH: ${{ inputs.efficiency_j_th }}
-          HARDWARE_COST_USD: ${{ inputs.hardware_cost_usd }}
-          POOL_FEE_PCT: ${{ inputs.pool_fee_pct }}
+          ELECTRICITY_USD_KWH: ${{ inputs.electricity_usd_kwh || '0.05' }}
+          HASHRATE_TH: ${{ inputs.hashrate_th || '200' }}
+          EFFICIENCY_J_TH: ${{ inputs.efficiency_j_th || '15' }}
+          HARDWARE_COST_USD: ${{ inputs.hardware_cost_usd || '0' }}
+          POOL_FEE_PCT: ${{ inputs.pool_fee_pct || '2' }}
         run: |
           set -euo pipefail
           mkdir -p .brain/crypto
           python - <<'PY'
-          import json
-          import os
-          from brain_v12.business.crypto_mining_intelligence import (
-              MiningMachine, NetworkSnapshot, build_intelligence_report
-          )
+          import json, os
+          from brain_v12.business.crypto_live_collector import collect_btc_market_snapshot
+          from brain_v12.business.crypto_mining_intelligence import MiningMachine, NetworkSnapshot, build_intelligence_report
 
+          snapshot = collect_btc_market_snapshot()
           machine = MiningMachine(
-              machine_id="workflow-input",
+              machine_id="cloud-live",
               hashrate_th=float(os.environ["HASHRATE_TH"]),
               efficiency_j_th=float(os.environ["EFFICIENCY_J_TH"]),
               hardware_cost_usd=float(os.environ["HARDWARE_COST_USD"]),
@@ -78,19 +75,24 @@ jobs:
           )
           network = NetworkSnapshot(
               asset="BTC",
-              hashprice_usd_per_th_day=float(os.environ["HASHPRICE_USD_PER_TH_DAY"]),
-              observed_at="workflow-input",
-              source="workflow-input",
+              hashprice_usd_per_th_day=snapshot["hashprice_usd_per_th_day"],
+              observed_at=snapshot["observed_at"],
+              source=snapshot["sources"]["hashprice"],
+              btc_price_usd=snapshot["btc_price_usd"],
+              network_hashrate_eh_s=snapshot["network_hashrate_eh_s"],
+              difficulty=snapshot["difficulty"],
+              evidence_urls=list(snapshot["sources"].values()),
           )
           report = build_intelligence_report(
-              machine,
-              network,
-              float(os.environ["ELECTRICITY_USD_KWH"]),
+              machine, network, float(os.environ["ELECTRICITY_USD_KWH"]),
               [0.03, 0.05, 0.07, 0.10, 0.15],
           )
+          report["market_snapshot"] = snapshot
+          report["data_quality"] = {"status": "FRESH", "sources": snapshot["sources"], "fail_closed": True}
+          report["decision_state"] = report.get("analysis", {}).get("status", "RESEARCH")
           with open(".brain/crypto/mining_intelligence.json", "w", encoding="utf-8") as f:
               json.dump(report, f, indent=2)
-          print("CRYPTO_MINING_INTELLIGENCE=PASS")
+          print("CRYPTO_MINING_LIVE_COLLECTION=PASS")
           print(json.dumps(report, indent=2))
           PY
 
