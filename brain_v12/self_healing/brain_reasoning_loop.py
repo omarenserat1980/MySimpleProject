@@ -45,6 +45,7 @@ class BrainReasoningLoop:
         state["allowed_actions"] = list(self.registry.ids())
         state["action_descriptions"] = self.registry.descriptions()
         cycles: list[BrainCycle] = []
+        state["cycle_history"] = []
 
         questions = list(self.agent.questions)
         index = 0
@@ -86,6 +87,30 @@ class BrainReasoningLoop:
                 last_evidence=cycle.evidence,
                 last_exit_code=cycle.exit_code,
             )
+            state["cycle_history"].append({
+                "question": cycle.question,
+                "answer": cycle.answer,
+                "action_id": cycle.action_id,
+                "execution_ok": cycle.execution_ok,
+                "exit_code": cycle.exit_code,
+                "evidence": cycle.evidence,
+                "reason": cycle.reason,
+            })
+
+            # A failed workflow is converted into a focused diagnostic question.
+            # The Brain keeps the failure evidence in state so ChatGPT can reason
+            # over the actual job/log result rather than inventing a cause.
+            if (
+                not execution.ok
+                and action_id.startswith("workflow:")
+                and index + 1 < self.max_cycles
+            ):
+                workflow_follow_up = (
+                    "What exact workflow job or log evidence caused the failure, "
+                    "and what is the smallest safe corrective action?"
+                )
+                if workflow_follow_up not in questions[index + 1:]:
+                    questions.insert(index + 1, workflow_follow_up)
 
             # A failed execution becomes the next Brain-generated question.
             # This keeps the loop focused on the actual failure instead of
@@ -128,6 +153,7 @@ def self_test() -> None:
     assert cycles[0].evidence == "INSPECT=PASS"
     assert cycles[1].evidence == "VERIFY=PASS"
     assert cycles[1].exit_code == 0
+    assert cycles[1].evidence == "VERIFY=PASS"
 
     failing_agent = ReflectionAgent(
         max_turns=3,
