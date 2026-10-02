@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 GROUPS={
- "core":["brain_v12.tests.test_core","brain_v12.tests.test_evidence_verification"],
+ "core":["brain_v12.tests.test_core","brain_v12.test_evidence_verification"],
  "autonomy":["brain_v12.tests.test_autonomy_control_plane","brain_v12.tests.test_brain_supervisor","brain_v12.brain.test_autonomous_reasoner"],
  "repair":["brain_v12.brain.test_repair_engine","brain_v12.brain.test_repair_knowledge"],
  "self_healing":["brain_v12.self_healing.test_command_contract","brain_v12.self_healing.test_generator_registry","brain_v12.self_healing.test_improvement_eligibility","brain_v12.self_healing.test_native_patch_generator"],
