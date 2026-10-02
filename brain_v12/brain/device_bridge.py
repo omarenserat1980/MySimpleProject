@@ -4,7 +4,7 @@ import hashlib,hmac,os,time
 from uuid import uuid4
 AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; HEARTBEAT_STALE="STALE"
 class DeviceBridge:
-    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"cinematic_room13_render":{},
+    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
                    "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
     def __init__(self,store): self.store=store; self._last_seen=None
     def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
@@ -42,7 +42,9 @@ class DeviceBridge:
         if not item:return {"ok":False,"status":"RESULT_NOT_FOUND","verified":False}
         if item.get("status")!="COMPLETED":return {"ok":False,"status":"NOT_COMPLETED","verified":False,"task":item}
         task,result=item.get("task"),item.get("result") or {}
-        if task=="python_version":
+        if task in ("python_unittest","brain_self_test"):
+            combined="\n".join((str(result.get("stdout","")),str(result.get("stderr","")))); exit_code=result.get("returncode",result.get("exit_code")); verified=exit_code in (None,0) and "Ran " in combined and "OK" in combined
+        elif task=="python_version":
             stdout=str(result.get("stdout","")).strip(); exit_code=result.get("returncode",result.get("exit_code")); verified=bool(stdout) and exit_code in (None,0)
         elif task in ("brain_machine_cinema_60m","brain_machine_cinema_120m"):
             evidence=result.get("result") or result
