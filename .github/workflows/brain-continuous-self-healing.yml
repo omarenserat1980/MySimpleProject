@@ -46,6 +46,11 @@ jobs:
       - name: Checkout Brain
         uses: actions/checkout@v4
 
+      - name: Prepare Brain runtime
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -q httpx
+
       - name: Validate Repair Knowledge
         run: python -m unittest brain_v12.brain.test_repair_knowledge -v
 
@@ -64,17 +69,12 @@ jobs:
           BRAIN_MAX_BACKOFF_SECONDS: "20"
           BRAIN_REPAIR_COMMAND: "python -m brain_v12.self_healing.repair"
           BRAIN_CODE_GENERATOR_COMMAND: "python -m brain_v12.self_healing.native_patch_generator"
-          # Native generator is bounded by the registry and Stage 7 verification gate.
           BRAIN_GATE_PYTEST: "1"
           BRAIN_COMMAND: ${{ github.event.inputs.brain_command || 'BRAIN_CONTINUE_AUTONOMOUSLY' }}
           BRAIN_AUTO_CONFIRM: ${{ github.event.inputs.auto_confirm || 'false' }}
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.continuous_evolution \
-            --cycles "${{ github.event.inputs.continue_cycles || '3' }}" \
-            --loops-per-cycle 1 \
-            --timeout 120 \
-            --pause 2
+          python -m brain_v12.self_healing.continuous_evolution             --cycles "${{ github.event.inputs.continue_cycles || '3' }}"             --loops-per-cycle 1             --timeout 120             --pause 2
 
       - name: Report Applied Repair Evidence
         if: always()
