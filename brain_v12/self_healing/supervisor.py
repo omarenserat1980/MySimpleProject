@@ -167,9 +167,7 @@ def main() -> int:
                 actions = ReflectionActionRegistry()
                 if args.verify:
                     actions.register("verify", command_action("verify", shlex.split(args.verify), args.timeout))
-                if args.repair:
-                    actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout))
-                selected_action = "verify" if p.returncode == 0 else ("repair" if args.repair else None)
+                selected_action = "verify" if p.returncode == 0 else None
                 action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
                 item.reflection_actions.append(selected_action or "none")
                 print(json.dumps({
@@ -219,6 +217,9 @@ def main() -> int:
                     })
                     repair_env = os.environ.copy()
                     repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
+                    repair_env = os.environ.copy()
+                    repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
+                    actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout, repair_env))
                     repair_result = actions.execute("repair")
                     item.repair_exit_code = repair_result.exit_code
                     item.repair_stdout = repair_result.output[-12000:]
