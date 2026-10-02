@@ -32,3 +32,19 @@ def test_resolved_feedback_creates_improvement_task(tmp_path):
     assert task.feedback_id == f.feedback_id
     assert task.priority == "HIGH"
     assert task.evidence_ref == "case://verified"
+
+
+def test_feedback_task_bridge_uses_task_engine(tmp_path):
+    from cloud.feedback_task_bridge import enqueue_improvement
+    from brain_v12.brain.task_engine import TaskEngine
+    s=FeedbackStore(tmp_path)
+    f=s.create(customer_id="c1",rating=2,category="RELIABILITY",body="failure")
+    f.transition(FeedbackState.TRIAGED,"brain")
+    f.transition(FeedbackState.IN_PROGRESS,"brain")
+    f.transition(FeedbackState.RESOLVED,"brain","case://verified")
+    engine=TaskEngine()
+    task=enqueue_improvement(f,engine)
+    assert task["source"] == "CUSTOMER_FEEDBACK"
+    assert task["feedback_id"] == f.feedback_id
+    assert task["status"] == "PENDING"
+    assert engine.ready()[0]["id"] == task["id"]
