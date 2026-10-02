@@ -1,2 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">Electronic Brain Executor</string></resources>
+<resources>
+    <string name="app_name">Electronic Brain Executor</string>
+    <string name="chatgpt_accessibility_description">Electronic Brain human mediator: type, send, wait, and read ChatGPT responses.</string>
+</resources>
