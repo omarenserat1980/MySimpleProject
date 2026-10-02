@@ -56,68 +56,8 @@ def require_auth(
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
-class FeedbackCreate(BaseModel):
-    customer_id: str | None = None
-    rating: int | None = Field(default=None, ge=1, le=5)
-    category: str
-    body: str
-    consent_to_contact: bool = False
-    marketing_consent: bool = False
-    request_id: str | None = None
-    case_id: str | None = None
-
-def _feedback_path(feedback_id: str) -> Path:
-    return FEEDBACK_STATE / f"{feedback_id}.json"
-
-def _write_feedback(data: dict) -> None:
-    path = _feedback_path(data["feedback_id"])
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
-
-@app.post("/v1/feedback")
-def create_feedback(payload: FeedbackCreate):
-    feedback = Feedback(**payload.model_dump())
-    data = asdict(feedback)
-    _write_feedback(data)
-    return data
-
-@app.get("/v1/feedback/{feedback_id}")
-def get_feedback(feedback_id: str, _: None = Depends(require_auth)):
-    path = _feedback_path(feedback_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="feedback_not_found")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-@app.post("/v1/feedback/{feedback_id}/transition")
-def transition_feedback(feedback_id: str, state: str, evidence_ref: str | None = None, _: None = Depends(require_auth)):
-    path = _feedback_path(feedback_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="feedback_not_found")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    current = FeedbackState(data["state"])
-    target = FeedbackState(state)
-    allowed = {
-        FeedbackState.RECEIVED: {FeedbackState.TRIAGED, FeedbackState.SPAM, FeedbackState.DUPLICATE, FeedbackState.LEGAL_HOLD},
-        FeedbackState.TRIAGED: {FeedbackState.ASSIGNED, FeedbackState.IN_PROGRESS, FeedbackState.SPAM, FeedbackState.DUPLICATE, FeedbackState.LEGAL_HOLD},
-        FeedbackState.ASSIGNED: {FeedbackState.IN_PROGRESS, FeedbackState.LEGAL_HOLD},
-        FeedbackState.IN_PROGRESS: {FeedbackState.RESPONDED, FeedbackState.RESOLVED, FeedbackState.LEGAL_HOLD},
-        FeedbackState.RESPONDED: {FeedbackState.RESOLVED, FeedbackState.CLOSED, FeedbackState.LEGAL_HOLD},
-        FeedbackState.RESOLVED: {FeedbackState.CLOSED, FeedbackState.LEGAL_HOLD},
-        FeedbackState.CLOSED: {FeedbackState.LEGAL_HOLD},
-        FeedbackState.LEGAL_HOLD: {FeedbackState.CLOSED},
-        FeedbackState.SPAM: set(),
-        FeedbackState.DUPLICATE: set(),
-    }
-    if target not in allowed[current]:
-        raise HTTPException(status_code=409, detail="invalid_feedback_transition")
-    if target in {FeedbackState.RESPONDED, FeedbackState.RESOLVED, FeedbackState.CLOSED} and not evidence_ref:
-        raise HTTPException(status_code=422, detail="evidence_required")
-    data["state"] = target.value
-    data["updated_at"] = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
-    data["evidence_ref"] = evidence_ref
-    _write_feedback(data)
-    return data
+from cloud.customer_feedback import FeedbackState, FeedbackStore
+FEEDBACK_STORE = FeedbackStore(STATE)
 
 
 CUSTOMER_REQUESTS = STATE / "customer_requests"
@@ -826,8 +766,6 @@ class FeedbackTransitionRequest(BaseModel):
     evidence_ref: str|None=None
     reason: str=""
 
-from cloud.customer_feedback import FeedbackState, FeedbackStore
-FEEDBACK_STORE=FeedbackStore(STATE)
 
 @app.post("/v1/feedback")
 def create_feedback(body: FeedbackCreateRequest):
