@@ -28,3 +28,19 @@ $("apiUrl").value=api;
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 refresh();setInterval(refresh,15000);
 setView("dashboard");
+
+const customerEndpoints=["/api/customers","/api/customer/requests"];
+async function submitCustomerRequest(e){
+ e.preventDefault();
+ const result=$("customerResult"), status=$("customerStatus");
+ const payload={display_name:$("customerName").value.trim(),service:$("customerService").value.trim(),need:$("customerNeed").value.trim(),marketing_consent:$("customerMarketing").checked};
+ result.textContent="جارٍ إرسال الطلب إلى Brain API…";
+ try{
+   const d=await first(customerEndpoints.map(p=>p));
+   result.textContent=JSON.stringify(d,null,2);
+ }catch(err){
+   result.textContent="لم يتم إنشاء طلب فعلي: "+err.message+" — لا توجد بيانات محلية بديلة.";
+   status.innerHTML='<div class="item"><b>REQUEST</b><span class="badge">API REQUIRED</span></div><div class="item"><b>MARKETING CONSENT</b><span class="badge">'+(payload.marketing_consent?"GRANTED":"NOT GRANTED")+'</span></div>';
+ }
+}
+if($("customerRequest")) $("customerRequest").onsubmit=submitCustomerRequest;
