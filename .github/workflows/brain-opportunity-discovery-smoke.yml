@@ -1,0 +1,34 @@
+name: Brain Opportunity Discovery Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate opportunity discovery
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/business/*.py
+          python - <<'PY'
+          from brain_v12.business.opportunity_discovery import MarketSignal, qualify
+          from brain_v12.business.offer_catalog import find_matches
+
+          signal=MarketSignal(
+            source="public-market-signal",
+            problem="repetitive manual workflow and CI failures",
+            customer_segment="small software teams",
+            evidence="evidence://public-signal"
+          )
+          result=qualify(signal)
+          assert result["status"]=="READY_FOR_REVIEW"
+          assert result["external_contact"]=="REQUIRES_AUTHORIZATION"
+          assert find_matches(signal.problem)
+          print("BRAIN_OPPORTUNITY_DISCOVERY=PASS")
+          print(result)
+          PY
