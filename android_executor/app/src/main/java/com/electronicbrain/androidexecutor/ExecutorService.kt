@@ -153,7 +153,7 @@ class ExecutorService : Service() {
                 "ffmpeg_run" -> {
                     val a = params.optJSONArray("argv") ?: return fail("ARGV_REQUIRED")
                     val args = Array(a.length()) { i -> a.getString(i) }
-                    ok(JSONObject(FFmpegEngine(this).run(args)))
+                    ok(JSONObject(FFmpegEngine(this).run(args.toList())))
                 }
                 "verify_file" -> {
                     val file = safePath(params.optString("path", ""))
@@ -212,7 +212,7 @@ class ExecutorService : Service() {
                     val command = argv.firstOrNull() ?: return fail("ARGV_EMPTY")
                     val allowed = setOf("id","uname","getprop","pwd","ls","df","du","mkdir","cp","mv","rm","cat")
                     if (command !in allowed) return fail("COMMAND_NOT_ALLOWED")
-                    val p = ProcessBuilder("toybox", *argv).start()
+                    val p = ProcessBuilder("toybox", *argv.toTypedArray()).start()
                     val out = p.inputStream.bufferedReader().readText()
                     val err = p.errorStream.bufferedReader().readText()
                     val code = p.waitFor()
