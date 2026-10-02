@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020">
+<title>Electronic Brain Cloud</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div><div class="brand">ELECTRONIC BRAIN</div><div class="sub">Cloud Control Center</div></div>
+  <span id="status" class="pill offline">OFFLINE</span>
+</header>
+<main>
+  <section class="hero">
+    <div>
+      <span class="eyebrow">NO INSTALL • WEB ONLY</span>
+      <h1>Your Brain, available from any browser.</h1>
+      <p>Control jobs, inspect runtime health, and follow execution without installing an APK on the phone.</p>
+    </div>
+    <button id="connect">Connect Brain</button>
+  </section>
+  <section class="grid">
+    <article class="card"><span>RUNTIME</span><strong id="runtime">—</strong><small id="runtimeDetail">Waiting for API</small></article>
+    <article class="card"><span>JOBS</span><strong id="jobs">—</strong><small>Cloud task queue</small></article>
+    <article class="card"><span>AGENTS</span><strong id="agents">—</strong><small>Connected executors</small></article>
+  </section>
+  <section class="panel">
+    <div class="panelHead"><h2>Command Center</h2><span>Browser → Brain API</span></div>
+    <textarea id="command" placeholder="Tell Brain what to do…"></textarea>
+    <div class="actions"><button id="run">Run task</button><button id="health" class="secondary">Health check</button></div>
+    <pre id="output">Ready.</pre>
+  </section>
+  <section class="panel">
+    <div class="panelHead"><h2>Cloud architecture</h2><span>APK optional, not required</span></div>
+    <div class="flow"><b>Browser</b><i>→</i><b>HTTPS API</b><i>→</i><b>Brain Supervisor</b><i>→</i><b>Workers</b></div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
