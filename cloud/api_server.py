@@ -49,6 +49,168 @@ def require_auth(
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
+
+
+CUSTOMER_REQUESTS = STATE / "customer_requests"
+CUSTOMER_REQUESTS.mkdir(parents=True, exist_ok=True)
+
+
+class CustomerRequest(BaseModel):
+    display_name: str
+    service: str
+    need: str
+    marketing_consent: bool = False
+
+
+class CustomerMessage(BaseModel):
+    message: str
+    channel: str = "BRAIN_PORTAL"
+    purpose: str = "SERVICE"
+
+
+def _customer_path(request_id: str) -> Path:
+    safe = request_id.strip()
+    if not safe or "/" in safe or "\\" in safe or safe in {".", ".."}:
+        raise HTTPException(status_code=400, detail="invalid request_id")
+    return CUSTOMER_REQUESTS / (safe + ".json")
+
+
+def _save_customer(record: dict) -> None:
+    CUSTOMER_REQUESTS.mkdir(parents=True, exist_ok=True)
+    tmp = _customer_path(record["request_id"]).with_suffix(".tmp")
+    tmp.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(_customer_path(record["request_id"]))
+
+
+def _load_customer(request_id: str) -> dict:
+    path = _customer_path(request_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="customer request not found")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail="customer request state is unreadable") from exc
+
+
+def _customer_audit(record: dict, event: str, **details: object) -> None:
+    record.setdefault("audit", []).append({"event": event, "at": time.time(), **details})
+
+
+@app.post("/api/customers")
+def create_customer(body: CustomerRequest):
+    display_name, service, need = body.display_name.strip(), body.service.strip(), body.need.strip()
+    if not display_name or not service or not need:
+        raise HTTPException(status_code=400, detail="display_name, service and need are required")
+    request_id = str(uuid.uuid4())
+    record = {
+        "request_id": request_id,
+        "display_name": display_name,
+        "service": service,
+        "need": need,
+        "consent": {
+            "service": True,
+            "marketing": bool(body.marketing_consent),
+            "marketing_source": "customer_portal" if body.marketing_consent else None,
+        },
+        "status": "READY_FOR_REVIEW",
+        "lifecycle_state": "DISCOVERED",
+        "pipeline_state": "DISCOVERED",
+        "evidence_state": "READY_FOR_REVIEW",
+        "financial_state": "NOT_VERIFIED",
+        "revenue_state": "NOT_REALIZED",
+        "external_actions": [],
+        "audit": [],
+        "created_at": time.time(),
+    }
+    _customer_audit(record, "CUSTOMER_REQUEST_CREATED",
+                     lifecycle_state="DISCOVERED",
+                     marketing_consent=bool(body.marketing_consent))
+    _save_customer(record)
+    return {
+        "ok": True,
+        "request_id": request_id,
+        "status": record["status"],
+        "lifecycle_state": record["lifecycle_state"],
+        "consent_state": record["consent"],
+        "evidence_state": record["evidence_state"],
+        "financial_state": record["financial_state"],
+        "revenue_state": record["revenue_state"],
+    }
+
+
+@app.get("/api/customers/{request_id}")
+def get_customer(request_id: str):
+    return {"ok": True, "customer": _load_customer(request_id)}
+
+
+@app.post("/api/customers/{request_id}/approve", dependencies=[Depends(require_auth)])
+def approve_customer(request_id: str):
+    record = _load_customer(request_id)
+    if record["lifecycle_state"] not in {"DISCOVERED", "READY_FOR_REVIEW"}:
+        raise HTTPException(status_code=409, detail="customer request is not awaiting approval")
+    record["status"] = "APPROVED"
+    record["lifecycle_state"] = "APPROVED"
+    record["pipeline_state"] = "APPROVED"
+    _customer_audit(record, "HUMAN_APPROVAL_RECORDED", lifecycle_state="APPROVED")
+    _save_customer(record)
+    return {"ok": True, "customer": record}
+
+
+@app.post("/api/customers/{request_id}/message", dependencies=[Depends(require_auth)])
+def message_customer(request_id: str, body: CustomerMessage):
+    record = _load_customer(request_id)
+    from brain_v12.business.customer_governance import (
+        COMMUNICATION_CHANNELS, CONSENT_PURPOSES, Consent,
+        CustomerOperation, CustomerProfile,
+    )
+    if not body.message.strip():
+        raise HTTPException(status_code=400, detail="message is required")
+    if body.channel not in COMMUNICATION_CHANNELS:
+        raise HTTPException(status_code=400, detail="unsupported communication channel")
+    if body.purpose not in CONSENT_PURPOSES:
+        raise HTTPException(status_code=400, detail="unsupported consent purpose")
+    profile = CustomerProfile(
+        customer_id=record["request_id"],
+        display_name=record["display_name"],
+        consents=[
+            Consent(purpose="SERVICE", granted=bool(record["consent"]["service"]), source="customer_portal"),
+            Consent(purpose="MARKETING", granted=bool(record["consent"]["marketing"]), source="customer_portal"),
+        ],
+    )
+    decision = CustomerOperation(
+        customer_id=record["request_id"], action="SEND_MESSAGE",
+        channel=body.channel, purpose=body.purpose,
+    ).authorize(profile)
+    if decision.get("status") != "REQUIRES_AUTHORIZATION":
+        return {"ok": False, "gate": decision}
+    _customer_audit(record, "EXTERNAL_MESSAGE_AUTHORIZED",
+                     channel=body.channel, purpose=body.purpose)
+    record["external_actions"].append({
+        "action": "SEND_MESSAGE", "channel": body.channel, "purpose": body.purpose,
+        "message": body.message.strip(), "status": "AUTHORIZED_NOT_SENT", "at": time.time(),
+    })
+    _save_customer(record)
+    return {
+        "ok": True,
+        "gate": "AUTHORIZED_NOT_SENT",
+        "message": "Connector execution remains a separate external action.",
+        "customer": record,
+    }
+
+
+@app.get("/api/customers/{request_id}/financial", dependencies=[Depends(require_auth)])
+def customer_financial_state(request_id: str):
+    record = _load_customer(request_id)
+    return {
+        "ok": True,
+        "request_id": request_id,
+        "financial_state": record["financial_state"],
+        "revenue_state": record["revenue_state"],
+        "source": "customer_portal",
+        "payment_verification": "REVENUE_LEDGER_ONLY",
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok", "uptime_seconds": round(time.time() - STARTED, 1)}
