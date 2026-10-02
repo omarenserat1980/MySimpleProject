@@ -23,7 +23,7 @@ class ExecutorService : Service() {
         private const val CHANNEL = "electronic_brain_executor"
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -158,6 +158,30 @@ class ExecutorService : Service() {
                 "verify_file" -> {
                     val file = safePath(params.optString("path", ""))
                     ok(JSONObject(VerificationEngine.file(file, params.optLong("min_bytes", 1L))))
+                }
+                "verify_media" -> {
+                    val file = safePath(params.optString("path", ""))
+                    ok(JSONObject(FFmpegEngine(this).probeMedia(file)))
+                }
+                "termux_probe" -> {
+                    val installed = TermuxBridge.isInstalled(this)
+                    if (!installed) {
+                        ok(JSONObject().put("installed", false).put("ready", false).put("error", "TERMUX_NOT_INSTALLED"))
+                    } else {
+                        val result = TermuxBridge.run(
+                            this,
+                            "/data/data/com.termux/files/usr/bin/ffmpeg",
+                            listOf("-version"),
+                            timeoutMs = 20_000L
+                        )
+                        ok(JSONObject()
+                            .put("installed", true)
+                            .put("ready", result.exitCode == 0 && result.errorCode == 0)
+                            .put("exit_code", result.exitCode)
+                            .put("stdout", result.stdout.take(4000))
+                            .put("stderr", result.stderr.take(2000))
+                            .put("error", result.errorMessage))
+                    }
                 }
                 "status" -> ok(JSONObject()
                     .put("device", "Android")
