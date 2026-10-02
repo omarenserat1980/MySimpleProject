@@ -56,6 +56,12 @@ class MainActivity : ComponentActivity() {
                 status.text = "STOPPED"
             }
         }
+        val accessibility = Button(this).apply {
+            text = "ENABLE CHATGPT MEDIATOR"
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }
         val storage = Button(this).apply {
             text = "ALLOW ALL FILES"
             setOnClickListener {
@@ -71,7 +77,7 @@ class MainActivity : ComponentActivity() {
                 text = "ELECTRONIC BRAIN\nOPTIONAL ANDROID CLIENT"
                 textSize = 22f
             })
-            addView(agentId); addView(agentKey); addView(brainUrl); addView(start); addView(stop); addView(storage); addView(status)
+            addView(agentId); addView(agentKey); addView(brainUrl); addView(start); addView(stop); addView(accessibility); addView(storage); addView(status)
             addView(TextView(this@MainActivity).apply {
                 text = "Brain Cloud is the primary runtime.\nThis Android client is optional and never required for cloud operation."
                 textSize = 13f
