@@ -10,13 +10,14 @@ Selection rules:
 - no agent may declare its own success
 - paid APIs may be used only as optional adapters
 
-Recommended initial set:
-- OpenCode — primary coding-agent backend
-- OpenHands — autonomous software-development backend
-- Goose — MCP/tool-orchestration backend
-- Qwen Code — Qwen/Asia-oriented coding backend
-- Ollama — local model runtime
-- vLLM — cloud/GPU model serving runtime
-- OpenShell — security sandbox candidate; evaluation required before production
+The radar now covers global coding agents, model runtimes, security runtimes, Indian-language AI, Japanese research, Taiwanese language models, Korean models, Chinese OCR/compute paths, European models, and Arabic-first models.
 
-Sources are recorded in global_ai_radar.json and must be revalidated before production promotion.
+## Evidence-first evaluation
+
+`global_ai_radar_evaluator.py` converts each registry candidate into a bounded evaluation plan:
+
+Discover → License Check → Capability Test → Security Test → Benchmark → Evidence Review → Adapter Validation → Verify
+
+Every stage starts as `PENDING`. Promotion is forbidden until independent evidence exists for all required stages. A successful process exit is not treated as proof of capability or correctness.
+
+Sources are recorded in `global_ai_radar.json` and must be revalidated before production promotion.
