@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from cloud.deploy_engine import DeployError, deploy, docker_available, logs, restart, status as docker_status, stop
 from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
+from cloud.customer_communications import Channel, CommunicationHub, MessageState
 from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ STARTED = time.time()
 TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
 app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
 runtime = CloudRuntime()
+COMMUNICATION_HUB = CommunicationHub(STATE / "customer_communications")
 
 # The Cloud Hub owns its queue worker. No Termux/external process is required.
 if os.getenv("BRAIN_API_QUEUE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}:
@@ -204,15 +206,28 @@ def message_customer(request_id: str, body: CustomerMessage):
         return {"ok": False, "gate": decision}
     _customer_audit(record, "EXTERNAL_MESSAGE_AUTHORIZED",
                      channel=body.channel, purpose=body.purpose)
+    msg = COMMUNICATION_HUB.create(
+        customer_id=record["request_id"],
+        channel=Channel.EMAIL if body.channel == "EMAIL" else (
+            Channel.WEB_CHAT if body.channel == "WEB_CHAT" else Channel.CUSTOMER_PORTAL
+        ),
+        direction="OUTBOUND",
+        body=body.message.strip(),
+        consent_scope=body.purpose,
+        case_id=record.get("case_id"),
+        idempotency_key=f"customer:{record['request_id']}:outbound:{hashlib.sha256(body.message.strip().encode()).hexdigest()}",
+    )
     record["external_actions"].append({
         "action": "SEND_MESSAGE", "channel": body.channel, "purpose": body.purpose,
-        "message": body.message.strip(), "status": "AUTHORIZED_NOT_SENT", "at": time.time(),
+        "message_id": msg.message_id, "message": body.message.strip(),
+        "status": "QUEUED_FOR_CONNECTOR", "at": time.time(),
     })
     _save_customer(record)
     return {
         "ok": True,
-        "gate": "AUTHORIZED_NOT_SENT",
-        "message": "Connector execution remains a separate external action.",
+        "gate": "QUEUED_FOR_CONNECTOR",
+        "message_id": msg.message_id,
+        "message": "Message is recorded in the Communications Hub and awaits a configured transport connector.",
         "customer": record,
     }
 
@@ -928,3 +943,73 @@ def diwan_archive_check(state: str, legal_hold: bool = False):
     try: eligible = archive_eligible(RecordState(state), legal_hold)
     except ValueError: raise HTTPException(status_code=400, detail="invalid record state")
     return {"ok": True, "system": "BRAIN_DIWAN", "archive_eligible": eligible, "legal_hold": legal_hold}
+
+
+class CommunicationCreateRequest(BaseModel):
+    customer_id: str
+    channel: str
+    direction: str
+    body: str
+    thread_id: str | None = None
+    case_id: str | None = None
+    request_id: str | None = None
+    consent_scope: str | None = None
+    idempotency_key: str | None = None
+
+
+@app.post("/v1/communications", dependencies=[Depends(require_auth)])
+def create_communication(body: CommunicationCreateRequest):
+    try:
+        channel = Channel(body.channel.upper())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="unsupported communication channel")
+    try:
+        msg = COMMUNICATION_HUB.create(
+            customer_id=body.customer_id,
+            channel=channel,
+            direction=body.direction.upper(),
+            body=body.body,
+            thread_id=body.thread_id,
+            case_id=body.case_id,
+            request_id=body.request_id,
+            consent_scope=body.consent_scope,
+            idempotency_key=body.idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True, "message": asdict(msg) if "asdict" in globals() else msg.__dict__}
+
+
+@app.get("/v1/communications/customer/{customer_id}", dependencies=[Depends(require_auth)])
+def list_customer_communications(customer_id: str, limit: int = 100):
+    items = COMMUNICATION_HUB.list_customer(customer_id)
+    return {"ok": True, "customer_id": customer_id, "messages": [m.__dict__ for m in items[-max(1, min(limit, 500)):]]}
+
+
+@app.get("/v1/communications/{message_id}", dependencies=[Depends(require_auth)])
+def get_communication(message_id: str):
+    try:
+        msg = COMMUNICATION_HUB.get(message_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="communication not found")
+    return {"ok": True, "message": msg.__dict__}
+
+
+class CommunicationTransitionRequest(BaseModel):
+    state: str
+    evidence_ref: str | None = None
+
+
+@app.post("/v1/communications/{message_id}/transition", dependencies=[Depends(require_auth)])
+def transition_communication(message_id: str, body: CommunicationTransitionRequest):
+    try:
+        state = MessageState(body.state.upper())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="unsupported communication state")
+    try:
+        msg = COMMUNICATION_HUB.transition(message_id, state, body.evidence_ref)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="communication not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"ok": True, "message": msg.__dict__}
