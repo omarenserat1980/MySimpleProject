@@ -12,6 +12,8 @@ import os
 import sys
 import time
 from datetime import datetime, timezone
+from io import BytesIO
+from zipfile import ZipFile
 import urllib.error
 import urllib.request
 
@@ -139,6 +141,45 @@ def main() -> int:
                 if conclusion == "success":
                     print("WORKFLOW_MONITOR=SUCCESS")
                     return 0
+
+                # Failed workflows are not opaque: collect job names/statuses and
+                # bounded log tails so the next Brain reflection has evidence.
+                jobs_url = f"https://api.github.com/repos/{args.repo}/actions/runs/{run_id}/jobs?per_page=100"
+                try:
+                    jobs_req = urllib.request.Request(jobs_url, method="GET", headers=headers)
+                    with urllib.request.urlopen(jobs_req, timeout=30) as jobs_resp:
+                        jobs_data = json.loads(jobs_resp.read().decode("utf-8"))
+                    for job in jobs_data.get("jobs", []):
+                        job_id = job.get("id")
+                        print(
+                            f"WORKFLOW_JOB: id={job_id} name={job.get('name')} "
+                            f"status={job.get('status')} conclusion={job.get('conclusion')}"
+                        )
+                        if job.get("conclusion") == "failure" and job_id:
+                            logs_url = (
+                                f"https://api.github.com/repos/{args.repo}/actions/jobs/"
+                                f"{job_id}/logs"
+                            )
+                            try:
+                                logs_req = urllib.request.Request(
+                                    logs_url, method="GET", headers=headers
+                                )
+                                with urllib.request.urlopen(logs_req, timeout=30) as logs_resp:
+                                    raw_logs = logs_resp.read()
+                                with ZipFile(BytesIO(raw_logs)) as archive:
+                                    names = archive.namelist()
+                                    for name in names[-3:]:
+                                        content = archive.read(name).decode("utf-8", "replace")
+                                        print(f"WORKFLOW_LOG_FILE={name}")
+                                        print(f"WORKFLOW_LOG_TAIL={content[-4000:]}")
+                            except (urllib.error.URLError, urllib.error.HTTPError, Exception) as log_exc:
+                                print(
+                                    f"WORKFLOW_LOG_ERROR job={job_id}: {log_exc}",
+                                    file=sys.stderr,
+                                )
+                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as jobs_exc:
+                    print(f"WORKFLOW_JOBS_ERROR: {jobs_exc}", file=sys.stderr)
+
                 print("WORKFLOW_MONITOR=FAILED")
                 return 1
 
