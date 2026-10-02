@@ -36,11 +36,16 @@ class ChatGPTReasoner:
 
     def plan(self, question: str, context: Mapping[str, object]) -> dict[str, Any]:
         allowed = list(context.get("allowed_actions", []))
+        descriptions = dict(context.get("action_descriptions", {}))
+        action_catalog = {
+            action_id: descriptions.get(action_id, "")
+            for action_id in allowed
+        }
         prompt = (
             "The Brain is running a bounded self-reflection cycle.\n"
             f"Question: {question}\n"
             f"Observed evidence/context: {json.dumps(dict(context), ensure_ascii=False, default=str)}\n"
-            f"Allowed action IDs: {json.dumps(allowed, ensure_ascii=False)}\n\n"
+            f"Allowed action catalog: {json.dumps(action_catalog, ensure_ascii=False)}\n\n"
             "Return ONLY JSON with keys: answer, action_id, reason, expected_evidence, risk. "
             "action_id MUST be one of the supplied allowed action IDs or 'none'. "
             "Never invent commands, shell text, URLs, credentials, or new action IDs."
