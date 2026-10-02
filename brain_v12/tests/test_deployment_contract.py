@@ -4,7 +4,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 APP = ROOT / "app.py"
-WORKFLOW = ROOT.parent / ".github" / "workflows" / "brain-v12.yml"
+WORKFLOW = ROOT.parent / ".github" / "workflows" / "brain-github-cloud.yml"
 
 
 class DeploymentContractTests(unittest.TestCase):
