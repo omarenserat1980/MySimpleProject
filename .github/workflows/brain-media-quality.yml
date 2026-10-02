@@ -1,0 +1,38 @@
+name: Brain Media Quality Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Company media topic"
+        required: true
+        default: "Electronic Brain development update"
+      company_name:
+        description: "Company/brand name"
+        required: true
+        default: "Electronic Brain"
+
+permissions:
+  contents: read
+
+jobs:
+  media-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate media agent
+        env:
+          TOPIC: ${{ inputs.topic }}
+          COMPANY: ${{ inputs.company_name }}
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/media/*.py
+          python - <<'PY'
+          import os, json
+          from brain_v12.media.media_agent import MediaAgent
+          brand={"company_name":os.environ["COMPANY"],"products":["Electronic Brain"],"prohibited_claims":[]}
+          result=MediaAgent(brand).draft(os.environ["TOPIC"], ["This is a company development update."])
+          assert result["status"] == "READY_FOR_REVIEW", result
+          assert result["gate"]["ok"], result
+          print(json.dumps(result, indent=2))
+          PY
