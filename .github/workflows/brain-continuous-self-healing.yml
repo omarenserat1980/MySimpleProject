@@ -52,8 +52,11 @@ jobs:
           python -m pip install --disable-pip-version-check -q httpx fastapi python-multipart google-api-python-client google-auth-oauthlib google-auth-httplib2
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
-          command -v ffmpeg
-          command -v ffprobe
+          mkdir -p brain_v12/bin
+          ln -sf "$(command -v ffmpeg)" brain_v12/bin/ffmpeg
+          ln -sf "$(command -v ffprobe)" brain_v12/bin/ffprobe
+          test -x brain_v12/bin/ffmpeg
+          test -x brain_v12/bin/ffprobe
           python - <<'PY'
           import fastapi, httpx
           print("BRAIN_RUNTIME_DEPS=READY")
