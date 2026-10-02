@@ -27,6 +27,20 @@ CONTRACT = WORK / "repair-contract.json"
 PROGRESS = WORK / "CINEMATIC_QUALITY_GATE_PROGRESS.json"
 
 
+def progress(stage: int, total: int, name: str, status: str, detail: str) -> None:
+    """Persist fail-closed machine-readable gate progress after every stage update."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "stage": stage,
+        "total_stages": total,
+        "name": name,
+        "status": status,
+        "detail": detail,
+    }
+    PROGRESS.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[CINEMATIC_QC_PROGRESS] {stage}/{total} {name}: {status} — {detail}", flush=True)
+
+
 def run(cmd: list[str], timeout: int = 1800) -> subprocess.CompletedProcess[str]:
     p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
     if p.returncode:
