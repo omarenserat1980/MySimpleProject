@@ -34,6 +34,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
+from brain_v12.self_healing.reflection_agent import ReflectionAgent
+
 
 @dataclass
 class Attempt:
@@ -47,6 +49,8 @@ class Attempt:
     repair_stdout: str = ""
     repair_stderr: str = ""
     verified: bool = False
+    reflection_questions: list[str] | None = None
+    reflection_actions: list[str] | None = None
 
 
 def utc_now() -> str:
@@ -119,6 +123,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--timeout", type=int, default=int(os.getenv("BRAIN_COMMAND_TIMEOUT", "900")))
     p.add_argument("--state", default=os.getenv("BRAIN_STATE_DIR", ".brain/state"))
     p.add_argument("--continue-on-success", action="store_true")
+    p.add_argument("--reflection-turns", type=int, default=int(os.getenv("BRAIN_REFLECTION_TURNS", "3")))
     return p.parse_args()
 
 
@@ -145,6 +150,24 @@ def main() -> int:
                 p = run(args.command, args.timeout)
                 diagnosis = diagnose(p.stdout, p.stderr, p.returncode)
                 item = Attempt(n, started, p.returncode, p.stdout[-20000:], p.stderr[-20000:], diagnosis)
+
+                reflection = ReflectionAgent(max_turns=max(1, args.reflection_turns))
+                reflection_result = reflection.run(initial_context={
+                    "exit_code": item.exit_code,
+                    "diagnosis": item.diagnosis,
+                    "stdout": item.stdout[-4000:],
+                    "stderr": item.stderr[-4000:],
+                    "command": args.command,
+                    "verify_command": args.verify,
+                })
+                item.reflection_questions = [t.question for t in reflection_result.turns]
+                item.reflection_actions = [t.challenge for t in reflection_result.turns if t.challenge]
+                print(json.dumps({
+                    "reflection_status": reflection_result.status,
+                    "questions": item.reflection_questions,
+                    "challenges": item.reflection_actions,
+                    "next_question": reflection_result.next_question,
+                }, ensure_ascii=False))
 
                 if p.returncode == 0:
                     ok, vo, ve, vc = verify(args.verify, args.timeout)
