@@ -1,12 +1,23 @@
 name: Brain Reasoning Loop
 
 on:
+  workflow_dispatch:
+    inputs:
+      max_cycles:
+        description: 'Maximum Brain↔ChatGPT reasoning cycles'
+        required: false
+        default: '3'
+      live_chatgpt:
+        description: 'Enable live ChatGPT provider test when OPENAI_API_KEY is configured'
+        required: false
+        default: 'false'
   push:
     branches: [main]
   pull_request:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   reasoning-loop:
@@ -14,6 +25,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Brain reasoning loop self-test
+        env:
+          BRAIN_REFLECTION_TURNS: ${{ inputs.max_cycles || '3' }}
         run: python3 brain_v12/self_healing/brain_reasoning_loop.py
+      - name: Validate ChatGPT fail-closed behavior
+        run: python3 - <<'PY'
+          import os
+          from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
+          r = ChatGPTReasoner()
+          if not r.provider.configured:
+              p = r.plan('What should Brain verify next?', {'allowed_actions': ['verify']})
+              assert p['action_id'] == 'none', p
+              print('CHATGPT_FAIL_CLOSED=PASS')
+          else:
+              print('CHATGPT_PROVIDER=CONFIGURED')
+          PY
       - name: Run complete self-test
         run: python3 brain_v12/self_healing/self_test.py
