@@ -159,9 +159,16 @@ class FilmReliabilityEngine:
                 rc = 124
                 self._log(f"ATTEMPT {attempt}: renderer timeout")
             candidate = attempt_dir / "final.mp4"
+            rendered = candidate.is_file() and candidate.stat().st_size >= 1024
             qc = self._qc(candidate)
             sensory_qc = self._sensory_qc(payload)
-            record = {"attempt": attempt, "return_code": rc, "qc": qc, "sensory_qc": sensory_qc,
+            stage_history = ["QUEUED", "RUNNING"]
+            if rendered:
+                stage_history.append("RENDERED")
+            if qc.get("ok"):
+                stage_history.append("QC")
+            record = {"attempt": attempt, "return_code": rc, "stage_history": stage_history,
+                      "qc": qc, "sensory_qc": sensory_qc,
                       "elapsed_seconds": round(time.time() - started, 2)}
             history.append(record)
             self._log(f"ATTEMPT {attempt}: rc={rc} media_qc={qc.get('ok')} sensory_qc={sensory_qc.get('ok')}")
@@ -170,13 +177,16 @@ class FilmReliabilityEngine:
                 staging = self.output_dir / ".final.mp4.tmp"
                 shutil.copyfile(candidate, staging)
                 final_qc = self._qc(staging)
+                history[-1]["stage_history"].append("MASTER_QC")
                 if not final_qc.get("ok"):
                     staging.unlink(missing_ok=True)
                     history[-1]["promotion_qc"] = final_qc
                     continue
                 os.replace(staging, self.final)
+                history[-1]["stage_history"].append("VERIFIED_COMPLETED")
                 manifest = {
                     "status": "VERIFIED_COMPLETED",
+                    "stage_contract": ["QUEUED", "RUNNING", "RENDERED", "QC", "MASTER_QC", "VERIFIED_COMPLETED"],
                     "profile": "BRAIN CLOUD FILM RELIABILITY ENGINE",
                     "runtime": "brain_cloud",
                     "device_required": False,
