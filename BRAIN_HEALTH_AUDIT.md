@@ -38,3 +38,10 @@ Evidence review of the main branch, focusing on production readiness, customer o
 - Complete durable authorization activation/revocation with audit evidence.
 - Add persistent production storage/queue if Brain must operate continuously outside GitHub Actions.
 - Complete an end-to-end CI gate across customer, communications, Diwan, cinema, security, and runtime.
+
+## Release Gate
+- [x] Evidence-first release gate implemented in `cloud/release_gate.py`.
+- [x] Regression test added for false cinema readiness.
+- [x] GitHub Actions gate added; failed required gates block release.
+- [ ] End-to-end customer transport remains an explicit release prerequisite for public communications.
+- [ ] Persistent production runtime/storage remains an explicit infrastructure prerequisite for always-on service.
