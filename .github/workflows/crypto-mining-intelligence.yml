@@ -1,0 +1,39 @@
+name: Crypto Mining Intelligence Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain_v12/business/crypto_mining_intelligence.py'
+      - 'brain_v12/business/crypto_mining_verification.py'
+      - 'brain_v12/business/test_crypto_mining_intelligence.py'
+      - 'brain_v12/business/test_crypto_mining_verification.py'
+      - '.github/workflows/crypto-mining-intelligence.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test runner
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Compile verification modules
+        run: |
+          python -m py_compile \
+            brain_v12/business/crypto_mining_intelligence.py \
+            brain_v12/business/crypto_mining_verification.py
+
+      - name: Run Crypto Mining Intelligence tests
+        run: |
+          python -m pytest -q \
+            brain_v12/business/test_crypto_mining_intelligence.py \
+            brain_v12/business/test_crypto_mining_verification.py
