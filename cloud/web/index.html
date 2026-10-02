@@ -12,6 +12,7 @@
   <nav>
     <button class="active" data-view="dashboard">لوحة التحكم</button>
     <button data-view="chat">المحادثة</button>
+    <button data-view="customers">العملاء</button>
     <button data-view="tasks">المهام</button>
     <button data-view="agents">الوكلاء</button>
     <button data-view="media">الوسائط</button>
@@ -39,6 +40,12 @@
 </section>
 
 <section id="chat" class="view"><div class="panel chat"><h2>💬 المحادثة</h2><div id="messages" class="messages"><div class="bubble brain">Brain Cloud جاهز. اكتب طلبك.</div></div><div class="composer"><textarea id="prompt" placeholder="ماذا تريد من Brain؟"></textarea><button id="send">إرسال</button></div></div></section>
+
+<section id="customers" class="view">
+<div class="grid">
+<article class="panel wide"><h2>🤝 Customer Operations & Trust</h2><p>طبقة حوكمة العميل: الأدلة، الموافقات، الاتصال، العروض، التسليم، الدفع، وما بعد البيع.</p><div class="flow"><i>Lead</i><i>→</i><i>Qualified</i><i>→</i><i>Offer</i><i>→</i><i>Approval</i><i>→</i><i>Delivery</i><i>→</i><i>Payment Evidence</i><i>→</i><i>After-sales</i></div><div class="list"><div class="item"><b>قرار العميل</b><span class="badge">HUMAN</span></div><div class="item"><b>التواصل الخارجي</b><span class="badge">AUTHORIZATION REQUIRED</span></div><div class="item"><b>التسويق</b><span class="badge">CONSENT REQUIRED</span></div><div class="item"><b>التنفيذ المالي</b><span class="badge">DISABLED</span></div></div></article>
+<article class="panel"><h2>قنوات الاتصال</h2><div class="list"><div class="item"><b>Brain Portal</b><span class="ok">ACTIVE UI</span></div><div class="item"><b>Email</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>WhatsApp</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>Telegram</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>Social</b><span class="badge">GATED</span></div></div></article>
+</div></section>
 
 <section id="tasks" class="view"><div class="panel"><div class="row"><h2>📋 المهام</h2><button id="loadTasks">تحديث</button></div><div id="tasksList" class="list"><div class="empty">لم يتم تحميل المهام بعد.</div></div></div></section>
 
