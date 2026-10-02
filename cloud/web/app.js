@@ -49,8 +49,13 @@ function renderCustomerStatus(customer){
 async function submitCustomerRequest(e){
  e.preventDefault();
  const result=$("customerResult"), status=$("customerStatus");
+ const customerType=$("customerType").value;
  const payload={
    display_name:$("customerName").value.trim(),
+   customer_type:customerType,
+   legal_entity_name:["COMPANY","ORGANIZATION","GOVERNMENT"].includes(customerType)?$("customerName").value.trim():null,
+   registration_id:$("entityRegistration").value.trim()||null,
+   authorized_representative:$("authorizedRepresentative").value.trim()||null,
    service:$("customerService").value.trim(),
    need:$("customerNeed").value.trim(),
    marketing_consent:$("customerMarketing").checked
@@ -73,3 +78,11 @@ async function submitCustomerRequest(e){
  }
 }
 if($("customerRequest")) $("customerRequest").onsubmit=submitCustomerRequest;
+
+function syncCustomerTypeFields(){
+ const t=$("customerType")?.value;
+ const entity=["COMPANY","ORGANIZATION","GOVERNMENT"].includes(t);
+ if($("entityRegWrap")) $("entityRegWrap").hidden=!entity;
+ if($("representativeWrap")) $("representativeWrap").hidden=!entity;
+}
+if($("customerType")){$("customerType").onchange=syncCustomerTypeFields;syncCustomerTypeFields();}
