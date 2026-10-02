@@ -42,7 +42,7 @@
 <section id="order" class="section"><h2>📩 طلب منتج أو خدمة</h2><p>أرسل مواصفاتك. سيتم إنشاء رقم طلب محلي للمتابعة؛ الدفع لا يحدث من هذه الصفحة بعد.</p>
 <form class="form" onsubmit="submitOrder(event)">
 <input id="name" required placeholder="الاسم / الشركة"><input id="contact" required placeholder="وسيلة التواصل">
-<select id="product"><option>BRAIN AI Starter Kit</option><option>BRAIN Automation Kit</option><option>Business Intelligence Pack</option><option>BRAIN Media Toolkit</option><option>خدمة أعمال مخصصة</option></select>
+<select id="product"><option value="ai-starter-kit">BRAIN AI Starter Kit</option><option value="automation-kit">BRAIN Automation Kit</option><option value="business-intelligence-pack">Business Intelligence Pack</option><option value="media-toolkit">BRAIN Media Toolkit</option><option>خدمة أعمال مخصصة</option></select>
 <input id="budget" placeholder="الميزانية التقريبية (اختياري)">
 <textarea class="full" id="details" placeholder="ما الذي تحتاجه؟"></textarea>
 <div class="full"><button class="btn primary" type="submit">إنشاء طلب تجاري</button><div id="result" class="result"></div></div>
@@ -50,8 +50,8 @@
 <footer>© BRAIN Digital Commerce • قناة تجارية رقمية للعقل الإلكتروني • لا يمثل الطلب وحده إيرادًا محققًا.</footer>
 </div>
 <script>
-function pick(name){document.getElementById('product').value=name;location.hash='order';document.getElementById('details').focus()}
-function submitOrder(e){e.preventDefault();const id='BRAIN-ORD-'+Date.now().toString(36).toUpperCase();document.getElementById('result').textContent='تم إنشاء مسودة طلب: '+id+' — هذه المسودة ليست إثبات دفع ولا إيرادًا.';localStorage.setItem(id,JSON.stringify({id,product:product.value,name:name.value,contact:contact.value,budget:budget.value,details:details.value,status:'ORDER_DRAFT'}))}
+function pick(name){const map={'BRAIN AI Starter Kit':'ai-starter-kit','BRAIN Automation Kit':'automation-kit','Business Intelligence Pack':'business-intelligence-pack','BRAIN Media Toolkit':'media-toolkit'};document.getElementById('product').value=map[name]||'ai-starter-kit';location.hash='order';document.getElementById('details').focus()}
+async function submitOrder(e){e.preventDefault();const result=document.getElementById('result');result.textContent='جاري تسجيل الطلب في Brain…';try{const r=await fetch('/api/commerce/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:document.getElementById('name').value,contact:document.getElementById('contact').value,product_id:document.getElementById('product').value,details:document.getElementById('details').value+'\nBudget: '+document.getElementById('budget').value})});const data=await r.json();if(!r.ok)throw new Error(data.detail||'ORDER_FAILED');const o=data.order;result.textContent='تم تسجيل الطلب: '+o.order_id+' — الحالة: '+o.state+' — لا يمثل الطلب إثبات دفع أو إيرادًا.';document.getElementById('result').dataset.orderId=o.order_id}catch(err){result.textContent='تعذر تسجيل الطلب في الخادم: '+err.message+' — لم يتم ادعاء أي إيراد.'}}
 </script>
 </body>
 </html>
