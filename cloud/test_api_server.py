@@ -154,3 +154,49 @@ def test_customer_portal_lifecycle_and_financial_gate(monkeypatch, tmp_path):
     assert financial.status_code == 200
     assert financial.json()["financial_state"] == "NOT_VERIFIED"
     assert financial.json()["revenue_state"] == "NOT_REALIZED"
+
+
+def test_diwan_approval_api_and_notification_outbox(monkeypatch, tmp_path):
+    api, client = _client(monkeypatch)
+    monkeypatch.setenv("BRAIN_STATE_DIR", str(tmp_path))
+    import cloud.approval_desk as desk
+    desk.STATE = tmp_path
+    desk.APPROVAL_DIR = tmp_path / "approvals"
+    desk.OUTBOX_DIR = tmp_path / "notification_outbox"
+    monkeypatch.delenv("BRAIN_SMTP_HOST", raising=False)
+
+    headers = {"Authorization": "Bearer test-token"}
+    created = client.post("/v1/diwan/approvals", headers=headers, json={
+        "subject": "Production commitment",
+        "reason": "External commitment requires human approval.",
+        "risk": "HIGH",
+        "recipient_email": "owner@example.com",
+        "evidence": [{"type": "quote", "ref": "quote-1"}],
+    })
+    assert created.status_code == 200
+    approval = created.json()["approval"]
+    approval_id = approval["approval_id"]
+    assert approval["status"] == "PENDING"
+
+    inbox = client.get("/v1/diwan/approvals", headers=headers)
+    assert inbox.status_code == 200
+    assert inbox.json()["approvals"][0]["approval_id"] == approval_id
+
+    decision = client.post(
+        f"/v1/diwan/approvals/{approval_id}/decision",
+        headers=headers,
+        json={"decision": "APPROVED", "actor": "authorized-human", "note": "Evidence reviewed"},
+    )
+    assert decision.status_code == 200
+    assert decision.json()["approval"]["status"] == "APPROVED"
+
+    duplicate = client.post(
+        f"/v1/diwan/approvals/{approval_id}/decision",
+        headers=headers,
+        json={"decision": "APPROVED", "actor": "authorized-human"},
+    )
+    assert duplicate.status_code == 409
+
+    notifications = client.get("/v1/diwan/notifications", headers=headers)
+    assert notifications.status_code == 200
+    assert notifications.json()["notifications"][0]["status"] == "QUEUED"
