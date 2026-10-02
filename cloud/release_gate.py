@@ -29,12 +29,44 @@ class ReleaseGate:
    paths={r.path for r in app.routes}; return Gate("api_routes",True,not dup and "/v1/feedback" in paths,"runtime://fastapi/routes",f"duplicates={dup}")
   except Exception as e:return Gate("api_routes",True,False,"runtime://fastapi/import",repr(e))
  def _cinema_truth(self):
-  p=Path("docs/film.json")
-  if not p.exists():return Gate("cinema_truth",True,False,"file://docs/film.json","missing metadata")
-  try:
-   d=json.loads(p.read_text(encoding="utf-8")); v=Path("docs")/d.get("video",""); ready=all(d.get("status",{}).get(k)=="ready" for k in ("render","video","audio","verification","web")); artifact=v.is_file() and v.stat().st_size>1024; verified=ready and artifact
-   return Gate("cinema_truth",True,verified,str(v),f"ready={ready},artifact={artifact}")
-  except Exception as e:return Gate("cinema_truth",True,False,"file://docs/film.json",repr(e))
+  # Generate one real Brain-native cinema part in an isolated workspace.
+  # This proves the render/audio/QC toolchain instead of trusting a committed placeholder.
+  with tempfile.TemporaryDirectory(prefix="brain-release-cinema-") as td:
+   env=os.environ.copy()
+   env.update({
+    "BRAIN_MACHINE_FILM_ROOT":str(Path(td)/"machine_films"),
+    "BRAIN_FILM_PARTS":"1",
+    "BRAIN_FILM_PART_SECONDS":"5",
+    "BRAIN_FILM_START":"1",
+    "BRAIN_FILM_END":"1",
+    "BRAIN_FILM_SHARD_ONLY":"1",
+   })
+   p=subprocess.run([sys.executable,"brain_v12/machine_cinematic_factory.py"],capture_output=True,text=True,env=env,timeout=180)
+   if p.returncode:
+    return Gate("cinema_truth",True,False,"process://brain_cinematic_factory",(p.stdout+p.stderr)[-3000:])
+   root=Path(td)/"machine_films"
+   manifest=root/"manifest.json"; clip=root/"parts"/"001"/"part-001.mp4"
+   if not manifest.exists() or not clip.exists() or clip.stat().st_size<=1024:
+    return Gate("cinema_truth",True,False,"process://brain_cinematic_factory",f"manifest={manifest.exists()},clip={clip.exists()}")
+   try:
+    d=json.loads(manifest.read_text(encoding="utf-8"))
+    q=self._probe_media(clip)
+    passed=d.get("status")=="SHARD_COMPLETED" and q["video"] and q["audio"] and q["duration"]>0 and q["width"]>0 and q["height"]>0
+    return Gate("cinema_truth",True,passed,"process://brain_cinematic_factory",f"status={d.get('status')},probe={q}")
+   except Exception as e:
+    return Gate("cinema_truth",True,False,"process://brain_cinematic_factory",repr(e))
+ def _probe_media(self,path:Path):
+  p=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,width,height","-of","json",str(path)],capture_output=True,text=True,timeout=60)
+  if p.returncode: raise RuntimeError(p.stderr.strip() or "ffprobe failed")
+  d=json.loads(p.stdout); streams=d.get("streams",[])
+  return {
+   "duration":float((d.get("format") or {}).get("duration") or 0),
+   "video":any(x.get("codec_type")=="video" for x in streams),
+   "audio":any(x.get("codec_type")=="audio" for x in streams),
+   "width":next((x.get("width") for x in streams if x.get("codec_type")=="video"),0),
+   "height":next((x.get("height") for x in streams if x.get("codec_type")=="video"),0),
+  }
+
  def _governance(self):
   req=["COMMERCIAL_GOVERNANCE_SPEC.md","PAYMENT_POLICY.md","PUBLIC_IDENTITY_AND_LIMITED_LIABILITY_POLICY.md"]; missing=[x for x in req if not Path(x).exists()]; return Gate("governance",True,not missing,"repo://governance",f"missing={missing}")
  def _atomic(self,result):
