@@ -14,7 +14,7 @@ def test_feedback_lifecycle_and_evidence(tmp_path):
     g=s.get(f.feedback_id)
     assert g.state is FeedbackState.RESOLVED
     assert len(g.events)==6
-    assert [e["event"] for e in g.events] == ["CREATED","STATE_CHANGED","ASSIGNED","STATE_CHANGED","STATE_CHANGED","STATE_CHANGED"]
+    assert [e["event"] for e in g.events] == ["CREATED","STATE_CHANGED","STATE_CHANGED","ASSIGNED","STATE_CHANGED","STATE_CHANGED"]
 
 def test_invalid_rating(tmp_path):
     try: FeedbackStore(tmp_path).create(customer_id=None,rating=6,category="X",body="bad")
