@@ -48,5 +48,26 @@ if health_ok; then
   fi
 else start_api; fi
 if ! auth_ok; then echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2; exit 44; fi
+
+seed_bootstrap_task() {
+  if [ -z "${BRAIN_CONTROL_KEY:-}" ]; then
+    echo "JET_BRAIN_SUPERVISOR bootstrap_skipped_no_control_key" >&2
+    return 0
+  fi
+  "$PYTHON" - <<'PY'
+import json, os, urllib.request
+base=os.environ["V12_BRAIN_URL"]
+key=os.environ.get("BRAIN_CONTROL_KEY","")
+headers={"Content-Type":"application/json","X-Brain-Control-Key":key}
+try:
+    req=urllib.request.Request(base+"/api/device/enqueue",data=json.dumps({"task":"brain_self_test","params":{}}).encode(),headers=headers,method="POST")
+    with urllib.request.urlopen(req,timeout=5) as r:
+        out=json.loads(r.read().decode())
+    print("JET_BRAIN_SUPERVISOR bootstrap_task="+str(out.get("task",{}).get("task_id","UNKNOWN")),flush=True)
+except Exception as exc:
+    print("JET_BRAIN_SUPERVISOR bootstrap_failed="+str(exc)[:200],flush=True)
+PY
+}
+seed_bootstrap_task
 echo "JET_BRAIN_RUNTIME url=$V12_BRAIN_URL agent=$V12_AGENT_ID" >&2
 exec "$PYTHON" "$ROOT/brain_v12/tools/brain_emulator_agent.py"
