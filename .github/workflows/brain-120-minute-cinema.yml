@@ -84,6 +84,21 @@ jobs:
           ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
       - name: Cinematic Master QC
         run: python brain_v12/cinematic_master_qc.py master master/final.mp4
+      - name: Independent final media probe
+        run: |
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json master/final.mp4 > master/final_ffprobe.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("master/final_ffprobe.json").read_text(encoding="utf-8"))
+          streams=d.get("streams",[])
+          assert streams, "final video stream missing"
+          s=streams[0]
+          assert s.get("codec_name"), "video codec missing"
+          assert int(s.get("width") or 0)>0 and int(s.get("height") or 0)>0, "video dimensions missing"
+          assert float(s.get("duration") or 0)>0, "video duration missing"
+          print("FINAL_MEDIA_PROBE=VERIFIED")
+          PY
       - name: Build verified manifest
         run: |
           python - <<'PY'
@@ -109,5 +124,6 @@ jobs:
             master/final.mp4
             master/manifest.json
             master/cinematic_qc.json
+            master/final_ffprobe.json
             master/VERIFIED_COMPLETED
           retention-days: 7
