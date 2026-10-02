@@ -27,6 +27,29 @@ jobs:
         run: python -m pytest -q cloud/test_customer_feedback.py cloud/test_api_server.py
       - name: TaskEngine evidence contract
         run: python -m pytest -q brain_v12/brain/task_engine_test.py
+      - name: Brain health contract manifest
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          payload = {
+              "contract": "brain-health",
+              "checks": [
+                  "customer_feedback",
+                  "customer_api",
+                  "feedback_task_bridge",
+                  "task_engine_evidence",
+              ],
+          }
+          out = Path(".brain_state/health_contract")
+          out.mkdir(parents=True, exist_ok=True)
+          (out / "manifest.json").write_text(json.dumps(payload, indent=2) + "\n")
+          PY
+      - name: Upload health contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-health-contract-evidence
+          path: .brain_state/health_contract/manifest.json
       - name: Feedback task bridge contract
         run: python -m pytest -q cloud/test_customer_feedback.py -k bridge
       - name: API import and route uniqueness contract
