@@ -10,7 +10,11 @@ def test_radar_plans_require_independent_evidence():
     assert plans
     assert len(STAGES) == 8
     assert all(len(plan["stages"]) == len(STAGES) for plan in plans)
-    assert all(plan["promotable"] if "promotable" in plan else True for plan in plans)
+    assert all(
+        stage["evidence_required"]
+        for plan in plans
+        for stage in plan["stages"]
+    )
 
 
 def test_radar_does_not_auto_promote():
