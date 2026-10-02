@@ -99,6 +99,33 @@ def think_and_act(goal):
     query = urllib.parse.urlencode({"goal": goal})
     return request("POST", "/api/run?" + query)
 
+def evolve_from_evidence():
+    """Run the predictive engine and return only machine-readable evidence."""
+    import subprocess, sys
+    try:
+        p = subprocess.run(
+            [sys.executable, "-m", "brain_v12.self_healing.future_evolution"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=90,
+        )
+        return {"ok": p.returncode == 0, "output": (p.stdout + "\n" + p.stderr)[-8000:]}
+    except Exception as exc:
+        return {"ok": False, "output": str(exc)[:1000]}
+
+def repair_from_evidence(evidence: str):
+    """Use the bounded RepairEngine only; no arbitrary code execution."""
+    from brain_v12.brain.repair_engine import RepairEngine
+    engine = RepairEngine()
+    plan = engine.plan(evidence)
+    if not plan.safe:
+        return {"ok": False, "status": "REVIEW_REQUIRED", "classification": plan.classification,
+                "action": plan.action}
+    try:
+        result = engine.repair(ROOT, evidence)
+        return {"ok": bool(result[1]), "status": "REPAIRED" if result[1] else "REPAIR_FAILED",
+                "classification": result[0].classification, "action": result[0].action}
+    except Exception as exc:
+        return {"ok": False, "status": "REPAIR_EXCEPTION", "error": str(exc)[:1000]}
+
 def enqueue_self_test():
     if not CONTROL:
         return {"ok": False, "status": "CONTROL_KEY_MISSING"}
