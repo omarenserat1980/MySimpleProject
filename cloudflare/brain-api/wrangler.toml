@@ -1,0 +1,6 @@
+name = "brain-cloud-api"
+main = "src/index.js"
+compatibility_date = "2026-10-02"
+
+[vars]
+BRAIN_ORIGIN = "https://REPLACE_WITH_BRAIN_WORKER_HOST"
