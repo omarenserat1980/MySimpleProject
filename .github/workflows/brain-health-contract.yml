@@ -1,0 +1,40 @@
+name: BRAIN Health Contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloud/customer_feedback.py"
+      - "cloud/test_customer_feedback.py"
+      - "cloud/api_server.py"
+      - ".github/workflows/brain-health-contract.yml"
+      - "BRAIN_HEALTH_AUDIT.md"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r cloud/requirements.txt
+      - name: Compile
+        run: python -m compileall -q cloud
+      - name: Feedback contract
+        run: python -m pytest -q cloud/test_customer_feedback.py
+      - name: API import and route uniqueness contract
+        run: |
+          python - <<'PY'
+          from collections import Counter
+          from cloud.api_server import app
+          paths=[r.path for r in app.routes]
+          duplicates=[p for p,c in Counter(paths).items() if c>1]
+          assert not duplicates, f"duplicate API routes: {duplicates}"
+          assert "/v1/feedback" in paths
+          assert "/v1/feedback/{feedback_id}" in paths
+          assert "/v1/feedback/{feedback_id}/transition" in paths
+          print("API routes verified")
+          PY
