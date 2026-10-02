@@ -21,7 +21,7 @@ jobs:
 
       - name: Prepare Brain runtime test environment
         run: |
-          python3 -m pip install --disable-pip-version-check -q httpx fastapi google-api-python-client google-auth-oauthlib google-auth-httplib2
+          python3 -m pip install --disable-pip-version-check -q -r brain_v12/requirements.txt
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           mkdir -p brain_v12/bin
