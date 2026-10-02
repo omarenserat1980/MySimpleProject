@@ -184,7 +184,28 @@ def main() -> int:
                     repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
                     actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout, repair_env))
                 if args.verify:
-                    actions.register("verify", command_action("verify", shlex.split(args.verify), args.timeout))
+                    actions.register(
+                        "verify",
+                        command_action("verify", shlex.split(args.verify), args.timeout),
+                        "Run the explicitly configured verification command.",
+                    )
+
+                # Safe remote workflow test: only a fixed Brain-owned workflow is exposed.
+                # Never expose an arbitrary workflow filename to ChatGPT.
+                if os.getenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "1") == "1":
+                    from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
+                    actions.register(
+                        "workflow:reflection-e2e",
+                        workflow_dispatch_action(
+                            "workflow:reflection-e2e",
+                            repo=os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject"),
+                            workflow_id="reflection-e2e",
+                            ref=os.getenv("BRAIN_GITHUB_REF", "main"),
+                            inputs={},
+                            timeout=min(args.timeout, 120),
+                        ),
+                        "Dispatch the fixed Brain Reflection E2E GitHub workflow for an independent test.",
+                    )
                 chatgpt_repair_done = False
                 if args.chatgpt_reflection:
                     from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
