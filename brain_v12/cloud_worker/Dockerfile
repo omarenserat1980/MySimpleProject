@@ -5,7 +5,9 @@ RUN dotnet restore brain_v12/cloud_worker/BrainCloudWorker.csproj
 COPY brain_v12/cloud_worker/ brain_v12/cloud_worker/
 RUN dotnet publish brain_v12/cloud_worker/BrainCloudWorker.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
 ENTRYPOINT ["dotnet","BrainCloudWorker.dll"]
