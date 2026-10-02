@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import uuid
@@ -109,7 +110,7 @@ class CommunicationHub:
     def _atomic_write(self, path: Path, payload) -> None:
         fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
         try:
-            with open(fd, "w", encoding="utf-8") as fh:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 json.dump(payload, fh, ensure_ascii=False, indent=2)
                 fh.flush()
             Path(tmp).replace(path)
