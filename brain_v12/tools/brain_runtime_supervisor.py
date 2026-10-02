@@ -133,6 +133,24 @@ def enqueue_self_test():
                    {"X-Brain-Control-Key": CONTROL},
                    {"task": "brain_self_test", "params": {"source": "continuous_supervisor"}})
 
+def temporal_next_action():
+    """Project known risks forward, then return the safest present action."""
+    import subprocess, sys, json as _json
+    try:
+        p = subprocess.run(
+            [sys.executable, "-m", "brain_v12.self_healing.temporal_simulator"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=120,
+        )
+        raw = (p.stdout + "\n" + p.stderr).strip()
+        result = _json.loads(raw) if raw.startswith("{") else {}
+        return {
+            "ok": p.returncode == 0,
+            "action": result.get("recommended_present_action", "observe"),
+            "simulation": result,
+        }
+    except Exception as exc:
+        return {"ok": False, "action": "observe", "error": str(exc)[:1000]}
+
 def main():
     print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION", flush=True)
     cycle = 0
@@ -165,6 +183,20 @@ def main():
             prediction = evolve_from_evidence()
             record({"cycle": cycle, "event": "prediction_refresh", "ok": prediction["ok"]})
             print(f"JET_BRAIN_CYCLE {cycle} PREDICTION_REFRESH={'PASS' if prediction['ok'] else 'FAIL'}", flush=True)
+
+            temporal = temporal_next_action()
+            record({
+                "cycle": cycle,
+                "event": "temporal_simulation",
+                "ok": temporal["ok"],
+                "recommended_present_action": temporal.get("action"),
+            })
+            print(
+                f"JET_BRAIN_CYCLE {cycle} TIME_SIM="
+                f"{'PASS' if temporal['ok'] else 'FAIL'} "
+                f"NEXT={temporal.get('action')}",
+                flush=True,
+            )
 
             status = request("GET", "/api/device/status")
             if int(status.get("queued", 0)) == 0 and int(status.get("pending", 0)) == 0:
