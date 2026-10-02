@@ -36,3 +36,7 @@ The executor deliberately rejects commands outside its allowlist. Executor compl
 ## Build
 
 Open `android_executor/` in Android Studio, or use the included GitHub Actions workflow to build `app-debug.apk`.
+
+## CI verification
+
+The Android Executor CI workflow is the authoritative build path for the debug APK. A successful workflow without the uploaded APK artifact is not treated as a completed build.
