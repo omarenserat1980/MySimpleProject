@@ -36,17 +36,25 @@ def main():
         if "VERIFIED_COMPLETED" in text and "verification_gate.py" not in text and "ffprobe" not in text:
             findings.append({"kind":"success-without-independent-gate","file":str(p.relative_to(ROOT))})
     report={
-      "schema":"brain-completion-audit/v1",
+      "schema":"brain-completion-audit/v2",
       "commit":__import__("os").getenv("GITHUB_SHA","unknown"),
       "files_scanned":sum(1 for _ in files()),
       "python_files":len(py),
       "findings":findings,
+      "status":"AUDITED" if not findings else "FAILED",
+      "operational_gates":[
+        "durable_workflow_state", "lease_heartbeat_recovery",
+        "authentication_rbac", "full_cinema_evidence_gate",
+        "brain_git_smart_transport", "capability_based_executor_scheduler",
+        "tamper_evident_audit_chain"
+      ],
       "policy":"CODE != SUCCESS; only independent verification may authorize VERIFIED_COMPLETED"
     }
     out=ROOT/".brain/state/completion_audit.json"
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
-    print(json.dumps({"status":"VERIFIED","findings":len(findings),"evidence":str(out)},ensure_ascii=False))
-    return 0
+    status=report["status"]
+    print(json.dumps({"status":status,"findings":len(findings),"evidence":str(out)},ensure_ascii=False))
+    return 0 if not findings else 1
 
 if __name__=="__main__": raise SystemExit(main())
