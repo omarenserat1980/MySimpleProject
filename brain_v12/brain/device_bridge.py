@@ -17,7 +17,7 @@ class DeviceBridge:
         if not supplied:return False
         expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
         if not expected:
-            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE",""))
+            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
             if key_file and os.path.isfile(key_file):
                 try:
                     with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
