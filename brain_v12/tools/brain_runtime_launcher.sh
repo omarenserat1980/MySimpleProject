@@ -81,5 +81,11 @@ except Exception as exc:
 PY
 }
 seed_bootstrap_task
+# Keep a durable local supervisor alongside the Emulator. It only queues work when idle.
+if [ -n "${BRAIN_CONTROL_KEY:-}" ]; then
+  "$PYTHON" "$ROOT/brain_v12/tools/brain_runtime_supervisor.py" >> "$ROOT/.brain/state/supervisor.log" 2>&1 &
+  SUPERVISOR_PID=$!
+  echo "JET_BRAIN_SUPERVISOR pid=$SUPERVISOR_PID" >&2
+fi
 echo "JET_BRAIN_RUNTIME url=$V12_BRAIN_URL agent=$V12_AGENT_ID" >&2
 exec "$PYTHON" "$ROOT/brain_v12/tools/brain_emulator_agent.py"
