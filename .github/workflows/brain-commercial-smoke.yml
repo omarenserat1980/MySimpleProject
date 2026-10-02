@@ -1,0 +1,45 @@
+name: Brain Commercial Cycle Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-cycle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate commercial cycle
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/business/*.py
+          python - <<'PY'
+          from brain_v12.business.pipeline import Opportunity
+          from brain_v12.business.revenue_ledger import RevenueRecord
+          from brain_v12.business.lead_discovery import LeadSignal, normalize
+
+          lead=normalize(LeadSignal(
+            source="market-research",
+            customer_hint="Example SMB",
+            problem="manual workflow consumes staff time",
+            evidence_url="evidence://market-signal"
+          ))
+          assert lead["status"]=="READY_FOR_REVIEW"
+
+          opp=Opportunity("OPP-000001","Example SMB",lead["problem"],"AI Workflow Automation")
+          opp.transition("QUALIFIED","evidence://qualified-problem")
+          opp.transition("OFFER_READY","evidence://offer-scope")
+          opp.transition("HUMAN_APPROVED","human approval recorded")
+          opp.transition("DELIVERED","delivery artifact recorded")
+
+          ledger=RevenueRecord(opp.opportunity_id,"verified amount","USD")
+          ledger.verify("payment evidence recorded")
+          ledger.realize("delivery + payment reconciliation recorded")
+
+          assert ledger.status=="REVENUE_REALIZED"
+          print("BRAIN_COMMERCIAL_CYCLE=PASS")
+          print(opp.snapshot())
+          print(ledger.snapshot())
+          PY
