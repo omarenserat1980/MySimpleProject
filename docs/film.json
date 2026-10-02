@@ -4,12 +4,12 @@
   "subtitle": "فيلم سينمائي قصير من Brain Factory",
   "type": "Cinematic / Flipbook",
   "status": {
-    "render": "ready",
-    "video": "ready",
-    "audio": "ready",
-    "verification": "ready",
+    "render": "pending",
+    "video": "pending",
+    "audio": "pending",
+    "verification": "pending",
     "self_healing": "not_run",
-    "web": "ready"
+    "web": "pending"
   },
   "video": "assets/last_light_city.mp4",
   "poster": "assets/poster.svg",
@@ -46,7 +46,7 @@
     "production_seconds": 12
   },
   "build": {
-    "workflow": "Brain Cinema - Publish Film Page",
-    "source": "Last Light In The City - No Pay Production"
+    "status": "awaiting_verified_artifact",
+    "note": "This page is not marked ready until a verified MP4 artifact is present."
   }
 }
