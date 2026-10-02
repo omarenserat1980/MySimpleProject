@@ -167,9 +167,51 @@ def main() -> int:
                 actions = ReflectionActionRegistry()
                 if args.verify:
                     actions.register("verify", command_action("verify", shlex.split(args.verify), args.timeout))
-                selected_action = "verify" if p.returncode == 0 else None
-                action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
-                item.reflection_actions.append(selected_action or "none")
+                chatgpt_repair_done = False
+                if args.chatgpt_reflection:
+                    from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
+                    reasoner = ChatGPTReasoner()
+                    if reasoner.provider.configured:
+                        loop = BrainReasoningLoop(
+                            reflection, actions, reasoner=reasoner,
+                            max_cycles=max(1, args.reflection_turns),
+                        )
+                        cycles = loop.run({
+                            "exit_code": item.exit_code,
+                            "diagnosis": item.diagnosis,
+                            "stdout": item.stdout[-4000:],
+                            "stderr": item.stderr[-4000:],
+                            "command": args.command,
+                            "verify_command": args.verify,
+                        })
+                        item.reflection_questions = [x.question for x in cycles]
+                        item.reflection_answers = [x.answer for x in cycles]
+                        item.reflection_actions = [x.action_id for x in cycles]
+                        for x in cycles:
+                            if x.action_id == "repair" and x.execution_ok:
+                                chatgpt_repair_done = True
+                        last = next((x for x in reversed(cycles) if x.action_id != "none"), None)
+                        if last:
+                            selected_action = last.action_id
+                            action_result = ActionResult(
+                                last.action_id, last.execution_ok, last.exit_code,
+                                last.evidence if last.execution_ok else "",
+                                "" if last.execution_ok else last.evidence,
+                            )
+                        else:
+                            selected_action = "none"
+                            action_result = ActionResult("none", False, 127, "", "NO_ACTION")
+                        print(f"CHATGPT_REFLECTION: CONNECTED model={reasoner.provider.model}")
+                    else:
+                        print("CHATGPT_REFLECTION: NOT_CONFIGURED")
+                        selected_action = "verify" if p.returncode == 0 and args.verify else None
+                        action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
+                else:
+                    selected_action = "verify" if p.returncode == 0 and args.verify else None
+                    action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
+                item.reflection_actions = item.reflection_actions or []
+                if selected_action and selected_action not in item.reflection_actions:
+                    item.reflection_actions.append(selected_action)
                 print("BRAIN_REFLECTION_QUESTION")
                 for idx, question in enumerate(item.reflection_questions, 1):
                     print(f"  Q{idx}: {question}")
@@ -208,7 +250,7 @@ def main() -> int:
 
                 # The repair command is deliberately explicit and replaceable.
                 # It may generate/edit code, but success is impossible without verification.
-                if args.repair:
+                if args.repair and not chatgpt_repair_done:
                     # Give the repair agent a bounded, secret-redacted failure report.
                     # The agent can improve code based on concrete evidence rather than guessing.
                     failure_report = state_dir / "current_failure.json"
