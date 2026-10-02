@@ -6,6 +6,7 @@ from brain_v12.quran.quran_reasoning import self_test as quran_reasoning_test
 from brain_v12.self_healing.reflection_agent import self_test as reflection_agent_test
 from brain_v12.self_healing.reflection_actions import self_test as reflection_actions_test
 from brain_v12.self_healing.reflection_executor import self_test as reflection_executor_test
+from brain_v12.self_healing.brain_reasoning_loop import self_test as brain_reasoning_loop_test
 
 def main() -> int:
     causal_engine_test()
@@ -13,6 +14,8 @@ def main() -> int:
     quran_reasoning_test()
     reflection_agent_test()
     reflection_actions_test()
+    reflection_executor_test()
+    brain_reasoning_loop_test()
     checks = [
         ("missing-token", diagnose("", "github_token_or_gh_token_required", 2)),
         ("syntax", diagnose("", "SyntaxError: invalid syntax", 1)),
