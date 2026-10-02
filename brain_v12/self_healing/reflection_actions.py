@@ -57,6 +57,24 @@ def command_action(action_id: str, argv: Sequence[str], timeout: int = 120, env:
             return ActionResult(action_id, False, 124, str(exc.stdout or "")[-12000:], "TIMEOUT")
     return run
 
+def workflow_dispatch_action(
+    action_id: str,
+    repo: str,
+    workflow_id: str,
+    ref: str = "main",
+    inputs: dict[str, str] | None = None,
+    timeout: int = 60,
+) -> Callable[[], ActionResult]:
+    """Create a fixed, allowlisted workflow dispatch action without shell execution."""
+    import sys
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "ci" / "dispatch_workflow.py"
+    argv = [sys.executable, str(script), "--repo", repo, "--workflow", workflow_id, "--ref", ref]
+    for key, value in sorted((inputs or {}).items()):
+        argv.extend(["--input", f"{key}={value}"])
+    return command_action(action_id, argv, timeout)
+
+
 def self_test() -> None:
     reg = ReflectionActionRegistry()
     reg.register("safe-test", lambda: ActionResult("safe-test", True, 0, "PASS", ""), "Run the safe action self-test.")
