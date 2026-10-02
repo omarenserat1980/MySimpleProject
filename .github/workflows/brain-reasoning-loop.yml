@@ -23,7 +23,7 @@ jobs:
   reasoning-loop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run Brain reasoning loop self-test
         env:
           BRAIN_REFLECTION_TURNS: ${{ inputs.max_cycles || '3' }}
