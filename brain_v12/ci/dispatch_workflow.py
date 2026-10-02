@@ -19,8 +19,7 @@ def main() -> int:
     p.add_argument("--repo", required=True)
     p.add_argument("--workflow", required=True)
     p.add_argument("--ref", default="main")
-    p.add_argument("--brain-command", default=r"\AUTO1000")
-    p.add_argument("--auto-confirm", default="true")
+    p.add_argument("--input", action="append", default=[], metavar="KEY=VALUE")
     args = p.parse_args()
 
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
@@ -29,13 +28,18 @@ def main() -> int:
         return 2
 
     url = f"https://api.github.com/repos/{args.repo}/actions/workflows/{args.workflow}/dispatches"
-    payload = {
-        "ref": args.ref,
-        "inputs": {
-            "brain_command": args.brain_command,
-            "auto_confirm": args.auto_confirm.lower(),
-        },
-    }
+    inputs = {}
+    for raw in args.input:
+        if "=" not in raw:
+            print(f"INVALID_INPUT: {raw}", file=sys.stderr)
+            return 2
+        key, value = raw.split("=", 1)
+        key = key.strip()
+        if not key:
+            print(f"INVALID_INPUT_KEY: {raw}", file=sys.stderr)
+            return 2
+        inputs[key] = value
+    payload = {"ref": args.ref, "inputs": inputs}
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -65,8 +69,8 @@ def main() -> int:
     print(f"REPOSITORY={args.repo}")
     print(f"WORKFLOW={args.workflow}")
     print(f"REF={args.ref}")
-    print(f"BRAIN_COMMAND={args.brain_command}")
-    print(f"AUTO_CONFIRM={args.auto_confirm}")
+    for key, value in inputs.items():
+        print(f"INPUT_{key}={value}")
     return 0
 
 
