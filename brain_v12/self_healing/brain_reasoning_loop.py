@@ -47,7 +47,14 @@ class BrainReasoningLoop:
 
         for question in self.agent.questions[: self.max_cycles]:
             plan = self.reasoner.plan(question, state)
+            if not isinstance(plan, dict):
+                plan = {"answer": "", "action_id": "none", "reason": "INVALID_PLAN"}
             action_id = str(plan.get("action_id", "none"))
+            if action_id not in self.registry.ids():
+                plan = dict(plan)
+                plan["action_id"] = "none"
+                plan["reason"] = "ACTION_NOT_ALLOWLISTED"
+            action_id = str(plan["action_id"])
             execution = self.registry.execute(action_id)
             evidence = execution.output or execution.error
 
