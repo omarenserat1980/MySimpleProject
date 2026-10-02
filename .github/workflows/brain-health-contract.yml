@@ -33,6 +33,7 @@ jobs:
           keys=[(getattr(r,'methods',None) and tuple(sorted(r.methods)) or (), r.path) for r in app.routes if r.path]
           duplicates=[k for k,c in Counter(keys).items() if c>1]
           assert not duplicates, f"duplicate API method/routes: {duplicates}"
+          paths=[r.path for r in app.routes if r.path]
           assert "/v1/feedback" in paths
           assert "/v1/feedback/{feedback_id}" in paths
           assert "/v1/feedback/{feedback_id}/transition" in paths
