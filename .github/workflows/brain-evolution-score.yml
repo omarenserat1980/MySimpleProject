@@ -1,0 +1,57 @@
+name: Brain Evolution Score
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  evolution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect recent workflow evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/state
+          gh api "repos/${{ github.repository }}/actions/runs?branch=main&per_page=50" > .brain/state/evolution_runs.json
+
+      - name: Calculate evolution index
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/brain/brain_evolution.py
+          python brain_v12/brain/brain_evolution.py < .brain/state/evolution_runs.json > .brain/state/brain_evolution.json
+          cat .brain/state/brain_evolution.json
+
+      - name: Evidence gate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path(".brain/state/brain_evolution.json")
+          data=json.loads(p.read_text())
+          required={"schema","sample_size","completed_runs","metrics","evolution_index"}
+          missing=required-set(data)
+          if missing:
+              raise SystemExit(f"Missing evolution evidence fields: {sorted(missing)}")
+          if not 0 <= data["evolution_index"] <= 100:
+              raise SystemExit("Evolution index outside 0..100")
+          print("BRAIN_EVOLUTION_EVIDENCE=VALID")
+          print(f"BRAIN_EVOLUTION_INDEX={data['evolution_index']}")
+          print(f"BRAIN_EVOLUTION_SAMPLE={data['sample_size']}")
+
+      - name: Upload evolution evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-evolution-evidence
+          path: .brain/state/brain_evolution.json
+          if-no-files-found: error
