@@ -1,0 +1,49 @@
+name: Brain Public Opportunity Scan
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect public GitHub signals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/opportunities
+          gh api --method GET search/issues             -f q='is:open is:issue (label:"good first issue" OR label:"help wanted") (automation OR "github actions" OR CI OR workflow OR AI)'             -f per_page=30 > .brain/opportunities/github_raw.json
+
+      - name: Normalize and rank
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from brain_v12.business.public_opportunity_collector import collect_from_search_payload
+          from brain_v12.business.opportunity_report import build_report
+
+          with open(".brain/opportunities/github_raw.json", encoding="utf-8") as f:
+              payload=json.load(f)
+          items=collect_from_search_payload(payload)
+          report=build_report(items)
+          with open(".brain/opportunities/report.json","w",encoding="utf-8") as f:
+              json.dump(report,f,indent=2,ensure_ascii=False)
+          print("BRAIN_PUBLIC_OPPORTUNITY_SCAN=PASS")
+          print("INPUT=",report["total_input"])
+          print("UNIQUE=",report["unique_opportunities"])
+          print("READY=",len(report["ready_for_review"]))
+          PY
+
+      - name: Upload opportunity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-public-opportunities
+          path: .brain/opportunities/
