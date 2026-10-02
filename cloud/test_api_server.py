@@ -200,3 +200,36 @@ def test_diwan_approval_api_and_notification_outbox(monkeypatch, tmp_path):
     notifications = client.get("/v1/diwan/notifications", headers=headers)
     assert notifications.status_code == 200
     assert notifications.json()["notifications"][0]["status"] == "QUEUED"
+
+
+def test_diwan_case_and_correspondence_routes(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    import cloud.api_server as api
+    api.STATE = tmp_path
+    api.DIWAN_STATE = tmp_path / "diwan"
+    api.DIWAN_STATE.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(api, "TOKEN", "test-token")
+    client = TestClient(api.app)
+    headers = {"Authorization": "Bearer test-token"}
+
+    case = client.post("/v1/diwan/cases", json={
+        "title": "Test case", "owner_type": "CUSTOMER", "owner_id": "cust-1"
+    }, headers=headers)
+    assert case.status_code == 200
+    case_id = case.json()["case"]["case_id"]
+
+    corr = client.post("/v1/diwan/correspondence", json={
+        "direction": "INBOUND",
+        "subject": "Test request",
+        "channel": "EMAIL",
+        "sender": "example@example.invalid",
+        "case_id": case_id
+    }, headers=headers)
+    assert corr.status_code == 200
+    item = corr.json()["correspondence"]
+    assert item["number"].startswith("IN-")
+    assert item["state"] == "LINKED"
+
+    listed = client.get("/v1/diwan/correspondence", headers=headers)
+    assert listed.status_code == 200
+    assert len(listed.json()["correspondence"]) == 1
