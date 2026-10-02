@@ -2,6 +2,18 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+
+# Source-of-truth sync: refresh the local Brain before booting the runtime.
+# Never overwrite local work; only fast-forward a clean checkout.
+if command -v git >/dev/null 2>&1 && git diff --quiet && git diff --cached --quiet; then
+  if git pull --ff-only >/dev/null 2>&1; then
+    echo "JET_BRAIN_SOURCE_SYNC fast_forwarded" >&2
+  else
+    echo "JET_BRAIN_SOURCE_SYNC skipped_pull_failed" >&2
+  fi
+else
+  echo "JET_BRAIN_SOURCE_SYNC skipped_local_changes" >&2
+fi
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
