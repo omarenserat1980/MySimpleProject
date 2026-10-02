@@ -22,9 +22,13 @@ class TaskEngine:
         task["error"]=""
         return {"ok":True,"task":task}
 
-    def update(self,task_id,status):
+    def update(self,task_id,status,evidence_ref=None):
         if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
+        if status=="COMPLETED" and not evidence_ref:
+            return {"ok":False,"error":"EVIDENCE_REQUIRED"}
         self.tasks[task_id]["status"]=status
         if status=="RUNNING": self.tasks[task_id]["attempts"]+=1
+        if evidence_ref:
+            self.tasks[task_id]["evidence_ref"]=evidence_ref
         return self.tasks[task_id]
     def snapshot(self): return {"tasks":list(self.tasks.values()),"ready":self.ready()}
