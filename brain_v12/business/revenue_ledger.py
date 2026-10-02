@@ -11,19 +11,29 @@ class RevenueRecord:
     evidence: list[str] = field(default_factory=list)
     status: str = "PAYMENT_PENDING"
 
-    def verify(self, evidence: str) -> dict:
-        if not evidence.strip():
-            raise ValueError("payment evidence required")
-        self.evidence.append(evidence)
+    def verify(self, evidence: dict) -> dict:
+        """Verify payment only from structured, auditable payment evidence."""
+        if not isinstance(evidence, dict):
+            raise ValueError("structured payment evidence required")
+        transaction_id = str(evidence.get("transaction_id", "")).strip()
+        evidence_ref = str(evidence.get("evidence_ref", "")).strip()
+        if not transaction_id or not evidence_ref:
+            raise ValueError("transaction_id and evidence_ref required")
+        self.evidence.append(f"payment:{transaction_id}:{evidence_ref}")
         self.status = "PAYMENT_VERIFIED"
         return self.snapshot()
 
-    def realize(self, evidence: str) -> dict:
+    def realize(self, evidence: dict) -> dict:
+        """Recognize revenue only after verified payment plus delivery reconciliation."""
         if self.status != "PAYMENT_VERIFIED":
             raise ValueError("payment must be verified first")
-        if not evidence.strip():
-            raise ValueError("realization evidence required")
-        self.evidence.append(evidence)
+        if not isinstance(evidence, dict):
+            raise ValueError("structured realization evidence required")
+        delivery_ref = str(evidence.get("delivery_evidence_ref", "")).strip()
+        reconciliation_ref = str(evidence.get("reconciliation_ref", "")).strip()
+        if not delivery_ref or not reconciliation_ref:
+            raise ValueError("delivery_evidence_ref and reconciliation_ref required")
+        self.evidence.append(f"realization:{delivery_ref}:{reconciliation_ref}")
         self.status = "REVENUE_REALIZED"
         return self.snapshot()
 
