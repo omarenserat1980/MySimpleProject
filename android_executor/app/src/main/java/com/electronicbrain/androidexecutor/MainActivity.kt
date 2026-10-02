@@ -16,10 +16,10 @@ import androidx.core.app.ActivityCompat
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val prefs = getPreferences(MODE_PRIVATE)
+        val prefs = getSharedPreferences("executor", MODE_PRIVATE)
         val agentId = EditText(this).apply {
             hint = "V12_AGENT_ID"
-            setText(prefs.getString("agent_id", "android-executor-01"))
+            setText(prefs.getString("agent_id", "redmi3-01"))
         }
         val brainUrl = EditText(this).apply {
             hint = "BRAIN_BASE_URL"
