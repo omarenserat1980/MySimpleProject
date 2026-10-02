@@ -1,42 +1,77 @@
-# BRAIN Customer Communications Hub
+# BRAIN Customer Communications Hub — Production Baseline
 
-## Purpose
-
-Provide a unified, evidence-first communication layer between Brain and customers.
-
-The communication channel is not the authoritative business record. Business-relevant messages are registered in Diwan and linked to a customer, case, request, quote, approval, delivery, or payment record.
+## Objective
+Make every customer interaction traceable, timely, consent-aware and recoverable without exposing the private operator identity.
 
 ## Channels
-
-- CUSTOMER_PORTAL
-- EMAIL
-- WEB_CHAT
+- Customer Portal
+- Email adapter
+- Web Chat
 - API
-- MESSAGING_ADAPTER (future/provider-dependent)
+- Future messaging adapters
+
+The Hub is the communications system of record for transport state; Diwan remains the authoritative business-record/archive layer.
+
+## Customer experience contract
+1. One customer identity across channels.
+2. One thread/case reference across the conversation.
+3. Every outbound message has a purpose and applicable consent scope.
+4. Every important inbound/outbound message is hash-protected and linked to the relevant case/request.
+5. No `SENT` or `DELIVERED` claim without transport evidence.
+6. No customer message is treated as commercial acceptance unless the consent/approval gate establishes it.
+7. Private operator email is never exposed to customers.
+
+## Reliability
+- Durable atomic message storage.
+- Idempotency keys prevent duplicate sends.
+- Retryable FAILED/BOUNCED states.
+- Attempt counter and last error are preserved.
+- Provider adapters must return transport evidence.
+- External provider outage must not corrupt the authoritative message record.
+
+## Service discipline
+Each message has:
+- priority: LOW/NORMAL/HIGH/URGENT
+- SLA in minutes
+- assigned actor/team
+- escalation state
+- immutable content hash
+- lifecycle events
+
+Overdue messages become operational escalations; they do not silently disappear.
 
 ## Lifecycle
-
 `DRAFTED -> QUEUED -> SENT -> DELIVERED -> ACKNOWLEDGED -> CLOSED`
 
-Exception states:
-
+Exceptions:
 `FAILED, CANCELLED, BOUNCED, LEGAL_HOLD`
 
-## Rules
+## Commercial safety
+Service consent, marketing consent and analytics consent remain separate.
+Payment verification is never inferred from email/chat/receipt uploads.
+Commercial actions pass the operator-authority and customer-consent gates.
 
-1. Customer-facing identity uses the approved Brain/entity identity; private operator addresses are never exposed.
-2. Service consent, marketing consent, and analytics consent remain separate.
-3. A customer message is not automatically customer approval.
-4. Commercial acceptance must pass the applicable customer-consent and operator-authority gates.
-5. Payment verification is never inferred from a message or uploaded receipt alone.
-6. Important inbound/outbound messages are captured into Diwan with content hash and provenance.
-7. Email/chat delivery is evidence about transport, not proof of contractual acceptance unless the applicable agreement and evidence establish acceptance.
-8. Failed delivery creates a retryable operational task and does not become a successful communication.
-9. Legal hold prevents deletion of the authoritative record.
-10. The system must never report SENT/DELIVERED without transport evidence.
+## Target operating loop
+Customer -> Channel Adapter -> Communications Hub -> Diwan/Case File -> Supervisor -> Worker -> Response -> Channel Adapter -> Evidence -> Metrics
 
-## Target flow
+## Required production adapters
+- Email provider with verified sender identity and delivery/bounce evidence.
+- Portal/web-chat transport.
+- Optional messaging provider adapters.
+- Webhook ingestion for provider delivery/bounce events.
 
-Customer -> Channel Adapter -> Communications Hub -> Diwan/Case File -> Supervisor -> Worker -> Response -> Channel Adapter
+Until an adapter is connected, messages remain `QUEUED`/connector-pending; the system must never simulate delivery.
 
-The next integration layer should expose authenticated API endpoints for conversation creation, message registration, thread retrieval, and outbound queueing.
+## Operational metrics
+- first-response time
+- SLA compliance
+- delivery/bounce/failure rate
+- unresolved conversations
+- overdue escalations
+- customer consent coverage
+- duplicate-send prevention
+- customer-to-quote conversion
+- quote-to-payment verification conversion
+
+## Security
+Authenticated access, least privilege, audit logging, retention/legal hold and redaction of secrets/payment credentials are mandatory.
