@@ -58,6 +58,51 @@
       "role": "agent_sandbox_candidate",
       "why_add": "Candidate security boundary for autonomous agents; must be evaluated before production adoption.",
       "source": "https://github.com/NVIDIA/OpenShell"
+    },
+    {
+      "id": "indictrans2",
+      "category": "translation",
+      "role": "indian_language_translation_backend",
+      "why_add": "Open-source MIT model checkpoints for translation across 22 scheduled Indian languages; strong multilingual adapter for Brain.",
+      "source": "https://github.com/AI4Bharat/IndicTrans2",
+      "region": "India",
+      "license": "MIT"
+    },
+    {
+      "id": "indicconformer_asr",
+      "category": "speech_to_text",
+      "role": "indian_language_asr_backend",
+      "why_add": "Open-source MIT ASR suite covering 22 official Indian languages; useful for multilingual voice input.",
+      "source": "https://github.com/AI4Bharat/IndicConformerASR",
+      "region": "India",
+      "license": "MIT"
+    },
+    {
+      "id": "indicxlit",
+      "category": "transliteration",
+      "role": "indian_script_transliteration_backend",
+      "why_add": "Open-source MIT transliteration models for 21 Indic languages; useful for mixed Latin/Indic input normalization.",
+      "source": "https://github.com/AI4Bharat/IndicXlit",
+      "region": "India",
+      "license": "MIT"
+    },
+    {
+      "id": "indic_lid",
+      "category": "language_identification",
+      "role": "indic_language_detection_backend",
+      "why_add": "Open-source MIT language-identification component for Indian languages; useful before routing translation and speech pipelines.",
+      "source": "https://github.com/AI4Bharat/IndicLID",
+      "region": "India",
+      "license": "MIT"
+    },
+    {
+      "id": "sarvam_open_models",
+      "category": "model_pool",
+      "role": "india_model_experimental_pool",
+      "why_add": "Current Sarvam documentation exposes an open-source model pool; Brain should benchmark individual models and verify their exact licenses before production use.",
+      "source": "https://docs.sarvam.ai/api-reference/open-source/models",
+      "region": "India",
+      "status": "experimental"
     }
   ],
   "not_auto_selected": [
