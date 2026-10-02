@@ -37,6 +37,24 @@ def recent_fingerprints(limit=30):
     rows = HISTORY.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]
     return {json.loads(x).get("fingerprint") for x in rows if x.strip()}
 
+def refresh_predictions():
+    """Recompute future risks before choosing the next unit of work."""
+    try:
+        import subprocess, sys
+        p = subprocess.run(
+            [sys.executable, "-m", "brain_v12.self_healing.future_evolution"],
+            cwd=ROOT, text=True, capture_output=True, timeout=90,
+        )
+        record({
+            "event": "prediction_refresh",
+            "exit_code": p.returncode,
+            "status": "PASS" if p.returncode == 0 else "FAIL",
+        })
+        return p.returncode == 0
+    except Exception as exc:
+        record({"event": "prediction_refresh", "status": "ERROR", "error": str(exc)[:500]})
+        return False
+
 def candidates():
     items = []
     try:
@@ -95,6 +113,7 @@ def main():
     while True:
         try:
             cycle += 1
+            refresh_predictions()
             kind, priority, goal, fingerprint = choose_goal()
             print(f"JET_BRAIN_CYCLE {cycle} SELECT kind={kind} priority={priority} goal={goal[:180]}", flush=True)
             record({"cycle": cycle, "event": "selected", "kind": kind, "goal": goal, "fingerprint": fingerprint})
