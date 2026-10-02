@@ -103,6 +103,33 @@
       "source": "https://docs.sarvam.ai/api-reference/open-source/models",
       "region": "India",
       "status": "experimental"
+    },
+    {
+      "id": "ai4bharat_chitralekha",
+      "category": "media_localization",
+      "role": "indic_video_transcreation_candidate",
+      "why_add": "Open-source AI4Bharat project for Indic video transcription, translation and voice-over; useful for Brain's cinematic localization pipeline. License and model-level terms must be verified before production.",
+      "source": "https://github.com/AI4Bharat/Chitralekha",
+      "region": "India",
+      "status": "experimental"
+    },
+    {
+      "id": "sakana_shinka_evolve",
+      "category": "self_improvement_research",
+      "role": "algorithm_evolution_candidate",
+      "why_add": "Japan-based open research project focused on LLM-driven evolutionary improvement of algorithms; useful as a research candidate for Brain's bounded self-improvement layer, not an autonomous production dependency.",
+      "source": "https://sakana.ai/",
+      "region": "Japan",
+      "status": "experimental"
+    },
+    {
+      "id": "sakana_fugu",
+      "category": "agent_orchestration",
+      "role": "multi_model_orchestration_candidate",
+      "why_add": "Japan-based orchestration approach that dynamically coordinates multiple models and agents; evaluate as an optional architecture reference/adapter.",
+      "source": "https://sakana.ai/nvidia-open-model-innovation/",
+      "region": "Japan",
+      "status": "experimental"
     }
   ],
   "not_auto_selected": [
