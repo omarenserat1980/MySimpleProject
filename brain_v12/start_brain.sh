@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT/.."
 # Load the local Brain↔Termux bridge secret when configured; never print it.
-BRAIN_KEY_FILE="${BRAIN_EMULATOR_KEY_FILE:-$HOME/.brain/secrets/termux_agent.key}"
+BRAIN_KEY_FILE="${BRAIN_EMULATOR_KEY_FILE:-${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}}"
 if [ -f "$BRAIN_KEY_FILE" ]; then
   export BRAIN_EMULATOR_KEY="$(cat "$BRAIN_KEY_FILE")"
 fi
