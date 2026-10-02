@@ -49,7 +49,17 @@ jobs:
       - name: Prepare Brain runtime
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check -q httpx
+          python -m pip install --disable-pip-version-check -q httpx fastapi google-api-python-client google-auth-oauthlib google-auth-httplib2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
+          python - <<'PY'
+          import fastapi, httpx
+          print("BRAIN_RUNTIME_DEPS=READY")
+          print("FASTAPI="+fastapi.__version__)
+          print("HTTPX="+httpx.__version__)
+          PY
 
       - name: Validate Repair Knowledge
         run: python -m unittest brain_v12.brain.test_repair_knowledge -v
