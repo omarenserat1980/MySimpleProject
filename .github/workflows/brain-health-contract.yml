@@ -24,7 +24,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q cloud
       - name: Feedback contract
-        run: python -m pytest -q cloud/test_customer_feedback.py
+        run: python -m pytest -q cloud/test_customer_feedback.py cloud/test_api_server.py
       - name: API import and route uniqueness contract
         run: |
           python - <<'PY'
