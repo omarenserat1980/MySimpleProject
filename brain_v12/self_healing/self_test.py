@@ -5,6 +5,7 @@ from brain_v12.causal.causal_engine import self_test as causal_engine_test, caus
 from brain_v12.quran.quran_reasoning import self_test as quran_reasoning_test
 from brain_v12.self_healing.reflection_agent import self_test as reflection_agent_test
 from brain_v12.self_healing.reflection_actions import self_test as reflection_actions_test
+from brain_v12.self_healing.reflection_executor import self_test as reflection_executor_test
 
 def main() -> int:
     causal_engine_test()
