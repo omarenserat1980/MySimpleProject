@@ -217,8 +217,6 @@ def main() -> int:
                     })
                     repair_env = os.environ.copy()
                     repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
-                    repair_env = os.environ.copy()
-                    repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
                     actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout, repair_env))
                     repair_result = actions.execute("repair")
                     item.repair_exit_code = repair_result.exit_code
