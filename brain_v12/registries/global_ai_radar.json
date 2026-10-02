@@ -130,6 +130,52 @@
       "source": "https://sakana.ai/nvidia-open-model-innovation/",
       "region": "Japan",
       "status": "experimental"
+    },
+    {
+      "id": "breeze_asr_26",
+      "category": "speech_to_text",
+      "role": "taiwanese_taigi_asr_candidate",
+      "why_add": "Taiwanese MediaTek Research Breeze ASR work provides an open model path for Taigi/Hokkien speech recognition, expanding Brain's Asian-language voice coverage.",
+      "source": "https://github.com/mtkresearch/Breeze-ASR-26",
+      "region": "Taiwan",
+      "status": "experimental"
+    },
+    {
+      "id": "solar_open_2",
+      "category": "foundation_model",
+      "role": "korean_agent_model_candidate",
+      "why_add": "Upstage's open-weight 250B/15B-active MoE is explicitly designed for agentic work, tool calling and coding, with Korean, English and Japanese support; suitable as a benchmark/cloud adapter rather than a phone-local dependency.",
+      "source": "https://www.upstage.ai/blog/en/solar-open-2",
+      "region": "South Korea",
+      "status": "experimental",
+      "license": "Upstage Solar License"
+    },
+    {
+      "id": "paddleocr",
+      "category": "ocr",
+      "role": "document_and_screen_ocr_backend",
+      "why_add": "Open-source PaddleOCR provides a practical Chinese-origin OCR path for documents, screenshots and multilingual text extraction in Brain pipelines.",
+      "source": "https://github.com/PaddlePaddle/PaddleOCR",
+      "region": "China",
+      "status": "recommended_adapter"
+    },
+    {
+      "id": "deepseek_ascend_toolchain",
+      "category": "accelerator_runtime",
+      "role": "non_nvidia_compute_candidate",
+      "why_add": "DeepSeek and Huawei are open-sourcing tooling around Ascend AI chips; this is worth tracking as an alternative compute stack, but it should remain an experimental adapter until Brain validates hardware availability and reproducibility.",
+      "source": "https://github.com/deepseek-ai",
+      "region": "China",
+      "status": "experimental"
+    },
+    {
+      "id": "mistral_vibe",
+      "category": "coding_agent",
+      "role": "european_coding_agent_candidate",
+      "why_add": "Mistral's public Vibe project adds a European coding-agent option that can be benchmarked alongside Brain's existing coding-agent backends.",
+      "source": "https://github.com/mistralai/mistral-vibe",
+      "region": "Europe",
+      "status": "experimental"
     }
   ],
   "not_auto_selected": [
