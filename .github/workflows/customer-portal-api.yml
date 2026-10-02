@@ -7,9 +7,12 @@ on:
       - "cloud/test_api_server.py"
       - "cloud/commercial_governance.py"
       - "cloud/test_commercial_governance.py"
+      - "cloud/public_identity_policy.py"
+      - "cloud/test_public_identity_policy.py"
       - "cloud/web/app.js"
       - "brain_v12/business/customer_governance.py"
       - "docs/CUSTOMER_PORTAL_API_CONTRACT.md"
+      - "PUBLIC_IDENTITY_AND_LIMITED_LIABILITY_POLICY.md"
       - ".github/workflows/customer-portal-api.yml"
   workflow_dispatch:
 
@@ -22,7 +25,7 @@ jobs:
         run: python -m pip install -r cloud/requirements.txt
       - name: Python syntax
         run: python -m compileall -q cloud brain_v12/business/customer_governance.py
-      - name: Customer Portal API and commercial governance tests
-        run: python -m pytest -q cloud/test_api_server.py cloud/test_commercial_governance.py
+      - name: Customer Portal, commercial governance and identity policy tests
+        run: python -m pytest -q cloud/test_api_server.py cloud/test_commercial_governance.py cloud/test_public_identity_policy.py
       - name: Browser JavaScript syntax
         run: node --check cloud/web/app.js
