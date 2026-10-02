@@ -1,0 +1,30 @@
+name: BRAIN Payment Gateway Smoke
+
+on:
+  push:
+    branches: ["feat/brain-payment-gateway-adapter"]
+    paths:
+      - "brain_v12/brain/payment_gateway.py"
+      - "brain_v12/brain/commerce_api.py"
+      - "brain_v12/tests/test_payment_gateway.py"
+      - "brain_v12/app.py"
+  pull_request:
+    paths:
+      - "brain_v12/brain/payment_gateway.py"
+      - "brain_v12/brain/commerce_api.py"
+      - "brain_v12/tests/test_payment_gateway.py"
+      - "brain_v12/app.py"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Payment gateway tests
+        run: python -m unittest brain_v12.tests.test_commerce_api brain_v12.tests.test_payment_gateway -v

@@ -109,9 +109,11 @@ RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 from .brain_git.api import router as brain_git_router
 from .brain.commerce_api import router as commerce_router
+from .brain.payment_gateway import router as payment_router
 from .brain.customer_portal import router as customer_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 
 @app.middleware("http")
