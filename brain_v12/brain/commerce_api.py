@@ -11,6 +11,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+import secrets
+import hashlib
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -94,6 +96,8 @@ class CommerceStore:
             "details": body.details.strip(),
             "payment": {"status": "NOT_CONFIGURED", "evidence_ref": None},
             "delivery": {"status": "NOT_STARTED", "evidence_ref": None},
+            "portal": {"token_hash": ""},
+            "invoice": {"status": "PENDING_ISSUANCE"},
             "audit": [{"at": _now(), "event": "ORDER_DRAFT_CREATED"}],
         }
         with self.lock:
@@ -127,6 +131,7 @@ class CommerceStore:
 
             if target == "PAYMENT_VERIFIED":
                 order["payment"] = {"status": "VERIFIED", "evidence_ref": evidence_ref.strip()}
+                order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": evidence_ref.strip()}
             elif target == "DELIVERED":
                 order["delivery"] = {"status": "DELIVERED", "evidence_ref": evidence_ref.strip()}
             elif target == "REVENUE_REALIZED":
@@ -154,14 +159,24 @@ def router(data_path: str | None = None) -> APIRouter:
 
     @api.post("/orders")
     def create_order(body: CommerceOrderIn):
-        return {"ok": True, "order": store.create(body)}
+        order = store.create(body)
+        portal_token = secrets.token_urlsafe(32)
+        order["portal"]["token_hash"] = hashlib.sha256(portal_token.encode()).hexdigest()
+        data = {x["order_id"]: x for x in store.list()}
+        data[order["order_id"]] = order
+        store._write(data)
+        return {"ok": True, "order": order, "portal_token": portal_token, "portal_path": "/api/customer/orders/" + portal_token}
 
     @api.get("/orders")
-    def list_orders():
+    def list_orders(request: Request):
+        from .control_auth import require_control_key
+        require_control_key(request)
         return {"ok": True, "orders": store.list()}
 
     @api.get("/orders/{order_id}")
-    def get_order(order_id: str):
+    def get_order(request: Request, order_id: str):
+        from .control_auth import require_control_key
+        require_control_key(request)
         order = store.get(order_id)
         if not order:
             raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
