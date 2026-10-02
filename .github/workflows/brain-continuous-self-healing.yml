@@ -73,7 +73,7 @@ jobs:
       - name: Validate Self-Healing Contracts
         run: |
           set -euo pipefail
-          python -m unittest brain_v12.self_healing.test_command_contract brain_v12.self_healing.test_generator_registry brain_v12.self_healing.test_improvement_eligibility brain_v12.self_healing.test_native_patch_generator -v
+          python -m unittest brain_v12.self_healing.test_command_contract brain_v12.self_healing.test_generator_registry brain_v12.self_healing.test_improvement_eligibility brain_v12.self_healing.test_native_patch_generator brain_v12.self_healing.test_future_evolution -v
 
       - name: Run Brain Supervisor + Self-Healing
         env:
