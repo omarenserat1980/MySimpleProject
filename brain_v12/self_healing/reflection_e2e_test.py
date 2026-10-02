@@ -27,7 +27,7 @@ def proposal_discovery_probe() -> None:
     probe.parent.mkdir(parents=True, exist_ok=True)
     probe.write_text(
         'import subprocess\n'
-        'subprocess.run(["python", "brain_v12/self_healing/example.py"])\n',
+        'subprocess.run(["python", "-m", "brain_v12.self_healing.example"])\n',
         encoding="utf-8",
     )
     try:
