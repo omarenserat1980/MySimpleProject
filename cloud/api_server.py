@@ -897,7 +897,7 @@ def diwan_create_case(body: DiwanCaseRequest):
 def diwan_list_cases(limit: int = 100):
     items = []
     for p in sorted(DIWAN_CASES.glob("*.json"), reverse=True)[:max(1, min(limit, 500))]:
-        try: items.append(json.loads(p.read_text(encoding="utf-8"))
+        try: items.append(json.loads(p.read_text(encoding="utf-8")))
         except Exception: continue
     return {"ok": True, "system": "BRAIN_DIWAN", "cases": items}
 
