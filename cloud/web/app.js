@@ -29,18 +29,47 @@ function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 refresh();setInterval(refresh,15000);
 setView("dashboard");
 
-const customerEndpoints=["/api/customers","/api/customer/requests"];
+const customerEndpoints=["/api/customers"];
+let currentCustomerRequestId=null;
+
+function renderCustomerStatus(customer){
+ const status=$("customerStatus");
+ currentCustomerRequestId=customer.request_id||currentCustomerRequestId;
+ status.innerHTML=[
+   ["REQUEST",customer.request_id||"—"],
+   ["LIFECYCLE",customer.lifecycle_state||"—"],
+   ["PIPELINE",customer.pipeline_state||"—"],
+   ["EVIDENCE",customer.evidence_state||"—"],
+   ["FINANCIAL",customer.financial_state||"NOT_VERIFIED"],
+   ["REVENUE",customer.revenue_state||"NOT_REALIZED"],
+   ["MARKETING",customer.consent?.marketing?"GRANTED":"NOT GRANTED"]
+ ].map(([k,v])=>'<div class="item"><b>'+esc(k)+'</b><span class="badge">'+esc(v)+'</span></div>').join("");
+}
+
 async function submitCustomerRequest(e){
  e.preventDefault();
  const result=$("customerResult"), status=$("customerStatus");
- const payload={display_name:$("customerName").value.trim(),service:$("customerService").value.trim(),need:$("customerNeed").value.trim(),marketing_consent:$("customerMarketing").checked};
+ const payload={
+   display_name:$("customerName").value.trim(),
+   service:$("customerService").value.trim(),
+   need:$("customerNeed").value.trim(),
+   marketing_consent:$("customerMarketing").checked
+ };
  result.textContent="جارٍ إرسال الطلب إلى Brain API…";
  try{
-   const d=await first(customerEndpoints.map(p=>p));
-   result.textContent=JSON.stringify(d,null,2);
+   const created=await request("/api/customers",{
+     method:"POST",
+     headers:{"Content-Type":"application/json"},
+     body:JSON.stringify(payload)
+   });
+   currentCustomerRequestId=created.request_id;
+   const full=await request("/api/customers/"+encodeURIComponent(created.request_id));
+   result.textContent=JSON.stringify(full,null,2);
+   renderCustomerStatus(full.customer);
  }catch(err){
    result.textContent="لم يتم إنشاء طلب فعلي: "+err.message+" — لا توجد بيانات محلية بديلة.";
    status.innerHTML='<div class="item"><b>REQUEST</b><span class="badge">API REQUIRED</span></div><div class="item"><b>MARKETING CONSENT</b><span class="badge">'+(payload.marketing_consent?"GRANTED":"NOT GRANTED")+'</span></div>';
+   currentCustomerRequestId=null;
  }
 }
 if($("customerRequest")) $("customerRequest").onsubmit=submitCustomerRequest;
