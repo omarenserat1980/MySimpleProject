@@ -12,7 +12,8 @@ class ReleaseGate:
   self.root=Path(root or os.getenv("BRAIN_STATE_DIR",".brain_state"))/"release_gate"; self.root.mkdir(parents=True,exist_ok=True)
  def run(self):
   gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._cinema_truth(),self._governance()]
-  result={"status":"RELEASE_ALLOWED" if all(g.passed for g in gates if g.required) else "RELEASE_BLOCKED","evaluated_at":datetime.now(timezone.utc).isoformat(),"gates":[asdict(g) for g in gates]}; self._atomic(result); return result
+  all_required=all(g.passed for g in gates if g.required)
+  result={"status":"RELEASE_ALLOWED" if all_required else "RELEASE_BLOCKED","evaluated_at":datetime.now(timezone.utc).isoformat(),"gates":[asdict(g) for g in gates],"evidence_contract":{"all_required_gates_passed":all_required,"release_requires_runtime_evidence":True}}; self._atomic(result); return result
  def _compile(self):
   p=subprocess.run([sys.executable,"-m","compileall","-q","cloud"],capture_output=True,text=True); return Gate("compile",True,p.returncode==0,"process://compileall",p.stderr.strip())
  def _pytest_feedback(self):
