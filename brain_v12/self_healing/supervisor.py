@@ -170,6 +170,13 @@ def main() -> int:
                 selected_action = "verify" if p.returncode == 0 else None
                 action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
                 item.reflection_actions.append(selected_action or "none")
+                print("BRAIN_REFLECTION_QUESTION")
+                for idx, question in enumerate(item.reflection_questions, 1):
+                    print(f"  Q{idx}: {question}")
+                print(f"BRAIN_REFLECTION_ACTION: {selected_action or 'none'}")
+                print(f"BRAIN_REFLECTION_EXECUTION: {'PASS' if action_result.ok else 'NOT_VERIFIED'}")
+                print(f"BRAIN_REFLECTION_EXIT_CODE: {action_result.exit_code}")
+                print(f"BRAIN_REFLECTION_EVIDENCE: {action_result.output[-2000:] or action_result.error[-2000:]}")
                 print(json.dumps({
                     "reflection_status": reflection_result.status,
                     "questions": item.reflection_questions,
