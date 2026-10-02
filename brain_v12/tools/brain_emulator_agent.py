@@ -65,6 +65,15 @@ def execute(task):
             "version": platform.version(),
             "machine": platform.machine(),
         }
+    if task == "brain_self_test":
+        env = dict(os.environ)
+        root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+        p = subprocess.run(
+            [os.sys.executable, "-m", "unittest", *SELF_TESTS, "-v"],
+            cwd=root, env=env, capture_output=True, text=True, timeout=180
+        )
+        return {"returncode": p.returncode, "stdout": p.stdout, "stderr": p.stderr, "tests": SELF_TESTS}
     raise ValueError("TASK_NOT_ALLOWED")
 
 def main():
