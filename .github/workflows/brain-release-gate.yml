@@ -1,0 +1,29 @@
+name: BRAIN Release Gate
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r cloud/requirements.txt
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Run release gate
+        run: python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(),indent=2))"
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-release-gate-evidence
+          path: .brain_state/release_gate/release_gate.json
+      - name: Block release when gate fails
+        run: python -c "import json,sys; d=json.load(open('.brain_state/release_gate/release_gate.json')); print('BRAIN RELEASE STATUS:',d['status']); sys.exit(0 if d['status']=='RELEASE_ALLOWED' else 1)"
