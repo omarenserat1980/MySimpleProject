@@ -1,6 +1,11 @@
 name: Brain Crypto Mining Intelligence
 
 on:
+  push:
+    paths:
+      - "brain_v12/business/crypto_mining_intelligence.py"
+      - "brain_v12/business/test_crypto_mining_intelligence.py"
+      - ".github/workflows/brain-crypto-mining-intelligence.yml"
   workflow_dispatch:
     inputs:
       electricity_usd_kwh:
