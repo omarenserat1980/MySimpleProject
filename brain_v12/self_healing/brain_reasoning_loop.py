@@ -83,6 +83,7 @@ class BrainReasoningLoop:
                 last_action=cycle.action_id,
                 last_ok=cycle.execution_ok,
                 last_evidence=cycle.evidence,
+                last_exit_code=cycle.exit_code,
             )
 
             # A failed execution becomes the next Brain-generated question.
@@ -125,6 +126,7 @@ def self_test() -> None:
     assert all(c.execution_ok for c in cycles)
     assert cycles[0].evidence == "INSPECT=PASS"
     assert cycles[1].evidence == "VERIFY=PASS"
+    assert cycles[1].exit_code == 0
 
     failing_agent = ReflectionAgent(
         max_turns=3,
