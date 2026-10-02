@@ -93,6 +93,10 @@ def test_customer_portal_lifecycle_and_financial_gate(monkeypatch, tmp_path):
 
     created = client.post("/api/customers", json={
         "display_name": "Test Customer",
+        "customer_type": "COMPANY",
+        "legal_entity_name": "Test Customer LLC",
+        "registration_id": "REG-001",
+        "authorized_representative": "Authorized Person",
         "service": "Workflow automation",
         "need": "Automate intake",
         "marketing_consent": False,
@@ -102,6 +106,10 @@ def test_customer_portal_lifecycle_and_financial_gate(monkeypatch, tmp_path):
     request_id = data["request_id"]
     assert data["lifecycle_state"] == "DISCOVERED"
     assert data["status"] == "READY_FOR_REVIEW"
+    customer_record = client.get(f"/api/customers/{request_id}").json()["customer"]
+    assert customer_record["customer_type"] == "COMPANY"
+    assert customer_record["legal_entity"]["verification_state"] == "REQUIRED"
+    assert customer_record["legal_entity"]["registration_id"] == "REG-001"
     assert data["financial_state"] == "NOT_VERIFIED"
     assert data["revenue_state"] == "NOT_REALIZED"
 
