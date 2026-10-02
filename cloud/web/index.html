@@ -1,42 +1,66 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b1020">
-<title>Electronic Brain Cloud</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101d"><title>Electronic Brain Cloud</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header class="top">
-  <div><div class="brand">ELECTRONIC BRAIN</div><div class="sub">Cloud Control Center</div></div>
-  <span id="status" class="pill offline">OFFLINE</span>
-</header>
-<main>
-  <section class="hero">
-    <div>
-      <span class="eyebrow">NO INSTALL • WEB ONLY</span>
-      <h1>Your Brain, available from any browser.</h1>
-      <p>Control jobs, inspect runtime health, and follow execution without installing an APK on the phone.</p>
-    </div>
-    <button id="connect">Connect Brain</button>
-  </section>
-  <section class="grid">
-    <article class="card"><span>RUNTIME</span><strong id="runtime">—</strong><small id="runtimeDetail">Waiting for API</small></article>
-    <article class="card"><span>JOBS</span><strong id="jobs">—</strong><small>Cloud task queue</small></article>
-    <article class="card"><span>AGENTS</span><strong id="agents">—</strong><small>Connected executors</small></article>
-  </section>
-  <section class="panel">
-    <div class="panelHead"><h2>Command Center</h2><span>Browser → Brain API</span></div>
-    <textarea id="command" placeholder="Tell Brain what to do…"></textarea>
-    <div class="actions"><button id="run">Run task</button><button id="health" class="secondary">Health check</button></div>
-    <pre id="output">Ready.</pre>
-  </section>
-  <section class="panel">
-    <div class="panelHead"><h2>Cloud architecture</h2><span>APK optional, not required</span></div>
-    <div class="flow"><b>Browser</b><i>→</i><b>HTTPS API</b><i>→</i><b>Brain Supervisor</b><i>→</i><b>Workers</b></div>
-  </section>
-</main>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand">🧠 <span>Electronic Brain</span><small>Cloud UI v1 • Browser First</small></div>
+  <nav>
+    <button class="active" data-view="dashboard">لوحة التحكم</button>
+    <button data-view="chat">المحادثة</button>
+    <button data-view="tasks">المهام</button>
+    <button data-view="agents">الوكلاء</button>
+    <button data-view="media">الوسائط</button>
+    <button data-view="intelligence">Intelligence</button>
+    <button data-view="health">الصحة</button>
+    <button data-view="audit">التدقيق</button>
+    <button data-view="settings">الإعدادات</button>
+  </nav>
+  <div class="side-note">APK وTermux اختياريان. الواجهة الأساسية تعمل من المتصفح.</div>
+</aside>
+<main class="main">
+<header class="top"><div><h1 id="title">لوحة التحكم</h1><p>واجهة موحدة للـBrain Cloud — لا تثبيت على الهاتف.</p></div><div id="connection" class="status pending">غير متصل</div></header>
+
+<section id="dashboard" class="view active">
+<div class="cards">
+  <article><span>الحالة</span><b id="state">—</b><small id="stateDetail">بانتظار API</small></article>
+  <article><span>المهام</span><b id="taskCount">—</b><small>Queue / execution</small></article>
+  <article><span>الوكلاء</span><b id="agentCount">—</b><small>Available executors</small></article>
+  <article><span>الدليل</span><b id="evidence">—</b><small>Evidence gate</small></article>
+</div>
+<div class="grid">
+  <article class="panel wide"><h2>دورة Brain</h2><div class="flow"><i>Detect</i><i>→</i><i>Diagnose</i><i>→</i><i>Plan</i><i>→</i><i>Execute</i><i>→</i><i>Verify</i><i>→</i><i>Recover</i></div><pre id="overview">اضغط «فحص الآن» لقراءة الحالة الفعلية.</pre><button id="refreshBtn">فحص الآن</button></article>
+  <article class="panel"><h2>بوابات الأمان</h2><div id="guards" class="list"></div></article>
+</div>
+</section>
+
+<section id="chat" class="view"><div class="panel chat"><h2>💬 المحادثة</h2><div id="messages" class="messages"><div class="bubble brain">Brain Cloud جاهز. اكتب طلبك.</div></div><div class="composer"><textarea id="prompt" placeholder="ماذا تريد من Brain؟"></textarea><button id="send">إرسال</button></div></div></section>
+
+<section id="tasks" class="view"><div class="panel"><div class="row"><h2>📋 المهام</h2><button id="loadTasks">تحديث</button></div><div id="tasksList" class="list"><div class="empty">لم يتم تحميل المهام بعد.</div></div></div></section>
+
+<section id="agents" class="view"><div class="panel"><div class="row"><h2>⚙️ الوكلاء</h2><button id="loadAgents">فحص</button></div><div id="agentsList" class="list"></div></div></section>
+
+<section id="media" class="view"><div class="grid"><article class="panel wide"><h2>🎬 Media / Cinematic</h2><p>واجهة موحدة للسينما والوسائط. الإنتاج النهائي يجب أن يمر عبر Render → QC → Master QC → Evidence.</p><div class="flow"><i>Story</i><i>→</i><i>Assets</i><i>→</i><i>Render</i><i>→</i><i>ffprobe</i><i>→</i><i>Verified</i></div><pre>هذه الصفحة لا تعتبر أي فيلم ناجحًا دون artifact ودليل تحقق.</pre></article><article class="panel"><h2>آخر حالة</h2><pre id="mediaState">سيتم ربطها بمصنع الوسائط عند توفر endpoint.</pre></article></div></section>
+
+<section id="intelligence" class="view"><div class="grid"><article class="panel wide"><h2>📈 Intelligence</h2><p>تجميع حالات التطور، الفرص العامة، وتحليل التعدين في مكان واحد.</p><div class="list"><div class="item"><b>Crypto Mining Intelligence</b><span class="badge">EXPECTED / HUMAN APPROVAL</span></div><div class="item"><b>Opportunity Discovery</b><span class="badge">EVIDENCE FIRST</span></div><div class="item"><b>Brain Evolution</b><span class="badge">MEASURED</span></div></div></article><article class="panel"><h2>مبدأ القرار</h2><pre>EXPECTED ≠ VERIFIED ≠ REALIZED</pre></article></div></section>
+
+<section id="health" class="view"><div class="grid"><article class="panel wide"><h2>🫀 Brain Cognitive Health</h2><div id="healthGrid" class="healthGrid"></div><pre id="healthRaw">—</pre></article><article class="panel"><h2>الحالات</h2><div class="list"><div class="item">CLEAR</div><div class="item">BUSY</div><div class="item">OVERLOADED</div><div class="item">UNCERTAIN</div><div class="item">RECOVERY</div></div></article></div></section>
+
+<section id="audit" class="view"><div class="panel"><div class="row"><h2>🔐 Audit / Evidence</h2><button id="loadAudit">تحديث</button></div><pre id="auditRaw">لا يوجد سجل محمل.</pre></div></section>
+
+<section id="settings" class="view"><div class="grid"><article class="panel wide"><h2>⚙️ إعداد Cloud</h2><label>Brain API URL</label><input id="apiUrl" placeholder="https://your-brain-api.example"><div class="actions"><button id="saveApi">حفظ الاتصال</button><button class="secondary" id="clearApi">مسح</button></div><p class="hint">لا تضع GitHub tokens أو مفاتيح مزودي AI داخل هذه الصفحة. استخدم طبقة خادم آمنة.</p></article><article class="panel"><h2>المعمارية</h2><pre>Browser
+  ↓ HTTPS
+Brain Cloud API
+  ↓
+Supervisor
+  ↓
+Workers / GitHub Actions
+  ↓
+Evidence + Artifact</pre></article></div></section>
+</main></div>
 <script src="app.js"></script>
-</body>
-</html>
+</body></html>
