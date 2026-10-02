@@ -267,3 +267,49 @@ def test_standing_authorization_blocks_over_limit_and_scope_mismatch():
         approved_amount=50, approved_currency="JOD", evidence_ref="consent-1",
     )
     assert customer_gate(required=True, consent=consent, scope_ref="QUOTE-2", version="v1", amount=50, currency="JOD") == ApprovalStatus.REQUIRED
+
+
+def test_customer_feedback_api_lifecycle_and_evidence(monkeypatch, tmp_path):
+    api, client = _client(monkeypatch)
+    feedback_dir = tmp_path / "customer_feedback"
+    monkeypatch.setattr(api, "FEEDBACK_STATE", feedback_dir)
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    created = client.post("/v1/feedback", json={
+        "customer_id": "cust-1",
+        "rating": 4,
+        "category": "QUALITY",
+        "body": "Good service, but response was slow.",
+        "consent_to_contact": True,
+        "marketing_consent": False,
+    })
+    assert created.status_code == 200
+    feedback_id = created.json()["feedback_id"]
+    assert created.json()["state"] == "RECEIVED"
+
+    headers = {"Authorization": "Bearer test-token"}
+    fetched = client.get(f"/v1/feedback/{feedback_id}", headers=headers)
+    assert fetched.status_code == 200
+    assert fetched.json()["customer_id"] == "cust-1"
+
+    triaged = client.post(
+        f"/v1/feedback/{feedback_id}/transition",
+        headers=headers,
+        params={"state": "TRIAGED"},
+    )
+    assert triaged.status_code == 200
+
+    unresolved = client.post(
+        f"/v1/feedback/{feedback_id}/transition",
+        headers=headers,
+        params={"state": "RESOLVED"},
+    )
+    assert unresolved.status_code == 422
+
+    resolved = client.post(
+        f"/v1/feedback/{feedback_id}/transition",
+        headers=headers,
+        params={"state": "RESOLVED", "evidence_ref": "case://feedback/verified-1"},
+    )
+    assert resolved.status_code == 200
+    assert resolved.json()["state"] == "RESOLVED"
