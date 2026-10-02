@@ -27,3 +27,11 @@ class SupervisorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_reasoner_is_connected(self):
+        with tempfile.TemporaryDirectory() as d:
+            s=BrainSupervisor(root=d,max_cycles=2)
+            decision=s.reason({"job_id":"j1","verified":False,"failures":[{"id":"m1","class":"MEDIA_PIPELINE"}],"attempts":0,"max_attempts":2})
+            self.assertEqual(decision.action,"repair")
+            self.assertIn("cinematic_qc",decision.required_tests)
+
