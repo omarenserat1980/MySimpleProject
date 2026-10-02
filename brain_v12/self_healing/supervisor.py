@@ -168,6 +168,21 @@ def main() -> int:
                 item.reflection_actions = [t.challenge for t in reflection_result.turns if t.challenge]
 
                 actions = ReflectionActionRegistry()
+                if args.repair:
+                    failure_report = state_dir / "current_failure.json"
+                    write_state(failure_report, {
+                        "schema": "brain-repair-context/v1",
+                        "attempt": n,
+                        "exit_code": item.exit_code,
+                        "diagnosis": item.diagnosis,
+                        "stdout": item.stdout[-12000:],
+                        "stderr": item.stderr[-12000:],
+                        "command": args.command,
+                        "verify_command": args.verify,
+                    })
+                    repair_env = os.environ.copy()
+                    repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
+                    actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout, repair_env))
                 if args.verify:
                     actions.register("verify", command_action("verify", shlex.split(args.verify), args.timeout))
                 chatgpt_repair_done = False
