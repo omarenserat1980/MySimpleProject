@@ -15,12 +15,18 @@ jobs:
           python-version: "3.12"
       - name: Run benchmark and safety tests
         run: |
-          python -m unittest             brain_v12.brain.test_security_guard             brain_v12.brain.test_company_operating_system             brain_v12.brain.test_competitive_evolution             brain_v12.brain.test_level_report             brain_v12.self_healing.test_future_evolution_executor -v
+          python -m unittest \
+            brain_v12.brain.test_security_guard \
+            brain_v12.brain.test_company_operating_system \
+            brain_v12.brain.test_competitive_evolution \
+            brain_v12.brain.test_level_report \
+            brain_v12.self_healing.test_future_evolution_executor -v
       - name: Install film test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           python -m pip install -r cloud/requirements.txt
+          python -m pip install "pytest>=8,<9"
       - name: Run verified film production contract
         run: |
           python -m pytest -q cloud/test_film_contract.py
