@@ -20,6 +20,7 @@ class BrainCycle:
     answer: str
     action_id: str
     execution_ok: bool
+    exit_code: int
     evidence: str
     reason: str
 
@@ -55,6 +56,7 @@ class BrainReasoningLoop:
                 answer=str(plan.get("answer", "")),
                 action_id=action_id,
                 execution_ok=execution.ok,
+                exit_code=execution.exit_code,
                 evidence=evidence[-4000:],
                 reason=str(plan.get("reason", "")),
             )
