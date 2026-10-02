@@ -97,6 +97,7 @@ def main() -> int:
                 "stdout": item["stdout"][-4000:],
                 "stderr": item["stderr"][-4000:],
                 "error": item.get("error"),
+                    "diagnostic_file": str(ROOT / ".brain/state/self_test_matrix.json") if item["name"] == "self-test-matrix" else None,
             }
             for item in results if not item["passed"]
         ],
