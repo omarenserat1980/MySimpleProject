@@ -36,7 +36,7 @@ object LocalTools {
         outThread.start(); errThread.start()
         val deadline = System.currentTimeMillis() + timeoutMs
         while (p.isAlive && System.currentTimeMillis() < deadline) Thread.sleep(50)
-        if (p.isAlive) { p.destroyForcibly(); return -1 to stdout.toString() to (stderr.toString()+"TIMEOUT") }
+        if (p.isAlive) { p.destroyForcibly(); return Triple(-1, stdout.toString(), stderr.toString() + "TIMEOUT") }
         outThread.join(1000); errThread.join(1000)
         return Triple(p.exitValue(), stdout.toString(), stderr.toString())
     }
