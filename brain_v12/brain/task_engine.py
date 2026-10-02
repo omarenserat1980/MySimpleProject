@@ -22,6 +22,8 @@ class TaskEngine:
             return {"ok":False,"error":"RETRY_LIMIT_REACHED","task":task}
         task["status"]="PENDING"
         task["error"]=""
+        task["retry_of"] = task.get("retry_of") or task["id"]
+        task["retry_count"] = int(task.get("retry_count", 0)) + 1
         return {"ok":True,"task":task}
 
     def update(self,task_id,status,evidence_ref=None):
