@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111f">
+<title>BRAIN Digital Commerce</title>
+<style>
+:root{--bg:#050b14;--panel:#0b1422;--panel2:#101d2e;--line:#20334a;--text:#edf6ff;--muted:#91a5bc;--cyan:#55d6ff;--green:#43e0a1;--purple:#a78bfa;--gold:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 75% 0,#17304c 0,#07111e 38%,#050b14 75%);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}a{text-decoration:none;color:inherit}.wrap{max-width:1250px;margin:auto;padding:22px}.nav{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:12px 0 24px}.brand{font-size:22px;font-weight:800}.brand span{color:var(--cyan)}.navlinks{display:flex;gap:8px;flex-wrap:wrap}.navlinks a,.btn{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:#0b1726;color:#dff4ff}.btn.primary{background:linear-gradient(135deg,#147da6,#6b43c8);border:0}.hero{padding:55px 25px;border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#0b1829dd,#08111ddd);box-shadow:0 20px 70px #0004}.eyebrow{color:var(--cyan);font-size:12px;font-weight:700}.hero h1{font-size:clamp(32px,6vw,64px);margin:12px 0}.hero p{color:var(--muted);font-size:18px;line-height:1.9;max-width:800px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.section{margin-top:28px}.section h2{margin-bottom:8px}.section>p{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:#0b1624ee;border:1px solid var(--line);border-radius:20px;padding:18px}.card h3{margin:0 0 8px}.price{font-size:21px;font-weight:800;color:var(--gold);margin:14px 0}.card p,.card li{color:var(--muted);line-height:1.75}.tag{display:inline-block;padding:5px 8px;border-radius:99px;background:#0d2537;border:1px solid #1d4058;color:#a9d9ee;font-size:11px}.model{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.step{padding:14px;border:1px solid var(--line);border-radius:15px;background:#07111d;text-align:center}.step b{display:block;margin-top:7px}.notice{border:1px solid #5a4821;background:#211a0d;color:#f4ddb0;padding:14px;border-radius:15px;line-height:1.8}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form input,.form select,.form textarea{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#07111d;color:#fff}.form textarea{min-height:120px}.full{grid-column:1/-1}.result{margin-top:12px;color:var(--green)}footer{margin-top:45px;padding:25px 0;color:#71869c;border-top:1px solid var(--line);font-size:12px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.model{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.nav{align-items:flex-start;flex-direction:column}.grid,.form,.model{grid-template-columns:1fr}.hero{padding:35px 18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="nav"><div class="brand">🧠 <span>BRAIN</span> Digital Commerce</div><div class="navlinks"><a href="/">العقل</a><a href="#products">المنتجات</a><a href="#services">الخدمات</a><a href="#how">كيف نبيع</a><a href="#order">اطلب</a></div></nav>
+<section class="hero">
+<div class="eyebrow">BRAIN COMMERCIAL CHANNEL</div>
+<h1>بوابة التجارة الرقمية لشركة BRAIN</h1>
+<p>قناة تجارية مخصصة لتحويل قدرات Brain إلى منتجات رقمية وخدمات برمجية وذكاء اصطناعي قابلة للبيع، مع فصل واضح بين <b>الطلب</b> و<b>الدفع</b> و<b>التحقق</b> و<b>الإيراد المحقق</b>.</p>
+<div class="actions"><a class="btn primary" href="#products">استعرض المنتجات</a><a class="btn" href="#order">أرسل طلب شراء</a></div>
+</section>
+
+<section id="products" class="section"><h2>🛒 المنتجات الرقمية</h2><p>المرحلة الأولى تركز على عروض رقمية منخفضة التكلفة في التسليم وقابلة للتوسع.</p>
+<div class="grid">
+<article class="card"><span class="tag">DIGITAL</span><h3>BRAIN AI Starter Kit</h3><p>حزمة أدوات وقوالب لبناء مهام AI وأتمتة الأعمال.</p><div class="price">ابتداءً من $9</div><button class="btn primary" onclick="pick('BRAIN AI Starter Kit')">اطلب المنتج</button></article>
+<article class="card"><span class="tag">SOFTWARE</span><h3>BRAIN Automation Kit</h3><p>مكونات وأمثلة لأتمتة المهام وواجهات API وسير العمل.</p><div class="price">ابتداءً من $19</div><button class="btn primary" onclick="pick('BRAIN Automation Kit')">اطلب المنتج</button></article>
+<article class="card"><span class="tag">INTELLIGENCE</span><h3>Business Intelligence Pack</h3><p>قوالب تحليل وبحث وتقييم فرص ومؤشرات تجارية.</p><div class="price">ابتداءً من $25</div><button class="btn primary" onclick="pick('Business Intelligence Pack')">اطلب المنتج</button></article>
+<article class="card"><span class="tag">MEDIA</span><h3>BRAIN Media Toolkit</h3><p>أدوات وسير عمل لإنتاج وإدارة الأصول الرقمية والوسائط.</p><div class="price">ابتداءً من $15</div><button class="btn primary" onclick="pick('BRAIN Media Toolkit')">اطلب المنتج</button></article>
+</div></section>
+
+<section id="services" class="section"><h2>⚙ خدمات الأعمال</h2><div class="grid">
+<div class="card"><h3>AI Automation</h3><p>تصميم أتمتة مخصصة وربط أنظمة العمل.</p></div><div class="card"><h3>Software Development</h3><p>تطوير واجهات وخدمات API وحلول مخصصة.</p></div><div class="card"><h3>Digital Media</h3><p>إنتاج رقمي وسير عمل للصور والفيديو والصوت.</p></div><div class="card"><h3>Research & Intelligence</h3><p>بحث منظم وتحليل فرص ومعلومات داعمة للقرار.</p></div>
+</div></section>
+
+<section id="how" class="section"><h2>🔐 دورة التجارة والتحقق</h2><p>لا يتم تسجيل المال كإيراد لمجرد إنشاء طلب أو إظهار صفحة دفع.</p><div class="model">
+<div class="step">1<b>PRODUCT</b><small>عرض تجاري</small></div><div class="step">2<b>ORDER</b><small>إنشاء طلب</small></div><div class="step">3<b>PAYMENT</b><small>مزود دفع معتمد</small></div><div class="step">4<b>VERIFY</b><small>مطابقة الدليل</small></div><div class="step">5<b>REVENUE</b><small>تسجيل الإيراد</small></div>
+</div></section>
+
+<section class="section"><div class="notice">⚠️ <b>الحالة الحالية:</b> هذه الصفحة هي واجهة التجارة والطلبات. لم يتم تفعيل مزود دفع حقيقي بعد، لذلك لا ندعي وجود مبيعات أو إيرادات. عند ربط مزود دفع معتمد، يجب أن يمر كل طلب عبر التحقق والتسجيل المحاسبي قبل اعتباره إيرادًا محققًا.</div></section>
+
+<section id="order" class="section"><h2>📩 طلب منتج أو خدمة</h2><p>أرسل مواصفاتك. سيتم إنشاء رقم طلب محلي للمتابعة؛ الدفع لا يحدث من هذه الصفحة بعد.</p>
+<form class="form" onsubmit="submitOrder(event)">
+<input id="name" required placeholder="الاسم / الشركة"><input id="contact" required placeholder="وسيلة التواصل">
+<select id="product"><option value="ai-starter-kit">BRAIN AI Starter Kit</option><option value="automation-kit">BRAIN Automation Kit</option><option value="business-intelligence-pack">Business Intelligence Pack</option><option value="media-toolkit">BRAIN Media Toolkit</option><option>خدمة أعمال مخصصة</option></select>
+<input id="budget" placeholder="الميزانية التقريبية (اختياري)">
+<textarea class="full" id="details" placeholder="ما الذي تحتاجه؟"></textarea>
+<div class="full"><button class="btn primary" type="submit">إنشاء طلب تجاري</button><div id="result" class="result"></div></div>
+</form></section>
+<footer>© BRAIN Digital Commerce • قناة تجارية رقمية للعقل الإلكتروني • لا يمثل الطلب وحده إيرادًا محققًا.</footer>
+</div>
+<script>
+function pick(name){const map={'BRAIN AI Starter Kit':'ai-starter-kit','BRAIN Automation Kit':'automation-kit','Business Intelligence Pack':'business-intelligence-pack','BRAIN Media Toolkit':'media-toolkit'};document.getElementById('product').value=map[name]||'ai-starter-kit';location.hash='order';document.getElementById('details').focus()}
+async function submitOrder(e){e.preventDefault();const result=document.getElementById('result');result.textContent='جاري تسجيل الطلب في Brain…';try{const r=await fetch('/api/commerce/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({customer_name:document.getElementById('name').value,contact:document.getElementById('contact').value,product_id:document.getElementById('product').value,details:document.getElementById('details').value+'\nBudget: '+document.getElementById('budget').value})});const data=await r.json();if(!r.ok)throw new Error(data.detail||'ORDER_FAILED');const o=data.order;result.textContent='تم تسجيل الطلب: '+o.order_id+' — الحالة: '+o.state+' — لا يمثل الطلب إثبات دفع أو إيرادًا.';document.getElementById('result').dataset.orderId=o.order_id}catch(err){result.textContent='تعذر تسجيل الطلب في الخادم: '+err.message+' — لم يتم ادعاء أي إيراد.'}}
+</script>
+</body>
+</html>
