@@ -1,0 +1,31 @@
+name: Brain Revenue Engine Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  revenue-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate commercial engine
+        run: |
+          set -euo pipefail
+          python -m py_compile brain_v12/business/*.py
+          python - <<'PY'
+          from brain_v12.business.revenue_engine import RevenueEngine, Offer, CustomerSignal
+          engine=RevenueEngine([
+            Offer("AI Workflow Automation", ["workflow audit","automation prototype","verification report"], "quote after scope"),
+            Offer("Cinematic Media Package", ["short video","social assets","quality report"], "quote after scope"),
+            Offer("GitHub CI Reliability Package", ["failure diagnosis","bounded repair","verification evidence"], "quote after scope"),
+          ])
+          signal=CustomerSignal("market_signal","repetitive manual workflow needs automation",["job listing / customer request"],"SMB")
+          result=engine.create_opportunity(signal)
+          assert result["status"]=="READY_FOR_HUMAN_REVIEW", result
+          assert result["external_action"]=="REQUIRES_AUTHORIZATION", result
+          print("BRAIN_REVENUE_SMOKE=PASS")
+          print(result)
+          PY
