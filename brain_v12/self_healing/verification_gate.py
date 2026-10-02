@@ -91,7 +91,13 @@ def main() -> int:
         "verified_completed_allowed": passed,
         "evidence": str(EVIDENCE),
         "failed_gates": [
-            {"name": item["name"], "exit_code": item["exit_code"], "stderr": item["stderr"][-2000:]}
+            {
+                "name": item["name"],
+                "exit_code": item["exit_code"],
+                "stdout": item["stdout"][-4000:],
+                "stderr": item["stderr"][-4000:],
+                "error": item.get("error"),
+            }
             for item in results if not item["passed"]
         ],
     }, ensure_ascii=False))
