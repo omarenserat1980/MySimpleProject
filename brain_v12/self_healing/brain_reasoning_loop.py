@@ -2,7 +2,7 @@
 """Bounded Brain -> ChatGPT -> action -> evidence loop."""
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Mapping, Protocol
 
 from brain_v12.self_healing.reflection_agent import ReflectionAgent
@@ -112,15 +112,10 @@ class BrainReasoningLoop:
                 if workflow_follow_up not in questions[index + 1:]:
                     questions.insert(index + 1, workflow_follow_up)
 
-            # A failed execution becomes the next Brain-generated question.
-            # This keeps the loop focused on the actual failure instead of
-            # blindly advancing through a fixed checklist.
+            # Every failed execution gets an evidence-first question. The failure
+            # output remains in state so the reasoner can inspect the real evidence.
             if not execution.ok and index + 1 < self.max_cycles:
-                follow_up = self.agent.next_question(
-                    index + 1,
-                    str(plan.get("answer", "")),
-                    [evidence] if evidence else [],
-                )
+                follow_up = "What concrete evidence can verify that answer?"
                 if follow_up not in questions[index + 1:]:
                     questions.insert(index + 1, follow_up)
             index += 1
@@ -153,7 +148,6 @@ def self_test() -> None:
     assert cycles[0].evidence == "INSPECT=PASS"
     assert cycles[1].evidence == "VERIFY=PASS"
     assert cycles[1].exit_code == 0
-    assert cycles[1].evidence == "VERIFY=PASS"
 
     failing_agent = ReflectionAgent(
         max_turns=3,
