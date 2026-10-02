@@ -12,6 +12,8 @@ SELF_TESTS = (
 BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
 AGENT_ID = os.getenv("V12_AGENT_ID") or "agent-" + uuid4().hex[:12]
 KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent.key"))
+# Keep the local Brain API and emulator on one explicit key-file contract.
+os.environ.setdefault("BRAIN_AGENT_KEY_FILE", KEY_FILE)
 POLL_SECONDS = max(2, int(os.getenv("V12_POLL_SECONDS", os.getenv("V12_AGENT_POLL_SECONDS", "5"))))
 
 def load_key():
