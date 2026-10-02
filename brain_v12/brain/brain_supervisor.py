@@ -8,6 +8,7 @@ from __future__ import annotations
 import json, time
 from pathlib import Path
 from .autonomy_control_plane import ControlPlane
+from .autonomous_reasoner import AutonomousReasoner
 
 SAFE_EXTERNAL_ACTIONS = {"submit_application", "publish_external", "move_money", "withdraw"}
 
@@ -19,6 +20,7 @@ class BrainSupervisor:
         self.events_path = self.root / "events.jsonl"
         self.max_cycles = max(1, min(int(max_cycles), 5))
         self.control = ControlPlane(str(self.root / "control_plane"))
+        self.reasoner = AutonomousReasoner()
 
     def _event(self, job_id, event, data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
@@ -54,6 +56,11 @@ class BrainSupervisor:
             self.control._append(self.control.jobs,row)
         self._event(row["job_id"], "phase", {"phase":phase,"status":status,"details":row["details"]})
         return row
+
+    def reason(self, evidence):
+        decision=self.reasoner.next(evidence)
+        self._event(evidence.get("job_id", "unknown"), "reasoning_decision", self.reasoner.explain(decision))
+        return decision
 
     def next_action(self, job, verification):
         """Return the next bounded action from real verification evidence."""
