@@ -1,0 +1,23 @@
+name: Brain Cloudflare HTTPS Adapter
+
+on:
+  push:
+    paths:
+      - "cloudflare/brain-api/**"
+      - ".github/workflows/brain-cloudflare-adapter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate adapter files
+        run: |
+          test -f cloudflare/brain-api/wrangler.toml
+          test -f cloudflare/brain-api/src/index.js
+          test -f cloudflare/brain-api/README.md
+          node --check cloudflare/brain-api/src/index.js
