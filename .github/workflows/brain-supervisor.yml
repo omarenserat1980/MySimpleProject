@@ -110,6 +110,25 @@ jobs:
             echo "FAILURE_CLASS=UNKNOWN"
           fi
           grep -E "ERROR|Error|FAILED|failure|Traceback|Exception" supervisor-failure.log | tail -100 || true
+      - name: Bounded recovery rerun
+        if: ${{ github.event.workflow_run.run_attempt < 3 }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        run: |
+          set -euo pipefail
+          echo "BRAIN_SUPERVISOR_RECOVERY=RERUN_FAILED_JOBS"
+          echo "RUN_ID=$RUN_ID"
+          echo "RUN_ATTEMPT=$RUN_ATTEMPT"
+          gh run rerun "$RUN_ID" --failed
+      - name: Recovery limit evidence
+        if: ${{ github.event.workflow_run.run_attempt >= 3 }}
+        run: |
+          set -euo pipefail
+          echo "BRAIN_SUPERVISOR_RECOVERY=BLOCKED_ATTEMPT_LIMIT"
+          echo "RUN_ID=${{ github.event.workflow_run.id }}"
+          echo "RUN_ATTEMPT=${{ github.event.workflow_run.run_attempt }}"
       - name: Hand off recovery to global Brain watchdog
         run: |
           set -euo pipefail
