@@ -10,201 +10,32 @@
     "independent_verification_required": true
   },
   "recommended": [
-    {
-      "id": "opencode",
-      "category": "coding_agent",
-      "role": "primary_terminal_coding_backend",
-      "why_add": "Open-source, provider-agnostic, supports local models and multiple interfaces.",
-      "source": "https://opencode.ai/"
-    },
-    {
-      "id": "openhands",
-      "category": "coding_agent",
-      "role": "secondary_autonomous_engine",
-      "why_add": "Strong general software-development agent with Docker/runtime execution and local-model support.",
-      "source": "https://github.com/OpenHands/OpenHands"
-    },
-    {
-      "id": "goose",
-      "category": "agent_framework",
-      "role": "protocol_and_tool_backend",
-      "why_add": "Useful MCP-oriented alternative for tool orchestration and replaceable model backends.",
-      "source": "https://github.com/block/goose"
-    },
-    {
-      "id": "qwen_code",
-      "category": "coding_agent",
-      "role": "local_or_asian_model_backend",
-      "why_add": "Adds a Qwen-oriented coding-agent path and complements the Brain's Asia/global model strategy.",
-      "source": "https://github.com/QwenLM/qwen-code"
-    },
-    {
-      "id": "ollama",
-      "category": "model_runtime",
-      "role": "local_model_runtime",
-      "why_add": "Provides a simple local inference path so Brain can operate without mandatory paid model APIs.",
-      "source": "https://github.com/ollama/ollama"
-    },
-    {
-      "id": "vllm",
-      "category": "model_runtime",
-      "role": "cloud_gpu_model_runtime",
-      "why_add": "OpenAI-compatible serving path for higher-throughput self-hosted models.",
-      "source": "https://github.com/vllm-project/vllm"
-    },
-    {
-      "id": "openshell",
-      "category": "security_runtime",
-      "role": "agent_sandbox_candidate",
-      "why_add": "Candidate security boundary for autonomous agents; must be evaluated before production adoption.",
-      "source": "https://github.com/NVIDIA/OpenShell"
-    },
-    {
-      "id": "indictrans2",
-      "category": "translation",
-      "role": "indian_language_translation_backend",
-      "why_add": "Open-source MIT model checkpoints for translation across 22 scheduled Indian languages; strong multilingual adapter for Brain.",
-      "source": "https://github.com/AI4Bharat/IndicTrans2",
-      "region": "India",
-      "license": "MIT"
-    },
-    {
-      "id": "indicconformer_asr",
-      "category": "speech_to_text",
-      "role": "indian_language_asr_backend",
-      "why_add": "Open-source MIT ASR suite covering 22 official Indian languages; useful for multilingual voice input.",
-      "source": "https://github.com/AI4Bharat/IndicConformerASR",
-      "region": "India",
-      "license": "MIT"
-    },
-    {
-      "id": "indicxlit",
-      "category": "transliteration",
-      "role": "indian_script_transliteration_backend",
-      "why_add": "Open-source MIT transliteration models for 21 Indic languages; useful for mixed Latin/Indic input normalization.",
-      "source": "https://github.com/AI4Bharat/IndicXlit",
-      "region": "India",
-      "license": "MIT"
-    },
-    {
-      "id": "indic_lid",
-      "category": "language_identification",
-      "role": "indic_language_detection_backend",
-      "why_add": "Open-source MIT language-identification component for Indian languages; useful before routing translation and speech pipelines.",
-      "source": "https://github.com/AI4Bharat/IndicLID",
-      "region": "India",
-      "license": "MIT"
-    },
-    {
-      "id": "sarvam_open_models",
-      "category": "model_pool",
-      "role": "india_model_experimental_pool",
-      "why_add": "Current Sarvam documentation exposes an open-source model pool; Brain should benchmark individual models and verify their exact licenses before production use.",
-      "source": "https://docs.sarvam.ai/api-reference/open-source/models",
-      "region": "India",
-      "status": "experimental"
-    },
-    {
-      "id": "ai4bharat_chitralekha",
-      "category": "media_localization",
-      "role": "indic_video_transcreation_candidate",
-      "why_add": "Open-source AI4Bharat project for Indic video transcription, translation and voice-over; useful for Brain's cinematic localization pipeline. License and model-level terms must be verified before production.",
-      "source": "https://github.com/AI4Bharat/Chitralekha",
-      "region": "India",
-      "status": "experimental"
-    },
-    {
-      "id": "sakana_shinka_evolve",
-      "category": "self_improvement_research",
-      "role": "algorithm_evolution_candidate",
-      "why_add": "Japan-based open research project focused on LLM-driven evolutionary improvement of algorithms; useful as a research candidate for Brain's bounded self-improvement layer, not an autonomous production dependency.",
-      "source": "https://sakana.ai/",
-      "region": "Japan",
-      "status": "experimental"
-    },
-    {
-      "id": "sakana_fugu",
-      "category": "agent_orchestration",
-      "role": "multi_model_orchestration_candidate",
-      "why_add": "Japan-based orchestration approach that dynamically coordinates multiple models and agents; evaluate as an optional architecture reference/adapter.",
-      "source": "https://sakana.ai/nvidia-open-model-innovation/",
-      "region": "Japan",
-      "status": "experimental"
-    },
-    {
-      "id": "breeze_asr_26",
-      "category": "speech_to_text",
-      "role": "taiwanese_taigi_asr_candidate",
-      "why_add": "Taiwanese MediaTek Research Breeze ASR work provides an open model path for Taigi/Hokkien speech recognition, expanding Brain's Asian-language voice coverage.",
-      "source": "https://github.com/mtkresearch/Breeze-ASR-26",
-      "region": "Taiwan",
-      "status": "experimental"
-    },
-    {
-      "id": "taiwan_llm",
-      "category": "foundation_model",
-      "role": "traditional_chinese_local_model_candidate",
-      "why_add": "Taiwan-LLM provides open models tuned for Traditional Mandarin and English, including Llama-3-Taiwan variants; useful for Traditional Chinese localization and regional evaluation.",
-      "source": "https://github.com/MiuLab/Taiwan-LLM",
-      "region": "Taiwan",
-      "status": "experimental",
-      "license": "Llama-3 license for listed Llama-3-Taiwan models"
-    },
-    {
-      "id": "solar_open_2",
-      "category": "foundation_model",
-      "role": "korean_agent_model_candidate",
-      "why_add": "Upstage's open-weight 250B/15B-active MoE is explicitly designed for agentic work, tool calling and coding, with Korean, English and Japanese support; suitable as a benchmark/cloud adapter rather than a phone-local dependency.",
-      "source": "https://www.upstage.ai/blog/en/solar-open-2",
-      "region": "South Korea",
-      "status": "experimental",
-      "license": "Upstage Solar License"
-    },
-    {
-      "id": "paddleocr",
-      "category": "ocr",
-      "role": "document_and_screen_ocr_backend",
-      "why_add": "Open-source PaddleOCR provides a practical Chinese-origin OCR path for documents, screenshots and multilingual text extraction in Brain pipelines.",
-      "source": "https://github.com/PaddlePaddle/PaddleOCR",
-      "region": "China",
-      "status": "recommended_adapter"
-    },
-    {
-      "id": "deepseek_ascend_toolchain",
-      "category": "accelerator_runtime",
-      "role": "non_nvidia_compute_candidate",
-      "why_add": "DeepSeek and Huawei are open-sourcing tooling around Ascend AI chips; this is worth tracking as an alternative compute stack, but it should remain an experimental adapter until Brain validates hardware availability and reproducibility.",
-      "source": "https://github.com/deepseek-ai",
-      "region": "China",
-      "status": "experimental"
-    },
-    {
-      "id": "mistral_vibe",
-      "category": "coding_agent",
-      "role": "european_coding_agent_candidate",
-      "why_add": "Mistral's public Vibe project adds a European coding-agent option that can be benchmarked alongside Brain's existing coding-agent backends.",
-      "source": "https://github.com/mistralai/mistral-vibe",
-      "region": "Europe",
-      "status": "experimental"
-    },
-    {
-      "id": "openeurollm",
-      "category": "foundation_model",
-      "role": "european_multilingual_foundation_model_candidate",
-      "why_add": "OpenEuroLLM is building transparent multilingual foundation models with openly documented data, training and evaluation components; useful for Brain's European-language sovereign-model adapter.",
-      "source": "https://openeurollm.eu/",
-      "region": "Europe",
-      "status": "experimental"
-    },
-    {
-      "id": "lucie",
-      "category": "foundation_model",
-      "role": "french_european_language_model_candidate",
-      "why_add": "OpenLLM France provides open French-focused models and datasets, including edge-oriented and larger model sizes; useful for French and European-language routing.",
-      "source": "https://openllm-france.fr/en/main-page-en/",
-      "region": "France",
-      "status": "experimental"
-    }
+    {"id":"opencode","category":"coding_agent","role":"primary_terminal_coding_backend","why_add":"Open-source, provider-agnostic, supports local models and multiple interfaces.","source":"https://opencode.ai/"},
+    {"id":"openhands","category":"coding_agent","role":"secondary_autonomous_engine","why_add":"Strong general software-development agent with Docker/runtime execution and local-model support.","source":"https://github.com/OpenHands/OpenHands"},
+    {"id":"goose","category":"agent_framework","role":"protocol_and_tool_backend","why_add":"Useful MCP-oriented alternative for tool orchestration and replaceable model backends.","source":"https://github.com/block/goose"},
+    {"id":"qwen_code","category":"coding_agent","role":"local_or_asian_model_backend","why_add":"Adds a Qwen-oriented coding-agent path and complements the Brain's Asia/global model strategy.","source":"https://github.com/QwenLM/qwen-code"},
+    {"id":"ollama","category":"model_runtime","role":"local_model_runtime","why_add":"Provides a simple local inference path so Brain can operate without mandatory paid model APIs.","source":"https://github.com/ollama/ollama"},
+    {"id":"vllm","category":"model_runtime","role":"cloud_gpu_model_runtime","why_add":"OpenAI-compatible serving path for higher-throughput self-hosted models.","source":"https://github.com/vllm-project/vllm"},
+    {"id":"openshell","category":"security_runtime","role":"agent_sandbox_candidate","why_add":"Candidate security boundary for autonomous agents; must be evaluated before production adoption.","source":"https://github.com/NVIDIA/OpenShell"},
+    {"id":"indictrans2","category":"translation","role":"indian_language_translation_backend","why_add":"Open-source MIT model checkpoints for translation across 22 scheduled Indian languages; strong multilingual adapter for Brain.","source":"https://github.com/AI4Bharat/IndicTrans2","region":"India","license":"MIT"},
+    {"id":"indicconformer_asr","category":"speech_to_text","role":"indian_language_asr_backend","why_add":"Open-source MIT ASR suite covering 22 official Indian languages; useful for multilingual voice input.","source":"https://github.com/AI4Bharat/IndicConformerASR","region":"India","license":"MIT"},
+    {"id":"indicxlit","category":"transliteration","role":"indian_script_transliteration_backend","why_add":"Open-source MIT transliteration models for 21 Indic languages; useful for mixed Latin/Indic input normalization.","source":"https://github.com/AI4Bharat/IndicXlit","region":"India","license":"MIT"},
+    {"id":"indic_lid","category":"language_identification","role":"indic_language_detection_backend","why_add":"Open-source MIT language-identification component for Indian languages; useful before routing translation and speech pipelines.","source":"https://github.com/AI4Bharat/IndicLID","region":"India","license":"MIT"},
+    {"id":"sarvam_open_models","category":"model_pool","role":"india_model_experimental_pool","why_add":"Current Sarvam documentation exposes an open-source model pool; Brain should benchmark individual models and verify their exact licenses before production use.","source":"https://docs.sarvam.ai/api-reference/open-source/models","region":"India","status":"experimental"},
+    {"id":"ai4bharat_chitralekha","category":"media_localization","role":"indic_video_transcreation_candidate","why_add":"Open-source AI4Bharat project for Indic video transcription, translation and voice-over; useful for Brain's cinematic localization pipeline. License and model-level terms must be verified before production.","source":"https://github.com/AI4Bharat/Chitralekha","region":"India","status":"experimental"},
+    {"id":"sakana_shinka_evolve","category":"self_improvement_research","role":"algorithm_evolution_candidate","why_add":"Japan-based open research project focused on LLM-driven evolutionary improvement of algorithms; useful as a research candidate for Brain's bounded self-improvement layer, not an autonomous production dependency.","source":"https://sakana.ai/","region":"Japan","status":"experimental"},
+    {"id":"sakana_fugu","category":"agent_orchestration","role":"multi_model_orchestration_candidate","why_add":"Japan-based orchestration approach that dynamically coordinates multiple models and agents; evaluate as an optional architecture reference/adapter.","source":"https://sakana.ai/nvidia-open-model-innovation/","region":"Japan","status":"experimental"},
+    {"id":"breeze_asr_26","category":"speech_to_text","role":"taiwanese_taigi_asr_candidate","why_add":"Taiwanese MediaTek Research Breeze ASR work provides an open model path for Taigi/Hokkien speech recognition, expanding Brain's Asian-language voice coverage.","source":"https://github.com/mtkresearch/Breeze-ASR-26","region":"Taiwan","status":"experimental"},
+    {"id":"taiwan_llm","category":"foundation_model","role":"traditional_chinese_local_model_candidate","why_add":"Taiwan-LLM provides open models tuned for Traditional Mandarin and English, including Llama-3-Taiwan variants; useful for Traditional Chinese localization and regional evaluation.","source":"https://github.com/MiuLab/Taiwan-LLM","region":"Taiwan","status":"experimental","license":"Llama-3 license for listed Llama-3-Taiwan models"},
+    {"id":"solar_open_2","category":"foundation_model","role":"korean_agent_model_candidate","why_add":"Upstage's open-weight 250B/15B-active MoE is explicitly designed for agentic work, tool calling and coding, with Korean, English and Japanese support; suitable as a benchmark/cloud adapter rather than a phone-local dependency.","source":"https://www.upstage.ai/blog/en/solar-open-2","region":"South Korea","status":"experimental","license":"Upstage Solar License"},
+    {"id":"paddleocr","category":"ocr","role":"document_and_screen_ocr_backend","why_add":"Open-source PaddleOCR provides a practical Chinese-origin OCR path for documents, screenshots and multilingual text extraction in Brain pipelines.","source":"https://github.com/PaddlePaddle/PaddleOCR","region":"China","status":"recommended_adapter"},
+    {"id":"deepseek_ascend_toolchain","category":"accelerator_runtime","role":"non_nvidia_compute_candidate","why_add":"DeepSeek and Huawei are open-sourcing tooling around Ascend AI chips; this is worth tracking as an alternative compute stack, but it should remain an experimental adapter until Brain validates hardware availability and reproducibility.","source":"https://github.com/deepseek-ai","region":"China","status":"experimental"},
+    {"id":"mistral_vibe","category":"coding_agent","role":"european_coding_agent_candidate","why_add":"Mistral's public Vibe project adds a European coding-agent option that can be benchmarked alongside Brain's existing coding-agent backends.","source":"https://github.com/mistralai/mistral-vibe","region":"Europe","status":"experimental"},
+    {"id":"openeurollm","category":"foundation_model","role":"european_multilingual_foundation_model_candidate","why_add":"OpenEuroLLM is building transparent multilingual foundation models with openly documented data, training and evaluation components; useful for Brain's European-language sovereign-model adapter.","source":"https://openeurollm.eu/","region":"Europe","status":"experimental"},
+    {"id":"lucie","category":"foundation_model","role":"french_european_language_model_candidate","why_add":"OpenLLM France provides open French-focused models and datasets, including edge-oriented and larger model sizes; useful for French and European-language routing.","source":"https://openllm-france.fr/en/main-page-en/","region":"France","status":"experimental"},
+    {"id":"jais_2","category":"foundation_model","role":"arabic_first_model_candidate","why_add":"Jais 2 is an Arabic-centric open-weight family developed by MBZUAI, Cerebras and Inception; valuable for Arabic-first routing and culturally grounded evaluation.","source":"https://arxiv.org/abs/2608.13580","region":"United Arab Emirates","status":"experimental"},
+    {"id":"cohere_transcribe_arabic","category":"speech_to_text","role":"arabic_asr_backend","why_add":"Open-source Arabic ASR designed for dialect variation and Arabic-English code switching; Apache 2.0 and directly relevant to Brain voice input.","source":"https://huggingface.co/blog/CohereLabs/cohere-transcribe-arabic-07-2026-release","region":"Canada","license":"Apache-2.0","status":"recommended_adapter"},
+    {"id":"rightnow_arabic_0_5b","category":"foundation_model","role":"edge_arabic_model_candidate","why_add":"Sub-1B Arabic-specialized model released with GGUF quantizations and benchmark scripts; useful for low-resource/edge Brain experiments where large Arabic models are impractical.","source":"https://huggingface.co/RightNowAI/RightNow-Arabic-0.5B-Turbo","region":"Middle East","status":"experimental"}
   ],
   "not_auto_selected": [
     "Models or services that require payment are adapters only and never core dependencies.",
