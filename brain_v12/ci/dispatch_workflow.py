@@ -14,10 +14,17 @@ import urllib.error
 import urllib.request
 
 
+# Explicit Brain-owned workflow allowlist. ChatGPT may select only these IDs.
+ALLOWED_WORKFLOWS = {
+    "brain-reasoning-loop": ".github/workflows/brain-reasoning-loop.yml",
+    "reflection-e2e": ".github/workflows/reflection-e2e.yml",
+}
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--repo", required=True)
-    p.add_argument("--workflow", required=True)
+    p.add_argument("--workflow", required=True, choices=sorted(ALLOWED_WORKFLOWS))
     p.add_argument("--ref", default="main")
     p.add_argument("--input", action="append", default=[], metavar="KEY=VALUE")
     args = p.parse_args()
@@ -27,7 +34,8 @@ def main() -> int:
         print("GITHUB_TOKEN_OR_GH_TOKEN_REQUIRED", file=sys.stderr)
         return 2
 
-    url = f"https://api.github.com/repos/{args.repo}/actions/workflows/{args.workflow}/dispatches"
+    workflow_file = ALLOWED_WORKFLOWS[args.workflow]
+    url = f"https://api.github.com/repos/{args.repo}/actions/workflows/{workflow_file}/dispatches"
     inputs = {}
     for raw in args.input:
         if "=" not in raw:
@@ -67,7 +75,8 @@ def main() -> int:
 
     print("WORKFLOW_DISPATCH=SUCCESS")
     print(f"REPOSITORY={args.repo}")
-    print(f"WORKFLOW={args.workflow}")
+    print(f"WORKFLOW_ID={args.workflow}")
+    print(f"WORKFLOW_FILE={workflow_file}")
     print(f"REF={args.ref}")
     for key, value in inputs.items():
         print(f"INPUT_{key}={value}")
