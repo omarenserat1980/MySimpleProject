@@ -4,7 +4,7 @@ Pure-Python raster backend: Scene JSON -> low-level pixel drawing commands -> PN
 No SVG, Pillow, browser, GPU, or external image API is required.
 """
 from __future__ import annotations
-import struct, zlib
+import struct, zlib, hashlib
 from typing import Iterable
 
 W, H = 1000, 650
@@ -68,6 +68,10 @@ def png_bytes(buf:PixelBuffer):
 
 def compile_machine_commands(scene:dict):
     typ=scene.get("type","landscape"); pal=scene.get("palette","default"); objects=scene.get("objects",[])
+    seed_text=str(scene.get("scene_id", scene.get("title", "")))+"|"+str(scene.get("variant", 0))
+    seed=int(hashlib.sha256(seed_text.encode("utf-8")).hexdigest()[:8],16)
+    dx=(seed % 121)-60; dy=((seed >> 8) % 61)-30
+    sun_r=45+((seed >> 16) % 31)
     sky={"default":"#8ed8ff","night":"#101827","sunset":"#d97a6d"}.get(pal,"#8ed8ff")
     ground={"default":"#6ca85a","night":"#263746","sunset":"#5f8057"}.get(pal,"#6ca85a")
     cmds=[("RECT",0,0,W,H,sky)]
@@ -75,10 +79,11 @@ def compile_machine_commands(scene:dict):
         cmds += [("POLY",[(0,470),(220,190),(430,470),(630,170),(1000,470)],"#667f92"),
                  ("POLY",[(0,500),(300,280),(540,500),(730,250),(1000,500),(1000,650),(0,650)],"#435c70"),
                  ("RECT",0,500,1000,650,ground)]
-        if "sun" in objects: cmds.append(("CIRCLE",800,115,65,"#ffd84d"))
-        if "moon" in objects: cmds += [("CIRCLE",800,115,58,"#e8edf5"),("CIRCLE",820,95,58,sky)]
+        if "sun" in objects: cmds.append(("CIRCLE",800+dx//3,115+dy//3,sun_r,"#ffd84d"))
+        if "moon" in objects: cmds += [("CIRCLE",800+dx//3,115+dy//3,58,"#e8edf5"),("CIRCLE",820+dx//3,95+dy//3,58,sky)]
         if "stars" in objects:
-            for x,y in [(90,90),(180,145),(300,80),(420,130),(560,75),(690,150)]: cmds.append(("CIRCLE",x,y,4,"#ffffff"))
+            for n,(x,y) in enumerate([(90,90),(180,145),(300,80),(420,130),(560,75),(690,150),(760,65),(900,135)]):
+                if n < 6 + seed % 3: cmds.append(("CIRCLE",(x+dx//4)%980+10,(y+dy//4)%180+30,3+(seed+n)%3,"#ffffff"))
         if "lake" in objects: cmds.append(("POLY",[(360,540),(500,500),(650,540),(930,540),(930,650),(360,650)],"#4fa7c9"))
         if "tree" in objects:
             cmds += [("RECT",145,415,170,565,"#6b4226"),("POLY",[(158,300),(80,450),(236,450)],"#285b32"),("POLY",[(158,350),(95,485),(220,485)],"#285b32")]
@@ -110,12 +115,28 @@ def compile_machine_commands(scene:dict):
         cmds += [("CIRCLE",250,300,120,"#ffcf4a"),("POLY",[(500,150),(650,430),(350,430)],"#55c7a5"),("RECT",700,210,870,380,"#d85b74")]
     return cmds
 
+def _apply_film_grain(buf:PixelBuffer, scene:dict):
+    """Add deterministic low-amplitude texture so flat scenes retain visible detail."""
+    seed=int(hashlib.sha256(str(scene.get("scene_id", scene.get("title", ""))).encode("utf-8")).hexdigest()[:8],16)
+    state=seed or 1
+    px=buf.px
+    for y in range(0, buf.h, 2):
+        for x in range((y // 2) & 1, buf.w, 2):
+            state=(1664525*state+1013904223)&0xffffffff
+            delta=((state >> 29)&7)-3
+            i=(y*buf.w+x)*4
+            for k in range(3):
+                px[i+k]=max(0,min(255,px[i+k]+delta))
+
 def render_machine(scene:dict):
+    """Render a deterministic, materially varied raster scene."""
     buf=PixelBuffer()
-    for cmd in compile_machine_commands(scene):
+    commands=compile_machine_commands(scene)
+    for cmd in commands:
         op=cmd[0]
         if op=="RECT": buf.rect(*cmd[1:])
         elif op=="CIRCLE": buf.circle(*cmd[1:])
         elif op=="LINE": buf.line(*cmd[1:])
         elif op=="POLY": buf.polygon(*cmd[1:])
-    return png_bytes(buf), compile_machine_commands(scene)
+    _apply_film_grain(buf, scene)
+    return png_bytes(buf), commands

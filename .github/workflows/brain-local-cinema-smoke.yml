@@ -24,6 +24,11 @@ jobs:
       - name: Python compile
         run: |
           python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py brain_v12/brain/device_bridge.py brain_v12/local_worker/brain_local_worker.py brain_v12/tools/brain_emulator_agent.py
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg
+
       - name: Local painter smoke
         run: |
           PYTHONPATH=. python - <<'PY'
@@ -48,9 +53,11 @@ jobs:
           PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
           test -f "${BRAIN_MACHINE_FILM_ROOT}/final.mp4"
           test -f "${BRAIN_MACHINE_FILM_ROOT}/manifest.json"
-          test -f "${BRAIN_MACHINE_FILM_ROOT}/VERIFIED_COMPLETED"
+          test -f "${BRAIN_MACHINE_FILM_ROOT}/cinematic_repair_manifest.json"
+          test ! -f "${BRAIN_MACHINE_FILM_ROOT}/VERIFIED_COMPLETED"
+          grep -q '"status": "REPAIR_REQUIRED"' "${BRAIN_MACHINE_FILM_ROOT}/manifest.json"
           ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "${BRAIN_MACHINE_FILM_ROOT}/final.mp4"
-          echo "BRAIN_FACTORY_END_TO_END_SMOKE=VERIFIED"
+          echo "BRAIN_FACTORY_END_TO_END_SMOKE=FAIL_CLOSED_REPAIR_REQUIRED"
 
       - name: Device task contract smoke
         run: |

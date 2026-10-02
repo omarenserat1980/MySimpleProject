@@ -1,0 +1,66 @@
+name: BRAIN Cinematic Quality Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'brain/cinematic-master-qc-v1'
+
+concurrency:
+  group: brain-cinematic-quality-gate
+  cancel-in-progress: true
+
+jobs:
+  cinematic-quality-gate:
+    name: CINEMATIC QUALITY GATE
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate gate source
+        run: |
+          python -m py_compile \
+            brain_v12/cinematic_quality_gate.py \
+            brain_v12/cinematic_master_qc.py \
+            brain_v12/cinematic_repair_loop.py \
+            brain_v12/machine_raster_engine.py \
+            brain_v12/machine_cinematic_factory.py \
+            brain_v12/gstreamer_backend.py
+
+      - name: Install GStreamer and local voice generator
+        timeout-minutes: 5
+        run: |
+          set -euxo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng python3-pil gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly ges1.0-tools
+          command -v ffmpeg
+          command -v espeak-ng
+          command -v gst-launch-1.0
+          command -v ges-launch-1.0
+          gst-launch-1.0 --version | head -n 1
+          ges-launch-1.0 --version 2>&1 | head -n 1 || true
+          gst-inspect-1.0 multifilesrc >/dev/null
+          gst-inspect-1.0 pngdec >/dev/null
+          gst-inspect-1.0 audiomixer >/dev/null
+          gst-inspect-1.0 mp4mux >/dev/null
+          gst-inspect-1.0 x264enc >/dev/null
+          gst-inspect-1.0 voaacenc >/dev/null
+          ffmpeg -version | head -n 1
+          espeak-ng --version | head -n 1
+
+      - name: Execute unified Cinematic Quality Gate
+        run: |
+          set -euxo pipefail
+          python brain_v12/cinematic_quality_gate.py
+
+      - name: Publish gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-cinematic-quality-gate-evidence
+          path: /tmp/brain-cinematic-quality-gate/
+          if-no-files-found: warn
+
+# BRAIN_AUTORUN_PROBE: trigger the real GStreamer gate on branch push.
