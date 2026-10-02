@@ -69,7 +69,11 @@ def workflow_dispatch_action(
     import sys
     from pathlib import Path
     script = Path(__file__).resolve().parents[1] / "ci" / "dispatch_workflow.py"
-    argv = [sys.executable, str(script), "--repo", repo, "--workflow", workflow_id, "--ref", ref]
+    argv = [
+        sys.executable, str(script), "--repo", repo, "--workflow", workflow_id,
+        "--ref", ref, "--wait", "--wait-timeout", str(timeout),
+        "--poll-seconds", str(max(1, min(10, timeout // 10 or 1))),
+    ]
     for key, value in sorted((inputs or {}).items()):
         argv.extend(["--input", f"{key}={value}"])
     return command_action(action_id, argv, timeout)
