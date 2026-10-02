@@ -1,6 +1,6 @@
 import hashlib, hmac, json, os, tempfile, time, unittest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from brain_v12.app import app
 from brain_v12.brain.commerce_api import CommerceStore, CommerceOrderIn
 from brain_v12.brain.payment_gateway import signature
 
@@ -14,7 +14,10 @@ class PaymentGatewayTests(unittest.TestCase):
         self.store=CommerceStore(self.db)
         self.order=self.store.create(CommerceOrderIn(customer_name="Test",contact="test@example.com",product_id="ai-starter-kit"))
         self.store.transition(self.order["order_id"],"PAYMENT_PENDING","test-pending")
-        self.client=TestClient(app)
+        from brain_v12.brain.payment_gateway import router
+        api=FastAPI()
+        api.include_router(router(self.db))
+        self.client=TestClient(api)
     def tearDown(self):
         self.tmp.cleanup()
         os.environ.pop("BRAIN_COMMERCE_DB",None)
