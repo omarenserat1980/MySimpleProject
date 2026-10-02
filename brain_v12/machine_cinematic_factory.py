@@ -48,7 +48,7 @@ def render_part(i,png,scene):
     narration_text=f"المشهد {i}. {scene.get('text','مشهد سينمائي')}. تستمر الحكاية في هذه اللحظة."
     run(["espeak-ng","-v","ar","-s","145","-p","45","-w",str(narration),narration_text],120)
     # Local procedural music bed: four-note chord with slow tremolo, not a placeholder silence/tone.
-    chord="amix=inputs=4:duration=longest,weights='1 0.8 0.65 0.5',normalize=0"
+    chord="amix=inputs=4:duration=longest:weights=1 0.8 0.65 0.5:normalize=0"
     run(["ffmpeg","-y",
          "-f","lavfi","-i",f"sine=frequency={220+(i%4)*12}:sample_rate=48000:duration={PART_SECONDS}",
          "-f","lavfi","-i",f"sine=frequency={277+(i%4)*12}:sample_rate=48000:duration={PART_SECONDS}",
