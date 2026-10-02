@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source of truth
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare Brain runtime test environment
         run: |
