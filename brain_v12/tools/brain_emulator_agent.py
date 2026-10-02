@@ -9,6 +9,8 @@ import urllib.parse
 import urllib.request
 from uuid import uuid4
 
+SELF_TESTS = ("brain_v12.brain.test_security_guard", "brain_v12.brain.test_company_operating_system", "brain_v12.brain.test_competitive_evolution", "brain_v12.self_healing.test_future_evolution_executor")
+
 BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
 AGENT_ID = os.getenv("V12_AGENT_ID") or "agent-" + uuid4().hex[:12]
 KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent.key"))
