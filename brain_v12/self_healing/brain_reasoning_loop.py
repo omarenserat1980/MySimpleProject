@@ -45,7 +45,10 @@ class BrainReasoningLoop:
         state["allowed_actions"] = list(self.registry.ids())
         cycles: list[BrainCycle] = []
 
-        for question in self.agent.questions[: self.max_cycles]:
+        questions = list(self.agent.questions)
+        index = 0
+        while index < self.max_cycles and index < len(questions):
+            question = questions[index]
             plan = self.reasoner.plan(question, state)
             if not isinstance(plan, dict):
                 plan = {"answer": "", "action_id": "none", "reason": "INVALID_PLAN"}
@@ -81,6 +84,19 @@ class BrainReasoningLoop:
                 last_ok=cycle.execution_ok,
                 last_evidence=cycle.evidence,
             )
+
+            # A failed execution becomes the next Brain-generated question.
+            # This keeps the loop focused on the actual failure instead of
+            # blindly advancing through a fixed checklist.
+            if not execution.ok and index + 1 < self.max_cycles:
+                follow_up = self.agent.next_question(
+                    index + 1,
+                    str(plan.get("answer", "")),
+                    [evidence] if evidence else [],
+                )
+                if follow_up not in questions[index + 1:]:
+                    questions.insert(index + 1, follow_up)
+            index += 1
         return cycles
 
 
@@ -109,6 +125,35 @@ def self_test() -> None:
     assert all(c.execution_ok for c in cycles)
     assert cycles[0].evidence == "INSPECT=PASS"
     assert cycles[1].evidence == "VERIFY=PASS"
+
+    failing_agent = ReflectionAgent(
+        max_turns=3,
+        questions=("What should I inspect?", "What should I verify?"),
+    )
+    failing_registry = ReflectionActionRegistry()
+    failing_registry.register(
+        "inspect", lambda: ActionResult("inspect", False, 2, "", "INSPECT=FAIL")
+    )
+    failing_registry.register(
+        "verify", lambda: ActionResult("verify", True, 0, "VERIFY=PASS", "")
+    )
+
+    class FailureAwareChatGPT:
+        def plan(self, question: str, context: Mapping[str, object]) -> dict:
+            if context.get("last_ok") is False:
+                return {
+                    "answer": "Investigate the failed evidence before continuing.",
+                    "action_id": "verify",
+                    "reason": "failure follow-up",
+                }
+            return {"answer": "Inspect.", "action_id": "inspect", "reason": "initial"}
+
+    failure_cycles = BrainReasoningLoop(
+        failing_agent, failing_registry, FailureAwareChatGPT()
+    ).run()
+    assert failure_cycles[0].execution_ok is False
+    assert failure_cycles[1].question == "What concrete evidence can verify that answer?"
+    assert failure_cycles[1].execution_ok is True
 
 
 if __name__ == "__main__":
