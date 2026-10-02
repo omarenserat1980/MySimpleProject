@@ -36,14 +36,15 @@ jobs:
       BRAIN_CLOUD_MODE: github-actions
       BRAIN_TASK: health
       BRAIN_FFMPEG_BIN: /usr/bin/ffmpeg
+      BRAIN_FFPROBE_BIN: /usr/bin/ffprobe
     steps:
       - name: Checkout Brain source of truth
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Prepare Linux runtime
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -90,6 +91,7 @@ jobs:
             echo "python=$(python --version)"
             echo "ffmpeg=$(ffmpeg -version | head -n 1)"
             echo "brain_ffmpeg=$BRAIN_FFMPEG_BIN"
+            echo "brain_ffprobe=$BRAIN_FFPROBE_BIN"
           } | tee brain6_artifacts/github_cloud/runtime.txt
           git status --short
           git log -1 --oneline
