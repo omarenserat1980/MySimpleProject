@@ -110,6 +110,28 @@ def think_and_act(goal):
     query = urllib.parse.urlencode({"goal": goal})
     return request("POST", "/api/run?" + query)
 
+def create_tracked_task(kind: str, priority: float, goal: str, fingerprint: str) -> dict:
+    """Persist the selected objective as a durable local work item."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    path = STATE / "continuous_tasks.jsonl"
+    task = {
+        "task_id": f"continuous-{int(time.time()*1000)}",
+        "kind": kind,
+        "priority": priority,
+        "goal": goal,
+        "fingerprint": fingerprint,
+        "status": "RUNNING",
+        "started_at": time.time(),
+    }
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(task, ensure_ascii=False) + "\n")
+    return task
+
+def finish_tracked_task(task: dict, status: str, evidence: dict | None = None) -> None:
+    row = {**task, "status": status, "finished_at": time.time(), "evidence": evidence or {}}
+    with (STATE / "continuous_tasks.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
 def evolve_from_evidence():
     """Run the predictive engine and return only machine-readable evidence."""
     import subprocess, sys
@@ -174,9 +196,15 @@ def main():
             print(f"JET_BRAIN_CYCLE {cycle} SELECT kind={kind} priority={priority} goal={goal[:180]}", flush=True)
             record({"cycle": cycle, "event": "selected", "kind": kind, "goal": goal, "fingerprint": fingerprint})
 
+            task = create_tracked_task(kind, priority, goal, fingerprint)
             result = think_and_act(goal)
             verification = result.get("verification", {}) if isinstance(result, dict) else {}
             verified = verification.get("status") == "VERIFIED" or bool(verification.get("result_verified"))
+            finish_tracked_task(
+                task,
+                "VERIFIED" if verified else "FAILED",
+                {"verification": verification, "status": result.get("status") if isinstance(result, dict) else "UNKNOWN"},
+            )
             record({
                 "cycle": cycle, "event": "completed", "goal": goal,
                 "fingerprint": fingerprint, "verified": verified,
