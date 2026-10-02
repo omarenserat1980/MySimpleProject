@@ -18,7 +18,9 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
       - name: Run release gate
-        run: python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(),indent=2))"
+        run: |
+          python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(),indent=2))"
+          test -s .brain_state/release_gate/release_gate.json
       - name: Validate gate evidence schema
         if: always()
         run: python -c "import json; d=json.load(open('.brain_state/release_gate/release_gate.json')); assert d.get('status') in {'RELEASE_ALLOWED','RELEASE_BLOCKED'}; assert d.get('gates'); assert d.get('evidence_contract',{}).get('release_requires_runtime_evidence') is True; print('release gate evidence schema: OK')"
