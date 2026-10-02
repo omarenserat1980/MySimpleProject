@@ -1,0 +1,68 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Evidence-first registry of AI backends that Brain may evaluate and use as replaceable adapters.",
+  "selection_policy": {
+    "free_first": true,
+    "open_source_preferred": true,
+    "self_hostable_preferred": true,
+    "external_services_are_optional": true,
+    "agent_must_not_self_declare_success": true,
+    "independent_verification_required": true
+  },
+  "recommended": [
+    {
+      "id": "opencode",
+      "category": "coding_agent",
+      "role": "primary_terminal_coding_backend",
+      "why_add": "Open-source, provider-agnostic, supports local models and multiple interfaces.",
+      "source": "https://opencode.ai/"
+    },
+    {
+      "id": "openhands",
+      "category": "coding_agent",
+      "role": "secondary_autonomous_engine",
+      "why_add": "Strong general software-development agent with Docker/runtime execution and local-model support.",
+      "source": "https://github.com/OpenHands/OpenHands"
+    },
+    {
+      "id": "goose",
+      "category": "agent_framework",
+      "role": "protocol_and_tool_backend",
+      "why_add": "Useful MCP-oriented alternative for tool orchestration and replaceable model backends.",
+      "source": "https://github.com/block/goose"
+    },
+    {
+      "id": "qwen_code",
+      "category": "coding_agent",
+      "role": "local_or_asian_model_backend",
+      "why_add": "Adds a Qwen-oriented coding-agent path and complements the Brain's Asia/global model strategy.",
+      "source": "https://github.com/QwenLM/qwen-code"
+    },
+    {
+      "id": "ollama",
+      "category": "model_runtime",
+      "role": "local_model_runtime",
+      "why_add": "Provides a simple local inference path so Brain can operate without mandatory paid model APIs.",
+      "source": "https://github.com/ollama/ollama"
+    },
+    {
+      "id": "vllm",
+      "category": "model_runtime",
+      "role": "cloud_gpu_model_runtime",
+      "why_add": "OpenAI-compatible serving path for higher-throughput self-hosted models.",
+      "source": "https://github.com/vllm-project/vllm"
+    },
+    {
+      "id": "openshell",
+      "category": "security_runtime",
+      "role": "agent_sandbox_candidate",
+      "why_add": "Candidate security boundary for autonomous agents; must be evaluated before production adoption.",
+      "source": "https://github.com/NVIDIA/OpenShell"
+    }
+  ],
+  "not_auto_selected": [
+    "Models or services that require payment are adapters only and never core dependencies.",
+    "Experimental agents are benchmark candidates until Brain records independent evidence.",
+    "No backend is trusted merely because its process exits successfully."
+  ]
+}
