@@ -36,8 +36,8 @@ jobs:
           opp.transition("DELIVERED","delivery artifact recorded")
 
           ledger=RevenueRecord(opp.opportunity_id,"verified amount","USD")
-          ledger.verify("payment evidence recorded")
-          ledger.realize("delivery + payment reconciliation recorded")
+          ledger.verify({"transaction_id":"tx-commercial-001","evidence_ref":"evidence://payment/tx-commercial-001"})
+          ledger.realize({"delivery_evidence_ref":"evidence://delivery/OPP-000001","reconciliation_ref":"evidence://reconciliation/tx-commercial-001"})
 
           assert ledger.status=="REVENUE_REALIZED"
           print("BRAIN_COMMERCIAL_CYCLE=PASS")
