@@ -13,11 +13,12 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from cloud.deploy_engine import DeployError, deploy, docker_available, logs, restart, status as docker_status, stop
 from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
+from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -542,10 +543,10 @@ class ApprovalCreateRequest(BaseModel):
     risk: str = "MEDIUM"
     requested_action: str = "APPROVE"
     recipient_email: str | None = None
-    evidence: list[dict] = []
+    evidence: list[dict] = Field(default_factory=list)
     source_type: str = "BRAIN"
     source_id: str | None = None
-    metadata: dict = {}
+    metadata: dict = Field(default_factory=dict)
 
 
 class ApprovalDecisionRequest(BaseModel):
@@ -788,3 +789,142 @@ def diwan_registry(limit: int = 100):
         "correspondence": len(list(DIWAN_STATE.glob("corr-*.json"))),
         "approvals": len(list_approvals(None, limit)),
     }
+
+
+DIWAN_CASES = STATE / "diwan_cases"
+DIWAN_CORRESPONDENCE = STATE / "diwan_correspondence"
+
+def _diwan_store(root: Path, key: str, value: dict) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    tmp = root / (key + ".tmp")
+    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(root / (key + ".json"))
+
+def _diwan_load(root: Path, key: str) -> dict | None:
+    p = root / (key + ".json")
+    if not p.exists():
+        return None
+    return json.loads(p.read_text(encoding="utf-8"))
+
+def _diwan_next_number(prefix: str, root: Path) -> str:
+    root.mkdir(parents=True, exist_ok=True)
+    return register_number(prefix, len(list(root.glob("*.json"))) + 1)
+
+class DiwanCorrespondenceRequest(BaseModel):
+    direction: str
+    subject: str
+    channel: str
+    sender: str | None = None
+    recipients: list[str] = Field(default_factory=list)
+    case_id: str | None = None
+    classification: str = "UNCLASSIFIED"
+    confidentiality: str = "INTERNAL"
+    content_ref: str | None = None
+    attachments: list[str] = Field(default_factory=list)
+
+class DiwanCaseRequest(BaseModel):
+    title: str
+    owner_type: str
+    owner_id: str
+
+class DiwanTransitionRequest(BaseModel):
+    state: str
+    actor: str
+    reason: str = ""
+
+class DiwanRouteRequest(BaseModel):
+    target: str
+    assigned_by: str
+    deadline_at: str | None = None
+    notes: str = ""
+
+@app.post("/v1/diwan/correspondence", dependencies=[Depends(require_auth)])
+def diwan_register_correspondence(body: DiwanCorrespondenceRequest):
+    direction = body.direction.upper()
+    if direction not in {"INBOUND", "OUTBOUND"}:
+        raise HTTPException(status_code=400, detail="direction must be INBOUND or OUTBOUND")
+    if not body.subject.strip() or not body.channel.strip():
+        raise HTTPException(status_code=400, detail="subject and channel are required")
+    c = Correspondence(direction=direction, subject=body.subject.strip(), channel=body.channel.strip().upper(),
+        sender=body.sender, recipients=body.recipients, case_id=body.case_id,
+        classification=body.classification, confidentiality=body.confidentiality,
+        content_ref=body.content_ref, attachments=body.attachments,
+        number=_diwan_next_number("IN" if direction == "INBOUND" else "OUT", DIWAN_CORRESPONDENCE))
+    c.transition(CorrespondenceState.REGISTERED, "diwan")
+    record = {k: (v.value if hasattr(v, "value") else v) for k, v in c.__dict__.items()}
+    _diwan_store(DIWAN_CORRESPONDENCE, c.correspondence_id, {"record": record})
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": record}
+
+@app.get("/v1/diwan/correspondence", dependencies=[Depends(require_auth)])
+def diwan_list_correspondence(limit: int = 100):
+    items = []
+    for p in sorted(DIWAN_CORRESPONDENCE.glob("*.json"), reverse=True)[:max(1, min(limit, 500))]:
+        try: items.append(json.loads(p.read_text(encoding="utf-8"))["record"])
+        except Exception: continue
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": items}
+
+@app.get("/v1/diwan/correspondence/{correspondence_id}", dependencies=[Depends(require_auth)])
+def diwan_get_correspondence(correspondence_id: str):
+    item = _diwan_load(DIWAN_CORRESPONDENCE, correspondence_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": item["record"]}
+
+@app.post("/v1/diwan/correspondence/{correspondence_id}/transition", dependencies=[Depends(require_auth)])
+def diwan_transition_correspondence(correspondence_id: str, body: DiwanTransitionRequest):
+    item = _diwan_load(DIWAN_CORRESPONDENCE, correspondence_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    record = item["record"]
+    c = Correspondence(**{**record, "state": CorrespondenceState(record["state"])})
+    try:
+        c.transition(CorrespondenceState(body.state), body.actor, body.reason)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    item["record"] = {k: (v.value if hasattr(v, "value") else v) for k, v in c.__dict__.items()}
+    _diwan_store(DIWAN_CORRESPONDENCE, correspondence_id, item)
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": item["record"]}
+
+@app.post("/v1/diwan/cases", dependencies=[Depends(require_auth)])
+def diwan_create_case(body: DiwanCaseRequest):
+    case = CaseFile(title=body.title.strip(), owner_type=body.owner_type, owner_id=body.owner_id)
+    case.number = _diwan_next_number("CASE", DIWAN_CASES)
+    data = dict(case.__dict__)
+    _diwan_store(DIWAN_CASES, case.case_id, data)
+    return {"ok": True, "system": "BRAIN_DIWAN", "case": data}
+
+@app.get("/v1/diwan/cases", dependencies=[Depends(require_auth)])
+def diwan_list_cases(limit: int = 100):
+    items = []
+    for p in sorted(DIWAN_CASES.glob("*.json"), reverse=True)[:max(1, min(limit, 500))]:
+        try: items.append(json.loads(p.read_text(encoding="utf-8"))
+        except Exception: continue
+    return {"ok": True, "system": "BRAIN_DIWAN", "cases": items}
+
+@app.post("/v1/diwan/correspondence/{correspondence_id}/route", dependencies=[Depends(require_auth)])
+def diwan_route(correspondence_id: str, body: DiwanRouteRequest):
+    item = _diwan_load(DIWAN_CORRESPONDENCE, correspondence_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    assignment = RoutingAssignment(correspondence_id, body.target, body.assigned_by, deadline_at=body.deadline_at, notes=body.notes)
+    record = item["record"]
+    c = Correspondence(**{**record, "state": CorrespondenceState(record["state"])})
+    try:
+        if c.state == CorrespondenceState.REGISTERED:
+            c.transition(CorrespondenceState.CLASSIFIED, body.assigned_by, "classification")
+        if c.state == CorrespondenceState.CLASSIFIED:
+            c.transition(CorrespondenceState.LINKED, body.assigned_by, "routing")
+        if c.state == CorrespondenceState.LINKED:
+            c.transition(CorrespondenceState.ROUTED, body.assigned_by, "routing")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    item["record"] = {k: (v.value if hasattr(v, "value") else v) for k, v in c.__dict__.items()}
+    item["routing"] = assignment.__dict__
+    _diwan_store(DIWAN_CORRESPONDENCE, correspondence_id, item)
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": item["record"], "routing": item["routing"]}
+
+@app.get("/v1/diwan/records/archive-check", dependencies=[Depends(require_auth)])
+def diwan_archive_check(state: str, legal_hold: bool = False):
+    try: eligible = archive_eligible(RecordState(state), legal_hold)
+    except ValueError: raise HTTPException(status_code=400, detail="invalid record state")
+    return {"ok": True, "system": "BRAIN_DIWAN", "archive_eligible": eligible, "legal_hold": legal_hold}
