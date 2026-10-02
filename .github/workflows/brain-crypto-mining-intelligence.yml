@@ -6,6 +6,8 @@ on:
       - "brain_v12/business/crypto_mining_intelligence.py"
       - "brain_v12/business/test_crypto_mining_intelligence.py"
       - "brain_v12/business/crypto_mining_data.py"
+      - "brain_v12/business/crypto_market_snapshot.py"
+      - "brain_v12/business/test_crypto_market_snapshot.py"
       - ".github/workflows/brain-crypto-mining-intelligence.yml"
   workflow_dispatch:
     inputs:
@@ -46,7 +48,7 @@ jobs:
       - name: Run unit tests
         run: |
           set -euo pipefail
-          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_data.py
+          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py
           python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py
 
       - name: Generate evidence report
