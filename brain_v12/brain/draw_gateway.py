@@ -1,4 +1,4 @@
-"""Human-to-image routing for BRAIN. Local mode is the Machine Raster Painter."""
+"""Human-to-image routing for BRAIN. Local mode produces verified SVG plus raster PNG."""
 from __future__ import annotations
 import base64, re
 from pathlib import Path
@@ -21,9 +21,12 @@ def draw_local(prompt:str, mode:str="auto")->dict[str,Any]:
     scene=visual_engine.compile_scene(prompt,mode)
     png,commands=machine_raster_engine.render_machine(scene)
     valid=png.startswith(b"\x89PNG\r\n\x1a\n") and len(png)>128
-    return {"ok":valid,"provider":"brain_local_machine_raster","verified":valid,
-            "scene":scene,"png_base64":base64.b64encode(png).decode("ascii"),
-            "machine_commands":commands,"format":"png","renderer":"machine-raster"}
+    svg=visual_engine.render_svg(scene)
+    valid_svg=svg.lstrip().startswith("<svg") and "</svg>" in svg
+    verified=valid and valid_svg
+    return {"ok":verified,"provider":"brain_local_machine_raster","verified":verified,
+            "scene":scene,"svg":svg,"png_base64":base64.b64encode(png).decode("ascii"),
+            "machine_commands":commands,"format":"svg","raster_format":"png","renderer":"machine-raster+svg-scene"}
 
 def save_png_base64(data:str,target:Path)->int:
     raw=base64.b64decode(data,validate=True)
