@@ -41,7 +41,7 @@ class ReleaseGate:
     "BRAIN_FILM_END":"1",
     "BRAIN_FILM_SHARD_ONLY":"1",
    })
-   p=subprocess.run([sys.executable,"brain_v12/machine_cinematic_factory.py"],capture_output=True,text=True,env=env,timeout=180)
+   p=subprocess.run([sys.executable,"-m","brain_v12.machine_cinematic_factory"],capture_output=True,text=True,env=env,timeout=180)
    if p.returncode:
     return Gate("cinema_truth",True,False,"process://brain_cinematic_factory",(p.stdout+p.stderr)[-3000:])
    root=Path(td)/"machine_films"
