@@ -40,3 +40,5 @@ Open `android_executor/` in Android Studio, or use the included GitHub Actions w
 ## CI verification
 
 The Android Executor CI workflow is the authoritative build path for the debug APK. A successful workflow without the uploaded APK artifact is not treated as a completed build.
+
+The Kotlin compile fixes are now present on `main`; this change triggers CI against the current branch head so the fixes are actually compiled and verified.
