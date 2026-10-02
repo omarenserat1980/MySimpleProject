@@ -84,3 +84,65 @@ def test_final_video_is_job_scoped(monkeypatch, tmp_path):
     recorded.write_bytes(b"z" * 2048)
     selected = api._find_final_video({"id": "job-2", "output_dir": str(output), "video_path": str(recorded)})
     assert selected == recorded
+
+
+def test_customer_portal_lifecycle_and_financial_gate(monkeypatch, tmp_path):
+    api, client = _client(monkeypatch)
+    customer_dir = tmp_path / "customer_requests"
+    monkeypatch.setattr(api, "CUSTOMER_REQUESTS", customer_dir)
+
+    created = client.post("/api/customers", json={
+        "display_name": "Test Customer",
+        "service": "Workflow automation",
+        "need": "Automate intake",
+        "marketing_consent": False,
+    })
+    assert created.status_code == 200
+    data = created.json()
+    request_id = data["request_id"]
+    assert data["lifecycle_state"] == "DISCOVERED"
+    assert data["status"] == "READY_FOR_REVIEW"
+    assert data["financial_state"] == "NOT_VERIFIED"
+    assert data["revenue_state"] == "NOT_REALIZED"
+
+    fetched = client.get(f"/api/customers/{request_id}")
+    assert fetched.status_code == 200
+    assert fetched.json()["customer"]["consent"]["marketing"] is False
+
+    unauth_approve = client.post(f"/api/customers/{request_id}/approve")
+    assert unauth_approve.status_code == 401
+
+    approved = client.post(
+        f"/api/customers/{request_id}/approve",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert approved.status_code == 200
+    customer = approved.json()["customer"]
+    assert customer["lifecycle_state"] == "APPROVED"
+    assert customer["financial_state"] == "NOT_VERIFIED"
+    assert customer["revenue_state"] == "NOT_REALIZED"
+
+    marketing_message = client.post(
+        f"/api/customers/{request_id}/message",
+        headers={"Authorization": "Bearer test-token"},
+        json={"message": "Marketing", "channel": "EMAIL", "purpose": "MARKETING"},
+    )
+    assert marketing_message.status_code == 200
+    assert marketing_message.json()["ok"] is False
+    assert marketing_message.json()["gate"]["reason"] == "NO_VALID_CONSENT"
+
+    service_message = client.post(
+        f"/api/customers/{request_id}/message",
+        headers={"Authorization": "Bearer test-token"},
+        json={"message": "Service update", "channel": "EMAIL", "purpose": "SERVICE"},
+    )
+    assert service_message.status_code == 200
+    assert service_message.json()["gate"] == "AUTHORIZED_NOT_SENT"
+
+    financial = client.get(
+        f"/api/customers/{request_id}/financial",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert financial.status_code == 200
+    assert financial.json()["financial_state"] == "NOT_VERIFIED"
+    assert financial.json()["revenue_state"] == "NOT_REALIZED"
