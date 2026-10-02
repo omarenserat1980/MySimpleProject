@@ -32,7 +32,7 @@ class ReleaseGate:
   p=Path("docs/film.json")
   if not p.exists():return Gate("cinema_truth",True,False,"file://docs/film.json","missing metadata")
   try:
-   d=json.loads(p.read_text(encoding="utf-8")); v=Path("docs")/d.get("video",""); ready=all(d.get("status",{}).get(k)=="ready" for k in ("render","video","audio","verification","web")); artifact=v.is_file() and v.stat().st_size>1024; return Gate("cinema_truth",True,(not ready) or artifact,str(v),f"ready={ready},artifact={artifact}")
+   d=json.loads(p.read_text(encoding="utf-8")); v=Path("docs")/d.get("video",""); ready=all(d.get("status",{}).get(k)=="ready" for k in ("render","video","audio","verification","web")); artifact=v.is_file() and v.stat().st_size>1024; verified=ready and artifact\n   return Gate("cinema_truth",True,verified,str(v),f"ready={ready},artifact={artifact}")
   except Exception as e:return Gate("cinema_truth",True,False,"file://docs/film.json",repr(e))
  def _governance(self):
   req=["COMMERCIAL_GOVERNANCE_SPEC.md","PAYMENT_POLICY.md","PUBLIC_IDENTITY_AND_LIMITED_LIABILITY_POLICY.md"]; missing=[x for x in req if not Path(x).exists()]; return Gate("governance",True,not missing,"repo://governance",f"missing={missing}")
