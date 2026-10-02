@@ -16,6 +16,12 @@ class DeviceBridge:
     def authenticate(self,supplied):
         if not supplied:return False
         expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
+        if not expected:
+            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE",""))
+            if key_file and os.path.isfile(key_file):
+                try:
+                    with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
+                except OSError: expected=""
         if expected and hmac.compare_digest(supplied,expected):return True
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
