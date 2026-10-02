@@ -5,6 +5,10 @@ on:
     paths:
       - "brain_v12/business/crypto_mining_intelligence.py"
       - "brain_v12/business/test_crypto_mining_intelligence.py"
+      - "brain_v12/business/crypto_mining_verification.py"
+      - "brain_v12/business/test_crypto_mining_verification.py"
+      - "brain_v12/business/revenue_ledger.py"
+      - "brain_v12/business/test_revenue_ledger.py"
       - "brain_v12/business/crypto_mining_data.py"
       - "brain_v12/business/crypto_market_snapshot.py"
       - "brain_v12/business/test_crypto_market_snapshot.py"
@@ -47,8 +51,8 @@ jobs:
       - name: Run tests
         run: |
           set -euo pipefail
-          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py brain_v12/business/crypto_live_collector.py
-          python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py brain_v12/business/test_crypto_mining_verification.py brain_v12/business/test_crypto_market_snapshot.py
+          python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_verification.py brain_v12/business/revenue_ledger.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py brain_v12/business/crypto_live_collector.py
+          python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py brain_v12/business/test_crypto_mining_verification.py brain_v12/business/test_revenue_ledger.py brain_v12/business/test_crypto_market_snapshot.py
 
       - name: Collect live public market data
         env:
