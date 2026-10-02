@@ -15,6 +15,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m py_compile brain_v12/business/*.py
+          python -m pytest -q brain_v12/business/test_customer_governance.py
           python - <<'PY'
           from brain_v12.business.pipeline import Opportunity
           from brain_v12.business.revenue_ledger import RevenueRecord
