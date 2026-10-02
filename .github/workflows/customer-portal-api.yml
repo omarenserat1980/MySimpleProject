@@ -9,6 +9,9 @@ on:
       - "cloud/test_commercial_governance.py"
       - "cloud/public_identity_policy.py"
       - "cloud/test_public_identity_policy.py"
+      - "cloud/standing_authorization.py"
+      - "cloud/test_standing_authorization.py"
+      - "STANDING_AUTHORIZATION_AND_CUSTOMER_CONSENT.md"
       - "cloud/approval_desk.py"
       - "cloud/test_approval_desk.py"
       - "BRAIN_DIWAN_APPROVALS.md"
@@ -29,6 +32,6 @@ jobs:
       - name: Python syntax
         run: python -m compileall -q cloud brain_v12/business/customer_governance.py
       - name: Customer Portal, commercial governance and identity policy tests
-        run: python -m pytest -q cloud/test_api_server.py cloud/test_commercial_governance.py cloud/test_public_identity_policy.py cloud/test_approval_desk.py
+        run: python -m pytest -q cloud/test_api_server.py cloud/test_commercial_governance.py cloud/test_public_identity_policy.py cloud/test_approval_desk.py cloud/test_standing_authorization.py
       - name: Browser JavaScript syntax
         run: node --check cloud/web/app.js
