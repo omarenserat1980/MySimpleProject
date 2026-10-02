@@ -90,6 +90,10 @@ def main() -> int:
         "status": report["status"],
         "verified_completed_allowed": passed,
         "evidence": str(EVIDENCE),
+        "failed_gates": [
+            {"name": item["name"], "exit_code": item["exit_code"], "stderr": item["stderr"][-2000:]}
+            for item in results if not item["passed"]
+        ],
     }, ensure_ascii=False))
     return 0 if passed else 1
 
