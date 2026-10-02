@@ -233,3 +233,37 @@ def test_diwan_case_and_correspondence_routes(monkeypatch, tmp_path):
     listed = client.get("/v1/diwan/correspondence", headers=headers)
     assert listed.status_code == 200
     assert len(listed.json()["correspondence"]) == 1
+
+
+def test_standing_authorization_customer_consent_api_gate(monkeypatch, tmp_path):
+    from cloud.standing_authorization import (
+        ApprovalStatus, CustomerConsent, Risk, StandingAuthorization,
+        customer_gate, execution_gate, operator_gate,
+    )
+    auth = StandingAuthorization(enabled=True, monetary_limit=100, currency="JOD")
+    op = operator_gate(authorization=auth, risk=Risk.ROUTINE, amount=50, currency="JOD")
+    assert op == ApprovalStatus.NOT_REQUIRED
+    consent = CustomerConsent(
+        approved=True, scope_ref="QUOTE-1", approved_version="v1",
+        approved_amount=50, approved_currency="JOD", evidence_ref="consent-1",
+    )
+    customer = customer_gate(
+        required=True, consent=consent, scope_ref="QUOTE-1", version="v1",
+        amount=50, currency="JOD",
+    )
+    assert customer == ApprovalStatus.APPROVED
+    assert execution_gate(operator_status=op, customer_status=customer)
+
+
+def test_standing_authorization_blocks_over_limit_and_scope_mismatch():
+    from cloud.standing_authorization import (
+        ApprovalStatus, CustomerConsent, Risk, StandingAuthorization,
+        customer_gate, operator_gate,
+    )
+    auth = StandingAuthorization(enabled=True, monetary_limit=100, currency="JOD")
+    assert operator_gate(authorization=auth, risk=Risk.ROUTINE, amount=101, currency="JOD") == ApprovalStatus.REQUIRED
+    consent = CustomerConsent(
+        approved=True, scope_ref="QUOTE-1", approved_version="v1",
+        approved_amount=50, approved_currency="JOD", evidence_ref="consent-1",
+    )
+    assert customer_gate(required=True, consent=consent, scope_ref="QUOTE-2", version="v1", amount=50, currency="JOD") == ApprovalStatus.REQUIRED
