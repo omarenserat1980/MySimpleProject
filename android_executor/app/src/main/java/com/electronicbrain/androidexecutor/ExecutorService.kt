@@ -152,7 +152,7 @@ class ExecutorService : Service() {
                 "ffmpeg_probe" -> ok(JSONObject(FFmpegEngine(this).probe()))
                 "ffmpeg_run" -> {
                     val a = params.optJSONArray("argv") ?: return fail("ARGV_REQUIRED")
-                    val args = List(a.length()) { i -> a.getString(i) }
+                    val args = Array(a.length()) { i -> a.getString(i) }
                     ok(JSONObject(FFmpegEngine(this).run(args)))
                 }
                 "verify_file" -> {
