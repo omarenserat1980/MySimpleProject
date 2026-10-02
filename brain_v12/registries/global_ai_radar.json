@@ -141,6 +141,16 @@
       "status": "experimental"
     },
     {
+      "id": "taiwan_llm",
+      "category": "foundation_model",
+      "role": "traditional_chinese_local_model_candidate",
+      "why_add": "Taiwan-LLM provides open models tuned for Traditional Mandarin and English, including Llama-3-Taiwan variants; useful for Traditional Chinese localization and regional evaluation.",
+      "source": "https://github.com/MiuLab/Taiwan-LLM",
+      "region": "Taiwan",
+      "status": "experimental",
+      "license": "Llama-3 license for listed Llama-3-Taiwan models"
+    },
+    {
       "id": "solar_open_2",
       "category": "foundation_model",
       "role": "korean_agent_model_candidate",
@@ -175,6 +185,24 @@
       "why_add": "Mistral's public Vibe project adds a European coding-agent option that can be benchmarked alongside Brain's existing coding-agent backends.",
       "source": "https://github.com/mistralai/mistral-vibe",
       "region": "Europe",
+      "status": "experimental"
+    },
+    {
+      "id": "openeurollm",
+      "category": "foundation_model",
+      "role": "european_multilingual_foundation_model_candidate",
+      "why_add": "OpenEuroLLM is building transparent multilingual foundation models with openly documented data, training and evaluation components; useful for Brain's European-language sovereign-model adapter.",
+      "source": "https://openeurollm.eu/",
+      "region": "Europe",
+      "status": "experimental"
+    },
+    {
+      "id": "lucie",
+      "category": "foundation_model",
+      "role": "french_european_language_model_candidate",
+      "why_add": "OpenLLM France provides open French-focused models and datasets, including edge-oriented and larger model sizes; useful for French and European-language routing.",
+      "source": "https://openllm-france.fr/en/main-page-en/",
+      "region": "France",
       "status": "experimental"
     }
   ],
