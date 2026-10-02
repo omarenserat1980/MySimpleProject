@@ -37,3 +37,16 @@ def test_wrong_opportunity_cannot_realize_revenue():
     ledger = RevenueRecord("different-opportunity", "verified mining payout", "BTC")
     with pytest.raises(ValueError, match="opportunity_id mismatch"):
         ledger.realize_from_mining_verification(result)
+
+
+def test_free_form_payment_evidence_cannot_verify():
+    ledger = RevenueRecord("commercial-guard-001", "payment", "USD")
+    with pytest.raises(ValueError, match="structured payment evidence"):
+        ledger.verify("payment evidence recorded")
+
+
+def test_incomplete_structured_evidence_cannot_realize():
+    ledger = RevenueRecord("commercial-guard-002", "payment", "USD")
+    ledger.verify({"transaction_id": "tx-guard-002", "evidence_ref": "evidence://payment/tx-guard-002"})
+    with pytest.raises(ValueError, match="delivery_evidence_ref"):
+        ledger.realize({"delivery_evidence_ref": "evidence://delivery/guard-002"})
