@@ -32,17 +32,21 @@ class DeviceBridgeTests(unittest.TestCase):
 
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
-        self.assertFalse(queued["ok"])
-        self.assertEqual(queued["status"], "DEVICE_EXECUTION_DISABLED")
+        self.assertTrue(queued["ok"])
+        self.assertEqual(queued["status"], "QUEUED")
+        task = queued["task"]
         polled = self.bridge.poll("android-test")
-        self.assertFalse(polled["ok"])
-        self.assertEqual(polled["status"], "DEVICE_EXECUTION_DISABLED")
-        self.assertFalse(self.bridge.result("missing")["ok"])
+        self.assertTrue(polled["ok"])
+        self.assertEqual(polled["status"], "TASK_AVAILABLE")
+        self.assertEqual(polled["task"]["task_id"], task["task_id"])
+        reported = self.bridge.report(task["task_id"], "android-test", True, {"status": "READY"})
+        self.assertTrue(reported["ok"])
+        self.assertEqual(reported["status"], "COMPLETED")
 
     def test_rejects_unknown_task(self):
         result = self.bridge.enqueue("shell")
         self.assertFalse(result["ok"])
-        self.assertEqual(result["status"], "DEVICE_EXECUTION_DISABLED")
+        self.assertEqual(result["status"], "TASK_NOT_ALLOWED")
 
     def test_requeues_stale_claim(self):
         result = self.bridge.requeue_stale(5)
