@@ -37,3 +37,5 @@ jobs:
           python -m pytest -q \
             brain_v12/business/test_crypto_mining_intelligence.py \
             brain_v12/business/test_crypto_mining_verification.py
+
+# CI trigger verification marker
