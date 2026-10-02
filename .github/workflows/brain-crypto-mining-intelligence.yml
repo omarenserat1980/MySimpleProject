@@ -1,0 +1,92 @@
+name: Brain Crypto Mining Intelligence
+
+on:
+  workflow_dispatch:
+    inputs:
+      electricity_usd_kwh:
+        description: "Electricity cost in USD/kWh"
+        required: true
+        default: "0.05"
+      hashprice_usd_per_th_day:
+        description: "Observed BTC hashprice in USD/TH/day"
+        required: true
+        default: "0.04"
+      hashrate_th:
+        description: "Machine hashrate in TH/s"
+        required: true
+        default: "200"
+      efficiency_j_th:
+        description: "Machine efficiency in J/TH"
+        required: true
+        default: "15"
+      hardware_cost_usd:
+        description: "Hardware cost for payback sensitivity only"
+        required: false
+        default: "0"
+      pool_fee_pct:
+        description: "Pool fee percent"
+        required: false
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  mining-intelligence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: |
+          set -euo pipefail
+          python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py
+
+      - name: Generate evidence report
+        env:
+          ELECTRICITY_USD_KWH: ${{ inputs.electricity_usd_kwh }}
+          HASHPRICE_USD_PER_TH_DAY: ${{ inputs.hashprice_usd_per_th_day }}
+          HASHRATE_TH: ${{ inputs.hashrate_th }}
+          EFFICIENCY_J_TH: ${{ inputs.efficiency_j_th }}
+          HARDWARE_COST_USD: ${{ inputs.hardware_cost_usd }}
+          POOL_FEE_PCT: ${{ inputs.pool_fee_pct }}
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/crypto
+          python - <<'PY'
+          import json
+          import os
+          from brain_v12.business.crypto_mining_intelligence import (
+              MiningMachine, NetworkSnapshot, build_intelligence_report
+          )
+
+          machine = MiningMachine(
+              machine_id="workflow-input",
+              hashrate_th=float(os.environ["HASHRATE_TH"]),
+              efficiency_j_th=float(os.environ["EFFICIENCY_J_TH"]),
+              hardware_cost_usd=float(os.environ["HARDWARE_COST_USD"]),
+              pool_fee_pct=float(os.environ["POOL_FEE_PCT"]),
+          )
+          network = NetworkSnapshot(
+              asset="BTC",
+              hashprice_usd_per_th_day=float(os.environ["HASHPRICE_USD_PER_TH_DAY"]),
+              observed_at="workflow-input",
+              source="workflow-input",
+          )
+          report = build_intelligence_report(
+              machine,
+              network,
+              float(os.environ["ELECTRICITY_USD_KWH"]),
+              [0.03, 0.05, 0.07, 0.10, 0.15],
+          )
+          with open(".brain/crypto/mining_intelligence.json", "w", encoding="utf-8") as f:
+              json.dump(report, f, indent=2)
+          print("CRYPTO_MINING_INTELLIGENCE=PASS")
+          print(json.dumps(report, indent=2))
+          PY
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-crypto-mining-intelligence
+          path: .brain/crypto/mining_intelligence.json
