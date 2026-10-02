@@ -83,6 +83,17 @@ def candidates():
                     items.append(("prediction", risk, "استبق التطور المتوقع: " + text))
         except Exception:
             pass
+    # Turn the latest simulated preventive action into an actual cognitive objective.
+    temporal_log = STATE / "temporal_simulation.jsonl"
+    if temporal_log.exists():
+        try:
+            lines = [line for line in temporal_log.read_text(encoding="utf-8", errors="ignore").splitlines() if line.strip()]
+            latest = json.loads(lines[-1]) if lines else {}
+            action = str(latest.get("recommended_present_action", "")).strip()
+            if action and action not in {"observe", "continue_verified_path"}:
+                items.append(("temporal_action", 1.1, "نفّذ الإجراء الوقائي المتوقع ثم تحقق منه: " + action))
+        except (ValueError, OSError):
+            pass
     items.append(("health", 0.7, "افحص Brain بحثاً عن فشل أو نقص أو خطوة آمنة تمنع المشكلة التالية."))
     return sorted(items, key=lambda x: x[1], reverse=True)
 
