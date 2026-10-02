@@ -35,13 +35,13 @@ class ReflectionActionRegistry:
     def ids(self) -> list[str]:
         return sorted(self._actions)
 
-def command_action(action_id: str, argv: Sequence[str], timeout: int = 120) -> Callable[[], ActionResult]:
+def command_action(action_id: str, argv: Sequence[str], timeout: int = 120, env: dict[str, str] | None = None) -> Callable[[], ActionResult]:
     if not argv or timeout < 1 or timeout > 900:
         raise ValueError("invalid_action_configuration")
     frozen = tuple(argv)
     def run() -> ActionResult:
         try:
-            p = subprocess.run(frozen, capture_output=True, text=True, timeout=timeout, check=False)
+            p = subprocess.run(frozen, capture_output=True, text=True, timeout=timeout, check=False, env=env or None)
             return ActionResult(action_id, p.returncode == 0, p.returncode, p.stdout[-12000:], p.stderr[-12000:])
         except subprocess.TimeoutExpired as exc:
             return ActionResult(action_id, False, 124, str(exc.stdout or "")[-12000:], "TIMEOUT")
