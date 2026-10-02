@@ -28,6 +28,9 @@ jobs:
           python -m pip install -r cloud/requirements.txt
           python -m pip install "pytest>=8,<9"
       - name: Run verified film production contract
+        env:
+          BRAIN_FFMPEG_BIN: /usr/bin/ffmpeg
+          BRAIN_FFPROBE_BIN: /usr/bin/ffprobe
         run: |
           python -m pytest -q cloud/test_film_contract.py
       - name: Run durable workflow and commercial governance contracts
