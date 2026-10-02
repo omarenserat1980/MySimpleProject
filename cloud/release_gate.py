@@ -11,12 +11,15 @@ class ReleaseGate:
  def __init__(self,root:Path|None=None):
   self.root=Path(root or os.getenv("BRAIN_STATE_DIR",".brain_state"))/"release_gate"; self.root.mkdir(parents=True,exist_ok=True)
  def run(self):
-  gates=[self._compile(),self._pytest_feedback(),self._api_routes(),self._cinema_truth(),self._governance()]
+  gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._cinema_truth(),self._governance()]
   result={"status":"RELEASE_ALLOWED" if all(g.passed for g in gates if g.required) else "RELEASE_BLOCKED","evaluated_at":datetime.now(timezone.utc).isoformat(),"gates":[asdict(g) for g in gates]}; self._atomic(result); return result
  def _compile(self):
   p=subprocess.run([sys.executable,"-m","compileall","-q","cloud"],capture_output=True,text=True); return Gate("compile",True,p.returncode==0,"process://compileall",p.stderr.strip())
  def _pytest_feedback(self):
   p=subprocess.run([sys.executable,"-m","pytest","-q","cloud/test_customer_feedback.py"],capture_output=True,text=True); return Gate("feedback_contract",True,p.returncode==0,"process://pytest/customer_feedback",(p.stdout+p.stderr)[-3000:])
+ def _pytest_task_engine(self):
+  p=subprocess.run([sys.executable,"-m","pytest","-q","brain_v12/brain/task_engine_test.py"],capture_output=True,text=True)
+  return Gate("task_engine_evidence_contract",True,p.returncode==0,"process://pytest/task_engine",(p.stdout+p.stderr)[-3000:])
  def _api_routes(self):
   try:
    from cloud.api_server import app
