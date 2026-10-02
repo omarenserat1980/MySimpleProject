@@ -43,6 +43,17 @@
 
 <section id="customers" class="view">
 <div class="grid">
+<article class="panel wide"><h2>👤 Customer Portal</h2>
+<p>طلب خدمة جديد. البيانات لا تُعتبر عميلاً فعلياً أو عقداً حتى تصل إلى API وتُسجل الأدلة المطلوبة.</p>
+<form id="customerRequest" class="customerForm">
+<label>الاسم<input id="customerName" required maxlength="120"></label>
+<label>الخدمة<input id="customerService" required maxlength="160" placeholder="مثال: أتمتة سير عمل"></label>
+<label>وصف الحاجة<textarea id="customerNeed" required maxlength="2000"></textarea></label>
+<label class="check"><input id="customerMarketing" type="checkbox"> أوافق على استخدام بياناتي لأغراض التسويق</label>
+<button type="submit">إرسال الطلب</button>
+</form>
+<pre id="customerResult">بانتظار إدخال طلب.</pre></article>
+<article class="panel"><h2>حالة الطلب</h2><div id="customerStatus" class="list"><div class="empty">لا يوجد طلب محمل.</div></div></article>
 <article class="panel wide"><h2>🤝 Customer Operations & Trust</h2><p>طبقة حوكمة العميل: الأدلة، الموافقات، الاتصال، العروض، التسليم، الدفع، وما بعد البيع.</p><div class="flow"><i>Lead</i><i>→</i><i>Qualified</i><i>→</i><i>Offer</i><i>→</i><i>Approval</i><i>→</i><i>Delivery</i><i>→</i><i>Payment Evidence</i><i>→</i><i>After-sales</i></div><div class="list"><div class="item"><b>قرار العميل</b><span class="badge">HUMAN</span></div><div class="item"><b>التواصل الخارجي</b><span class="badge">AUTHORIZATION REQUIRED</span></div><div class="item"><b>التسويق</b><span class="badge">CONSENT REQUIRED</span></div><div class="item"><b>التنفيذ المالي</b><span class="badge">DISABLED</span></div></div></article>
 <article class="panel"><h2>قنوات الاتصال</h2><div class="list"><div class="item"><b>Brain Portal</b><span class="ok">ACTIVE UI</span></div><div class="item"><b>Email</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>WhatsApp</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>Telegram</b><span class="badge">CONNECTOR READY</span></div><div class="item"><b>Social</b><span class="badge">GATED</span></div></div></article>
 </div></section>
