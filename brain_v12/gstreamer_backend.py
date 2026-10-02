@@ -5,7 +5,7 @@ audio mixing, H.264/AAC encoding and timeline crossfades. The independent QC
 oracle may still use FFmpeg until that layer is separately migrated.
 """
 from __future__ import annotations
-import math, shutil, subprocess
+import math, shlex, shutil, subprocess
 from pathlib import Path
 from typing import Iterable
 
@@ -82,7 +82,7 @@ def render_part(image: Path, output: Path, duration: float, fps: int,
         'voaacenc bitrate=192000 ! aacparse ! mux.audio_0 '
         f'mp4mux name=mux ! filesink location="{output}"'
     )
-    _run([gst, "-e", pipeline], max(300, int(duration * 60) + 300))
+    _run([gst, "-e", *shlex.split(pipeline)], max(300, int(duration * 60) + 300))
     if not output.is_file() or output.stat().st_size == 0:
         raise RuntimeError("GSTREAMER_RENDER_EMPTY")
     shutil.rmtree(work, ignore_errors=True)
