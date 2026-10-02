@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
 REVIEW = "brain_v12.self_healing.review_loop"
 REPAIR = "brain_v12.self_healing.repair"
+FUTURE = "brain_v12.self_healing.future_evolution"
 
 
 def now() -> str:
@@ -90,6 +91,16 @@ def main() -> int:
         repair_code = None
         repair_stdout = ""
         repair_stderr = ""
+        future_code = None
+        future_output = ""
+
+        # Predict the next failure/development before the normal review.
+        # Prediction is evidence, not permission to bypass verification.
+        try:
+            future_code, future_output, _future_err = run_module(FUTURE, [], args.timeout)
+            print("BRAIN_FUTURE_EVOLUTION=" + future_output[-8000:], flush=True)
+        except Exception as exc:
+            future_code, future_output = 124, repr(exc)
 
         try:
             code, stdout, stderr = run_review(args.loops_per_cycle, args.timeout)
@@ -124,6 +135,8 @@ def main() -> int:
             "review_stdout": stdout,
             "review_stderr": stderr,
             "repair_exit_code": repair_code,
+            "future_evolution_exit_code": future_code,
+            "future_evolution_output": future_output[-8000:],
             "repair_stdout": repair_stdout,
             "repair_stderr": repair_stderr,
             "status": status,
@@ -137,6 +150,7 @@ def main() -> int:
                     "updated_at": now(),
                     "review_exit_code": code,
                     "repair_exit_code": repair_code,
+                    "future_evolution_exit_code": future_code,
                 },
                 ensure_ascii=False,
                 indent=2,
