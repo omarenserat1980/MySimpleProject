@@ -1,0 +1,30 @@
+name: Brain Diwan Secretariat Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloud/diwan.py"
+      - "cloud/test_diwan.py"
+      - "BRAIN_DIWAN_SECRETARIAT_SPEC.md"
+  pull_request:
+    paths:
+      - "cloud/diwan.py"
+      - "cloud/test_diwan.py"
+      - "BRAIN_DIWAN_SECRETARIAT_SPEC.md"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --upgrade pytest
+      - name: Compile
+        run: python -m py_compile cloud/diwan.py
+      - name: Dيوان contract tests
+        run: python -m pytest -q cloud/test_diwan.py
