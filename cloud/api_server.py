@@ -40,6 +40,22 @@ FILM_JOBS.mkdir(parents=True, exist_ok=True)
 FEEDBACK_STATE = STATE / "customer_feedback"
 FEEDBACK_STATE.mkdir(parents=True, exist_ok=True)
 
+def require_auth(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    local_app: str | None = Header(default=None, alias="X-BRAIN-Local-App"),
+) -> None:
+    # Local Android control is allowed only over loopback with an explicit marker.
+    host = request.client.host if request.client else ""
+    if local_app == "1" and host in {"127.0.0.1", "::1", "localhost"}:
+        return
+    if not TOKEN:
+        raise HTTPException(status_code=503, detail="control plane token is not configured")
+    expected = "Bearer " + TOKEN
+    if not authorization or not hmac.compare_digest(authorization, expected):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+
 class FeedbackCreate(BaseModel):
     customer_id: str | None = None
     rating: int | None = Field(default=None, ge=1, le=5)
@@ -102,24 +118,6 @@ def transition_feedback(feedback_id: str, state: str, evidence_ref: str | None =
     data["evidence_ref"] = evidence_ref
     _write_feedback(data)
     return data
-
-
-def require_auth(
-    request: Request,
-    authorization: str | None = Header(default=None),
-    local_app: str | None = Header(default=None, alias="X-BRAIN-Local-App"),
-) -> None:
-    # Local Android control is allowed only over loopback with an explicit marker.
-    host = request.client.host if request.client else ""
-    if local_app == "1" and host in {"127.0.0.1", "::1", "localhost"}:
-        return
-    if not TOKEN:
-        raise HTTPException(status_code=503, detail="control plane token is not configured")
-    expected = "Bearer " + TOKEN
-    if not authorization or not hmac.compare_digest(authorization, expected):
-        raise HTTPException(status_code=401, detail="unauthorized")
-
-
 
 
 CUSTOMER_REQUESTS = STATE / "customer_requests"
