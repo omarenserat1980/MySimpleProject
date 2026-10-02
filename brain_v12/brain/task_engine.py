@@ -39,5 +39,11 @@ class TaskEngine:
         """Evidence-gated terminal completion."""
         return self.update(task_id, "COMPLETED", evidence_ref)
 
+    def verify_and_complete(self,task_id,verification, evidence_ref=None):
+        """Complete only when an external verification result explicitly passes."""
+        if not verification:
+            return {"ok":False,"error":"VERIFICATION_FAILED"}
+        return self.complete(task_id, evidence_ref)
+
     def snapshot(self):
         return {"tasks":list(self.tasks.values()),"ready":self.ready()}
