@@ -1,12 +1,15 @@
-"""Evidence-first crypto mining economics for Electronic Brain.
+"""Evidence-first crypto mining economics and payout verification.
 
-Deterministic analysis only. Never trades, purchases, contacts a provider,
-or claims realized revenue.
+The verifier never logs into a provider, moves funds, or treats an in-app
+balance as realized revenue. It only evaluates evidence supplied by an
+authorized collector/user.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from typing import Any
+import hashlib
+import json
 
 
 @dataclass(frozen=True)
@@ -75,6 +78,89 @@ class MiningAnalysis:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class PayoutEvidence:
+    provider: str
+    observed_at: str
+    balance_btc: float
+    withdrawal_requested_btc: float
+    network: str
+    destination_fingerprint: str
+    txid: str = ""
+    explorer_url: str = ""
+    received_btc: float = 0.0
+    fee_btc: float = 0.0
+    source_url: str = ""
+    evidence_sha256: str = ""
+
+    def validate(self) -> None:
+        if not self.provider.strip() or not self.observed_at.strip():
+            raise ValueError("provider and observed_at are required")
+        if self.balance_btc < 0 or self.withdrawal_requested_btc < 0:
+            raise ValueError("BTC amounts must be >= 0")
+        if self.received_btc < 0 or self.fee_btc < 0:
+            raise ValueError("received_btc and fee_btc must be >= 0")
+        if not self.destination_fingerprint.strip():
+            raise ValueError("destination_fingerprint is required")
+
+
+def _evidence_digest(evidence: PayoutEvidence) -> str:
+    payload = asdict(evidence)
+    payload["evidence_sha256"] = ""
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def verify_payout(evidence: PayoutEvidence) -> dict[str, Any]:
+    """Classify payout evidence without contacting the provider or blockchain."""
+    evidence.validate()
+    checks = {
+        "provider_identified": bool(evidence.provider.strip()),
+        "withdrawal_requested": evidence.withdrawal_requested_btc > 0,
+        "destination_identified": bool(evidence.destination_fingerprint.strip()),
+        "txid_present": bool(evidence.txid.strip()),
+        "received_amount_present": evidence.received_btc > 0,
+        "received_not_greater_than_requested": (
+            evidence.received_btc <= evidence.withdrawal_requested_btc
+        ),
+    }
+    expected_digest = _evidence_digest(evidence)
+    checks["evidence_integrity"] = (
+        not evidence.evidence_sha256 or evidence.evidence_sha256 == expected_digest
+    )
+    on_chain_proof = bool(evidence.txid.strip() and evidence.explorer_url.strip())
+    checks["on_chain_proof"] = on_chain_proof
+
+    if all(checks.values()) and on_chain_proof:
+        status = "VERIFIED_COMPLETED"
+        financial_state = "REVENUE_REALIZED"
+    elif checks["withdrawal_requested"] and not checks["received_amount_present"]:
+        status = "PENDING_WITHDRAWAL_EVIDENCE"
+        financial_state = "EXPECTED"
+    elif not checks["evidence_integrity"]:
+        status = "REJECTED_EVIDENCE_INTEGRITY"
+        financial_state = "UNVERIFIED"
+    else:
+        status = "REJECTED_INCOMPLETE_EVIDENCE"
+        financial_state = "UNVERIFIED"
+
+    return {
+        "status": status,
+        "financial_state": financial_state,
+        "checks": checks,
+        "evidence_sha256": expected_digest,
+        "net_received_btc": round(evidence.received_btc, 14),
+        "fee_btc": round(evidence.fee_btc, 14),
+        "guardrails": {
+            "provider_login": False,
+            "funds_moved_by_brain": False,
+            "auto_purchase": False,
+            "auto_withdrawal": False,
+            "seed_phrase_requested": False,
+        },
+    }
+
+
 def analyze_mining(machine: MiningMachine, network: NetworkSnapshot,
                    electricity_usd_kwh: float,
                    market_freshness: str = "UNKNOWN") -> MiningAnalysis:
@@ -87,31 +173,21 @@ def analyze_mining(machine: MiningMachine, network: NetworkSnapshot,
     gross = machine.hashrate_th * network.hashprice_usd_per_th_day * uptime
     pool_fee = gross * (machine.pool_fee_pct / 100.0)
     net_after_pool = gross - pool_fee
-
     power_kw = machine.hashrate_th * machine.efficiency_j_th / 1000.0
     kwh_day = power_kw * 24.0 * uptime
     electricity_cost = kwh_day * electricity_usd_kwh
     profit = net_after_pool - electricity_cost - machine.other_daily_cost_usd
     breakeven = ((net_after_pool - machine.other_daily_cost_usd) / kwh_day
                  if kwh_day > 0 else 0.0)
-
     monthly = profit * 30.0
     payback = (machine.hardware_cost_usd / profit
                if machine.hardware_cost_usd > 0 and profit > 0 else None)
     annual_return = ((profit * 365.0 / machine.hardware_cost_usd) * 100.0
                      if machine.hardware_cost_usd > 0 and profit > 0 else None)
-
-    if profit > 0:
-        status = "HUMAN_APPROVAL"
-    elif profit < 0:
-        status = "WAIT"
-    else:
-        status = "RESEARCH"
+    status = "HUMAN_APPROVAL" if profit > 0 else "WAIT" if profit < 0 else "RESEARCH"
 
     return MiningAnalysis(
-        machine_id=machine.machine_id,
-        asset=network.asset,
-        status=status,
+        machine_id=machine.machine_id, asset=network.asset, status=status,
         gross_daily_revenue_usd=round(gross, 6),
         pool_fee_daily_usd=round(pool_fee, 6),
         electricity_kwh_daily=round(kwh_day, 6),
@@ -140,8 +216,7 @@ def analyze_mining(machine: MiningMachine, network: NetworkSnapshot,
 
 def compare_electricity_prices(machine: MiningMachine, network: NetworkSnapshot,
                                prices_usd_kwh: list[float]) -> list[dict[str, Any]]:
-    return [analyze_mining(machine, network, price).snapshot()
-            for price in prices_usd_kwh]
+    return [analyze_mining(machine, network, price).snapshot() for price in prices_usd_kwh]
 
 
 def build_intelligence_report(machine: MiningMachine, network: NetworkSnapshot,
@@ -150,7 +225,7 @@ def build_intelligence_report(machine: MiningMachine, network: NetworkSnapshot,
     analysis = analyze_mining(machine, network, electricity_usd_kwh)
     report: dict[str, Any] = {
         "engine": "Crypto Mining Intelligence",
-        "version": "1.0",
+        "version": "1.1",
         "decision_state": analysis.status,
         "analysis": analysis.snapshot(),
         "guardrails": {
