@@ -5,7 +5,6 @@ import json, os, time, urllib.request
 
 BASE = os.environ.get("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
 CONTROL = os.environ.get("BRAIN_CONTROL_KEY", "")
-AGENT = os.environ.get("V12_AGENT_ID", "redmi3-01")
 INTERVAL = max(15, int(os.environ.get("BRAIN_SUPERVISOR_INTERVAL", "60")))
 
 def request(method, path, headers=None, payload=None):
@@ -25,22 +24,15 @@ def enqueue():
                    {"X-Brain-Control-Key": CONTROL},
                    {"task": "brain_self_test", "params": {"source": "runtime_supervisor"}})
 
-def inspect():
-    return request("GET", "/api/device/status")
-
 def main():
     print("JET_BRAIN_SUPERVISOR started", flush=True)
     last_queued = 0.0
     while True:
         try:
-            status = inspect()
-            counts = status.get("queued", {})
-            if isinstance(counts, dict):
-                queued = int(counts.get("QUEUED", 0))
-                claimed = int(counts.get("CLAIMED", 0))
-            else:
-                queued = claimed = 0
-            if queued == 0 and claimed == 0 and time.time() - last_queued >= INTERVAL:
+            status = request("GET", "/api/device/status")
+            queued = int(status.get("queued", 0))
+            pending = int(status.get("pending", 0))
+            if queued == 0 and pending == 0 and time.time() - last_queued >= INTERVAL:
                 result = enqueue()
                 last_queued = time.time()
                 print("JET_BRAIN_SUPERVISOR enqueue=" +
