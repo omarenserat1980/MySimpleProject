@@ -43,6 +43,7 @@ class BrainReasoningLoop:
     def run(self, context: Mapping[str, object] | None = None) -> list[BrainCycle]:
         state = dict(context or {})
         state["allowed_actions"] = list(self.registry.ids())
+        state["action_descriptions"] = self.registry.descriptions()
         cycles: list[BrainCycle] = []
 
         questions = list(self.agent.questions)
