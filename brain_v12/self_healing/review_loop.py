@@ -83,6 +83,51 @@ def deterministic_review(timeout: int) -> tuple[bool, dict]:
     return ok, {"checks": checks}
 
 
+def materialize_failure_proposal(timeout: int) -> dict:
+    """Turn current failure evidence into a deterministic repair proposal."""
+    proposal = STATE / "current_improvement.json"
+    try:
+        p = run(
+            [os.environ.get("PYTHON", "python"), "-m",
+             "brain_v12.self_healing.improvement_engine"],
+            timeout=timeout,
+        )
+        return {
+            "exit_code": p.returncode,
+            "stdout": p.stdout[-6000:],
+            "stderr": p.stderr[-6000:],
+            "proposal_exists": proposal.is_file(),
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "exit_code": 124,
+            "stdout": "",
+            "stderr": "failure proposal discovery timeout",
+            "proposal_exists": proposal.is_file(),
+        }
+
+
+def append_cycle_history(entry: dict) -> None:
+    """Persist an append-only reflection/repair evidence record."""
+    path = STATE / "cycle_history.jsonl"
+    record = {
+        "loop": entry.get("loop"),
+        "question": entry.get("diagnostic_question"),
+        "answer": entry.get("diagnostic_answer", ""),
+        "action_id": entry.get("action_id", "repair"),
+        "execution_ok": bool(entry.get("repair_ok", False)),
+        "exit_code": entry.get("repair_exit_code"),
+        "evidence": entry.get("failure_evidence", {}),
+        "reason": entry.get("reason", ""),
+        "diagnostic_question": entry.get("diagnostic_question"),
+        "repair_proposal": entry.get("repair_proposal", {}),
+        "repair_result": entry.get("repair", {}),
+        "verification_result": entry.get("post_repair_verification", {}),
+    }
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def repair(timeout: int) -> tuple[bool, dict]:
     env = os.environ.copy()
     failure = STATE / "current_failure.json"
@@ -136,12 +181,43 @@ def main() -> int:
             (STATE / "current_failure.json").write_text(
                 json.dumps(failure, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-            repaired, repair_details = repair(args.timeout)
+
+            # Failure evidence must first become a deterministic proposal.
+            proposal_details = materialize_failure_proposal(args.timeout)
+            entry["failure_proposal_discovery"] = proposal_details
+            proposal_file = STATE / "current_improvement.json"
+            try:
+                proposal = json.loads(proposal_file.read_text(encoding="utf-8"))
+            except Exception:
+                proposal = {}
+            entry["repair_proposal"] = {
+                "candidate_count": int(proposal.get("candidate_count", 0) or 0),
+                "mode": proposal.get("mode", "PROPOSAL_ONLY"),
+                "candidates": proposal.get("candidates", []),
+            }
+            entry["diagnostic_question"] = (
+                "What exact workflow job/log evidence caused this verification "
+                "failure, and what is the smallest safe corrective action?"
+            )
+            entry["failure_evidence"] = details
+
+            if not proposal_details.get("proposal_exists") or not proposal.get("candidates"):
+                repaired = False
+                repair_details = {
+                    "status": "NO_SAFE_REPAIR_PROPOSAL",
+                    "reason": "failure_evidence_did_not_produce_a_contract_candidate",
+                    "proposal": entry["repair_proposal"],
+                }
+            else:
+                repaired, repair_details = repair(args.timeout)
+            entry["repair_ok"] = repaired
+            entry["repair_exit_code"] = repair_details.get("exit_code")
             entry["repair"] = repair_details
             ok2, details2 = deterministic_review(args.timeout)
             entry["post_repair_verification"] = details2
             entry["status"] = "REPAIRED_AND_VERIFIED" if repaired and ok2 else "REPAIR_FAILED"
             final_ok = repaired and ok2
+            append_cycle_history(entry)
 
         if final_ok and (autonomous or os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1"):
             # First discover deterministic, evidence-backed opportunities.
