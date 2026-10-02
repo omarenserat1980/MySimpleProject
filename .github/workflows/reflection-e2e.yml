@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run reflection E2E
         run: |
-          python3 brain_v12/self_healing/reflection_e2e_test.py
+          python3 -m brain_v12.self_healing.reflection_e2e_test
       - name: Run self-test
         run: |
-          python3 brain_v12/self_healing/self_test.py
+          python3 -m brain_v12.self_healing.self_test
