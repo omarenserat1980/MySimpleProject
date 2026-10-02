@@ -35,4 +35,9 @@ class TaskEngine:
         if evidence_ref:
             self.tasks[task_id]["evidence_ref"]=evidence_ref
         return self.tasks[task_id]
-    def snapshot(self): return {"tasks":list(self.tasks.values()),"ready":self.ready()}
+    def complete(self,task_id,evidence_ref=None):
+        """Evidence-gated terminal completion."""
+        return self.update(task_id, "COMPLETED", evidence_ref)
+
+    def snapshot(self):
+        return {"tasks":list(self.tasks.values()),"ready":self.ready()}
