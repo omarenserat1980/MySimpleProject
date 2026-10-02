@@ -25,7 +25,7 @@
 - [x] Python runtime
 - [x] FFmpeg/FFprobe installation
 - [x] espeak-ng installation target
-- [ ] Stable media toolchain verification
+- [x] Stable media toolchain verification target
 - [ ] Durable run/evidence index
 - [ ] Unified executor contract
 
@@ -65,3 +65,13 @@
 - [ ] Recovery chaos tests
 - [ ] Artifact retention policy
 - [ ] End-to-end release gate
+
+## Phase 9 — Customer learning and operational quality
+- [x] Durable customer feedback lifecycle
+- [x] Evidence-gated feedback resolution
+- [x] Canonical Diwan API routes (duplicate implementations removed)
+- [x] Cinema publication fail-closed gate
+- [ ] Connect verified outbound customer transport
+- [ ] Link feedback automatically to Diwan case files and improvement tasks
+- [ ] Add abuse/rate limiting and persistent public API storage
+- [ ] Establish end-to-end release gate
