@@ -1,16 +1,19 @@
 """Bounded executor for predicted future-evolution plans; never fakes verification."""
 from __future__ import annotations
 import subprocess,sys
-from dataclasses import dataclass
 from typing import Any
 
-@dataclass(frozen=True)
-class ExecutionResult:
-    status:str
-    verified:bool
-    evidence:dict[str,Any]
+SELF_TESTS=(
+    "brain_v12.brain.test_security_guard",
+    "brain_v12.brain.test_company_operating_system",
+    "brain_v12.brain.test_competitive_evolution",
+    "brain_v12.self_healing.test_future_evolution_executor",
+)
 
-ALLOWLIST={"python_self_test":lambda: [sys.executable,"-m","unittest"]}
+def _self_test_command():
+    return [sys.executable,"-m","unittest",*SELF_TESTS,"-v"]
+
+ALLOWLIST={"python_self_test":_self_test_command}
 
 def execute_prediction(plan:dict[str,Any],timeout=180)->dict[str,Any]:
     if plan.get("status")!="PREDICTED":
@@ -24,7 +27,10 @@ def execute_prediction(plan:dict[str,Any],timeout=180)->dict[str,Any]:
         p=subprocess.run(ALLOWLIST[executor](),capture_output=True,text=True,timeout=timeout)
     except Exception as exc:
         return {"status":"FAILED","verified":False,"reason":str(exc)[:500]}
-    evidence={"returncode":p.returncode,"stdout":p.stdout,"stderr":p.stderr,"executor":executor}
-    if p.returncode==0:
+    evidence={"returncode":p.returncode,"stdout":p.stdout,"stderr":p.stderr,
+              "executor":executor,"tests":SELF_TESTS}
+    combined=p.stdout+"\n"+p.stderr
+    verified=p.returncode==0 and "Ran " in combined and "OK" in combined
+    if verified:
         return {"status":"VERIFIED_COMPLETED","verified":True,"evidence":evidence}
     return {"status":"FAILED","verified":False,"evidence":evidence}
