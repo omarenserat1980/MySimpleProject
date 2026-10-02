@@ -76,7 +76,8 @@ class MiningAnalysis:
 
 
 def analyze_mining(machine: MiningMachine, network: NetworkSnapshot,
-                   electricity_usd_kwh: float) -> MiningAnalysis:
+                   electricity_usd_kwh: float,
+                   market_freshness: str = "UNKNOWN") -> MiningAnalysis:
     machine.validate()
     network.validate()
     if electricity_usd_kwh < 0:
@@ -132,6 +133,7 @@ def analyze_mining(machine: MiningMachine, network: NetworkSnapshot,
             "network_observed_at": network.observed_at,
             "network_source": network.source,
             "result_class": "EXPECTED_ONLY",
+            "market_freshness": market_freshness,
         },
     )
 
