@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Sequence
 
 from brain_v12.self_healing.reflection_agent import ReflectionAgent
+from brain_v12.self_healing.reflection_actions import ReflectionActionRegistry, ActionResult, command_action
 
 
 @dataclass
@@ -162,15 +163,29 @@ def main() -> int:
                 })
                 item.reflection_questions = [t.question for t in reflection_result.turns]
                 item.reflection_actions = [t.challenge for t in reflection_result.turns if t.challenge]
+
+                actions = ReflectionActionRegistry()
+                if args.verify:
+                    actions.register("verify", command_action("verify", shlex.split(args.verify), args.timeout))
+                if args.repair:
+                    actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout))
+                selected_action = "verify" if p.returncode == 0 else ("repair" if args.repair else None)
+                action_result = actions.execute(selected_action) if selected_action else ActionResult("none", False, 0, "", "NO_ACTION")
+                item.reflection_actions.append(selected_action or "none")
                 print(json.dumps({
                     "reflection_status": reflection_result.status,
                     "questions": item.reflection_questions,
                     "challenges": item.reflection_actions,
+                    "selected_action": selected_action,
+                    "action_ok": action_result.ok,
+                    "action_exit_code": action_result.exit_code,
+                    "action_error": action_result.error,
                     "next_question": reflection_result.next_question,
                 }, ensure_ascii=False))
 
                 if p.returncode == 0:
-                    ok, vo, ve, vc = verify(args.verify, args.timeout)
+                    ok = action_result.ok
+                    vo, ve, vc = action_result.output, action_result.error, action_result.exit_code
                     item.verified = ok
                     item.stdout = (item.stdout + "\n[VERIFY]\n" + vo)[-20000:]
                     item.stderr = (item.stderr + "\n[VERIFY]\n" + ve)[-20000:]
@@ -204,17 +219,10 @@ def main() -> int:
                     })
                     repair_env = os.environ.copy()
                     repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
-                    repair = subprocess.run(
-                        args.repair,
-                        shell=True,
-                        text=True,
-                        capture_output=True,
-                        timeout=args.timeout,
-                        env=repair_env,
-                    )
-                    item.repair_exit_code = repair.returncode
-                    item.repair_stdout = repair.stdout[-12000:]
-                    item.repair_stderr = repair.stderr[-12000:]
+                    repair_result = actions.execute("repair")
+                    item.repair_exit_code = repair_result.exit_code
+                    item.repair_stdout = repair_result.output[-12000:]
+                    item.repair_stderr = repair_result.error[-12000:]
 
                 delay = min(args.max_backoff, args.backoff * (2 ** (n - 1)))
                 print(f"BRAIN_HEALING_RETRY attempt={n + 1} sleep={delay:g}s")
