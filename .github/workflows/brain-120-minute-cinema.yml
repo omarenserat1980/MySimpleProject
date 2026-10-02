@@ -1,26 +1,20 @@
 name: BRAIN 120 Minute Cinema
-# Brain launch marker: 2-hour cinematic production
-# Brain launch trigger: FULL_120_MINUTE_PRODUCTION
-# BRAIN LAUNCH REQUEST: FULL_120_MINUTE_PRODUCTION
-# Brain launch: FULL_120_MINUTE_PRODUCTION
-
 on:
   push:
     paths:
       - 'brain_v12/machine_cinematic_factory.py'
       - 'brain_v12/visual_engine.py'
       - 'brain_v12/machine_raster_engine.py'
+      - 'brain_v12/cinematic_master_qc.py'
       - '.github/workflows/brain-120-minute-cinema.yml'
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   render:
     name: Render shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -32,52 +26,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install media runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
       - name: Verify Brain source
-        run: |
-          python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py
+        run: python -m py_compile brain_v12/machine_cinematic_factory.py brain_v12/visual_engine.py brain_v12/machine_raster_engine.py brain_v12/cinematic_master_qc.py
       - name: Render shard
         env:
-          BRAIN_FILM_TITLE: "BRAIN — الفيلم السينمائي الطويل"
-          BRAIN_FILM_PARTS: "240"
-          BRAIN_FILM_PART_SECONDS: "30"
-          BRAIN_FILM_START: "${{ matrix.start }}"
-          BRAIN_FILM_END: "${{ matrix.end }}"
-          BRAIN_FILM_SHARD_ONLY: "1"
+          BRAIN_FILM_TITLE: 'BRAIN — الفيلم السينمائي الطويل'
+          BRAIN_FILM_PARTS: '240'
+          BRAIN_FILM_PART_SECONDS: '30'
+          BRAIN_FILM_START: '${{ matrix.start }}'
+          BRAIN_FILM_END: '${{ matrix.end }}'
+          BRAIN_FILM_SHARD_ONLY: '1'
         run: |
           PYTHONPATH=. python brain_v12/machine_cinematic_factory.py
           test -f brain6_artifacts/machine_films/manifest.json
-          grep -q '"status": "SHARD_COMPLETED"' brain6_artifacts/machine_films/manifest.json
+          python brain_v12/cinematic_master_qc.py shard brain6_artifacts/machine_films/manifest.json
       - name: Upload shard
         uses: actions/upload-artifact@v4
         with:
           name: brain-cinema-shard-${{ matrix.shard }}
           path: brain6_artifacts/machine_films
           retention-days: 2
-
   assemble:
-    name: Assemble and verify master
+    name: Assemble and verify cinematic master
     needs: render
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Install media runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
       - name: Download shards
         uses: actions/download-artifact@v4
         with:
           pattern: brain-cinema-shard-*
           path: shards
           merge-multiple: false
+      - name: Validate shard evidence
+        run: |
+          test "$(find shards -name 'manifest.json' | wc -l)" -eq 4
+          python - <<'PY'
+          import glob,json
+          manifests=[json.load(open(p,encoding='utf-8')) for p in glob.glob('shards/**/manifest.json',recursive=True)]
+          parts=sum(len(m.get('parts_manifest',[])) for m in manifests)
+          assert parts==240,parts
+          assert all(m.get('status')=='SHARD_COMPLETED' for m in manifests)
+          assert all(all(p.get('narration_asset') and p.get('music_asset') and p.get('motion') for p in m['parts_manifest']) for m in manifests)
+          print('CINEMATIC_EVIDENCE=240/240')
+          PY
       - name: Assemble master
         run: |
           mkdir -p master/parts
@@ -86,27 +82,24 @@ jobs:
           find master/parts -type f -name 'part-*.mp4' -printf '%f\n' | sort -V | awk '{print "file \x27parts/" $0 "\x27"}' > master/concat.txt
           test "$(wc -l < master/concat.txt)" -eq 240
           ffmpeg -y -f concat -safe 0 -i master/concat.txt -c copy master/final.mp4
-      - name: Master QC
-        run: |
-          ffprobe -v error -show_entries format=duration -show_entries stream=codec_type,width,height -of json master/final.mp4 > master/qc.json
-          python - <<'PY'
-          import json
-          q=json.load(open("master/qc.json"))
-          duration=float(q["format"]["duration"])
-          streams=q["streams"]
-          video=[s for s in streams if s.get("codec_type")=="video"][0]
-          assert 7190 <= duration <= 7210, duration
-          assert video["width"]==1000 and video["height"]==650
-          print("BRAIN_120_MINUTE_MASTER_QC=VERIFIED", duration)
-          PY
-          printf 'BRAIN MACHINE CINEMA VERIFIED — 120 MINUTES\n' > master/VERIFIED_COMPLETED
-      - name: Build master manifest
+      - name: Cinematic Master QC
+        run: python brain_v12/cinematic_master_qc.py master master/final.mp4
+      - name: Build verified manifest
         run: |
           python - <<'PY'
-          import json, pathlib
-          q=json.load(open("master/qc.json"))
-          manifest={"status":"VERIFIED_COMPLETED","title":"BRAIN — الفيلم السينمائي الطويل","parts":240,"part_seconds":30,"target_seconds":7200,"master_qc":q,"renderer":"Brain Machine Raster Painter","external_api":False}
-          pathlib.Path("master/manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
+          import json,pathlib
+          q=json.load(open('master/cinematic_qc.json',encoding='utf-8'))
+          assert q['status']=='CINEMATIC_QC_PASSED'
+          pathlib.Path('master/manifest.json').write_text(json.dumps({
+            'status':'VERIFIED_COMPLETED',
+            'title':'BRAIN — الفيلم السينمائي الطويل',
+            'parts':240,'part_seconds':30,'target_seconds':7200,
+            'renderer':'Brain Machine Raster Painter v2',
+            'voice':'espeak-ng local Arabic narration',
+            'music':'local procedural music bed',
+            'external_api':False,'cinematic_qc':q
+          },ensure_ascii=False,indent=2))
+          pathlib.Path('master/VERIFIED_COMPLETED').write_text('BRAIN CINEMATIC MASTER VERIFIED\n',encoding='utf-8')
           PY
       - name: Upload verified master
         uses: actions/upload-artifact@v4
@@ -115,6 +108,6 @@ jobs:
           path: |
             master/final.mp4
             master/manifest.json
-            master/qc.json
+            master/cinematic_qc.json
             master/VERIFIED_COMPLETED
           retention-days: 7
