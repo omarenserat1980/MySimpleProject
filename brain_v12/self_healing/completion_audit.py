@@ -21,6 +21,8 @@ def main():
     findings=[]
     py=list(ROOT.glob("brain_v12/**/*.py"))+list(ROOT.glob("cloud/**/*.py"))
     for p in py:
+        if p.resolve() == Path(__file__).resolve():
+            continue
         try: text=p.read_text(encoding="utf-8")
         except Exception: continue
         for i,line in enumerate(text.splitlines(),1):
