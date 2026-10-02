@@ -24,12 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Install Brain runtime dependencies
+        run: python3 -m pip install -r cloud/requirements.txt
       - name: Run Brain reasoning loop self-test
         env:
           BRAIN_REFLECTION_TURNS: ${{ inputs.max_cycles || '3' }}
         run: python3 brain_v12/self_healing/brain_reasoning_loop.py
       - name: Validate ChatGPT fail-closed behavior
         run: |
+          python3 - <<'PY'
           from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
           r = ChatGPTReasoner()
           if not r.provider.configured:
@@ -38,5 +41,6 @@ jobs:
               print('CHATGPT_FAIL_CLOSED=PASS')
           else:
               print('CHATGPT_PROVIDER=CONFIGURED')
+          PY
       - name: Run complete self-test
         run: python3 brain_v12/self_healing/self_test.py
