@@ -59,6 +59,10 @@ class CustomerRequest(BaseModel):
     display_name: str
     service: str
     need: str
+    customer_type: str = "INDIVIDUAL"
+    legal_entity_name: str | None = None
+    registration_id: str | None = None
+    authorized_representative: str | None = None
     marketing_consent: bool = False
 
 
@@ -99,12 +103,25 @@ def _customer_audit(record: dict, event: str, **details: object) -> None:
 @app.post("/api/customers")
 def create_customer(body: CustomerRequest):
     display_name, service, need = body.display_name.strip(), body.service.strip(), body.need.strip()
+    allowed_types = {"INDIVIDUAL", "SOLE_PROPRIETOR", "COMPANY", "ORGANIZATION", "GOVERNMENT", "PARTNER"}
+    entity_types = {"COMPANY", "ORGANIZATION", "GOVERNMENT"}
+    customer_type = body.customer_type.strip().upper()
+    if customer_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="unsupported customer_type")
     if not display_name or not service or not need:
         raise HTTPException(status_code=400, detail="display_name, service and need are required")
     request_id = str(uuid.uuid4())
     record = {
         "request_id": request_id,
         "display_name": display_name,
+        "customer_type": customer_type,
+        "legal_entity": {
+            "is_entity": customer_type in entity_types,
+            "legal_entity_name": (body.legal_entity_name or display_name).strip() if customer_type in entity_types else None,
+            "registration_id": body.registration_id.strip() if body.registration_id else None,
+            "authorized_representative": body.authorized_representative.strip() if body.authorized_representative else None,
+            "verification_state": "REQUIRED" if customer_type in entity_types else "NOT_APPLICABLE",
+        },
         "service": service,
         "need": need,
         "consent": {
