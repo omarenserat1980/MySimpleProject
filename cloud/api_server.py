@@ -604,3 +604,187 @@ def decide_diwan_approval(approval_id: str, body: ApprovalDecisionRequest):
 @app.get("/v1/diwan/notifications", dependencies=[Depends(require_auth)])
 def diwan_notifications(limit: int = 100):
     return {"ok": True, "system": "BRAIN_DIWAN", "notifications": notification_status(limit)}
+
+def now_iso() -> str:
+    return __import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# BRAIN DIWAN & SECRETARIAT OS — registry / cases / correspondence / archive
+# ---------------------------------------------------------------------------
+from cloud.diwan import (
+    CaseFile, Correspondence, CorrespondenceState, DocumentVersion,
+    RoutingAssignment, RecordState, archive_eligible, content_hash, register_number,
+)
+
+DIWAN_STATE = STATE / "diwan"
+DIWAN_STATE.mkdir(parents=True, exist_ok=True)
+
+
+def _diwan_safe(value: str) -> str:
+    value = value.strip()
+    if not value or "/" in value or "\\" in value or value in {".", ".."}:
+        raise HTTPException(status_code=400, detail="invalid identifier")
+    return value
+
+
+def _diwan_json(name: str, value: dict) -> None:
+    path = DIWAN_STATE / f"{_diwan_safe(name)}.json"
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _diwan_read(name: str) -> dict | None:
+    path = DIWAN_STATE / f"{_diwan_safe(name)}.json"
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _diwan_next(prefix: str) -> str:
+    year = time.gmtime().tm_year
+    counter = DIWAN_STATE / f"counter-{prefix}-{year}.txt"
+    current = int(counter.read_text() or "0") if counter.exists() else 0
+    current += 1
+    tmp = counter.with_suffix(".tmp")
+    tmp.write_text(str(current), encoding="utf-8")
+    tmp.replace(counter)
+    return register_number(prefix, current, year)
+
+
+class DiwanCorrespondenceRequest(BaseModel):
+    direction: str
+    subject: str
+    channel: str
+    sender: str | None = None
+    recipients: list[str] = []
+    case_id: str | None = None
+    classification: str = "UNCLASSIFIED"
+    confidentiality: str = "INTERNAL"
+    content_ref: str | None = None
+    attachments: list[str] = []
+
+
+class DiwanCaseRequest(BaseModel):
+    title: str
+    owner_type: str
+    owner_id: str
+
+
+class DiwanRouteRequest(BaseModel):
+    target: str
+    assigned_by: str
+    deadline_at: str | None = None
+    notes: str = ""
+
+
+@app.post("/v1/diwan/cases", dependencies=[Depends(require_auth)])
+def diwan_create_case(body: DiwanCaseRequest):
+    case = CaseFile(title=body.title.strip(), owner_type=body.owner_type.strip(), owner_id=body.owner_id.strip())
+    case.number = _diwan_next("CASE")
+    _diwan_json("case-" + case.case_id, case.__dict__)
+    return {"ok": True, "system": "BRAIN_DIWAN", "case": case.__dict__}
+
+
+@app.get("/v1/diwan/cases/{case_id}", dependencies=[Depends(require_auth)])
+def diwan_get_case(case_id: str):
+    case = _diwan_read("case-" + _diwan_safe(case_id))
+    if not case:
+        raise HTTPException(status_code=404, detail="case not found")
+    return {"ok": True, "system": "BRAIN_DIWAN", "case": case}
+
+
+@app.post("/v1/diwan/correspondence", dependencies=[Depends(require_auth)])
+def diwan_register_correspondence(body: DiwanCorrespondenceRequest):
+    direction = body.direction.upper().strip()
+    if direction not in {"INBOUND", "OUTBOUND"}:
+        raise HTTPException(status_code=400, detail="direction must be INBOUND or OUTBOUND")
+    c = Correspondence(
+        direction=direction,
+        subject=body.subject.strip(),
+        channel=body.channel.strip().upper(),
+        sender=body.sender,
+        recipients=body.recipients,
+        case_id=body.case_id,
+        classification=body.classification,
+        confidentiality=body.confidentiality,
+        content_ref=body.content_ref,
+        attachments=body.attachments,
+    )
+    c.number = _diwan_next("IN" if direction == "INBOUND" else "OUT")
+    c.transition(CorrespondenceState.REGISTERED, "diwan")
+    if body.case_id:
+        c.transition(CorrespondenceState.CLASSIFIED, "diwan")
+        c.transition(CorrespondenceState.LINKED, "diwan")
+        case = _diwan_read("case-" + _diwan_safe(body.case_id))
+        if case:
+            case.setdefault("correspondence_ids", []).append(c.correspondence_id)
+            _diwan_json("case-" + body.case_id, case)
+    _diwan_json("corr-" + c.correspondence_id, c.__dict__ | {"state": c.state.value, "events": c.events})
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": c.__dict__ | {"state": c.state.value}}
+
+
+@app.get("/v1/diwan/correspondence", dependencies=[Depends(require_auth)])
+def diwan_list_correspondence(limit: int = 100):
+    limit = max(1, min(500, limit))
+    items = []
+    for p in sorted(DIWAN_STATE.glob("corr-*.json"), reverse=True)[:limit]:
+        try:
+            items.append(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": items}
+
+
+@app.get("/v1/diwan/correspondence/{correspondence_id}", dependencies=[Depends(require_auth)])
+def diwan_get_correspondence(correspondence_id: str):
+    item = _diwan_read("corr-" + _diwan_safe(correspondence_id))
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": item}
+
+
+@app.post("/v1/diwan/correspondence/{correspondence_id}/route", dependencies=[Depends(require_auth)])
+def diwan_route_correspondence(correspondence_id: str, body: DiwanRouteRequest):
+    item = _diwan_read("corr-" + _diwan_safe(correspondence_id))
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    state = CorrespondenceState(item["state"])
+    c = Correspondence(
+        direction=item["direction"], subject=item["subject"], channel=item["channel"],
+        sender=item.get("sender"), recipients=item.get("recipients", []),
+        case_id=item.get("case_id"), classification=item.get("classification", "UNCLASSIFIED"),
+        confidentiality=item.get("confidentiality", "INTERNAL"), content_ref=item.get("content_ref"),
+        attachments=item.get("attachments", []), correspondence_id=item["correspondence_id"],
+        number=item.get("number"), state=state, created_at=item.get("created_at", now_iso()),
+        updated_at=item.get("updated_at", now_iso()), events=item.get("events", []),
+    )
+    if c.state not in {CorrespondenceState.CLASSIFIED, CorrespondenceState.LINKED}:
+        raise HTTPException(status_code=409, detail="correspondence is not ready for routing")
+    c.transition(CorrespondenceState.ROUTED, body.assigned_by, "assigned to " + body.target)
+    item = c.__dict__ | {"state": c.state.value, "events": c.events}
+    item["routing"] = RoutingAssignment(correspondence_id, body.target, body.assigned_by, deadline_at=body.deadline_at, notes=body.notes).__dict__
+    _diwan_json("corr-" + correspondence_id, item)
+    return {"ok": True, "system": "BRAIN_DIWAN", "correspondence": item}
+
+
+@app.get("/v1/diwan/archive/eligibility/{correspondence_id}", dependencies=[Depends(require_auth)])
+def diwan_archive_eligibility(correspondence_id: str):
+    item = _diwan_read("corr-" + _diwan_safe(correspondence_id))
+    if not item:
+        raise HTTPException(status_code=404, detail="correspondence not found")
+    state = RecordState.CLOSED if item["state"] == "CLOSED" else RecordState.ACTIVE
+    held = item["state"] == "LEGAL_HOLD"
+    return {"ok": True, "system": "BRAIN_DIWAN", "eligible": archive_eligible(state, held), "legal_hold": held}
+
+
+@app.get("/v1/diwan/registry", dependencies=[Depends(require_auth)])
+def diwan_registry(limit: int = 100):
+    return {
+        "ok": True,
+        "system": "BRAIN_DIWAN",
+        "cases": len(list(DIWAN_STATE.glob("case-*.json"))),
+        "correspondence": len(list(DIWAN_STATE.glob("corr-*.json"))),
+        "approvals": len(list_approvals(None, limit)),
+    }
