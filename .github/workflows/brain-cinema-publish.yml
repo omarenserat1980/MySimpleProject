@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify production artifact
+        shell: bash
+        run: |
+          if [ "\${{ github.event_name }}" = "workflow_run" ]; then echo "Artifact will be downloaded from the verified production run."; else test -s docs/assets/last_light_city.mp4; fi
       - name: Prepare cinema metadata
         shell: bash
         run: |
@@ -36,10 +40,20 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
-      - name: Normalize published video
-        if: ${{ github.event_name == 'workflow_run' }}
+      - name: Verify published video
         run: |
           test -s docs/assets/last_light_city.mp4
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json docs/assets/last_light_city.mp4 > /tmp/film-probe.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/film-probe.json').read_text())
+          streams=d.get('streams',[])
+          assert streams and streams[0].get('codec_name'), 'video stream missing'
+          assert float(streams[0].get('duration') or 0) > 0, 'video duration missing'
+          print('published artifact verified')
+          PY
           rm -f docs/assets/ffprobe.json docs/assets/film_manifest.json docs/assets/VERIFIED_COMPLETED
 
       - name: Verify web package
