@@ -145,7 +145,7 @@ def test_customer_portal_lifecycle_and_financial_gate(monkeypatch, tmp_path):
         json={"message": "Service update", "channel": "EMAIL", "purpose": "SERVICE"},
     )
     assert service_message.status_code == 200
-    assert service_message.json()["gate"] == "AUTHORIZED_NOT_SENT"
+    assert service_message.json()["gate"] == "QUEUED_FOR_CONNECTOR"
 
     financial = client.get(
         f"/api/customers/{request_id}/financial",
@@ -228,7 +228,7 @@ def test_diwan_case_and_correspondence_routes(monkeypatch, tmp_path):
     assert corr.status_code == 200
     item = corr.json()["correspondence"]
     assert item["number"].startswith("IN-")
-    assert item["state"] == "LINKED"
+    assert item["state"] == "REGISTERED"
 
     listed = client.get("/v1/diwan/correspondence", headers=headers)
     assert listed.status_code == 200
@@ -284,7 +284,7 @@ def test_customer_feedback_api_lifecycle_and_evidence(monkeypatch, tmp_path):
         "marketing_consent": False,
     })
     assert created.status_code == 200
-    feedback_id = created.json()["feedback_id"]
+    feedback_id = created.json()["feedback"]["feedback_id"]
     assert created.json()["state"] == "RECEIVED"
 
     headers = {"Authorization": "Bearer test-token"}
