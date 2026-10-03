@@ -29,7 +29,7 @@ class CommercialDashboardAPITests(unittest.TestCase):
     def test_create_case_is_evidence_gated(self):
         response = self.client.post(
             "/api/commercial/cases",
-            json={"capability_id": "brain-automation-services"},
+            json={"capability_id": "brain-automation-services", "case_id": "case-create-test"},
         )
         self.assertEqual(response.status_code, 200)
         case = response.json()["case"]
@@ -42,6 +42,11 @@ class CommercialDashboardAPITests(unittest.TestCase):
         self.assertFalse(case["funds_moved_by_brain"])
 
     def test_cases_endpoint_lists_created_case(self):
+        created = self.client.post(
+            "/api/commercial/cases",
+            json={"capability_id": "digital-commerce", "case_id": "case-list-test"},
+        )
+        self.assertEqual(created.status_code, 200)
         response = self.client.get("/api/commercial/cases")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
