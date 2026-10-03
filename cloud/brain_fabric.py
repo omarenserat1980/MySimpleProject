@@ -71,6 +71,35 @@ def heartbeat(node_id: str, *, state: str = "READY", jobs_running: int = 0) -> d
         _atomic_write(path, record)
     return record
 
+def update_node(node_id: str, **changes: Any) -> dict[str, Any]:
+    """Apply a validated partial node update and persist it atomically."""
+    node_id = _validate_id(node_id)
+    allowed = {"provider", "architecture", "endpoint", "capabilities", "state", "jobs_running"}
+    capacity_allowed = {"cpu", "memory_mb", "storage_gb"}
+    unknown = set(changes) - allowed - capacity_allowed
+    if unknown:
+        raise ValueError("unsupported node fields: " + ",".join(sorted(unknown)))
+    path = _state_dir() / f"node-{node_id}.json"
+    with _LOCK:
+        record = _read(path)
+        if not record:
+            raise KeyError(node_id)
+        for key in allowed:
+            if key in changes and changes[key] is not None:
+                if key == "capabilities":
+                    record[key] = sorted(set(str(x).strip() for x in changes[key] if str(x).strip()))
+                elif key == "jobs_running":
+                    record[key] = max(0, int(changes[key]))
+                elif key == "state":
+                    record[key] = str(changes[key]).strip().upper() or "READY"
+                elif key in {"provider", "architecture", "endpoint"}:
+                    record[key] = changes[key]
+        for key in capacity_allowed:
+            if key in changes and changes[key] is not None:
+                record.setdefault("capacity", {})[key] = int(changes[key]) if key != "cpu" else float(changes[key])
+        _atomic_write(path, record)
+    return record
+
 def list_nodes() -> list[dict[str, Any]]:
     with _LOCK:
         items = [_read(p) for p in sorted(_state_dir().glob("node-*.json"))]
