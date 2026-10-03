@@ -38,3 +38,8 @@ Reason: Direct file execution can remove the repository root from sys.path and p
 
 ## D-009 — Legacy ideas are preserved
 Decision: Existing legacy requirements and prior architectural ideas should be retained and migrated rather than silently deleted.
+
+## D-010 — Pytest is the canonical Brain test runner
+Decision: Use pytest for the Brain test suite in GitHub Actions.
+
+Reason: The repository tests use pytest-style test functions; unittest discovery does not reliably collect them. CI must execute the actual test files and fail when the suite cannot run.
