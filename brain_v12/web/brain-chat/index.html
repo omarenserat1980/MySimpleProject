@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain AI</title>
+<style>
+body{margin:0;font-family:system-ui;background:#111827;color:#f9fafb}main{max-width:900px;margin:auto;height:100vh;display:flex;flex-direction:column}
+header{padding:18px;border-bottom:1px solid #374151;font-size:22px;font-weight:700}
+#chat{flex:1;overflow:auto;padding:20px}.msg{padding:12px 16px;margin:10px 0;border-radius:14px;white-space:pre-wrap;line-height:1.6}.user{background:#1f2937}.assistant{background:#172554}
+form{display:flex;gap:10px;padding:16px;border-top:1px solid #374151}textarea{flex:1;resize:none;border:1px solid #4b5563;border-radius:12px;background:#0f172a;color:white;padding:12px}button{border:0;border-radius:12px;padding:0 20px;font-weight:700;cursor:pointer}
+</style></head>
+<body><main><header>🧠 Brain AI</header><section id="chat"></section>
+<form id="form"><textarea id="input" rows="2" placeholder="اكتب رسالتك إلى Brain..."></textarea><button>إرسال</button></form></main>
+<script>
+let sessionId=null;
+const chat=document.querySelector('#chat'), input=document.querySelector('#input');
+function add(role,text){const d=document.createElement('div');d.className='msg '+role;d.textContent=text||'';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d}
+async function init(){const r=await fetch('/api/brain-chat/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Brain AI Chat'})});const j=await r.json();sessionId=j.session.id;add('assistant','مرحباً. أنا Brain AI. كيف يمكنني مساعدتك؟')}
+document.querySelector('#form').onsubmit=async e=>{e.preventDefault();const message=input.value.trim();if(!message||!sessionId)return;input.value='';add('user',message);const pending=add('assistant','...');try{const r=await fetch('/api/brain-chat/sessions/'+sessionId+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});const j=await r.json();pending.textContent=j.response?.content||j.status||'تعذر الحصول على رد.'}catch(err){pending.textContent='حدث خطأ في الاتصال بـBrain.'}};
+init();
+</script></body></html>
