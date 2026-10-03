@@ -24,12 +24,13 @@ class BrainAIResponse:
 
 class BrainAI:
     """Unified Brain AI facade with governed model-driven tool execution."""
-    def __init__(self, provider, memory_store=None, cognitive=None, github=None, max_tool_rounds=4):
+    def __init__(self, provider, memory_store=None, cognitive=None, github=None, max_tool_rounds=4, max_tool_retries=2):
         self.provider = provider
         self.memory_store = memory_store
         self.cognitive = cognitive
         self.github = github
         self.max_tool_rounds = max(1, int(max_tool_rounds))
+        self.max_tool_retries = max(0, int(max_tool_retries))
         self.tools: Dict[str, BrainAITool] = {}
         self._register_builtin_tools()
 
@@ -59,7 +60,7 @@ class BrainAI:
         return {"name":"Brain AI","version":"1.2","provider":provider_status,
                 "tools":[{"name":t.name,"description":t.description,"risk":t.risk,"permission":t.permission} for t in self.tools.values()],
                 "memory_enabled":self.memory_store is not None,"cognitive_loop_enabled":self.cognitive is not None,
-                "github_gateway": self.github is not None, "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds}
+                "github_gateway": self.github is not None, "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries}
 
     def _context(self) -> str:
         parts=[]
@@ -118,13 +119,30 @@ class BrainAI:
                 name=intent["name"]
                 params=intent["params"]
                 outcome=self.execute_tool(name, params, approved=approved)
-                record={"round":round_no,"tool":name,"params":params,"result":outcome}
+                attempts=0
+                while not self._verify_tool_outcome(outcome) and self._retryable(outcome) and attempts < self.max_tool_retries:
+                    attempts += 1
+                    evidence.append({"type":"self_healing","tool":name,"action":"retry","attempt":attempts,"round":round_no,"reason":outcome.get("error") or outcome.get("status")})
+                    outcome=self.execute_tool(name, params, approved=approved)
+                record={"round":round_no,"tool":name,"params":params,"result":outcome,"retry_count":attempts,"verified":self._verify_tool_outcome(outcome)}
                 calls.append(record)
                 trace.append(record)
-                evidence.append({"type":"tool","tool":name,"status":outcome.get("status","EXECUTED" if outcome.get("ok") else "FAILED"),"round":round_no})
+                evidence.append({"type":"tool","tool":name,"status":outcome.get("status","EXECUTED" if outcome.get("ok") else "FAILED"),"round":round_no,"verified":record["verified"],"retry_count":attempts})
                 if not outcome.get("ok") and outcome.get("status") in {"WAITING_APPROVAL","WAITING_PERMISSION"}:
                     return BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status"))
         return BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT")
+
+    @staticmethod
+    def _verify_tool_outcome(outcome: Dict[str, Any]) -> bool:
+        if not isinstance(outcome, dict):
+            return False
+        if not outcome.get("ok"):
+            return False
+        return outcome.get("status", "EXECUTED") not in {"FAILED", "INVALID_TOOL_RESULT"}
+
+    @staticmethod
+    def _retryable(outcome: Dict[str, Any]) -> bool:
+        return isinstance(outcome, dict) and outcome.get("status") == "FAILED"
 
     def execute_tool(self, name: str, params: Optional[Dict[str, Any]]=None, approved: bool=False) -> Dict[str, Any]:
         tool=self.tools.get(name)
