@@ -84,6 +84,7 @@ jobs:
           assert js.startswith("window.BRAIN_API_BASE = ")
           print("Pages payload validation: OK")
           PY
+      # Unique naming avoids stale-artifact collisions when a workflow attempt is rerun.
       - uses: actions/upload-pages-artifact@v4
         with:
           name: brain-pages-${{ github.run_id }}-${{ github.run_attempt }}

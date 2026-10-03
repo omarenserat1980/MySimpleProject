@@ -51,6 +51,7 @@ class BrainAI:
         def solve(params):
             goal = str((params or {}).get("goal", "")).strip()
             if not goal:
+                # Keep the empty-input contract consistent with ProblemSolver.
                 return {"ok": False, "status": "EMPTY_GOAL"}
             result = problem_solver.solve(goal)
             return result
