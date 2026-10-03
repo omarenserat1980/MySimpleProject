@@ -1,4 +1,4 @@
-name: Brain Actions Python Probe
+name: Brain Actions Compile Probe
 
 on:
   push:
@@ -11,11 +11,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Python probe
-        run: python --version
+      - name: Compile
+        run: python -m compileall -q brain_v12/tests
