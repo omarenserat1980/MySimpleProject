@@ -9,13 +9,6 @@ on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
-  schedule:
-    - cron: "17 * * * *"
-
-permissions:
-  contents: read
-  actions: read
-
 jobs:
   evolution:
     runs-on: ubuntu-latest
