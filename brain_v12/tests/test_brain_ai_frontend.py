@@ -17,6 +17,7 @@ class BrainAIFrontendTest(unittest.TestCase):
             'localStorage',
             'brain_ai_chats_v2',
             'brain_ai_api_base',
+            'window.BRAIN_API_BASE',
             '/api/brain-chat/sessions',
             'ensureSession',
             '/messages',
