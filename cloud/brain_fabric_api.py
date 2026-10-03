@@ -1,6 +1,6 @@
 """FastAPI routes for BRAIN Cloud Fabric."""
 from __future__ import annotations
-import os, hmac, time
+import os, hmac
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,8 @@ class HeartbeatRequest(BaseModel):
     jobs_running: int = 0
     architecture: str | None = None
     cpu: float | None = None
+    memory_mb: int | None = None
+    storage_gb: int | None = None
     capabilities: list[str] | None = None
 
 class JobRequest(BaseModel):
@@ -79,27 +81,21 @@ def node_heartbeat(node_id: str, body: HeartbeatRequest):
     if not verify_enrollment(node_id, body.enrollment_token):
         raise HTTPException(status_code=401, detail="invalid or expired enrollment token")
     try:
-        result=heartbeat(node_id, state=body.state, jobs_running=body.jobs_running)
+        result = heartbeat(node_id, state=body.state, jobs_running=body.jobs_running)
     except KeyError:
-        # First heartbeat may complete registration using the authenticated bootstrap token.
-        result=register_node(
+        result = register_node(
             node_id, architecture=body.architecture or "unknown",
-            cpu=body.cpu or 0, capabilities=body.capabilities or [])
+            cpu=body.cpu or 0, memory_mb=body.memory_mb or 0,
+            storage_gb=body.storage_gb or 0, capabilities=body.capabilities or [])
     else:
-        changed=False
-        if body.architecture:
-            result["architecture"]=body.architecture; changed=True
-        if body.cpu is not None:
-            result["capacity"]["cpu"]=body.cpu; changed=True
-        if body.capabilities is not None:
-            result["capabilities"]=sorted(set(body.capabilities)); changed=True
-        if changed:
-            result = update_node(
-                node_id,
-                architecture=body.architecture,
-                cpu=body.cpu,
-                capabilities=body.capabilities,
-            )
+        result = update_node(
+            node_id,
+            architecture=body.architecture,
+            cpu=body.cpu,
+            memory_mb=body.memory_mb,
+            storage_gb=body.storage_gb,
+            capabilities=body.capabilities,
+        )
     return {"ok": True, "node": result}
 
 @router.post("/choose", dependencies=[Depends(fabric_auth)])
@@ -115,7 +111,7 @@ def job_create(body: JobRequest):
 
 @router.get("/jobs/{job_id}", dependencies=[Depends(fabric_auth)])
 def job_get(job_id: str):
-    job=get_job(job_id)
+    job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="fabric job not found")
     return {"ok": True, "job": job}
