@@ -26,27 +26,38 @@ def sha256_text(text: str) -> str:
 
 
 def fetch_source(url: str) -> str:
-    """Fetch the Tanzil export using its documented POST form contract."""
-    params = {
-        "quranType": "uthmani",
-        "outType": "txt-2",
-        "agree": "true",
-        "marks": "true",
-        "sajdah": "true",
-        "rub": "true",
-        "stanween": "true",
-    }
-    target = url.split("?", 1)[0]
-    request = urllib.request.Request(
-        target,
-        data=urllib.parse.urlencode(params).encode("ascii"),
-        headers={
-            "User-Agent": "BRAIN-Quran-Pipeline/1.0",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "text/plain,*/*",
-        },
-        method="POST",
-    )
+    """Fetch either the pinned Tanzil-derived JSON mirror or Tanzil's POST export."""
+    if "raw.githubusercontent.com" in url:
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "BRAIN-Quran-Pipeline/1.0",
+                "Accept": "application/json,text/plain,*/*",
+            },
+            method="GET",
+        )
+    else:
+        params = {
+            "quranType": "uthmani",
+            "outType": "txt-2",
+            "agree": "true",
+            "marks": "true",
+            "sajdah": "true",
+            "rub": "true",
+            "stanween": "true",
+            "tatweel": "true",
+        }
+        target = url.split("?", 1)[0]
+        request = urllib.request.Request(
+            target,
+            data=urllib.parse.urlencode(params).encode("ascii"),
+            headers={
+                "User-Agent": "BRAIN-Quran-Pipeline/1.0",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "text/plain,*/*",
+            },
+            method="POST",
+        )
     with urllib.request.urlopen(request, timeout=60) as response:
         text = response.read().decode("utf-8-sig")
     if not text.strip():
