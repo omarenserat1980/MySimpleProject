@@ -15,13 +15,14 @@ on:
     paths:
       - "brain_v12/**"
       - ".github/workflows/brain-github-cloud.yml"
+      - ".github/workflows/brain-github-supervisor.yml"
       - "PROJECT_MASTER_SPEC.md"
       - "PROJECT_ROADMAP.md"
       - "DECISIONS.md"
 
 concurrency:
-  group: brain-github-cloud
-  cancel-in-progress: true
+  group: brain-github-cloud-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -108,23 +109,16 @@ jobs:
           from brain_v12.github_capability_registry import GITHUB_TOOL_COUNT, GITHUB_TOOLS
           assert GITHUB_TOOL_COUNT == 89, GITHUB_TOOL_COUNT
           assert len(GITHUB_TOOLS) == 89, len(GITHUB_TOOLS)
-          required = {
-              "fetch_pr",
-              "fetch_workflow_job_logs",
-              "merge_pull_request",
-              "update_file",
-              "search_repositories",
-          }
+          required = {"fetch_pr","fetch_workflow_job_logs","merge_pull_request","update_file","search_repositories"}
           missing = sorted(required - set(GITHUB_TOOLS))
           assert not missing, missing
           print("github_capability_registry=PASS")
-          print("github_tool_count=89")
           PY
 
       - name: Run GitHub Agent tests
         run: |
           set -euo pipefail
-          python -m unittest             brain_v12.tests.test_github_control_plane             brain_v12.tests.test_github_agent_router             brain_v12.tests.test_github_capability_registry             brain_v12.tests.test_github_executor             brain_v12.tests.test_github_planner             brain_v12.tests.test_github_task_engine             brain_v12.tests.test_github_runtime_adapter             brain_v12.tests.test_github_agent             brain_v12.tests.test_github_autonomous_supervisor             -v
+          python -m unittest discover -s brain_v12/tests -p 'test_github_*.py' -v
 
       - name: Execute Brain task
         run: |
@@ -134,60 +128,35 @@ jobs:
       - name: Run Brain tests
         run: |
           set -euo pipefail
-          if [ -d brain_v12/tests ]; then
-            python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
-          else
-            echo "No brain_v12/tests directory; compile gate remains authoritative."
-          fi
+          python -m unittest discover -s brain_v12/tests -p 'test_*.py' -v
 
       - name: Verify task result evidence
-        if: always()
+        if: success()
         run: |
           set -euo pipefail
           test -f brain6_artifacts/github_cloud/task_result.json
           python - <<'PY'
           import json
-          p="brain6_artifacts/github_cloud/task_result.json"
-          d=json.load(open(p, encoding="utf-8"))
-          print(json.dumps(d, indent=2))
+          print(json.dumps(json.load(open("brain6_artifacts/github_cloud/task_result.json")), indent=2))
           PY
 
       - name: Verify toolchain
+        if: success()
         run: |
           set -euo pipefail
-          for tool in ffmpeg ffprobe git python; do
-            command -v "$tool" >/dev/null || { echo "MISSING=$tool"; exit 1; }
-          done
-
-      - name: Verify task evidence
-        run: |
-          set -euo pipefail
-          test -f brain6_artifacts/github_cloud/task_result.json
-          cat brain6_artifacts/github_cloud/task_result.json
+          for tool in ffmpeg ffprobe git python; do command -v "$tool" >/dev/null || exit 1; done
 
       - name: Write evidence
+        if: success()
         run: |
           set -euo pipefail
           cat > brain6_artifacts/github_cloud/evidence.json <<EOF
-          {
-            "state": "VERIFIED_RUNNER_READY",
-            "mode": "github-actions",
-            "task": "$BRAIN_TASK",
-            "run_id": "$GITHUB_RUN_ID",
-            "commit": "$GITHUB_SHA",
-            "os": "$RUNNER_OS",
-            "arch": "$RUNNER_ARCH",
-            "persistent_vm": false,
-            "billing_model": "github-hosted-standard-runner",
-            "github_capability_registry": 89,
-            "github_agent_tests": "required",
-            "next_layer": "brain task executor",
-            "executor_contract": "task resolved from workflow_dispatch input"
-          }
+          {"state":"VERIFIED_RUNNER_READY","mode":"github-actions","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","github_capability_registry":89,"github_agent_tests":"PASS"}
           EOF
           cat brain6_artifacts/github_cloud/evidence.json
 
       - name: Upload evidence
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: brain-github-cloud-evidence
