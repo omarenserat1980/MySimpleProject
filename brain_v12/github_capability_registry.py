@@ -106,7 +106,7 @@ WRITE_OR_MUTATING_TOOLS = {
     if any(token in name for token in (
         "create_", "update_", "delete_", "merge_", "enable_", "rerun_",
         "add_", "remove_", "request_", "dismiss_", "convert_", "mark_",
-        "lock_", "unlock_", "resolve_", "unresolve_", "label_", "reply_",
+        "lock_", "unlock_", "resolve_", "unresolve_", "label_", "reply_", "dispatch_",
     ))
 }
 
