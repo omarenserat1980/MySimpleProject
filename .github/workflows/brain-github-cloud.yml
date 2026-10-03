@@ -135,14 +135,29 @@ jobs:
           set -euo pipefail
           PYTHONPATH=. python -m unittest brain_v12.tests.test_verification_gate -v
 
-      - name: Verify task result evidence
+      - name: Verify task result through unified gate
         if: success()
         run: |
           set -euo pipefail
           test -f brain6_artifacts/github_cloud/task_result.json
-          python - <<'PY'
+          PYTHONPATH=. python - <<'PY'
           import json
-          print(json.dumps(json.load(open("brain6_artifacts/github_cloud/task_result.json")), indent=2))
+          from brain_v12.brain.verification_gate import VerificationGate
+
+          with open("brain6_artifacts/github_cloud/task_result.json", encoding="utf-8") as f:
+              task = json.load(f)
+
+          result = {
+              "ok": task.get("ok") is True,
+              "status": "COMPLETED" if task.get("state") == "TASK_COMPLETED" else "FAILED",
+              "evidence": task,
+          }
+          decision = VerificationGate.evaluate(result)
+          print(json.dumps({"task": task, "verification_gate": decision}, indent=2, ensure_ascii=False))
+          assert decision["action_verified"] is True, decision
+          assert decision["objective_verified"] is False, decision
+          assert decision["status"] == "ACTION_VERIFIED", decision
+          assert decision["evidence_ref"], decision
           PY
 
       - name: Verify toolchain
@@ -156,7 +171,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > brain6_artifacts/github_cloud/evidence.json <<EOF
-          {"state":"VERIFIED_RUNNER_READY","mode":"github-actions","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","github_capability_registry":90,"github_agent_tests":"PASS"}
+          {"state":"VERIFIED_RUNNER_READY","mode":"github-actions","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","github_capability_registry":90,"github_agent_tests":"PASS","verification_gate":"ACTION_VERIFIED_ONLY"}
           EOF
           cat brain6_artifacts/github_cloud/evidence.json
 
