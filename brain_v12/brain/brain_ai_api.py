@@ -1,15 +1,16 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BrainAIChatIn(BaseModel):
     message: str
     instructions: str = ""
+    approved: bool = False
 
 
 class BrainAIToolIn(BaseModel):
     name: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
     approved: bool = False
 
 
@@ -22,7 +23,7 @@ def router(brain_ai):
 
     @r.post("/chat")
     def chat(body: BrainAIChatIn):
-        result = brain_ai.chat(body.message, body.instructions)
+        result = brain_ai.chat(body.message, body.instructions, body.approved)
         return {"ok": result.ok, "reply": result.reply, "mode": result.mode,
                 "model": result.model, "tool_calls": result.tool_calls,
                 "evidence": result.evidence, "error": result.error}
