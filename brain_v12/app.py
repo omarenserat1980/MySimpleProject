@@ -61,6 +61,7 @@ from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
 from . import visual_engine
 from . import short_video_factory
+from .cloud_bootstrap import bootstrap_status
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -135,6 +136,11 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+
+@app.get("/api/brain/cloud/status")
+def brain_cloud_status():
+    """Return verified Brain Cloud bootstrap/runtime state without exposing secrets."""
+    return bootstrap_status()
 
 @app.middleware("http")
 async def no_cache(request, call_next):
