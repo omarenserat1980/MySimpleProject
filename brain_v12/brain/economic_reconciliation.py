@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 class ReconciliationRequest(BaseModel):
     order_id: str
+    payment_transaction_id: str
     payment_evidence_ref: str
     delivery_evidence_ref: str
     amount_usd: float
@@ -41,8 +42,8 @@ class ReconciliationStore:
         os.replace(tmp, self.path)
 
     def reconcile(self, body: ReconciliationRequest) -> Dict[str, Any]:
-        if not body.payment_evidence_ref.strip() or not body.delivery_evidence_ref.strip():
-            raise ValueError("independent payment and delivery evidence are required")
+        if not body.payment_transaction_id.strip() or not body.payment_evidence_ref.strip() or not body.delivery_evidence_ref.strip():
+            raise ValueError("payment transaction, payment evidence, and delivery evidence are required")
         if body.currency != "USD" or body.amount_usd <= 0:
             raise ValueError("unsupported currency or invalid amount")
 
@@ -55,6 +56,7 @@ class ReconciliationStore:
             "state": "REVENUE_REALIZED",
             "amount_usd": body.amount_usd,
             "currency": body.currency,
+            "payment_transaction_id": body.payment_transaction_id,
             "payment_evidence_ref": body.payment_evidence_ref,
             "delivery_evidence_ref": body.delivery_evidence_ref,
             "money_movement": False,
