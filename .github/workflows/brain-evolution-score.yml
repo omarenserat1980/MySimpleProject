@@ -55,3 +55,5 @@ jobs:
           name: brain-evolution-evidence
           path: .brain/state/brain_evolution.json
           if-no-files-found: error
+
+# Trigger validation: unique top-level events verified.
