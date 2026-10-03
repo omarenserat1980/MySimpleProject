@@ -15,7 +15,7 @@ class FakeControlPlane:
         return {"workflow_runs": [{
             "id": 123,
             "name": "Self Healing",
-            "path": ".github/workflows/brain-continuous-self-healing.yml",
+            "path": "workflow.yml",
             "status": "completed",
             "conclusion": "success",
             "created_at": "2999-01-01T00:00:00Z",
