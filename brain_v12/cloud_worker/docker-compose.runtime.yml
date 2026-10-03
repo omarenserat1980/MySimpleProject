@@ -1,0 +1,22 @@
+services:
+  brain-runtime:
+    build:
+      context: ../..
+      dockerfile: brain_v12/cloud_worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      BRAIN_CLOUD_API_KEY: ${BRAIN_CLOUD_API_KEY:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - brain-worker-state:/var/lib/brain
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  brain-worker-state:
