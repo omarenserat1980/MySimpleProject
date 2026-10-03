@@ -86,6 +86,9 @@ jobs:
           PY
       - uses: actions/upload-pages-artifact@v4
         with:
+          name: brain-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: brain-pages-${{ github.run_id }}-${{ github.run_attempt }}

@@ -131,7 +131,7 @@ class TestBrainAI(unittest.TestCase):
         self.ai.connect_supervisor(type("Solver", (), {"solve": lambda self, goal: self.fail("must not run")})())
         result = self.ai.execute_tool("supervisor.solve", {"goal": "  "})
         self.assertFalse(result["ok"])
-        self.assertEqual(result["status"], "GOAL_REQUIRED")
+        self.assertEqual(result["status"], "EMPTY_GOAL")
 
     def test_full_github_tool_surface_is_registered(self):
         from brain_v12.github_capability_registry import GITHUB_TOOLS
