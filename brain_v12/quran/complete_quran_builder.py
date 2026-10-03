@@ -18,11 +18,7 @@ from typing import Any, Iterable
 
 EXPECTED_AYAHS = 6236
 EXPECTED_SURAHS = 114
-DEFAULT_SOURCE = (
-    "https://tanzil.net/pub/download/index.php?"
-    "quranType=uthmani&outType=txt-2&agree=true&marks=true"
-    "&sajdah=true&rub=true&stanween=true"
-)
+DEFAULT_SOURCE = "https://raw.githubusercontent.com/dotquran/corpus/main/processed/quran-uthmani.json"
 
 
 def sha256_text(text: str) -> str:
@@ -56,6 +52,21 @@ def fetch_source(url: str) -> str:
     if not text.strip():
         raise RuntimeError("QURAN_SOURCE_EMPTY")
     return text
+
+
+def parse_dotquran_json(text: str) -> list[tuple[str, str]]:
+    payload = json.loads(text)
+    verses: list[tuple[str, str]] = []
+    for surah in payload.get("surahs", []):
+        surah_number = int(surah["number"])
+        for ayah in surah.get("ayahs", []):
+            ayah_number = int(ayah["number"])
+            if ayah_number <= 0:
+                continue
+            verse_text = str(ayah["text"]).strip()
+            if verse_text:
+                verses.append((f"{surah_number}:{ayah_number}", verse_text))
+    return verses
 
 
 def parse_tanzil_lines(text: str) -> list[tuple[str, str]]:
@@ -123,7 +134,10 @@ def main() -> int:
     args = parser.parse_args()
 
     text = args.source_file.read_text(encoding="utf-8-sig") if args.source_file else fetch_source(args.source_url)
-    verses = parse_tanzil_lines(text)
+    if text.lstrip().startswith("{"):
+        verses = parse_dotquran_json(text)
+    else:
+        verses = parse_tanzil_lines(text)
     records, manifest = process(verses)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
