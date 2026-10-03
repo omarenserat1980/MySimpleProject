@@ -1,7 +1,7 @@
 """Brain-native media toolchain resolver.
 
 Production media code must use the Brain-provided FFmpeg/FFprobe toolchain.
-There is intentionally NO fallback to the host/system ffmpeg binaries.
+Production has no fallback to host/system binaries; CI may use a runner-installed tool.
 Configure BRAIN_FFMPEG_BIN and BRAIN_FFPROBE_BIN, or package executables at
 brain_v12/bin/ffmpeg and brain_v12/bin/ffprobe.
 """
@@ -19,6 +19,10 @@ def _resolve(env_name: str, filename: str) -> str:
     if configured:
         candidates.append(pathlib.Path(configured))
     candidates.append(BIN_ROOT / filename)
+    if os.getenv("CI", "").lower() == "true":
+        system_path = shutil.which(filename)
+        if system_path:
+            candidates.append(pathlib.Path(system_path))
     for path in candidates:
         if path.is_file() and os.access(path, os.X_OK):
             return str(path.resolve())
