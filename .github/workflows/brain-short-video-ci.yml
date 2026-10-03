@@ -7,6 +7,9 @@ on:
       - "brain_v12/short_video_factory.py"
       - "brain_v12/tests/test_short_video_factory.py"
       - "brain_v12/tests/test_short_video_api.py"
+      - "brain_v12/tests/test_youtube_publisher.py"
+      - "brain_v12/brain/youtube_publisher.py"
+      - "brain_v12/brain/youtube_oauth.py"
       - "brain_v12/app.py"
       - "brain_v12/media_engine.py"
       - ".github/workflows/brain-short-video-ci.yml"
@@ -33,6 +36,8 @@ jobs:
         run: python -m compileall -q brain_v12
       - name: Short video factory tests
         run: python -m unittest brain_v12.tests.test_short_video_factory brain_v12.tests.test_short_video_api -v
+      - name: YouTube publisher tests
+        run: python -m unittest brain_v12.tests.test_youtube_publisher -v
       - name: Media engine tests
         run: python -m unittest brain_v12.tests.test_media_engine -v
       - name: Independent verification gate
