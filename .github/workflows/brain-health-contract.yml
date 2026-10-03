@@ -41,6 +41,7 @@ jobs:
                   "customer_api",
                   "feedback_task_bridge",
                   "task_engine_evidence",
+                  "release_gate_contract",
               ],
           }
           out = Path(".brain_state/health_contract")
