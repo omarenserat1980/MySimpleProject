@@ -1,0 +1,28 @@
+name: Brain AI Core
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/brain_ai.py'
+      - 'brain_v12/brain/brain_ai_api.py'
+      - 'brain_v12/app.py'
+      - 'brain_v12/tests/test_brain_ai.py'
+      - 'docs/BRAIN_AI_GEMINI_LIKE_ARCHITECTURE.md'
+  push:
+    branches: [main]
+    paths:
+      - 'brain_v12/brain/brain_ai.py'
+      - 'brain_v12/brain/brain_ai_api.py'
+      - 'brain_v12/app.py'
+      - 'brain_v12/tests/test_brain_ai.py'
+      - 'docs/BRAIN_AI_GEMINI_LIKE_ARCHITECTURE.md'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s brain_v12/tests -p 'test_brain_ai.py' -v

@@ -21,6 +21,8 @@ from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
+from .brain.brain_ai import BrainAI
+from .brain.brain_ai_api import router as brain_ai_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
@@ -61,6 +63,7 @@ store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); stor
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
+brain_ai=BrainAI(openai_provider, store, cognitive)
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
@@ -115,6 +118,7 @@ from .brain.customer_portal import router as customer_router
 from .brain.economic_reconciliation import router as economic_reconciliation_router
 from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
+app.include_router(brain_ai_router(brain_ai))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
