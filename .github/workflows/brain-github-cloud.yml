@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > brain6_artifacts/github_cloud/evidence.json <<EOF
-          {"state":"VERIFIED_RUNNER_READY","mode":"github-actions","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","github_capability_registry":89,"github_agent_tests":"PASS"}
+          {"state":"VERIFIED_RUNNER_READY","mode":"github-actions","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","github_capability_registry":90,"github_agent_tests":"PASS"}
           EOF
           cat brain6_artifacts/github_cloud/evidence.json
 
