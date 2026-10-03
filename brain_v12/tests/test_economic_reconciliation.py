@@ -38,6 +38,7 @@ class EconomicReconciliationTests(unittest.TestCase):
     def test_reconcile_is_idempotent_and_evidence_gated(self):
         payload = {
             "order_id": "BRAIN-ORD-1",
+            "payment_transaction_id": "tx:1",
             "payment_evidence_ref": "pay:1",
             "delivery_evidence_ref": "delivery:1",
             "amount_usd": 9,
