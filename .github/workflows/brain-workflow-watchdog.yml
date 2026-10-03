@@ -36,16 +36,22 @@ jobs:
         id: inspect
         env:
           GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p brain6_artifacts/workflow_watchdog
+          printf '%s\n' "$TARGET_SHA" > brain6_artifacts/workflow_watchdog/target_sha.txt
           gh run list --limit 50 --json databaseId,status,conclusion,workflowName,attempt,headSha,createdAt,updatedAt             > brain6_artifacts/workflow_watchdog/recent-runs.json
 
           python - <<'PY'
           import json
           from pathlib import Path
 
+          import os
+          target_sha=os.environ["TARGET_SHA"].strip()
+          if not target_sha:
+              raise SystemExit("TARGET_SHA is required")
           data=json.loads(Path("brain6_artifacts/workflow_watchdog/recent-runs.json").read_text())
           rows=[]
           for r in data:
@@ -54,6 +60,8 @@ jobs:
               if r.get("status") != "completed":
                   continue
               if r.get("conclusion") not in {"failure","timed_out"}:
+                  continue
+              if r.get("headSha") != target_sha:
                   continue
               rows.append({
                   "run_id": r.get("databaseId"),
