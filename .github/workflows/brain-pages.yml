@@ -4,6 +4,7 @@ on:
     paths:
       - "cloud/web/**"
       - "brain_v12/web/brain-app-v2/**"
+      - "brain_v12/web/brain-chat/**"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
 permissions:
@@ -27,14 +28,22 @@ jobs:
           BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN }}
         run: |
           rm -rf _site
-          mkdir -p _site/brain-app-v2
+          mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
+          cp -a brain_v12/web/brain-chat/. _site/brain-chat/
           python - <<'PY'
           import json, os
           from pathlib import Path
+          origin = os.environ.get("BRAIN_API_ORIGIN", "").strip().rstrip("/")
+          if origin and not origin.startswith("https://"):
+              raise SystemExit("BRAIN_API_ORIGIN must use HTTPS")
           Path("_site/brain-app-v2/config.json").write_text(
-              json.dumps({"api_base": os.environ.get("BRAIN_API_ORIGIN", "").rstrip("/")}, ensure_ascii=False),
+              json.dumps({"api_base": origin}, ensure_ascii=False),
+              encoding="utf-8",
+          )
+          Path("_site/brain-chat/config.js").write_text(
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\\n",
               encoding="utf-8",
           )
           PY
