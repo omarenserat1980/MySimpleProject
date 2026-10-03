@@ -1,4 +1,4 @@
-"""SQLite-backed conversation sessions for Brain Chat."""
+"""SQLite-backed conversation sessions and per-session memory for Brain Chat."""
 
 from __future__ import annotations
 import json
@@ -41,6 +41,12 @@ class ChatSessionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_chat_session_messages
               ON chat_session_messages(session_id, id);
+            CREATE TABLE IF NOT EXISTS chat_session_memory(
+              session_id TEXT PRIMARY KEY,
+              summary TEXT NOT NULL DEFAULT '',
+              updated_at TEXT NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES chat_sessions(id)
+            );
             """)
 
     def create(self, title="New Brain Chat"):
@@ -49,6 +55,10 @@ class ChatSessionStore:
         with self.connect() as con:
             con.execute("INSERT INTO chat_sessions VALUES(?,?,?,?)",
                         (sid, title or "New Brain Chat", stamp, stamp))
+            con.execute(
+                "INSERT INTO chat_session_memory(session_id,summary,updated_at) VALUES(?,?,?)",
+                (sid, "", stamp),
+            )
             con.commit()
         return self.get(sid)
 
@@ -70,6 +80,10 @@ class ChatSessionStore:
                 "SELECT role,content,metadata,created_at FROM chat_session_messages "
                 "WHERE session_id=? ORDER BY id", (session_id,)
             ).fetchall()
+            memory = con.execute(
+                "SELECT summary,updated_at FROM chat_session_memory WHERE session_id=?",
+                (session_id,),
+            ).fetchone()
         out = dict(session)
         out["messages"] = []
         for row in messages:
@@ -79,6 +93,7 @@ class ChatSessionStore:
             except Exception:
                 item["metadata"] = {}
             out["messages"].append(item)
+        out["memory"] = dict(memory) if memory else {"summary": "", "updated_at": None}
         return out
 
     def context_messages(self, session_id, limit=24):
@@ -99,6 +114,32 @@ class ChatSessionStore:
                 item["metadata"] = {}
             items.append(item)
         return items
+
+    def get_memory(self, session_id):
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT summary,updated_at FROM chat_session_memory WHERE session_id=?",
+                (session_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def set_memory(self, session_id, summary):
+        stamp = _now()
+        with self.connect() as con:
+            exists = con.execute(
+                "SELECT 1 FROM chat_sessions WHERE id=?", (session_id,)
+            ).fetchone()
+            if not exists:
+                return None
+            con.execute(
+                "INSERT INTO chat_session_memory(session_id,summary,updated_at) VALUES(?,?,?) "
+                "ON CONFLICT(session_id) DO UPDATE SET summary=excluded.summary,updated_at=excluded.updated_at",
+                (session_id, str(summary or ""), stamp),
+            )
+            con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?",
+                        (stamp, session_id))
+            con.commit()
+        return self.get_memory(session_id)
 
     def add_message(self, session_id, role, content, metadata=None):
         stamp = _now()
