@@ -21,6 +21,7 @@ from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
 from cloud.customer_communications import Channel, CommunicationHub, MessageState
 from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
+from cloud.brain_fabric_api import router as fabric_router
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -29,6 +30,7 @@ TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
 app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
 runtime = CloudRuntime()
 COMMUNICATION_HUB = CommunicationHub(STATE / "customer_communications")
+app.include_router(fabric_router)
 
 # The Cloud Hub owns its queue worker. No Termux/external process is required.
 if os.getenv("BRAIN_API_QUEUE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}:
