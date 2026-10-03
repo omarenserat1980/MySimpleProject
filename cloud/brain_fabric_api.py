@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from cloud.brain_fabric import (
     register_node, heartbeat, list_nodes, choose_node, create_job,
-    get_job, transition_job, snapshot,
+    get_job, transition_job, snapshot, update_node,
 )
 from cloud.brain_node_security import create_enrollment, verify_enrollment
 
@@ -94,8 +94,12 @@ def node_heartbeat(node_id: str, body: HeartbeatRequest):
         if body.capabilities is not None:
             result["capabilities"]=sorted(set(body.capabilities)); changed=True
         if changed:
-            from cloud.brain_fabric import _state_dir, _atomic_write
-            _atomic_write(_state_dir()/f"node-{node_id}.json", result)
+            result = update_node(
+                node_id,
+                architecture=body.architecture,
+                cpu=body.cpu,
+                capabilities=body.capabilities,
+            )
     return {"ok": True, "node": result}
 
 @router.post("/choose", dependencies=[Depends(fabric_auth)])
