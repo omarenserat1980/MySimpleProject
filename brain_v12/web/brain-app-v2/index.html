@@ -27,5 +27,5 @@
  <div class="notice">التنفيذ الخارجي يخضع لصلاحيات Brain والأدلة المطلوبة.</div>
 </footer>
 </main></div>
-<script src="./app.js"></script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{})}</script><script src="./app.js"></script>
 </body></html>
