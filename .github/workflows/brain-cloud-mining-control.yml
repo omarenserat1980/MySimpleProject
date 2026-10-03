@@ -39,6 +39,10 @@ jobs:
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_end_to_end.py
 
+      - name: Validate worker telemetry normalization gate
+        run: |
+          python -m pytest -q brain_v12/business/test_crypto_worker_telemetry.py
+
       - name: Validate live public mining market freshness gate
         run: |
           python -m pytest -q brain_v12/business/test_crypto_live_collector.py
