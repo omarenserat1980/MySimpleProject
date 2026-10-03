@@ -2,7 +2,7 @@ from brain_v12.github_capability_registry import GITHUB_TOOL_COUNT, GITHUB_TOOLS
 
 def test_github_tool_surface_is_complete():
     assert GITHUB_TOOL_COUNT == 90
-    assert len(GITHUB_TOOLS) == 89
+    assert len(GITHUB_TOOLS) == 90
     assert has_tool("fetch_pr")
     assert has_tool("merge_pull_request")
     assert has_tool("fetch_workflow_job_logs")
