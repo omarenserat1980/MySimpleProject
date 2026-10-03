@@ -1,21 +1,69 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Brain AI</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Brain AI — Electronic Brain</title>
 <style>
-body{margin:0;font-family:system-ui;background:#111827;color:#f9fafb}main{max-width:900px;margin:auto;height:100vh;display:flex;flex-direction:column}
-header{padding:18px;border-bottom:1px solid #374151;font-size:22px;font-weight:700}
-#chat{flex:1;overflow:auto;padding:20px}.msg{padding:12px 16px;margin:10px 0;border-radius:14px;white-space:pre-wrap;line-height:1.6}.user{background:#1f2937}.assistant{background:#172554}
-form{display:flex;gap:10px;padding:16px;border-top:1px solid #374151}textarea{flex:1;resize:none;border:1px solid #4b5563;border-radius:12px;background:#0f172a;color:white;padding:12px}button{border:0;border-radius:12px;padding:0 20px;font-weight:700;cursor:pointer}
-</style></head>
-<body><main><header>🧠 Brain AI</header><section id="chat"></section>
-<form id="form"><textarea id="input" rows="2" placeholder="اكتب رسالتك إلى Brain..."></textarea><button>إرسال</button></form></main>
+:root{--bg:#050b14;--panel:#0b1422;--panel2:#101c2c;--line:#20344a;--text:#edf6ff;--muted:#8fa5bb;--accent:#55d6ff;--accent2:#9d7cff;--good:#43e0a1;--warn:#ffd166;--bad:#ff6b81}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:radial-gradient(circle at 70% 0,#153452 0,#07111f 35%,#050b14 75%);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea{font:inherit}button{cursor:pointer}.app{height:100%;display:grid;grid-template-columns:280px 1fr}
+.sidebar{background:#07111ddd;border-left:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;backdrop-filter:blur(20px)}
+.brand{display:flex;align-items:center;gap:10px}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:25px;background:radial-gradient(circle,#8be9ff,#3877e8 48%,#512f91);box-shadow:0 0 28px #55d6ff44}.brand h1{font-size:18px;margin:0}.brand small{color:var(--muted)}
+.status{padding:12px;border:1px solid var(--line);background:#081522;border-radius:14px}.statusRow{display:flex;align-items:center;gap:8px;font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--warn);box-shadow:0 0 10px currentColor}.online .dot{background:var(--good)}.offline .dot{background:var(--bad)}
+.new{width:100%;border:1px solid #31516e;background:#10263b;color:#fff;padding:12px;border-radius:12px;font-weight:700}.nav{display:grid;gap:5px}.nav button{border:1px solid transparent;background:transparent;color:#a9bbce;text-align:right;padding:10px 11px;border-radius:10px}.nav button:hover,.nav button.active{background:#10263b;border-color:#234763;color:#fff}
+.sideFoot{margin-top:auto;color:#687f95;font-size:11px;line-height:1.7}
+.main{min-width:0;display:flex;flex-direction:column;height:100%}.top{height:66px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:#07111dcc;backdrop-filter:blur(16px)}.topTitle b{font-size:16px}.topTitle small{display:block;color:var(--muted);margin-top:2px}.model{border:1px solid var(--line);background:#0c1827;border-radius:999px;padding:8px 12px;color:#a9c0d5;font-size:11px}
+.messages{flex:1;overflow:auto;padding:30px 20px 130px}.wrap{max-width:900px;margin:auto}.welcome{text-align:center;padding:8vh 10px 30px}.orb{width:92px;height:92px;margin:auto;border-radius:50%;background:radial-gradient(circle,#b6f4ff,#55d6ff 12%,#3877e8 43%,#6338a3 65%,transparent 72%);filter:drop-shadow(0 0 32px #55d6ff77);animation:pulse 3s infinite}@keyframes pulse{50%{transform:scale(1.06)}}.welcome h2{margin:18px 0 6px;font-size:30px}.welcome p{color:var(--muted);margin:0 auto;max-width:650px;line-height:1.8}
+.msg{display:flex;gap:10px;margin:20px 0;align-items:flex-start}.msg.user{flex-direction:row-reverse}.avatar{flex:0 0 34px;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#13263b;color:#cdeeff}.user .avatar{background:#24577b}.bubble{max-width:min(780px,88%);padding:14px 16px;border-radius:17px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}.assistant .bubble{background:#0d1a2a;border:1px solid #20384f;border-bottom-right-radius:5px}.user .bubble{background:linear-gradient(135deg,#14547a,#244c82);border-bottom-left-radius:5px}.meta{font-size:10px;color:#718ba1;margin-top:7px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.chip{font-size:10px;padding:5px 8px;border-radius:999px;border:1px solid #28445d;color:#9fb8cc;background:#081521}
+.typing{display:inline-flex;gap:4px}.typing i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:b 1s infinite}.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}@keyframes b{50%{opacity:.2;transform:translateY(-3px)}}
+.composer{position:fixed;bottom:0;right:280px;left:0;padding:14px 20px 18px;background:linear-gradient(transparent,#050b14 22%)}.compose{max-width:900px;margin:auto;border:1px solid #29455e;background:#091522ee;border-radius:19px;box-shadow:0 18px 55px #0007;padding:9px}.compose textarea{display:block;width:100%;min-height:58px;max-height:180px;resize:none;border:0;outline:0;background:transparent;color:#fff;padding:10px 11px}.actions{display:flex;justify-content:space-between;align-items:center;gap:8px}.hint{font-size:10px;color:#687f95}.send{width:44px;height:44px;border:0;border-radius:13px;background:linear-gradient(135deg,#147da6,#4865d4);color:#fff;font-size:19px}.send:disabled{opacity:.45}.approve{margin-top:9px;padding:9px 12px;border-radius:10px;border:1px solid #765f24;background:#302a12;color:#ffd76b;font-size:11px}
+.quick{max-width:900px;margin:0 auto 14px;display:flex;gap:7px;flex-wrap:wrap}.quick button{border:1px solid var(--line);background:#0b1827;color:#a9bfd1;padding:8px 11px;border-radius:999px;font-size:11px}.quick button:hover{border-color:#3a6382;color:#fff}
+.mobileMenu{display:none}
+@media(max-width:800px){.app{grid-template-columns:1fr}.sidebar{position:fixed;z-index:20;top:0;bottom:0;right:0;width:285px;transform:translateX(105%);transition:.25s;box-shadow:-20px 0 70px #0009}.sidebar.open{transform:translateX(0)}.mobileMenu{display:block;border:1px solid var(--line);background:#0d1b2b;color:#fff;border-radius:10px;width:40px;height:40px}.top{padding:0 12px}.composer{right:0;padding:10px}.messages{padding:20px 10px 125px}.bubble{max-width:88%}.welcome{padding-top:5vh}.welcome h2{font-size:25px}.model{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><div class="logo">🧠</div><div><h1>Brain AI</h1><small>Electronic Brain</small></div></div>
+  <div class="status" id="status"><div class="statusRow"><span class="dot"></span><span>جاري التحقق من Brain…</span></div></div>
+  <button class="new" onclick="newChat()">＋ محادثة جديدة</button>
+  <div class="nav">
+    <button class="active">💬 المحادثة</button>
+    <button onclick="location.href='/'">⌂ لوحة Brain الرئيسية</button>
+    <button onclick="location.href='/code-hub/'">⌘ BRAIN Code Hub</button>
+    <button onclick="location.href='/browser/'">🌐 BRAIN Browser</button>
+    <button onclick="location.href='/media-engine/'">🎬 BRAIN Media Engine</button>
+  </div>
+  <div class="sideFoot">Brain AI لا يعتبر أي إجراء خارجياً ناجحاً إلا إذا عاد بنتيجة موثقة. العمليات الحساسة تتطلب موافقة صريحة.</div>
+</aside>
+<main class="main">
+<header class="top"><button class="mobileMenu" onclick="toggleSide()">☰</button><div class="topTitle"><b>Brain AI</b><small id="sub">المساعد الذكي للعقل الإلكتروني</small></div><div class="model" id="model">Model Router • checking</div></header>
+<section class="messages" id="messages"><div class="wrap" id="wrap">
+  <div class="welcome" id="welcome"><div class="orb"></div><h2>مرحباً، أنا Brain AI</h2><p>أفهم طلبك، أحلله، وأستخدم أدوات Brain عندما تكون متاحة. ابدأ بطلب طبيعي، مثل: «حلّل حالة المشروع» أو «افحص مشكلة GitHub».</p></div>
+</div></section>
+<div class="composer"><div class="wrap">
+  <div class="quick"><button onclick="quick('افحص حالة Brain الحالية')">حالة Brain</button><button onclick="quick('حلّل آخر مشكلة في GitHub')">تحليل GitHub</button><button onclick="quick('ما الأدوات المتاحة لك؟')">الأدوات</button><button onclick="quick('ما الذي تستطيع تنفيذه فعلياً؟')">القدرات</button></div>
+  <div class="compose"><textarea id="input" placeholder="اكتب رسالتك إلى Brain AI…" rows="2"></textarea><div class="actions"><span class="hint">Enter للإرسال • Shift+Enter لسطر جديد</span><button class="send" id="send" onclick="send()">➤</button></div></div>
+</div></div>
+</main>
+</div>
 <script>
-let sessionId=null;
-const chat=document.querySelector('#chat'), input=document.querySelector('#input');
-function add(role,text){const d=document.createElement('div');d.className='msg '+role;d.textContent=text||'';chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d}
-async function init(){const r=await fetch('/api/brain-chat/sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'Brain AI Chat'})});const j=await r.json();sessionId=j.session.id;add('assistant','مرحباً. أنا Brain AI. كيف يمكنني مساعدتك؟')}
-document.querySelector('#form').onsubmit=async e=>{e.preventDefault();const message=input.value.trim();if(!message||!sessionId)return;input.value='';add('user',message);const pending=add('assistant','...');try{const r=await fetch('/api/brain-chat/sessions/'+sessionId+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});const j=await r.json();pending.textContent=j.response?.content||j.status||'تعذر الحصول على رد.'}catch(err){pending.textContent='حدث خطأ في الاتصال بـBrain.'}};
-init();
-</script></body></html>
+const $=id=>document.getElementById(id); let busy=false, approved=false;
+function toggleSide(){$('sidebar').classList.toggle('open')}
+function newChat(){$('wrap').innerHTML='<div class="welcome" id="welcome"><div class="orb"></div><h2>محادثة جديدة</h2><p>أنا جاهز. ما المهمة التي تريد من Brain AI تنفيذها أو تحليلها؟</p></div>';approved=false;if(innerWidth<801)toggleSide()}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function add(role,text,meta='',chips=[]){$('welcome')?.remove();const d=document.createElement('div');d.className='msg '+role;d.innerHTML='<div class="avatar">'+(role==='user'?'👤':'🧠')+'</div><div><div class="bubble">'+esc(text)+'</div>'+ (chips.length?'<div class="chips">'+chips.map(x=>'<span class="chip">'+esc(x)+'</span>').join('')+'</div>':'')+(meta?'<div class="meta">'+esc(meta)+'</div>':'')+'</div>';$('wrap').appendChild(d);scroll();return d}
+function scroll(){$('messages').scrollTop=$('messages').scrollHeight}
+function quick(t){$('input').value=t;$('input').focus();send()}
+async function status(){try{const r=await fetch('/api/brain-ai/status',{cache:'no-store'});const j=await r.json();$('status').className='status online';$('status').innerHTML='<div class="statusRow"><span class="dot"></span><b>Brain متصل</b></div><div style="margin-top:6px;color:#8198ad;font-size:10px">'+esc(j.mode||j.provider||'AI Gateway جاهز')+'</div>';$('model').textContent=(j.model||j.provider||'Model Router')+' • ready'}catch(e){$('status').className='status offline';$('status').innerHTML='<div class="statusRow"><span class="dot"></span><span>Brain غير متصل</span></div>';$('model').textContent='Backend unavailable'}}
+function typing(){const d=document.createElement('div');d.className='msg assistant';d.id='typing';d.innerHTML='<div class="avatar">🧠</div><div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>';$('wrap').appendChild(d);scroll()}
+async function send(){if(busy)return;const input=$('input'),message=input.value.trim();if(!message)return;input.value='';add('user',message);busy=true;$('send').disabled=true;typing();try{const r=await fetch('/api/brain-ai/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,instructions:'أجب بالعربية عند الإمكان. كن عملياً ومختصراً. لا تدّع تنفيذ إجراء لم تُثبت نتيجته.',approved})});const j=await r.json();$('typing')?.remove();if(j.ok){const chips=[];if(j.model)chips.push(j.model);if(j.mode)chips.push(j.mode);if(Array.isArray(j.tool_calls))chips.push(...j.tool_calls.slice(0,4).map(x=>typeof x==='string'?x:(x.name||'tool')));add('assistant',j.reply||'تمت معالجة الطلب.',chips.length?'Brain AI':'',chips)}else{let text=j.reply||j.error||'تعذر إكمال الطلب.';const d=add('assistant',text,'لم يتم اعتماد نجاح غير مثبت');if(String(j.error||'').includes('APPROVAL')){const b=document.createElement('button');b.className='approve';b.textContent='موافقة صريحة ثم إعادة المحاولة';b.onclick=()=>{approved=true;b.remove();sendAgain(message)};d.querySelector('div > div').appendChild(b)}}}catch(e){$('typing')?.remove();add('assistant','تعذر الاتصال بخدمة Brain AI. تحقق من تشغيل الخادم.','Connection error')}finally{busy=false;$('send').disabled=false;status()}}
+async function sendAgain(message){$('input').value=message;await send()}
+$('input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}})
+status();setInterval(status,10000);
+</script>
+</body>
+</html>
