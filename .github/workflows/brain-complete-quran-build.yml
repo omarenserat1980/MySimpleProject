@@ -42,3 +42,5 @@ jobs:
         with:
           name: brain-quran-verse-build
           path: .brain/quran/
+
+# Trigger validation: unique top-level events verified.
