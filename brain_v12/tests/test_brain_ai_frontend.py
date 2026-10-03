@@ -18,6 +18,10 @@ class BrainAIFrontendTest(unittest.TestCase):
             'localStorage',
             'brain_ai_chats_v2',
             'brain_ai_api_base',
+            '/api/brain-chat/sessions',
+            'ensureSession',
+            '/messages',
+            'sessionId',
             'openSettings',
             'renderHistory',
             'snapshot',
@@ -28,7 +32,7 @@ class BrainAIFrontendTest(unittest.TestCase):
             self.assertIn(item, self.html, item)
 
     def test_no_legacy_chat_session_endpoint(self):
-        self.assertNotIn('/api/brain-chat/sessions', self.html)
+        self.assertIn('encodeURIComponent(sid)', self.html)
 
     def test_javascript_syntax(self):
         scripts = re.findall(r'<script(?:[^>]*)>(.*?)</script>', self.html, re.S | re.I)
