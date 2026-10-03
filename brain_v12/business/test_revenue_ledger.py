@@ -1,7 +1,7 @@
 import pytest
 
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
-from brain_v12.business.crypto_mining_verification import VerificationState, start_cloud_mining_verification
+from brain_v12.business.crypto_mining_verification import BlockchainProof, VerificationState, start_cloud_mining_verification
 from brain_v12.business.revenue_ledger import RevenueRecord
 
 
@@ -9,11 +9,15 @@ def _verified_cycle(opportunity_id: str) -> dict:
     cycle = start_cloud_mining_verification("CloudMineCrypto", opportunity_id)
     for state in (VerificationState.RISK_CHECK, VerificationState.FREE_TEST, VerificationState.MEASURE, VerificationState.WITHDRAWAL_TEST):
         cycle.advance(state, "test")
-    return cycle.submit_payout_evidence(PayoutEvidence(
+    cycle.submit_payout_evidence(PayoutEvidence(
         provider="CloudMineCrypto", observed_at="2026-10-02T23:30:00+03:00",
         balance_btc=0.0000012, withdrawal_requested_btc=0.000001, network="bitcoin",
         destination_fingerprint="wallet:sha256:abc", txid="tx-001",
         explorer_url="https://example.test/tx/tx-001", received_btc=0.00000095, fee_btc=0.00000005,
+    ))
+    return cycle.submit_blockchain_proof(BlockchainProof(
+        txid="tx-001", explorer_url="https://example.test/tx/tx-001",
+        confirmations=3, verified_at="2026-10-03T00:00:00+03:00",
     ))
 
 
