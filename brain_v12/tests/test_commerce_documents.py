@@ -33,7 +33,7 @@ class CommerceDocumentsTests(unittest.TestCase):
         order = r.json()["order"]
         oid = order["order_id"]
         self.client.post(f"/api/commerce/orders/{oid}/payment-pending", json={"evidence_ref":"checkout:test"})
-        self.client.post(f"/api/commerce/orders/{oid}/payment-verified", headers=self.headers, json={"evidence_ref":"provider:test"})
+        self.client.post(f"/api/commerce/orders/{oid}/payment-verified", headers=self.headers, json={"transaction_id":"tx:test","evidence_ref":"provider:test"})
         self.client.post(f"/api/commerce/orders/{oid}/delivery-pending", headers=self.headers, json={"evidence_ref":"delivery-request:test"})
         self.client.post(f"/api/commerce/orders/{oid}/delivered", headers=self.headers, json={"evidence_ref":"delivery:test"})
         return oid
