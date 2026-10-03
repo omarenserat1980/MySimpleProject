@@ -2234,6 +2234,7 @@ app.mount('/browser', StaticFiles(directory=os.path.join(ROOT,'web','browser'), 
 app.mount('/brain-chat', StaticFiles(directory=os.path.join(ROOT,'web','brain-chat'), html=True), name='brain-chat')
 app.mount('/text-to-drawing', StaticFiles(directory=os.path.join(ROOT,'web','text-to-drawing'), html=True), name='text-to-drawing')
 app.mount('/local-painter', StaticFiles(directory=os.path.join(ROOT,'web','local-painter'), html=True), name='local-painter')
+app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-app-v2"),html=True),name="brain-app-v2")
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
