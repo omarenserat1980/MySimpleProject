@@ -49,6 +49,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install Brain AI Python dependencies
+        run: python -m pip install -r requirements.txt
       - name: Validate Brain AI frontend contract
         run: python -m unittest brain_v12.tests.test_brain_ai_frontend -v
       - name: Validate Brain AI session API contract
