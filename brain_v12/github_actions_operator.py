@@ -6,6 +6,7 @@ the resulting run, and never treats an accepted dispatch as verified success.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,10 +63,19 @@ class GitHubActionsOperator:
         return runs[0] if runs else None
 
     def wait_for_run(self, repo_full_name: str, workflow_id: str, *,
-                     timeout_seconds: int = 900, poll_seconds: int = 10) -> WorkflowEvidence:
+                     timeout_seconds: int = 900, poll_seconds: int = 10,
+                     not_before: float | None = None) -> WorkflowEvidence:
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
             run = self.latest_run(repo_full_name, workflow_id)
+            if run and not_before is not None:
+                created = run.get("created_at", "")
+                try:
+                    created_ts = datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp()
+                except (ValueError, TypeError):
+                    created_ts = 0.0
+                if created_ts < not_before - 5:
+                    run = None
             if run and run.get("status") == "completed":
                 conclusion = run.get("conclusion")
                 verified = conclusion == "success"
@@ -82,9 +92,11 @@ class GitHubActionsOperator:
                           ref: str = "main", inputs: dict[str, str] | None = None,
                           approved: bool = False, timeout_seconds: int = 900,
                           poll_seconds: int = 10) -> dict[str, Any]:
+        not_before = time.time()
         dispatch = self.dispatch(repo_full_name, workflow_id, ref=ref, inputs=inputs, approved=approved)
         evidence = self.wait_for_run(repo_full_name, workflow_id,
-                                     timeout_seconds=timeout_seconds, poll_seconds=poll_seconds)
+                                     timeout_seconds=timeout_seconds, poll_seconds=poll_seconds,
+                                     not_before=not_before)
         return {"dispatch": dispatch, "evidence": evidence.as_dict(),
                 "verified_completed": evidence.verified}
 
