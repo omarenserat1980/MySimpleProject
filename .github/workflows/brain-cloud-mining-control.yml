@@ -13,75 +13,60 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install test dependencies
         run: |
           python -m pip install --disable-pip-version-check pytest
-
       - name: Validate commercial outcome gate
         run: |
           python -m pytest -q brain_v12/business/test_commercial_outcome_gate.py
-
       - name: Validate monetization registry
         run: |
           python -m pytest -q brain_v12/business/test_monetization_registry.py
-
       - name: Validate initial monetization catalog
         run: |
           python -m pytest -q brain_v12/business/test_initial_monetization_catalog.py
-
       - name: Validate commercial KPI report
         run: |
           python -m pytest -q brain_v12/business/test_commercial_kpi_report.py
-
+      - name: Validate commercial acquisition and delivery case
+        run: |
+          python -m pytest -q brain_v12/business/test_commercial_case.py
       - name: Validate cloud control plane
         run: |
           python -m pytest -q brain_v12/tests/test_cloud_mining_control_plane.py
-
       - name: Validate mining payout and blockchain proof gates
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_verification.py
-
       - name: Validate revenue ledger mining gate
         run: |
           python -m pytest -q brain_v12/business/test_revenue_ledger.py
-
       - name: Validate worker-to-revenue integration gate
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_end_to_end.py
-
       - name: Validate worker telemetry normalization gate
         run: |
           python -m pytest -q brain_v12/business/test_crypto_worker_telemetry.py
-
       - name: Validate live public mining market freshness gate
         run: |
           python -m pytest -q brain_v12/business/test_crypto_live_collector.py
-
       - name: Validate Braiins read-only adapter gate
         run: |
           python -m pytest -q brain_v12/business/test_braiins_readonly_adapter.py
-
       - name: Validate mining economics gate
         run: |
           python -m pytest -q brain_v12/business/test_mining_economics_gate.py
-
       - name: Validate Mining Economics Engine
         run: |
           python -m pytest -q brain_v12/business/test_mining_economics_engine.py
-
       - name: Validate Mining Opportunity Intelligence
         run: |
           python -m pytest -q brain_v12/business/test_mining_opportunity_intelligence.py
-
       - name: Validate Mining Opportunity Audit Bridge
         run: |
           python -m pytest -q brain_v12/business/test_mining_opportunity_audit_bridge.py
-
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
