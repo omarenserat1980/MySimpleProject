@@ -55,12 +55,16 @@ def verify_payment(*, invoice_id: str, amount: Decimal, currency: str,
         raise ValueError("payment verification requires invoice, amount, currency, transaction and evidence")
 
 def recognize_revenue(*, payment_verified: bool, delivered: bool,
-                      payment_transaction_id: str, payment_evidence_ref: str,
-                      delivery_evidence_ref: str, reconciliation_ref: str) -> None:
+                      payment_transaction_id: str = "", payment_evidence_ref: str = "",
+                      delivery_evidence_ref: str = "", reconciliation_ref: str = "",
+                      evidence_ref: str = "") -> None:
+    """Require payment, delivery, and reconciliation evidence before revenue recognition."""
     if not payment_verified:
         raise ValueError("revenue cannot be realized before payment verification")
     if not delivered:
         raise ValueError("revenue cannot be realized before delivery")
+    if evidence_ref and not payment_evidence_ref:
+        payment_evidence_ref = evidence_ref
     if not payment_transaction_id or not payment_evidence_ref:
         raise ValueError("revenue realization requires verified payment transaction evidence")
     if not delivery_evidence_ref or not reconciliation_ref:
