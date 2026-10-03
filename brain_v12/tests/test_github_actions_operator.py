@@ -47,3 +47,27 @@ def test_dispatch_and_wait_reports_verified():
     )
     assert result["verified_completed"] is True
     assert fake.dispatched[0][2] == "workflow.yml"
+
+
+def test_latest_run_is_newest_even_if_api_order_changes():
+    class UnorderedFake(FakeControlPlane):
+        def actions_runs(self, owner, repo, page=1, per_page=50):
+            return {"workflow_runs": [
+                {"id": 1, "path": "workflow.yml", "status": "completed",
+                 "conclusion": "failure", "created_at": "2026-01-01T00:00:00Z"},
+                {"id": 2, "path": "workflow.yml", "status": "completed",
+                 "conclusion": "success", "created_at": "2026-02-01T00:00:00Z"},
+            ]}
+
+    run = GitHubActionsOperator(UnorderedFake()).latest_run("owner/repo", "workflow.yml")
+    assert run["id"] == 2
+
+
+def test_verified_evidence_contains_run_metadata():
+    evidence = GitHubActionsOperator(FakeControlPlane()).wait_for_run(
+        "owner/repo", "workflow.yml", timeout_seconds=1, poll_seconds=1
+    )
+    data = evidence.as_dict()
+    assert data["ref"] is None
+    assert data["created_at"] == "2999-01-01T00:00:00Z"
+    assert data["run_url"] is None
