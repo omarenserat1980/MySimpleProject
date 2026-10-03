@@ -25,6 +25,7 @@ from .predictive_failure_engine import predict
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / ".brain" / "state"
 PY_ROOTS = ("brain_v12", "tests", "scripts")
+PATCH_FILE = STATE / "last_applied_patch.diff"
 
 
 def now() -> str:
@@ -32,12 +33,7 @@ def now() -> str:
 
 
 def continue_autonomously() -> bool:
-    """Return whether the Brain received its explicit continuation directive.
-
-    The directive is intentionally opt-in. It means continue through the safe
-    observe -> diagnose -> execute -> verify -> repair -> retry cycle, never
-    bypassing verification or safety gates.
-    """
+    """Return whether the Brain received its explicit continuation directive."""
     raw = os.getenv("BRAIN_COMMAND", "").strip()
     if raw == "BRAIN_CONTINUE_AUTONOMOUSLY":
         return True
@@ -79,7 +75,12 @@ def deterministic_review(timeout: int) -> tuple[bool, dict]:
             })
             ok = ok and p.returncode == 0
         except subprocess.TimeoutExpired as e:
-            checks.append({"command": " ".join(cmd), "exit_code": 124, "stdout": str(e.stdout or ""), "stderr": str(e.stderr or "")})
+            checks.append({
+                "command": " ".join(cmd),
+                "exit_code": 124,
+                "stdout": str(e.stdout or ""),
+                "stderr": str(e.stderr or ""),
+            })
             ok = False
     return ok, {"checks": checks}
 
@@ -147,9 +148,28 @@ def repair(timeout: int) -> tuple[bool, dict]:
         return False, {"exit_code": 124, "stdout": "", "stderr": "repair timeout"}
 
 
+def rollback_applied_patch() -> tuple[bool, dict]:
+    """Rollback only the patch produced by the verified repair agent."""
+    if not PATCH_FILE.is_file():
+        return True, {"status": "NO_PATCH_TO_ROLLBACK"}
+    try:
+        p = run(["git", "apply", "-R", "--whitespace=error-all", str(PATCH_FILE)])
+    except Exception as exc:
+        return False, {"status": "ROLLBACK_EXCEPTION", "error": repr(exc)}
+    if p.returncode != 0:
+        return False, {
+            "status": "ROLLBACK_FAILED",
+            "exit_code": p.returncode,
+            "stdout": p.stdout[-4000:],
+            "stderr": p.stderr[-4000:],
+        }
+    PATCH_FILE.unlink(missing_ok=True)
+    return True, {"status": "ROLLED_BACK", "exit_code": 0}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--loops", type=int, default=int(os.getenv("BRAIN_REVIEW_LOOPS", "100000000")))
+    ap.add_argument("--loops", type=int, default=int(os.getenv("BRAIN_REVIEW_LOOPS", "1")))
     ap.add_argument("--delay", type=float, default=float(os.getenv("BRAIN_REVIEW_DELAY", "0")))
     ap.add_argument("--timeout", type=int, default=int(os.getenv("BRAIN_REVIEW_TIMEOUT", "120")))
     args = ap.parse_args()
@@ -160,13 +180,12 @@ def main() -> int:
     history = []
     final_ok = True
     autonomous = continue_autonomously()
+    stop_on_failure = os.getenv("BRAIN_STOP_ON_UNRECOVERED_FAILURE", "0") == "1"
     if autonomous:
         print("BRAIN_COMMAND=CONTINUE_AUTONOMOUSLY", flush=True)
 
     for i in range(1, args.loops + 1):
         entry = {"loop": i, "started_at": now(), "review": review_files()}
-        # Predict known failure modes before the main verification cycle.
-        # Prediction is advisory evidence; it never bypasses the verification gate.
         try:
             entry["predictive_preflight"] = predict()
         except Exception as exc:
@@ -176,9 +195,10 @@ def main() -> int:
                 "predicted_failure_count": 0,
                 "error": repr(exc),
             }
+
         ok, details = deterministic_review(args.timeout)
         entry["verification"] = details
-        entry["status"] = "VERIFIED"
+        entry["status"] = "VERIFIED" if ok else "VERIFICATION_FAILED"
 
         if not ok:
             final_ok = False
@@ -194,7 +214,6 @@ def main() -> int:
                 json.dumps(failure, ensure_ascii=False, indent=2), encoding="utf-8"
             )
 
-            # Failure evidence must first become a deterministic proposal.
             proposal_details = materialize_failure_proposal(args.timeout)
             entry["failure_proposal_discovery"] = proposal_details
             proposal_file = STATE / "current_improvement.json"
@@ -202,6 +221,7 @@ def main() -> int:
                 proposal = json.loads(proposal_file.read_text(encoding="utf-8"))
             except Exception:
                 proposal = {}
+
             entry["repair_proposal"] = {
                 "candidate_count": int(proposal.get("candidate_count", 0) or 0),
                 "mode": proposal.get("mode", "PROPOSAL_ONLY"),
@@ -222,17 +242,33 @@ def main() -> int:
                 }
             else:
                 repaired, repair_details = repair(args.timeout)
+
             entry["repair_ok"] = repaired
             entry["repair_exit_code"] = repair_details.get("exit_code")
             entry["repair"] = repair_details
-            ok2, details2 = deterministic_review(args.timeout)
-            entry["post_repair_verification"] = details2
-            entry["status"] = "REPAIRED_AND_VERIFIED" if repaired and ok2 else "REPAIR_FAILED"
-            final_ok = repaired and ok2
+
+            if repaired:
+                ok2, details2 = deterministic_review(args.timeout)
+                entry["post_repair_verification"] = details2
+                final_ok = ok2
+                entry["status"] = "REPAIRED_AND_VERIFIED" if ok2 else "REPAIR_FAILED"
+            else:
+                entry["post_repair_verification"] = {
+                    "status": "NOT_RUN",
+                    "reason": "no_verified_repair_was_applied",
+                }
+                entry["status"] = "REPAIR_FAILED"
+
             append_cycle_history(entry)
 
+            if stop_on_failure and not final_ok:
+                entry["stop_reason"] = "unrecovered_failure"
+                entry["finished_at"] = now()
+                history.append(entry)
+                print(f"BRAIN_REVIEW_LOOP {i}/{args.loops} status={entry['status']}", flush=True)
+                break
+
         if final_ok and (autonomous or os.getenv("BRAIN_PROACTIVE_EVOLUTION", "0") == "1"):
-            # First discover deterministic, evidence-backed opportunities.
             discovery = run(
                 [os.environ.get("PYTHON", "python"), "-m",
                  "brain_v12.self_healing.improvement_engine"],
@@ -260,6 +296,7 @@ def main() -> int:
                     json.dumps(improvement, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+
             improvement["loop"] = i
             improvement["review"] = entry["review"]
             improvement["verification"] = details
@@ -267,6 +304,7 @@ def main() -> int:
                 json.dumps(improvement, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+
             candidate_count = int(improvement.get("candidate_count", 0) or 0)
             mode = str(improvement.get("mode", "PROPOSAL_ONLY"))
             generator_configured = bool(os.getenv("BRAIN_CODE_GENERATOR_COMMAND"))
@@ -293,11 +331,7 @@ def main() -> int:
             if not eligible:
                 entry["proactive_improvement"] = {
                     "status": "NOT_APPLIED",
-                    "reason": (
-                        "no_safe_candidate"
-                        if candidate_count == 0
-                        else "generator_not_eligible"
-                    ),
+                    "reason": "no_safe_candidate" if candidate_count == 0 else "generator_not_eligible",
                 }
                 entry["status"] = "VERIFIED_NO_IMPROVEMENT"
             else:
@@ -316,14 +350,33 @@ def main() -> int:
                         os.environ.pop("BRAIN_REPAIR_CONTEXT", None)
                     else:
                         os.environ["BRAIN_REPAIR_CONTEXT"] = old_context
+
                 entry["proactive_improvement"] = improvement_details
-                print("BRAIN_PROACTIVE_IMPROVEMENT=" + json.dumps(improvement_details, ensure_ascii=False, sort_keys=True), flush=True)
+                print(
+                    "BRAIN_PROACTIVE_IMPROVEMENT="
+                    + json.dumps(improvement_details, ensure_ascii=False, sort_keys=True),
+                    flush=True,
+                )
                 if improved:
-                    final_ok, after_improvement = deterministic_review(args.timeout)
+                    after_ok, after_improvement = deterministic_review(args.timeout)
                     entry["improvement_verification"] = after_improvement
-                    if not final_ok:
+                    if after_ok:
                         final_ok = True
-                        entry["status"] = "IMPROVEMENT_REJECTED_AND_ROLLED_BACK"
+                        entry["status"] = "IMPROVEMENT_VERIFIED"
+                    else:
+                        rolled_back, rollback_details = rollback_applied_patch()
+                        entry["improvement_rollback"] = rollback_details
+                        if rolled_back:
+                            rollback_ok, rollback_verification = deterministic_review(args.timeout)
+                            entry["rollback_verification"] = rollback_verification
+                            final_ok = rollback_ok
+                            entry["status"] = (
+                                "IMPROVEMENT_REJECTED_AND_ROLLED_BACK"
+                                if rollback_ok else "ROLLBACK_VERIFICATION_FAILED"
+                            )
+                        else:
+                            final_ok = False
+                            entry["status"] = "IMPROVEMENT_REJECTED_ROLLBACK_FAILED"
                 else:
                     entry["status"] = "VERIFIED_NO_IMPROVEMENT"
 
@@ -338,10 +391,11 @@ def main() -> int:
         "created_at": now(),
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     report = {
-        "schema": "brain-100m-review-loop/v2",
+        "schema": "brain-100m-review-loop/v3",
         "status": "VERIFIED_COMPLETED" if final_ok else "FAILED_REPAIR_CYCLE",
         "loops_requested": args.loops,
         "loops_completed": len(history),
+        "stopped_early": len(history) < args.loops,
         "finished_at": now(),
         "history": history,
     }
