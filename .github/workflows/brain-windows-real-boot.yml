@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - brain-real-boot-verification
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       iso_url:
