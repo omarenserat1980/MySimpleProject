@@ -11,4 +11,6 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "BRAIN_PLUGIN_AUTOPILOT_BOOT_OK"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - run: echo "BRAIN_PLUGIN_AUTOPILOT_CHECKOUT_OK"
