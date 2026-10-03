@@ -49,6 +49,7 @@ from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
+from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
@@ -121,6 +122,7 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commerce_documents_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(commercial_dashboard_router())
 
 @app.middleware("http")
 async def no_cache(request, call_next):
