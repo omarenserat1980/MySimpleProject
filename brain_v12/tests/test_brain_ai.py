@@ -50,6 +50,21 @@ class TestBrainAI(unittest.TestCase):
             self.assertIn("github.tool." + name, self.ai.tools)
         self.assertEqual(sum(1 for name in self.ai.tools if name.startswith("github.tool.")), len(GITHUB_TOOLS))
 
+
+    def test_chatgpt_capability_registry_is_available(self):
+        result = self.ai.execute_tool("chatgpt.capabilities")
+        self.assertTrue(result["ok"])
+        names = {item["name"] for item in result["tools"]}
+        self.assertIn("web", names)
+        self.assertIn("files", names)
+        self.assertIn("github", names)
+
+    def test_chatgpt_discovery_selects_host_capability(self):
+        result = self.ai.execute_tool("chatgpt.discover", {"query": "ابحث في الويب عن معلومات حديثة"})
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["candidates"])
+        self.assertEqual(result["candidates"][0]["tool"], "web")
+
     def test_github_mutation_surface_remains_approval_gated(self):
         result = self.ai.execute_tool("github.tool.update_file", {"method": "PUT", "path": "/repos/o/r/contents/x"})
         self.assertEqual(result["status"], "WAITING_APPROVAL")
