@@ -83,6 +83,7 @@ workforce=WorkforceControl(store)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
+workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
@@ -1069,6 +1070,23 @@ def youtube_status():
 def youtube_cinematic_prepare(body: CinematicReleaseIn, request: Request):
     require_control_key(request)
     return workforce.prepare_cinematic_release(body.title, body.description, body.media_path, body.tags, body.privacy)
+
+class YouTubePublishIn(BaseModel):
+    title: str
+    description: str = ""
+    media_path: str
+    tags: list[str] = []
+    privacy: str = "private"
+    category_id: str = "22"
+    thumbnail_path: str = ""
+
+@app.post("/api/youtube/publish")
+def youtube_publish(body: YouTubePublishIn, request: Request):
+    require_control_key(request)
+    return workforce.youtube_publisher.publish_cinematic_release(
+        body.title, body.description, body.media_path, body.tags,
+        body.privacy, body.category_id, body.thumbnail_path,
+    )
 
 @app.post("/api/youtube/release/authorize")
 def youtube_release_authorize(body: dict, request: Request):
