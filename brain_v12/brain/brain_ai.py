@@ -59,6 +59,27 @@ class BrainAI:
         self.register_tool("github.registry", "Discover GitHub tools grouped by domain and risk.", lambda p: self._github_registry())
         self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
+        self._register_github_tool_surface()
+
+
+    def _register_github_tool_surface(self):
+        """Expose every governed GitHub capability as a first-class Brain tool."""
+        from ..github_capability_registry import GITHUB_TOOLS, WRITE_OR_MUTATING_TOOLS
+        for tool_name in GITHUB_TOOLS:
+            brain_name = "github.tool." + tool_name
+            mutable = tool_name in WRITE_OR_MUTATING_TOOLS
+            capability = "repo.write" if mutable else "repo.read"
+            risk = "high" if mutable else "low"
+            permission = "github.write" if mutable else None
+            def handler(params, _cap=capability):
+                method = str(params.get("method", "GET")).upper()
+                path = str(params.get("path", ""))
+                if not path.startswith("/"):
+                    raise ValueError("github tool requires an absolute REST path")
+                return self.github.rest(method, path, capability=_cap,
+                                        approved=bool(params.get("approved", False)),
+                                        params=params.get("query"), body=params.get("body"))
+            self.register_tool(brain_name, "GitHub capability: " + tool_name.replace("_", " "), handler, risk=risk, permission=permission)
 
     def _github_registry(self):
         domains = {
