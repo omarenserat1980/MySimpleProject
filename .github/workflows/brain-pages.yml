@@ -52,6 +52,13 @@ jobs:
               raise SystemExit("Brain Chat entry point is missing from Pages artifact")
           if not Path("_site/brain-chat/config.js").is_file():
               raise SystemExit("Brain Chat runtime configuration was not generated")
+          if not Path("_site/index.html").is_file():
+              raise SystemExit("Pages root entry point is missing from artifact")
+          if "\\n" in Path("_site/brain-chat/config.js").read_text(encoding="utf-8"):
+              raise SystemExit("Brain Chat config contains a literal backslash-n")
+          config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
+          if "api_base" not in config:
+              raise SystemExit("Brain app config is missing api_base")
           summary = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary:
               with open(summary, "a", encoding="utf-8") as stream:
