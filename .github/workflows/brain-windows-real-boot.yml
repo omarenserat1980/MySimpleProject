@@ -141,7 +141,7 @@ jobs:
 
           xorriso -indev windows-server-2025.iso \
             -outdev brain-windows-server-2025-proof.iso \
-            -boot_image any replay \
+            -boot_image any keep \
             -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
             -map /tmp/brain-ws-oem/\$OEM\$ '/sources/\$OEM\$' \
             -commit
