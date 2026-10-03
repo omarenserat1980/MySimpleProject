@@ -21,6 +21,9 @@ class WorkflowEvidence:
     conclusion: str | None
     verified: bool
     reason: str
+    ref: str | None = None
+    created_at: str | None = None
+    run_url: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -30,6 +33,9 @@ class WorkflowEvidence:
             "conclusion": self.conclusion,
             "verified": self.verified,
             "reason": self.reason,
+            "ref": self.ref,
+            "created_at": self.created_at,
+            "run_url": self.run_url,
         }
 
 
@@ -60,7 +66,11 @@ class GitHubActionsOperator:
             runs = [r for r in runs if str(r.get("path", "")).endswith(workflow_id)
                     or str(r.get("name", "")) == workflow_id
                     or str(r.get("workflow_id", "")) == workflow_id]
-        return runs[0] if runs else None
+        if not runs:
+            return None
+        # GitHub normally returns newest-first, but sort explicitly so verification
+        # never depends on an undocumented ordering assumption.
+        return max(runs, key=lambda r: str(r.get("created_at", "")))
 
     def wait_for_run(self, repo_full_name: str, workflow_id: str, *,
                      timeout_seconds: int = 900, poll_seconds: int = 10,
@@ -83,6 +93,9 @@ class GitHubActionsOperator:
                     workflow_id, run.get("id"), "VERIFIED" if verified else "FAILED",
                     conclusion, verified,
                     "completed_success" if verified else "workflow_conclusion_not_success",
+                    ref=run.get("head_branch") or run.get("ref"),
+                    created_at=run.get("created_at"),
+                    run_url=run.get("html_url"),
                 )
             time.sleep(max(1, poll_seconds))
         return WorkflowEvidence(workflow_id, None, "TIMEOUT", None, False,
