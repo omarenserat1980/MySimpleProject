@@ -29,6 +29,19 @@ class BrainAIToolTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["full_name"], "o/r")
 
+    def test_tool_failure_is_retried_and_verified(self):
+        attempts = {"n": 0}
+        def flaky(_):
+            attempts["n"] += 1
+            if attempts["n"] == 1:
+                raise RuntimeError("transient")
+            return {"ok": True, "status": "COMPLETED"}
+        self.ai.register_tool("flaky", "test retry", flaky)
+        result = self.ai.chat("retry this")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.tool_calls[0]["retry_count"], 1)
+        self.assertTrue(result.tool_calls[0]["verified"])
+
     def test_write_requires_approval(self):
         result = self.ai.execute_tool("github.write_contents", {"owner":"o","repo":"r","path":"x","body":{}}, approved=False)
         self.assertEqual(result["status"], "WAITING_APPROVAL")
