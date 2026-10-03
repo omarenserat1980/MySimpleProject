@@ -1,0 +1,23 @@
+name: Brain Plugin Verification
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m compileall -q brain_v12/tests
+      - name: Plugin test
+        run: python -m unittest brain_v12.tests.test_brain_autopilot_plugin -v
+      - name: Manifest
+        run: python -c "import json; json.load(open('plugins/brain-autopilot/plugin.json', encoding='utf-8')); print('plugin.json: valid')"
