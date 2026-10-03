@@ -26,6 +26,10 @@ jobs:
         run: |
           python3 -m compileall -q brain_v12/quran
 
+      - name: Install project dependencies
+        run: |
+          python3 -m pip install$(printf ' ') -r requirements.txt
+
       - name: Run V12 self-test
         run: |
           BRAIN_GATE_PYTEST=1 python3 brain_v12/self_healing/self_test.py
