@@ -60,10 +60,13 @@ class ReleaseGate:
    except Exception as e:
     return Gate("cinema_truth",True,False,"process://brain_cinematic_factory",repr(e))
  def _probe_media(self,path:Path):
-  p=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,width,height","-of","json",str(path)],capture_output=True,text=True,timeout=60)
+  from brain_v12 import brain_ffmpeg
+  ffprobe_bin=brain_ffmpeg.ffprobe()
+  p=subprocess.run([ffprobe_bin,"-v","error","-show_entries","format=duration:stream=codec_type,width,height","-of","json",str(path)],capture_output=True,text=True,timeout=60)
   if p.returncode: raise RuntimeError(p.stderr.strip() or "ffprobe failed")
   d=json.loads(p.stdout); streams=d.get("streams",[])
   return {
+   "ffprobe_path":ffprobe_bin,
    "duration":float((d.get("format") or {}).get("duration") or 0),
    "video":any(x.get("codec_type")=="video" for x in streams),
    "audio":any(x.get("codec_type")=="audio" for x in streams),
