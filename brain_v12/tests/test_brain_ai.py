@@ -52,6 +52,17 @@ class TestBrainAI(unittest.TestCase):
         ai = BrainAI(FakeProvider(), FakeMemory(), None, model_router=router)
         self.assertTrue(ai.status()["model_router"]["ok"])
 
+    def test_model_router_evidence_is_exposed(self):
+        class Router:
+            def respond(self, *args, **kwargs):
+                return {"ok": True, "provider": "router-model", "model": "router-model", "reply": "ok", "routing": {"task": "chat", "selected_model": "router-model", "fallback_used": False}, "evidence": {"type": "model_routing", "selected": "router-model"}}
+            def status(self): return {"enabled": True}
+        brain = BrainAI(provider=FakeProvider(), model_router=Router())
+        result = brain.chat("hello")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.model, "router-model")
+        self.assertTrue(any(x.get("type") == "model_routing" for x in result.evidence))
+
     def test_status_exposes_brain_layer(self):
         data = self.ai.status()
         self.assertEqual(data["name"], "Brain AI")
