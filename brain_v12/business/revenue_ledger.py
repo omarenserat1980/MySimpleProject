@@ -50,16 +50,25 @@ class RevenueRecord:
         if verification.get("state") != "REVENUE_REALIZED":
             raise ValueError("mining verification must be REVENUE_REALIZED")
 
-        payout = verification.get("evidence", {}).get("payout_verification", {})
+        evidence = verification.get("evidence", {})
+        payout = evidence.get("payout_verification", {})
+        blockchain = evidence.get("blockchain_proof", {})
+        expected_txid = str(evidence.get("payout_txid", "")).strip()
         if payout.get("status") != "VERIFIED_COMPLETED":
             raise ValueError("verified payout evidence required")
-        if not payout.get("txid") or not payout.get("explorer_url"):
-            raise ValueError("transaction and explorer evidence required")
         if payout.get("financial_state") != "REVENUE_REALIZED":
             raise ValueError("financial realization evidence required")
+        if not expected_txid or not blockchain.get("txid") or not blockchain.get("explorer_url"):
+            raise ValueError("transaction and explorer evidence required")
+        if blockchain.get("txid") != expected_txid:
+            raise ValueError("blockchain proof txid mismatch")
+        if str(blockchain.get("chain_status", "")).upper() != "CONFIRMED":
+            raise ValueError("confirmed blockchain proof required")
+        if int(blockchain.get("confirmations", 0)) < 1:
+            raise ValueError("blockchain confirmations required")
 
         self.evidence.append(
-            f"mining:{verification['provider']}:{payout['txid']}:{payout['explorer_url']}"
+            f"mining:{verification['provider']}:{expected_txid}:{blockchain['explorer_url']}"
         )
         self.status = "REVENUE_REALIZED"
         return self.snapshot()
