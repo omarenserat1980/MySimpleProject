@@ -2,8 +2,10 @@ import unittest
 from brain_v12.brain.brain_ai import BrainAI
 
 class Provider:
+    def __init__(self, responses):
+        self.responses = list(responses)
     def status(self): return {"ok": True}
-    def respond(self, *args, **kwargs): return {"ok": True, "reply": "ok", "provider": "fake", "model": "fake"}
+    def respond(self, *args, **kwargs): return self.responses.pop(0)
 
 class FakeGitHub:
     def capability_catalog(self): return {"ok": True, "domains": ["repositories", "issues", "actions"]}
@@ -18,7 +20,7 @@ class FakeGitHub:
 
 class BrainAIToolTests(unittest.TestCase):
     def setUp(self):
-        self.ai = BrainAI(Provider(), github=FakeGitHub())
+        self.ai = BrainAI(Provider([{"ok": True, "reply": "ok", "provider": "fake", "model": "fake"}]), github=FakeGitHub())
 
     def test_github_tools_are_registered(self):
         self.assertIn("github.repository", self.ai.tools)
@@ -32,6 +34,25 @@ class BrainAIToolTests(unittest.TestCase):
     def test_write_requires_approval(self):
         result = self.ai.execute_tool("github.write_contents", {"owner":"o","repo":"r","path":"x","body":{}}, approved=False)
         self.assertEqual(result["status"], "WAITING_APPROVAL")
+
+    def test_model_driven_tool_loop_executes_and_returns_final_answer(self):
+        provider = Provider([
+            {"ok": True, "provider": "fake", "model": "fake", "tool_calls": [{"name":"github.repository","params":{"owner":"o","repo":"r"}}]},
+            {"ok": True, "provider": "fake", "model": "fake", "reply": "Repository verified."},
+        ])
+        ai = BrainAI(provider, github=FakeGitHub())
+        result = ai.chat("تحقق من المستودع")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.reply, "Repository verified.")
+        self.assertEqual(result.tool_calls[0]["tool"], "github.repository")
+        self.assertTrue(any(e["type"] == "tool" for e in result.evidence))
+
+    def test_unknown_model_tool_is_rejected(self):
+        provider = Provider([{"ok": True, "provider": "fake", "model": "fake", "tool_calls": [{"name":"github.no_such_tool","params":{}}]}])
+        ai = BrainAI(provider, github=FakeGitHub())
+        result = ai.chat("نفذ الأداة")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error, "TOOL_LOOP_LIMIT")
 
 if __name__ == "__main__":
     unittest.main()
