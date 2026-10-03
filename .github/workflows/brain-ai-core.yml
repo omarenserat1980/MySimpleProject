@@ -10,6 +10,7 @@ on:
       - 'brain_v12/tests/test_brain_ai*.py'
       - 'brain_v12/tests/test_chatgpt_tool_bridge.py'
       - 'brain_v12/tests/test_chatgpt_host_gateway.py'
+      - 'brain_v12/tests/test_chat_session_api.py'
       - 'brain_v12/tests/test_autonomous_supervisor.py'
       - 'docs/BRAIN_AI_GEMINI_LIKE_ARCHITECTURE.md'
   push:
@@ -31,4 +32,4 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m unittest discover -s brain_v12/tests -p 'test_brain_ai*.py' -v
-      - run: python -m unittest brain_v12.tests.test_chatgpt_tool_bridge brain_v12.tests.test_chatgpt_host_gateway brain_v12.tests.test_autonomous_supervisor -v
+      - run: python -m unittest brain_v12.tests.test_chatgpt_tool_bridge brain_v12.tests.test_chatgpt_host_gateway brain_v12.tests.test_chat_session_api brain_v12.tests.test_autonomous_supervisor -v
