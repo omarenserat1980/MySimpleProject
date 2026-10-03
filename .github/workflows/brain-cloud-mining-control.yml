@@ -21,7 +21,9 @@ jobs:
           python-version: "3.12"
       - name: Install test dependencies
         run: |
-          python -m pip install --disable-pip-version-check pytest fastapi httpx
+          python -m pip install --disable-pip-version-check pytest
+          python -m pip install --disable-pip-version-check -r requirements.txt
+          python -m pip install --disable-pip-version-check cryptography
       - name: Validate commercial outcome gate
         run: |
           python -m pytest -q brain_v12/business/test_commercial_outcome_gate.py
