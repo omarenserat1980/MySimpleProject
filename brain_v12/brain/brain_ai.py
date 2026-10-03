@@ -56,6 +56,24 @@ class BrainAI:
         self.register_tool("github.search", "Search GitHub resources.", lambda p: g.search(p["query"], p.get("search_type","repositories")))
         self.register_tool("github.write_contents", "Write repository contents; explicit approval required.", lambda p: g.write_contents(p["owner"], p["repo"], p["path"], p["body"], approved=bool(p.get("approved",False))), risk="high", permission="code.write")
         self.register_tool("github.rest", "Governed full GitHub REST gateway for operations not covered by a dedicated Brain tool. Mutations require explicit approval.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
+        self.register_tool("github.registry", "Discover GitHub tools grouped by domain and risk.", lambda p: self._github_registry())
+        self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
+        self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
+
+    def _github_registry(self):
+        domains = {
+            "repositories": ["github.repository"],
+            "contents": ["github.contents", "github.write_contents"],
+            "issues": ["github.issues"],
+            "pull_requests": ["github.pull_request"],
+            "actions": ["github.actions_runs"],
+            "releases": ["github.releases"],
+            "search": ["github.search"],
+            "gateway": ["github.read", "github.write", "github.rest"],
+        }
+        return {"ok": True, "version": "1.0", "domains": domains,
+                "tool_count": sum(len(v) for v in domains.values()),
+                "policy": "reads allowed by capability; mutations require explicit approval"}
 
     def status(self):
         provider_status = self.provider.status() if hasattr(self.provider, "status") else {}
