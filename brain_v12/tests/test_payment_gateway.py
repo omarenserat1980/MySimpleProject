@@ -32,6 +32,9 @@ class PaymentGatewayTests(unittest.TestCase):
         r=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(r.status_code,200)
         self.assertEqual(r.json()["state"],"PAYMENT_VERIFIED")
+        payment=r.json()["order"]["payment"]
+        self.assertEqual(payment["transaction_id"],"pay_123")
+        self.assertEqual(payment["evidence_ref"],"payment-webhook:test:evt_12345678")
     def test_replay_rejected(self):
         p={"event_id":"evt_replay1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_456","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
         raw,h=self.signed(p)
