@@ -28,6 +28,9 @@ class BrainAIFrontendTest(unittest.TestCase):
             'snapshot',
             'evidenceView',
             'سجل التنفيذ والتحقق',
+            '/api/brain/cloud/status',
+            'async function status()',
+            'cloudStatus()',
         ]
         for item in required:
             self.assertIn(item, self.html, item)
