@@ -19,6 +19,7 @@ from typing import Any, Iterable
 EXPECTED_AYAHS = 6236
 EXPECTED_SURAHS = 114
 DEFAULT_SOURCE = "https://raw.githubusercontent.com/dotquran/corpus/main/processed/quran-uthmani.json"
+FALLBACK_SOURCE = "https://api.alquran.cloud/v1/quran/quran-uthmani"
 
 
 def sha256_text(text: str) -> str:
@@ -67,6 +68,10 @@ def fetch_source(url: str) -> str:
 
 def parse_dotquran_json(text: str) -> list[tuple[str, str]]:
     payload = json.loads(text)
+    if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+        payload = payload["data"]
+    if not isinstance(payload, dict) or not isinstance(payload.get("surahs"), list):
+        raise ValueError("QURAN_JSON_SCHEMA_INVALID")
     verses: list[tuple[str, str]] = []
     for surah in payload.get("surahs", []):
         surah_number = int(surah["number"])
@@ -144,11 +149,27 @@ def main() -> int:
     parser.add_argument("--out-dir", type=pathlib.Path, default=pathlib.Path(".brain/quran"))
     args = parser.parse_args()
 
-    text = args.source_file.read_text(encoding="utf-8-sig") if args.source_file else fetch_source(args.source_url)
-    if text.lstrip().startswith("{"):
-        verses = parse_dotquran_json(text)
+    if args.source_file:
+        text = args.source_file.read_text(encoding="utf-8-sig")
+        verses = parse_dotquran_json(text) if text.lstrip().startswith("{") else parse_tanzil_lines(text)
     else:
-        verses = parse_tanzil_lines(text)
+        verses = []
+        failures: list[str] = []
+        sources = [args.source_url]
+        if args.source_url == DEFAULT_SOURCE:
+            sources.append(FALLBACK_SOURCE)
+        for source in sources:
+            try:
+                text = fetch_source(source)
+                parsed = parse_dotquran_json(text) if text.lstrip().startswith("{") else parse_tanzil_lines(text)
+                if len(parsed) == EXPECTED_AYAHS:
+                    verses = parsed
+                    break
+                failures.append(f"{source}:parsed={len(parsed)}")
+            except Exception as exc:
+                failures.append(f"{source}:{type(exc).__name__}:{exc}")
+        if len(verses) != EXPECTED_AYAHS:
+            raise RuntimeError("QURAN_SOURCE_UNAVAILABLE|" + "|".join(failures))
     records, manifest = process(verses)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
