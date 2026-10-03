@@ -12,7 +12,7 @@ class MessageIn(BaseModel):
     instructions: str = ""
     approved: bool = False
 
-def router(brain_ai, store=None):
+def router(brain_ai, store=None, context_limit=24):
     store = store or ChatSessionStore()
     store.init()
     r = APIRouter(prefix="/api/brain-chat", tags=["Brain Chat"])
@@ -37,7 +37,15 @@ def router(brain_ai, store=None):
         if store.get(session_id) is None:
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
         store.add_message(session_id, "user", body.message)
-        result = brain_ai.chat(body.message, body.instructions, approved=body.approved)
+        history = store.context_messages(session_id, limit=context_limit)
+        context_lines = []
+        for item in history:
+            context_lines.append("[{}] {}".format(item["role"], item["content"]))
+        session_context = "\n".join(context_lines)
+        instructions = body.instructions
+        if session_context:
+            instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
+        result = brain_ai.chat(body.message, instructions, approved=body.approved)
         assistant = {"role":"assistant","content":result.reply,"ok":result.ok,"mode":result.mode,
                      "model":result.model,"tool_calls":result.tool_calls,
                      "evidence":result.evidence,"error":result.error}
