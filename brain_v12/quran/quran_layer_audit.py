@@ -58,3 +58,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+# CI verification marker: package path is configured by the audit workflow.
