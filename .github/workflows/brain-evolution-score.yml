@@ -1,6 +1,13 @@
 name: Brain Evolution Score
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/brain-evolution-score.yml"
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
