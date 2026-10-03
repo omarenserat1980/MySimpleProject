@@ -54,6 +54,16 @@ class CommerceStateIn(BaseModel):
     evidence_ref: str = Field(min_length=1, max_length=1000)
 
 
+class PaymentVerificationIn(BaseModel):
+    transaction_id: str = Field(min_length=1, max_length=300)
+    evidence_ref: str = Field(min_length=1, max_length=1000)
+
+
+class RevenueRealizationIn(BaseModel):
+    delivery_evidence_ref: str = Field(min_length=1, max_length=1000)
+    reconciliation_ref: str = Field(min_length=1, max_length=1000)
+
+
 class CommerceStore:
     def __init__(self, path: str):
         self.path = Path(path)
@@ -106,7 +116,7 @@ class CommerceStore:
             self._write(data)
         return order
 
-    def transition(self, order_id: str, target: str, evidence_ref: str) -> dict:
+    def transition(self, order_id: str, target: str, evidence_ref: str | dict) -> dict:
         if target not in STATES:
             raise HTTPException(status_code=400, detail="INVALID_STATE")
         with self.lock:
@@ -126,23 +136,38 @@ class CommerceStore:
             }
             if target not in allowed.get(current, set()):
                 raise HTTPException(status_code=409, detail=f"INVALID_TRANSITION:{current}->{target}")
-            if not evidence_ref.strip():
-                raise HTTPException(status_code=400, detail="EVIDENCE_REQUIRED")
-
             if target == "PAYMENT_VERIFIED":
-                order["payment"] = {"status": "VERIFIED", "evidence_ref": evidence_ref.strip()}
-                order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": evidence_ref.strip()}
-            elif target == "DELIVERED":
-                order["delivery"] = {"status": "DELIVERED", "evidence_ref": evidence_ref.strip()}
+                if not isinstance(evidence_ref, dict):
+                    raise HTTPException(status_code=400, detail="STRUCTURED_PAYMENT_EVIDENCE_REQUIRED")
+                transaction_id = str(evidence_ref.get("transaction_id", "")).strip()
+                payment_evidence_ref = str(evidence_ref.get("evidence_ref", "")).strip()
+                if not transaction_id or not payment_evidence_ref:
+                    raise HTTPException(status_code=400, detail="TRANSACTION_ID_AND_EVIDENCE_REF_REQUIRED")
+                payment_record = {
+                    "type": "payment_verification",
+                    "transaction_id": transaction_id,
+                    "evidence_ref": payment_evidence_ref,
+                }
+                order["payment"] = {"status": "VERIFIED", **payment_record}
+                order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": payment_evidence_ref, "transaction_id": transaction_id}
             elif target == "REVENUE_REALIZED":
+                if not isinstance(evidence_ref, dict):
+                    raise HTTPException(status_code=400, detail="STRUCTURED_RECONCILIATION_EVIDENCE_REQUIRED")
+                delivery_ref = str(evidence_ref.get("delivery_evidence_ref", "")).strip()
+                reconciliation_ref = str(evidence_ref.get("reconciliation_ref", "")).strip()
+                if not delivery_ref or not reconciliation_ref:
+                    raise HTTPException(status_code=400, detail="DELIVERY_AND_RECONCILIATION_EVIDENCE_REQUIRED")
                 if order.get("payment", {}).get("status") != "VERIFIED":
                     raise HTTPException(status_code=409, detail="PAYMENT_NOT_VERIFIED")
                 if order.get("delivery", {}).get("status") != "DELIVERED":
                     raise HTTPException(status_code=409, detail="DELIVERY_NOT_VERIFIED")
-                order["revenue"] = {"status": "REALIZED", "evidence_ref": evidence_ref.strip()}
+                order["revenue"] = {"status": "REALIZED", "delivery_evidence_ref": delivery_ref, "reconciliation_ref": reconciliation_ref}
+            elif target == "DELIVERED":
+                order["delivery"] = {"status": "DELIVERED", "evidence_ref": evidence_ref.strip()}
             order["state"] = target
             order["updated_at"] = _now()
-            order["audit"].append({"at": _now(), "event": target, "evidence_ref": evidence_ref.strip()})
+            audit_evidence = evidence_ref if isinstance(evidence_ref, dict) else evidence_ref.strip()
+            order["audit"].append({"at": _now(), "event": target, "evidence": audit_evidence})
             data[order_id] = order
             self._write(data)
             return order
@@ -187,10 +212,10 @@ def router(data_path: str | None = None) -> APIRouter:
         return {"ok": True, "order": store.transition(order_id, "PAYMENT_PENDING", body.evidence_ref)}
 
     @api.post("/orders/{order_id}/payment-verified")
-    def payment_verified(request: Request, order_id: str, body: CommerceStateIn):
+    def payment_verified(request: Request, order_id: str, body: PaymentVerificationIn):
         from .control_auth import require_control_key
         require_control_key(request)
-        return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.evidence_ref)}
+        return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.model_dump())}
 
     @api.post("/orders/{order_id}/delivery-pending")
     def delivery_pending(request: Request, order_id: str, body: CommerceStateIn):
@@ -205,10 +230,10 @@ def router(data_path: str | None = None) -> APIRouter:
         return {"ok": True, "order": store.transition(order_id, "DELIVERED", body.evidence_ref)}
 
     @api.post("/orders/{order_id}/revenue-realized")
-    def revenue_realized(request: Request, order_id: str, body: CommerceStateIn):
+    def revenue_realized(request: Request, order_id: str, body: RevenueRealizationIn):
         from .control_auth import require_control_key
         require_control_key(request)
-        return {"ok": True, "order": store.transition(order_id, "REVENUE_REALIZED", body.evidence_ref)}
+        return {"ok": True, "order": store.transition(order_id, "REVENUE_REALIZED", body.model_dump())}
 
     @api.get("/status")
     def status():
