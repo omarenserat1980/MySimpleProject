@@ -1,6 +1,11 @@
 name: Brain Media Quality Gate
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/media/**"
+      - ".github/workflows/brain-media-quality.yml"
   workflow_dispatch:
     inputs:
       topic:
@@ -22,8 +27,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate media agent
         env:
-          TOPIC: ${{ inputs.topic }}
-          COMPANY: ${{ inputs.company_name }}
+          TOPIC: ${{ inputs.topic || 'Electronic Brain development update' }}
+          COMPANY: ${{ inputs.company_name || 'Electronic Brain' }}
         run: |
           set -euo pipefail
           python -m py_compile brain_v12/media/*.py
