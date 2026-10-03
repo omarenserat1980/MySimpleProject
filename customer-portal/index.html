@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Electronic Brain — Customer Portal</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#eaf0ff;background:#080b14}body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#182044,#080b14 55%)}main{max-width:960px;margin:auto;padding:28px 18px}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}.brand{font-weight:800;font-size:22px}.badge{padding:6px 10px;border:1px solid #34405f;border-radius:999px;font-size:12px;color:#aeb9d6}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:760px){.grid{grid-template-columns:1fr}}section{background:#111727cc;border:1px solid #29324b;border-radius:18px;padding:18px;box-shadow:0 12px 40px #0005}h1{font-size:30px;margin:8px 0}h2{font-size:18px}label{display:block;font-size:13px;color:#aeb9d6;margin:10px 0 5px}input,textarea{box-sizing:border-box;width:100%;padding:11px;border-radius:10px;border:1px solid #34405f;background:#0b1020;color:#fff}textarea{min-height:90px}button{border:0;border-radius:10px;padding:11px 15px;background:#6d5dfc;color:#fff;font-weight:700;cursor:pointer;margin-top:12px}button.secondary{background:#26304a}.status{padding:12px;border-radius:10px;background:#0b1020;margin-top:12px;white-space:pre-wrap}.event{padding:9px 0;border-bottom:1px solid #27304a;font-size:13px}.muted{color:#8e9ab9}
+</style></head>
+<body><main>
+<header><div class="brand">🧠 Electronic Brain</div><div class="badge">Customer Portal / Diwan</div></header>
+<section><h1>Customer case center</h1><p class="muted">Submit a request, inspect its case, and view the governed audit trail. Approval actions remain explicit.</p>
+<label>Brain API base URL</label><input id="api" placeholder="https://your-brain-api.example.com">
+<div class="grid">
+<div><label>Name</label><input id="name"></div><div><label>Email</label><input id="email" type="email"></div>
+</div>
+<label>Service</label><input id="service" value="Brain Cloud">
+<label>Details</label><textarea id="details"></textarea>
+<label><input id="consent" type="checkbox" style="width:auto"> I consent to marketing contact.</label>
+<button onclick="createLead()">Create customer case</button><div id="result" class="status">Ready.</div>
+</section>
+<div class="grid" style="margin-top:16px">
+<section><h2>Case lookup</h2><label>Case ID</label><input id="caseId"><button class="secondary" onclick="loadCase()">Load case</button><div id="case" class="status">No case loaded.</div></section>
+<section><h2>Audit trail</h2><div id="events" class="status">No events loaded.</div></section>
+</div>
+<script>
+const el=id=>document.getElementById(id);
+function base(){return el('api').value.trim().replace(/\/$/,'')}
+async function req(path,opt={}){const r=await fetch(base()+path,{headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={raw:t}}if(!r.ok)throw new Error(d.detail||'HTTP '+r.status);return d}
+async function createLead(){try{const d=await req('/v1/leads',{method:'POST',body:JSON.stringify({name:el('name').value,email:el('email').value,service:el('service').value,details:el('details').value,marketing_consent:el('consent').checked})});el('caseId').value=d.case_id||'';el('result').textContent='Lead created. Case ID: '+d.case_id;await loadCase()}catch(e){el('result').textContent='Error: '+e.message}}
+async function loadCase(){try{const id=el('caseId').value.trim();if(!id)throw Error('Enter a case ID');const c=await req('/v1/cases/'+encodeURIComponent(id));el('case').textContent=JSON.stringify(c,null,2);const ev=await req('/v1/cases/'+encodeURIComponent(id)+'/events');el('events').innerHTML=ev.map(x=>'<div class="event"><b>'+x.event_type+'</b> · '+x.actor+'<br><span class="muted">'+x.created_at+' · '+x.payload_hash+'</span></div>').join('')||'No events.'}catch(e){el('case').textContent='Error: '+e.message}}
+</script></main></body></html>
