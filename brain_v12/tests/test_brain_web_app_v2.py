@@ -17,6 +17,8 @@ class BrainWebAppV2ContractTest(unittest.TestCase):
         for endpoint in ("/api/brain-ai/chat", "/api/brain-ai/status", "/api/media/upload", "/api/image-factory/generate"):
             self.assertIn(endpoint, js)
         self.assertIn("./version.json?ts=", js)
+        self.assertIn("./config.json?ts=", js)
+        self.assertIn("API_BASE", js)
         self.assertIn("APP_VERSION_KEY", js)
         self.assertNotIn("BRAIN_GITHUB_TOKEN", js)
 
