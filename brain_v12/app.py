@@ -24,6 +24,7 @@ from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
+from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.model_router import ModelRouter
 from .brain.model_providers import configured_model_providers
@@ -126,6 +127,7 @@ from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(brain_chat_router(brain_ai, store))
+app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
