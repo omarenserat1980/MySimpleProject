@@ -1,6 +1,11 @@
 name: BRAIN-0-1 Self Test
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'brain0/**'
+      - '.github/workflows/brain0-self-test.yml'
   workflow_dispatch:
   push:
     paths:
