@@ -21,6 +21,22 @@ class SupervisorSession:
     attempts: int = 0
     evidence: list[SupervisorEvidence] = field(default_factory=list)
 
+    # Backward-compatible session facade used by legacy callers/tests.
+    def complete(self, session: "SupervisorSession", *, ci_passed: bool, verification_passed: bool) -> "SupervisorSession":
+        session.evidence.append(SupervisorEvidence("ci", "passed" if ci_passed else "failed"))
+        session.evidence.append(SupervisorEvidence("verification", "passed" if verification_passed else "failed"))
+        session.state = "SUCCESS" if ci_passed and verification_passed else "FAILED"
+        return session
+
+    def retry(self, session: "SupervisorSession", reason: str) -> "SupervisorSession":
+        if session.state not in {"RUNNING", "FAILED"}:
+            raise ValueError(f"INVALID_RETRY_STATE:{session.state}")
+        session.state = "RETRYING"
+        session.attempts += 1
+        session.evidence.append(SupervisorEvidence("retry", "requested", {"reason": reason, "attempt": session.attempts}))
+        session.state = "RUNNING"
+        return session
+
 class GitHubAutonomousSupervisor:
     TERMINAL = {"SUCCESS", "FAILED", "CANCELLED"}
 
