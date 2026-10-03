@@ -118,7 +118,7 @@ jobs:
       - name: Run GitHub Agent tests
         run: |
           set -euo pipefail
-          pytest -q brain_v12/tests/test_github_*.py
+          PYTHONPATH=. pytest -q brain_v12/tests/test_github_*.py
 
       - name: Execute Brain task
         run: |
