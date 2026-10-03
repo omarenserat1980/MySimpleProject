@@ -23,6 +23,25 @@ class VerificationState(StrEnum):
     REJECTED = "REJECTED"
 
 
+@dataclass(frozen=True)
+class BlockchainProof:
+    txid: str
+    explorer_url: str
+    confirmations: int
+    chain_status: str = "CONFIRMED"
+    verified_at: str = ""
+
+    def validate(self) -> None:
+        if not self.txid.strip() or not self.explorer_url.strip():
+            raise ValueError("txid and explorer_url are required")
+        if self.confirmations < 1:
+            raise ValueError("at least one confirmation is required")
+        if self.chain_status.upper() != "CONFIRMED":
+            raise ValueError("chain_status must be CONFIRMED")
+        if not self.verified_at.strip():
+            raise ValueError("verified_at is required")
+
+
 @dataclass
 class MiningVerificationCycle:
     opportunity_id: str
@@ -52,12 +71,39 @@ class MiningVerificationCycle:
     def submit_payout_evidence(self, payout: PayoutEvidence) -> dict[str, Any]:
         result = verify_payout(payout)
         self.evidence["payout_verification"] = result
+        self.evidence["payout_txid"] = payout.txid
         if self.state == VerificationState.WITHDRAWAL_TEST and result["status"] == "VERIFIED_COMPLETED":
-            self.advance(VerificationState.BLOCKCHAIN_VERIFY, "payout contains transaction evidence")
-            self.advance(VerificationState.REVENUE_REALIZED, "all payout evidence gates passed")
+            self.advance(
+                VerificationState.BLOCKCHAIN_VERIFY,
+                "payout evidence passed; explicit chain proof required",
+            )
         elif result["status"].startswith("REJECTED"):
             if self.state not in {VerificationState.REVENUE_REALIZED, VerificationState.REJECTED}:
                 self.advance(VerificationState.REJECTED, result["status"])
+        return self.snapshot()
+
+    def submit_blockchain_proof(self, proof: BlockchainProof) -> dict[str, Any]:
+        if self.state != VerificationState.BLOCKCHAIN_VERIFY:
+            raise ValueError("blockchain proof is only accepted in BLOCKCHAIN_VERIFY")
+        proof.validate()
+        payout = self.evidence.get("payout_verification", {})
+        checks = payout.get("checks", {})
+        expected_txid = self.evidence.get("payout_txid")
+        if payout.get("status") != "VERIFIED_COMPLETED" or not checks.get("on_chain_proof") or not expected_txid:
+            raise ValueError("verified payout evidence is required before blockchain proof")
+        if proof.txid != expected_txid:
+            raise ValueError("blockchain proof txid does not match payout evidence")
+        self.evidence["blockchain_proof"] = {
+            "txid": proof.txid,
+            "explorer_url": proof.explorer_url,
+            "confirmations": proof.confirmations,
+            "chain_status": proof.chain_status,
+            "verified_at": proof.verified_at,
+        }
+        self.advance(
+            VerificationState.REVENUE_REALIZED,
+            "explicit confirmed blockchain proof matched payout",
+        )
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
