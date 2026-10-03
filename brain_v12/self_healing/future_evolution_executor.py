@@ -3,11 +3,12 @@ from __future__ import annotations
 import subprocess,sys
 from typing import Any
 
+# Keep this list bounded and deterministic. Do not include this executor's
+# own test module, otherwise python_self_test would recursively invoke itself.
 SELF_TESTS=(
     "brain_v12.brain.test_security_guard",
     "brain_v12.brain.test_company_operating_system",
     "brain_v12.brain.test_competitive_evolution",
-    "brain_v12.self_healing.test_future_evolution_executor",
 )
 
 def _self_test_command():
