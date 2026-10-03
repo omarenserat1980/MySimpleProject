@@ -1,6 +1,9 @@
 name: Brain Windows Real Boot Evidence
 
 on:
+  push:
+    branches:
+      - brain-real-boot-verification
   workflow_dispatch:
     inputs:
       iso_url:
