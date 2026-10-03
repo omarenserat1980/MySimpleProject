@@ -52,7 +52,7 @@ class TestChatGPTToolBridge(unittest.TestCase):
         self.assertEqual(result.status, "INVALID_BRIDGE_RESULT")
 
 
-from brain_v12.brain.chatgpt_tool_bridge import JsonChatGPTToolAdapter
+from brain_v12.brain.chatgpt_tool_bridge import JsonChatGPTToolAdapter, HttpChatGPTToolAdapter, build_chatgpt_tool_bridge_from_environment
 
 
 class TestJsonChatGPTToolAdapter(unittest.TestCase):
@@ -66,6 +66,22 @@ class TestJsonChatGPTToolAdapter(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(seen[0]["request_id"], "req-2")
         self.assertEqual(result.result["tool"], "web")
+
+    def test_http_adapter_missing_url_fails_closed(self):
+        adapter = HttpChatGPTToolAdapter("")
+        with self.assertRaises(RuntimeError):
+            adapter.dispatch(ToolBridgeRequest("web", {}, "req-http-1"))
+
+    def test_environment_factory_without_url_is_unavailable(self):
+        import os
+        previous = os.environ.pop("BRAIN_CHATGPT_BRIDGE_URL", None)
+        try:
+            bridge = build_chatgpt_tool_bridge_from_environment()
+            self.assertFalse(bridge.available)
+            self.assertEqual(bridge.status()["transport"], None)
+        finally:
+            if previous is not None:
+                os.environ["BRAIN_CHATGPT_BRIDGE_URL"] = previous
 
     def test_missing_transport_fails_closed(self):
         bridge = ChatGPTToolBridge(JsonChatGPTToolAdapter(None))
