@@ -131,7 +131,13 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             raise HTTPException(409, "AMOUNT_MISMATCH")
         if order.get("state") != "PAYMENT_PENDING":
             raise HTTPException(409, "INVALID_PAYMENT_STATE")
-        order = store.transition(payload.order_id, "PAYMENT_VERIFIED", f"{payload.provider}:{payload.payment_reference}")
+        order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
+            "transaction_id": payload.payment_reference,
+            "evidence_ref": f"payment-webhook:{payload.provider}:{payload.event_id}",
+            "provider": payload.provider,
+            "event_id": payload.event_id,
+            "verified_at": int(time.time()),
+        })
         replay.record(payload.event_id)
         return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
 
