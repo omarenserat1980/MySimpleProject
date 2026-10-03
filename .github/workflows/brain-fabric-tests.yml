@@ -1,0 +1,23 @@
+name: Brain Fabric Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  fabric:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install cloud test dependencies
+        run: python -m pip install -r cloud/requirements.txt
+      - name: Run Brain Fabric tests
+        run: python -m pytest -q cloud/test_brain_fabric.py cloud/test_brain_node_security.py cloud/test_brain_fabric_integration.py
