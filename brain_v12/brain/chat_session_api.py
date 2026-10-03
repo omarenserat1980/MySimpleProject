@@ -77,7 +77,7 @@ def router(brain_ai, store=None, context_limit=24):
         result = brain_ai.chat(body.message, instructions, approved=body.approved)
         assistant = {"role":"assistant","content":result.reply,"ok":result.ok,"mode":result.mode,
                      "model":result.model,"tool_calls":result.tool_calls,
-                     "evidence":result.evidence,"error":result.error}
+                     "evidence":result.evidence,"model_routing":result.model_routing,"error":result.error}
         session = store.add_message(session_id, "assistant", result.reply, assistant)
         return {"ok": result.ok, "session": session, "response": assistant}
     return r
