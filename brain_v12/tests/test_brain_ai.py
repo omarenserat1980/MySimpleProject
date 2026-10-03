@@ -44,6 +44,16 @@ class TestBrainAI(unittest.TestCase):
         result = self.ai.execute_tool("status")
         self.assertEqual(result["status"], "COMPLETED")
 
+    def test_full_github_tool_surface_is_registered(self):
+        from brain_v12.github_capability_registry import GITHUB_TOOLS
+        for name in GITHUB_TOOLS:
+            self.assertIn("github.tool." + name, self.ai.tools)
+        self.assertEqual(sum(1 for name in self.ai.tools if name.startswith("github.tool.")), len(GITHUB_TOOLS))
+
+    def test_github_mutation_surface_remains_approval_gated(self):
+        result = self.ai.execute_tool("github.tool.update_file", {"method": "PUT", "path": "/repos/o/r/contents/x"})
+        self.assertEqual(result["status"], "WAITING_APPROVAL")
+
 
 if __name__ == "__main__":
     unittest.main()
