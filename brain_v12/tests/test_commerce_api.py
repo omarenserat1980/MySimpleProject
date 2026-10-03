@@ -17,10 +17,10 @@ class CommerceApiTests(unittest.TestCase):
             ))
             oid = order["order_id"]
             s.transition(oid, "PAYMENT_PENDING", "checkout-intent:smoke")
-            s.transition(oid, "PAYMENT_VERIFIED", "provider-receipt:smoke")
+            s.transition(oid, "PAYMENT_VERIFIED", {"transaction_id": "tx-smoke", "evidence_ref": "provider-receipt:smoke"})
             s.transition(oid, "DELIVERY_PENDING", "delivery-request:smoke")
             s.transition(oid, "DELIVERED", "delivery-proof:smoke")
-            final = s.transition(oid, "REVENUE_REALIZED", "reconciliation:smoke")
+            final = s.transition(oid, "REVENUE_REALIZED", {"delivery_evidence_ref": "delivery-proof:smoke", "reconciliation_ref": "reconciliation:smoke"})
             self.assertEqual(final["state"], "REVENUE_REALIZED")
 
     def test_revenue_cannot_be_realized_without_verified_payment(self):
@@ -36,6 +36,21 @@ class CommerceApiTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 s.transition(oid, "PAYMENT_VERIFIED", "")
             self.assertEqual(s.get(oid)["state"], "PAYMENT_PENDING")
+
+    def test_free_form_payment_and_revenue_evidence_are_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = CommerceStore(str(Path(d) / "commerce.json"))
+            order = s.create(CommerceOrderIn(customer_name="Test", contact="test@example.com", product_id="ai-starter-kit"))
+            oid = order["order_id"]
+            s.transition(oid, "PAYMENT_PENDING", "checkout-intent:smoke")
+            with self.assertRaises(Exception):
+                s.transition(oid, "PAYMENT_VERIFIED", "free-form-payment-proof")
+            s.transition(oid, "PAYMENT_VERIFIED", {"transaction_id": "tx-1", "evidence_ref": "payment-proof:1"})
+            s.transition(oid, "DELIVERY_PENDING", "delivery-request:1")
+            s.transition(oid, "DELIVERED", "delivery-proof:1")
+            with self.assertRaises(Exception):
+                s.transition(oid, "REVENUE_REALIZED", "free-form-reconciliation")
+
 
 
 if __name__ == "__main__":
