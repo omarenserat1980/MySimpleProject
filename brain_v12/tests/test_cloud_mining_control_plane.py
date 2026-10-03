@@ -24,3 +24,12 @@ def test_payment_evidence_requires_transaction_id():
     job = cp.plan("w1")
     ev = cp.evidence(job.job_id, 1000, 5, 1)
     assert ev["status"] == "MINING_EVIDENCE_ONLY"
+
+
+def test_transaction_reference_is_not_verified_receipt():
+    cp = CloudMiningControlPlane()
+    cp.register_worker(CloudWorker("w1", "vm", "user-region", "owner", enabled=True))
+    job = cp.plan("w1")
+    ev = cp.evidence(job.job_id, 1000, 5, 1, payout_tx_id="tx-123")
+    assert ev["status"] == "PAYOUT_TX_REFERENCE_PRESENT"
+    assert ev["status"] != "VERIFIED_RECEIVED"
