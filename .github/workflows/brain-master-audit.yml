@@ -8,16 +8,6 @@ on:
       - ".github/workflows/**"
       - "*.md"
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "brain_v12/**"
-      - ".github/workflows/**"
-      - "*.md"
-
-permissions:
-  contents: read
-
 jobs:
   master-audit:
     runs-on: ubuntu-latest
