@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -68,6 +72,7 @@ class ChatGPTToolBridge:
             "execution": "delegated",
             "evidence_required": True,
             "fail_closed": True,
+            "transport": getattr(self.adapter, "transport_name", None),
         }
 
 
@@ -78,6 +83,8 @@ class JsonChatGPTToolAdapter:
     a JSON object containing ok/status/result/error. No host tool is executed
     by Brain itself; the host owns the callable and its permissions.
     """
+
+    transport_name = "callable"
 
     def __init__(self, transport):
         self.transport = transport
@@ -91,3 +98,66 @@ class JsonChatGPTToolAdapter:
             "arguments": request.arguments,
         }
         return self.transport(payload)
+
+
+class HttpChatGPTToolAdapter:
+    """HTTP host-gateway adapter for a real ChatGPT tool bridge.
+
+    The gateway is external to Brain and is responsible for invoking the
+    actual host capability. Brain sends only a JSON envelope and accepts a
+    structured execution result. Missing configuration, non-2xx responses,
+    malformed JSON, and transport errors fail closed.
+    """
+
+    transport_name = "http"
+
+    def __init__(self, url: str, token: Optional[str] = None, timeout: float = 30.0):
+        self.url = str(url or "").strip()
+        self.token = token
+        self.timeout = float(timeout)
+
+    @classmethod
+    def from_environment(cls):
+        url = os.getenv("BRAIN_CHATGPT_BRIDGE_URL", "").strip()
+        token = os.getenv("BRAIN_CHATGPT_BRIDGE_TOKEN")
+        timeout = float(os.getenv("BRAIN_CHATGPT_BRIDGE_TIMEOUT", "30"))
+        if not url:
+            return None
+        return cls(url, token=token, timeout=timeout)
+
+    def dispatch(self, request: ToolBridgeRequest):
+        if not self.url:
+            raise RuntimeError("BRAIN_CHATGPT_BRIDGE_URL is not configured")
+        payload = json.dumps({
+            "request_id": request.request_id,
+            "tool": request.tool,
+            "arguments": request.arguments,
+        }, ensure_ascii=False).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if self.token:
+            headers["Authorization"] = "Bearer " + self.token
+        req = urllib.request.Request(self.url, data=payload, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                raw = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")[:500]
+            raise RuntimeError("bridge HTTP %s: %s" % (exc.code, body))
+        except urllib.error.URLError as exc:
+            raise RuntimeError("bridge transport error: %s" % exc.reason)
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("bridge returned invalid JSON: %s" % exc)
+        if not isinstance(result, dict):
+            raise RuntimeError("bridge returned a non-object JSON response")
+        return result
+
+
+def build_chatgpt_tool_bridge_from_environment() -> ChatGPTToolBridge:
+    """Create a fail-closed bridge from BRAIN_CHATGPT_BRIDGE_* settings."""
+    adapter = HttpChatGPTToolAdapter.from_environment()
+    return ChatGPTToolBridge(adapter)
