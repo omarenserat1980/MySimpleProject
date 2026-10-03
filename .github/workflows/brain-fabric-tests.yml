@@ -21,4 +21,9 @@ jobs:
       - name: Install cloud test dependencies
         run: python -m pip install -r cloud/requirements.txt
       - name: Run Brain Fabric tests
-        run: python -m pytest -q cloud/test_brain_fabric.py cloud/test_brain_node_security.py cloud/test_brain_fabric_integration.py
+        run: >-
+          python -m pytest -q
+          cloud/test_brain_fabric.py
+          cloud/test_brain_node_security.py
+          cloud/test_brain_fabric_integration.py
+          cloud/test_brain_fabric_api.py
