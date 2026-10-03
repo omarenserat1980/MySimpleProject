@@ -7,7 +7,6 @@ from typing import Mapping, Protocol
 
 from brain_v12.self_healing.reflection_agent import ReflectionAgent
 from brain_v12.self_healing.reflection_actions import ReflectionActionRegistry
-from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
 
 
 class Reasoner(Protocol):
@@ -37,7 +36,10 @@ class BrainReasoningLoop:
     ) -> None:
         self.agent = agent
         self.registry = registry
-        self.reasoner = reasoner or ChatGPTReasoner()
+        if reasoner is None:
+            from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
+            reasoner = ChatGPTReasoner()
+        self.reasoner = reasoner
         self.max_cycles = max_cycles or agent.max_turns
 
     def run(self, context: Mapping[str, object] | None = None) -> list[BrainCycle]:
