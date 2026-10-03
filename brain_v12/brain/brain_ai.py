@@ -57,6 +57,13 @@ class BrainAI:
         self.register_tool("chatgpt.discover", "Find the most relevant ChatGPT host tool for a natural-language task.", lambda p: self._chatgpt_discover(p))
         self.register_tool("chatgpt.bridge_status", "Report whether a real ChatGPT host-tool bridge is configured.", lambda p: self._chatgpt_bridge_status())
         self.register_tool("chatgpt.execute", "Delegate a ChatGPT host-tool call only through a configured fail-closed bridge.", lambda p: self._chatgpt_execute(p), risk="medium")
+        from .success_bot import SuccessBot
+        self.success_bot = SuccessBot()
+        self.register_tool("success.create", "Create a bounded goal that cannot become success without verification evidence.", lambda p: self._success_create(p))
+        self.register_tool("success.start", "Start execution of a registered Success Bot goal through Brain Supervisor.", lambda p: self._success_start(p))
+        self.register_tool("success.update", "Record measured progress and evidence for a Success Bot goal.", lambda p: self._success_update(p))
+        self.register_tool("success.verify", "Verify a Success Bot goal and only then allow VERIFIED_COMPLETED.", lambda p: self._success_verify(p))
+        self.register_tool("success.status", "Read the current Success Bot goal state and evidence.", lambda p: self._success_status(p))
         g = self.github
         if g is None:
             self._register_github_surface_without_runtime()
@@ -121,6 +128,42 @@ class BrainAI:
                 ranked.append((score, name))
         ranked.sort(key=lambda x: (-x[0], x[1]))
         return {"ok": True, "query": query, "candidates": [{"tool": n, "score": score, "brain_tool": "github.tool." + n} for score, n in ranked[:10]]}
+
+    def _success_create(self, params):
+        state = self.success_bot.create_goal(params.get("goal", ""), params.get("success_criteria"))
+        return {"ok": True, "status": "GOAL_CREATED", "goal": self.success_bot.snapshot(state)}
+
+    def _success_start(self, params):
+        state = self.success_bot.get_goal(params.get("goal_id", ""))
+        if state is None:
+            return {"ok": False, "status": "GOAL_NOT_FOUND"}
+        job = self.success_bot.start(state, steps=params.get("steps"))
+        return {"ok": True, "status": "RUNNING", "goal": self.success_bot.snapshot(state), "job": job}
+
+    def _success_update(self, params):
+        state = self.success_bot.get_goal(params.get("goal_id", ""))
+        if state is None:
+            return {"ok": False, "status": "GOAL_NOT_FOUND"}
+        updated = self.success_bot.update(
+            state,
+            verified=bool(params.get("verified", False)),
+            evidence=params.get("evidence"),
+            progress=params.get("progress"),
+        )
+        return {"ok": True, "status": updated.status, "goal": self.success_bot.snapshot(updated)}
+
+    def _success_verify(self, params):
+        state = self.success_bot.get_goal(params.get("goal_id", ""))
+        if state is None:
+            return {"ok": False, "status": "GOAL_NOT_FOUND"}
+        verified = self.success_bot.verify(state, params.get("verification") or {})
+        return {"ok": True, "status": verified.status, "goal": self.success_bot.snapshot(verified)}
+
+    def _success_status(self, params):
+        state = self.success_bot.get_goal(params.get("goal_id", ""))
+        if state is None:
+            return {"ok": False, "status": "GOAL_NOT_FOUND"}
+        return {"ok": True, "status": state.status, "goal": self.success_bot.snapshot(state)}
 
     def _chatgpt_capabilities(self):
         from .chatgpt_tool_registry import capability_catalog
