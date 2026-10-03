@@ -29,6 +29,12 @@ class BrainAI:
         self.memory_store = memory_store
         self.cognitive = cognitive
         self.github = github
+        if chatgpt_bridge is None:
+            try:
+                from .chatgpt_tool_bridge import build_chatgpt_tool_bridge_from_environment
+                chatgpt_bridge = build_chatgpt_tool_bridge_from_environment()
+            except Exception:
+                chatgpt_bridge = None
         self.chatgpt_bridge = chatgpt_bridge
         self.max_tool_rounds = max(1, int(max_tool_rounds))
         self.max_tool_retries = max(0, int(max_tool_retries))
@@ -160,7 +166,7 @@ class BrainAI:
         return {"name":"Brain AI","version":"1.2","provider":provider_status,
                 "tools":[{"name":t.name,"description":t.description,"risk":t.risk,"permission":t.permission} for t in self.tools.values()],
                 "memory_enabled":self.memory_store is not None,"cognitive_loop_enabled":self.cognitive is not None,
-                "github_gateway": self.github is not None, "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries, "diagnose_repair_enabled": True, "max_repair_attempts": self.max_repair_attempts}
+                "github_gateway": self.github is not None, "chatgpt_bridge": self._chatgpt_bridge_status(), "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries, "diagnose_repair_enabled": True, "max_repair_attempts": self.max_repair_attempts}
 
     def _context(self) -> str:
         parts=[]
