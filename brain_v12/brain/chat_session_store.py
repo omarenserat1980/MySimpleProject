@@ -81,6 +81,25 @@ class ChatSessionStore:
             out["messages"].append(item)
         return out
 
+    def context_messages(self, session_id, limit=24):
+        """Return recent conversation messages for model context."""
+        limit = max(1, int(limit))
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT role,content,metadata,created_at FROM chat_session_messages "
+                "WHERE session_id=? ORDER BY id DESC LIMIT ?",
+                (session_id, limit),
+            ).fetchall()
+        items = []
+        for row in reversed(rows):
+            item = dict(row)
+            try:
+                item["metadata"] = json.loads(item["metadata"])
+            except Exception:
+                item["metadata"] = {}
+            items.append(item)
+        return items
+
     def add_message(self, session_id, role, content, metadata=None):
         stamp = _now()
         with self.connect() as con:
