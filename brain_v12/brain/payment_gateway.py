@@ -139,6 +139,6 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             "verified_at": int(time.time()),
         })
         replay.record(payload.event_id)
-        return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
+        return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference, "order": order}
 
     return api
