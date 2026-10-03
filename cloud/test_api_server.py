@@ -285,12 +285,12 @@ def test_customer_feedback_api_lifecycle_and_evidence(monkeypatch, tmp_path):
     })
     assert created.status_code == 200
     feedback_id = created.json()["feedback"]["feedback_id"]
-    assert created.json()["state"] == "RECEIVED"
+    assert created.json()["feedback"]["state"] == "RECEIVED"
 
     headers = {"Authorization": "Bearer test-token"}
     fetched = client.get(f"/v1/feedback/{feedback_id}", headers=headers)
     assert fetched.status_code == 200
-    assert fetched.json()["customer_id"] == "cust-1"
+    assert fetched.json()["feedback"]["customer_id"] == "cust-1"
 
     triaged = client.post(
         f"/v1/feedback/{feedback_id}/transition",
@@ -312,4 +312,4 @@ def test_customer_feedback_api_lifecycle_and_evidence(monkeypatch, tmp_path):
         params={"state": "RESOLVED", "evidence_ref": "case://feedback/verified-1"},
     )
     assert resolved.status_code == 200
-    assert resolved.json()["state"] == "RESOLVED"
+    assert resolved.json()["feedback"]["state"] == "RESOLVED"
