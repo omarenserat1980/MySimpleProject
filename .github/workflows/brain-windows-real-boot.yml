@@ -37,7 +37,7 @@ jobs:
 
       - name: Download and validate Microsoft media
         env:
-          ISO_URL: ${{ inputs.iso_url }}
+          ISO_URL: ${{ inputs.iso_url || 'https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us' }}
         run: |
           set -euo pipefail
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
@@ -172,7 +172,7 @@ jobs:
 
       - name: Boot and install Windows Server 2025
         env:
-          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes || '35' }}
         shell: bash
         run: |
           set -euo pipefail
