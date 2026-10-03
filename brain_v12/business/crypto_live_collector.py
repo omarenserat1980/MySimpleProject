@@ -45,7 +45,7 @@ def collect_btc_market_snapshot() -> dict:
 
     if not isinstance(prices, dict):
         raise ValueError("mempool price payload is not an object")
-    if not isinstance(mining, list) or not mining or not network_source:
+    if not isinstance(mining, dict) or not mining or not network_source:
         raise ValueError("mempool hashrate payload is empty across all supported periods")
 
     usd = _positive_number(prices.get("USD"), "BTC USD price")
