@@ -10,12 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+
       - name: Validate cloud control plane
         run: |
-          python -m unittest discover -s brain_v12/tests -p 'test_cloud_mining_control_plane.py' -v
+          python -m pytest -q brain_v12/tests/test_cloud_mining_control_plane.py
+
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
