@@ -38,7 +38,7 @@ def collect_btc_market_snapshot() -> dict:
             candidate = _get_json(endpoint)
         except Exception:
             continue
-        if isinstance(candidate, list) and candidate:
+        if isinstance(candidate, dict) and (candidate.get("hashrates") or candidate.get("currentHashrate")):
             mining = candidate
             network_source = endpoint
             break
@@ -49,12 +49,20 @@ def collect_btc_market_snapshot() -> dict:
         raise ValueError("mempool hashrate payload is empty across all supported periods")
 
     usd = _positive_number(prices.get("USD"), "BTC USD price")
-    latest = mining[-1] if isinstance(mining[-1], dict) else None
-    if not latest:
-        raise ValueError("mempool hashrate record is invalid")
-
-    hashrate = _positive_number(latest.get("avgHashrate"), "network hashrate")
-    difficulty = _positive_number(latest.get("difficulty"), "network difficulty")
+    if not isinstance(mining, dict):
+        raise ValueError("mempool hashrate payload is invalid")
+    history = mining.get("hashrates") or []
+    latest = history[-1] if isinstance(history, list) and history and isinstance(history[-1], dict) else None
+    hashrate_value = mining.get("currentHashrate")
+    difficulty_value = mining.get("currentDifficulty")
+    if hashrate_value is None and latest:
+        hashrate_value = latest.get("avgHashrate")
+    if difficulty_value is None:
+        difficulties = mining.get("difficulty") or []
+        if isinstance(difficulties, list) and difficulties and isinstance(difficulties[-1], dict):
+            difficulty_value = difficulties[-1].get("difficulty")
+    hashrate = _positive_number(hashrate_value, "network hashrate")
+    difficulty = _positive_number(difficulty_value, "network difficulty")
 
     hashprice = None
     hashprice_source = HASHPRICE_URL
