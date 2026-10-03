@@ -86,3 +86,18 @@ function syncCustomerTypeFields(){
  if($("representativeWrap")) $("representativeWrap").hidden=!entity;
 }
 if($("customerType")){$("customerType").onchange=syncCustomerTypeFields;syncCustomerTypeFields();}
+
+async function loadCommercial(){
+ try{
+  const d=await request("/api/commercial/dashboard");
+  $("commercialCapabilities").textContent=d.capabilities??"—";
+  $("commercialCases").textContent=d.cases??0;
+  $("commercialRevenue").textContent=(d.verified_revenue??0)+" USD";
+  $("commercialProfit").textContent=(d.verified_profit??0)+" USD";
+  const actions=d.cases_needing_action||[];
+  $("commercialNext").textContent=actions.length?JSON.stringify(actions,null,2):"لا توجد حالات عملاء. الخطوة التالية: اختيار عرض تجاري ثم جمع دليل عميل حقيقي بموافقة بشرية.";
+  const offers=await request("/api/commercial/offers");
+  $("commercialOffers").innerHTML=(offers.offers||[]).map(x=>'<div class="item"><b>'+esc(x.capability_name)+'</b><span class="badge">'+esc(x.status)+'</span></div>').join("");
+ }catch(e){$("commercialNext").textContent="فشل تحميل اللوحة: "+e.message}
+}
+$("loadCommercial").onclick=loadCommercial;
