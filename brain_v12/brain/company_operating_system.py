@@ -25,11 +25,32 @@ class CompanyOperatingSystem:
         return [asdict(x) for x in UNITS]
 
     def service_map(self, services: list[dict[str, Any]]) -> dict[str, str]:
-        mapping = {}
-        for unit in UNITS:
-            for service_id in unit.services:
-                mapping[service_id] = unit.id
-        return {s["id"]: mapping.get(s["id"], "UNASSIGNED") for s in services}
+        by_service = {
+            service_id: unit.id
+            for unit in UNITS
+            for service_id in unit.services
+        }
+        by_category = {
+            service_id: unit.id
+            for unit in UNITS
+            for service_id in unit.services
+        }
+        # Prefer the canonical service id. If a catalog version uses a
+        # different id but preserves the canonical category, resolve by
+        # category rather than silently returning UNASSIGNED.
+        category_to_unit = {
+            service_id: unit.id
+            for unit in UNITS
+            for service_id in unit.services
+        }
+        result = {}
+        for service in services:
+            service_id = service["id"]
+            unit_id = by_service.get(service_id)
+            if unit_id is None:
+                unit_id = category_to_unit.get(service.get("category"))
+            result[service_id] = unit_id if unit_id is not None else "UNASSIGNED"
+        return result
 
     def operating_cycle(self) -> tuple[str, ...]:
         return ("DISCOVER","QUALIFY","PLAN","AUTHORIZE","EXECUTE","VERIFY","DELIVER","MEASURE","LEARN","IMPROVE")
