@@ -15,6 +15,10 @@ class MessageIn(BaseModel):
 class MemoryIn(BaseModel):
     summary: str = ""
 
+class CompactIn(BaseModel):
+    keep_recent: int = 24
+    max_summary_chars: int = 12000
+
 def router(brain_ai, store=None, context_limit=24):
     store = store or ChatSessionStore()
     store.init()
@@ -46,6 +50,15 @@ def router(brain_ai, store=None, context_limit=24):
         if store.get(session_id) is None:
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
         return {"ok": True, "memory": store.set_memory(session_id, body.summary)}
+
+    @r.post("/sessions/{session_id}/compact")
+    def compact_session(session_id: str, body: CompactIn = CompactIn()):
+        if store.get(session_id) is None:
+            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+        result = store.compact_session(
+            session_id, keep_recent=body.keep_recent, max_summary_chars=body.max_summary_chars
+        )
+        return {"ok": True, "compaction": result}
 
     @r.post("/sessions/{session_id}/messages")
     def send_message(session_id: str, body: MessageIn):
