@@ -40,6 +40,9 @@ jobs:
       - name: Validate commercial dashboard CLI
         run: |
           python -m pytest -q brain_v12/business/test_commercial_dashboard_cli.py
+      - name: Validate commercial dashboard API
+        run: |
+          python -m pytest -q brain_v12/business/test_commercial_dashboard_api.py
       - name: Validate cloud control plane
         run: |
           python -m pytest -q brain_v12/tests/test_cloud_mining_control_plane.py
