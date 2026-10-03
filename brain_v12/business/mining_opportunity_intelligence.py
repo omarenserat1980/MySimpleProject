@@ -32,7 +32,7 @@ def build_mining_opportunity_report(
     worker_reports: list[dict[str, Any]] = []
     for item in workers:
         telemetry = item["telemetry"]
-        hashrate = float(getattr(telemetry, "hashrate_th", 0.0))
+        hashrate = float(getattr(telemetry, "hashrate_60m", 0.0)) / 1_000_000_000_000.0
         if hashrate <= 0:
             continue
         inp = MiningEconomicsInput(
