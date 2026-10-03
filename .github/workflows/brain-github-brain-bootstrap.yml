@@ -1,6 +1,12 @@
 name: BRAIN GitHub Brain Bootstrap
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain_git/**"
+      - "brain_v12/brain/**"
+      - ".github/workflows/brain-github-brain-bootstrap.yml"
   workflow_dispatch:
 
 permissions:
@@ -25,8 +31,9 @@ jobs:
           assert p["public_exposure_default"]=="DISABLED"
           print("BRAIN_GIT_CONTRACT=VERIFIED")
           PY
-      - name: Brain Git unit tests
-        run: python -m unittest brain_v12.brain_git.test_service brain_v12.brain_git.test_workflow_engine -v
+      - name: Brain Git and control-plane unit tests
+        run: |
+          python -m unittest brain_v12.brain_git.test_service brain_v12.brain_git.test_workflow_engine -v
           python -m unittest brain_v12.brain.test_control_plane brain_v12.brain.test_film_completion_gate -v
       - name: Compile Brain control plane
         run: python -m compileall -q brain_v12/brain
