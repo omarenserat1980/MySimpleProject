@@ -61,6 +61,8 @@ class BrainAI:
         self.register_tool("github.rest", "Governed full GitHub REST gateway for operations not covered by a dedicated Brain tool. Mutations require explicit approval.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self.register_tool("github.registry", "Discover GitHub tools grouped by domain and risk.", lambda p: self._github_registry())
         self.register_tool("github.discover", "Find the most relevant GitHub tool for a natural-language task.", lambda p: self._github_discover(p))
+        self.register_tool("chatgpt.capabilities", "List the ChatGPT host-tool capabilities visible to Brain.", lambda p: self._chatgpt_capabilities())
+        self.register_tool("chatgpt.discover", "Find the most relevant ChatGPT host tool for a natural-language task.", lambda p: self._chatgpt_discover(p))
         self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self._register_github_tool_surface()
@@ -109,6 +111,14 @@ class BrainAI:
                 ranked.append((score, name))
         ranked.sort(key=lambda x: (-x[0], x[1]))
         return {"ok": True, "query": query, "candidates": [{"tool": n, "score": score, "brain_tool": "github.tool." + n} for score, n in ranked[:10]]}
+
+    def _chatgpt_capabilities(self):
+        from .chatgpt_tool_registry import capability_catalog
+        return capability_catalog()
+
+    def _chatgpt_discover(self, params):
+        from .chatgpt_tool_registry import discover
+        return discover(params.get("query", ""), params.get("limit", 10))
 
     def _github_registry(self):
         domains = {
@@ -258,6 +268,7 @@ class BrainAI:
 إذا احتاج الطلب فعلاً إلى أداة، أرجع tool_calls منظمة بالشكل:
 {"tool_calls":[{"name":"github.repository","params":{"owner":"...","repo":"..."}}]}
 استخدم فقط أسماء الأدوات الموجودة في BRAIN_TOOLS.
+عند الحاجة إلى قدرة يوفرها ChatGPT، استخدم chatgpt.discover ثم chatgpt.capabilities؛ لا تدّعِ تنفيذ أداة مضيفة ما لم يظهر دليل تنفيذ فعلي من الجسر.
 لا تختلق ذاكرة أو صلاحية أو نتيجة أداة.
 لا تدّعي تنفيذ تغيير أو تشغيل اختبار دون دليل.
 العمليات الحساسة تحتاج موافقة وصلاحية صريحة.
