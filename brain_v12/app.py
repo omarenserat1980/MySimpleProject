@@ -22,6 +22,7 @@ from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
+from .brain.github_tools import BrainGitHubTools
 from .brain.model_router import ModelRouter
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.openai_provider import OpenAIProvider
@@ -66,6 +67,8 @@ orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImpro
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
 model_router=ModelRouter(openai_provider)
 brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
+github_tools=BrainGitHubTools()
+github_tools.register(brain_ai)
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
