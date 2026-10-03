@@ -6,10 +6,6 @@ on:
       - 'brain0/**'
       - '.github/workflows/brain0-full-verification.yml'
   workflow_dispatch:
-  push:
-    paths:
-      - 'brain0/**'
-      - '.github/workflows/brain0-full-verification.yml'
 jobs:
   verify:
     runs-on: ubuntu-latest
