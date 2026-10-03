@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0d10"><meta name="description" content="Electronic Brain Web App">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./app.css">
+<title>Brain AI</title>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="logo">B</div><div><b>Brain</b><small>Electronic Brain</small></div></div>
+  <button id="newChat" class="new">＋ محادثة جديدة</button>
+  <input id="search" class="search" placeholder="بحث في المحادثات">
+  <div id="chats" class="chats"></div>
+  <div class="side-bottom"><span id="version">Web v2.0.0</span><br><button id="update" hidden class="update">نسخة جديدة متاحة — تحديث</button><br>المفاتيح السرية تبقى على الخادم.</div>
+</aside>
+<main>
+<header class="top"><div><b>Brain</b><span id="mode"> AI</span></div><div><span id="dot" class="dot"></span><span id="health">جارٍ التحقق…</span></div></header>
+<section id="messages"><div id="wrap"></div></section>
+<footer class="composer">
+ <div class="compose-box">
+  <div class="input-row"><button id="mic" title="إملاء صوتي">🎙</button><textarea id="input" rows="1" placeholder="اكتب رسالتك إلى Brain…"></textarea><button id="send" class="send">إرسال</button></div>
+  <div class="tools"><label>📎 ملف<input id="file" type="file" multiple></label><button id="image">🖼 صورة</button><button id="clear">مسح</button></div>
+  <div id="preview"></div>
+ </div>
+ <div class="notice">التنفيذ الخارجي يخضع لصلاحيات Brain والأدلة المطلوبة.</div>
+</footer>
+</main></div>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("./sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{})}</script><script src="./app.js"></script>
+</body></html>

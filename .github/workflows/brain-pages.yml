@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "cloud/web/**"
+      - "brain_v12/web/brain-app-v2/**"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
 permissions:
@@ -21,8 +22,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
+      - name: Build static Brain Web payload
+        env:
+          BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN }}
+        run: |
+          rm -rf _site
+          mkdir -p _site/brain-app-v2
+          cp -a cloud/web/. _site/
+          cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path("_site/brain-app-v2/config.json").write_text(
+              json.dumps({"api_base": os.environ.get("BRAIN_API_ORIGIN", "").rstrip("/")}, ensure_ascii=False),
+              encoding="utf-8",
+          )
+          PY
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: cloud/web
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
