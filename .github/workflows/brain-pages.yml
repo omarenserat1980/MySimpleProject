@@ -19,11 +19,11 @@ jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
     environment:
-      name: github-pages
+      name: brain-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/configure-pages@v5
       - name: Build static Brain Web payload
         env:
