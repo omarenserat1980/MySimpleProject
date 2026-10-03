@@ -8,7 +8,7 @@ class TestCryptoLiveCollector(unittest.TestCase):
     def test_public_snapshot_is_passed_through_freshness_gate(self):
         payloads = [
             {"USD": 100000.0},
-            [{"avgHashrate": 700000000000000000000.0, "difficulty": 100000000000000000000.0}],
+            {"hashrates": [{"avgHashrate": 700000000000000000000.0}], "difficulty": [{"difficulty": 100000000000000000000.0}], "currentHashrate": 700000000000000000000.0, "currentDifficulty": 100000000000000000000.0},
             {"usd_per_th_day": 0.05},
         ]
         with patch("brain_v12.business.crypto_live_collector._get_json", side_effect=payloads):
