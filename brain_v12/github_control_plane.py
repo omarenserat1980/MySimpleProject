@@ -28,9 +28,17 @@ class GitHubControlPlane:
         raw=json.dumps({"ts":time.time(),"action":action,"capability":capability,"status":status,"details":details},sort_keys=True)
         self.audit.append({"ts":time.time(),"action":action,"capability":capability,"status":status,"digest":hashlib.sha256(raw.encode()).hexdigest()})
     def authorize(self, capability, approved=False):
-        if capability in self.policy.blocked: raise GitHubControlError(f"BLOCKED_CAPABILITY:{capability}")
-        if capability in self.policy.write_requires_approval and not approved: raise GitHubControlError(f"EXPLICIT_APPROVAL_REQUIRED:{capability}")
+        if capability in self.policy.blocked:
+            raise GitHubControlError(f"BLOCKED_CAPABILITY:{capability}")
+        known = self.policy.read_only | self.policy.write_requires_approval
+        if capability not in known:
+            raise GitHubControlError(f"UNKNOWN_CAPABILITY:{capability}")
+        if capability in self.policy.write_requires_approval and not approved:
+            raise GitHubControlError(f"EXPLICIT_APPROVAL_REQUIRED:{capability}")
     def request(self, method, path, *, capability="repo.read", approved=False, params=None, body=None, timeout=30.0):
+        method = method.upper()
+        if method not in {"GET", "HEAD", "OPTIONS"} and capability not in self.policy.write_requires_approval:
+            raise GitHubControlError(f"MUTATION_REQUIRES_WRITE_CAPABILITY:{capability}")
         self.authorize(capability, approved)
         if not path.startswith("/"): path="/"+path
         try:
@@ -54,5 +62,9 @@ class GitHubControlPlane:
         return self.request("POST",f"/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",capability="actions.write",approved=approved,body=body)
     def releases(self, owner, repo): return self.request("GET",f"/repos/{owner}/{repo}/releases",capability="releases.read")
     def search(self, query, search_type="repositories"): return self.request("GET",f"/search/{search_type}",capability="search.read",params={"q":query})
+    def rest(self, method, path, capability="repo.read", approved=False, params=None, body=None):
+        """Governed escape hatch for the GitHub REST API; all mutations remain approval-gated."""
+        return self.request(method, path, capability=capability, approved=approved, params=params, body=body)
+
     def capability_catalog(self):
         return {"ok":True,"gateway":"GitHubControlPlane","configured":self.configured(),"domains":["repositories","git-data","contents","branches","tags","commits","issues","pull-requests","reviews","actions","releases","packages","projects","security","search","users","organizations","webhooks"],"execution_model":["discover","authorize","execute","verify","audit"],"write_policy":"explicit approval for mutable operations"}
