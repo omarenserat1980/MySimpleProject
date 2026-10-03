@@ -31,6 +31,7 @@ class BrainAI:
         self.github = github
         self.max_tool_rounds = max(1, int(max_tool_rounds))
         self.max_tool_retries = max(0, int(max_tool_retries))
+        self.max_repair_attempts = 1
         self.tools: Dict[str, BrainAITool] = {}
         self._register_builtin_tools()
 
@@ -60,7 +61,7 @@ class BrainAI:
         return {"name":"Brain AI","version":"1.2","provider":provider_status,
                 "tools":[{"name":t.name,"description":t.description,"risk":t.risk,"permission":t.permission} for t in self.tools.values()],
                 "memory_enabled":self.memory_store is not None,"cognitive_loop_enabled":self.cognitive is not None,
-                "github_gateway": self.github is not None, "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries}
+                "github_gateway": self.github is not None, "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries, "diagnose_repair_enabled": True, "max_repair_attempts": self.max_repair_attempts}
 
     def _context(self) -> str:
         parts=[]
@@ -124,7 +125,14 @@ class BrainAI:
                     attempts += 1
                     evidence.append({"type":"self_healing","tool":name,"action":"retry","attempt":attempts,"round":round_no,"reason":outcome.get("error") or outcome.get("status")})
                     outcome=self.execute_tool(name, params, approved=approved)
-                record={"round":round_no,"tool":name,"params":params,"result":outcome,"retry_count":attempts,"verified":self._verify_tool_outcome(outcome)}
+                repair_count=0
+                if not self._verify_tool_outcome(outcome) and self._repairable(outcome):
+                    repaired=self._diagnose_and_repair(user_text, name, params, outcome, approved=approved)
+                    if repaired is not None:
+                        repair_count=1
+                        outcome=repaired["outcome"]
+                        evidence.append({"type":"diagnose_repair","tool":name,"action":"corrected_tool_call","replacement":repaired["intent"],"verified":self._verify_tool_outcome(outcome)})
+                record={"round":round_no,"tool":name,"params":params,"result":outcome,"retry_count":attempts,"repair_count":repair_count,"verified":self._verify_tool_outcome(outcome)}
                 calls.append(record)
                 trace.append(record)
                 evidence.append({"type":"tool","tool":name,"status":outcome.get("status","EXECUTED" if outcome.get("ok") else "FAILED"),"round":round_no,"verified":record["verified"],"retry_count":attempts})
@@ -143,6 +151,24 @@ class BrainAI:
     @staticmethod
     def _retryable(outcome: Dict[str, Any]) -> bool:
         return isinstance(outcome, dict) and outcome.get("status") == "FAILED"
+
+    @staticmethod
+    def _repairable(outcome: Dict[str, Any]) -> bool:
+        return isinstance(outcome, dict) and outcome.get("status") in {"FAILED", "INVALID_TOOL_RESULT", "UNKNOWN_TOOL"}
+
+    def _diagnose_and_repair(self, user_text, failed_name, failed_params, outcome, approved=False):
+        prompt = "Diagnose this failed Brain tool call and return exactly one corrected tool intent under tool_calls as JSON. Use only BRAIN_TOOLS. Failure evidence:\n" + json.dumps({"user_request": user_text, "failed_tool": failed_name, "failed_params": failed_params, "failure": outcome}, ensure_ascii=False, default=str)
+        try:
+            result = self.provider.respond(prompt, context=self._context(), instructions=self._system_instructions())
+        except Exception:
+            return None
+        intents = self._tool_intents(result if isinstance(result, dict) else {})
+        if len(intents) != 1:
+            return None
+        intent = intents[0]
+        if intent["name"] not in self.tools or (intent["name"] == failed_name and intent["params"] == failed_params):
+            return None
+        return {"intent": intent, "outcome": self.execute_tool(intent["name"], intent["params"], approved=approved)}
 
     def execute_tool(self, name: str, params: Optional[Dict[str, Any]]=None, approved: bool=False) -> Dict[str, Any]:
         tool=self.tools.get(name)
