@@ -43,7 +43,7 @@ class BrainGitService:
             work=Path(d)/"seed"
             self._run(["clone",str(path),str(work)])
             self._run(["checkout","-B","main"],cwd=work)
-            (work/"README.md").write_text("Brain Git repository\n",encoding="utf-8")
+            (work/"README.md").write_text(f"Brain Git {name}\n",encoding="utf-8")
             self._run(["add","README.md"],cwd=work)
             env=dict(os.environ,GIT_AUTHOR_NAME="Brain",GIT_AUTHOR_EMAIL="brain@localhost",GIT_COMMITTER_NAME="Brain",GIT_COMMITTER_EMAIL="brain@localhost")
             p=subprocess.run(["git","commit","-m","initialize Brain Git repository"],cwd=work,text=True,capture_output=True,env=env)
