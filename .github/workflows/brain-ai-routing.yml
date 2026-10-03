@@ -1,0 +1,25 @@
+name: Brain AI Routing
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/model_router.py'
+      - 'brain_v12/tests/test_model_router.py'
+      - 'brain_v12/brain/brain_ai.py'
+      - 'brain_v12/app.py'
+  push:
+    branches: [main]
+    paths:
+      - 'brain_v12/brain/model_router.py'
+      - 'brain_v12/tests/test_model_router.py'
+
+jobs:
+  test-routing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test model routing
+        run: python -m unittest discover -s brain_v12/tests -p 'test_model_router.py' -v
