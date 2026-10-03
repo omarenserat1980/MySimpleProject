@@ -47,7 +47,7 @@ jobs:
         run: |
           python -m pytest -q brain_v12/business/test_crypto_live_collector.py
 
-      - name: Emit cloud control snapshot
+      - name: Validate Braiins read-only adapter gate\n        run: |\n          python -m pytest -q brain_v12/business/test_braiins_readonly_adapter.py\n\n      - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
           echo "Cloud layer coordinates registered workers; it does not mine on GitHub Actions."
