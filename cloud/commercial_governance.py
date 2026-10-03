@@ -55,13 +55,16 @@ def verify_payment(*, invoice_id: str, amount: Decimal, currency: str,
         raise ValueError("payment verification requires invoice, amount, currency, transaction and evidence")
 
 def recognize_revenue(*, payment_verified: bool, delivered: bool,
-                      evidence_ref: str) -> None:
+                      payment_transaction_id: str, payment_evidence_ref: str,
+                      delivery_evidence_ref: str, reconciliation_ref: str) -> None:
     if not payment_verified:
         raise ValueError("revenue cannot be realized before payment verification")
     if not delivered:
         raise ValueError("revenue cannot be realized before delivery")
-    if not evidence_ref:
-        raise ValueError("revenue realization requires audit evidence")
+    if not payment_transaction_id or not payment_evidence_ref:
+        raise ValueError("revenue realization requires verified payment transaction evidence")
+    if not delivery_evidence_ref or not reconciliation_ref:
+        raise ValueError("revenue realization requires delivery and reconciliation evidence")
 
 def consent_allows(*, purpose: str, consents: Mapping[str, bool]) -> bool:
     return bool(consents.get(purpose.upper(), False))
