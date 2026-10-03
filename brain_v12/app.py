@@ -2224,6 +2224,7 @@ app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-
 app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
 app.mount('/code-hub', StaticFiles(directory=os.path.join(ROOT,'web','code-hub'), html=True), name='code-hub')
 app.mount('/browser', StaticFiles(directory=os.path.join(ROOT,'web','browser'), html=True), name='browser')
+app.mount('/brain-chat', StaticFiles(directory=os.path.join(ROOT,'web','brain-chat'), html=True), name='brain-chat')
 app.mount('/text-to-drawing', StaticFiles(directory=os.path.join(ROOT,'web','text-to-drawing'), html=True), name='text-to-drawing')
 app.mount('/local-painter', StaticFiles(directory=os.path.join(ROOT,'web','local-painter'), html=True), name='local-painter')
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
