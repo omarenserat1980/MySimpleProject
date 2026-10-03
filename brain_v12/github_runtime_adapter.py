@@ -7,7 +7,7 @@ GitHub tool by exact name.
 """
 from __future__ import annotations
 from typing import Any, Callable, Mapping
-from .github_capability_registry import has_tool
+from .github_capability_registry import GITHUB_TOOL_COUNT, has_tool
 from .github_executor import GitHubExecutor
 
 class GitHubRuntimeAdapter:
@@ -30,9 +30,10 @@ class GitHubRuntimeAdapter:
 
     def health(self) -> dict[str, Any]:
         registered = self.available_tools()
+        missing = max(0, GITHUB_TOOL_COUNT - len(registered))
         return {
-            "ok": True,
+            "ok": missing == 0,
             "registered_tools": len(registered),
-            "missing_from_runtime": 89 - len(registered),
-            "registry_size": 89,
+            "missing_from_runtime": missing,
+            "registry_size": GITHUB_TOOL_COUNT,
         }
