@@ -57,7 +57,7 @@ def fetch_source(url: str) -> str:
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "text/plain,*/*",
             },
-            method="POST",
+            method="GET",
         )
     with urllib.request.urlopen(request, timeout=60) as response:
         text = response.read().decode("utf-8-sig")
