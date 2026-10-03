@@ -25,6 +25,8 @@ from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
 from .brain.openai_provider import OpenAIProvider
+from .brain.model_router import ModelRouter
+from .brain.model_providers import configured_model_providers
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
@@ -64,7 +66,10 @@ store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); stor
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
-brain_ai=BrainAI(openai_provider, store, cognitive)
+model_router=ModelRouter()
+for _provider in configured_model_providers():
+    model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
+brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
