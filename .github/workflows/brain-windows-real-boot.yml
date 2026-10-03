@@ -139,13 +139,27 @@ jobs:
           test -s brain-windows-server-2025-proof.iso
           sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
 
+      - name: Validate proof media before boot
+        run: |
+          set -euo pipefail
+          xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
+          xorriso -indev brain-windows-server-2025-proof.iso -find / -name Autounattend.xml -print 2>&1 | tee proof-iso-autounattend.txt
+          xorriso -indev brain-windows-server-2025-proof.iso -find / -name SetupComplete.cmd -print 2>&1 | tee proof-iso-setupcomplete.txt
+          grep -q 'Autounattend.xml' proof-iso-autounattend.txt
+          grep -q 'SetupComplete.cmd' proof-iso-setupcomplete.txt
+
       - name: Prepare virtual blade storage
         run: |
           set -euo pipefail
           qemu-img create -f qcow2 windows-server-2025.qcow2 64G
           truncate -s 64M windows-evidence.img
-          mkfs.vfat -n BRAIN_EVIDENCE windows-evidence.img
+          mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
           cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+          if [ -e /dev/kvm ]; then
+            echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
+          else
+            echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
+          fi
 
       - name: Boot and install Windows Server 2025
         env:
@@ -154,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout "$BOOT_TIMEOUT"m qemu-system-x86_64 \
-            -machine q35,accel=tcg -cpu max -m 4G -smp 2 \
+            -machine q35,accel=kvm:tcg -cpu max -m 4G -smp 2 \
             -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
             -drive if=pflash,format=raw,file=OVMF_VARS.fd \
             -device ich9-ahci,id=sata \
@@ -242,6 +256,10 @@ jobs:
             windows-boot-evidence.json
             windows-combined-evidence.json
             windows-completion-gate.json
+            proof-iso-toc.txt
+            proof-iso-autounattend.txt
+            proof-iso-setupcomplete.txt
+            qemu-accel.txt
             qemu-console.log
             qemu-serial.log
 
