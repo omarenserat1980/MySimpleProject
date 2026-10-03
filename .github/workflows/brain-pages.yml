@@ -1,6 +1,7 @@
 name: Brain Cloud Web
 on:
   push:
+    branches: [main]
     paths:
       - "cloud/web/**"
       - "brain_v12/web/brain-app-v2/**"
@@ -13,9 +14,10 @@ permissions:
   id-token: write
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -43,9 +45,19 @@ jobs:
               encoding="utf-8",
           )
           Path("_site/brain-chat/config.js").write_text(
-              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\\n",
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
               encoding="utf-8",
           )
+          if not Path("_site/brain-chat/index.html").is_file():
+              raise SystemExit("Brain Chat entry point is missing from Pages artifact")
+          if not Path("_site/brain-chat/config.js").is_file():
+              raise SystemExit("Brain Chat runtime configuration was not generated")
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as stream:
+                  stream.write("## Brain Pages build\n")
+                  stream.write("- Brain API origin: " + ("configured" if origin else "not configured; the deployed UI will show the backend as disconnected until an API origin is supplied") + "\n")
+                  stream.write("- Brain Chat artifact: present\n")
           PY
       - uses: actions/upload-pages-artifact@v4
         with:
