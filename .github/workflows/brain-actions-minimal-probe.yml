@@ -1,10 +1,8 @@
-name: Brain Actions Minimal Probe
+name: Brain Actions Python Probe
 
 on:
-  workflow_dispatch:
   push:
-    paths:
-      - ".github/workflows/brain-actions-minimal-probe.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,5 +11,11 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe
-        run: echo "BRAIN_ACTIONS_MINIMAL_PROBE_OK"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python probe
+        run: python --version
