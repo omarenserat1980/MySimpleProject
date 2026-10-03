@@ -6,3 +6,4 @@ google-auth>=2.35,<3
 Pillow>=10.4,<12
 
 httpx>=0.27,<1
+pytest>=8.3,<9
