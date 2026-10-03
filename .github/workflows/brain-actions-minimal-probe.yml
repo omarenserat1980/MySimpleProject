@@ -1,0 +1,17 @@
+name: Brain Actions Minimal Probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/brain-actions-minimal-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe
+        run: echo "BRAIN_ACTIONS_MINIMAL_PROBE_OK"
