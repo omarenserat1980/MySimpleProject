@@ -9,5 +9,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+ENV BRAIN_CLOUD_API_KEY=
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD wget -qO- http://127.0.0.1:8080/health || exit 1
 ENTRYPOINT ["dotnet","BrainCloudWorker.dll"]
