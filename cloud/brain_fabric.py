@@ -1,0 +1,140 @@
+"""BRAIN Cloud Fabric: a provider-neutral private-cloud control plane.
+
+This is the Brain-owned layer above infrastructure providers. It does not pretend
+to be a hypervisor or create physical compute; it registers compute nodes,
+tracks capacity/health, persists jobs, and chooses an eligible node.
+"""
+from __future__ import annotations
+import json, os, threading, time, uuid
+from pathlib import Path
+from typing import Any
+
+DEFAULT_STATE = Path(os.getenv("BRAIN_STATE_DIR", ".brain_state")) / "fabric"
+_LOCK = threading.RLock()
+
+def _state_dir() -> Path:
+    p = Path(os.getenv("BRAIN_FABRIC_STATE_DIR", str(DEFAULT_STATE)))
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+def _atomic_write(path: Path, value: dict[str, Any]) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+def _read(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+def _validate_id(value: str) -> str:
+    value = value.strip()
+    if not value or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_." for c in value):
+        raise ValueError("invalid fabric id")
+    return value
+
+def _now() -> float:
+    return time.time()
+
+def register_node(name: str, *, provider: str = "self-hosted",
+                  architecture: str = "unknown", cpu: float = 0,
+                  memory_mb: int = 0, storage_gb: int = 0,
+                  capabilities: list[str] | None = None,
+                  endpoint: str | None = None) -> dict[str, Any]:
+    node_id = _validate_id(name)
+    record = {
+        "node_id": node_id, "name": node_id,
+        "provider": provider.strip() or "self-hosted",
+        "architecture": architecture.strip() or "unknown",
+        "capacity": {"cpu": float(cpu), "memory_mb": int(memory_mb), "storage_gb": int(storage_gb)},
+        "capabilities": sorted(set(str(x).strip() for x in (capabilities or []) if str(x).strip())),
+        "endpoint": endpoint, "state": "READY", "last_heartbeat": _now(),
+        "registered_at": _now(), "jobs_running": 0,
+    }
+    with _LOCK:
+        _atomic_write(_state_dir() / f"node-{node_id}.json", record)
+    return record
+
+def heartbeat(node_id: str, *, state: str = "READY", jobs_running: int = 0) -> dict[str, Any]:
+    node_id = _validate_id(node_id)
+    path = _state_dir() / f"node-{node_id}.json"
+    with _LOCK:
+        record = _read(path)
+        if not record:
+            raise KeyError(node_id)
+        record["state"] = state.strip().upper() or "READY"
+        record["jobs_running"] = max(0, int(jobs_running))
+        record["last_heartbeat"] = _now()
+        _atomic_write(path, record)
+    return record
+
+def list_nodes() -> list[dict[str, Any]]:
+    with _LOCK:
+        items = [_read(p) for p in sorted(_state_dir().glob("node-*.json"))]
+    return [x for x in items if x]
+
+def _eligible(node: dict[str, Any], required: set[str]) -> bool:
+    if node.get("state") not in {"READY", "RUNNING"}:
+        return False
+    if _now() - float(node.get("last_heartbeat", 0)) > float(os.getenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120")):
+        return False
+    return required.issubset(set(node.get("capabilities", [])))
+
+def choose_node(required_capabilities: list[str] | None = None) -> dict[str, Any]:
+    required = {str(x).strip() for x in (required_capabilities or []) if str(x).strip()}
+    candidates = [n for n in list_nodes() if _eligible(n, required)]
+    if not candidates:
+        raise RuntimeError("NO_ELIGIBLE_BRAIN_FABRIC_NODE")
+    return min(candidates, key=lambda n: (int(n.get("jobs_running", 0)), n["node_id"]))
+
+def create_job(kind: str, payload: dict[str, Any], required_capabilities: list[str] | None = None) -> dict[str, Any]:
+    node = choose_node(required_capabilities)
+    job = {
+        "job_id": uuid.uuid4().hex, "kind": kind.strip() or "generic",
+        "payload": payload, "required_capabilities": list(required_capabilities or []),
+        "node_id": node["node_id"], "state": "QUEUED",
+        "created_at": _now(), "updated_at": _now(), "evidence": [],
+    }
+    with _LOCK:
+        _atomic_write(_state_dir() / f"job-{job['job_id']}.json", job)
+    return job
+
+def get_job(job_id: str) -> dict[str, Any] | None:
+    return _read(_state_dir() / f"job-{_validate_id(job_id)}.json")
+
+def transition_job(job_id: str, state: str, *, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    job_id = _validate_id(job_id)
+    state = state.strip().upper()
+    if state not in {"QUEUED", "RUNNING", "SUCCESS", "FAILED", "CANCELLED", "RETRYING"}:
+        raise ValueError("unsupported fabric job state")
+    path = _state_dir() / f"job-{job_id}.json"
+    with _LOCK:
+        job = _read(path)
+        if not job:
+            raise KeyError(job_id)
+        job["state"] = state
+        job["updated_at"] = _now()
+        if evidence:
+            job.setdefault("evidence", []).append({"at": _now(), **evidence})
+        _atomic_write(path, job)
+    return job
+
+def snapshot() -> dict[str, Any]:
+    nodes = list_nodes()
+    jobs = []
+    with _LOCK:
+        for p in sorted(_state_dir().glob("job-*.json")):
+            item = _read(p)
+            if item:
+                jobs.append(item)
+    return {
+        "system": "BRAIN_CLOUD_FABRIC", "mode": "provider-neutral",
+        "provider_lock_in": False, "persistent": True, "nodes": nodes,
+        "jobs": jobs[-100:],
+        "capabilities": ["node_registry", "health_heartbeat", "capacity_tracking",
+                         "capability_scheduling", "durable_job_state",
+                         "provider_neutral_infrastructure"],
+    }
