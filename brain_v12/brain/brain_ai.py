@@ -163,7 +163,8 @@ class BrainAI:
                 "policy": "reads allowed by capability; mutations require explicit approval"}
 
     def status(self):
-        provider_status = self.provider.status() if hasattr(self.provider, "status") else {}\n        router_status = self.model_router.status() if self.model_router is not None else {"enabled": False}
+        provider_status = self.provider.status() if hasattr(self.provider, "status") else {}
+        router_status = self.model_router.status() if self.model_router is not None else {"enabled": False}
         return {"name":"Brain AI","version":"1.2","provider":provider_status, "model_router": router_status,
                 "tools":[{"name":t.name,"description":t.description,"risk":t.risk,"permission":t.permission} for t in self.tools.values()],
                 "memory_enabled":self.memory_store is not None,"cognitive_loop_enabled":self.cognitive is not None,
@@ -185,7 +186,9 @@ class BrainAI:
         prompt = user_text
         if tool_trace:
             prompt += "\n\n[BRAIN_TOOL_TRACE]\n" + json.dumps(tool_trace, ensure_ascii=False, default=str)
-        if self.model_router is not None:\n            return self.model_router.respond(prompt, context=context, instructions=instructions)\n        return self.provider.respond(prompt, context=context, instructions=instructions)
+        if self.model_router is not None:
+            return self.model_router.respond(prompt, context=context, instructions=instructions)
+        return self.provider.respond(prompt, context=context, instructions=instructions)
 
     @staticmethod
     def _tool_intents(result):
