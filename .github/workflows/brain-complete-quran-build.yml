@@ -7,10 +7,6 @@ on:
       - "brain_v12/quran/**"
       - ".github/workflows/brain-complete-quran-build.yml"
   workflow_dispatch:
-  push:
-    paths:
-      - "brain_v12/quran/**"
-
 jobs:
   build-quran:
     runs-on: ubuntu-latest
