@@ -6,7 +6,11 @@ from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 MEMPOOL_PRICES = "https://mempool.space/api/v1/prices"
-MEMPOOL_HASHRATE = "https://mempool.space/api/v1/mining/hashrate/1w"
+MEMPOOL_HASHRATE_ENDPOINTS = (
+    "https://mempool.space/api/v1/mining/hashrate/1w",
+    "https://mempool.space/api/v1/mining/hashrate/3d",
+    "https://mempool.space/api/v1/mining/hashrate/24h",
+)
 HASHPRICE_URL = "https://d-central.tech/wp-json/dc/v1/hashprice"
 
 
@@ -27,12 +31,22 @@ def _positive_number(value, name):
 def collect_btc_market_snapshot() -> dict:
     observed_at = datetime.now(timezone.utc).isoformat()
     prices = _get_json(MEMPOOL_PRICES)
-    mining = _get_json(MEMPOOL_HASHRATE)
+    mining = None
+    network_source = None
+    for endpoint in MEMPOOL_HASHRATE_ENDPOINTS:
+        try:
+            candidate = _get_json(endpoint)
+        except Exception:
+            continue
+        if isinstance(candidate, list) and candidate:
+            mining = candidate
+            network_source = endpoint
+            break
 
     if not isinstance(prices, dict):
         raise ValueError("mempool price payload is not an object")
-    if not isinstance(mining, list) or not mining:
-        raise ValueError("mempool hashrate payload is empty")
+    if not isinstance(mining, list) or not mining or not network_source:
+        raise ValueError("mempool hashrate payload is empty across all supported periods")
 
     usd = _positive_number(prices.get("USD"), "BTC USD price")
     latest = mining[-1] if isinstance(mining[-1], dict) else None
@@ -60,7 +74,7 @@ def collect_btc_market_snapshot() -> dict:
         "observed_at": observed_at,
         "sources": {
             "price": MEMPOOL_PRICES,
-            "network": MEMPOOL_HASHRATE,
+            "network": network_source,
             "hashprice": HASHPRICE_URL,
         },
         "btc_price_usd": usd,
