@@ -1,6 +1,7 @@
 import unittest
 
-from brain_v12.brain.brain_ai import BrainAI\nfrom brain_v12.brain.model_router import ModelRouter
+from brain_v12.brain.brain_ai import BrainAI
+from brain_v12.brain.model_router import ModelRouter
 
 
 class FakeProvider:
@@ -78,7 +79,6 @@ class TestBrainAI(unittest.TestCase):
         for name in GITHUB_TOOLS:
             self.assertIn("github.tool." + name, self.ai.tools)
         self.assertEqual(sum(1 for name in self.ai.tools if name.startswith("github.tool.")), len(GITHUB_TOOLS))
-
 
     def test_chatgpt_capability_registry_is_available(self):
         result = self.ai.execute_tool("chatgpt.capabilities")
