@@ -5,6 +5,7 @@ on:
     paths:
       - "cloud/customer_feedback.py"
       - "cloud/test_customer_feedback.py"
+      - "cloud/test_api_server.py"
       - "cloud/api_server.py"
       - ".github/workflows/brain-health-contract.yml"
       - "BRAIN_HEALTH_AUDIT.md"
