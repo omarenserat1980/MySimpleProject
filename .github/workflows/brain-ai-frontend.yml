@@ -13,17 +13,65 @@ on:
       - "brain_v12/tests/test_brain_ai_frontend.py"
       - ".github/workflows/brain-ai-frontend.yml"
   workflow_dispatch:
+    inputs:
+      run_smoke:
+        description: "Run browser-independent Brain Chat smoke checks"
+        required: false
+        default: "true"
 
 permissions:
   contents: read
 
+concurrency:
+  group: brain-ai-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Validate Brain AI frontend
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate Brain AI frontend contract
         run: python -m unittest brain_v12.tests.test_brain_ai_frontend -v
+      - name: Validate Brain AI session API contract
+        run: python -m unittest brain_v12.tests.test_chat_session_api -v
+      - name: Node JavaScript syntax check
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          p=Path("brain_v12/web/brain-chat/index.html")
+          scripts=re.findall(r"<script(?:[^>]*)>(.*?)</script>", p.read_text(encoding="utf-8"), re.S|re.I)
+          Path("/tmp/brain-chat.js").write_text("\n".join(scripts), encoding="utf-8")
+          print("Extracted", len(scripts), "script block(s)")
+          PY
+          node --check /tmp/brain-chat.js
+      - name: Static security sanity check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE "sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}" brain_v12/web/brain-chat; then
+            echo "Potential credential-like token found in frontend" >&2
+            exit 1
+          fi
+          grep -Fq "encodeURIComponent(sid)" brain_v12/web/brain-chat/index.html
+          grep -Fq "evidenceView" brain_v12/web/brain-chat/index.html
+      - name: Publish verification summary
+        if: always()
+        run: |
+          echo "## Brain AI Frontend CI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: ${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Frontend contract: executed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Session API contract: executed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- JavaScript syntax: executed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Static security sanity: executed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Verification status: see preceding steps" >> "$GITHUB_STEP_SUMMARY"
