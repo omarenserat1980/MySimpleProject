@@ -28,6 +28,7 @@ class GitHubAgentRouter:
         "branch_write": GitHubRoute("branches","repo.write","create_branch",True),
         "release_write": GitHubRoute("releases","releases.write","create_release",True),
         "workflow_write": GitHubRoute("actions","actions.write","rerun_workflow_job",True),
+        "workflow_dispatch": GitHubRoute("actions","actions.write","dispatch_workflow",True),
     }
     KEYWORD_ALIASES = {
         "pr":"pull_request", "pull":"pull_request", "pull_request":"pull_request",
@@ -38,7 +39,7 @@ class GitHubAgentRouter:
         "review":"review", "reviews":"review", "search":"search", "find":"search",
         "edit":"code_write", "modify":"code_write", "write":"code_write",
         "issue_write":"issue_write", "pr_write":"pull_request_write", "branch_write":"branch_write",
-        "release_write":"release_write", "workflow_write":"workflow_write",
+        "release_write":"release_write", "workflow_write":"workflow_write", "dispatch":"workflow_dispatch", "workflow_dispatch":"workflow_dispatch",
     }
     def __init__(self, control_plane: GitHubControlPlane | None = None):
         self.github = control_plane or GitHubControlPlane()
