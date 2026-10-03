@@ -5,7 +5,7 @@
 - [x] Add Commercial Outcome Gate
 - [x] Require verified payment evidence before revenue realization
 - [x] Require verified attributable costs before profit verification
-- [ ] Build a unified monetization registry for every Brain capability
+- [x] Build unified monetization registry and initial capability catalog
 - [ ] Add commercial KPI/evidence dashboard
 
 ## Phase 1 — Evidence and runtime foundation
@@ -94,3 +94,11 @@
 - [ ] Link feedback automatically to Diwan case files and improvement tasks
 - [ ] Add abuse/rate limiting and persistent public API storage
 - [ ] Establish end-to-end release gate
+
+## Phase 10 — Commercial execution
+- [ ] Generate a commercial KPI/evidence dashboard
+- [ ] Connect every monetization entry to an offer, customer evidence, delivery evidence, payment evidence, and cost evidence
+- [ ] Track verified revenue separately from forecasts and opportunities
+- [ ] Track verified profit separately from revenue
+- [ ] Produce a weekly evidence-backed commercial review
+- [ ] Convert validated Brain capabilities into permission-gated customer acquisition workflows
