@@ -1,0 +1,9 @@
+{
+  "api_base": "",
+  "runtime": {
+    "mode": "auto",
+    "origins": [],
+    "discovery": "config",
+    "requires_https": true
+  }
+}
