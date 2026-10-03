@@ -21,6 +21,8 @@ class BrainAIFrontendTest(unittest.TestCase):
             'openSettings',
             'renderHistory',
             'snapshot',
+            'evidenceView',
+            'سجل التنفيذ والتحقق',
         ]
         for item in required:
             self.assertIn(item, self.html, item)
