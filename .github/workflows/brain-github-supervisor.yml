@@ -64,6 +64,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TASK: ${{ steps.task.outputs.task }}
+          DISPATCHED_AT: ${{ steps.dispatch.outputs.dispatched_at }}
         run: |
           set -euo pipefail
           deadline=$((SECONDS + 1200))
@@ -73,9 +74,9 @@ jobs:
               --repo "${{ github.repository }}" \
               --workflow brain-github-cloud.yml \
               --branch main \
-              --limit 10 \
+              --limit 20 \
               --json databaseId,status,conclusion,createdAt,event \
-              --jq '[.[] | select(.event == "workflow_dispatch")][0].databaseId // empty')"
+              --jq --arg t "$DISPATCHED_AT" '[.[] | select(.event == "workflow_dispatch" and .createdAt >= $t)][0].databaseId // empty')"
             if [[ -n "$run_id" ]]; then
               echo "BRAIN_CLOUD_RUN_ID=$run_id"
               break
