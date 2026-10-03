@@ -1,6 +1,6 @@
 import unittest
 from brain_v12.brain.brain_ai_api import BrainAIChatIn
-from brain_v12.brain.chat_session_api import SessionCreateIn, MessageIn, router
+from brain_v12.brain.chat_session_api import SessionCreateIn, MessageIn, router\nfrom brain_v12.brain.chat_session_store import ChatSessionStore\nimport tempfile
 
 
 class FakeResult:
@@ -25,7 +25,7 @@ class ChatSessionApiTests(unittest.TestCase):
         self.assertEqual(MessageIn(message="hello").message, "hello")
         self.assertEqual(BrainAIChatIn(message="hello").message, "hello")
 
-    def test_router_builds(self):
+    def test_persistent_store_round_trip(self):\n        with tempfile.NamedTemporaryFile() as f:\n            store = ChatSessionStore(f.name); store.init()\n            s = store.create("Persisted")\n            store.add_message(s["id"], "user", "hello")\n            loaded = store.get(s["id"])\n            self.assertEqual(loaded["title"], "Persisted")\n            self.assertEqual(loaded["messages"][0]["content"], "hello")\n\n    def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
 
