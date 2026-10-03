@@ -89,7 +89,7 @@ class BrainGitService:
         self._audit("commit.create",name,{"branch":branch,"sha":sha,"files":sorted(files),"message":message})
         return {"sha":sha,"branch":branch,"files":sorted(files)}
     def read_file_at(self,name,path,ref="HEAD"):
-        data=self._run(["show",f"{ref}:{path}"],cwd=self._path(name)); return data
+        data=self._run(["show",f"{ref}:{path}"],cwd=self._path(name)); return data.rstrip("\n")
 
     def branches(self,name):
         out=self._run(["for-each-ref","--format=%(refname:short) %(objectname)","refs/heads"],cwd=self._path(name))
