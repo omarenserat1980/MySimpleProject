@@ -141,6 +141,45 @@ class ChatSessionStore:
             con.commit()
         return self.get_memory(session_id)
 
+    def compact_session(self, session_id, keep_recent=24, max_summary_chars=12000):
+        """Persist a bounded deterministic summary of older messages."""
+        keep_recent = max(1, int(keep_recent))
+        max_summary_chars = max(256, int(max_summary_chars))
+        with self.connect() as con:
+            session = con.execute("SELECT id FROM chat_sessions WHERE id=?", (session_id,)).fetchone()
+            if not session:
+                return None
+            rows = con.execute(
+                "SELECT id,role,content,created_at FROM chat_session_messages WHERE session_id=? ORDER BY id",
+                (session_id,),
+            ).fetchall()
+            existing = con.execute(
+                "SELECT summary FROM chat_session_memory WHERE session_id=?", (session_id,)
+            ).fetchone()
+        if len(rows) <= keep_recent:
+            return {"compacted": False, "older_messages": 0, "summary": existing["summary"] if existing else ""}
+        older = rows[:-keep_recent]
+        lines = []
+        if existing and existing["summary"]:
+            lines.append("Previous durable summary:\n" + existing["summary"])
+        lines.append("Compacted conversation history:")
+        for row in older:
+            text = str(row["content"]).replace("\n", " ").strip()
+            lines.append("[{}] {}".format(row["role"], text))
+        summary = "\n".join(lines)
+        if len(summary) > max_summary_chars:
+            summary = summary[:max_summary_chars - 32].rstrip() + "\n[SUMMARY_TRUNCATED]"
+        stamp = _now()
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO chat_session_memory(session_id,summary,updated_at) VALUES(?,?,?) "
+                "ON CONFLICT(session_id) DO UPDATE SET summary=excluded.summary,updated_at=excluded.updated_at",
+                (session_id, summary, stamp),
+            )
+            con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?", (stamp, session_id))
+            con.commit()
+        return {"compacted": True, "older_messages": len(older), "summary": summary}
+
     def add_message(self, session_id, role, content, metadata=None):
         stamp = _now()
         with self.connect() as con:
