@@ -48,4 +48,6 @@ jobs:
         run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s brain_v12/tests -p 'test_brain_ai*.py' -v
       - run: python -m unittest brain_v12.tests.test_success_bot -v
+      - name: Run Supervisor solution and verification tests
+        run: python -m unittest brain_v12.tests.test_problem_solver brain_v12.brain.test_solution_engine -v
       - run: python -m unittest brain_v12.tests.test_chatgpt_tool_bridge brain_v12.tests.test_chatgpt_host_gateway brain_v12.tests.test_chat_session_api brain_v12.tests.test_autonomous_supervisor brain_v12.tests.test_streaming_api brain_v12.tests.test_model_providers brain_v12.tests.test_model_router_providers -v
