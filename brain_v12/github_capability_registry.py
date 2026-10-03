@@ -6,7 +6,7 @@ data-only: execution remains behind explicit permission gates.
 """
 from __future__ import annotations
 
-GITHUB_TOOL_COUNT = 89
+GITHUB_TOOL_COUNT = 90
 
 GITHUB_TOOLS = [
     "add_comment_to_issue",
@@ -27,6 +27,7 @@ GITHUB_TOOLS = [
     "create_tree",
     "delete_file",
     "dismiss_pull_request_review",
+    "dispatch_workflow",
     "download_user_content",
     "download_workflow_artifact",
     "enable_auto_merge",
