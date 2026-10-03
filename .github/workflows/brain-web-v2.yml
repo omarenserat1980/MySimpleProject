@@ -1,0 +1,50 @@
+name: Brain Web App v2 Verify
+
+on:
+  push:
+    branches: [main, brain-web-v2]
+    paths:
+      - "brain_v12/web/brain-app-v2/**"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_brain_web_app_v2.py"
+      - ".github/workflows/brain-web-v2.yml"
+  pull_request:
+    paths:
+      - "brain_v12/web/brain-app-v2/**"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_brain_web_app_v2.py"
+      - ".github/workflows/brain-web-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-web-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compile Brain API
+        run: python -m py_compile brain_v12/app.py
+      - name: Verify Brain Web App v2 contract
+        run: python -m unittest brain_v12.tests.test_brain_web_app_v2 -v
+      - name: Verify static payload
+        run: |
+          test -s brain_v12/web/brain-app-v2/index.html
+          test -s brain_v12/web/brain-app-v2/app.js
+          test -s brain_v12/web/brain-app-v2/sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          v=json.loads(Path("brain_v12/web/brain-app-v2/version.json").read_text())
+          assert v["version"], "missing web version"
+          assert v["update_policy"] == "service-worker"
+          print("Brain Web App v2:", v["version"])
+          PY
