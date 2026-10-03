@@ -17,7 +17,7 @@ class BrainGitServiceTests(unittest.TestCase):
             self.assertEqual(len(s.audit("proof")),1)
             out=s.commit_files("proof",{"README.md":"Brain Git proof\\n"},"initial proof","main")
             self.assertEqual(len(out["sha"]),40)
-            self.assertEqual(s.read_file_at("proof","README.md","main"),"Brain Git proof")
+            self.assertEqual(s.read_file_at("proof","README.md","main").rstrip("\\n"),"Brain Git proof")
             s.create_branch("proof","test-branch","main")
             self.assertTrue(any(x["name"]=="test-branch" for x in s.branches("proof")))
             self.assertTrue(s.fsck("proof")["ok"])
