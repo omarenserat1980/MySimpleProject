@@ -16,108 +16,61 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
   contents: read
+  actions: read
 
 jobs:
-  dispatch-and-verify:
-    name: Dispatch and verify Brain Cloud
+  brain-cloud:
+    name: Run Brain Cloud through reusable workflow
+    uses: ./.github/workflows/brain-github-cloud.yml
+    with:
+      task: ${{ inputs.task || 'health' }}
+    permissions:
+      contents: read
+      actions: read
+
+  verify:
+    name: Verify Brain Cloud evidence
+    needs: brain-cloud
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 5
     steps:
-      - name: Checkout Brain source of truth
-        uses: actions/checkout@v5
+      - name: Download Brain Cloud evidence
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 1
+          name: brain-github-cloud-evidence
+          path: brain6_artifacts/supervisor-evidence
 
-      - name: Resolve task
-        id: task
-        shell: bash
-        env:
-          REQUESTED_TASK: ${{ inputs.task }}
+      - name: Verify evidence contract
         run: |
           set -euo pipefail
-          task="${REQUESTED_TASK:-health}"
-          case "$task" in
-            health|supervisor|tests|media-test|cinema-test) ;;
-            *)
-              echo "Unsupported task: $task" >&2
-              exit 2
-              ;;
-          esac
-          echo "task=$task" >> "$GITHUB_OUTPUT"
-
-      - name: Dispatch Brain Cloud task
-        id: dispatch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TASK: ${{ steps.task.outputs.task }}
-        run: |
-          set -euo pipefail
-          gh workflow run brain-github-cloud.yml \
-            --repo "${{ github.repository }}" \
-            --ref main \
-            -f "task=$TASK"
-          echo "dispatched_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for the dispatched run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TASK: ${{ steps.task.outputs.task }}
-          DISPATCHED_AT: ${{ steps.dispatch.outputs.dispatched_at }}
-        run: |
-          set -euo pipefail
-          deadline=$((SECONDS + 1200))
-          run_id=""
-          while (( SECONDS < deadline )); do
-            run_id="$(gh run list \
-              --repo "${{ github.repository }}" \
-              --workflow brain-github-cloud.yml \
-              --branch main \
-              --limit 20 \
-              --json databaseId,status,conclusion,createdAt,event \
-              --jq --arg t "$DISPATCHED_AT" '[.[] | select(.event == "workflow_dispatch" and .createdAt >= $t)][0].databaseId // empty')"
-            if [[ -n "$run_id" ]]; then
-              echo "BRAIN_CLOUD_RUN_ID=$run_id"
-              break
-            fi
-            sleep 10
-          done
-          test -n "$run_id"
-
-          gh run watch "$run_id" \
-            --repo "${{ github.repository }}" \
-            --exit-status
-
-      - name: Verify evidence artifact exists
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          run_id="$(gh run list \
-            --repo "${{ github.repository }}" \
-            --workflow brain-github-cloud.yml \
-            --branch main \
-            --limit 10 \
-            --json databaseId,status,conclusion,event \
-            --jq '[.[] | select(.event == "workflow_dispatch" and .conclusion == "success")][0].databaseId // empty')"
-          test -n "$run_id"
-          gh run download "$run_id" \
-            --repo "${{ github.repository }}" \
-            --name brain-github-cloud-evidence \
-            --dir brain6_artifacts/supervisor-evidence
           test -s brain6_artifacts/supervisor-evidence/evidence.json
+          test -s brain6_artifacts/supervisor-evidence/task_result.json
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path("brain6_artifacts/supervisor-evidence/evidence.json")
-          evidence = json.loads(p.read_text(encoding="utf-8"))
-          assert evidence.get("verification_gate") == "ACTION_VERIFIED_ONLY", evidence
+
+          root = Path("brain6_artifacts/supervisor-evidence")
+          evidence = json.loads((root / "evidence.json").read_text(encoding="utf-8"))
+          task = json.loads((root / "task_result.json").read_text(encoding="utf-8"))
+
+          assert task.get("ok") is True, task
+          assert task.get("state") == "TASK_COMPLETED", task
           assert evidence.get("github_capability_registry") == 90, evidence
-          print(json.dumps({"supervisor_verified": True, "evidence": evidence}, indent=2))
+          assert evidence.get("github_agent_tests") == "PASS", evidence
+          assert evidence.get("verification_gate") == "ACTION_VERIFIED_ONLY", evidence
+
+          print(json.dumps({
+              "supervisor_verified": True,
+              "objective_verified": False,
+              "action_verified": True,
+              "evidence_contract": "PASS",
+              "task": task,
+              "evidence": evidence,
+          }, indent=2, ensure_ascii=False))
           PY
 
-      - name: Upload supervisor evidence
+      - name: Upload supervisor verification
         uses: actions/upload-artifact@v4
         with:
           name: brain-github-supervisor-evidence
