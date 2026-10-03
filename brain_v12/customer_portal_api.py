@@ -141,6 +141,14 @@ def create_app(
         except KeyError:
             raise HTTPException(status_code=404, detail="case_not_found")
 
+    @app.get("/v1/cases/{case_id}/events")
+    def get_case_events(case_id: int) -> list[dict]:
+        try:
+            cases.get_case(case_id)
+            return cases.events(case_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="case_not_found")
+
     @app.post("/v1/cases/{case_id}/approval", response_model=ApprovalOut, status_code=201)
     def request_approval(case_id: int) -> ApprovalOut:
         try:
