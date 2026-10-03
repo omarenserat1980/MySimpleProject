@@ -27,6 +27,10 @@ jobs:
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_verification.py
 
+      - name: Validate revenue ledger mining gate
+        run: |
+          python -m pytest -q brain_v12/business/test_revenue_ledger.py
+
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
