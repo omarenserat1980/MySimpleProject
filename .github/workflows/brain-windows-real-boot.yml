@@ -125,6 +125,9 @@ jobs:
             <settings pass="oobeSystem">
               <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
                 <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+                <FirstLogonCommands>
+                  <SynchronousCommand wcm:action="add"><Order>1</Order><CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\brain-windows-evidence.ps1</CommandLine><Description>Brain Windows boot evidence</Description></SynchronousCommand>
+                </FirstLogonCommands>
               </component>
             </settings>
           </unattend>
