@@ -44,8 +44,11 @@ class BrainAI:
                 from ..github_control_plane import GitHubControlPlane
                 self.github = GitHubControlPlane()
             except Exception:
-                return
+                self.github = None
         g = self.github
+        if g is None:
+            self._register_github_surface_without_runtime()
+            return
         self.register_tool("github.capabilities", "List governed GitHub capability domains.", lambda p: g.capability_catalog())
         self.register_tool("github.repository", "Read repository metadata.", lambda p: g.repository(p["owner"], p["repo"]))
         self.register_tool("github.contents", "Read repository file or directory contents.", lambda p: g.contents(p["owner"], p["repo"], p.get("path",""), p.get("ref")))
@@ -62,6 +65,17 @@ class BrainAI:
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self._register_github_tool_surface()
 
+
+    def _register_github_surface_without_runtime(self):
+        """Register the complete surface even when the runtime transport is unavailable."""
+        from ..github_capability_registry import GITHUB_TOOLS, WRITE_OR_MUTATING_TOOLS
+        for tool_name in GITHUB_TOOLS:
+            mutable = tool_name in WRITE_OR_MUTATING_TOOLS
+            def unavailable(params, _tool=tool_name):
+                return {"ok": False, "status": "GITHUB_RUNTIME_UNAVAILABLE", "tool": _tool}
+            self.register_tool("github.tool." + tool_name, "GitHub capability: " + tool_name.replace("_", " "),
+                               unavailable, risk="high" if mutable else "low",
+                               permission="github.write" if mutable else None)
 
     def _register_github_tool_surface(self):
         """Expose every governed GitHub capability as a first-class Brain tool."""
