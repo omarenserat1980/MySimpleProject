@@ -1,5 +1,13 @@
 # Electronic Brain — Roadmap
 
+## Phase 0 — Commercial outcome architecture
+- [x] Define engineering success separately from economic success
+- [x] Add Commercial Outcome Gate
+- [x] Require verified payment evidence before revenue realization
+- [x] Require verified attributable costs before profit verification
+- [ ] Build a unified monetization registry for every Brain capability
+- [ ] Add commercial KPI/evidence dashboard
+
 ## Phase 1 — Evidence and runtime foundation
 - [x] GitHub source-of-truth workflow
 - [x] Brain GitHub Cloud control-plane workflow
@@ -36,6 +44,10 @@
 - [ ] Real artifact QC with ffprobe
 - [ ] Master QC
 - [ ] Verified final MP4 artifact
+- [ ] Define customer offer and pricing evidence
+- [ ] Customer acquisition evidence
+- [ ] Verified payment evidence
+- [ ] Profit measurement after verified delivery and costs
 - [ ] YouTube publishing only after explicit authorization and OAuth verification
 
 ## Phase 5 — Device bridge
@@ -44,6 +56,7 @@
 - [ ] Secure polling/command contract
 - [ ] Offline queue and recovery
 - [ ] Phone-to-Brain Cloud evidence synchronization
+- [ ] Define paid service/product paths for device capabilities
 
 ## Phase 6 — Knowledge and Quran layer
 - [x] Reasoning guard
@@ -51,6 +64,7 @@
 - [x] Layer audit
 - [ ] Complete registry build and evidence verification
 - [ ] Immutable audit trail for generated knowledge
+- [ ] Define lawful knowledge-service monetization paths where appropriate
 
 ## Phase 7 — Economic and opportunity systems
 - [x] Economic ledger safety model
@@ -58,6 +72,10 @@
 - [ ] Evidence-backed opportunity normalization/deduplication
 - [ ] Payment adapters kept separate from discovery
 - [ ] No transaction without explicit permission and verified receipt
+- [ ] Opportunity-to-offer conversion pipeline
+- [ ] Customer/buyer evidence pipeline
+- [ ] Verified revenue evidence pipeline
+- [ ] Verified profit evidence pipeline
 
 ## Phase 8 — Production hardening
 - [ ] Security review
@@ -65,6 +83,7 @@
 - [ ] Recovery chaos tests
 - [ ] Artifact retention policy
 - [ ] End-to-end release gate
+- [ ] Commercial outcome release gate
 
 ## Phase 9 — Customer learning and operational quality
 - [x] Durable customer feedback lifecycle
