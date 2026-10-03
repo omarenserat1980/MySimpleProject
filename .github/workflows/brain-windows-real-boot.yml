@@ -11,7 +11,7 @@ on:
       timeout_minutes:
         description: "Maximum guest boot/install time"
         required: true
-        default: "35"
+        default: "45"
         type: string
 
 permissions:
@@ -20,7 +20,7 @@ permissions:
 jobs:
   real_windows_boot:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -86,6 +86,12 @@ jobs:
           cp brain_v12/windows_boot_evidence.ps1 "$oem_scripts/brain-windows-evidence.ps1"
           cp brain_v12/windows_setupcomplete.cmd "$oem_scripts/SetupComplete.cmd"
 
+          # FirstLogonCommands only fires after a real user logon. Create a
+          # one-shot, runner-generated Administrator password so the evidence
+          # agent cannot stall at the Server OOBE/login boundary.
+          BRAIN_AUTOPASS="$(openssl rand -hex 24)"
+          export BRAIN_AUTOPASS
+
           cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
           <?xml version="1.0" encoding="utf-8"?>
           <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
@@ -125,8 +131,26 @@ jobs:
             <settings pass="oobeSystem">
               <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
                 <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+                <AutoLogon>
+                  <Password><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></Password>
+                  <Enabled>true</Enabled><LogonCount>1</LogonCount><Username>Administrator</Username>
+                </AutoLogon>
+                <UserAccounts>
+                  <AdministratorPassword><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></AdministratorPassword>
+                </UserAccounts>
                 <FirstLogonCommands>
-                  <SynchronousCommand wcm:action="add"><Order>1</Order><CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\brain-windows-evidence.ps1</CommandLine><Description>Brain Windows boot evidence</Description></SynchronousCommand>
+                  <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\brain-windows-evidence.ps1</CommandLine>
+                    <Description>Brain Windows boot evidence</Description>
+                    <RequiresUserInput>false</RequiresUserInput>
+                  </SynchronousCommand>
+                  <SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable further automatic logon</Description>
+                    <RequiresUserInput>false</RequiresUserInput>
+                  </SynchronousCommand>
                 </FirstLogonCommands>
               </component>
             </settings>
@@ -145,6 +169,17 @@ jobs:
       - name: Validate proof media before boot
         run: |
           set -euo pipefail
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          p="/tmp/brain-ws-oem/Autounattend.xml"
+          ET.parse(p)
+          xml=open(p,encoding="utf-8").read()
+          assert "FirstLogonCommands" in xml
+          assert "AutoLogon" in xml
+          assert "Administrator" in xml
+          assert "brain-windows-evidence.ps1" in xml
+          print("AUTOUNATTEND_PREFLIGHT=PASS")
+          PY
           xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
           xorriso -indev brain-windows-server-2025-proof.iso -find / -name Autounattend.xml -print 2>&1 | tee proof-iso-autounattend.txt
           xorriso -indev brain-windows-server-2025-proof.iso -find / -name SetupComplete.cmd -print 2>&1 | tee proof-iso-setupcomplete.txt
