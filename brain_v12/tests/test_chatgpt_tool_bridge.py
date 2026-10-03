@@ -52,5 +52,27 @@ class TestChatGPTToolBridge(unittest.TestCase):
         self.assertEqual(result.status, "INVALID_BRIDGE_RESULT")
 
 
+from brain_v12.brain.chatgpt_tool_bridge import JsonChatGPTToolAdapter
+
+
+class TestJsonChatGPTToolAdapter(unittest.TestCase):
+    def test_transport_receives_json_compatible_envelope(self):
+        seen = []
+        def transport(payload):
+            seen.append(payload)
+            return {"ok": True, "status": "EXECUTED", "result": {"tool": payload["tool"]}}
+        bridge = ChatGPTToolBridge(JsonChatGPTToolAdapter(transport))
+        result = bridge.dispatch(ToolBridgeRequest("web", {"query": "x"}, "req-2"))
+        self.assertTrue(result.ok)
+        self.assertEqual(seen[0]["request_id"], "req-2")
+        self.assertEqual(result.result["tool"], "web")
+
+    def test_missing_transport_fails_closed(self):
+        bridge = ChatGPTToolBridge(JsonChatGPTToolAdapter(None))
+        result = bridge.dispatch(ToolBridgeRequest("web", {}, "req-3"))
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "BRIDGE_FAILED")
+
+
 if __name__ == "__main__":
     unittest.main()
