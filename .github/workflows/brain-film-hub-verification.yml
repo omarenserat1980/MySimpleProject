@@ -1,6 +1,11 @@
 name: Brain Film Hub Verification
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/film_hub/**"
+      - ".github/workflows/brain-film-hub-verification.yml"
   workflow_dispatch:
   push:
     paths:
