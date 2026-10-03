@@ -24,8 +24,9 @@ class BrainAIResponse:
 
 class BrainAI:
     """Unified Brain AI facade with governed model-driven tool execution."""
-    def __init__(self, provider, memory_store=None, cognitive=None, github=None, chatgpt_bridge=None, max_tool_rounds=4, max_tool_retries=2):
+    def __init__(self, provider, memory_store=None, cognitive=None, github=None, chatgpt_bridge=None, model_router=None, max_tool_rounds=4, max_tool_retries=2):
         self.provider = provider
+        self.model_router = model_router
         self.memory_store = memory_store
         self.cognitive = cognitive
         self.github = github
@@ -162,8 +163,8 @@ class BrainAI:
                 "policy": "reads allowed by capability; mutations require explicit approval"}
 
     def status(self):
-        provider_status = self.provider.status() if hasattr(self.provider, "status") else {}
-        return {"name":"Brain AI","version":"1.2","provider":provider_status,
+        provider_status = self.provider.status() if hasattr(self.provider, "status") else {}\n        router_status = self.model_router.status() if self.model_router is not None else {"enabled": False}
+        return {"name":"Brain AI","version":"1.2","provider":provider_status, "model_router": router_status,
                 "tools":[{"name":t.name,"description":t.description,"risk":t.risk,"permission":t.permission} for t in self.tools.values()],
                 "memory_enabled":self.memory_store is not None,"cognitive_loop_enabled":self.cognitive is not None,
                 "github_gateway": self.github is not None, "chatgpt_bridge": self._chatgpt_bridge_status(), "tool_loop_enabled": True, "max_tool_rounds": self.max_tool_rounds, "self_healing_enabled": True, "max_tool_retries": self.max_tool_retries, "diagnose_repair_enabled": True, "max_repair_attempts": self.max_repair_attempts}
@@ -184,7 +185,7 @@ class BrainAI:
         prompt = user_text
         if tool_trace:
             prompt += "\n\n[BRAIN_TOOL_TRACE]\n" + json.dumps(tool_trace, ensure_ascii=False, default=str)
-        return self.provider.respond(prompt, context=context, instructions=instructions)
+        if self.model_router is not None:\n            return self.model_router.respond(prompt, context=context, instructions=instructions)\n        return self.provider.respond(prompt, context=context, instructions=instructions)
 
     @staticmethod
     def _tool_intents(result):
