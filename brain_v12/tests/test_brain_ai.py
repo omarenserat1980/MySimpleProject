@@ -1,6 +1,6 @@
 import unittest
 
-from brain_v12.brain.brain_ai import BrainAI
+from brain_v12.brain.brain_ai import BrainAI\nfrom brain_v12.brain.model_router import ModelRouter
 
 
 class FakeProvider:
@@ -21,6 +21,35 @@ class FakeMemory:
 class TestBrainAI(unittest.TestCase):
     def setUp(self):
         self.ai = BrainAI(FakeProvider(), FakeMemory(), None)
+
+    def test_model_router_selects_and_falls_back(self):
+        router = ModelRouter(default_model="primary", fallback_models=["backup"])
+        calls = []
+        def primary(payload):
+            calls.append("primary")
+            return {"ok": False, "error": "temporary"}
+        def backup(payload):
+            calls.append("backup")
+            return {"ok": True, "result": {"reply": "backup reply", "response_id": "backup-1"}}
+        router.register("primary", primary, tasks=["chat"], priority=1)
+        router.register("backup", backup, tasks=["chat"], priority=2)
+        result = router.respond("hello")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["provider"], "backup")
+        self.assertTrue(result["routing"]["fallback_used"])
+        self.assertEqual(calls, ["primary", "backup"])
+
+    def test_model_router_fails_closed_when_no_model_exists(self):
+        router = ModelRouter()
+        result = router.respond("hello")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "NO_MODEL_AVAILABLE")
+
+    def test_brain_status_exposes_model_router(self):
+        router = ModelRouter(default_model="primary")
+        router.register("primary", lambda payload: {"ok": True, "result": {"reply": "x"}}, tasks=["chat"])
+        ai = BrainAI(FakeProvider(), FakeMemory(), None, model_router=router)
+        self.assertTrue(ai.status()["model_router"]["ok"])
 
     def test_status_exposes_brain_layer(self):
         data = self.ai.status()
