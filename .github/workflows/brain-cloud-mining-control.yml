@@ -1,6 +1,9 @@
 name: Brain Cloud Mining Control Plane
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: "31 */6 * * *"
