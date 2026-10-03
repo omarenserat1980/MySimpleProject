@@ -23,6 +23,12 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Configure Brain media toolchain
+        run: |
+          echo "BRAIN_FFMPEG_BIN=/usr/bin/ffmpeg" >> "$GITHUB_ENV"
+          echo "BRAIN_FFPROBE_BIN=/usr/bin/ffprobe" >> "$GITHUB_ENV"
+          /usr/bin/ffmpeg -version | head -n 1
+          /usr/bin/ffprobe -version | head -n 1
       - name: Compile Brain
         run: python -m compileall -q brain_v12
       - name: Short video factory tests
@@ -33,3 +39,4 @@ jobs:
         env:
           BRAIN_GATE_PYTEST: "0"
         run: python brain_v12/self_healing/verification_gate.py
+
