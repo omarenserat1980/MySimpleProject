@@ -23,6 +23,10 @@ jobs:
         run: |
           python -m pytest -q brain_v12/tests/test_cloud_mining_control_plane.py
 
+      - name: Validate mining payout and blockchain proof gates
+        run: |
+          python -m pytest -q brain_v12/business/test_crypto_mining_verification.py
+
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
