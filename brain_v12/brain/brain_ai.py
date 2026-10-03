@@ -53,6 +53,10 @@ class BrainAI:
                 self.github = GitHubControlPlane()
             except Exception:
                 self.github = None
+        self.register_tool("chatgpt.capabilities", "List the ChatGPT host-tool capabilities visible to Brain.", lambda p: self._chatgpt_capabilities())
+        self.register_tool("chatgpt.discover", "Find the most relevant ChatGPT host tool for a natural-language task.", lambda p: self._chatgpt_discover(p))
+        self.register_tool("chatgpt.bridge_status", "Report whether a real ChatGPT host-tool bridge is configured.", lambda p: self._chatgpt_bridge_status())
+        self.register_tool("chatgpt.execute", "Delegate a ChatGPT host-tool call only through a configured fail-closed bridge.", lambda p: self._chatgpt_execute(p), risk="medium")
         g = self.github
         if g is None:
             self._register_github_surface_without_runtime()
@@ -69,10 +73,6 @@ class BrainAI:
         self.register_tool("github.rest", "Governed full GitHub REST gateway for operations not covered by a dedicated Brain tool. Mutations require explicit approval.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self.register_tool("github.registry", "Discover GitHub tools grouped by domain and risk.", lambda p: self._github_registry())
         self.register_tool("github.discover", "Find the most relevant GitHub tool for a natural-language task.", lambda p: self._github_discover(p))
-        self.register_tool("chatgpt.capabilities", "List the ChatGPT host-tool capabilities visible to Brain.", lambda p: self._chatgpt_capabilities())
-        self.register_tool("chatgpt.discover", "Find the most relevant ChatGPT host tool for a natural-language task.", lambda p: self._chatgpt_discover(p))
-        self.register_tool("chatgpt.bridge_status", "Report whether a real ChatGPT host-tool bridge is configured.", lambda p: self._chatgpt_bridge_status())
-        self.register_tool("chatgpt.execute", "Delegate a ChatGPT host-tool call only through a configured fail-closed bridge.", lambda p: self._chatgpt_execute(p), risk="medium")
         self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self._register_github_tool_surface()
