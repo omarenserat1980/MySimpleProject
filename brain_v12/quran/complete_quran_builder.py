@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import urllib.parse
 import urllib.request
 from typing import Any, Iterable
 
@@ -29,9 +30,32 @@ def sha256_text(text: str) -> str:
 
 
 def fetch_source(url: str) -> str:
-    request = urllib.request.Request(url, headers={"User-Agent": "BRAIN-Quran-Pipeline/1.0"})
+    """Fetch the Tanzil export using its documented POST form contract."""
+    params = {
+        "quranType": "uthmani",
+        "outType": "txt-2",
+        "agree": "true",
+        "marks": "true",
+        "sajdah": "true",
+        "rub": "true",
+        "stanween": "true",
+    }
+    target = url.split("?", 1)[0]
+    request = urllib.request.Request(
+        target,
+        data=urllib.parse.urlencode(params).encode("ascii"),
+        headers={
+            "User-Agent": "BRAIN-Quran-Pipeline/1.0",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "text/plain,*/*",
+        },
+        method="POST",
+    )
     with urllib.request.urlopen(request, timeout=60) as response:
-        return response.read().decode("utf-8-sig")
+        text = response.read().decode("utf-8-sig")
+    if not text.strip():
+        raise RuntimeError("QURAN_SOURCE_EMPTY")
+    return text
 
 
 def parse_tanzil_lines(text: str) -> list[tuple[str, str]]:
