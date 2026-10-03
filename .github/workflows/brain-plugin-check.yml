@@ -2,6 +2,10 @@ name: Brain Plugin Verification
 
 on:
   push:
+    paths:
+      - "plugins/brain-autopilot/**"
+      - "brain_v12/tests/test_brain_autopilot_plugin.py"
+      - ".github/workflows/brain-plugin-check.yml"
   workflow_dispatch:
 
 permissions:
