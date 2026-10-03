@@ -37,8 +37,12 @@ def test_payment_and_revenue_require_evidence():
     with pytest.raises(ValueError):
         recognize_revenue(payment_verified=False, delivered=True, evidence_ref="x")
     with pytest.raises(ValueError):
-        recognize_revenue(payment_verified=True, delivered=False, evidence_ref="x")
-    recognize_revenue(payment_verified=True, delivered=True, evidence_ref="audit:1")
+        recognize_revenue(payment_verified=True, delivered=False, payment_transaction_id="TX-1", payment_evidence_ref="bank:abc", delivery_evidence_ref="delivery:1", reconciliation_ref="recon:1")
+    with pytest.raises(ValueError):
+        recognize_revenue(payment_verified=True, delivered=True, payment_transaction_id="", payment_evidence_ref="bank:abc", delivery_evidence_ref="delivery:1", reconciliation_ref="recon:1")
+    with pytest.raises(ValueError):
+        recognize_revenue(payment_verified=True, delivered=True, payment_transaction_id="TX-1", payment_evidence_ref="bank:abc", delivery_evidence_ref="", reconciliation_ref="recon:1")
+    recognize_revenue(payment_verified=True, delivered=True, payment_transaction_id="TX-1", payment_evidence_ref="bank:abc", delivery_evidence_ref="delivery:1", reconciliation_ref="recon:1")
 
 def test_service_and_marketing_consent_are_separate():
     assert consent_allows(purpose="SERVICE", consents={"SERVICE": True, "MARKETING": False})
