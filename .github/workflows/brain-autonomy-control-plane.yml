@@ -1,6 +1,12 @@
 name: Brain Autonomy Control Plane - Verify
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/autonomy_control_plane.py"
+      - "brain_v12/tests/test_autonomy_control_plane.py"
+      - ".github/workflows/brain-autonomy-control-plane.yml"
   workflow_dispatch:
   schedule:
     - cron: "23 */12 * * *"
