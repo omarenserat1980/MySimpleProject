@@ -35,3 +35,5 @@ def main():
     print(f"SELF_TEST_MATRIX={'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 if __name__=="__main__": raise SystemExit(main())
+
+# CI resolver revision marker.
