@@ -1,0 +1,52 @@
+name: Brain Cloudflare Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare/brain-api/**"
+      - ".github/workflows/brain-cloudflare-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate adapter
+        run: |
+          test -f cloudflare/brain-api/wrangler.toml
+          test -f cloudflare/brain-api/src/index.js
+          node --check cloudflare/brain-api/src/index.js
+
+      - name: Require deployment configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRAIN_ORIGIN: ${{ secrets.BRAIN_ORIGIN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          test -n "$BRAIN_ORIGIN" || { echo "Missing BRAIN_ORIGIN"; exit 1; }
+          case "$BRAIN_ORIGIN" in
+            https://*) ;;
+            *) echo "BRAIN_ORIGIN must use HTTPS"; exit 1 ;;
+          esac
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare/brain-api
+          command: deploy --var "BRAIN_ORIGIN:${{ secrets.BRAIN_ORIGIN }}"
