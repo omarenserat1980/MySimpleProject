@@ -37,6 +37,15 @@ class BrainAIToolTests(unittest.TestCase):
                 raise RuntimeError("transient")
             return {"ok": True, "status": "COMPLETED"}
         self.ai.register_tool("flaky", "test retry", flaky)
+        class RetryProvider:
+            def status(self): return {"ok": True}
+            def respond(self, *args, **kwargs):
+                if not hasattr(self, "done"):
+                    self.done = True
+                    return {"ok": True, "provider": "fake", "model": "fake",
+                            "tool_calls": [{"name": "flaky", "params": {}}]}
+                return {"ok": True, "provider": "fake", "model": "fake", "reply": "recovered"}
+        self.ai.provider = RetryProvider()
         result = self.ai.chat("retry this")
         self.assertTrue(result.ok)
         self.assertEqual(result.tool_calls[0]["retry_count"], 1)
