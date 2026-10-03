@@ -1,0 +1,74 @@
+name: Brain Continuous Evolution Review Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      loops:
+        description: "Bounded review loops for this hosted run (1-10)"
+        required: false
+        default: "1"
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    paths:
+      - "brain_v12/**"
+      - "requirements.txt"
+      - ".github/workflows/brain-continuous-evolution-review-stable.yml"
+
+permissions:
+  contents: read
+
+# A review already in progress is never cancelled.
+# GitHub permits one running and one pending run for this group; a newer
+# pending run replaces the older pending run, so the queue stays bounded.
+concurrency:
+  group: brain-continuous-evolution-stable
+  cancel-in-progress: false
+
+jobs:
+  evolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Install system media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Brain Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Independent verification gate
+        env:
+          BRAIN_GATE_PYTEST: "1"
+          BRAIN_GATE_TIMEOUT: "120"
+        run: |
+          set -o pipefail
+          python -m brain_v12.self_healing.verification_gate
+
+      - name: Review and self-heal
+        env:
+          BRAIN_REVIEW_LOOPS: ${{ github.event.inputs.loops || '1' }}
+          BRAIN_REVIEW_TIMEOUT: "60"
+          BRAIN_CODE_GENERATOR_COMMAND: ${{ vars.BRAIN_CODE_GENERATOR_COMMAND }}
+          BRAIN_PROACTIVE_EVOLUTION: "0"
+          BRAIN_REVIEW_PYTEST: "1"
+          BRAIN_GATE_PYTEST: "1"
+          BRAIN_STOP_ON_UNRECOVERED_FAILURE: "1"
+        run: |
+          set -o pipefail
+          python -m brain_v12.self_healing.review_loop --loops "$BRAIN_REVIEW_LOOPS" --timeout "$BRAIN_REVIEW_TIMEOUT"
+
+      - name: Save evolution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-continuous-evolution-stable-evidence
+          path: .brain/state/
+          if-no-files-found: ignore
