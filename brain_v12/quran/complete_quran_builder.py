@@ -18,7 +18,7 @@ from typing import Any, Iterable
 
 EXPECTED_AYAHS = 6236
 EXPECTED_SURAHS = 114
-DEFAULT_SOURCE = "https://raw.githubusercontent.com/dotquran/corpus/main/processed/quran-uthmani.json"
+DEFAULT_SOURCE = "https://cdn.jsdelivr.net/gh/dotquran/corpus@main/processed/quran-uthmani.json"
 FALLBACK_SOURCE = "https://api.alquran.cloud/v1/quran/quran-uthmani"
 
 
