@@ -7,7 +7,7 @@ from brain_v12.business.monetization_registry import (
 )
 
 
-def entry(capability_id, status, evidence=()):
+def entry(capability_id, status, evidence=(), realized_revenue=None, verified_costs=None):
     return MonetizationEntry(
         capability_id=capability_id,
         capability_name=capability_id,
@@ -17,8 +17,10 @@ def entry(capability_id, status, evidence=()):
         delivery_evidence="artifact",
         cost_model="tracked",
         status=status,
-        realized_revenue=100.0 if status in {"REVENUE_REALIZED", "PROFIT_VERIFIED"} else 0.0,
-        verified_costs=20.0 if status == "PROFIT_VERIFIED" else 0.0,
+        realized_revenue=(100.0 if status in {"REVENUE_REALIZED", "PROFIT_VERIFIED"} else 0.0)
+        if realized_revenue is None else realized_revenue,
+        verified_costs=(20.0 if status == "PROFIT_VERIFIED" else 0.0)
+        if verified_costs is None else verified_costs,
         evidence_refs=list(evidence),
     )
 
@@ -31,7 +33,7 @@ class MonetizationRegistryTests(unittest.TestCase):
 
     def test_profit_requires_realized_revenue(self):
         with self.assertRaises(ValueError):
-            entry("api", "PROFIT_VERIFIED").to_record()
+            entry("api", "PROFIT_VERIFIED", realized_revenue=0.0).to_record()
 
     def test_rank_uses_commercial_state_and_evidence(self):
         records = rank_monetization_entries(
