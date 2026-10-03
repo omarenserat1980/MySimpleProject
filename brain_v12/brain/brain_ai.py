@@ -264,7 +264,9 @@ class BrainAI:
             result=self._provider_respond(user_text, self._context(), instructions or self._system_instructions(), trace)
             if not result.get("ok"):
                 return BrainAIResponse(False,"","error",model=result.get("model"),tool_calls=calls,evidence=evidence,error=result.get("error"))
-            evidence.append({"type":"provider","provider":result.get("provider"),"response_id":result.get("response_id"),"round":round_no})
+            evidence.append({"type":"provider","provider":result.get("provider"),"model":result.get("model"),"response_id":result.get("response_id"),"round":round_no})
+            if result.get("routing") or result.get("evidence", {}).get("type") == "model_routing":
+                evidence.append({"type":"model_routing", **(result.get("routing") or result.get("evidence") or {})})
             intents=self._tool_intents(result)
             if not intents:
                 return BrainAIResponse(True,result.get("reply",""),"model",model=result.get("model"),tool_calls=calls,evidence=evidence)
