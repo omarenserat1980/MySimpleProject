@@ -97,7 +97,7 @@ class CommerceReversalTests(unittest.TestCase):
             f"/api/commerce/reversals/{oid}/refund-request",
             json={"evidence_ref": "x"},
         )
-        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.status_code, 403)
 
 
 if __name__ == "__main__":
