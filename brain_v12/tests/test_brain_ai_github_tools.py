@@ -80,7 +80,7 @@ class BrainAIToolTests(unittest.TestCase):
         self.ai.provider = RepairProvider()
         result = self.ai.chat("repair this")
         self.assertTrue(result.ok)
-        self.assertEqual(attempts["bad"], 1)
+        self.assertEqual(attempts["bad"], 3)
         self.assertEqual(attempts["good"], 1)
         self.assertTrue(any(e.get("type") == "diagnose_repair" and e.get("verified") for e in result.evidence))
     def test_write_requires_approval(self):
