@@ -14,4 +14,4 @@ def test_mutations_are_gated():
     assert "update_file" in WRITE_OR_MUTATING_TOOLS
     assert "dispatch_workflow" in WRITE_OR_MUTATING_TOOLS
     assert "fetch_pr" not in WRITE_OR_MUTATING_TOOLS
-    assert capability_catalog()["tool_count"] == 89
+    assert capability_catalog()["tool_count"] == 90
