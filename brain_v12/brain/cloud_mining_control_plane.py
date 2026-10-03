@@ -81,7 +81,7 @@ class CloudMiningControlPlane:
             "accepted_shares": accepted,
             "rejected_shares": rejected,
             "payout_tx_id": payout_tx_id,
-            "status": "VERIFIED_RECEIVED" if payout_tx_id else "MINING_EVIDENCE_ONLY",
+            "status": "PAYOUT_TX_REFERENCE_PRESENT" if payout_tx_id else "MINING_EVIDENCE_ONLY",
             "recorded_at": datetime.now(timezone.utc).isoformat(),
         }
 
