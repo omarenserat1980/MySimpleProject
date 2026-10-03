@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "brain-autopilot",
+  "version": "0.1.0",
+  "description": "Evidence-first Brain workflows for inspecting GitHub repositories, diagnosing failures, and preparing verified changes.",
+  "license": "MIT",
+  "keywords": ["github", "repository", "debugging", "verification", "autopilot", "brain"],
+  "skills": "./skills/"
+}
