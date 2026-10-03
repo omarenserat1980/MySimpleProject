@@ -47,13 +47,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest
       - name: Run tests
         run: |
           set -euo pipefail
           python -m py_compile brain_v12/business/crypto_mining_intelligence.py brain_v12/business/crypto_mining_verification.py brain_v12/business/revenue_ledger.py brain_v12/business/crypto_mining_data.py brain_v12/business/crypto_market_snapshot.py brain_v12/business/crypto_live_collector.py
           python -m pytest -q brain_v12/business/test_crypto_mining_intelligence.py brain_v12/business/test_crypto_mining_verification.py brain_v12/business/test_revenue_ledger.py brain_v12/business/test_crypto_market_snapshot.py
-
       - name: Collect live public market data
         env:
           ELECTRICITY_USD_KWH: ${{ inputs.electricity_usd_kwh || '0.05' }}
@@ -68,29 +72,10 @@ jobs:
           import json, os
           from brain_v12.business.crypto_live_collector import collect_btc_market_snapshot
           from brain_v12.business.crypto_mining_intelligence import MiningMachine, NetworkSnapshot, build_intelligence_report
-
           snapshot = collect_btc_market_snapshot()
-          machine = MiningMachine(
-              machine_id="cloud-live",
-              hashrate_th=float(os.environ["HASHRATE_TH"]),
-              efficiency_j_th=float(os.environ["EFFICIENCY_J_TH"]),
-              hardware_cost_usd=float(os.environ["HARDWARE_COST_USD"]),
-              pool_fee_pct=float(os.environ["POOL_FEE_PCT"]),
-          )
-          network = NetworkSnapshot(
-              asset="BTC",
-              hashprice_usd_per_th_day=snapshot["hashprice_usd_per_th_day"],
-              observed_at=snapshot["observed_at"],
-              source=snapshot["sources"]["hashprice"],
-              btc_price_usd=snapshot["btc_price_usd"],
-              network_hashrate_eh=snapshot["network_hashrate_eh_s"],
-              difficulty=snapshot["difficulty"],
-              evidence_urls=list(snapshot["sources"].values()),
-          )
-          report = build_intelligence_report(
-              machine, network, float(os.environ["ELECTRICITY_USD_KWH"]),
-              [0.03, 0.05, 0.07, 0.10, 0.15],
-          )
+          machine = MiningMachine(machine_id="cloud-live", hashrate_th=float(os.environ["HASHRATE_TH"]), efficiency_j_th=float(os.environ["EFFICIENCY_J_TH"]), hardware_cost_usd=float(os.environ["HARDWARE_COST_USD"]), pool_fee_pct=float(os.environ["POOL_FEE_PCT"]))
+          network = NetworkSnapshot(asset="BTC", hashprice_usd_per_th_day=snapshot["hashprice_usd_per_th_day"], observed_at=snapshot["observed_at"], source=snapshot["sources"]["hashprice"], btc_price_usd=snapshot["btc_price_usd"], network_hashrate_eh=snapshot["network_hashrate_eh_s"], difficulty=snapshot["difficulty"], evidence_urls=list(snapshot["sources"].values()))
+          report = build_intelligence_report(machine, network, float(os.environ["ELECTRICITY_USD_KWH"]), [0.03, 0.05, 0.07, 0.10, 0.15])
           report["market_snapshot"] = snapshot
           report["data_quality"] = {"status": "FRESH", "sources": snapshot["sources"], "fail_closed": True}
           report["decision_state"] = report.get("analysis", {}).get("status", "RESEARCH")
@@ -99,7 +84,6 @@ jobs:
           print("CRYPTO_MINING_LIVE_COLLECTION=PASS")
           print(json.dumps(report, indent=2))
           PY
-
       - name: Upload evidence
         uses: actions/upload-artifact@v4
         with:
