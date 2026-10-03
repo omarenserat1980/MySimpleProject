@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "brain_v12/quran/**"
+      - "brain_v12/self_healing/**"
       - ".github/workflows/brain-quran-layer-audit.yml"
   workflow_dispatch:
 jobs:
