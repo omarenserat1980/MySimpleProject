@@ -161,7 +161,7 @@ jobs:
             -outdev brain-windows-server-2025-proof.iso \
             -boot_image any replay \
             -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
-            -map /tmp/brain-ws-oem/\$OEM\$ '/sources/\$OEM\$' \
+            -map "$oem_scripts" "/sources/\$OEM\$/\$\$/Setup/Scripts" \
             -commit
           test -s brain-windows-server-2025-proof.iso
           sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
