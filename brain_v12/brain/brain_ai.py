@@ -27,8 +27,9 @@ class BrainAIResponse:
 class BrainAI:
     """Gemini-like Brain facade: conversation + memory + tools + verification."""
 
-    def __init__(self, provider, memory_store=None, cognitive=None):
+    def __init__(self, provider, memory_store=None, cognitive=None, model_router=None):
         self.provider = provider
+        self.model_router = model_router
         self.memory_store = memory_store
         self.cognitive = cognitive
         self.tools: Dict[str, BrainAITool] = {}
@@ -42,6 +43,7 @@ class BrainAI:
             "name": "Brain AI",
             "version": "1.0",
             "provider": provider_status,
+            "model_router": self.model_router.status() if self.model_router is not None else None,
             "tools": [{"name": t.name, "description": t.description,
                        "risk": t.risk, "permission": t.permission}
                       for t in self.tools.values()],
@@ -71,10 +73,13 @@ class BrainAI:
         user_text = (user_text or "").strip()
         if not user_text:
             return BrainAIResponse(False, "", "error", error="EMPTY_MESSAGE")
-        result = self.provider.respond(
+        result = (self.model_router.respond(
             user_text, context=self._context(),
             instructions=instructions or self._system_instructions(),
-        )
+        ) if self.model_router is not None else self.provider.respond(
+            user_text, context=self._context(),
+            instructions=instructions or self._system_instructions(),
+        ))
         if not result.get("ok"):
             return BrainAIResponse(False, "", "error",
                                    model=result.get("model"),
