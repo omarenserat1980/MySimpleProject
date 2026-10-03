@@ -57,6 +57,7 @@ class BrainAI:
         self.register_tool("github.write_contents", "Write repository contents; explicit approval required.", lambda p: g.write_contents(p["owner"], p["repo"], p["path"], p["body"], approved=bool(p.get("approved",False))), risk="high", permission="code.write")
         self.register_tool("github.rest", "Governed full GitHub REST gateway for operations not covered by a dedicated Brain tool. Mutations require explicit approval.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self.register_tool("github.registry", "Discover GitHub tools grouped by domain and risk.", lambda p: self._github_registry())
+        self.register_tool("github.discover", "Find the most relevant GitHub tool for a natural-language task.", lambda p: self._github_discover(p))
         self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self._register_github_tool_surface()
@@ -80,6 +81,20 @@ class BrainAI:
                                         approved=bool(params.get("approved", False)),
                                         params=params.get("query"), body=params.get("body"))
             self.register_tool(brain_name, "GitHub capability: " + tool_name.replace("_", " "), handler, risk=risk, permission=permission)
+
+    def _github_discover(self, params):
+        """Rank the registered GitHub tools for a natural-language task."""
+        from ..github_capability_registry import GITHUB_TOOLS
+        query = str(params.get("query", "")).lower()
+        tokens = {t for t in query.replace("/", " ").replace("-", " ").split() if len(t) > 2}
+        ranked = []
+        for name in GITHUB_TOOLS:
+            words = set(name.replace("_", " ").split())
+            score = len(tokens & words)
+            if score:
+                ranked.append((score, name))
+        ranked.sort(key=lambda x: (-x[0], x[1]))
+        return {"ok": True, "query": query, "candidates": [{"tool": n, "score": score, "brain_tool": "github.tool." + n} for score, n in ranked[:10]]}
 
     def _github_registry(self):
         domains = {
