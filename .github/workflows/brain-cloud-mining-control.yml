@@ -51,6 +51,10 @@ jobs:
         run: |
           python -m pytest -q brain_v12/business/test_braiins_readonly_adapter.py
 
+      - name: Validate mining economics gate
+        run: |
+          python -m pytest -q brain_v12/business/test_mining_economics_gate.py
+
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
