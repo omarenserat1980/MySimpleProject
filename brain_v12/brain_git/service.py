@@ -70,7 +70,11 @@ class BrainGitService:
         with tempfile.TemporaryDirectory() as d:
             work=Path(d)/"work"; self._run(["clone",str(repo),str(work)])
             if branch:
-                self._run(["checkout","-B",branch],cwd=work)
+                remote_ref=self._run(["rev-parse","--verify",f"refs/remotes/origin/{branch}"],cwd=work) if self._run(["rev-parse","--verify","HEAD"],cwd=work) else ""
+                if remote_ref:
+                    self._run(["checkout","-B",branch,f"origin/{branch}"],cwd=work)
+                else:
+                    self._run(["checkout","-B",branch],cwd=work)
             for rel,content in files.items():
                 p=work/rel; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(content,encoding="utf-8")
             self._run(["add","--all"],cwd=work)
