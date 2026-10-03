@@ -23,6 +23,7 @@ from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
+from .brain.chat_session_api import router as brain_chat_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
@@ -119,6 +120,7 @@ from .brain.economic_reconciliation import router as economic_reconciliation_rou
 from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
+app.include_router(brain_chat_router(brain_ai))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
