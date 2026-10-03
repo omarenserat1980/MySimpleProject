@@ -24,7 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
+        with:
+          enablement: true
       - name: Build static Brain Web payload
         env:
           BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN }}
