@@ -18,6 +18,7 @@ class BrainAIFrontendTest(unittest.TestCase):
             'brain_ai_chats_v2',
             'brain_ai_api_base',
             'window.BRAIN_API_BASE',
+            './config.js',
             '/api/brain-chat/sessions',
             'ensureSession',
             '/messages',
