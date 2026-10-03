@@ -1,6 +1,13 @@
 name: Brain GitHub Cloud - Free Linux Control Plane
 
 on:
+  workflow_call:
+    inputs:
+      task:
+        description: "Brain task to execute"
+        required: false
+        default: "health"
+        type: string
   workflow_dispatch:
     inputs:
       task:
