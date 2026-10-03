@@ -1,0 +1,126 @@
+"""FastAPI routes for BRAIN Cloud Fabric."""
+from __future__ import annotations
+import os, hmac, time
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field
+
+from cloud.brain_fabric import (
+    register_node, heartbeat, list_nodes, choose_node, create_job,
+    get_job, transition_job, snapshot,
+)
+from cloud.brain_node_security import create_enrollment, verify_enrollment
+
+router = APIRouter(prefix="/v1/fabric", tags=["brain-fabric"])
+
+def fabric_auth(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    local_app: str | None = Header(default=None, alias="X-BRAIN-Local-App"),
+) -> None:
+    host = request.client.host if request.client else ""
+    if local_app == "1" and host in {"127.0.0.1", "::1", "localhost"}:
+        return
+    token = os.getenv("BRAIN_CONTROL_TOKEN", "")
+    if not token or not authorization or not hmac.compare_digest(authorization, "Bearer "+token):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+class NodeRequest(BaseModel):
+    node_id: str
+    provider: str = "self-hosted"
+    architecture: str = "unknown"
+    cpu: float = 0
+    memory_mb: int = 0
+    storage_gb: int = 0
+    capabilities: list[str] = Field(default_factory=list)
+    endpoint: str | None = None
+
+class EnrollmentRequest(BaseModel):
+    node_id: str
+    ttl_seconds: int = 900
+
+class HeartbeatRequest(BaseModel):
+    enrollment_token: str
+    state: str = "READY"
+    jobs_running: int = 0
+    architecture: str | None = None
+    cpu: float | None = None
+    capabilities: list[str] | None = None
+
+class JobRequest(BaseModel):
+    kind: str
+    payload: dict = Field(default_factory=dict)
+    required_capabilities: list[str] = Field(default_factory=list)
+
+class TransitionRequest(BaseModel):
+    state: str
+    evidence: dict | None = None
+
+@router.get("", dependencies=[Depends(fabric_auth)])
+def fabric_status():
+    return {"ok": True, **snapshot()}
+
+@router.post("/enroll", dependencies=[Depends(fabric_auth)])
+def enroll(body: EnrollmentRequest):
+    return {"ok": True, **create_enrollment(body.node_id.strip(), body.ttl_seconds)}
+
+@router.post("/nodes", dependencies=[Depends(fabric_auth)])
+def add_node(body: NodeRequest):
+    return {"ok": True, "node": register_node(
+        body.node_id, provider=body.provider, architecture=body.architecture,
+        cpu=body.cpu, memory_mb=body.memory_mb, storage_gb=body.storage_gb,
+        capabilities=body.capabilities, endpoint=body.endpoint)}
+
+@router.get("/nodes", dependencies=[Depends(fabric_auth)])
+def nodes():
+    return {"ok": True, "nodes": list_nodes()}
+
+@router.post("/nodes/{node_id}/heartbeat")
+def node_heartbeat(node_id: str, body: HeartbeatRequest):
+    if not verify_enrollment(node_id, body.enrollment_token):
+        raise HTTPException(status_code=401, detail="invalid or expired enrollment token")
+    try:
+        result=heartbeat(node_id, state=body.state, jobs_running=body.jobs_running)
+    except KeyError:
+        # First heartbeat may complete registration using the authenticated bootstrap token.
+        result=register_node(
+            node_id, architecture=body.architecture or "unknown",
+            cpu=body.cpu or 0, capabilities=body.capabilities or [])
+    else:
+        changed=False
+        if body.architecture:
+            result["architecture"]=body.architecture; changed=True
+        if body.cpu is not None:
+            result["capacity"]["cpu"]=body.cpu; changed=True
+        if body.capabilities is not None:
+            result["capabilities"]=sorted(set(body.capabilities)); changed=True
+        if changed:
+            from cloud.brain_fabric import _state_dir, _atomic_write
+            _atomic_write(_state_dir()/f"node-{node_id}.json", result)
+    return {"ok": True, "node": result}
+
+@router.post("/choose", dependencies=[Depends(fabric_auth)])
+def choose(body: JobRequest):
+    return {"ok": True, "node": choose_node(body.required_capabilities)}
+
+@router.post("/jobs", dependencies=[Depends(fabric_auth)])
+def job_create(body: JobRequest):
+    try:
+        return {"ok": True, "job": create_job(body.kind, body.payload, body.required_capabilities)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+@router.get("/jobs/{job_id}", dependencies=[Depends(fabric_auth)])
+def job_get(job_id: str):
+    job=get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="fabric job not found")
+    return {"ok": True, "job": job}
+
+@router.post("/jobs/{job_id}/transition", dependencies=[Depends(fabric_auth)])
+def job_transition(job_id: str, body: TransitionRequest):
+    try:
+        return {"ok": True, "job": transition_job(job_id, body.state, evidence=body.evidence)}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="fabric job not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
