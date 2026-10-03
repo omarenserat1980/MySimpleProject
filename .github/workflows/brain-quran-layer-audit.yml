@@ -1,6 +1,11 @@
 name: Brain Quran Layer Audit
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/quran/**"
+      - ".github/workflows/brain-quran-layer-audit.yml"
   workflow_dispatch:
   push:
     paths:
