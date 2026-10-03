@@ -101,6 +101,31 @@ jobs:
           set -euo pipefail
           python -m compileall -q brain_v12
 
+      - name: Verify GitHub capability registry
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from brain_v12.github_capability_registry import GITHUB_TOOL_COUNT, GITHUB_TOOLS
+          assert GITHUB_TOOL_COUNT == 89, GITHUB_TOOL_COUNT
+          assert len(GITHUB_TOOLS) == 89, len(GITHUB_TOOLS)
+          required = {
+              "fetch_pr",
+              "fetch_workflow_job_logs",
+              "merge_pull_request",
+              "update_file",
+              "search_repositories",
+          }
+          missing = sorted(required - set(GITHUB_TOOLS))
+          assert not missing, missing
+          print("github_capability_registry=PASS")
+          print("github_tool_count=89")
+          PY
+
+      - name: Run GitHub Agent tests
+        run: |
+          set -euo pipefail
+          python -m unittest             brain_v12.tests.test_github_control_plane             brain_v12.tests.test_github_agent_router             brain_v12.tests.test_github_capability_registry             brain_v12.tests.test_github_executor             brain_v12.tests.test_github_planner             brain_v12.tests.test_github_task_engine             brain_v12.tests.test_github_runtime_adapter             brain_v12.tests.test_github_agent             brain_v12.tests.test_github_autonomous_supervisor             -v
+
       - name: Execute Brain task
         run: |
           set -euo pipefail
@@ -154,6 +179,8 @@ jobs:
             "arch": "$RUNNER_ARCH",
             "persistent_vm": false,
             "billing_model": "github-hosted-standard-runner",
+            "github_capability_registry": 89,
+            "github_agent_tests": "required",
             "next_layer": "brain task executor",
             "executor_contract": "task resolved from workflow_dispatch input"
           }
