@@ -130,6 +130,11 @@ jobs:
           set -euo pipefail
           PYTHONPATH=. pytest -q brain_v12/tests
 
+      - name: Verify unified objective gate
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python -m unittest brain_v12.tests.test_verification_gate -v
+
       - name: Verify task result evidence
         if: success()
         run: |
