@@ -61,6 +61,36 @@ class ChatSessionApiTests(unittest.TestCase):
             items = store.context_messages(s["id"], limit=2)
             self.assertEqual([x["content"] for x in items], ["two", "three"])
 
+    def test_long_conversation_compaction_preserves_recent_window(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            s = store.create("Long")
+            for i in range(5):
+                store.add_message(s["id"], "user", "message-{}".format(i))
+            result = store.compact_session(s["id"], keep_recent=2, max_summary_chars=1000)
+            self.assertTrue(result["compacted"])
+            self.assertEqual(result["older_messages"], 3)
+            self.assertIn("message-0", result["summary"])
+            self.assertIn("message-2", result["summary"])
+            self.assertNotIn("message-3", result["summary"])
+            recent = store.context_messages(s["id"], limit=2)
+            self.assertEqual([x["content"] for x in recent], ["message-3", "message-4"])
+            self.assertLessEqual(len(store.get_memory(s["id"])["summary"]), 1000)
+
+    def test_compaction_is_session_isolated(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            first = store.create("First")
+            second = store.create("Second")
+            for i in range(3):
+                store.add_message(first["id"], "user", "first-{}".format(i))
+            store.add_message(second["id"], "user", "second-only")
+            store.compact_session(first["id"], keep_recent=1)
+            self.assertIn("first-0", store.get_memory(first["id"])["summary"])
+            self.assertEqual(store.get_memory(second["id"])["summary"], "")
+
     def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
