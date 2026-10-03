@@ -5,6 +5,7 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # Manual dispatch remains available in GitHub UI; Brain connector may lack Actions-dispatch permission.
   schedule:
     - cron: "31 */6 * * *"
 
