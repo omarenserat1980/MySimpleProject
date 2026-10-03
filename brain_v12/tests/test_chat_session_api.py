@@ -1,6 +1,9 @@
+import tempfile
 import unittest
+
 from brain_v12.brain.brain_ai_api import BrainAIChatIn
-from brain_v12.brain.chat_session_api import SessionCreateIn, MessageIn, router\nfrom brain_v12.brain.chat_session_store import ChatSessionStore\nimport tempfile
+from brain_v12.brain.chat_session_api import MemoryIn, MessageIn, SessionCreateIn, router
+from brain_v12.brain.chat_session_store import ChatSessionStore
 
 
 class FakeResult:
@@ -23,9 +26,31 @@ class ChatSessionApiTests(unittest.TestCase):
     def test_models_validate(self):
         self.assertEqual(SessionCreateIn().title, "New Brain Chat")
         self.assertEqual(MessageIn(message="hello").message, "hello")
+        self.assertEqual(MemoryIn(summary="x").summary, "x")
         self.assertEqual(BrainAIChatIn(message="hello").message, "hello")
 
-    def test_persistent_store_round_trip(self):\n        with tempfile.NamedTemporaryFile() as f:\n            store = ChatSessionStore(f.name); store.init()\n            s = store.create("Persisted")\n            store.add_message(s["id"], "user", "hello")\n            loaded = store.get(s["id"])\n            self.assertEqual(loaded["title"], "Persisted")\n            self.assertEqual(loaded["messages"][0]["content"], "hello")\n\n    def test_context_messages_are_ordered_and_limited(self):
+    def test_persistent_store_round_trip(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            s = store.create("Persisted")
+            store.add_message(s["id"], "user", "hello")
+            loaded = store.get(s["id"])
+            self.assertEqual(loaded["title"], "Persisted")
+            self.assertEqual(loaded["messages"][0]["content"], "hello")
+            self.assertEqual(loaded["memory"]["summary"], "")
+
+    def test_session_memory_is_persistent_and_isolated(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            first = store.create("First")
+            second = store.create("Second")
+            store.set_memory(first["id"], "first-session facts")
+            self.assertEqual(store.get_memory(first["id"])["summary"], "first-session facts")
+            self.assertEqual(store.get_memory(second["id"])["summary"], "")
+
+    def test_context_messages_are_ordered_and_limited(self):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
             store.init()
