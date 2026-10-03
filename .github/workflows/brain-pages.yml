@@ -48,12 +48,12 @@ jobs:
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
               encoding="utf-8",
           )
+          if not Path("_site/index.html").is_file():
+              raise SystemExit("Pages root entry point is missing from artifact")
           if not Path("_site/brain-chat/index.html").is_file():
               raise SystemExit("Brain Chat entry point is missing from Pages artifact")
           if not Path("_site/brain-chat/config.js").is_file():
               raise SystemExit("Brain Chat runtime configuration was not generated")
-          if not Path("_site/index.html").is_file():
-              raise SystemExit("Pages root entry point is missing from artifact")
           if "\\n" in Path("_site/brain-chat/config.js").read_text(encoding="utf-8"):
               raise SystemExit("Brain Chat config contains a literal backslash-n")
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
@@ -65,6 +65,22 @@ jobs:
                   stream.write("## Brain Pages build\n")
                   stream.write("- Brain API origin: " + ("configured" if origin else "not configured; the deployed UI will show the backend as disconnected until an API origin is supplied") + "\n")
                   stream.write("- Brain Chat artifact: present\n")
+          PY
+      - name: Validate Pages payload
+        run: |
+          test -f _site/index.html
+          test -f _site/brain-chat/index.html
+          test -f _site/brain-chat/config.js
+          test -f _site/brain-app-v2/config.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
+          assert "api_base" in config
+          js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
+          assert "\\n" not in js
+          assert js.startswith("window.BRAIN_API_BASE = ")
+          print("Pages payload validation: OK")
           PY
       - uses: actions/upload-pages-artifact@v4
         with:
