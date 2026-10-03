@@ -18,8 +18,9 @@ import urllib.error
 import urllib.request
 
 
-# Explicit Brain-owned workflow allowlist. ChatGPT may select only these IDs.
+# Explicit Brain-owned workflow allowlist. Dispatch remains an approval-gated write.
 ALLOWED_WORKFLOWS = {
+    "brain-github-cloud": ".github/workflows/brain-github-cloud.yml",
     "brain-reasoning-loop": ".github/workflows/brain-reasoning-loop.yml",
     "reflection-e2e": ".github/workflows/reflection-e2e.yml",
 }
@@ -142,8 +143,6 @@ def main() -> int:
                     print("WORKFLOW_MONITOR=SUCCESS")
                     return 0
 
-                # Failed workflows are not opaque: collect job names/statuses and
-                # bounded log tails so the next Brain reflection has evidence.
                 jobs_url = f"https://api.github.com/repos/{args.repo}/actions/runs/{run_id}/jobs?per_page=100"
                 try:
                     jobs_req = urllib.request.Request(jobs_url, method="GET", headers=headers)
@@ -161,22 +160,16 @@ def main() -> int:
                                 f"{job_id}/logs"
                             )
                             try:
-                                logs_req = urllib.request.Request(
-                                    logs_url, method="GET", headers=headers
-                                )
+                                logs_req = urllib.request.Request(logs_url, method="GET", headers=headers)
                                 with urllib.request.urlopen(logs_req, timeout=30) as logs_resp:
                                     raw_logs = logs_resp.read()
                                 with ZipFile(BytesIO(raw_logs)) as archive:
-                                    names = archive.namelist()
-                                    for name in names[-3:]:
+                                    for name in archive.namelist()[-3:]:
                                         content = archive.read(name).decode("utf-8", "replace")
                                         print(f"WORKFLOW_LOG_FILE={name}")
                                         print(f"WORKFLOW_LOG_TAIL={content[-4000:]}")
-                            except (urllib.error.URLError, urllib.error.HTTPError, Exception) as log_exc:
-                                print(
-                                    f"WORKFLOW_LOG_ERROR job={job_id}: {log_exc}",
-                                    file=sys.stderr,
-                                )
+                            except Exception as log_exc:
+                                print(f"WORKFLOW_LOG_ERROR job={job_id}: {log_exc}", file=sys.stderr)
                 except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError) as jobs_exc:
                     print(f"WORKFLOW_JOBS_ERROR: {jobs_exc}", file=sys.stderr)
 
@@ -187,7 +180,3 @@ def main() -> int:
 
     print("WORKFLOW_MONITOR=TIMEOUT", file=sys.stderr)
     return 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
