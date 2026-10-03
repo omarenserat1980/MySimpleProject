@@ -46,6 +46,12 @@ class GitHubControlPlane:
     def issues(self, owner, repo, number=None): return self.request("GET",f"/repos/{owner}/{repo}/issues"+(f"/{number}" if number is not None else ""),capability="issues.read")
     def pull_request(self, owner, repo, number): return self.request("GET",f"/repos/{owner}/{repo}/pulls/{number}",capability="pulls.read")
     def actions_runs(self, owner, repo, page=1, per_page=30): return self.request("GET",f"/repos/{owner}/{repo}/actions/runs",capability="actions.read",params={"page":page,"per_page":per_page})
+    def dispatch_workflow(self, owner, repo, workflow_id, ref="main", inputs=None, approved=False):
+        """Dispatch a workflow through GitHub REST; mutable action requires explicit approval."""
+        body={"ref":ref}
+        if inputs:
+            body["inputs"]=inputs
+        return self.request("POST",f"/repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches",capability="actions.write",approved=approved,body=body)
     def releases(self, owner, repo): return self.request("GET",f"/repos/{owner}/{repo}/releases",capability="releases.read")
     def search(self, query, search_type="repositories"): return self.request("GET",f"/search/{search_type}",capability="search.read",params={"q":query})
     def capability_catalog(self):
