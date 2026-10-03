@@ -51,6 +51,38 @@ class BrainAIToolTests(unittest.TestCase):
         self.assertEqual(result.tool_calls[0]["retry_count"], 1)
         self.assertTrue(result.tool_calls[0]["verified"])
 
+    def test_diagnose_repairs_failed_tool_and_verifies(self):
+        attempts = {"bad": 0, "good": 0}
+
+        def bad(_):
+            attempts["bad"] += 1
+            raise RuntimeError("bad parameters")
+
+        def good(params):
+            attempts["good"] += 1
+            return {"ok": True, "status": "COMPLETED", "value": params.get("value")}
+
+        self.ai.register_tool("bad_tool", "fails", bad)
+        self.ai.register_tool("good_tool", "replacement", good)
+
+        class RepairProvider:
+            def status(self): return {"ok": True}
+            def respond(self, prompt, **kwargs):
+                if "Diagnose this failed Brain tool call" in prompt:
+                    return {"ok": True, "provider": "fake", "model": "fake",
+                            "tool_calls": [{"name": "good_tool", "params": {"value": 42}}]}
+                if not hasattr(self, "done"):
+                    self.done = True
+                    return {"ok": True, "provider": "fake", "model": "fake",
+                            "tool_calls": [{"name": "bad_tool", "params": {}}]}
+                return {"ok": True, "provider": "fake", "model": "fake", "reply": "repaired"}
+
+        self.ai.provider = RepairProvider()
+        result = self.ai.chat("repair this")
+        self.assertTrue(result.ok)
+        self.assertEqual(attempts["bad"], 1)
+        self.assertEqual(attempts["good"], 1)
+        self.assertTrue(any(e.get("type") == "diagnose_repair" and e.get("verified") for e in result.evidence))
     def test_write_requires_approval(self):
         result = self.ai.execute_tool("github.write_contents", {"owner":"o","repo":"r","path":"x","body":{}}, approved=False)
         self.assertEqual(result["status"], "WAITING_APPROVAL")
