@@ -70,3 +70,22 @@ def collect_btc_market_snapshot() -> dict:
         "data_quality": "FRESH",
         "external_actions_enabled": False,
     }
+
+
+def collect_validated_btc_market_snapshot(max_age_hours: float = 24.0) -> dict:
+    """Collect public data and enforce the canonical freshness contract."""
+    from .crypto_market_snapshot import MarketSnapshot
+
+    payload = collect_btc_market_snapshot()
+    snapshot = MarketSnapshot(
+        asset=payload["asset"],
+        hashprice_usd_per_th_day=payload["hashprice_usd_per_th_day"],
+        observed_at=payload["observed_at"],
+        source=payload["sources"]["hashprice"],
+        btc_price_usd=payload["btc_price_usd"],
+        network_hashrate_eh=payload["network_hashrate_eh_s"],
+        difficulty=payload["difficulty"],
+        evidence_urls=tuple(payload["sources"].values()),
+    )
+    validation = snapshot.validate(max_age_hours=max_age_hours)
+    return {**payload, "freshness_validation": validation}
