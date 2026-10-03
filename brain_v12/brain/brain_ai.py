@@ -55,6 +55,7 @@ class BrainAI:
         self.register_tool("github.releases", "Read repository releases.", lambda p: g.releases(p["owner"], p["repo"]))
         self.register_tool("github.search", "Search GitHub resources.", lambda p: g.search(p["query"], p.get("search_type","repositories")))
         self.register_tool("github.write_contents", "Write repository contents; explicit approval required.", lambda p: g.write_contents(p["owner"], p["repo"], p["path"], p["body"], approved=bool(p.get("approved",False))), risk="high", permission="code.write")
+        self.register_tool("github.rest", "Governed full GitHub REST gateway for operations not covered by a dedicated Brain tool. Mutations require explicit approval.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
 
     def status(self):
         provider_status = self.provider.status() if hasattr(self.provider, "status") else {}
