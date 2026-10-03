@@ -25,7 +25,18 @@ class ChatSessionApiTests(unittest.TestCase):
         self.assertEqual(MessageIn(message="hello").message, "hello")
         self.assertEqual(BrainAIChatIn(message="hello").message, "hello")
 
-    def test_persistent_store_round_trip(self):\n        with tempfile.NamedTemporaryFile() as f:\n            store = ChatSessionStore(f.name); store.init()\n            s = store.create("Persisted")\n            store.add_message(s["id"], "user", "hello")\n            loaded = store.get(s["id"])\n            self.assertEqual(loaded["title"], "Persisted")\n            self.assertEqual(loaded["messages"][0]["content"], "hello")\n\n    def test_router_builds(self):
+    def test_persistent_store_round_trip(self):\n        with tempfile.NamedTemporaryFile() as f:\n            store = ChatSessionStore(f.name); store.init()\n            s = store.create("Persisted")\n            store.add_message(s["id"], "user", "hello")\n            loaded = store.get(s["id"])\n            self.assertEqual(loaded["title"], "Persisted")\n            self.assertEqual(loaded["messages"][0]["content"], "hello")\n\n    def test_context_messages_are_ordered_and_limited(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            s = store.create("Context")
+            store.add_message(s["id"], "user", "one")
+            store.add_message(s["id"], "assistant", "two")
+            store.add_message(s["id"], "user", "three")
+            items = store.context_messages(s["id"], limit=2)
+            self.assertEqual([x["content"] for x in items], ["two", "three"])
+
+    def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
 
