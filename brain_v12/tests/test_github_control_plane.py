@@ -13,3 +13,13 @@ def test_blocked():
     try: GitHubControlPlane(token='test').authorize('financial.transfer')
     except GitHubControlError as e: assert 'BLOCKED_CAPABILITY' in str(e)
     else: raise AssertionError('blocked capability was authorized')
+
+
+def test_workflow_dispatch_is_write_gated():
+    cp=GitHubControlPlane(token="test")
+    try:
+        cp.dispatch_workflow("owner","repo","workflow.yml",ref="main")
+    except GitHubControlError as e:
+        assert "EXPLICIT_APPROVAL_REQUIRED:actions.write" in str(e)
+    else:
+        raise AssertionError("workflow dispatch bypassed approval")
