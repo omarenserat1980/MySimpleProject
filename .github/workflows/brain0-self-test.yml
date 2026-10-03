@@ -7,11 +7,6 @@ on:
       - 'brain0/**'
       - '.github/workflows/brain0-self-test.yml'
   workflow_dispatch:
-  push:
-    paths:
-      - 'brain0/**'
-      - '.github/workflows/brain0-self-test.yml'
-
 jobs:
   verify:
     runs-on: ubuntu-latest
