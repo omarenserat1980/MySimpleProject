@@ -56,18 +56,29 @@ def collect_btc_market_snapshot() -> dict:
     hashrate = _positive_number(latest.get("avgHashrate"), "network hashrate")
     difficulty = _positive_number(latest.get("difficulty"), "network difficulty")
 
-    hp_payload = _get_json(HASHPRICE_URL)
-    if not isinstance(hp_payload, dict):
-        raise ValueError("hashprice payload is not an object")
-    candidates = (
-        hp_payload.get("usd_per_th_day"),
-        hp_payload.get("hashprice_usd_per_th_day"),
-        hp_payload.get("hashprice", {}).get("usd_per_th_day")
-        if isinstance(hp_payload.get("hashprice"), dict) else None,
-    )
-    hashprice = next((x for x in candidates if isinstance(x, (int, float)) and x > 0), None)
+    hashprice = None
+    hashprice_source = HASHPRICE_URL
+    try:
+        hp_payload = _get_json(HASHPRICE_URL)
+        if isinstance(hp_payload, dict):
+            candidates = (
+                hp_payload.get("usd_per_th_day"),
+                hp_payload.get("hashprice_usd_per_th_day"),
+                hp_payload.get("hashprice", {}).get("usd_per_th_day")
+                if isinstance(hp_payload.get("hashprice"), dict) else None,
+            )
+            hashprice = next((x for x in candidates if isinstance(x, (int, float)) and x > 0), None)
+    except Exception:
+        hashprice = None
+
     if hashprice is None:
-        raise ValueError("hashprice field not found")
+        # Conservative, source-independent fallback: derive gross BTC block subsidy
+        # revenue per TH/day from the fresh Mempool network hashrate and BTC price.
+        # This is a modelled estimate, not proof of mining revenue.
+        block_subsidy_btc = 3.125
+        network_th_s = hashrate / 1e12
+        hashprice = (144.0 * block_subsidy_btc * usd) / network_th_s
+        hashprice_source = "derived:mempool-network-hashrate+btc-price:block-subsidy-only"
 
     return {
         "asset": "BTC",
@@ -75,7 +86,7 @@ def collect_btc_market_snapshot() -> dict:
         "sources": {
             "price": MEMPOOL_PRICES,
             "network": network_source,
-            "hashprice": HASHPRICE_URL,
+            "hashprice": hashprice_source,
         },
         "btc_price_usd": usd,
         "network_hashrate_eh_s": hashrate / 1e18,
