@@ -26,7 +26,8 @@ def router(brain_ai):
         result = brain_ai.chat(body.message, body.instructions, approved=body.approved)
         return {"ok": result.ok, "reply": result.reply, "mode": result.mode,
                 "model": result.model, "tool_calls": result.tool_calls,
-                "evidence": result.evidence, "error": result.error}
+                "evidence": result.evidence, "error": result.error,
+                "model_routing": next((e for e in result.evidence if e.get("type") == "model_routing"), None)}
 
     @r.post("/tool")
     def tool(body: BrainAIToolIn):
