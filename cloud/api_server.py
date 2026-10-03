@@ -786,11 +786,32 @@ def get_feedback(feedback_id:str):
     return {"ok":True,"feedback":asdict(f)}
 
 @app.post("/v1/feedback/{feedback_id}/transition",dependencies=[Depends(require_auth)])
-def transition_feedback(feedback_id:str,body:FeedbackTransitionRequest):
-    try: f=FEEDBACK_STORE.get(feedback_id); state=FeedbackState(body.state.upper()); f.transition(state,body.actor,body.evidence_ref,body.reason); FEEDBACK_STORE.save(f)
-    except FileNotFoundError: raise HTTPException(status_code=404,detail="feedback not found")
-    except ValueError as exc: raise HTTPException(status_code=409,detail=str(exc))
-    return {"ok":True,"feedback":asdict(f)}
+def transition_feedback(
+    feedback_id: str,
+    body: FeedbackTransitionRequest | None = None,
+    state: str | None = None,
+    evidence_ref: str | None = None,
+    actor: str | None = None,
+    reason: str = "",
+):
+    """Transition feedback state with JSON-body and legacy query-parameter compatibility."""
+    request_body = body
+    requested_state = (request_body.state if request_body else state)
+    requested_evidence = (request_body.evidence_ref if request_body else evidence_ref)
+    requested_actor = (request_body.actor if request_body else actor) or "api-client"
+    requested_reason = (request_body.reason if request_body else reason)
+    if not requested_state:
+        raise HTTPException(status_code=422, detail="state is required")
+    try:
+        f = FEEDBACK_STORE.get(feedback_id)
+        target = FeedbackState(requested_state.upper())
+        f.transition(target, requested_actor, requested_evidence, requested_reason)
+        FEEDBACK_STORE.save(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="feedback not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"ok": True, "feedback": asdict(f)}
 
 class CommunicationCreateRequest(BaseModel):
     customer_id: str
