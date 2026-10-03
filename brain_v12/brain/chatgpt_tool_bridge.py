@@ -69,3 +69,25 @@ class ChatGPTToolBridge:
             "evidence_required": True,
             "fail_closed": True,
         }
+
+
+class JsonChatGPTToolAdapter:
+    """Host-side transport contract using an injected callable.
+
+    The callable receives a JSON-compatible request dictionary and must return
+    a JSON object containing ok/status/result/error. No host tool is executed
+    by Brain itself; the host owns the callable and its permissions.
+    """
+
+    def __init__(self, transport):
+        self.transport = transport
+
+    def dispatch(self, request: ToolBridgeRequest):
+        if not callable(self.transport):
+            raise RuntimeError("ChatGPT host transport is not configured")
+        payload = {
+            "request_id": request.request_id,
+            "tool": request.tool,
+            "arguments": request.arguments,
+        }
+        return self.transport(payload)
