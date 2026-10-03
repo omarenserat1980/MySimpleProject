@@ -1,6 +1,11 @@
 name: Brain Complete Quran Build
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/quran/**"
+      - ".github/workflows/brain-complete-quran-build.yml"
   workflow_dispatch:
   push:
     paths:
