@@ -17,6 +17,7 @@
     <button data-view="agents">الوكلاء</button>
     <button data-view="media">الوسائط</button>
     <button data-view="intelligence">Intelligence</button>
+    <button data-view="commercial">التجارة</button>
     <button data-view="health">الصحة</button>
     <button data-view="audit">التدقيق</button>
     <button data-view="settings">الإعدادات</button>
@@ -66,6 +67,20 @@
 <section id="agents" class="view"><div class="panel"><div class="row"><h2>⚙️ الوكلاء</h2><button id="loadAgents">فحص</button></div><div id="agentsList" class="list"></div></div></section>
 
 <section id="media" class="view"><div class="grid"><article class="panel wide"><h2>🎬 Media / Cinematic</h2><p>واجهة موحدة للسينما والوسائط. الإنتاج النهائي يجب أن يمر عبر Render → QC → Master QC → Evidence.</p><div class="flow"><i>Story</i><i>→</i><i>Assets</i><i>→</i><i>Render</i><i>→</i><i>ffprobe</i><i>→</i><i>Verified</i></div><pre>هذه الصفحة لا تعتبر أي فيلم ناجحًا دون artifact ودليل تحقق.</pre></article><article class="panel"><h2>آخر حالة</h2><pre id="mediaState">سيتم ربطها بمصنع الوسائط عند توفر endpoint.</pre></article></div></section>
+
+<section id="commercial" class="view">
+<div class="grid">
+<article class="panel wide"><div class="row"><h2>💼 Commercial Operations</h2><button id="loadCommercial">تحديث</button></div>
+<p>لوحة تجارية مبنية على الأدلة. نجاح CI لا يعني إيرادًا محققًا.</p>
+<div class="cards">
+<article><span>القدرات</span><b id="commercialCapabilities">—</b><small>Monetization paths</small></article>
+<article><span>العملاء</span><b id="commercialCases">—</b><small>Customer cases</small></article>
+<article><span>الإيراد المحقق</span><b id="commercialRevenue">—</b><small>Verified revenue</small></article>
+<article><span>الربح المحقق</span><b id="commercialProfit">—</b><small>Verified profit</small></article>
+</div>
+<div id="commercialOffers" class="list"></div></article>
+<article class="panel"><h2>الخطوة التالية</h2><pre id="commercialNext">اضغط تحديث لقراءة الأدلة المطلوبة.</pre></article>
+</div></section>
 
 <section id="intelligence" class="view"><div class="grid"><article class="panel wide"><h2>📈 Intelligence</h2><p>تجميع حالات التطور، الفرص العامة، وتحليل التعدين في مكان واحد.</p><div class="list"><div class="item"><b>Crypto Mining Intelligence</b><span class="badge">EXPECTED / HUMAN APPROVAL</span></div><div class="item"><b>Opportunity Discovery</b><span class="badge">EVIDENCE FIRST</span></div><div class="item"><b>Brain Evolution</b><span class="badge">MEASURED</span></div></div></article><article class="panel"><h2>مبدأ القرار</h2><pre>EXPECTED ≠ VERIFIED ≠ REALIZED</pre></article></div></section>
 
