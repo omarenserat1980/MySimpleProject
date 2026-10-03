@@ -24,11 +24,12 @@ class BrainAIResponse:
 
 class BrainAI:
     """Unified Brain AI facade with governed model-driven tool execution."""
-    def __init__(self, provider, memory_store=None, cognitive=None, github=None, max_tool_rounds=4, max_tool_retries=2):
+    def __init__(self, provider, memory_store=None, cognitive=None, github=None, chatgpt_bridge=None, max_tool_rounds=4, max_tool_retries=2):
         self.provider = provider
         self.memory_store = memory_store
         self.cognitive = cognitive
         self.github = github
+        self.chatgpt_bridge = chatgpt_bridge
         self.max_tool_rounds = max(1, int(max_tool_rounds))
         self.max_tool_retries = max(0, int(max_tool_retries))
         self.max_repair_attempts = 1
@@ -63,6 +64,8 @@ class BrainAI:
         self.register_tool("github.discover", "Find the most relevant GitHub tool for a natural-language task.", lambda p: self._github_discover(p))
         self.register_tool("chatgpt.capabilities", "List the ChatGPT host-tool capabilities visible to Brain.", lambda p: self._chatgpt_capabilities())
         self.register_tool("chatgpt.discover", "Find the most relevant ChatGPT host tool for a natural-language task.", lambda p: self._chatgpt_discover(p))
+        self.register_tool("chatgpt.bridge_status", "Report whether a real ChatGPT host-tool bridge is configured.", lambda p: self._chatgpt_bridge_status())
+        self.register_tool("chatgpt.execute", "Delegate a ChatGPT host-tool call only through a configured fail-closed bridge.", lambda p: self._chatgpt_execute(p), risk="medium")
         self.register_tool("github.read", "Execute an arbitrary governed GitHub read operation through the REST gateway.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.read"), params=p.get("params"), body=p.get("body")))
         self.register_tool("github.write", "Execute an arbitrary governed GitHub mutation through the REST gateway; explicit approval required.", lambda p: g.rest(p["method"], p["path"], p.get("capability","repo.write"), approved=bool(p.get("approved",False)), params=p.get("params"), body=p.get("body")), risk="high", permission="github.write")
         self._register_github_tool_surface()
@@ -119,6 +122,23 @@ class BrainAI:
     def _chatgpt_discover(self, params):
         from .chatgpt_tool_registry import discover
         return discover(params.get("query", ""), params.get("limit", 10))
+
+    def _chatgpt_bridge_status(self):
+        if self.chatgpt_bridge is None:
+            return {"ok": True, "status": "BRIDGE_UNAVAILABLE", "available": False, "evidence_required": True}
+        return {"ok": True, **self.chatgpt_bridge.status()}
+
+    def _chatgpt_execute(self, params):
+        if self.chatgpt_bridge is None:
+            return {"ok": False, "status": "BRIDGE_UNAVAILABLE", "error": "No ChatGPT host-tool bridge configured."}
+        from .chatgpt_tool_bridge import ToolBridgeRequest
+        request = ToolBridgeRequest(
+            tool=str(params.get("tool", "")),
+            arguments=params.get("arguments") if isinstance(params.get("arguments"), dict) else {},
+            request_id=str(params.get("request_id", "")),
+        )
+        result = self.chatgpt_bridge.dispatch(request)
+        return {"ok": result.ok, "status": result.status, "request_id": result.request_id, "result": result.result, "error": result.error}
 
     def _github_registry(self):
         domains = {
