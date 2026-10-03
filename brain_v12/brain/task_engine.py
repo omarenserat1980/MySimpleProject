@@ -45,5 +45,32 @@ class TaskEngine:
             return {"ok":False,"error":"VERIFICATION_FAILED"}
         return self.complete(task_id, evidence_ref)
 
+    def run_with_alternatives(self, task_id, solution_engine, problem, executors, verifier):
+        """Run a verified fallback chain and reflect its lifecycle on this task."""
+        if task_id not in self.tasks: return {"ok":False,"error":"TASK_NOT_FOUND"}
+        task = self.tasks[task_id]
+        if task["status"] not in {"PENDING", "FAILED"}:
+            return {"ok":False,"error":"TASK_NOT_RUNNABLE"}
+        self.update(task_id, "RUNNING")
+        try:
+            result = solution_engine.solve(problem, executors, verifier)
+            if not isinstance(result, dict):
+                raise TypeError("solution engine must return a mapping")
+        except Exception as exc:
+            error = f"SOLUTION_ENGINE_ERROR:{type(exc).__name__}"
+            self.fail(task_id, error)
+            return {"ok":False,"error":error,"task":task}
+        task["solution_run"] = result
+        if result.get("ok") is True and result.get("status") == "VERIFIED":
+            evidence_ref = result.get("evidence_ref")
+            if evidence_ref:
+                return self.verify_and_complete(task_id, True, evidence_ref)
+            self.fail(task_id, "VERIFICATION_EVIDENCE_REQUIRED")
+            return {"ok":False,"error":"VERIFICATION_EVIDENCE_REQUIRED","task":task,
+                    "solution_run":result}
+        self.fail(task_id, "NO_ALTERNATIVE_VERIFIED", result.get("evidence_ref"))
+        return {"ok":False,"error":"NO_ALTERNATIVE_VERIFIED","task":task,
+                "solution_run":result}
+
     def snapshot(self):
         return {"tasks":list(self.tasks.values()),"ready":self.ready()}
