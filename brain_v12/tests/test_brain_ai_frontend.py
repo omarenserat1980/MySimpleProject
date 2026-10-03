@@ -51,5 +51,15 @@ class BrainAIFrontendTest(unittest.TestCase):
         finally:
             Path(path).unlink(missing_ok=True)
 
+
+    def test_supervisor_evidence_labels_objective_as_unverified(self):
+        for item in ("supervisor_execution", "objective_verified", "الهدف غير مثبت"):
+            self.assertIn(item, self.html)
+
+    def test_pages_workflow_is_main_only_and_deploys_an_artifact(self):
+        workflow = Path(".github/workflows/brain-pages.yml").read_text(encoding="utf-8")
+        for item in ("branches: [main]", "actions/upload-pages-artifact@v4", "actions/deploy-pages@v4", "BRAIN_API_ORIGIN"):
+            self.assertIn(item, workflow)
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,20 @@ class FakeProvider:
                 "response_id": "test-response"}
 
 
+class SupervisorToolProvider(FakeProvider):
+    def __init__(self):
+        self.calls = 0
+
+    def respond(self, user_text, context="", instructions=""):
+        self.calls += 1
+        if self.calls == 1:
+            return {"ok": True, "provider": "fake", "model": "test",
+                    "tool_calls": [{"name": "supervisor.solve",
+                                    "params": {"goal": "inspect the current state"}}]}
+        return {"ok": True, "provider": "fake", "model": "test",
+                "reply": "A safe step ran, but the user objective is not yet verified."}
+
+
 class FakeMemory:
     def memories(self):
         return [{"key": "project", "value": "Electronic Brain"}]
@@ -84,6 +98,40 @@ class TestBrainAI(unittest.TestCase):
                               lambda _: {"ok": True, "status": "COMPLETED"})
         result = self.ai.execute_tool("status")
         self.assertEqual(result["status"], "COMPLETED")
+
+    def test_supervisor_chat_runs_pipeline_and_exposes_action_and_objective_evidence(self):
+        class Solver:
+            def __init__(self): self.goals = []
+            def solve(self, goal):
+                self.goals.append(goal)
+                return {
+                    "ok": True, "status": "IN_PROGRESS", "run_id": "PS-test",
+                    "objective_verified": False,
+                    "supervisor_job": {"job_id": "job-test", "status": "blocked"},
+                    "execution": {"status": "COMPLETED", "solution_run": {
+                        "attempts": [{"alternative_id": "state.read", "status": "VERIFIED"}],
+                    }},
+                    "verification": {"status": "VERIFIED", "evidence": "tool://step/hash"},
+                }
+
+        provider = SupervisorToolProvider()
+        ai = BrainAI(provider)
+        solver = Solver()
+        ai.connect_supervisor(solver)
+        result = ai.chat("inspect the current state")
+        self.assertTrue(result.ok)
+        self.assertEqual(solver.goals, ["inspect the current state"])
+        supervisor_evidence = next(x for x in result.evidence if x["type"] == "supervisor_execution")
+        self.assertFalse(supervisor_evidence["objective_verified"])
+        self.assertEqual(supervisor_evidence["evidence_ref"], "tool://step/hash")
+        call = next(x for x in result.tool_calls if x["tool"] == "supervisor.solve")
+        self.assertFalse(call["verified"])
+
+    def test_supervisor_tool_rejects_empty_goal(self):
+        self.ai.connect_supervisor(type("Solver", (), {"solve": lambda self, goal: self.fail("must not run")})())
+        result = self.ai.execute_tool("supervisor.solve", {"goal": "  "})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "GOAL_REQUIRED")
 
     def test_full_github_tool_surface_is_registered(self):
         from brain_v12.github_capability_registry import GITHUB_TOOLS

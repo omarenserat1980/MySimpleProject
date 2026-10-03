@@ -46,6 +46,22 @@ class BrainAI:
     def register_tool(self, name, description, handler, risk="low", permission=None):
         self.tools[name] = BrainAITool(name, description, handler, risk, permission)
 
+    def connect_supervisor(self, problem_solver):
+        """Expose the bounded Supervisor pipeline through Brain Chat."""
+        def solve(params):
+            goal = str((params or {}).get("goal", "")).strip()
+            if not goal:
+                return {"ok": False, "status": "GOAL_REQUIRED"}
+            result = problem_solver.solve(goal)
+            return result
+
+        self.register_tool(
+            "supervisor.solve",
+            "Run a bounded Brain Supervisor cycle for a user goal. Returns the selected action, action-level verification evidence, and a separate objective verification status. Never claim the objective is complete unless objective_verified is true.",
+            solve,
+            risk="medium",
+        )
+
     def _register_builtin_tools(self):
         if self.github is None:
             try:
@@ -290,6 +306,27 @@ class BrainAI:
                 calls.append(record)
                 trace.append(record)
                 evidence.append({"type":"tool","tool":name,"status":outcome.get("status","EXECUTED" if outcome.get("ok") else "FAILED"),"round":round_no,"verified":record["verified"],"retry_count":attempts})
+                if name == "supervisor.solve":
+                    verification = outcome.get("verification", {})
+                    run = outcome.get("execution", {}).get("solution_run", {})
+                    evidence.append({
+                        "type": "supervisor_execution",
+                        "tool": name,
+                        "run_id": outcome.get("run_id"),
+                        "supervisor_job_id": (outcome.get("supervisor_job") or {}).get("job_id"),
+                        "status": outcome.get("status"),
+                        "verified": verification.get("status") == "VERIFIED",
+                        "objective_verified": outcome.get("objective_verified") is True,
+                        "evidence_ref": verification.get("evidence"),
+                    })
+                    for item in run.get("attempts", []):
+                        evidence.append({
+                            "type": "supervisor_attempt",
+                            "tool": item.get("alternative_id"),
+                            "status": item.get("status"),
+                            "verified": item.get("status") == "VERIFIED",
+                            "error": item.get("error"),
+                        })
                 if not outcome.get("ok") and outcome.get("status") in {"WAITING_APPROVAL","WAITING_PERMISSION"}:
                     return BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status"))
         return BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT")
@@ -299,6 +336,8 @@ class BrainAI:
         if not isinstance(outcome, dict):
             return False
         if not outcome.get("ok"):
+            return False
+        if outcome.get("tool") == "supervisor.solve" and outcome.get("objective_verified") is not True:
             return False
         return outcome.get("status", "EXECUTED") not in {"FAILED", "INVALID_TOOL_RESULT"}
 
@@ -348,4 +387,5 @@ class BrainAI:
 لا تدّعي تنفيذ تغيير أو تشغيل اختبار دون دليل.
 العمليات الحساسة تحتاج موافقة وصلاحية صريحة.
 بعد تنفيذ الأداة، استخدم BRAIN_TOOL_TRACE لصياغة الرد النهائي.
+أداة supervisor.solve تسجل تنفيذ خطوة آمنة وقد تثبت نجاح تلك الخطوة فقط؛ لا تقل إن هدف المستخدم اكتمل إلا إذا objective_verified=true في الدليل.
 لا تكشف سلسلة التفكير الداخلية؛ قدم ملخصاً عملياً للخطوات والنتائج."""

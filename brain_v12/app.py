@@ -88,45 +88,10 @@ workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
-problem_solver=ProblemSolver(cognitive)
 device_bridge=DeviceBridge(store)
 brain_supervisor=BrainSupervisor()
-
-def brain_ai_supervisor_solve(params):
-    """Route a Brain Chat goal through ProblemSolver and persist Supervisor verification."""
-    goal=str((params or {}).get("goal","")).strip()
-    if not goal:
-        return {"ok":False,"status":"EMPTY_GOAL"}
-    job=brain_supervisor.create(goal)
-    result=problem_solver.solve(goal)
-    verification=result.get("verification") or {}
-    verified=verification.get("status") == "VERIFIED"
-    job=brain_supervisor.transition(
-        job,
-        "verify",
-        status="completed" if verified else "blocked",
-        details={
-            "run_id": result.get("run_id"),
-            "verified": verified,
-            "problem_solver_status": verification.get("status"),
-        },
-    )
-    brain_supervisor.snapshot(job, {"verified":verified,"problem_solver":result})
-    return {
-        "ok": verified,
-        "status": "VERIFIED_COMPLETED" if verified else "VERIFICATION_BLOCKED",
-        "goal": goal,
-        "job": job,
-        "problem_solver": result,
-        "evidence": [{"type":"problem_solver_verification","verified":verified,"status":verification.get("status")}],
-    }
-
-brain_ai.register_tool(
-    "supervisor.solve",
-    "Route a user goal through ProblemSolver and Brain Supervisor; completion requires verification evidence.",
-    brain_ai_supervisor_solve,
-    risk="medium",
-)
+problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
+brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
