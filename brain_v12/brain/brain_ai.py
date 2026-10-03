@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from typing import Any, Callable, Dict, List, Optional
+
+from .tool_protocol import ToolCallRequest, ToolCallResult, parse_tool_call
 
 
 @dataclass
@@ -25,7 +28,7 @@ class BrainAIResponse:
 
 
 class BrainAI:
-    """Gemini-like Brain facade: conversation + memory + tools + verification."""
+    """Brain facade: model routing + strict tool calling + evidence."""
 
     def __init__(self, provider, memory_store=None, cognitive=None, model_router=None):
         self.provider = provider
@@ -41,7 +44,7 @@ class BrainAI:
         provider_status = self.provider.status() if hasattr(self.provider, "status") else {}
         return {
             "name": "Brain AI",
-            "version": "1.0",
+            "version": "1.1",
             "provider": provider_status,
             "model_router": self.model_router.status() if self.model_router is not None else None,
             "tools": [{"name": t.name, "description": t.description,
@@ -49,6 +52,7 @@ class BrainAI:
                       for t in self.tools.values()],
             "memory_enabled": self.memory_store is not None,
             "cognitive_loop_enabled": self.cognitive is not None,
+            "tool_calling": {"protocol": "strict-json-v1", "enabled": True},
         }
 
     def _context(self) -> str:
@@ -69,26 +73,127 @@ class BrainAI:
             parts.append("[BRAIN_TOOLS]\n" + str(catalog))
         return "\n\n".join(parts)
 
-    def chat(self, user_text: str, instructions: str = "") -> BrainAIResponse:
+    def _respond(self, user_text: str, instructions: str):
+        return (self.model_router.respond(
+            user_text, context=self._context(), instructions=instructions
+        ) if self.model_router is not None else self.provider.respond(
+            user_text, context=self._context(), instructions=instructions
+        ))
+
+    @staticmethod
+    def _candidate_tool_call(result: Dict[str, Any]) -> Optional[ToolCallRequest]:
+        for key in ("tool_call", "tool_request"):
+            if key in result:
+                call = parse_tool_call(result[key])
+                if call:
+                    return call
+        for key in ("tool_calls",):
+            calls = result.get(key)
+            if isinstance(calls, list) and calls:
+                call = parse_tool_call(calls[0])
+                if call:
+                    return call
+        return parse_tool_call(result.get("reply", ""))
+
+    def _tool_result(self, call: ToolCallRequest, approved: bool) -> ToolCallResult:
+        raw = self.execute_tool(call.name, call.arguments, approved)
+        ok = bool(raw.get("ok", raw.get("status") == "SUCCESS"))
+        status = str(raw.get("status", "SUCCESS" if ok else "FAILED"))
+        return ToolCallResult(call.call_id, call.name, status, ok, raw)
+
+    def chat(self, user_text: str, instructions: str = "", approved: bool = False) -> BrainAIResponse:
         user_text = (user_text or "").strip()
         if not user_text:
             return BrainAIResponse(False, "", "error", error="EMPTY_MESSAGE")
-        result = (self.model_router.respond(
-            user_text, context=self._context(),
-            instructions=instructions or self._system_instructions(),
-        ) if self.model_router is not None else self.provider.respond(
-            user_text, context=self._context(),
-            instructions=instructions or self._system_instructions(),
-        ))
+
+        base_instructions = instructions or self._system_instructions()
+        result = self._respond(user_text, base_instructions)
+        provider_evidence = {
+            "type": "provider",
+            "provider": result.get("provider"),
+            "response_id": result.get("response_id"),
+        }
         if not result.get("ok"):
             return BrainAIResponse(False, "", "error",
                                    model=result.get("model"),
+                                   evidence=[provider_evidence],
                                    error=result.get("error"))
+
+        call = self._candidate_tool_call(result)
+        if call is None:
+            return BrainAIResponse(
+                True, result.get("reply", ""), "model",
+                model=result.get("model"), evidence=[provider_evidence],
+            )
+
+        tool_result = self._tool_result(call, approved)
+        evidence = [provider_evidence, tool_result.evidence()]
+        call_record = {
+            "call_id": call.call_id,
+            "name": call.name,
+            "arguments": call.arguments,
+            "status": tool_result.status,
+        }
+
+        if tool_result.status in {"WAITING_APPROVAL", "WAITING_PERMISSION", "UNKNOWN_TOOL"}:
+            return BrainAIResponse(
+                False,
+                "",
+                "waiting_approval" if tool_result.status == "WAITING_APPROVAL" else "waiting_permission",
+                model=result.get("model"),
+                tool_calls=[call_record],
+                evidence=evidence,
+                error=tool_result.status,
+            )
+
+        if not tool_result.ok:
+            return BrainAIResponse(
+                False, "",
+                "tool_failed",
+                model=result.get("model"),
+                tool_calls=[call_record],
+                evidence=evidence,
+                error=tool_result.status,
+            )
+
+        final_context = (
+            self._context()
+            + "\n\n[BRAIN_TOOL_RESULT]\n"
+            + json.dumps(tool_result.result, ensure_ascii=False, default=str)
+        )
+        final_instructions = (
+            base_instructions
+            + "\nThe requested tool has now executed. "
+              "Use only the supplied tool result as evidence. "
+              "Return a concise final answer, not another tool call."
+        )
+        final_result = (self.model_router.respond(
+            user_text, context=final_context, instructions=final_instructions
+        ) if self.model_router is not None else self.provider.respond(
+            user_text, context=final_context, instructions=final_instructions
+        ))
+        evidence.append({
+            "type": "provider_final",
+            "provider": final_result.get("provider"),
+            "response_id": final_result.get("response_id"),
+        })
+        if not final_result.get("ok"):
+            return BrainAIResponse(
+                True,
+                "تم تنفيذ الأداة بنجاح، لكن تعذّر توليد الرد النهائي من النموذج.",
+                "tool_executed",
+                model=result.get("model"),
+                tool_calls=[call_record],
+                evidence=evidence,
+                error=final_result.get("error"),
+            )
         return BrainAIResponse(
-            True, result.get("reply", ""), "model",
-            model=result.get("model"),
-            evidence=[{"type": "provider", "provider": result.get("provider"),
-                       "response_id": result.get("response_id")}],
+            True,
+            final_result.get("reply", ""),
+            "tool_executed",
+            model=final_result.get("model") or result.get("model"),
+            tool_calls=[call_record],
+            evidence=evidence,
         )
 
     def execute_tool(self, name: str, params: Optional[Dict[str, Any]] = None,
@@ -110,15 +215,17 @@ class BrainAI:
                     "error": str(exc)[:1000]}
         if not isinstance(result, dict):
             return {"ok": False, "status": "INVALID_TOOL_RESULT", "tool": name}
-        return {"tool": name, **result}
+        return {"ok": True, "status": "SUCCESS", "tool": name, **result}
 
     @staticmethod
     def _system_instructions() -> str:
         return """أنت Brain AI داخل Electronic Brain.
-أنت واجهة عقلية موحدة فوق الذاكرة والأدوات والنماذج، ولست مجرد chatbot.
-افهم الطلب، استخدم السياق المتاح، وكن واضحاً بشأن ما تم تنفيذه وما لم يتم.
-لا تختلق ذاكرة أو صلاحية أو نتيجة أداة.
-لا تدّعي تنفيذ تغيير أو تشغيل اختبار دون دليل من الأداة.
-عند الحاجة إلى تنفيذ فعل، اقترح الأداة المناسبة وحدود الصلاحية، ثم تحقّق من النتيجة.
-لا تكشف سلسلة التفكير الداخلية؛ قدم ملخصاً عملياً للخطوات والنتائج.
+أنت واجهة عقلية موحدة فوق الذاكرة والأدوات والنماذج.
+إذا احتجت أداة، أخرج JSON صارماً فقط بالشكل:
+{"type":"tool_call","call_id":"unique-id","name":"registered_tool","arguments":{}}
+لا تطلب أداة غير موجودة في [BRAIN_TOOLS].
+لا تدّعي تنفيذ تغيير أو تشغيل اختبار دون دليل من نتيجة الأداة.
+الأدوات عالية الخطورة تحتاج موافقة صريحة.
+بعد نتيجة الأداة، قدّم جواباً نهائياً موجزاً يعتمد على النتيجة فقط.
+لا تكشف سلسلة التفكير الداخلية.
 """
