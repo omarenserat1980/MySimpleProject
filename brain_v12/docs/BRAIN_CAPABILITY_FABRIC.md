@@ -37,3 +37,15 @@ Brain must continuously favor:
 - explicit authorization for external side effects, publishing, purchases, contracts, or financial commitments.
 
 Paid capability is therefore an optional economic layer, not a dependency of Brain's core survival or development.
+
+
+## Autonomy tier contract
+
+The default execution order is strict: **BRAIN_OWNED → FREE_DIVERSE → PAID_EXTERNAL**.
+
+- Brain-owned executors are preferred after unavailable/unhealthy executors are filtered.
+- Free/open-source executors provide diversity and continuity without making a single vendor a dependency.
+- Paid executors remain disabled by default.
+- Commercial mode may explicitly enable paid executors, but tier ordering still prevents a paid executor from outranking an eligible Brain-owned or free executor.
+- External side effects remain separately permission-gated even when the executor is free.
+- The policy is fail-closed: no executor is never converted into synthetic success.
