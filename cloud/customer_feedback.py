@@ -15,7 +15,7 @@ class FeedbackState(str, Enum):
 
 _ALLOWED={
  FeedbackState.RECEIVED:{FeedbackState.TRIAGED,FeedbackState.SPAM,FeedbackState.DUPLICATE,FeedbackState.LEGAL_HOLD},
- FeedbackState.TRIAGED:{FeedbackState.ASSIGNED,FeedbackState.IN_PROGRESS,FeedbackState.SPAM,FeedbackState.DUPLICATE,FeedbackState.LEGAL_HOLD},
+ FeedbackState.TRIAGED:{FeedbackState.ASSIGNED,FeedbackState.IN_PROGRESS,FeedbackState.RESOLVED,FeedbackState.SPAM,FeedbackState.DUPLICATE,FeedbackState.LEGAL_HOLD},
  FeedbackState.ASSIGNED:{FeedbackState.IN_PROGRESS,FeedbackState.LEGAL_HOLD},
  FeedbackState.IN_PROGRESS:{FeedbackState.RESPONDED,FeedbackState.RESOLVED,FeedbackState.LEGAL_HOLD},
  FeedbackState.RESPONDED:{FeedbackState.RESOLVED,FeedbackState.CLOSED,FeedbackState.LEGAL_HOLD},
