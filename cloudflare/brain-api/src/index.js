@@ -62,6 +62,8 @@ async function createCommercialOrder(request, env, requestOrigin, allowedOrigin)
   let body;
   try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
 
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
   const service = String(body.service || "").trim();
   const plan = String(body.plan || "").trim();
   const need = String(body.need || "").trim();
@@ -73,8 +75,8 @@ async function createCommercialOrder(request, env, requestOrigin, allowedOrigin)
   const orderId = "BRAIN-MKT-" + new Date().toISOString().slice(0,10).replaceAll("-","") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
   const amount = prices[key];
   await env.BRAIN_DB.prepare(
-    "INSERT INTO orders (order_id, service, plan, amount, currency, state) VALUES (?, ?, ?, ?, 'USD', 'NEW')"
-  ).bind(orderId, service, key, amount).run();
+    "INSERT INTO orders (order_id, service, plan, amount, currency, state, client_email) VALUES (?, ?, ?, ?, 'USD', 'NEW', ?)"
+  ).bind(orderId, service, key, amount, client.email).run();
 
   return json({
     ok: true,
@@ -91,14 +93,17 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   let body;
   try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
 
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
   const orderId = String(body.order_id || "").trim();
   if (!orderId) return json({ ok: false, error: "ORDER_ID_REQUIRED" }, 400, requestOrigin, allowedOrigin);
 
   const order = await env.BRAIN_DB.prepare(
-    "SELECT order_id, service, plan, amount, currency, state FROM orders WHERE order_id = ?"
+    "SELECT order_id, service, plan, amount, currency, state, client_email FROM orders WHERE order_id = ?"
   ).bind(orderId).first();
 
   if (!order) return json({ ok: false, error: "ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (String(order.client_email || "").toLowerCase() !== client.email.toLowerCase()) return json({ ok: false, error: "ORDER_ACCESS_DENIED" }, 403, requestOrigin, allowedOrigin);
   if (String(order.state) === "PAYMENT_VERIFIED") return json({ ok: false, error: "ORDER_ALREADY_PAID" }, 409, requestOrigin, allowedOrigin);
   if (Number(order.amount) <= 0) return json({ ok: false, error: "INVALID_ORDER_AMOUNT" }, 409, requestOrigin, allowedOrigin);
 
@@ -233,6 +238,23 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   ]);
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
+}
+
+async function requireClient(request, env) {
+  const auth = String(request.headers.get("Authorization") || "");
+  if (!auth.startsWith("Bearer ")) return { ok: false, status: 401, error: "AUTH_REQUIRED" };
+  const origin = String(env.BRAIN_ORIGIN || "").replace(/\/$/, "");
+  if (!origin || origin.includes("REPLACE_WITH_")) return { ok: false, status: 503, error: "CLIENT_AUTH_ORIGIN_NOT_CONFIGURED" };
+  try {
+    const response = await fetch(origin + "/auth/me", { headers: { Authorization: auth, Accept: "application/json" } });
+    if (!response.ok) return { ok: false, status: 401, error: "INVALID_CLIENT_SESSION" };
+    const data = await response.json();
+    const email = String((data.account || {}).email || "").trim();
+    if (!email) return { ok: false, status: 401, error: "CLIENT_IDENTITY_MISSING" };
+    return { ok: true, email };
+  } catch {
+    return { ok: false, status: 502, error: "CLIENT_AUTH_UNAVAILABLE" };
+  }
 }
 
 async function hmacSha256Hex(data, secret) {
