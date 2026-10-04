@@ -35,6 +35,9 @@ export default {
     if (url.pathname === "/api/orders" && request.method === "GET") {
       return listClientOrders(request, env, requestOrigin, allowedOrigin);
     }
+    if (url.pathname === "/api/orders/transition" && request.method === "POST") {
+      return transitionClientOrder(request, env, requestOrigin, allowedOrigin);
+    }
 
     if (url.pathname === "/api/deliveries" && request.method === "GET") {
       return listClientDeliveries(request, env, requestOrigin, allowedOrigin);
@@ -511,6 +514,34 @@ async function recordOrderEvent(env, orderId, fromState, toState, eventType, evi
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO order_events (event_id, order_id, from_state, to_state, event_type, evidence) VALUES (?, ?, ?, ?, ?, ?)"
   ).bind(eventId, orderId, fromState, toState, eventType, JSON.stringify(evidence)).run();
+}
+
+
+async function transitionClientOrder(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+  const orderId = String(body.order_id || "").trim();
+  const nextState = String(body.state || "").trim().toUpperCase();
+  const allowed = {
+    PAYMENT_VERIFIED: ["IN_PROGRESS"],
+    IN_PROGRESS: ["WAITING_CLIENT", "READY", "FAILED"],
+    WAITING_CLIENT: ["IN_PROGRESS", "READY", "CANCELLED"],
+    READY: ["PUBLISHED", "COMPLETED"],
+    PUBLISHED: ["MEASURING", "COMPLETED"],
+    MEASURING: ["COMPLETED", "FAILED"],
+  };
+  if (!orderId || !nextState) return json({ ok: false, error: "ORDER_ID_AND_STATE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const order = await env.BRAIN_DB.prepare("SELECT order_id, client_email, state FROM orders WHERE order_id = ?").bind(orderId).first();
+  if (!order) return json({ ok: false, error: "ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (String(order.client_email || "").toLowerCase() !== client.email.toLowerCase()) return json({ ok: false, error: "ORDER_ACCESS_DENIED" }, 403, requestOrigin, allowedOrigin);
+  const current = String(order.state);
+  if (!(allowed[current] || []).includes(nextState)) return json({ ok: false, error: "INVALID_STATE_TRANSITION", from: current, to: nextState }, 409, requestOrigin, allowedOrigin);
+  await env.BRAIN_DB.prepare("UPDATE orders SET state = ? WHERE order_id = ?").bind(nextState, orderId).run();
+  await recordOrderEvent(env, orderId, current, nextState, "SERVICE_STATE_TRANSITION", { actor: client.email });
+  return json({ ok: true, order_id: orderId, from: current, state: nextState }, 200, requestOrigin, allowedOrigin);
 }
 
 async function listClientOrders(request, env, requestOrigin, allowedOrigin) {
