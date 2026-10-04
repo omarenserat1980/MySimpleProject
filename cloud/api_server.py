@@ -154,6 +154,34 @@ class ClientOrderRequest(BaseModel):
     plan: str
     need: str = Field(min_length=10, max_length=10000)
 
+
+@app.post("/api/payments/paytabs/callback")
+async def paytabs_callback(request: Request):
+    """Public PayTabs callback; verify HMAC before changing payment state."""
+    from brain.provider_hub.paytabs_webhook import parse_and_validate_payment
+    raw_body = await request.body()
+    signature = request.headers.get("Signature", "")
+    server_key = os.getenv("PAYTABS_SERVER_KEY", "").strip()
+    if not server_key:
+        raise HTTPException(status_code=503, detail="payment provider secret is not configured")
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+        order_id = str(payload.get("cart_id", ""))
+        amount = str(payload.get("cart_amount", ""))
+        currency = str(payload.get("cart_currency", ""))
+        verified = parse_and_validate_payment(raw_body, signature, server_key, expected_order_id=order_id, expected_amount=amount, expected_currency=currency)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    evidence_dir = STATE / "payment_evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    tran_ref = str(verified["tran_ref"])
+    evidence_path = evidence_dir / (hashlib.sha256(tran_ref.encode()).hexdigest() + ".json")
+    if evidence_path.exists():
+        return {"ok": True, "status": "ALREADY_RECORDED", "tran_ref": tran_ref}
+    record = {"provider":"paytabs","order_id":order_id,"tran_ref":tran_ref,"amount":amount,"currency":currency,"verified_at":time.time(),"payment_state":"PAYMENT_VERIFIED","evidence":verified}
+    evidence_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "status": "PAYMENT_VERIFIED", "tran_ref": tran_ref}
+
 @app.post("/api/auth/register")
 def client_register(body: ClientAuthRequest):
     email = body.email.strip().lower()
