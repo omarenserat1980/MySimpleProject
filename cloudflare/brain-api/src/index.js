@@ -172,7 +172,7 @@ async function handlePayTabsReturn(request, env, allowedOrigin) {
   const orderId = String(fields.cartId || "");
   const tranRef = String(fields.tranRef || "");
   const status = String(fields.respStatus || "");
-  const target = new URL(allowedOrigin);
+  const target = new URL(String(env.BRAIN_RETURN_PAGE || allowedOrigin));
   target.searchParams.set("payment", status === "A" ? "return_received" : "return_failed");
   if (orderId) target.searchParams.set("order", orderId);
   if (tranRef) target.searchParams.set("tran_ref", tranRef);
