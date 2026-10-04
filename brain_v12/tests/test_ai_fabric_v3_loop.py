@@ -7,7 +7,7 @@ class AIFabricV3LoopTests(unittest.TestCase):
     def test_benchmark_updates_learning(self):
         f = AIFabric()
         f.register("good", "agent", lambda p: {"ok": True, "verified": True}, priority=10, free=True)
-        rows = benchmark(f, "task", {})
+        rows = benchmark(f, "task", {}, kind="agent")
         self.assertTrue(rows[0].verified)
         self.assertEqual(f.intelligence.stats["good"].verified, 1)
 
