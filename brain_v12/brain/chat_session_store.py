@@ -60,12 +60,12 @@ class ChatSessionStore:
             );
             """)
 
-    def create(self, title="New Brain Chat"):
+    def create(self, title="New Brain Chat", account_id=None, device_id=None):
         sid = str(uuid4())
         stamp = _now()
         with self.connect() as con:
-            con.execute("INSERT INTO chat_sessions VALUES(?,?,?,?)",
-                        (sid, title or "New Brain Chat", stamp, stamp))
+            con.execute("INSERT INTO chat_sessions(id,title,created_at,updated_at,account_id,device_id) VALUES(?,?,?,?,?,?)",
+                        (sid, title or "New Brain Chat", stamp, stamp, account_id, device_id))
             con.execute(
                 "INSERT INTO chat_session_memory(session_id,summary,updated_at) VALUES(?,?,?)",
                 (sid, "", stamp),
@@ -79,11 +79,12 @@ class ChatSessionStore:
             con.commit()
         return self.get(sid)
 
-    def list(self):
+    def list(self, account_id=None):
         with self.connect() as con:
-            rows = con.execute(
-                "SELECT * FROM chat_sessions ORDER BY updated_at DESC"
-            ).fetchall()
+            if account_id:
+                rows = con.execute("SELECT * FROM chat_sessions WHERE account_id=? ORDER BY updated_at DESC", (account_id,)).fetchall()
+            else:
+                rows = con.execute("SELECT * FROM chat_sessions ORDER BY updated_at DESC").fetchall()
         return [dict(x) for x in rows]
 
     def get(self, session_id):
