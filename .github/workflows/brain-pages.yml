@@ -61,6 +61,7 @@ jobs:
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
           if "api_base" not in config:
               raise SystemExit("Brain app config is missing api_base")
+          print("BRAIN_API_ORIGIN_STATE=" + ("configured" if origin else "not configured"))
           summary = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary:
               with open(summary, "a", encoding="utf-8") as stream:
