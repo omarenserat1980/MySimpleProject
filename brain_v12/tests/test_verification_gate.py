@@ -21,6 +21,7 @@ class VerificationGateTests(unittest.TestCase):
         result = VerificationGate.evaluate({
             "ok": True, "status": "COMPLETED",
             "objective_verified": True,
+            "objective_verification": {"passed": True, "criterion": "task_result.json exists and is valid"},
             "evidence": {"artifact": "task_result.json", "sha256": "abc"},
         })
         self.assertTrue(result["objective_verified"])
@@ -41,6 +42,11 @@ class VerificationGateTests(unittest.TestCase):
                 "ok": True, "status": "COMPLETED"
             })
 
+
+    def test_objective_boolean_alone_is_rejected(self):
+        result = VerificationGate.evaluate({"ok": True, "status": "COMPLETED", "objective_verified": True, "evidence": {"artifact": "task_result.json"}})
+        self.assertFalse(result["objective_verified"])
+        self.assertEqual(result["reason"], "OBJECTIVE_VERIFICATION_CONTRACT_REQUIRED")
 
 if __name__ == "__main__":
     unittest.main()
