@@ -228,9 +228,17 @@ class ChatSessionStore:
             con.commit()
         return {"compacted": True, "older_messages": len(older), "summary": summary}
 
-    def add_message(self, session_id, role, content, metadata=None):
+    def add_message(self, session_id, role, content, metadata=None, client_message_id=None):
         stamp = _now()
         with self.connect() as con:
+            if client_message_id:
+                existing = con.execute(
+                    "SELECT id FROM chat_session_messages WHERE session_id=? AND metadata LIKE ? LIMIT 1",
+                    (session_id, '%"client_message_id": "' + str(client_message_id).replace('"', '""') + '"%'),
+                ).fetchone()
+                if existing:
+                    return self.get(session_id)
+
             exists = con.execute(
                 "SELECT 1 FROM chat_sessions WHERE id=?", (session_id,)
             ).fetchone()
