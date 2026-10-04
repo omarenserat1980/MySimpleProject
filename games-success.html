@@ -4,17 +4,22 @@
 <style>
 body{margin:0;background:#070a12;color:#f7f8ff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}.wrap{max-width:760px;margin:8vh auto;padding:24px}.card{border:1px solid #29344d;border-radius:24px;background:#101522;padding:30px;box-shadow:0 20px 70px #0008}.ok{color:#42e6c5;font-weight:900}.err{color:#ff8d9b}.btn{display:inline-block;padding:13px 18px;border-radius:12px;background:#7567ff;color:white;text-decoration:none;font-weight:800;margin-top:12px}.mut{color:#9eabc1}.license{background:#080d18;border:1px solid #29344d;border-radius:14px;padding:14px;margin-top:16px;font-family:monospace;direction:ltr;text-align:left;word-break:break-all}
 </style></head><body><main class="wrap"><section class="card"><div id="out">جارٍ التحقق من عملية الدفع…</div></section></main>
+<script src="games-api-config.js"></script>
 <script>
+const BRAIN_API_BASE=(window.BRAIN_API_BASE||"").replace(/\/$/,"");
 const params=new URLSearchParams(location.search), sessionId=params.get("session_id");
-const apiBase=(window.BRAIN_API_BASE||"").replace(/\/$/,"");
+
 async function run(){
  const out=document.getElementById("out");
  if(!sessionId){out.innerHTML='<h1 class="err">لا توجد جلسة دفع</h1><p class="mut">ارجع إلى المتجر وابدأ عملية شراء جديدة.</p><a class="btn" href="games-store.html">العودة للمتجر</a>';return}
  try{
-  const r=await fetch(apiBase+"/api/games/checkout-result?session_id="+encodeURIComponent(sessionId),{cache:"no-store"});
+  const r=await fetch(BRAIN_API_BASE+"/api/games/checkout-result?session_id="+encodeURIComponent(sessionId),{cache:"no-store"});
   const j=await r.json();
   if(!r.ok) throw new Error(j.detail||"تعذر التحقق");
-  out.innerHTML='<div class="ok">✓ تم التحقق من الدفع</div><h1>'+j.game_title+'</h1><p class="mut">رقم الطلب: '+j.order_id+'</p><p>تم إنشاء ترخيص BRAIN أحادي الاستخدام لمسار التسليم.</p><div class="license">'+j.license+'</div><a class="btn" href="'+j.download_url+'" target="_blank" rel="noopener">فتح اللعبة</a><p class="mut">احتفظ برقم الطلب والترخيص. لا يتم اعتبار العملية مكتملة إلا بعد ظهور هذه الصفحة.</p>';
+  if(j.already_delivered){out.innerHTML='<div class="ok">✓ الطلب مسلّم مسبقًا</div><h1>'+j.game_title+'</h1><p class="mut">رقم الطلب: '+j.order_id+'</p><div class="license">'+j.license+'</div><a class="btn" href="'+j.download_url+'" target="_blank" rel="noopener">فتح اللعبة</a>';return}
+  const d=await fetch(BRAIN_API_BASE+j.delivery_url.replace(/^https?:\/\/[^/]+/,""),{cache:"no-store"});
+  const delivered=await d.json(); if(!d.ok) throw new Error(delivered.detail||"تعذر التسليم");
+  out.innerHTML='<div class="ok">✓ تم التحقق من الدفع والتسليم</div><h1>'+delivered.game_title+'</h1><p class="mut">رقم الطلب: '+delivered.order_id+'</p><p>تم تسجيل التسليم بنجاح.</p><div class="license">'+delivered.license+'</div><a class="btn" href="'+delivered.download_url+'" target="_blank" rel="noopener">فتح اللعبة</a><p class="mut">هذه هي نقطة اكتمال العملية.</p>';
  }catch(e){out.innerHTML='<h1 class="err">لم يتم تأكيد الدفع</h1><p class="mut">'+e.message+'</p><a class="btn" href="games-store.html">العودة للمتجر</a>'}
 }
 run();
