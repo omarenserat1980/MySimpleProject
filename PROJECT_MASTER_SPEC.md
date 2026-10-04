@@ -85,3 +85,5 @@ Tokens and secrets must never be committed. Autonomous workflows must use least-
 
 ## 13. Current implementation status
 The repository contains the major Brain V12 modules and economic workflows. Runtime audits remain authoritative for what is actually working.
+## 14. Capability-first architecture
+Brain tasks must declare capabilities rather than hard-code a single application, vendor, or provider. The Capability Fabric maintains multiple executors per capability, filters them by permission and availability, ranks them deterministically, and performs bounded fallback after classified execution failure. No available executor is a failure state, never a synthetic success. ChatGPT is an AI partner behind the AI Gateway, not a mandatory single point of failure. Objective verification and evidence remain separate gates after execution.
