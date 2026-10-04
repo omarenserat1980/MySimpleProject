@@ -37,3 +37,21 @@ def test_empty_company_enters_discovery():
     d = e.run_cycle()
     assert d.status == "NO_OBJECTIVE"
     assert d.action == "OBSERVE_AND_DISCOVER"
+
+
+def test_risk_percent_is_calculated_and_bounded():
+    low = CompanyObjective("low", "low", 10, evidence=100)
+    high = CompanyObjective("high", "high", 10, evidence=0, action_class=ActionClass.IRREVERSIBLE)
+    assert 0 <= low.risk_percent <= 100
+    assert 0 <= high.risk_percent <= 100
+    assert high.risk_percent > low.risk_percent
+    assert high.risk_band == "HIGH" or high.risk_band == "CRITICAL"
+
+
+def test_decision_exposes_calculated_risk():
+    e = BrainExecutive(CompanyState(objectives=[
+        CompanyObjective("build", "build", 10, evidence=80),
+    ]))
+    d = e.decide()
+    assert d.risk_percent == 11.9
+    assert d.risk_band == "LOW"
