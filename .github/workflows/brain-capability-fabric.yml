@@ -4,8 +4,11 @@ on:
   push:
     paths:
       - "brain_v12/brain/capability_fabric.py"
+      - "brain_v12/brain/health_probe.py"
       - "brain_v12/brain/capability_catalog.py"
       - "brain_v12/tests/test_capability_fabric.py"
+      - "brain_v12/tests/test_capability_health_integration.py"
+      - "brain_v12/tests/test_health_probe.py"
       - "brain_v12/tests/test_capability_catalog.py"
       - "brain_v12/docs/BRAIN_CAPABILITY_FABRIC.md"
       - ".github/workflows/brain-capability-fabric.yml"
@@ -23,6 +26,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile
-        run: python -m compileall -q brain_v12/brain/capability_fabric.py brain_v12/brain/capability_catalog.py
+        run: python -m compileall -q brain_v12/brain/capability_fabric.py brain_v12/brain/health_probe.py brain_v12/brain/capability_catalog.py
       - name: Unit tests
-        run: python -m unittest -v brain_v12.tests.test_capability_fabric brain_v12.tests.test_capability_catalog
+        run: python -m unittest -v brain_v12.tests.test_capability_fabric brain_v12.tests.test_capability_health_integration brain_v12.tests.test_health_probe brain_v12.tests.test_capability_catalog
