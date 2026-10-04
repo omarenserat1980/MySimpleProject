@@ -35,6 +35,34 @@ class CompanyObjective:
     def score(self) -> float:
         return (self.value * 0.55 + self.urgency * 0.20 + self.evidence * 0.25) / max(self.cost, 0.01)
 
+    @property
+    def risk_percent(self) -> float:
+        """Calculated execution risk, 0-100, from impact, uncertainty and cost exposure."""
+        impact = {
+            ActionClass.INTERNAL_REVERSIBLE: 10.0,
+            ActionClass.EXTERNAL_SIDE_EFFECT: 45.0,
+            ActionClass.FINANCIAL: 70.0,
+            ActionClass.LEGAL: 60.0,
+            ActionClass.IRREVERSIBLE: 85.0,
+        }[self.action_class]
+        uncertainty = 100.0 - min(max(self.evidence, 0.0), 100.0)
+        cost_exposure = 100.0 * max(self.cost, 0.0) / (
+            max(self.cost, 0.0) + max(self.value, 0.0) + 1.0
+        )
+        risk = 0.50 * impact + 0.30 * uncertainty + 0.20 * cost_exposure
+        return round(min(max(risk, 0.0), 100.0), 2)
+
+    @property
+    def risk_band(self) -> str:
+        risk = self.risk_percent
+        if risk < 25:
+            return "LOW"
+        if risk < 50:
+            return "MEDIUM"
+        if risk < 75:
+            return "HIGH"
+        return "CRITICAL"
+
 
 @dataclass(frozen=True)
 class ExecutiveDecision:
@@ -44,6 +72,8 @@ class ExecutiveDecision:
     status: str
     reason: str
     decision_id: str
+    risk_percent: float = 0.0
+    risk_band: str = "LOW"
 
 
 @dataclass
@@ -84,13 +114,15 @@ class BrainExecutive:
         if obj is None:
             return ExecutiveDecision("", "OBSERVE_AND_DISCOVER", 0.0, "NO_OBJECTIVE",
                                      "no eligible objective; discovery required",
-                                     self._decision_id("none", "OBSERVE_AND_DISCOVER"))
+                                     self._decision_id("none", "OBSERVE_AND_DISCOVER"),
+                                     0.0, "LOW")
         allowed, reason = self._gate(obj)
         action = f"EXECUTE:{obj.objective_id}"
         status = "READY" if allowed else "GATED"
         return ExecutiveDecision(
             obj.objective_id, action, obj.score, status, reason,
             self._decision_id(obj.objective_id, action),
+            obj.risk_percent, obj.risk_band,
         )
 
     def complete(self, objective_id: str) -> None:
