@@ -19,8 +19,18 @@ code{color:#c7d2fe}@media(max-width:700px){.grid{grid-template-columns:1fr}heade
 <div class="card"><h2>البنية</h2><div class="row"><span>Runtime / API</span><b>Adapter</b></div><div class="row"><span>Payment</span><b>Router</b></div><div class="row"><span>Email</span><b>Adapter</b></div><div class="row"><span>Storage</span><b>Adapter</b></div><div class="row"><span>Database</span><b>Adapter</b></div></div>
 <div class="card"><h2>بوابة الأمان التجاري</h2><div class="row"><span>Payment verified</span><b id="pay">LOCKED</b></div><div class="row"><span>Revenue evidence</span><b id="rev">LOCKED</b></div><div class="row"><span>Delivery evidence</span><b id="del">LOCKED</b></div><div class="status" id="result">لا توجد ادعاءات تشغيلية. التطبيق لا يعتبر المزوّد فعالًا دون دليل.</div></div>
 </section>
+<section class="card" style="margin-top:16px"><h2>Commercial Readiness</h2><p class="muted">يعرض هذا القسم نتيجة التقرير الفعلي عند تحميله. لا يتم افتراض الجاهزية من الواجهة.</p><input id="reportFile" type="file" accept=".json" style="margin:8px 0"><div id="readinessPanel" class="status">حمّل commercial_readiness.json لعرض النتيجة.</div></section>
 <section class="card" style="margin-top:16px"><h2>المبدأ</h2><p class="muted">يمكن تغيير أي مزوّد دون إعادة بناء Brain Core. المزود منفّذ قابل للاستبدال؛ الحقيقة التجارية محفوظة داخل Brain.</p><p class="muted">حالة المزود: <code>DISCOVERED → CONFIGURED → HEALTHY → VERIFIED → ACTIVE</code></p></section>
 </main>
 <script>
 function runChecks(){const ok={storage:!!window.localStorage,fetch:typeof fetch==="function",secure:location.protocol==="https:"||location.hostname==="localhost"};const passed=Object.values(ok).filter(Boolean).length;document.getElementById("result").textContent="الفحص المحلي: "+passed+"/"+Object.keys(ok).length+" متطلبات أساسية متاحة. هذا لا يثبت اتصال الدفع أو الإيراد."}
+</script><script>
+function showReport(data){
+ const checks=data.checks||{};
+ const labels={public_api:"Public API",auth_verified:"Authentication",trial_enforced:"Trial",order_flow_verified:"Order flow",payment_provider_active:"Payment provider",payment_verification_live:"Payment verification",delivery_verified:"Delivery",evidence_generated:"Evidence"};
+ const rows=Object.keys(labels).map(k=>'<div class="row"><span>'+labels[k]+'</span><b>'+ (checks[k]?'PASS':'BLOCKED') +'</b></div>').join('');
+ const blockers=(data.blockers||[]).map(x=>'<li>'+x+'</li>').join('')||'<li>None</li>';
+ document.getElementById('readinessPanel').innerHTML='<div><strong>'+String(data.status||'UNKNOWN')+'</strong></div>'+rows+'<h3>Blockers</h3><ul>'+blockers+'</ul>';
+}
+document.getElementById('reportFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{showReport(JSON.parse(reader.result))}catch(err){document.getElementById('readinessPanel').textContent='ملف التقرير غير صالح.'}};reader.readAsText(f)});
 </script></body></html>
