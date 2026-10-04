@@ -1,0 +1,55 @@
+name: Brain Opportunity Execution
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+concurrency:
+  group: brain-opportunity-execution
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build opportunity queue
+        run: python3 scripts/brain_opportunity_discovery.py
+
+      - name: Execute bounded opportunity preparation
+        run: python3 scripts/brain_opportunity_executor.py
+
+      - name: Verify execution evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path(".brain_state/opportunity_execution_result.json").read_text())
+          v=json.loads(Path(".brain_state/opportunity_verification.json").read_text())
+          assert r["status"] == "EXECUTION_PREPARED"
+          assert r["financial_side_effects"] == "BLOCKED"
+          assert r["external_submission"] == "NOT_PERFORMED"
+          assert r["payment"] == "NOT_VERIFIED"
+          assert v["status"] == "VERIFIED_PREPARATION"
+          assert all(v["checks"].values())
+          print("OPPORTUNITY_EXECUTION_GATE=VERIFIED")
+          print("COMMERCIAL_STATE="+v["commercial_state"])
+          print("PAYMENT_STATE="+v["payment_state"])
+          PY
+
+      - name: Publish execution evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-opportunity-execution
+          path: |
+            .brain_state/opportunity_queue.json
+            .brain_state/opportunity_task.json
+            .brain_state/opportunity_execution_result.json
+            .brain_state/opportunity_verification.json
+          retention-days: 14
