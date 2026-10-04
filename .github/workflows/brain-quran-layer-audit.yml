@@ -1,4 +1,5 @@
 name: Brain Quran Layer Audit
+# Explicit self-trigger: workflow-file changes must launch a fresh audit.
 
 on:
   push:
