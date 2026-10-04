@@ -78,3 +78,8 @@ assert.match(worker, /RESULT_EVIDENCE_REQUIRED/);
 assert.match(worker, /JOB_NOT_RUNNING/);
 assert.match(worker, /state = 'SUCCESS'/);
 assert.match(worker, /order_state: "READY"/);
+
+assert.match(worker, /confirmDelivery/);
+assert.match(worker, /DELIVERY_NOT_READY/);
+assert.match(worker, /CLIENT_DELIVERY_CONFIRMED/);
+assert.match(worker, /order_state: "COMPLETED"/);
