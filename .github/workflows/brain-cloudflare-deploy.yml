@@ -28,6 +28,7 @@ jobs:
           test -f cloudflare/brain-api/wrangler.toml
           test -f cloudflare/brain-api/src/index.js
           test -f cloudflare/brain-api/migrations/0001_commercial.sql
+          test -f cloudflare/brain-api/migrations/0005_cinema_entitlements.sql
           node --check cloudflare/brain-api/src/index.js
           node cloudflare/brain-api/test/commercial_worker_static.test.js
 
@@ -86,6 +87,31 @@ jobs:
           sed -i "s/database_id = \"REPLACED_IN_CI\"/database_id = \"$D1_DATABASE_ID\"/" wrangler.toml
           npx wrangler d1 migrations apply brain-commercial --remote
           echo "D1_MIGRATIONS=APPLIED"
+
+      - name: Ensure private cinema R2 bucket
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          name="brain-cinema-media"
+          p=subprocess.run(["npx","wrangler","r2","bucket","list","--json"],capture_output=True,text=True,check=True)
+          rows=json.loads(p.stdout)
+          if not any(x.get("name")==name for x in rows):
+              subprocess.run(["npx","wrangler","r2","bucket","create",name],check=True)
+          print("CINEMA_R2_BUCKET_READY=TRUE")
+          PY
+
+      - name: Upload verified cinema master to private R2
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          test -s ../../docs/assets/last_light_city.mp4
+          npx wrangler r2 object put brain-cinema-media/films/last_light_city.mp4 --file ../../docs/assets/last_light_city.mp4 --content-type video/mp4 --cache-control "private, no-store" --remote
+          echo "CINEMA_MASTER_R2_UPLOAD=PASS"
 
       - name: Configure PayTabs Worker secret
         working-directory: cloudflare/brain-api
