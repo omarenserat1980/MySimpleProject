@@ -1,4 +1,4 @@
-"""Capability Fabric with health, verification, and evidence gates."""
+"""Capability Fabric with health, verification, and master completion gate."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from .execution_verifier import ExecutionVerifier, evidence_dict
 from .health_probe import HealthProbeEngine
+from .master_verification_gate import MasterVerificationGate
 
 
 @dataclass(frozen=True)
@@ -30,14 +31,13 @@ class ExecutionAttempt:
 class CapabilityFabric:
     """Provider-neutral capability registry with health and evidence gates."""
 
-    def __init__(
-        self,
-        health: HealthProbeEngine | None = None,
-        verifier: ExecutionVerifier | None = None,
-    ) -> None:
+    def __init__(self, health: HealthProbeEngine | None = None,
+                 verifier: ExecutionVerifier | None = None,
+                 master_gate: MasterVerificationGate | None = None) -> None:
         self._executors: dict[str, ExecutorSpec] = {}
         self.health = health or HealthProbeEngine()
         self.verifier = verifier or ExecutionVerifier()
+        self.master_gate = master_gate or MasterVerificationGate(self.verifier)
 
     def register(self, spec: ExecutorSpec, probe: Callable[[], Any] | None = None) -> None:
         if not spec.executor_id or not spec.capability:
@@ -86,20 +86,14 @@ class CapabilityFabric:
             if ev.verified:
                 self.health.record_execution(spec.executor_id, True)
                 attempts.append(ExecutionAttempt(spec.executor_id, True, result=result))
-                return {"status": "SUCCESS", "capability": capability,
-                        "executor_id": spec.executor_id, "result": result,
-                        "attempts": [a.__dict__ for a in attempts], "evidence": evidence}
+                gate = self.master_gate.evaluate(capability, spec.executor_id, result)
+                if gate.verified:
+                    return {"status": gate.status, "capability": capability,
+                            "executor_id": spec.executor_id, "result": result,
+                            "attempts": [a.__dict__ for a in attempts],
+                            "evidence": evidence, "gate": gate.evidence}
             self.health.record_execution(spec.executor_id, False)
             attempts.append(ExecutionAttempt(spec.executor_id, False,
                                              result=result, error="VERIFICATION_FAILED"))
         return {"status": "FAILED", "capability": capability, "executor_id": None,
                 "attempts": [a.__dict__ for a in attempts], "evidence": evidence}
-
-    def snapshot(self) -> list[dict[str, Any]]:
-        return [{**{
-            "executor_id": x.executor_id, "capability": x.capability,
-            "priority": x.priority, "state": x.state, "cost_class": x.cost_class,
-            "permissions": sorted(x.permissions), "metadata": dict(x.metadata),
-            "healthy": self.health.healthy(x.executor_id),
-        }, "health_score": self.health.score(x.executor_id)}
-        for x in sorted(self._executors.values(), key=lambda x: x.executor_id)]
