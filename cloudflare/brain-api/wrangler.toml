@@ -4,7 +4,7 @@ compatibility_date = "2026-10-02"
 
 [vars]
 BRAIN_ALLOWED_ORIGIN = "https://omarenserat1980.github.io"
-BRAIN_RETURN_PAGE = "https://omarenserat1980.github.io/MySimpleProject/"
+BRAIN_RETURN_PAGE = "https://omarenserat1980.github.io/MySimpleProject/cinema.html"
 
 [[d1_databases]]
 binding = "BRAIN_DB"
