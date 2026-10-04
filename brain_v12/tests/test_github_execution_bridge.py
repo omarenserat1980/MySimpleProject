@@ -23,7 +23,7 @@ class GitHubExecutionBridgeTests(unittest.TestCase):
             created["control"]["id"],
             "repository",
             verifier=lambda value: {
-                "verified": value["ok"] is True,
+                "verified": value["result"]["ok"] is True,
                 "evidence_ref": "evidence://github/repository/1",
             },
         )
