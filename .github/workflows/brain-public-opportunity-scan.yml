@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "brain_v12/business/**"
+      - "brain_v12/brain/live_opportunity_researcher.py"
       - ".github/workflows/brain-public-opportunity-scan.yml"
   workflow_dispatch:
   schedule:
@@ -25,9 +26,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .brain/opportunities
-          gh api --method GET search/issues             -f q='is:open is:issue (label:"good first issue" OR label:"help wanted") (automation OR "github actions" OR CI OR workflow OR AI)'             -f per_page=30 > .brain/opportunities/github_raw.json
+          gh api --method GET search/issues \
+            -f q='is:open is:issue (label:"good first issue" OR label:"help wanted") (automation OR "github actions" OR CI OR workflow OR AI OR Python)' \
+            -f per_page=30 > .brain/opportunities/github_raw.json
 
-      - name: Normalize and rank
+      - name: Collect live public freelance signals
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python - <<'PY'
+          import json
+          from brain_v12.brain.live_opportunity_researcher import LiveOpportunityResearcher
+
+          class Engine:
+              def ingest_live_opportunities(self, items, max_age_hours=72):
+                  return items
+
+          class Store:
+              def event(self, name, result):
+                  print(name, json.dumps(result, ensure_ascii=False))
+
+          result = LiveOpportunityResearcher(Engine(), Store()).run_once()
+          with open(".brain/opportunities/live_scan.json", "w", encoding="utf-8") as f:
+              json.dump(result, f, indent=2, ensure_ascii=False)
+          print("BRAIN_LIVE_PUBLIC_SCAN=", "PASS" if result["ok"] else "DEGRADED")
+          print("LIVE_RECEIVED=", result["received"])
+          print("LIVE_ERRORS=", len(result["errors"]))
+          PY
+
+      - name: Normalize and rank GitHub signals
         run: |
           set -euo pipefail
           python - <<'PY'
