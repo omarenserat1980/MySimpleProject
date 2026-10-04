@@ -7,7 +7,7 @@ from typing import Any, Callable
 from .execution_verifier import ExecutionVerifier, evidence_dict
 from .health_probe import HealthProbeEngine
 from .master_verification_gate import MasterVerificationGate
-from .verification_policies import verify_capability
+from .verification_policies import register_default_verifiers, verify_capability
 
 
 @dataclass(frozen=True)
@@ -37,7 +37,7 @@ class CapabilityFabric:
                  master_gate: MasterVerificationGate | None = None) -> None:
         self._executors: dict[str, ExecutorSpec] = {}
         self.health = health or HealthProbeEngine()
-        self.verifier = verifier or ExecutionVerifier()
+        self.verifier = register_default_verifiers(verifier or ExecutionVerifier())
         self.master_gate = master_gate or MasterVerificationGate(self.verifier)
 
     def register(self, spec: ExecutorSpec, probe: Callable[[], Any] | None = None) -> None:
