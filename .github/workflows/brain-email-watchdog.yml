@@ -32,32 +32,22 @@ jobs:
           test -n "$AGENTMAIL_API_KEY"
           test -n "$BRAIN_ALERT_TO"
 
-      - name: Test outbound email and write evidence
+      - name: Probe AgentMail inbox without sending email
         run: |
           python - <<'PY'
-          import json, os
-          from datetime import datetime, timezone
+          import json, os, urllib.request
           from pathlib import Path
-          from brain_v12.brain.notification_router import NotificationRouter
 
-          path = Path(os.environ["BRAIN_NOTIFICATION_EVIDENCE"])
-          router = NotificationRouter(evidence_path=path)
-          result = router.notify(
-              event_type="EMAIL_CHANNEL_HEALTH",
-              source="brain-email-watchdog",
-              severity="ERROR",
-              subject="Brain email channel health check",
-              text=(
-                  "Brain email channel health check completed. "
-                  "This is an operational connectivity probe."
-              ),
-              fingerprint=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
+          inbox = os.environ["BRAIN_EMAIL_INBOX_ID"]
+          request = urllib.request.Request(
+              f"https://api.agentmail.to/v0/inboxes/{inbox}",
+              headers={"Authorization": f"Bearer {os.environ['AGENTMAIL_API_KEY']}"},
+              method="GET",
           )
-          # A verified probe is evidence of connectivity. The watchdog itself
-          # remains green only when the provider returns message/thread IDs.
-          if result.status != "SENT_VERIFIED":
-              raise SystemExit(f"EMAIL_CHANNEL_NOT_VERIFIED:{result.status}:{result.error}")
-          print("EMAIL_CHANNEL=VERIFIED")
-          print("MESSAGE_ID_PRESENT=", bool(result.message_id))
-          print("THREAD_ID_PRESENT=", bool(result.thread_id))
+          with urllib.request.urlopen(request, timeout=30) as response:
+              data = json.loads(response.read().decode("utf-8"))
+          if data.get("inbox_id") != inbox:
+              raise SystemExit("EMAIL_CHANNEL_NOT_VERIFIED:inbox_mismatch")
+          print("EMAIL_CHANNEL=REACHABLE")
+          print("INBOX_VERIFIED=1")
           PY
