@@ -170,8 +170,9 @@ async function cinemaStream(request, env, requestOrigin, allowedOrigin) {
   const cookieMatch = cookieHeader.match(/(?:^|;\\s*)BRAIN_CINEMA_TOKEN=([^;]+)/);
   const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : "";
   if (!token) return json({ ok: false, error: "ENTITLEMENT_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
   const tokenHash = await sha256Hex(new TextEncoder().encode(token));
-  const entitlement = await env.BRAIN_DB?.prepare(
+  const entitlement = await env.BRAIN_DB.prepare(
     "SELECT e.state, o.state AS order_state FROM cinema_entitlements e JOIN orders o ON o.order_id=e.order_id WHERE e.token_hash=? AND e.film_id=? LIMIT 1"
   ).bind(tokenHash, filmId).first();
   if (!entitlement || entitlement.state !== "GRANTED" || entitlement.order_state !== "PAYMENT_VERIFIED") {
