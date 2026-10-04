@@ -1,0 +1,73 @@
+name: Brain Human Intermediary Autopilot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "11,41 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/self_healing/human_intermediary_predictor.py"
+      - "brain_v12/self_healing/test_human_intermediary_predictor.py"
+      - "PROJECT_ROADMAP.md"
+      - ".github/workflows/brain-human-intermediary-autopilot.yml"
+
+concurrency:
+  group: brain-human-intermediary-autopilot
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  predict-and-advance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 120
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run predictor tests
+        run: python -m unittest brain_v12.self_healing.test_human_intermediary_predictor -v
+      - name: Predict current human-intermediary continuation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python -m brain_v12.self_healing.human_intermediary_predictor
+      - name: Verify monotonic continuation contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("brain_v12/state/human_intermediary_prediction.json")
+          d=json.loads(p.read_text(encoding="utf-8"))
+          assert d["execution_contract"]["success_requires_evidence"] is True
+          assert d["execution_contract"]["automatic_production_code_mutation"] is False
+          assert d["execution_contract"]["automatic_prompt_mutation"] is False
+          assert d["execution_contract"]["automatic_financial_or_external_side_effects"] is False
+          assert d["anti_regression"]["policy"] == "monotonic_progress_only"
+          print("HUMAN_INTERMEDIARY_AUTOPILOT=VERIFIED")
+          print("FRONTIER=", d["current_frontier"])
+          print("NEXT_ACTION=", d["next_safe_action"])
+          PY
+      - name: Commit only monotonic state/report changes
+        run: |
+          git config user.name "brain-autopilot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add brain_v12/state/human_intermediary_state.json brain_v12/state/human_intermediary_prediction.json
+          if git diff --cached --quiet; then
+            echo "BRAIN_INTERMEDIARY_STATE=UNCHANGED"
+          else
+            git commit -m "brain: persist human intermediary continuation state"
+            git push
+          fi
+      - name: Upload prediction evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-human-intermediary-prediction-${{ github.run_id }}
+          path: brain_v12/state/human_intermediary_prediction.json
+          retention-days: 14
