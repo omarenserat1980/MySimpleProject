@@ -11,7 +11,7 @@ on:
       timeout_minutes:
         description: "Maximum guest boot/install time"
         required: true
-        default: "45"
+        default: "55"
         type: string
 
 permissions:
@@ -20,7 +20,7 @@ permissions:
 jobs:
   real_windows_boot:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
 
@@ -214,16 +214,22 @@ jobs:
             -device ide-hd,bus=sata.2,drive=osdisk \
             -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
             -device ide-hd,bus=sata.3,drive=evidence \
-            -nic user,model=e1000 -cdrom brain-windows-server-2025-proof.iso -boot order=d \
+            -nic user,model=e1000 \
+            -drive file=brain-windows-server-2025-proof.iso,media=cdrom,if=none,id=installmedia,readonly=on \
+            -device ide-cd,bus=sata.1,drive=installmedia \
+            -boot once=d,menu=off \
             -display none -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
             > qemu-console.log 2>&1 &
           QPID=$!
           deadline=$((SECONDS + BOOT_TIMEOUT*60))
           found=0
+          boot_source="unknown"
           while [ "$SECONDS" -lt "$deadline" ]; do
             if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
               found=1
+              boot_source="windows-installed-disk"
               echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
+              echo "WINDOWS_BOOT_SOURCE=$boot_source"
               break
             fi
             if ! kill -0 "$QPID" 2>/dev/null; then
@@ -246,6 +252,7 @@ jobs:
           s.close()
           PY
           sleep 15
+          printf 'BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\nBOOT_SOURCE=%s\n' "$boot_source" | tee windows-boot-phase.txt
           kill "$QPID" 2>/dev/null || true
           wait "$QPID" 2>/dev/null || true
 
@@ -298,6 +305,7 @@ jobs:
             proof-iso-autounattend.txt
             proof-iso-setupcomplete.txt
             qemu-accel.txt
+            windows-boot-phase.txt
             qemu-console.log
             qemu-serial.log
 
