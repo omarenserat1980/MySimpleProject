@@ -126,9 +126,41 @@ jobs:
         working-directory: cloudflare/brain-api
         env:
           PAYTABS_PROFILE_ID: ${{ vars.PAYTABS_PROFILE_ID || secrets.PAYTABS_PROFILE_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: /tmp/wrangler-output.ndjson
         run: |
           set -euo pipefail
-          npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID"
+          rm -f /tmp/wrangler-output.ndjson
+          npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID" | tee /tmp/wrangler-deploy.log
+          WORKER_URL=$(grep -Eo 'https://[^[:space:]]+\\.workers\\.dev' /tmp/wrangler-deploy.log | tail -1 || true)
+          if [ -z "$WORKER_URL" ]; then echo "WORKER_URL_NOT_FOUND"; exit 1; fi
+          echo "WORKER_URL=$WORKER_URL"
+          echo "$WORKER_URL" > /tmp/worker_url
+
+      - name: Wire public cinema page to deployed Worker
+        env:
+          WORKER_URL_FILE: /tmp/worker_url
+        run: |
+          set -euo pipefail
+          WORKER_URL=$(cat "$WORKER_URL_FILE")
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("cinema.html")
+          s=p.read_text()
+          url=Path("/tmp/worker_url").read_text().strip()
+          if "__BRAIN_CINEMA_API_URL__" not in s:
+              raise SystemExit("CINEMA_API_PLACEHOLDER_MISSING")
+          p.write_text(s.replace("__BRAIN_CINEMA_API_URL__", url))
+          PY
+          if git diff --quiet -- cinema.html; then
+            echo "CINEMA_PAGE_ALREADY_WIRED=TRUE"
+          else
+            git config user.name "brain-cloud-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add cinema.html
+            git commit -m "chore: wire cinema page to deployed Brain API"
+            git push origin HEAD:main
+            echo "CINEMA_PAGE_WIRED=TRUE"
+          fi
 
       - name: Smoke test syntax and config
         working-directory: cloudflare/brain-api
