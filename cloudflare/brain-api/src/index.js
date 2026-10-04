@@ -40,6 +40,10 @@ export default {
       return claimNextJob(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/jobs/complete" && request.method === "POST") {
+      return completeJob(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -405,6 +409,30 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function completeJob(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const control = String(env.BRAIN_CONTROL_TOKEN || "");
+  const auth = String(request.headers.get("Authorization") || "");
+  if (!control || auth !== "Bearer " + control) return json({ ok: false, error: "CONTROL_AUTH_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+  const jobId = String(body.job_id || "").trim();
+  const evidence = body.evidence;
+  const artifactUrl = String(body.artifact_url || "").trim();
+  if (!jobId || !evidence || (typeof evidence !== "string" && typeof evidence !== "object")) return json({ ok: false, error: "RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
+  if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
+  const evidenceText = typeof evidence === "string" ? evidence : JSON.stringify(evidence);
+  await env.BRAIN_DB.prepare("UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ?").bind(evidenceText, jobId).run();
+  const deliveryId = "DEL-" + crypto.randomUUID().toUpperCase();
+  await env.BRAIN_DB.prepare(
+    "INSERT OR IGNORE INTO deliveries (delivery_id, order_id, state, artifact_url, evidence) VALUES (?, ?, 'READY', ?, ?)"
+  ).bind(deliveryId, job.order_id, artifactUrl || null, evidenceText).run();
+  await env.BRAIN_DB.prepare("UPDATE orders SET state = 'READY' WHERE order_id = ? AND state = 'PAYMENT_VERIFIED'").bind(job.order_id).run();
+  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: deliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
+}
 
 async function claimNextJob(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
