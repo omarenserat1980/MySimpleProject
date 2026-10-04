@@ -64,10 +64,11 @@ jobs:
           python - <<'PY'
           from collections import Counter
           from cloud.api_server import app
-          keys=[(getattr(r,'methods',None) and tuple(sorted(r.methods)) or (), r.path) for r in app.routes if r.path]
+          routes=[r for r in app.routes if getattr(r,"path",None)]
+          keys=[(tuple(sorted(getattr(r,"methods",set()) or set())), r.path) for r in routes]
           duplicates=[k for k,c in Counter(keys).items() if c>1]
           assert not duplicates, f"duplicate API method/routes: {duplicates}"
-          paths=[r.path for r in app.routes if r.path]
+          paths=[r.path for r in routes]
           assert "/v1/feedback" in paths
           assert "/v1/feedback/{feedback_id}" in paths
           assert "/v1/feedback/{feedback_id}/transition" in paths
