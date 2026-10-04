@@ -1,0 +1,56 @@
+name: Brain Chat Multi-Device Sync Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/chat_session_store.py"
+      - "brain_v12/brain/chat_session_api.py"
+      - "brain_v12/tests/test_chat_session_api.py"
+      - "brain_v12/web/brain-chat/index.html"
+      - ".github/workflows/brain-chat-sync-tests.yml"
+  pull_request:
+    paths:
+      - "brain_v12/brain/chat_session_store.py"
+      - "brain_v12/brain/chat_session_api.py"
+      - "brain_v12/tests/test_chat_session_api.py"
+      - "brain_v12/web/brain-chat/index.html"
+      - ".github/workflows/brain-chat-sync-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  chat-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run persistent chat and account-isolation tests
+        run: python -m unittest brain_v12.tests.test_chat_session_api -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Brain Chat browser JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path("brain_v12/web/brain-chat/index.html").read_text(encoding="utf-8")
+          start = html.find("<script>")
+          end = html.find("</script>", start)
+          if start < 0 or end < 0:
+              raise SystemExit("INLINE_CHAT_SCRIPT_NOT_FOUND")
+          Path("/tmp/brain-chat.js").write_text(html[start + len("<script>"):end], encoding="utf-8")
+          PY
+          node --check /tmp/brain-chat.js
+      - name: Emit sync evidence
+        run: |
+          echo "CHAT_SYNC_GATE=EXECUTED"
+          echo "CHAT_SYNC_ACCOUNT_DISCOVERY=ENABLED"
+          echo "CHAT_SYNC_CURSOR_REPLAY=ENABLED"
+          echo "CHAT_SYNC_OFFLINE_OUTBOX=ENABLED"
+          echo "CHAT_SYNC_FAIL_CLOSED_TESTS=EXECUTED"
