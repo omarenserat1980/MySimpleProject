@@ -12,7 +12,6 @@ on:
       - "docs/movies.html"
       - "docs/catalog.json"
       - "docs/studio/**"
-      - "docs/assets/last_light_city_preview.mp4"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
 permissions:
@@ -52,7 +51,6 @@ jobs:
           cp docs/movies.html _site/movies.html
           cp docs/catalog.json _site/catalog.json
           mkdir -p _site/assets
-          cp docs/assets/last_light_city_preview.mp4 _site/assets/last_light_city_preview.mp4
           python - <<'PY'
           import json, os
           from pathlib import Path
@@ -125,7 +123,6 @@ jobs:
           test -f _site/studio/app.js
           test -f _site/studio/studio.css
           test -f _site/catalog.json
-          test -f _site/assets/last_light_city_preview.mp4
           test -f _site/brain-chat/config.js
           test -f _site/brain-app-v2/config.json
           python - <<'PY'
