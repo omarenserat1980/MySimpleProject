@@ -5,6 +5,7 @@ const worker = fs.readFileSync("src/index.js", "utf8");
 const schema = fs.readFileSync("migrations/0001_commercial.sql", "utf8");
 const clientMigration = fs.readFileSync("migrations/0002_order_client.sql", "utf8");
 const auditMigration = fs.readFileSync("migrations/0003_order_audit.sql", "utf8");
+const revenueMigration = fs.readFileSync("migrations/0004_revenue_ledger.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
 assert.match(worker, /PAYTABS_SERVER_KEY/);
@@ -38,3 +39,9 @@ assert.match(worker, /ORDER BY created_at DESC LIMIT 50/);
 assert.match(worker, /recordOrderEvent/);
 assert.match(worker, /PAYMENT_WEBHOOK_VERIFIED/);
 assert.match(auditMigration, /CREATE TABLE IF NOT EXISTS order_events/);
+
+assert.match(worker, /REVENUE_REALIZED/);
+assert.match(worker, /revenue_ledger/);
+assert.match(worker, /revenue_state/);
+assert.match(revenueMigration, /CREATE TABLE IF NOT EXISTS revenue_ledger/);
+assert.match(revenueMigration, /UNIQUE/);
