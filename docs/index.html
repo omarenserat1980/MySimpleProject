@@ -26,14 +26,14 @@ a{color:var(--accent)}
 
 <section class="player">
 <video controls playsinline preload="metadata" poster="assets/poster.svg">
-<source src="assets/last_light_city.mp4" type="video/mp4">
+<source src="assets/last_light_city_preview.mp4" type="video/mp4">
 متصفحك لا يدعم تشغيل الفيديو.
 </video>
 </section>
 
 <section class="grid">
 <article class="card"><h2>🎬 الفيلم</h2><p>العنوان: آخر ضوء في المدينة</p><p>النوع: سينمائي / Flipbook</p><p>المقاس: 1280×720 — 16:9</p><p>المحرك: Python + Pillow + FFmpeg</p></article>
-<article class="card"><h2>🔊 الصوت</h2><p class="muted">المسار الصوتي المدمج في النسخة النهائية.</p><audio controls preload="metadata"><source src="assets/last_light_city.mp4" type="video/mp4"></audio></article>
+<article class="card"><h2>🔊 الصوت</h2><p class="muted">المسار الصوتي المدمج في النسخة النهائية.</p><audio controls preload="metadata"><source src="assets/last_light_city_preview.mp4" type="video/mp4"></audio></article>
 <article class="card"><h2>⚙️ الإنتاج</h2><p>إنتاج محلي مجاني بدون خدمة مدفوعة.</p><p class="muted">يتم التحقق من ملف MP4 بعد التوليد.</p></article>
 </section>
 
@@ -74,6 +74,6 @@ document.querySelector('.player video').poster=d.poster;
 }catch(e){console.warn('film metadata unavailable',e)}})();
 </script></main>
 <script>
-document.querySelector('video').addEventListener('error',()=>console.log('ضع ملف الفيلم النهائي في assets/last_light_city.mp4'));
+document.querySelector('video').addEventListener('error',()=>console.log('ضع ملف الفيلم النهائي في assets/last_light_city_preview.mp4'));
 </script>
 </body></html>
