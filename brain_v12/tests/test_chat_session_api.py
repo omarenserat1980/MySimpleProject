@@ -105,6 +105,19 @@ class ChatSessionApiTests(unittest.TestCase):
             self.assertEqual([e["event_type"] for e in second["events"]], ["MESSAGE_ADDED"])
             self.assertGreater(second["next_cursor"], first["next_cursor"])
 
+    def test_duplicate_client_message_is_idempotent(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            s = store.create("Idempotent")
+            first = store.add_message(s["id"], "user", "hello", client_message_id="client-1")
+            second = store.add_message(s["id"], "user", "hello", client_message_id="client-1")
+            self.assertEqual(len(first["messages"]), 1)
+            self.assertEqual(len(second["messages"]), 1)
+            feed = store.sync_events(s["id"])
+            message_events = [e for e in feed["events"] if e["event_type"] == "MESSAGE_ADDED"]
+            self.assertEqual(len(message_events), 1)
+
     def test_sync_event_feed_is_session_isolated(self):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
