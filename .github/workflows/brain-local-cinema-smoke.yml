@@ -42,6 +42,10 @@ jobs:
           assert len(commands)>0
           print("BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED")
           PY
+      - name: Install local cinema TTS dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
       - name: End-to-end one-shot factory smoke
         env:
           BRAIN_FILM_PARTS: "1"
