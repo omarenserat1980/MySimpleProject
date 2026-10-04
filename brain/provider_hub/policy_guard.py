@@ -32,13 +32,7 @@ class CommercialPolicyGuard:
         contained: bool = False,
     ) -> PolicyDecision:
         # Keep the contract backward-compatible with older callers while
-        # accepting the explicit keyword form used by current integrations.
-        if "financial_action" in kwargs:
-            financial_action = bool(kwargs["financial_action"])
-        if "evidence_present" in kwargs:
-            evidence_present = bool(kwargs["evidence_present"])
-        if "contained" in kwargs:
-            contained = bool(kwargs["contained"])
+        # The three explicit parameters intentionally accept both positional and keyword callers.
         if contained and self.policy.contained_orders_blocked:
             return PolicyDecision(False, "ORDER_CONTAINED")
         if financial_action and not self.policy.financial_action_authorized:
