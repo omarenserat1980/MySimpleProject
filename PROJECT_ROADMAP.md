@@ -110,6 +110,10 @@
 - [ ] Establish end-to-end release gate
 
 ## Phase 10 — Commercial execution
+- [x] Define evidence-first Founder Compensation Engine and extraordinary-compensation ambition
+- [ ] Implement compensation calculation/eligibility service against verified Economic Ledger evidence
+- [ ] Add founder compensation evidence dashboard and audit trail
+- [ ] Validate jurisdiction-specific compensation/tax policy before any real payment
 - [ ] Generate a commercial KPI/evidence dashboard
 - [ ] Connect every monetization entry to an offer, customer evidence, delivery evidence, payment evidence, and cost evidence
 - [ ] Track verified revenue separately from forecasts and opportunities
