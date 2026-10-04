@@ -207,6 +207,9 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   ).bind(tranRef, orderId).first();
 
   if (!payment) return json({ ok: false, error: "PAYMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (payment.state === "PAYMENT_VERIFIED") {
+    return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef, idempotent: true }, 200, requestOrigin, allowedOrigin);
+  }
   if (Number(payment.amount) !== amount || String(payment.currency) !== currency) {
     return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
   }
