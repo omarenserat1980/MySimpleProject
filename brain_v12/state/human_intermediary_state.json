@@ -1,0 +1,14 @@
+{
+  "schema": "brain-human-intermediary-state/v1",
+  "updated_at": "2026-10-04T02:35:20.982537+00:00",
+  "max_phase": 0,
+  "max_step": 5,
+  "regression_blocked": false,
+  "last_prediction": [
+    "continue from the current verified frontier rather than restart",
+    "prefer evidence/gates before declaring completion",
+    "repair a concrete failure before opening an unrelated new branch",
+    "advance in small verified steps and preserve successful state",
+    "prefer free/open-source paths when technically viable"
+  ]
+}
