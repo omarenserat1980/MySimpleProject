@@ -76,7 +76,7 @@ class BrainExecutionCoordinator:
                 evidence_ref=evidence,
             )
 
-        return {**result, "control_task": control, "task": self.task_engine.tasks[task_id]}
+        return {**result, "control": control, "control_task": control, "task": self.task_engine.tasks[task_id]}
 
     def snapshot(self) -> dict[str, Any]:
         return {
