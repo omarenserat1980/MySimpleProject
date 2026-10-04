@@ -7,6 +7,7 @@ on:
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
       - "docs/cinema.html"
+      - "docs/movies.html"
       - "docs/assets/last_light_city_preview.mp4"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
@@ -39,6 +40,7 @@ jobs:
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
           cp docs/cinema.html _site/cinema.html
+          cp docs/movies.html _site/movies.html
           mkdir -p _site/assets
           cp docs/assets/last_light_city_preview.mp4 _site/assets/last_light_city_preview.mp4
           python - <<'PY'
@@ -57,6 +59,8 @@ jobs:
           )
           if not Path("_site/index.html").is_file():
               raise SystemExit("Pages root entry point is missing from artifact")
+          if not Path("_site/movies.html").is_file():
+              raise SystemExit("Movies catalog entry point is missing from Pages artifact")
           if not Path("_site/cinema.html").is_file():
               raise SystemExit("Cinema entry point is missing from Pages artifact")
           if not Path("_site/brain-chat/index.html").is_file():
@@ -81,6 +85,7 @@ jobs:
           test -f _site/index.html
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
+          test -f _site/movies.html
           test -f _site/assets/last_light_city_preview.mp4
           test -f _site/brain-chat/config.js
           test -f _site/brain-app-v2/config.json
