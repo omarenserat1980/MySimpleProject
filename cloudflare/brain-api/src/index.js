@@ -1,5 +1,6 @@
-const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
 import { supervisorTick } from "./supervisor.js";
+
+const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
 const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
 
 export default {
