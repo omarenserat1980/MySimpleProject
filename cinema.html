@@ -72,7 +72,8 @@
 </div>
 
 <script>
-const API='__BRAIN_CINEMA_API_URL__';\nconst movie=document.getElementById('movie'), gate=document.getElementById('gate');
+const API='__BRAIN_CINEMA_API_URL__';
+const movie=document.getElementById('movie'), gate=document.getElementById('gate');
 function preview(){document.getElementById('player').scrollIntoView({behavior:'smooth'});movie.currentTime=0;movie.play().catch(()=>{})}
 function openCheckout(){document.getElementById('checkout').classList.add('open')}
 function closeCheckout(){document.getElementById('checkout').classList.remove('open')}
