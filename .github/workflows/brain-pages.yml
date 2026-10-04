@@ -8,6 +8,7 @@ on:
       - "brain_v12/web/brain-chat/**"
       - "docs/cinema.html"
       - "docs/movies.html"
+      - "docs/catalog.json"
       - "docs/assets/last_light_city_preview.mp4"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
@@ -41,6 +42,7 @@ jobs:
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
           cp docs/cinema.html _site/cinema.html
           cp docs/movies.html _site/movies.html
+          cp docs/catalog.json _site/catalog.json
           mkdir -p _site/assets
           cp docs/assets/last_light_city_preview.mp4 _site/assets/last_light_city_preview.mp4
           python - <<'PY'
@@ -86,6 +88,7 @@ jobs:
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
+          test -f _site/catalog.json
           test -f _site/assets/last_light_city_preview.mp4
           test -f _site/brain-chat/config.js
           test -f _site/brain-app-v2/config.json
