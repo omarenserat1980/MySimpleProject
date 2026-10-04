@@ -208,7 +208,7 @@ def persist_monotonic(state: dict[str, Any], phase: int, step: int, report: dict
         "max_phase": phase,
         "max_step": step,
         "regression_blocked": regression,
-        "last_prediction": report["prediction"],
+        "last_prediction": report["predicted_user_behavior"]["prediction"],
     }
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(new_state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
