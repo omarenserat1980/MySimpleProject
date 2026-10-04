@@ -2,10 +2,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    const allowedOrigin = String(env.BRAIN_ALLOWED_ORIGIN || "https://omarenserat1980.github.io");
+    const requestOrigin = request.headers.get("Origin") || "";
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
-        headers: corsHeaders(),
+        headers: corsHeaders(requestOrigin, allowedOrigin),
       });
     }
 
@@ -22,30 +24,36 @@ export default {
     const headers = new Headers(request.headers);
     headers.delete("host");
 
-    const upstream = await fetch(target, {
+    let upstream;
+    try {
+      upstream = await fetch(target, {
       method: request.method,
       headers,
       body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
       redirect: "manual",
-    });
+      });
+    } catch (error) {
+      return json({ ok: false, error: "UPSTREAM_UNAVAILABLE" }, 502, requestOrigin, allowedOrigin);
+    }
 
     const out = new Response(upstream.body, upstream);
-    for (const [k, v] of Object.entries(corsHeaders())) out.headers.set(k, v);
+    for (const [k, v] of Object.entries(corsHeaders(requestOrigin, allowedOrigin))) out.headers.set(k, v);
     return out;
   },
 };
 
-function corsHeaders() {
+function corsHeaders(requestOrigin = "", allowedOrigin = "https://omarenserat1980.github.io") {
+  const allowOrigin = requestOrigin === allowedOrigin ? allowedOrigin : allowedOrigin;
   return {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": allowOrigin,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "access-control-allow-headers": "Content-Type, Authorization, X-V12-Agent-Key",
   };
 }
 
-function json(value, status = 200) {
+function json(value, status = 200, requestOrigin = "", allowedOrigin = "https://omarenserat1980.github.io") {
   return new Response(JSON.stringify(value), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders() },
+    headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders(requestOrigin, allowedOrigin) },
   });
 }
