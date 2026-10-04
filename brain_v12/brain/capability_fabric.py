@@ -1,9 +1,10 @@
-"""Capability Fabric with health-score-aware executor selection."""
+"""Capability Fabric with health, verification, and evidence gates."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from .execution_verifier import ExecutionVerifier, evidence_dict
 from .health_probe import HealthProbeEngine
 
 
@@ -27,11 +28,16 @@ class ExecutionAttempt:
 
 
 class CapabilityFabric:
-    """Provider-neutral capability registry with health-ranked bounded fallback."""
+    """Provider-neutral capability registry with health and evidence gates."""
 
-    def __init__(self, health: HealthProbeEngine | None = None) -> None:
+    def __init__(
+        self,
+        health: HealthProbeEngine | None = None,
+        verifier: ExecutionVerifier | None = None,
+    ) -> None:
         self._executors: dict[str, ExecutorSpec] = {}
         self.health = health or HealthProbeEngine()
+        self.verifier = verifier or ExecutionVerifier()
 
     def register(self, spec: ExecutorSpec, probe: Callable[[], Any] | None = None) -> None:
         if not spec.executor_id or not spec.capability:
@@ -45,10 +51,16 @@ class CapabilityFabric:
                       if x.capability == capability and x.state == "ONLINE"]
         if require_healthy:
             candidates = [x for x in candidates if self.health.healthy(x.executor_id)]
-        return sorted(
-            candidates,
-            key=lambda x: (-self.health.score(x.executor_id), x.priority, x.cost_class, x.executor_id),
-        )
+        return sorted(candidates, key=lambda x: (
+            -self.health.score(x.executor_id), x.priority, x.cost_class, x.executor_id))
+
+    def plan(self, capability: str, required_permissions: set[str] | None = None,
+             require_healthy: bool = True, probe_before_select: bool = False) -> list[ExecutorSpec]:
+        if probe_before_select:
+            self.probe_capability(capability)
+        required = required_permissions or set()
+        return [x for x in self.discover(capability, require_healthy)
+                if required.issubset(x.permissions)]
 
     def probe_capability(self, capability: str) -> list[dict[str, Any]]:
         for spec in self._executors.values():
@@ -56,42 +68,32 @@ class CapabilityFabric:
                 self.health.probe(spec.executor_id)
         return self.health.snapshot()
 
-    def plan(
-        self,
-        capability: str,
-        required_permissions: set[str] | None = None,
-        require_healthy: bool = True,
-        probe_before_select: bool = False,
-    ) -> list[ExecutorSpec]:
-        required = required_permissions or set()
-        if probe_before_select:
-            self.probe_capability(capability)
-        return [x for x in self.discover(capability, require_healthy=require_healthy)
-                if required.issubset(x.permissions)]
-
-    def execute(
-        self,
-        capability: str,
-        runner: Callable[[ExecutorSpec], Any],
-        required_permissions: set[str] | None = None,
-        max_attempts: int = 3,
-        probe_before_select: bool = True,
-    ) -> dict[str, Any]:
+    def execute(self, capability: str, runner: Callable[[ExecutorSpec], Any],
+                required_permissions: set[str] | None = None, max_attempts: int = 3,
+                probe_before_select: bool = True) -> dict[str, Any]:
         candidates = self.plan(capability, required_permissions, True, probe_before_select)
         attempts: list[ExecutionAttempt] = []
+        evidence: list[dict[str, Any]] = []
         for spec in candidates[:max(0, max_attempts)]:
             try:
                 result = runner(spec)
-                self.health.record_execution(spec.executor_id, True)
-                attempts.append(ExecutionAttempt(spec.executor_id, True, result=result))
-                return {"status": "SUCCESS", "capability": capability,
-                        "executor_id": spec.executor_id,
-                        "attempts": [a.__dict__ for a in attempts]}
             except Exception as exc:
                 self.health.record_execution(spec.executor_id, False)
                 attempts.append(ExecutionAttempt(spec.executor_id, False, error=str(exc)))
+                continue
+            ev = self.verifier.verify(capability, spec.executor_id, result)
+            evidence.append(evidence_dict(ev))
+            if ev.verified:
+                self.health.record_execution(spec.executor_id, True)
+                attempts.append(ExecutionAttempt(spec.executor_id, True, result=result))
+                return {"status": "SUCCESS", "capability": capability,
+                        "executor_id": spec.executor_id, "result": result,
+                        "attempts": [a.__dict__ for a in attempts], "evidence": evidence}
+            self.health.record_execution(spec.executor_id, False)
+            attempts.append(ExecutionAttempt(spec.executor_id, False,
+                                             result=result, error="VERIFICATION_FAILED"))
         return {"status": "FAILED", "capability": capability, "executor_id": None,
-                "attempts": [a.__dict__ for a in attempts]}
+                "attempts": [a.__dict__ for a in attempts], "evidence": evidence}
 
     def snapshot(self) -> list[dict[str, Any]]:
         return [{**{
