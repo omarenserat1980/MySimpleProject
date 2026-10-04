@@ -812,7 +812,9 @@ def transition_feedback(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="feedback not found")
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        detail = str(exc)
+        status_code = 422 if "requires evidence_ref" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     return {"ok": True, "feedback": asdict(f)}
 
 class CommunicationCreateRequest(BaseModel):
