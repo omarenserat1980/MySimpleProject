@@ -68,6 +68,10 @@ class DurableSyncQueue:
         self._persist()
         return True
 
+    def items(self) -> list[QueueItem]:
+        """Return all durable entries for restart recovery."""
+        return list(self._items.values())
+
     def pending(self) -> list[QueueItem]:
         return [x for x in self._items.values() if x.state in {"PENDING","FAILED"}]
 
