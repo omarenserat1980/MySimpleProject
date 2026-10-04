@@ -1,63 +1,207 @@
+const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
+const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    const allowedOrigin = String(env.BRAIN_ALLOWED_ORIGIN || "https://omarenserat1980.github.io");
+    const allowedOrigin = String(env.BRAIN_ALLOWED_ORIGIN || DEFAULT_ALLOWED_ORIGIN);
     const requestOrigin = request.headers.get("Origin") || "";
+
     if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: corsHeaders(requestOrigin, allowedOrigin),
-      });
+      return new Response(null, { status: 204, headers: corsHeaders(requestOrigin, allowedOrigin) });
     }
 
     if (url.pathname === "/health") {
-      return json({ ok: true, service: "brain-cloud-api", mode: "adapter" });
+      const db = Boolean(env.BRAIN_DB);
+      return json({ ok: true, service: "brain-cloud-api", mode: "commercial-edge", d1: db ? "CONFIGURED" : "NOT_CONFIGURED" }, 200, requestOrigin, allowedOrigin);
     }
 
-    if (url.pathname === "/api/payments/paytabs/callback") {
-      // PayTabs callback must be handled by the protected BRAIN origin.
-      // Do not accept or mark payments verified in the public proxy itself.
-      return json({ ok: false, error: "PAYTABS_CALLBACK_ORIGIN_REQUIRED" }, 503, requestOrigin, allowedOrigin);
+    if (url.pathname === "/api/payments/paytabs/create" && request.method === "POST") {
+      return createPayTabsPayment(request, env, url, requestOrigin, allowedOrigin);
+    }
+
+    if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
+      return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
 
     const origin = String(env.BRAIN_ORIGIN || "").replace(/\/$/, "");
     if (!origin || origin.includes("REPLACE_WITH_")) {
-      return json({ ok: false, error: "BRAIN_ORIGIN_NOT_CONFIGURED" }, 503);
+      return json({ ok: false, error: "BRAIN_ORIGIN_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
     }
 
     const target = new URL(url.pathname + url.search, origin);
     const headers = new Headers(request.headers);
     headers.delete("host");
 
-    let upstream;
     try {
-      upstream = await fetch(target, {
-      method: request.method,
-      headers,
-      body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
-      redirect: "manual",
+      const upstream = await fetch(target, {
+        method: request.method,
+        headers,
+        body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+        redirect: "manual",
       });
-    } catch (error) {
+      const out = new Response(upstream.body, upstream);
+      for (const [k, v] of Object.entries(corsHeaders(requestOrigin, allowedOrigin))) out.headers.set(k, v);
+      return out;
+    } catch {
       return json({ ok: false, error: "UPSTREAM_UNAVAILABLE" }, 502, requestOrigin, allowedOrigin);
     }
-
-    const out = new Response(upstream.body, upstream);
-    for (const [k, v] of Object.entries(corsHeaders(requestOrigin, allowedOrigin))) out.headers.set(k, v);
-    return out;
   },
 };
 
-function corsHeaders(requestOrigin = "", allowedOrigin = "https://omarenserat1980.github.io") {
-  const allowOrigin = requestOrigin === allowedOrigin ? allowedOrigin : allowedOrigin;
+async function createPayTabsPayment(request, env, url, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const serverKey = String(env.PAYTABS_SERVER_KEY || "");
+  const profileId = String(env.PAYTABS_PROFILE_ID || "");
+  if (!serverKey || !profileId) return json({ ok: false, error: "PAYTABS_SECRETS_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+
+  const orderId = String(body.order_id || "").trim();
+  if (!orderId) return json({ ok: false, error: "ORDER_ID_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+
+  const order = await env.BRAIN_DB.prepare(
+    "SELECT order_id, service, plan, amount, currency, state FROM orders WHERE order_id = ?"
+  ).bind(orderId).first();
+
+  if (!order) return json({ ok: false, error: "ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (String(order.state) === "PAYMENT_VERIFIED") return json({ ok: false, error: "ORDER_ALREADY_PAID" }, 409, requestOrigin, allowedOrigin);
+  if (Number(order.amount) <= 0) return json({ ok: false, error: "INVALID_ORDER_AMOUNT" }, 409, requestOrigin, allowedOrigin);
+
+  const existing = await env.BRAIN_DB.prepare(
+    "SELECT tran_ref, state FROM payments WHERE order_id = ? AND provider = 'paytabs' ORDER BY created_at DESC LIMIT 1"
+  ).bind(orderId).first();
+  if (existing && existing.state === "PAYMENT_VERIFIED") return json({ ok: false, error: "PAYMENT_ALREADY_VERIFIED" }, 409, requestOrigin, allowedOrigin);
+
+  const callback = url.origin + "/api/payments/paytabs/callback";
+  const returnUrl = String(env.BRAIN_RETURN_URL || allowedOrigin);
+
+  const payload = {
+    profile_id: Number(profileId),
+    tran_type: "sale",
+    tran_class: "ecom",
+    cart_id: order.order_id,
+    cart_currency: order.currency,
+    cart_amount: Number(order.amount),
+    cart_description: `BRAIN ${order.service} - ${order.plan}`,
+    callback,
+    return: returnUrl,
+  };
+
+  const response = await fetch(PAYTABS_BASE_URL + "/payment/request", {
+    method: "POST",
+    headers: { Authorization: serverKey, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.tran_ref) {
+    return json({ ok: false, error: "PAYTABS_PAYMENT_REQUEST_FAILED", provider_status: response.status }, 502, requestOrigin, allowedOrigin);
+  }
+
+  await env.BRAIN_DB.prepare(
+    "INSERT OR REPLACE INTO payments (tran_ref, order_id, amount, currency, provider, state, raw_evidence) VALUES (?, ?, ?, ?, 'paytabs', 'PAYMENT_PENDING', ?)"
+  ).bind(String(result.tran_ref), order.order_id, Number(order.amount), order.currency, JSON.stringify({
+    type: "PAYMENT_REQUEST",
+    tran_ref: result.tran_ref,
+    redirect_url: result.redirect_url || null,
+    created_at: new Date().toISOString(),
+  })).run();
+
+  await env.BRAIN_DB.prepare(
+    "UPDATE orders SET state = 'PAYMENT_PENDING' WHERE order_id = ?"
+  ).bind(order.order_id).run();
+
+  return json({
+    ok: true,
+    state: "PAYMENT_PENDING",
+    order_id: order.order_id,
+    tran_ref: result.tran_ref,
+    redirect_url: result.redirect_url || null,
+  }, 200, requestOrigin, allowedOrigin);
+}
+
+async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const serverKey = String(env.PAYTABS_SERVER_KEY || "");
+  if (!serverKey) return json({ ok: false, error: "PAYTABS_SERVER_KEY_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+
+  const raw = await request.arrayBuffer();
+  const signature = String(request.headers.get("Signature") || "").trim().toLowerCase();
+  if (!signature) return json({ ok: false, error: "SIGNATURE_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+
+  const expected = await hmacSha256Hex(raw, serverKey);
+  if (!timingSafeEqual(expected, signature)) return json({ ok: false, error: "INVALID_SIGNATURE" }, 401, requestOrigin, allowedOrigin);
+
+  let payload;
+  try { payload = JSON.parse(new TextDecoder().decode(raw)); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+
+  const orderId = String(payload.cart_id || "");
+  const tranRef = String(payload.tran_ref || "");
+  const amount = Number(payload.cart_amount);
+  const currency = String(payload.cart_currency || "");
+  const status = String((payload.payment_result || {}).response_status || "");
+
+  if (!orderId || !tranRef) return json({ ok: false, error: "PAYMENT_IDENTIFIERS_MISSING" }, 400, requestOrigin, allowedOrigin);
+
+  const payment = await env.BRAIN_DB.prepare(
+    "SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paytabs'"
+  ).bind(tranRef, orderId).first();
+
+  if (!payment) return json({ ok: false, error: "PAYMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (Number(payment.amount) !== amount || String(payment.currency) !== currency) {
+    return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+
+  const eventId = await sha256Hex(new TextEncoder().encode(tranRef + ":" + new TextDecoder().decode(raw)));
+  const evidence = JSON.stringify({ provider: "paytabs", tran_ref: tranRef, order_id: orderId, received_at: new Date().toISOString(), payload });
+
+  await env.BRAIN_DB.prepare(
+    "INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, ?, ?)"
+  ).bind(eventId, orderId, tranRef, status === "A" ? "PAYMENT_VERIFIED" : "PAYMENT_REJECTED", evidence).run();
+
+  if (status !== "A") {
+    await env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_FAILED', raw_evidence = ? WHERE tran_ref = ?")
+      .bind(evidence, tranRef).run();
+    return json({ ok: true, state: "PAYMENT_FAILED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
+  }
+
+  await env.BRAIN_DB.batch([
+    env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_VERIFIED', verified_at = CURRENT_TIMESTAMP, raw_evidence = ? WHERE tran_ref = ?").bind(evidence, tranRef),
+    env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
+  ]);
+
+  return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
+}
+
+async function hmacSha256Hex(data, secret) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, data);
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(data) {
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function corsHeaders(requestOrigin = "", allowedOrigin = DEFAULT_ALLOWED_ORIGIN) {
   return {
-    "access-control-allow-origin": allowOrigin,
+    "access-control-allow-origin": allowedOrigin,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "Content-Type, Authorization, X-V12-Agent-Key",
+    "access-control-allow-headers": "Content-Type, Authorization, X-V12-Agent-Key, Signature",
   };
 }
 
-function json(value, status = 200, requestOrigin = "", allowedOrigin = "https://omarenserat1980.github.io") {
+function json(value, status = 200, requestOrigin = "", allowedOrigin = DEFAULT_ALLOWED_ORIGIN) {
   return new Response(JSON.stringify(value), {
     status,
     headers: { "content-type": "application/json; charset=utf-8", ...corsHeaders(requestOrigin, allowedOrigin) },
