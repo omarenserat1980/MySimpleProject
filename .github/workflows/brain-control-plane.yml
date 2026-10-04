@@ -1,0 +1,40 @@
+name: Brain Control Plane
+
+on:
+  push:
+    paths:
+      - "brain_v12/brain/control_plane.py"
+      - "brain_v12/tests/test_control_plane.py"
+      - ".github/workflows/brain-control-plane.yml"
+  pull_request:
+    paths:
+      - "brain_v12/brain/control_plane.py"
+      - "brain_v12/tests/test_control_plane.py"
+      - ".github/workflows/brain-control-plane.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m compileall -q brain_v12/brain brain_v12/tests
+      - name: Control Plane contract
+        run: python -m unittest brain_v12.tests.test_control_plane -v
+      - name: Evidence
+        run: |
+          mkdir -p brain-artifacts
+          printf '%s\n' "BRAIN_CONTROL_PLANE_TESTED" > brain-artifacts/CONTROL_PLANE_VERIFIED.txt
+          test -s brain-artifacts/CONTROL_PLANE_VERIFIED.txt
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-control-plane-verified
+          path: brain-artifacts/CONTROL_PLANE_VERIFIED.txt
