@@ -7,9 +7,14 @@ on:
       - "brain_v12/brain/sync_runtime.py"
       - "brain_v12/brain/task_sync_adapter.py"
       - "brain_v12/brain/device_sync_adapter.py"
+      - "brain_v12/brain/device_bridge.py"
+      - "brain_v12/brain/device_sync_adapter.py"
+      - "brain_v12/brain/device_bridge.py"
       - "brain_v12/tests/test_sync_engine.py"
       - "brain_v12/tests/test_sync_runtime.py"
       - "brain_v12/tests/test_task_sync_adapter.py"
+      - "brain_v12/tests/test_device_sync_integration.py"
+      - "brain_v12/tests/test_device_sync_integration.py"
       - "brain_v12/tests/test_device_sync_integration.py"
       - "brain_v12/self_healing/self_test_matrix.py"
       - ".github/workflows/brain-sync-runtime-tests.yml"
@@ -39,7 +44,7 @@ jobs:
           python-version: "3.11"
       - name: Compile synchronization modules
         run: |
-          python -m py_compile brain_v12/brain/sync_engine.py brain_v12/brain/sync_runtime.py brain_v12/brain/task_sync_adapter.py brain_v12/brain/device_sync_adapter.py brain_v12/tests/test_sync_engine.py brain_v12/tests/test_sync_runtime.py brain_v12/tests/test_task_sync_adapter.py
+          python -m py_compile brain_v12/brain/sync_engine.py brain_v12/brain/sync_runtime.py brain_v12/brain/task_sync_adapter.py brain_v12/brain/device_sync_adapter.py brain_v12/tests/test_sync_engine.py brain_v12/tests/test_sync_runtime.py brain_v12/tests/test_task_sync_adapter.py brain_v12/tests/test_device_sync_integration.py
       - name: Run synchronization tests
         run: |
           python -m unittest brain_v12.tests.test_sync_engine brain_v12.tests.test_sync_runtime brain_v12.tests.test_task_sync_adapter brain_v12.tests.test_device_sync_integration -v
