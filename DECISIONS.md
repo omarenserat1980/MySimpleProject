@@ -43,3 +43,10 @@ Decision: Existing legacy requirements and prior architectural ideas should be r
 Decision: Use pytest for the Brain test suite in GitHub Actions.
 
 Reason: The repository tests use pytest-style test functions; unittest discovery does not reliably collect them. CI must execute the actual test files and fail when the suite cannot run.
+
+## D-011 — Runtime synchronization is explicit and convergent
+Decision: Brain runtime replicas use stable record identity, monotonic revisions, idempotent event IDs, optimistic concurrency, durable tombstones, replayable events, and deterministic state digests.
+
+Reason: Cloud, device/emulator, and worker state must converge without silent overwrites or duplicate side effects.
+
+Constraint: Runtime synchronization is separate from Git source synchronization; external side effects remain behind existing authorization gates.
