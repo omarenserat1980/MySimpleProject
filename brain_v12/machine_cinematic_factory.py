@@ -124,6 +124,7 @@ def build_film(title="BRAIN — فيلم سينمائي طويل 120 دقيقة"
         raise RuntimeError(f"MASTER_QC_FAILED:{final_qc}")
     manifest["master_qc"]=final_qc
     (OUT/"manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+    (OUT/"VERIFIED_COMPLETED").write_text("VERIFIED_COMPLETED\\n",encoding="utf-8")
     return manifest
 
 if __name__=="__main__":
