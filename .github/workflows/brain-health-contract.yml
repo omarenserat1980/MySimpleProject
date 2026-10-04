@@ -73,3 +73,5 @@ jobs:
           assert "/v1/feedback/{feedback_id}/transition" in paths
           print("API routes verified")
           PY
+
+# Contract trigger: ensure health verification follows API validation fixes.
