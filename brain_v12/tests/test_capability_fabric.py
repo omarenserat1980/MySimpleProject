@@ -9,7 +9,6 @@ from brain_v12.brain.execution_verifier import ExecutionVerifier
 class CapabilityFabricTests(unittest.TestCase):
     def test_fallback_requires_verified_artifact(self):
         fabric = CapabilityFabric()
-        fabric.verifier.register("media.render", ExecutionVerifier.verify_file)
         fabric.register(ExecutorSpec("local", "media.render", priority=10, cost_class="FREE"))
         fabric.register(ExecutorSpec("paid", "media.render", priority=30, cost_class="PAID"))
         calls = []
@@ -47,7 +46,6 @@ class CapabilityFabricTests(unittest.TestCase):
 
     def test_unverified_media_output_is_rejected(self):
         fabric = CapabilityFabric()
-        fabric.verifier.register("media.render", ExecutionVerifier.verify_file)
         fabric.register(ExecutorSpec("local", "media.render"))
         result = fabric.execute("media.render", lambda _: "/missing/output.mp4")
         self.assertEqual(result["status"], "FAILED")
