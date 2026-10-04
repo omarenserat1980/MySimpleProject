@@ -44,6 +44,10 @@ export default {
       return completeJob(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/deliveries/confirm" && request.method === "POST") {
+      return confirmDelivery(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -409,6 +413,29 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+  const deliveryId = String(body.delivery_id || "").trim();
+  if (!deliveryId) return json({ ok: false, error: "DELIVERY_ID_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const delivery = await env.BRAIN_DB.prepare(
+    "SELECT d.delivery_id, d.order_id, d.state FROM deliveries d JOIN orders o ON o.order_id = d.order_id WHERE d.delivery_id = ? AND o.client_email = ?"
+  ).bind(deliveryId, client.email).first();
+  if (!delivery) return json({ ok: false, error: "DELIVERY_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (delivery.state !== "READY") return json({ ok: false, error: "DELIVERY_NOT_READY" }, 409, requestOrigin, allowedOrigin);
+  await env.BRAIN_DB.prepare(
+    "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
+  ).bind(deliveryId).run();
+  await env.BRAIN_DB.prepare(
+    "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
+  ).bind(delivery.order_id).run();
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email });
+  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
+}
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
