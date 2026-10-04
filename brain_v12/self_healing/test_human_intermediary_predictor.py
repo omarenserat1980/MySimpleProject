@@ -23,7 +23,7 @@ class HumanIntermediaryPredictorTests(unittest.TestCase):
             p.STATE_DIR = Path(td)
             state = {"schema": "brain-human-intermediary-state/v1", "max_phase": 2, "max_step": 4}
             p.STATE_FILE.write_text(json.dumps(state), encoding="utf-8")
-            out = p.persist_monotonic(state, 1, 0, {"prediction": ["x"]})
+            out = p.persist_monotonic(state, 1, 0, {"predicted_user_behavior": {"prediction": ["x"]}})
             self.assertEqual(out["max_phase"], 2)
             self.assertEqual(out["max_step"], 4)
             self.assertTrue(out["regression_blocked"])
