@@ -14,6 +14,10 @@ on:
       - "docs/movies.html"
       - "docs/catalog.json"
       - "docs/studio/**"
+      - "docs/film-zero-line.html"
+      - "docs/film-last-signal.html"
+      - "docs/film-room-13.html"
+      - "docs/films/**"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
 permissions:
