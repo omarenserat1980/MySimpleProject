@@ -4,6 +4,7 @@ from dataclasses import dataclass,asdict
 from datetime import datetime,timezone
 from pathlib import Path
 import json,os,subprocess,sys,tempfile
+from cloud.company_launch_readiness import classify
 
 @dataclass
 class Gate:
@@ -16,7 +17,9 @@ class ReleaseGate:
  def run(self):
   gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._quran_layer(),self._cinema_truth(),self._governance()]
   all_required=all(g.passed for g in gates if g.required)
-  result={"status":"RELEASE_ALLOWED" if all_required else "RELEASE_BLOCKED","evaluated_at":datetime.now(timezone.utc).isoformat(),"gates":[asdict(g) for g in gates],"evidence_contract":{"all_required_gates_passed":all_required,"release_requires_runtime_evidence":True}}
+  status="RELEASE_ALLOWED" if all_required else "RELEASE_BLOCKED"
+  readiness=classify({"status":status}, None)
+  result={"status":status,"evaluated_at":datetime.now(timezone.utc).isoformat(),"gates":[asdict(g) for g in gates],"launch_readiness":asdict(readiness),"evidence_contract":{"all_required_gates_passed":all_required,"release_requires_runtime_evidence":True}}
   self._atomic(result); return result
 
  def _compile(self):
