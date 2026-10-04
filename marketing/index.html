@@ -41,8 +41,25 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:10px 4
 </div></section>
 
 <section class="card interactive" id="request">
-<div class="service-list"><h2>جرّب اختيار الخدمة</h2><button class="active" onclick="showService(0,this)">📣 استراتيجية التسويق</button><button onclick="showService(1,this)">✍️ صناعة المحتوى</button><button onclick="showService(2,this)">📊 تقارير الأداء</button><button onclick="showService(3,this)">🚀 تجهيز الحملات</button></div>
-<div class="detail" id="detail"><h3>استراتيجية التسويق</h3><p class="muted">نحوّل هدفك التجاري إلى رسالة وجمهور وقنوات وأولويات قابلة للتنفيذ.</p><ul><li>تحليل العرض والجمهور</li><li>تحديد الرسالة والقنوات</li><li>خطة أولويات واضحة</li></ul></div>
+<div class="service-list">
+<h2>اطلب الخدمة فعليًا</h2>
+<p class="muted">أرسل طلبًا حقيقيًا إلى صندوق طلبات BRAIN. لا يتم تحصيل أي مبلغ هنا حتى يتم ربط مزود دفع معتمد.</p>
+<button class="active" type="button" onclick="showService(0,this)">📣 استراتيجية التسويق</button>
+<button type="button" onclick="showService(1,this)">✍️ صناعة المحتوى</button>
+<button type="button" onclick="showService(2,this)">📊 تقارير الأداء</button>
+<button type="button" onclick="showService(3,this)">🚀 تجهيز الحملات</button>
+</div>
+<div class="detail">
+<form id="orderForm" style="display:grid;gap:10px">
+<label>الاسم<input id="customerName" required minlength="2" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px" placeholder="اسمك"></label>
+<label>البريد الإلكتروني<input id="customerEmail" type="email" required style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px" placeholder="you@example.com"></label>
+<label>الخدمة<select id="customerService" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"><option>استراتيجية التسويق</option><option>صناعة المحتوى</option><option>تقارير الأداء</option><option>تجهيز الحملات</option></select></label>
+<label>الباقة<select id="customerPlan" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px"><option>Starter — $49</option><option>Growth — $149</option><option>Campaign — $299</option></select></label>
+<label>وصف الطلب<textarea id="customerBrief" required minlength="10" rows="4" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px" placeholder="ما الذي تريد أن ننجزه؟"></textarea></label>
+<button class="btn primary" type="submit">إنشاء الطلب وإرساله</button>
+<div id="orderStatus" class="proof" aria-live="polite">الحالة: لم يُرسل أي طلب بعد.</div>
+</form>
+</div>
 </section>
 
 <section id="process"><div class="section-title"><h2>من الطلب إلى الدليل</h2><p>كل مرحلة لها حالة ونتيجة قابلة للتحقق.</p></div><div class="process">
@@ -61,6 +78,16 @@ const data=[
 ];
 function showService(i,btn){document.querySelectorAll('.service-list button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');let d=data[i];document.getElementById('detail').innerHTML='<h3>'+d[0]+'</h3><p class="muted">'+d[1]+'</p><ul>'+d[2].map(x=>'<li>'+x+'</li>').join('')+'</ul>'}
 function selectPlan(plan){document.getElementById('request').scrollIntoView({behavior:'smooth'});setTimeout(()=>alert('تم اختيار '+plan+' — الدفع غير مفعّل بعد، لذلك لم يتم إنشاء طلب أو تحصيل أي مبلغ.'),350)}
+document.getElementById('orderForm').addEventListener('submit',function(e){
+e.preventDefault();
+const name=document.getElementById('customerName').value.trim(),email=document.getElementById('customerEmail').value.trim(),service=document.getElementById('customerService').value,plan=document.getElementById('customerPlan').value,brief=document.getElementById('customerBrief').value.trim();
+if(!name||!email||brief.length<10)return;
+const id='BRAIN-MKT-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(100000+Math.random()*900000);
+const subject=encodeURIComponent('طلب خدمة '+id+' — '+plan);
+const body=encodeURIComponent('Order ID: '+id+'\nالاسم: '+name+'\nالبريد: '+email+'\nالخدمة: '+service+'\nالباقة: '+plan+'\nالوصف: '+brief+'\nالحالة: NEW / PAYMENT_PENDING');
+document.getElementById('orderStatus').innerHTML='<strong>تم إنشاء '+id+'</strong><br>سيتم فتح بريدك لإرسال الطلب إلى صندوق BRAIN. لم يتم تحصيل أي مبلغ.';
+window.location.href='mailto:brain-marketing@agentmail.to?subject='+subject+'&body='+body;
+});
 </script>
 </body>
 </html>
