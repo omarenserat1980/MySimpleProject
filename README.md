@@ -39,3 +39,14 @@ Perceive → Understand → Memory → Goal → Plan → Decide → Act → Obse
 - POST /api/mining/compare
 
 **حدود مهمة:** النتائج ليست بيانات سوق حية، ولا تُسجل كدخل محقق. أي ربح فعلي يبقى صفرًا حتى يوجد دليل دفع قابل للمطابقة في نظام الإيرادات.
+
+## GitHub Cloud verification
+
+يستخدم Brain الآن مسار تحقق موحدًا:
+
+**Supervisor → Reusable Brain Cloud → Tests → VerificationGate → Evidence**
+
+- نجاح التنفيذ (`ACTION_VERIFIED`) لا يساوي إكمال الهدف (`OBJECTIVE_VERIFIED`).
+- لا يُسمح لـBrain بإعلان الإكمال الموضوعي دون دليل غير فارغ وشرط تحقق صريح.
+- `brain-github-supervisor.yml` يستدعي `brain-github-cloud.yml` مباشرة كـReusable Workflow.
+- Evidence الناتج يجب أن يحتوي على عقدة التحقق وسجل المهمة قبل اعتباره صالحًا.
