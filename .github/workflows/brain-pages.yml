@@ -43,15 +43,14 @@ jobs:
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
           cp games-store.html _site/games-store.html
-          cp games-store.html _site/games-store.html
-          mkdir -p _site/brain_v12/web _site/marketing _site/customer-portal
+          mkdir -p _site/brain_v12/web _site/brain_v12/film_hub _site/marketing _site/customer-portal _site/studio
           cp -a brain_v12/web/. _site/brain_v12/web/
-          mkdir -p _site/brain_v12/film_hub
           cp -a brain_v12/film_hub/. _site/brain_v12/film_hub/
           cp -a marketing/. _site/marketing/
           cp -a customer-portal/. _site/customer-portal/
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
+          cp -a docs/studio/. _site/studio/
           cp docs/cinema.html _site/cinema.html
           cp docs/movies.html _site/movies.html
           cp docs/catalog.json _site/catalog.json
@@ -63,62 +62,60 @@ jobs:
           if origin and not origin.startswith("https://"):
               raise SystemExit("BRAIN_API_ORIGIN must use HTTPS")
           Path("_site/brain-app-v2/config.json").write_text(
-              json.dumps({"api_base": origin}, ensure_ascii=False),
-              encoding="utf-8",
-          )
+              json.dumps({"api_base": origin}, ensure_ascii=False), encoding="utf-8")
           Path("_site/brain-chat/config.js").write_text(
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
-              encoding="utf-8",
-          )
-          if not Path("_site/platform.html").is_file():
-              raise SystemExit("Unified Brain platform entry point is missing from artifact")
-          if not Path("_site/games-store.html").is_file():
-              raise SystemExit("BRAIN Games storefront is missing from Pages artifact")
-          if not Path("_site/index.html").is_file():
-              raise SystemExit("Pages root entry point is missing from artifact")
-          if not Path("_site/movies.html").is_file():
-              raise SystemExit("Movies catalog entry point is missing from Pages artifact")
-          if not Path("_site/cinema.html").is_file():
-              raise SystemExit("Cinema entry point is missing from Pages artifact")
-          if not Path("_site/brain-chat/index.html").is_file():
-              raise SystemExit("Brain Chat entry point is missing from Pages artifact")
-          if not Path("_site/brain-chat/config.js").is_file():
-              raise SystemExit("Brain Chat runtime configuration was not generated")
-          if "\\n" in Path("_site/brain-chat/config.js").read_text(encoding="utf-8"):
-              raise SystemExit("Brain Chat config contains a literal backslash-n")
-          # Verify every local platform link resolves inside the Pages artifact.
+              encoding="utf-8")
+          required = [
+              "_site/index.html", "_site/platform.html", "_site/games-store.html",
+              "_site/movies.html", "_site/cinema.html",
+              "_site/brain-chat/index.html", "_site/brain-chat/config.js",
+              "_site/brain-app-v2/config.json", "_site/studio/index.html",
+              "_site/studio/storyboard.html", "_site/marketing/index.html",
+              "_site/customer-portal/index.html", "_site/brain_v12/web/index.html",
+              "_site/brain_v12/film_hub/web/index.html",
+          ]
+          missing = [p for p in required if not Path(p).is_file()]
+          if missing:
+              raise SystemExit("Missing Pages artifact files: " + ", ".join(missing))
           from html.parser import HTMLParser
           class LinkParser(HTMLParser):
-              def __init__(self): super().__init__(); self.hrefs=[]
+              def __init__(self):
+                  super().__init__(); self.hrefs=[]
               def handle_starttag(self, tag, attrs):
                   if tag == "a":
                       href = dict(attrs).get("href", "")
-                      if href and not href.startswith(("#","http://","https://","mailto:")): self.hrefs.append(href.split("#",1)[0].split("?",1)[0])
-          parser=LinkParser(); parser.feed(Path("_site/platform.html").read_text(encoding="utf-8"))
+                      if href and not href.startswith(("#","http://","https://","mailto:")):
+                          self.hrefs.append(href.split("#",1)[0].split("?",1)[0])
+          parser = LinkParser()
+          parser.feed(Path("_site/platform.html").read_text(encoding="utf-8"))
+          root = Path("_site").resolve()
           for href in parser.hrefs:
-              target=(Path("_site")/href.lstrip("/")).resolve()
-              root=Path("_site").resolve()
+              target = (root / href.lstrip("/")).resolve()
               if not str(target).startswith(str(root)):
                   raise SystemExit(f"Platform link escapes Pages artifact: {href}")
               if not target.is_file() and not (target.is_dir() and (target/"index.html").is_file()):
                   raise SystemExit(f"Broken platform link: {href}")
-          print(f"Platform link validation: OK ({len(parser.hrefs)} local links)")
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
           if "api_base" not in config:
               raise SystemExit("Brain app config is missing api_base")
+          js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
+          if "\\n" in js or not js.startswith("window.BRAIN_API_BASE = "):
+              raise SystemExit("Brain Chat config is malformed")
+          print(f"Platform link validation: OK ({len(parser.hrefs)} local links)")
           print("BRAIN_API_ORIGIN_STATE=" + ("configured" if origin else "not configured"))
           summary = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary:
               with open(summary, "a", encoding="utf-8") as stream:
                   stream.write("## Brain Pages build\n")
-                  stream.write("- Brain API origin: " + ("configured" if origin else "not configured; the deployed UI will show the backend as disconnected until an API origin is supplied") + "\n")
-                  stream.write("- Brain Chat artifact: present\n")
+                  stream.write("- Brain API origin: " + ("configured" if origin else "not configured; deployed UI remains backend-disconnected until an API origin is supplied") + "\n")
+                  stream.write(f"- Local platform links validated: {len(parser.hrefs)}\n")
+                  stream.write("- Studio artifact: present\n")
           PY
       - name: Validate Pages payload
         run: |
           test -f _site/index.html
           test -f _site/platform.html
-          test -f _site/games-store.html
           test -f _site/games-store.html
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
@@ -127,7 +124,6 @@ jobs:
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
-          cp -r docs/studio _site/studio
           test -f _site/studio/storyboard.html
           test -f _site/studio/index.html
           test -f _site/studio/app.js
@@ -145,7 +141,6 @@ jobs:
           assert js.startswith("window.BRAIN_API_BASE = ")
           print("Pages payload validation: OK")
           PY
-      # Unique naming avoids stale-artifact collisions when a workflow attempt is rerun.
       - uses: actions/upload-pages-artifact@v4
         with:
           name: brain-pages-${{ github.run_id }}-${{ github.run_attempt }}
