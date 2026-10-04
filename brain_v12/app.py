@@ -24,6 +24,7 @@ from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
+from .brain.chat_session_store import ChatSessionStore
 from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.model_router import ModelRouter
@@ -65,6 +66,7 @@ from .cloud_bootstrap import bootstrap_status
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
+chat_store=ChatSessionStore(os.getenv("BRAIN_CHAT_DB",os.path.join(ROOT,"brain_chat.db"))); chat_store.init()
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
@@ -129,8 +131,8 @@ from .brain.economic_reconciliation import router as economic_reconciliation_rou
 from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
-app.include_router(brain_chat_router(brain_ai, store))
-app.include_router(brain_stream_router(brain_ai, store))
+app.include_router(brain_chat_router(brain_ai, chat_store))
+app.include_router(brain_stream_router(brain_ai, chat_store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
