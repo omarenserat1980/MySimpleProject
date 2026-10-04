@@ -67,3 +67,8 @@ assert.match(worker, /listClientJobs/);
 assert.match(worker, /state, attempt/);
 assert.match(jobsMigration, /CREATE TABLE IF NOT EXISTS service_jobs/);
 assert.match(jobsMigration, /attempt INTEGER/);
+
+assert.match(worker, /claimNextJob/);
+assert.match(worker, /CONTROL_AUTH_REQUIRED/);
+assert.match(worker, /attempt < 3/);
+assert.match(worker, /state = 'RUNNING'/);
