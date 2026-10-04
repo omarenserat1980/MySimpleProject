@@ -29,6 +29,8 @@ from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.model_router import ModelRouter
 from .brain.model_providers import configured_model_providers
+from .ai_fabric import AIFabric, FabricPolicy
+from .ai_fabric.api import router as ai_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
@@ -76,6 +78,16 @@ model_router=ModelRouter()
 for _provider in configured_model_providers():
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
 brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
+fabric=AIFabric(FabricPolicy(
+    free_first=os.getenv("BRAIN_AI_FREE_FIRST","1")=="1",
+    max_attempts=int(os.getenv("BRAIN_AI_MAX_ATTEMPTS","3")),
+    require_verification=os.getenv("BRAIN_AI_REQUIRE_VERIFICATION","1")=="1",
+    allow_external_side_effects=False,
+))
+for _name, _provider in model_router.providers.items():
+    fabric.register(_name, "model", _provider.handler, set(_provider.tasks), _provider.priority, free=_name in {"ollama","local","qwen","llama","mistral"})
+for _name, _tool in brain_ai.tools.items():
+    fabric.register(_name, "tool", lambda payload, _t=_tool: brain_ai.execute_tool(_t.name, payload, approved=False), {"*"}, 100, True)
 chat_session_store=ChatSessionStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
 chat_session_store.init()
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
@@ -139,6 +151,7 @@ from .brain.economic_reconciliation import router as economic_reconciliation_rou
 from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
+app.include_router(ai_fabric_router(fabric))
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
