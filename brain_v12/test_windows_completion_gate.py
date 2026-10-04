@@ -9,6 +9,7 @@ def complete():
         "network":{"adapter_up":True,"internet_443":True},
         "storage":{"filesystem":"NTFS","size_bytes":64*1024*1024*1024},
         "guest":{"os":"Windows Server 2025","architecture":"x86_64","boot_verified":True},
+        "boot_source":"windows-installed-disk",
     }
 
 class WindowsCompletionGateTests(unittest.TestCase):
@@ -21,6 +22,12 @@ class WindowsCompletionGateTests(unittest.TestCase):
         self.assertIn("QEMU_EXIT_IS_NOT_BOOT_PROOF",r["reasons"])
     def test_accepts_complete_evidence(self):
         self.assertEqual(WindowsCompletionGate().verify(complete())["status"],"WINDOWS_BOOT_VERIFIED")
+    def test_refuses_iso_boot(self):
+        e=complete()
+        e["boot_source"]="iso"
+        r=WindowsCompletionGate().verify(e)
+        self.assertFalse(r["verified"])
+        self.assertIn("BOOT_SOURCE_NOT_INSTALLED_DISK",r["reasons"])
     def test_refuses_fake_network_storage(self):
         e=complete()
         e["network"]["adapter_up"]=False
