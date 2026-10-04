@@ -24,3 +24,8 @@ console.log("COMMERCIAL_WORKER_STATIC_TEST=PASS");
 console.log("PAYMENT_VERIFICATION_GATES=PASS");
 console.log("D1_SCHEMA_GATES=PASS");
 console.log("NO_LIVE_SECRET_USED=TRUE");
+
+assert.match(worker, /requireClient/);
+assert.match(worker, /AUTH_REQUIRED/);
+assert.match(worker, /ORDER_ACCESS_DENIED/);
+assert.match(schema, /client_email/);
