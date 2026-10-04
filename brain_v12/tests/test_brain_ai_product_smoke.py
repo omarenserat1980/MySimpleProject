@@ -11,6 +11,7 @@ class BrainProductSmokeTest(unittest.TestCase):
         root = Path(cls.tmp.name)
         os.environ.update({
             "BRAIN_DB": str(root / "brain.db"),
+            "BRAIN_CHAT_DB": str(root / "brain_chat.db"),
             "BRAIN_EVIDENCE_DB": str(root / "evidence.db"),
             "BRAIN_GIT_ROOT": str(root / "brain_git"),
             "BRAIN_CONTROL_KEY": "product-smoke-control",
