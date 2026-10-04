@@ -46,6 +46,7 @@ class BrainExecutionCoordinator:
         if task_id is None:
             return {"ok": False, "error": "TASK_NOT_FOUND"}
 
+        self.task_engine.update(task_id, "RUNNING")
         result = self.control_plane.execute(control_task_id, executor, verifier)
         control = result.get("task", {})
         status = result.get("status", control.get("status"))
