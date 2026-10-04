@@ -42,6 +42,10 @@ jobs:
           mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
+          mkdir -p _site/brain_v12/web _site/marketing _site/customer-portal
+          cp -a brain_v12/web/. _site/brain_v12/web/
+          cp -a marketing/. _site/marketing/
+          cp -a customer-portal/. _site/customer-portal/
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
           cp docs/cinema.html _site/cinema.html
@@ -77,6 +81,23 @@ jobs:
               raise SystemExit("Brain Chat runtime configuration was not generated")
           if "\\n" in Path("_site/brain-chat/config.js").read_text(encoding="utf-8"):
               raise SystemExit("Brain Chat config contains a literal backslash-n")
+          # Verify every local platform link resolves inside the Pages artifact.
+          from html.parser import HTMLParser
+          class LinkParser(HTMLParser):
+              def __init__(self): super().__init__(); self.hrefs=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag == "a":
+                      href = dict(attrs).get("href", "")
+                      if href and not href.startswith(("#","http://","https://","mailto:")): self.hrefs.append(href.split("#",1)[0].split("?",1)[0])
+          parser=LinkParser(); parser.feed(Path("_site/platform.html").read_text(encoding="utf-8"))
+          for href in parser.hrefs:
+              target=(Path("_site")/href.lstrip("/")).resolve()
+              root=Path("_site").resolve()
+              if not str(target).startswith(str(root)):
+                  raise SystemExit(f"Platform link escapes Pages artifact: {href}")
+              if not target.is_file() and not (target.is_dir() and (target/"index.html").is_file()):
+                  raise SystemExit(f"Broken platform link: {href}")
+          print(f"Platform link validation: OK ({len(parser.hrefs)} local links)")
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
           if "api_base" not in config:
               raise SystemExit("Brain app config is missing api_base")
@@ -92,6 +113,9 @@ jobs:
         run: |
           test -f _site/index.html
           test -f _site/platform.html
+          test -f _site/marketing/index.html
+          test -f _site/customer-portal/index.html
+          test -f _site/brain_v12/web/index.html
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
