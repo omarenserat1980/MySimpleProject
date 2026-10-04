@@ -1,0 +1,25 @@
+name: Brain GitHub Execution Bridge
+on:
+  push:
+    paths:
+      - "brain_v12/brain/github_execution_bridge.py"
+      - "brain_v12/tests/test_github_execution_bridge.py"
+      - ".github/workflows/brain-github-execution-bridge.yml"
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m compileall -q brain_v12/brain brain_v12/tests brain_v12
+      - run: python -m unittest brain_v12.tests.test_github_execution_bridge -v
+      - run: |
+          mkdir -p brain-artifacts
+          printf '%s\n' BRAIN_GITHUB_EXECUTION_BRIDGE_VERIFIED > brain-artifacts/GITHUB_EXECUTION_BRIDGE_VERIFIED.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: brain-github-execution-bridge-verified
+          path: brain-artifacts/GITHUB_EXECUTION_BRIDGE_VERIFIED.txt
