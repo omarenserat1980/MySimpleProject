@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from .execution_verifier import ExecutionVerifier, evidence_dict
 from .health_probe import HealthProbeEngine
+from .autonomy_policy import AutonomyPolicy, executor_allowed, rank_key
 from .master_verification_gate import MasterVerificationGate
 from .verification_policies import register_default_verifiers, verify_capability
 
@@ -34,9 +35,11 @@ class CapabilityFabric:
 
     def __init__(self, health: HealthProbeEngine | None = None,
                  verifier: ExecutionVerifier | None = None,
-                 master_gate: MasterVerificationGate | None = None) -> None:
+                 master_gate: MasterVerificationGate | None = None,
+                 autonomy_policy: AutonomyPolicy | None = None) -> None:
         self._executors: dict[str, ExecutorSpec] = {}
         self.health = health or HealthProbeEngine()
+        self.autonomy_policy = autonomy_policy or AutonomyPolicy()
         self.verifier = register_default_verifiers(verifier or ExecutionVerifier())
         self.master_gate = master_gate or MasterVerificationGate(self.verifier)
 
@@ -53,7 +56,7 @@ class CapabilityFabric:
         if require_healthy:
             candidates = [x for x in candidates if self.health.healthy(x.executor_id)]
         return sorted(candidates, key=lambda x: (
-            -self.health.score(x.executor_id), x.priority, x.cost_class, x.executor_id))
+            -self.health.score(x.executor_id), *rank_key(x)))
 
     def plan(self, capability: str, required_permissions: set[str] | None = None,
              require_healthy: bool = True, probe_before_select: bool = False) -> list[ExecutorSpec]:
@@ -61,7 +64,7 @@ class CapabilityFabric:
             self.probe_capability(capability)
         required = required_permissions or set()
         return [x for x in self.discover(capability, require_healthy)
-                if required.issubset(x.permissions)]
+                if executor_allowed(x, policy=self.autonomy_policy, required_permissions=required)]
 
     def probe_capability(self, capability: str) -> list[dict[str, Any]]:
         for spec in self._executors.values():
