@@ -44,6 +44,9 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.sync_engine import BrainSyncStore
+from .brain.sync_runtime import DurableSyncQueue
+from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
 from .brain.film_completion_gate import FilmCompletionGate
@@ -92,6 +95,10 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 device_bridge=DeviceBridge(store)
+
+sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
+sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
+task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
