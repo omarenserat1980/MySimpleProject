@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# Product E2E verification depends on this governed Brain AI facade.
+
 import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
