@@ -6,6 +6,9 @@ on:
     paths:
       - 'brain_v12/brain/**'
       - 'brain_v12/github_control_plane.py'
+      - 'brain_v12/github_runtime_adapter.py'
+      - 'brain_v12/github_actions_operator.py'
+      - 'brain_v12/github_executor.py'
       - 'brain_v12/brain/brain_ai_api.py'
       - 'brain_v12/app.py'
       - 'brain_v12/tests/test_brain_ai*.py'
@@ -23,6 +26,9 @@ on:
     paths:
       - 'brain_v12/brain/**'
       - 'brain_v12/github_control_plane.py'
+      - 'brain_v12/github_runtime_adapter.py'
+      - 'brain_v12/github_actions_operator.py'
+      - 'brain_v12/github_executor.py'
       - 'brain_v12/brain/brain_ai_api.py'
       - 'brain_v12/app.py'
       - 'brain_v12/tests/test_brain_ai*.py'
