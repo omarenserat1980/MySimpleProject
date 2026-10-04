@@ -11,6 +11,7 @@ class MessageIn(BaseModel):
     message: str = Field(min_length=1)
     instructions: str = ""
     approved: bool = False
+    client_message_id: str | None = None
 
 class MemoryIn(BaseModel):
     summary: str = ""
@@ -71,7 +72,7 @@ def router(brain_ai, store=None, context_limit=24):
     def send_message(session_id: str, body: MessageIn):
         if store.get(session_id) is None:
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
-        store.add_message(session_id, "user", body.message)
+        store.add_message(session_id, "user", body.message, client_message_id=body.client_message_id)
         history = store.context_messages(session_id, limit=context_limit)
         memory = store.get_memory(session_id)
         context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
