@@ -67,6 +67,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload public cinema preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-cinema-preview
+          path: docs/assets/last_light_city_preview.mp4
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify web package
         run: |
           test -s docs/index.html
@@ -93,6 +101,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: brain-cinema-preview
+          path: docs/assets
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs
