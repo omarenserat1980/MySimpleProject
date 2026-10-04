@@ -23,24 +23,44 @@ jobs:
         run: |
           python3 scripts/brain_opportunity_discovery.py
 
-      - name: Verify safety gates
+      - name: Verify safety and execution contract
         run: |
           python3 - <<'PY'
           import json
-          p=".brain_state/opportunity_queue.json"
-          x=json.load(open(p))
-          assert x["commercial_truth"] == "DISCOVERY_ONLY_UNTIL_PAYMENT_VERIFIED"
-          assert x["gates"]["financial_side_effects_blocked"] is True
-          assert x["gates"]["payment_verification_required"] is True
-          assert x["gates"]["paid_external_disabled_by_default"] is True
-          assert x["candidates"]
+          from pathlib import Path
+          q=json.load(open(".brain_state/opportunity_queue.json"))
+          t=json.load(open(".brain_state/opportunity_task.json"))
+          assert q["commercial_truth"] == "DISCOVERY_ONLY_UNTIL_PAYMENT_VERIFIED"
+          assert q["gates"]["financial_side_effects_blocked"] is True
+          assert q["gates"]["payment_verification_required"] is True
+          assert q["gates"]["paid_external_disabled_by_default"] is True
+          assert q["candidates"]
+          assert q["selected_next"] == t["opportunity_id"]
+          assert t["state"] == "READY_FOR_EXECUTION"
+          assert t["required_evidence"] == ["scope","execution_result","verification_result"]
+          assert t["payment_state"] == "NOT_VERIFIED"
+          Path(".brain_state/opportunity_execution_contract.json").write_text(
+              json.dumps({
+                  "schema":"brain.opportunity_execution_contract.v1",
+                  "task_id":t["task_id"],
+                  "next_action":"SELECT_AND_EXECUTE_BOUNDED_WORK",
+                  "success_requires":["execution_result","verification_result"],
+                  "commercial_success_requires":["payment_verified"],
+                  "financial_side_effects":"BLOCKED"
+              },ensure_ascii=False,indent=2)+"\n"
+          )
           print("OPPORTUNITY_DISCOVERY=VERIFIED")
-          print("NEXT="+x["selected_next"])
+          print("NEXT="+q["selected_next"])
+          print("TASK="+t["task_id"])
+          print("NEXT_ACTION=SELECT_AND_EXECUTE_BOUNDED_WORK")
           PY
 
       - name: Publish opportunity evidence
         uses: actions/upload-artifact@v4
         with:
           name: brain-opportunity-queue
-          path: .brain_state/opportunity_queue.json
+          path: |
+            .brain_state/opportunity_queue.json
+            .brain_state/opportunity_task.json
+            .brain_state/opportunity_execution_contract.json
           retention-days: 14
