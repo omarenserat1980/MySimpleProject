@@ -1,57 +1,214 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>BRAIN AI — خدماتك الرقمية</title>
-<meta name="description" content="اطلب خدمة رقمية من BRAIN AI وابدأ بتجربة مجانية لمدة 5 أيام.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BRAIN Marketing — تسويق ينطلق من فكرتك</title>
+<meta name="description" content="BRAIN Marketing — خدمات التسويق والمحتوى والحملات والأتمتة. ابدأ تجربة مجانية لمدة 5 أيام بدون خصم تلقائي.">
+<meta name="theme-color" content="#090b16">
 <style>
-:root{--bg:#f6f8fc;--card:#fff;--ink:#172033;--muted:#6b7890;--line:#e2e7f0;--p:#635bff;--g:#18aa98;--danger:#c53b54;--shadow:0 18px 50px #1f2d4614}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#fbfcff,#f3f6fb);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.7}.wrap{max-width:1120px;margin:auto;padding:20px}
-nav{display:flex;justify-content:space-between;align-items:center;padding:10px 0}.brand{font-size:25px;font-weight:900}.brand i{color:var(--p);font-style:normal}.navlinks a{color:var(--muted);text-decoration:none;margin-right:18px}
-.hero{padding:65px 0 35px;text-align:center}.eyebrow{display:inline-block;padding:6px 13px;border-radius:99px;background:#eeedff;color:#5149d8;font-weight:800}.hero h1{font-size:clamp(38px,6vw,66px);line-height:1.1;margin:18px 0 10px}.hero h1 span{color:var(--p)}.hero p{color:var(--muted);font-size:19px;max-width:720px;margin:auto}.btn{border:0;border-radius:12px;padding:12px 19px;font-weight:800;cursor:pointer}.primary{background:var(--p);color:#fff}.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}.actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:24px}
-.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:25px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:var(--shadow)}.trial{border:2px solid var(--g);background:linear-gradient(180deg,#effdfa,#fff)}.featured{border:2px solid #c8c4ff}.price{font-size:32px;font-weight:900}.muted{color:var(--muted)}ul{padding-right:20px}.tag{display:inline-block;background:var(--g);color:white;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800}.full{width:100%;margin-top:12px}
-.panel{margin-top:25px}.auth{max-width:650px;margin:25px auto;display:none}.auth.active{display:block}.tabs{display:flex;gap:8px;margin-bottom:15px}.tabs button{flex:1}.form{display:grid;gap:11px}.form label{font-weight:700}.form input,.form select,.form textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff}.status{padding:12px;border-radius:10px;background:#f3f6fb;color:var(--muted);margin-top:10px}.error{background:#fff0f2;color:var(--danger)}.client{display:none}.client.active{display:block}.dash{display:grid;grid-template-columns:1fr 1fr;gap:16px}.trialbox{display:flex;justify-content:space-between;gap:15px;align-items:center;background:#effdfa;border:1px solid #c4eee8;border-radius:15px;padding:15px}.days{font-size:28px;font-weight:900;color:#148d80}.order{border-top:1px solid var(--line);padding:12px 0}.footer{text-align:center;color:var(--muted);padding:45px 0 20px}
-@media(max-width:900px){.plans{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.plans,.dash{grid-template-columns:1fr}.navlinks{display:none}.hero{padding-top:35px}}
-</style></head>
-<body><div class="wrap">
-<nav><div class="brand">BRAIN<i>•</i> AI</div><div class="navlinks"><a href="#plans">الخطط</a><a href="#services">الخدمات</a><a href="#account">حسابي</a></div></nav>
+:root{
+ --bg:#070914;--bg2:#0d1020;--card:#111526;--card2:#151a2d;--ink:#f7f8ff;--muted:#a5aec4;
+ --line:#252b42;--brand:#7868ff;--brand2:#a89fff;--cyan:#42e8cf;--danger:#ff7187;
+ --shadow:0 24px 80px rgba(0,0,0,.28);--radius:24px;--max:1180px
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(circle at 85% 0%,#201a55 0,transparent 32%),radial-gradient(circle at 10% 20%,#073d43 0,transparent 24%),var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.7}
+a{color:inherit}.wrap{max-width:var(--max);margin:auto;padding:0 22px}
+.topbar{position:sticky;top:0;z-index:20;background:rgba(7,9,20,.76);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.06)}
+nav{height:74px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{font-size:24px;font-weight:950;letter-spacing:-.7px}.brand b{color:var(--brand2)}
+.navlinks{display:flex;align-items:center;gap:25px}.navlinks a{text-decoration:none;color:#b9c0d4;font-weight:700;font-size:14px}.navlinks a:hover{color:#fff}
+.navcta{padding:9px 15px!important;border:1px solid #383d61;border-radius:12px;color:#fff!important}
+.hero{position:relative;padding:86px 0 65px;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:55px;align-items:center}
+.badge{display:inline-flex;gap:8px;align-items:center;border:1px solid #353a62;background:#11152a;color:#c9c4ff;padding:7px 12px;border-radius:99px;font-size:13px;font-weight:850}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 18px var(--cyan)}
+h1{font-size:clamp(43px,6vw,76px);line-height:1.02;letter-spacing:-2.8px;margin:20px 0}
+.gradient{background:linear-gradient(100deg,#fff 25%,#9d91ff 60%,#54e8d4);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:19px;color:#aeb6cb;max-width:690px}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin:28px 0}
+.btn{appearance:none;border:0;border-radius:14px;padding:13px 19px;font:inherit;font-weight:900;cursor:pointer;transition:.2s transform,.2s box-shadow}
+.btn:hover{transform:translateY(-2px)}
+.primary{background:linear-gradient(135deg,#7868ff,#5f50e8);color:#fff;box-shadow:0 14px 35px rgba(112,94,255,.25)}
+.ghost{background:#111526;color:#fff;border:1px solid #2d3450}.wide{min-width:185px}
+.micro{font-size:13px;color:#7f89a2}.micro strong{color:#dce1ef}
+.hero-card{background:linear-gradient(145deg,rgba(28,32,56,.96),rgba(13,16,31,.98));border:1px solid #303654;border-radius:30px;padding:25px;box-shadow:var(--shadow);position:relative}
+.hero-card:before{content:"";position:absolute;inset:-1px;border-radius:30px;background:linear-gradient(135deg,rgba(120,104,255,.35),transparent 50%,rgba(66,232,207,.2));z-index:-1}
+.metric{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--line)}.metric:last-child{border:0}
+.metric small{color:#8e98b0}.metric strong{font-size:20px}
+.spark{height:130px;margin:14px 0;background:linear-gradient(180deg,#191e38,#101426);border:1px solid #252b43;border-radius:18px;position:relative;overflow:hidden}
+.spark svg{width:100%;height:100%}
+.section{padding:72px 0}.section-head{max-width:730px;margin-bottom:30px}.kicker{color:var(--cyan);font-weight:900;font-size:13px;text-transform:uppercase;letter-spacing:1px}.section h2{font-size:clamp(30px,4vw,48px);line-height:1.1;margin:8px 0 12px;letter-spacing:-1.5px}.section-head p{color:var(--muted);font-size:17px}
+.trust-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px;border-top:1px solid #1c2135;border-bottom:1px solid #1c2135}
+.trust-item{padding:14px 18px;text-align:center}.trust-item b{display:block;font-size:15px}.trust-item span{font-size:12px;color:#7f899f}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.service{background:linear-gradient(180deg,#111526,#0e1221);border:1px solid var(--line);border-radius:22px;padding:23px;min-height:220px}.icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#1a1d37;border:1px solid #30365b;font-size:20px}.service h3{margin:17px 0 7px}.service p{color:#8f99af;font-size:14px;margin:0}.service .link{display:inline-block;margin-top:15px;color:#bdb6ff;font-weight:850;font-size:13px}
+.why{display:grid;grid-template-columns:1fr 1fr;gap:18px}.why-card{background:#0e1221;border:1px solid var(--line);border-radius:24px;padding:26px}.check{display:flex;gap:12px;margin:17px 0}.check i{flex:0 0 24px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#153c3b;color:var(--cyan);font-style:normal;font-size:13px}.check b{display:block}.check span{color:#8f99af;font-size:14px}
+.process{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;counter-reset:step}.step{position:relative;padding:24px;background:#101425;border:1px solid var(--line);border-radius:20px}.step:before{counter-increment:step;content:"0" counter(step);font-weight:950;color:#7770ff;font-size:13px}.step h3{margin:10px 0 6px}.step p{margin:0;color:#8d97ae;font-size:14px}
+.plans{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;align-items:stretch}.plan{background:#101425;border:1px solid var(--line);border-radius:24px;padding:25px;display:flex;flex-direction:column}.plan.featured{border:1px solid #7164ff;box-shadow:0 20px 55px rgba(93,79,236,.16);transform:translateY(-5px)}.plan.trial{background:linear-gradient(180deg,#102724,#101425);border-color:#1f766b}.plan-tag{font-size:11px;background:#1d6159;color:#b8fff5;border-radius:99px;padding:4px 9px;display:inline-block;font-weight:900}.plan h3{font-size:20px;margin:17px 0 3px}.price{font-size:35px;font-weight:950}.price small{font-size:12px;color:#818ba1;font-weight:700}.plan p{color:#8f99af;font-size:13px}.plan ul{padding-right:19px;color:#b4bdd0;font-size:13px;min-height:125px}.plan li{margin:7px 0}.plan .btn{margin-top:auto;width:100%}
+.note{margin-top:18px;color:#7e879c;font-size:12px;text-align:center}
+.auth{max-width:680px;margin:0 auto;display:none}.auth.active{display:block}.card{background:#101425;border:1px solid var(--line);border-radius:25px;padding:25px;box-shadow:var(--shadow)}
+.tabs{display:flex;gap:8px;margin-bottom:18px}.tabs button{flex:1}
+.form{display:grid;gap:12px}.form label{font-size:13px;font-weight:800}.form input,.form select,.form textarea{width:100%;margin-top:6px;padding:13px 14px;border:1px solid #2b324b;border-radius:12px;background:#0b0f1d;color:#fff;font:inherit;outline:none}.form input:focus,.form select:focus,.form textarea:focus{border-color:#6f63ed;box-shadow:0 0 0 3px #6f63ed22}.form textarea{min-height:115px;resize:vertical}.status{padding:12px 14px;border-radius:12px;background:#171c30;color:#929db4;margin-top:12px;font-size:13px}.error{background:#351925;color:#ff9aac}
+.client{display:none}.client.active{display:block}.dash{display:grid;grid-template-columns:1fr 1.2fr;gap:16px}.trialbox{display:flex;justify-content:space-between;align-items:center;gap:15px;background:#102725;border:1px solid #1f5c55;border-radius:16px;padding:16px}.days{font-size:27px;font-weight:950;color:var(--cyan)}.order{border-top:1px solid var(--line);padding:13px 0;font-size:13px}.order:first-child{border-top:0}
+.faq{display:grid;gap:10px;max-width:900px}.faq details{background:#101425;border:1px solid var(--line);border-radius:17px;padding:17px 20px}.faq summary{cursor:pointer;font-weight:850}.faq p{color:#8f99af;font-size:14px;margin:12px 0 0}
+.final-cta{background:linear-gradient(135deg,#17153b,#102b2a);border:1px solid #34356b;border-radius:30px;padding:42px;text-align:center}.final-cta p{color:#a1abc0;max-width:620px;margin:10px auto 20px}
+.footer{padding:35px 0 55px;color:#6f7990;font-size:12px;text-align:center}.footer b{color:#a8afc0}
+.hidden{display:none}
+@media(max-width:980px){.hero-grid{grid-template-columns:1fr}.grid4,.plans{grid-template-columns:repeat(2,1fr)}.process{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:680px){.wrap{padding:0 16px}.navlinks a:not(.navcta){display:none}.hero{padding:58px 0 45px}h1{letter-spacing:-1.8px}.trust-strip{grid-template-columns:repeat(2,1fr)}.grid4,.plans,.process,.why,.dash{grid-template-columns:1fr}.plan.featured{transform:none}.section{padding:55px 0}.final-cta{padding:30px 20px}}
+</style>
+</head>
+<body>
+<header class="topbar">
+<div class="wrap"><nav>
+<a class="brand" href="#">BRAIN<b>•</b> Marketing</a>
+<div class="navlinks">
+<a href="#services">الخدمات</a><a href="#process">كيف نعمل</a><a href="#plans">الأسعار</a><a href="#faq">الأسئلة</a>
+<a class="navcta" href="#account" onclick="openAuth('login')">حسابي</a>
+</div>
+</nav></div>
+</header>
 
-<section class="hero"><span class="eyebrow">خدمات رقمية حقيقية</span><h1>اطلب خدمتك، ودع <span>BRAIN AI</span> ينفذها.</h1><p>ابدأ بحساب عميل وتجربة مجانية لمدة 5 أيام. التجربة مرتبطة بحسابك، وليست بالمتصفح؛ لذلك لا يمكن إنشاء تجربة ثانية بنفس البريد.</p><div class="actions"><button class="btn primary" onclick="openAuth('register')">ابدأ 5 أيام مجانًا</button><button class="btn ghost" onclick="openAuth('login')">تسجيل الدخول</button></div></section>
+<main>
+<section class="hero">
+<div class="wrap hero-grid">
+<div>
+<span class="badge"><span class="dot"></span> تجربة مجانية لمدة 5 أيام</span>
+<h1>حوّل فكرتك إلى <span class="gradient">حضور رقمي أقوى.</span></h1>
+<p class="lead">BRAIN Marketing يساعدك في الاستراتيجية، المحتوى، الحملات والتقارير والأتمتة — من طلب الخدمة إلى التسليم، في تجربة واحدة واضحة.</p>
+<div class="actions">
+<button class="btn primary wide" onclick="openAuth('register')">ابدأ مجانًا</button>
+<a class="btn ghost wide" href="#services">اكتشف الخدمات</a>
+</div>
+<div class="micro"><strong>5 أيام مجانًا</strong> · لا خصم تلقائي · اختر خطتك لاحقًا</div>
+</div>
+<div class="hero-card" aria-label="نظرة على الخدمة">
+<div class="metric"><div><small>مسار العمل</small><br><strong>استراتيجية → تنفيذ → قياس</strong></div><span>✦</span></div>
+<div class="spark">
+<svg viewBox="0 0 500 130" preserveAspectRatio="none" aria-hidden="true"><path d="M0 105 C45 98,70 105,105 84 S165 65,200 76 S250 42,285 57 S335 62,370 36 S430 45,500 13" fill="none" stroke="#8a7cff" stroke-width="4"/><path d="M0 120 C65 118,90 110,130 111 S195 100,235 105 S290 84,330 91 S405 76,500 68" fill="none" stroke="#42e8cf" stroke-width="2" opacity=".7"/></svg>
+</div>
+<div class="metric"><div><small>الخدمات</small><br><strong>تسويق · محتوى · حملات · أتمتة</strong></div><span>→</span></div>
+<div class="metric"><div><small>البداية</small><br><strong>$0 لمدة 5 أيام</strong></div><span>✓</span></div>
+</div>
+</div>
+</section>
 
-<section id="plans"><h2>الخطط</h2><div class="plans">
-<article class="card trial"><span class="tag">ابدأ مجانًا</span><h3>FREE TRIAL</h3><div class="price">$0</div><p class="muted"><b>5 أيام</b> كاملة.</p><ul><li>حساب عميل</li><li>طلب خدمات مباشرة</li><li>متابعة حالة الطلب</li><li>لا خصم تلقائي</li></ul><button class="btn primary full" onclick="openAuth('register')">ابدأ التجربة</button></article>
-<article class="card"><h3>Starter</h3><div class="price">$49</div><p class="muted">للبداية.</p><ul><li>تحليل المنتج والجمهور</li><li>خطة محتوى</li><li>أفكار منشورات</li><li>تقرير تسليم</li></ul><button class="btn ghost full" onclick="choosePaid('Starter — $49')">اختيار Starter</button></article>
-<article class="card featured"><h3>Growth</h3><div class="price">$149</div><p class="muted">للنمو.</p><ul><li>استراتيجية</li><li>محتوى وإبداعيات</li><li>تجهيز حملات</li><li>قياس أداء</li></ul><button class="btn primary full" onclick="choosePaid('Growth — $149')">اختيار Growth</button></article>
-<article class="card"><h3>Campaign</h3><div class="price">$299</div><p class="muted">لحملة كاملة.</p><ul><li>خطة حملة</li><li>نسخ إعلانية</li><li>هيكل الحملة</li><li>تحسينات</li></ul><button class="btn ghost full" onclick="choosePaid('Campaign — $299')">اختيار Campaign</button></article>
-</div></section>
+<section class="trust-strip">
+<div class="trust-item"><b>وضوح في الأسعار</b><span>الخطة قبل الطلب</span></div>
+<div class="trust-item"><b>تجربة مجانية</b><span>5 أيام بدون خصم تلقائي</span></div>
+<div class="trust-item"><b>مساحة عميل</b><span>حساب وطلبات ومتابعة</span></div>
+<div class="trust-item"><b>خدمات متعددة</b><span>من الاستراتيجية إلى الأتمتة</span></div>
+</section>
 
-<section id="account" class="panel auth" aria-live="polite"><div class="card">
-<div class="tabs"><button class="btn primary" id="loginTab" onclick="setAuth('login')">دخول</button><button class="btn ghost" id="registerTab" onclick="setAuth('register')">إنشاء حساب</button></div>
-<form id="authForm" class="form"><div id="nameWrap"><label>الاسم<input id="authName" maxlength="120" autocomplete="name"></label></div><label>البريد الإلكتروني<input id="authEmail" type="email" required autocomplete="email"></label><label>كلمة المرور<input id="authPassword" type="password" minlength="10" required autocomplete="current-password"></label><button class="btn primary" id="authSubmit">متابعة</button></form>
-<div id="authStatus" class="status">أنشئ حسابك لبدء التجربة.</div></div></section>
+<section class="section" id="services">
+<div class="wrap">
+<div class="section-head"><span class="kicker">Services</span><h2>كل ما تحتاجه لبناء حضور رقمي متماسك.</h2><p>اختر الخدمة التي تحتاجها الآن، ثم صف هدفك بوضوح. نبدأ من المطلوب بدل بيع باقة لا تحتاجها.</p></div>
+<div class="grid4">
+<article class="service"><div class="icon">◎</div><h3>استراتيجية التسويق</h3><p>تحديد الجمهور، الرسالة، القنوات والأولويات قبل التنفيذ.</p><span class="link">ابدأ من الاستراتيجية →</span></article>
+<article class="service"><div class="icon">✎</div><h3>صناعة المحتوى</h3><p>أفكار ونسخ ومحتوى مهيأ للمنصات والأهداف التسويقية.</p><span class="link">اطلب محتوى →</span></article>
+<article class="service"><div class="icon">↗</div><h3>تجهيز الحملات</h3><p>هيكل حملة، رسائل إعلانية، تقسيمات وأساس واضح للقياس.</p><span class="link">جهّز حملتك →</span></article>
+<article class="service"><div class="icon">⌁</div><h3>الأداء والأتمتة</h3><p>تقارير أداء وأفكار تحسين وأتمتة للمهام الرقمية المتكررة.</p><span class="link">طوّر التشغيل →</span></article>
+</div>
+</div>
+</section>
 
-<section id="client" class="client panel"><div class="dash">
-<div class="card"><h2>مرحبًا، <span id="clientName"></span></h2><div class="trialbox"><div><b>FREE TRIAL</b><div class="muted">التجربة مرتبطة بحسابك.</div></div><div class="days" id="daysLeft">—</div></div><p class="muted" id="trialState"></p><button class="btn ghost" onclick="logout()">تسجيل الخروج</button></div>
-<div class="card" id="services"><h2>اطلب خدمة الآن</h2><form id="orderForm" class="form"><label>الخدمة<select id="service"><option>استراتيجية التسويق</option><option>صناعة المحتوى</option><option>تقارير الأداء</option><option>تجهيز الحملات</option><option>تصميم/تطوير موقع</option><option>أتمتة رقمية</option></select></label><label>الخطة<select id="plan"><option>FREE TRIAL — $0 / 5 DAYS</option><option>Starter — $49</option><option>Growth — $149</option><option>Campaign — $299</option></select></label><label>ماذا تريد؟<textarea id="need" minlength="10" required placeholder="اكتب المطلوب بالتفصيل..."></textarea></label><button class="btn primary">إرسال الطلب</button></form><div id="orderStatus" class="status">جاهز لاستقبال طلبك.</div></div></div>
-<div class="card" style="margin-top:16px"><h2>طلباتي</h2><div id="orders"><span class="muted">لا توجد طلبات بعد.</span></div></div></section>
+<section class="section" id="process">
+<div class="wrap">
+<div class="section-head"><span class="kicker">Workflow</span><h2>طريقة عمل بسيطة، من الطلب إلى التسليم.</h2><p>لا تحتاج إلى إدارة عشرات الأدوات لتبدأ.</p></div>
+<div class="process">
+<div class="step"><h3>حدّد الهدف</h3><p>أنشئ حسابًا واشرح ما تريد تحقيقه.</p></div>
+<div class="step"><h3>اختر الخدمة</h3><p>حدد الخدمة والخطة المناسبة لحجم احتياجك.</p></div>
+<div class="step"><h3>ابدأ التنفيذ</h3><p>يتم تنظيم الطلب ومتابعة حالته من مساحة العميل.</p></div>
+<div class="step"><h3>راجع وطور</h3><p>استلم المخرجات واطلب الخطوة التالية عند الحاجة.</p></div>
+</div>
+</div>
+</section>
 
-<section id="servicesInfo" class="panel"><div class="card"><h2>ماذا يمكنك طلبه؟</h2><p class="muted">خدمات إلكترونية قابلة للتنفيذ مثل التسويق، صناعة المحتوى، التقارير، المواقع والأتمتة. كل طلب يحصل على رقم وحالة، ولا نعلن نجاحًا أو إيرادًا دون دليل.</p></div></section>
-<div class="footer">BRAIN AI — Client Services</div></div>
+<section class="section" id="plans">
+<div class="wrap">
+<div class="section-head"><span class="kicker">Pricing</span><h2>ابدأ بدون مخاطرة، ثم اختر مستوى النمو.</h2><p>التجربة مجانية. بعد انتهائها لا يتم خصم أي مبلغ تلقائيًا؛ تختار الخطة المدفوعة بنفسك.</p></div>
+<div class="plans">
+<article class="plan trial"><span class="plan-tag">FREE · 5 DAYS</span><h3>التجربة المجانية</h3><div class="price">$0</div><p>لاستكشاف تجربة العميل وبدء أول طلب.</p><ul><li>حساب عميل</li><li>طلب خدمة</li><li>متابعة الطلب</li><li>لا خصم تلقائي</li></ul><button class="btn primary" onclick="openAuth('register')">ابدأ الآن</button></article>
+<article class="plan"><h3>Starter</h3><div class="price">$49</div><p>للبداية المنظمة.</p><ul><li>تحليل المنتج والجمهور</li><li>خطة محتوى</li><li>أفكار منشورات</li><li>تقرير تسليم</li></ul><button class="btn ghost" onclick="choosePaid('Starter — $49')">اختيار Starter</button></article>
+<article class="plan featured"><span class="plan-tag" style="background:#4b43a8;color:#fff">الأكثر توازنًا</span><h3>Growth</h3><div class="price">$149</div><p>لمن يريد خطة نمو أوسع.</p><ul><li>استراتيجية</li><li>محتوى وإبداعيات</li><li>تجهيز حملات</li><li>قياس أداء</li></ul><button class="btn primary" onclick="choosePaid('Growth — $149')">اختيار Growth</button></article>
+<article class="plan"><h3>Campaign</h3><div class="price">$299</div><p>للحملات المركزة.</p><ul><li>خطة حملة</li><li>نسخ إعلانية</li><li>هيكل الحملة</li><li>تحسينات</li></ul><button class="btn ghost" onclick="choosePaid('Campaign — $299')">اختيار Campaign</button></article>
+</div>
+<div class="note">الأسعار المعروضة هي أسعار الخدمات الحالية على الموقع. أي دفع فعلي يخضع لتوفر بوابة دفع مفعّلة وشروطها.</div>
+</div>
+</section>
+
+<section class="section">
+<div class="wrap why">
+<div class="why-card"><span class="kicker">Why BRAIN</span><h2>ليس مجرد قائمة خدمات.</h2><p class="muted">الفكرة هي جمع رحلة العميل في مكان واحد بدل تشتيت الطلبات بين رسائل وأدوات مختلفة.</p>
+<div class="check"><i>✓</i><div><b>وضوح من البداية</b><span>تعرف ما الذي تشتريه وما الخطة التي اخترتها.</span></div></div>
+<div class="check"><i>✓</i><div><b>مسار قابل للمتابعة</b><span>الحساب والطلبات والحالات في مساحة واحدة.</span></div></div>
+</div>
+<div class="why-card"><span class="kicker">For Teams</span><h2>للأفراد والفرق الصغيرة والشركات.</h2><p class="muted">ابدأ باحتياج محدد، ثم وسّع نطاق العمل عندما تتضح الأولويات.</p>
+<div class="check"><i>✓</i><div><b>من خدمة واحدة</b><span>ابدأ باستراتيجية أو محتوى أو حملة.</span></div></div>
+<div class="check"><i>✓</i><div><b>إلى منظومة كاملة</b><span>وسّع إلى التقارير والأتمتة والخدمات الرقمية.</span></div></div>
+</div>
+</div>
+</section>
+
+<section class="section" id="account">
+<div class="wrap">
+<div class="auth" aria-live="polite"><div class="card">
+<div class="tabs"><button class="btn primary" id="loginTab" onclick="setAuth('login')">تسجيل الدخول</button><button class="btn ghost" id="registerTab" onclick="setAuth('register')">إنشاء حساب</button></div>
+<h2 id="authTitle">ابدأ تجربتك</h2><p class="muted" id="authIntro">5 أيام مجانًا. لا خصم تلقائي.</p>
+<form id="authForm" class="form"><div id="nameWrap"><label>الاسم<input id="authName" maxlength="120" autocomplete="name"></label></div><label>البريد الإلكتروني<input id="authEmail" type="email" required autocomplete="email"></label><label>كلمة المرور<input id="authPassword" type="password" minlength="10" required autocomplete="current-password"></label><button class="btn primary" id="authSubmit">إنشاء الحساب وبدء التجربة</button></form>
+<div id="authStatus" class="status">أنشئ حسابك لبدء التجربة.</div>
+</div></div>
+</div>
+</section>
+
+<section id="client" class="client section">
+<div class="wrap">
+<div class="dash">
+<div class="card"><span class="kicker">Client Space</span><h2>مرحبًا، <span id="clientName"></span></h2><div class="trialbox"><div><b>FREE TRIAL</b><div class="muted">التجربة مرتبطة بحسابك.</div></div><div class="days" id="daysLeft">—</div></div><p class="muted" id="trialState"></p><button class="btn ghost" onclick="logout()">تسجيل الخروج</button></div>
+<div class="card" id="orderBox"><span class="kicker">New Order</span><h2>اطلب خدمتك</h2><form id="orderForm" class="form"><label>الخدمة<select id="service"><option>استراتيجية التسويق</option><option>صناعة المحتوى</option><option>تقارير الأداء</option><option>تجهيز الحملات</option><option>تصميم/تطوير موقع</option><option>أتمتة رقمية</option></select></label><label>الخطة<select id="plan"><option>FREE TRIAL — $0 / 5 DAYS</option><option>Starter — $49</option><option>Growth — $149</option><option>Campaign — $299</option></select></label><label>ما الذي تريد تحقيقه؟<textarea id="need" minlength="10" required placeholder="مثال: أريد خطة تسويق لمتجر إلكتروني يستهدف عملاء في الأردن..."></textarea></label><button class="btn primary">إرسال الطلب</button></form><div id="orderStatus" class="status">جاهز لاستقبال طلبك.</div></div>
+</div>
+<div class="card" style="margin-top:16px"><span class="kicker">Orders</span><h2>طلباتي</h2><div id="orders"><span class="muted">لا توجد طلبات بعد.</span></div></div>
+</div>
+</section>
+
+<section class="section" id="faq">
+<div class="wrap">
+<div class="section-head"><span class="kicker">FAQ</span><h2>أسئلة قبل أن تبدأ.</h2></div>
+<div class="faq">
+<details><summary>هل التجربة المجانية مجانية فعلًا؟</summary><p>نعم، التجربة الحالية مدتها 5 أيام ولا يوجد خصم تلقائي. بعد انتهائها تختار أنت ما إذا كنت تريد خطة مدفوعة.</p></details>
+<details><summary>هل أحتاج إلى إنشاء حساب؟</summary><p>نعم، لأن الحساب يربط التجربة والطلبات بك بدل الاعتماد على المتصفح فقط.</p></details>
+<details><summary>ماذا يحدث بعد إرسال الطلب؟</summary><p>يتم إنشاء رقم طلب وحالة للطلب داخل مساحة العميل. تفاصيل التنفيذ والتسليم تعتمد على الخدمة والخطة المختارة.</p></details>
+<details><summary>هل الدفع متاح الآن؟</summary><p>الدفع الحقيقي لا يُعتبر متاحًا إلا عند ربط بوابة دفع والتحقق من عملية الدفع. لا يتم اعتبار الطلب المدفوع لمجرد اختيار خطة.</p></details>
+</div>
+</div>
+</section>
+
+<section class="section">
+<div class="wrap"><div class="final-cta"><span class="kicker">Ready?</span><h2>ابدأ بخطوة صغيرة، وابنِ ما تحتاجه فعلًا.</h2><p>جرّب BRAIN Marketing لمدة 5 أيام، ثم قرر بنفسك إن كانت الخدمة مناسبة لك.</p><button class="btn primary wide" onclick="openAuth('register')">ابدأ التجربة المجانية</button></div></div>
+</section>
+</main>
+
+<footer class="footer"><div class="wrap"><b>BRAIN Marketing</b> · Client Services · تجربة مجانية 5 أيام · لا خصم تلقائي</div></footer>
+
 <script>
-/* Configure this to the public BRAIN Cloud API origin when the API is deployed. */
 const API=(new URLSearchParams(location.search).get('api')||window.BRAIN_API_URL||'/api').replace(/\/$/,'');
 let token=sessionStorage.getItem('brain_client_token')||'';
-let mode='register', pendingPlan='';
+let mode='register',pendingPlan='';
 const $=id=>document.getElementById(id);
-function openAuth(m){setAuth(m);$('account').classList.add('active');$('account').scrollIntoView({behavior:'smooth'})}
-function setAuth(m){mode=m;$('nameWrap').style.display=m==='register'?'block':'none';$('loginTab').className='btn '+(m==='login'?'primary':'ghost');$('registerTab').className='btn '+(m==='register'?'primary':'ghost');$('authSubmit').textContent=m==='register'?'إنشاء الحساب وبدء التجربة':'تسجيل الدخول';$('authStatus').textContent=m==='register'?'إذا كان بريدك قد استخدم تجربة سابقًا، سيبقى الحساب نفسه ولن تبدأ تجربة ثانية.':'أدخل بيانات حسابك للوصول إلى خدماتك وطلباتك.'}
+const authBox=document.querySelector('.auth');
+function openAuth(m){setAuth(m);authBox.classList.add('active');$('account').scrollIntoView({behavior:'smooth',block:'start'})}
+function setAuth(m){mode=m;$('nameWrap').style.display=m==='register'?'block':'none';$('loginTab').className='btn '+(m==='login'?'primary':'ghost');$('registerTab').className='btn '+(m==='register'?'primary':'ghost');$('authSubmit').textContent=m==='register'?'إنشاء الحساب وبدء التجربة':'تسجيل الدخول';$('authTitle').textContent=m==='register'?'ابدأ تجربتك':'مرحبًا بعودتك';$('authIntro').textContent=m==='register'?'5 أيام مجانًا. لا خصم تلقائي.':'أدخل بيانات حسابك للوصول إلى طلباتك.';$('authStatus').className='status';$('authStatus').textContent=m==='register'?'إذا استخدمت بريدك سابقًا، سيبقى حسابك نفسه ولن تبدأ تجربة ثانية.':'سجّل الدخول للوصول إلى مساحة العميل.'}
 function headers(){return {'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{})}}
 async function api(path,opt={}){const r=await fetch(API+path,{...opt,headers:{...headers(),...(opt.headers||{})}});const t=await r.text();let d;try{d=JSON.parse(t)}catch{d={detail:t}}if(!r.ok)throw new Error(d.detail||'تعذر إكمال العملية');return d}
-$('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authStatus').className='status';try{const path=mode==='register'?'/auth/register':'/auth/login';const body={email:$('authEmail').value.trim(),password:$('authPassword').value};if(mode==='register')body.display_name=$('authName').value.trim();const d=await api(path,{method:'POST',body:JSON.stringify(body)});token=d.token;sessionStorage.setItem('brain_client_token',token);renderAccount(d.account);$('authStatus').textContent='تم تسجيل الدخول.'}catch(err){$('authStatus').className='status error';$('authStatus').textContent=err.message}});
-async function renderAccount(account){$('client').classList.add('active');$('clientName').textContent=account.display_name;$('daysLeft').textContent=account.trial.remaining_days>0?Math.ceil(account.trial.remaining_seconds/86400)+' يوم':'منتهية';$('trialState').textContent=account.trial.state==='TRIAL_ACTIVE'?'تجربتك فعّالة. يمكنك طلب الخدمات الآن.':'انتهت التجربة. اختر خطة مدفوعة للمتابعة.';renderOrders(account.orders||[]);$('client').scrollIntoView({behavior:'smooth'});if(pendingPlan){$('plan').value=pendingPlan;pendingPlan=''}}
-function renderOrders(items){$('orders').innerHTML=items.length?items.slice().reverse().map(o=>'<div class="order"><b>'+o.order_id+'</b><br>'+o.service+' — '+o.plan+'<br><span class="muted">'+o.state+'</span></div>').join(''):'<span class="muted">لا توجد طلبات بعد.</span>'}
-$('orderForm').addEventListener('submit',async e=>{e.preventDefault();if(!token){openAuth('login');return}try{const d=await api('/orders',{method:'POST',body:JSON.stringify({service:$('service').value,plan:$('plan').value,need:$('need').value})});$('orderStatus').textContent='تم إنشاء الطلب '+d.order.order_id+' وحالته '+d.order.state+'.';renderAccount(d.account);$('need').value=''}catch(err){$('orderStatus').className='status error';$('orderStatus').textContent=err.message}});
+$('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authStatus').className='status';try{const path=mode==='register'?'/auth/register':'/auth/login';const body={email:$('authEmail').value.trim(),password:$('authPassword').value};if(mode==='register')body.display_name=$('authName').value.trim();const d=await api(path,{method:'POST',body:JSON.stringify(body)});token=d.token;sessionStorage.setItem('brain_client_token',token);renderAccount(d.account);$('authStatus').textContent='تم تسجيل الدخول بنجاح.'}catch(err){$('authStatus').className='status error';$('authStatus').textContent=err.message}});
+async function renderAccount(account){$('client').classList.add('active');$('clientName').textContent=account.display_name;$('daysLeft').textContent=account.trial.remaining_days>0?Math.ceil(account.trial.remaining_seconds/86400)+' يوم':'منتهية';$('trialState').textContent=account.trial.state==='TRIAL_ACTIVE'?'تجربتك فعّالة. يمكنك طلب الخدمات الآن.':'انتهت التجربة. اختر خطة مدفوعة للمتابعة.';renderOrders(account.orders||[]);$('client').scrollIntoView({behavior:'smooth',block:'start'});if(pendingPlan){$('plan').value=pendingPlan;pendingPlan=''}}
+function renderOrders(items){$('orders').innerHTML=items.length?items.slice().reverse().map(o=>'<div class="order"><b>'+o.order_id+'</b><br>'+o.service+' — '+o.plan+'<br><span class="muted">الحالة: '+o.state+'</span></div>').join(''):'<span class="muted">لا توجد طلبات بعد.</span>'}
+$('orderForm').addEventListener('submit',async e=>{e.preventDefault();if(!token){openAuth('login');return}try{const d=await api('/orders',{method:'POST',body:JSON.stringify({service:$('service').value,plan:$('plan').value,need:$('need').value})});$('orderStatus').className='status';$('orderStatus').textContent='تم إنشاء الطلب '+d.order.order_id+' — الحالة: '+d.order.state;renderAccount(d.account);$('need').value=''}catch(err){$('orderStatus').className='status error';$('orderStatus').textContent=err.message}});
 function choosePaid(p){pendingPlan=p;openAuth(token?'login':'register')}
 function logout(){token='';sessionStorage.removeItem('brain_client_token');$('client').classList.remove('active');openAuth('login')}
 (async()=>{setAuth('register');if(token){try{const d=await api('/auth/me');renderAccount(d.account)}catch{logout()}}})();
-</script></body></html>
+</script>
+</body>
+</html>
