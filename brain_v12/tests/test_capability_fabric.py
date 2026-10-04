@@ -4,6 +4,7 @@ from pathlib import Path
 
 from brain_v12.brain.capability_fabric import CapabilityFabric, ExecutorSpec
 from brain_v12.brain.execution_verifier import ExecutionVerifier
+from brain_v12.brain.autonomy_policy import AutonomyPolicy
 
 
 class CapabilityFabricTests(unittest.TestCase):
@@ -28,6 +29,17 @@ class CapabilityFabricTests(unittest.TestCase):
         self.assertEqual(result["status"], "VERIFIED_COMPLETED")
         self.assertEqual(result["executor_id"], "paid")
         self.assertEqual(calls, ["local", "paid"])
+
+    def test_brain_owned_executor_is_preferred_over_paid(self):
+        fabric = CapabilityFabric(autonomy_policy=AutonomyPolicy(allow_paid=True))
+        fabric.register(ExecutorSpec("paid", "ai.reasoning", priority=1, cost_class="PAID", metadata={"tier": "PAID_EXTERNAL"}))
+        fabric.register(ExecutorSpec("brain", "ai.reasoning", priority=50, cost_class="FREE", metadata={"tier": "BRAIN_OWNED"}))
+        self.assertEqual(fabric.plan("ai.reasoning")[0].executor_id, "brain")
+
+    def test_paid_executor_is_blocked_by_default(self):
+        fabric = CapabilityFabric()
+        fabric.register(ExecutorSpec("paid", "ai.reasoning", priority=1, cost_class="PAID", metadata={"tier": "PAID_EXTERNAL"}))
+        self.assertEqual(fabric.plan("ai.reasoning"), [])
 
     def test_permission_filter(self):
         fabric = CapabilityFabric()
