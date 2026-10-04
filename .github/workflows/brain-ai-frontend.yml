@@ -7,6 +7,7 @@ on:
       - "brain_v12/web/brain-chat/**"
       - "brain_v12/tests/test_brain_ai_frontend.py"
       - "brain_v12/tests/test_chat_session_api.py"
+      - "brain_v12/tests/test_chat_session_api.py"
       - "brain_v12/tests/test_brain_ai_api.py"
       - "brain_v12/tests/test_brain_ai_product_smoke.py"
       - "brain_v12/app.py"
@@ -63,7 +64,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Validate Brain AI frontend contract
         run: python -m unittest brain_v12.tests.test_brain_ai_frontend -v
-      - name: Validate Brain AI session API contract
+      - name: Validate Brain AI session API and sync contract
         run: python -m unittest brain_v12.tests.test_chat_session_api -v
       - name: Run Brain product end-to-end verification gate
         run: python -m unittest brain_v12.tests.test_brain_ai_product_smoke -v
