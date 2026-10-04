@@ -90,7 +90,7 @@ class BrainProductSmokeTest(unittest.TestCase):
         check = self.app.evidence_store.verify_hash(evidence["evidence_id"])
         self.assertTrue(check["ok"], check)
 
-        fetched = self.client.get(f"/api/brain/evidence/{evidence["evidence_id"]}")
+        fetched = self.client.get(f"/api/brain/evidence/{evidence['evidence_id']}")
         self.assertEqual(fetched.status_code, 200)
         body = fetched.json()
         self.assertEqual(body["verification_status"], "VERIFIED")
