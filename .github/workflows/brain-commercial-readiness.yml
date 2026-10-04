@@ -40,5 +40,12 @@ jobs:
               order_id="CI-READINESS",
           )
           assert r.status == "COMMERCIAL_LAUNCH_BLOCKED"
+          from brain.provider_hub.readiness_report import build_report
+          build_report(r, "commercial_readiness.json")
           print("Honest launch gate: BLOCKED until external evidence exists.")
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-commercial-readiness
+          path: commercial_readiness.json
           PY
