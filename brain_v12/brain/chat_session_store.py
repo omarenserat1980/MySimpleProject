@@ -230,6 +230,9 @@ class ChatSessionStore:
 
     def add_message(self, session_id, role, content, metadata=None, client_message_id=None):
         stamp = _now()
+        message_metadata = dict(metadata or {})
+        if client_message_id:
+            message_metadata["client_message_id"] = str(client_message_id)
         with self.connect() as con:
             if client_message_id:
                 existing = con.execute(
@@ -247,7 +250,7 @@ class ChatSessionStore:
             con.execute(
                 "INSERT INTO chat_session_messages(session_id,role,content,metadata,created_at) "
                 "VALUES(?,?,?,?,?)",
-                (session_id, role, content, json.dumps(metadata or {}, ensure_ascii=False), stamp),
+                (session_id, role, content, json.dumps(message_metadata, ensure_ascii=False), stamp),
             )
             con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?",
                         (stamp, session_id))
@@ -255,7 +258,7 @@ class ChatSessionStore:
             con.execute(
                 "INSERT INTO chat_sync_events(session_id,event_type,entity_id,payload,created_at) VALUES(?,?,?,?,?)",
                 (session_id, "MESSAGE_ADDED", str(message_id),
-                 json.dumps({"role": role, "content": content, "metadata": metadata or {}, "created_at": stamp}, ensure_ascii=False), stamp),
+                 json.dumps({"role": role, "content": content, "metadata": message_metadata, "created_at": stamp}, ensure_ascii=False), stamp),
             )
             con.commit()
         return self.get(session_id)
