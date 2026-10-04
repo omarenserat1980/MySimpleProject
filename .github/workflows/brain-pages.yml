@@ -45,6 +45,8 @@ jobs:
           cp games-store.html _site/games-store.html
           mkdir -p _site/brain_v12/web _site/marketing _site/customer-portal
           cp -a brain_v12/web/. _site/brain_v12/web/
+          mkdir -p _site/brain_v12/film_hub
+          cp -a brain_v12/film_hub/. _site/brain_v12/film_hub/
           cp -a marketing/. _site/marketing/
           cp -a customer-portal/. _site/customer-portal/
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
@@ -119,6 +121,7 @@ jobs:
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
           test -f _site/brain_v12/web/index.html
+          test -f _site/brain_v12/film_hub/web/index.html
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
