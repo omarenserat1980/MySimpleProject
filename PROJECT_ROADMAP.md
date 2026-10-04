@@ -28,6 +28,15 @@
 - [ ] Verify result and record evidence
 - [ ] Stop after bounded attempts
 
+## Phase 2.5 — Capability Fabric and provider independence
+- [x] Define provider-neutral capability contract
+- [x] Add Brain-owned Capability Fabric with bounded executor fallback
+- [x] Add permission-aware executor selection
+- [x] Add no-executor / no-fake-success behavior
+- [x] Add dedicated Capability Fabric CI gate
+- [ ] Register existing media/code/search/AI/device executors into the common fabric
+- [ ] Add health scoring and evidence-aware executor ranking
+
 ## Phase 3 — Brain Cloud execution
 - [x] Free GitHub-hosted Linux runner
 - [x] Python runtime
