@@ -43,6 +43,15 @@ jobs:
           PYTHONPATH=. python -m cloud.company_launch_readiness
           test -s .brain_state/company_launch_readiness.json
           cat .brain_state/company_launch_readiness.json
+          PYTHONPATH=. python - <<'PY'
+          import json
+          from pathlib import Path
+          from cloud.company_launch_actions import next_actions
+          p=Path(".brain_state/company_launch_readiness.json")
+          actions=next_actions(json.loads(p.read_text()))
+          Path(".brain_state/next_launch_actions.json").write_text(json.dumps(actions,ensure_ascii=False,indent=2))
+          print(json.dumps(actions,ensure_ascii=False,indent=2))
+          PY
 
       - name: Publish evidence artifact
         if: always()
@@ -52,6 +61,7 @@ jobs:
           path: |
             .brain_state/release_gate/release_gate.json
             .brain_state/company_launch_readiness.json
+            .brain_state/next_launch_actions.json
           retention-days: 7
 
       - name: Keep external side effects gated
