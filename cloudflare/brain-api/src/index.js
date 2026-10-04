@@ -242,7 +242,11 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_VERIFIED', verified_at = CURRENT_TIMESTAMP, raw_evidence = ? WHERE tran_ref = ?").bind(evidence, tranRef),
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
   ]);
-  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef });
+  const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
+  await env.BRAIN_DB.prepare(
+    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'REVENUE_REALIZED', ?)"
+  ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
+  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, revenue_state: "REVENUE_REALIZED", revenue_id: revenueId });
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
