@@ -91,6 +91,30 @@ class ChatSessionApiTests(unittest.TestCase):
             self.assertIn("first-0", store.get_memory(first["id"])["summary"])
             self.assertEqual(store.get_memory(second["id"])["summary"], "")
 
+    def test_sync_event_feed_is_ordered_and_cursor_based(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            s = store.create("Sync")
+            store.add_message(s["id"], "user", "hello")
+            store.add_message(s["id"], "assistant", "world")
+            first = store.sync_events(s["id"], after=0, limit=2)
+            self.assertEqual([e["event_type"] for e in first["events"]], ["SESSION_CREATED", "MESSAGE_ADDED"])
+            self.assertTrue(first["has_more"])
+            second = store.sync_events(s["id"], after=first["next_cursor"], limit=10)
+            self.assertEqual([e["event_type"] for e in second["events"]], ["MESSAGE_ADDED"])
+            self.assertGreater(second["next_cursor"], first["next_cursor"])
+
+    def test_sync_event_feed_is_session_isolated(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            first = store.create("First")
+            second = store.create("Second")
+            store.add_message(first["id"], "user", "only-first")
+            feed = store.sync_events(second["id"])
+            self.assertEqual(feed["events"], [])
+
     def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
