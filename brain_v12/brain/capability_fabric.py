@@ -1,4 +1,4 @@
-"""Capability Fabric with runtime-health-aware executor selection."""
+"""Capability Fabric with health-score-aware executor selection."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -27,7 +27,7 @@ class ExecutionAttempt:
 
 
 class CapabilityFabric:
-    """Provider-neutral capability registry with health-gated bounded fallback."""
+    """Provider-neutral capability registry with health-ranked bounded fallback."""
 
     def __init__(self, health: HealthProbeEngine | None = None) -> None:
         self._executors: dict[str, ExecutorSpec] = {}
@@ -41,13 +41,14 @@ class CapabilityFabric:
             self.health.register(spec.executor_id, probe)
 
     def discover(self, capability: str, require_healthy: bool = True) -> list[ExecutorSpec]:
-        candidates = [
-            x for x in self._executors.values()
-            if x.capability == capability and x.state == "ONLINE"
-        ]
+        candidates = [x for x in self._executors.values()
+                      if x.capability == capability and x.state == "ONLINE"]
         if require_healthy:
             candidates = [x for x in candidates if self.health.healthy(x.executor_id)]
-        return sorted(candidates, key=lambda x: (x.priority, x.cost_class, x.executor_id))
+        return sorted(
+            candidates,
+            key=lambda x: (-self.health.score(x.executor_id), x.priority, x.cost_class, x.executor_id),
+        )
 
     def probe_capability(self, capability: str) -> list[dict[str, Any]]:
         for spec in self._executors.values():
@@ -65,10 +66,8 @@ class CapabilityFabric:
         required = required_permissions or set()
         if probe_before_select:
             self.probe_capability(capability)
-        return [
-            x for x in self.discover(capability, require_healthy=require_healthy)
-            if required.issubset(x.permissions)
-        ]
+        return [x for x in self.discover(capability, require_healthy=require_healthy)
+                if required.issubset(x.permissions)]
 
     def execute(
         self,
@@ -78,43 +77,27 @@ class CapabilityFabric:
         max_attempts: int = 3,
         probe_before_select: bool = True,
     ) -> dict[str, Any]:
-        candidates = self.plan(
-            capability,
-            required_permissions,
-            require_healthy=True,
-            probe_before_select=probe_before_select,
-        )
+        candidates = self.plan(capability, required_permissions, True, probe_before_select)
         attempts: list[ExecutionAttempt] = []
         for spec in candidates[:max(0, max_attempts)]:
             try:
                 result = runner(spec)
+                self.health.record_execution(spec.executor_id, True)
                 attempts.append(ExecutionAttempt(spec.executor_id, True, result=result))
-                return {
-                    "status": "SUCCESS",
-                    "capability": capability,
-                    "executor_id": spec.executor_id,
-                    "attempts": [a.__dict__ for a in attempts],
-                }
+                return {"status": "SUCCESS", "capability": capability,
+                        "executor_id": spec.executor_id,
+                        "attempts": [a.__dict__ for a in attempts]}
             except Exception as exc:
+                self.health.record_execution(spec.executor_id, False)
                 attempts.append(ExecutionAttempt(spec.executor_id, False, error=str(exc)))
-        return {
-            "status": "FAILED",
-            "capability": capability,
-            "executor_id": None,
-            "attempts": [a.__dict__ for a in attempts],
-        }
+        return {"status": "FAILED", "capability": capability, "executor_id": None,
+                "attempts": [a.__dict__ for a in attempts]}
 
     def snapshot(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "executor_id": x.executor_id,
-                "capability": x.capability,
-                "priority": x.priority,
-                "state": x.state,
-                "cost_class": x.cost_class,
-                "permissions": sorted(x.permissions),
-                "metadata": dict(x.metadata),
-                "healthy": self.health.healthy(x.executor_id),
-            }
-            for x in sorted(self._executors.values(), key=lambda x: x.executor_id)
-        ]
+        return [{**{
+            "executor_id": x.executor_id, "capability": x.capability,
+            "priority": x.priority, "state": x.state, "cost_class": x.cost_class,
+            "permissions": sorted(x.permissions), "metadata": dict(x.metadata),
+            "healthy": self.health.healthy(x.executor_id),
+        }, "health_score": self.health.score(x.executor_id)}
+        for x in sorted(self._executors.values(), key=lambda x: x.executor_id)]
