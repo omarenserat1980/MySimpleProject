@@ -23,7 +23,20 @@ class CommercialContainmentGate:
     def __init__(self) -> None:
         self._incidents: dict[str, ContainmentIncident] = {}
 
-    def contain(self, incident_id: str, order_id: str, reason: str) -> ContainmentIncident:
+    def contain(
+        self,
+        incident_id: str,
+        order_id: str | None = None,
+        reason: str | None = None,
+    ) -> ContainmentIncident:
+        # Backward-compatible two-argument form: contain(order_id, reason).
+        if reason is None:
+            if order_id is None:
+                raise TypeError("CONTAINMENT_REASON_REQUIRED")
+            reason = order_id
+            order_id = incident_id
+            incident_id = f"containment:{order_id}:{reason}"
+        assert order_id is not None and reason is not None
         if incident_id in self._incidents:
             raise ValueError(f"DUPLICATE_INCIDENT:{incident_id}")
         incident = ContainmentIncident(
@@ -55,7 +68,4 @@ class CommercialContainmentGate:
         )
 
     def active_incidents(self, order_id: str) -> list[ContainmentIncident]:
-        return [
-            i for i in self._incidents.values()
-            if i.order_id == order_id and i.active
-        ]
+        return [i for i in self._incidents.values() if i.order_id == order_id and i.active]
