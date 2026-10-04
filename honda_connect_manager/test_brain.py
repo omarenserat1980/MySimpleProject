@@ -1,7 +1,7 @@
 import json
 import tempfile
 from pathlib import Path
-from brain import load_vehicle_export, compatible, discover_exports
+from honda_connect_manager.brain import load_vehicle_export, compatible, discover_exports
 
 def test_export():
     with tempfile.TemporaryDirectory() as d:
