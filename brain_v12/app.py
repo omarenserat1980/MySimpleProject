@@ -92,6 +92,13 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 device_bridge=DeviceBridge(store)
+# Sync runtime is available as a bounded adapter for task/evidence lifecycle integration.
+from .brain.sync_engine import BrainSyncStore
+from .brain.sync_runtime import DurableSyncQueue
+from .brain.task_sync_adapter import TaskSyncAdapter
+sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
+sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
+task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
