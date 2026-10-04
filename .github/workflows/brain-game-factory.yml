@@ -1,0 +1,40 @@
+name: Brain Game Factory
+on:
+  push:
+    paths:
+      - "brain_v12/business/game_factory.py"
+      - "brain_v12/business/web_game_factory.py"
+      - "brain_v12/business/game_release_gate.py"
+      - "brain_v12/tests/test_game_factory.py"
+      - "brain_v12/tests/test_web_game_factory.py"
+      - "brain_v12/tests/test_game_release_gate.py"
+      - ".github/workflows/brain-game-factory.yml"
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Run game factory tests
+        run: python -m pytest -q brain_v12/tests/test_game_factory.py brain_v12/tests/test_web_game_factory.py brain_v12/tests/test_game_release_gate.py
+      - name: Build Brain Runner
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from brain_v12.business.web_game_factory import WebGameFactory
+          doc, release = WebGameFactory().build("GAME-BRAIN-RUNNER","Brain Runner")
+          out=Path("game_release/brain-runner")
+          out.mkdir(parents=True)
+          (out/"index.html").write_text(doc,encoding="utf-8")
+          (out/"release_manifest.txt").write_text(str(release),encoding="utf-8")
+          print(release)
+          PY
+      - name: Upload game release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-runner-web-release
+          path: game_release/brain-runner
