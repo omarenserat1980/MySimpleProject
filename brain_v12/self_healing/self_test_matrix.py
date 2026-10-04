@@ -7,6 +7,7 @@ ROOT=Path(__file__).resolve().parents[2]
 GROUPS={
  "core":["brain_v12.tests.test_core","brain_v12.test_evidence_verification"],
  "autonomy":["brain_v12.tests.test_autonomy_control_plane","brain_v12.tests.test_brain_supervisor","brain_v12.brain.test_autonomous_reasoner"],
+ "synchronization":["brain_v12.tests.test_sync_engine"],
  "repair":["brain_v12.brain.test_repair_engine","brain_v12.brain.test_repair_knowledge"],
  "self_healing":["brain_v12.self_healing.test_command_contract","brain_v12.self_healing.test_generator_registry","brain_v12.self_healing.test_improvement_eligibility","brain_v12.self_healing.test_native_patch_generator"],
  "tools_media":["brain_v12.tests.test_media_engine"],
@@ -24,7 +25,6 @@ def run_group(name,mods,timeout=90):
         return {"group":name,"passed":p.returncode==0,"exit_code":p.returncode,"duration":round(time.time()-started,2),"stdout":p.stdout[-6000:],"stderr":p.stderr[-6000:]}
     except subprocess.TimeoutExpired:
         return {"group":name,"passed":False,"exit_code":124,"duration":round(time.time()-started,2),"error":"timeout"}
-
 def main():
     results=[run_group(n,m) for n,m in GROUPS.items()]
     passed=all(x["passed"] for x in results)
@@ -38,5 +38,3 @@ def main():
     print(f"SELF_TEST_MATRIX={'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 if __name__=="__main__": raise SystemExit(main())
-
-# CI resolver revision marker.
