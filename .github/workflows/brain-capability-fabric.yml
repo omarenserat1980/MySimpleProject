@@ -4,7 +4,9 @@ on:
   push:
     paths:
       - "brain_v12/brain/capability_fabric.py"
+      - "brain_v12/brain/capability_catalog.py"
       - "brain_v12/tests/test_capability_fabric.py"
+      - "brain_v12/tests/test_capability_catalog.py"
       - "brain_v12/docs/BRAIN_CAPABILITY_FABRIC.md"
       - ".github/workflows/brain-capability-fabric.yml"
   workflow_dispatch:
@@ -21,6 +23,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile
-        run: python -m compileall -q brain_v12/brain/capability_fabric.py
+        run: python -m compileall -q brain_v12/brain/capability_fabric.py brain_v12/brain/capability_catalog.py
       - name: Unit tests
-        run: python -m unittest -v brain_v12.tests.test_capability_fabric
+        run: python -m unittest -v brain_v12.tests.test_capability_fabric brain_v12.tests.test_capability_catalog
