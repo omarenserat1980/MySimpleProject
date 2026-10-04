@@ -18,7 +18,7 @@ assert.match(worker, /cinema_entitlements/);
 assert.match(migration, /CREATE TABLE IF NOT EXISTS cinema_entitlements/);
 assert.match(wrangler, /binding = "CINEMA_MEDIA"/);
 assert.match(wrangler, /bucket_name = "brain-cinema-media"/);
-assert.match(page, /__BRAIN_CINEMA_API_URL__/);
+assert.ok(page.includes("__BRAIN_CINEMA_API_URL__") || page.includes("workers.dev"), "cinema API must be placeholder or deployed endpoint");
 assert.match(page, /api\/cinema\/checkout/);
 assert.match(page, /api\/cinema\/access/);
 console.log("CINEMA_ENTITLEMENT_GATES=PASS");
