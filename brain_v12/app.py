@@ -24,6 +24,7 @@ from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
+from .brain.chat_session_store import ChatSessionStore
 from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.model_router import ModelRouter
@@ -72,6 +73,8 @@ model_router=ModelRouter()
 for _provider in configured_model_providers():
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
 brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
+chat_session_store=ChatSessionStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
+chat_session_store.init()
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
@@ -129,7 +132,7 @@ from .brain.economic_reconciliation import router as economic_reconciliation_rou
 from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
-app.include_router(brain_chat_router(brain_ai, store))
+app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
