@@ -50,6 +50,7 @@ jobs:
           path: |
             .brain_state/opportunity_queue.json
             .brain_state/opportunity_task.json
+            .brain_state/opportunity_scope.json
             .brain_state/opportunity_execution_result.json
             .brain_state/opportunity_verification.json
           retention-days: 14
