@@ -41,6 +41,17 @@ class ChatSessionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_chat_session_messages
               ON chat_session_messages(session_id, id);
+            CREATE TABLE IF NOT EXISTS chat_sync_events(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              session_id TEXT NOT NULL,
+              event_type TEXT NOT NULL,
+              entity_id TEXT,
+              payload TEXT NOT NULL DEFAULT '{}',
+              created_at TEXT NOT NULL,
+              FOREIGN KEY(session_id) REFERENCES chat_sessions(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_sync_events
+              ON chat_sync_events(session_id, id);
             CREATE TABLE IF NOT EXISTS chat_session_memory(
               session_id TEXT PRIMARY KEY,
               summary TEXT NOT NULL DEFAULT '',
@@ -58,6 +69,12 @@ class ChatSessionStore:
             con.execute(
                 "INSERT INTO chat_session_memory(session_id,summary,updated_at) VALUES(?,?,?)",
                 (sid, "", stamp),
+            )
+            con.commit()
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO chat_sync_events(session_id,event_type,entity_id,payload,created_at) VALUES(?,?,?,?,?)",
+                (sid, "SESSION_CREATED", sid, json.dumps({"title": title or "New Brain Chat"}, ensure_ascii=False), stamp),
             )
             con.commit()
         return self.get(sid)
@@ -139,7 +156,34 @@ class ChatSessionStore:
             con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?",
                         (stamp, session_id))
             con.commit()
-        return self.get_memory(session_id)
+        memory = self.get_memory(session_id)
+        with self.connect() as con:
+            con.execute(
+                "INSERT INTO chat_sync_events(session_id,event_type,entity_id,payload,created_at) VALUES(?,?,?,?,?)",
+                (session_id, "MEMORY_UPDATED", session_id, json.dumps({"memory": memory}, ensure_ascii=False), stamp),
+            )
+            con.commit()
+        return memory
+
+    def sync_events(self, session_id, after=0, limit=100):
+        """Return an ordered, replayable change feed for multi-device chat sync."""
+        after = max(0, int(after))
+        limit = max(1, min(int(limit), 500))
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT id,event_type,entity_id,payload,created_at FROM chat_sync_events WHERE session_id=? AND id>? ORDER BY id LIMIT ?",
+                (session_id, after, limit),
+            ).fetchall()
+        events = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except Exception:
+                item["payload"] = {}
+            events.append(item)
+        next_cursor = events[-1]["id"] if events else after
+        return {"events": events, "next_cursor": next_cursor, "has_more": len(events) == limit}
 
     def compact_session(self, session_id, keep_recent=24, max_summary_chars=12000):
         """Persist a bounded deterministic summary of older messages."""
@@ -177,6 +221,10 @@ class ChatSessionStore:
                 (session_id, summary, stamp),
             )
             con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?", (stamp, session_id))
+            con.execute(
+                "INSERT INTO chat_sync_events(session_id,event_type,entity_id,payload,created_at) VALUES(?,?,?,?,?)",
+                (session_id, "SESSION_COMPACTED", session_id, json.dumps({"older_messages": len(older)}, ensure_ascii=False), stamp),
+            )
             con.commit()
         return {"compacted": True, "older_messages": len(older), "summary": summary}
 
@@ -195,5 +243,11 @@ class ChatSessionStore:
             )
             con.execute("UPDATE chat_sessions SET updated_at=? WHERE id=?",
                         (stamp, session_id))
+            message_id = con.execute("SELECT last_insert_rowid()").fetchone()[0]
+            con.execute(
+                "INSERT INTO chat_sync_events(session_id,event_type,entity_id,payload,created_at) VALUES(?,?,?,?,?)",
+                (session_id, "MESSAGE_ADDED", str(message_id),
+                 json.dumps({"role": role, "content": content, "metadata": metadata or {}, "created_at": stamp}, ensure_ascii=False), stamp),
+            )
             con.commit()
         return self.get(session_id)
