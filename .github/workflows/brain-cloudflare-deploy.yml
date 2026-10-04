@@ -35,7 +35,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SERVER_KEY }}
-          PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_PROFILE_ID }}
+          PAYTABS_PROFILE_ID: ${{ vars.PAYTABS_PROFILE_ID || secrets.PAYTABS_PROFILE_ID }}
         run: |
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
@@ -91,7 +91,7 @@ jobs:
       - name: Deploy Worker
         working-directory: cloudflare/brain-api
         env:
-          PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_PROFILE_ID }}
+          PAYTABS_PROFILE_ID: ${{ vars.PAYTABS_PROFILE_ID || secrets.PAYTABS_PROFILE_ID }}
         run: |
           set -euo pipefail
           npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID"
