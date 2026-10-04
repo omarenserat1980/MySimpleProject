@@ -92,3 +92,7 @@ assert.match(supervisor, /30 minutes/);
 assert.match(supervisor, /attempt < 3/);
 assert.match(worker, /supervisorTick/);
 assert.match(worker, /\/api\/supervisor\/tick/);
+
+assert.match(worker, /transitionClientOrder/);
+assert.match(worker, /INVALID_STATE_TRANSITION/);
+assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
