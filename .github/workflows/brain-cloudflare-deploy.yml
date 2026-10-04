@@ -2,8 +2,7 @@ name: Brain Cloudflare Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "cloudflare/brain-api/**"
       - ".github/workflows/brain-cloudflare-deploy.yml"
@@ -23,30 +22,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate adapter
+      - name: Validate Worker
         run: |
+          set -euo pipefail
           test -f cloudflare/brain-api/wrangler.toml
           test -f cloudflare/brain-api/src/index.js
+          test -f cloudflare/brain-api/migrations/0001_commercial.sql
           node --check cloudflare/brain-api/src/index.js
 
-      - name: Require deployment configuration
+      - name: Require Cloudflare and PayTabs configuration
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BRAIN_ORIGIN: ${{ secrets.BRAIN_ORIGIN }}
+          PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SERVER_KEY }}
+          PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_PROFILE_ID }}
         run: |
+          set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
-          test -n "$BRAIN_ORIGIN" || { echo "Missing BRAIN_ORIGIN"; exit 1; }
-          case "$BRAIN_ORIGIN" in
-            https://*) ;;
-            *) echo "BRAIN_ORIGIN must use HTTPS"; exit 1 ;;
-          esac
+          test -n "$PAYTABS_SERVER_KEY" || { echo "Missing PAYTABS_SERVER_KEY"; exit 1; }
+          test -n "$PAYTABS_PROFILE_ID" || { echo "Missing PAYTABS_PROFILE_ID"; exit 1; }
+          echo "SECRETS_PRESENT=TRUE"
+          echo "SECRETS_NOT_PRINTED=TRUE"
+
+      - name: Ensure D1 database exists
+        id: d1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess
+          name="brain-commercial"
+          p=subprocess.run(["npx","wrangler","d1","list","--json"],capture_output=True,text=True,check=True)
+          rows=json.loads(p.stdout)
+          found=next((x for x in rows if x.get("name")==name),None)
+          if not found:
+              subprocess.run(["npx","wrangler","d1","create",name],check=True)
+              p=subprocess.run(["npx","wrangler","d1","list","--json"],capture_output=True,text=True,check=True)
+              rows=json.loads(p.stdout)
+              found=next((x for x in rows if x.get("name")==name),None)
+          if not found or not found.get("uuid"):
+              raise SystemExit("D1_DATABASE_ID_NOT_FOUND")
+          with open("/tmp/d1_id","w") as f: f.write(found["uuid"])
+          print("D1_DATABASE_READY=TRUE")
+          PY
+          echo "D1_DATABASE_ID=$(cat /tmp/d1_id)" >> "$GITHUB_ENV"
+
+      - name: Bind D1 and migrate
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          sed -i "s/database_id = \"REPLACED_IN_CI\"/database_id = \"$D1_DATABASE_ID\"/" wrangler.toml
+          npx wrangler d1 migrations apply brain-commercial --remote
+          echo "D1_MIGRATIONS=APPLIED"
+
+      - name: Configure PayTabs Worker secret
+        working-directory: cloudflare/brain-api
+        env:
+          PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SERVER_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PAYTABS_SERVER_KEY" | npx wrangler secret put PAYTABS_SERVER_KEY
+          echo "PAYTABS_SERVER_KEY_CONFIGURED=TRUE"
 
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/brain-api
-          command: deploy --var "BRAIN_ORIGIN:${{ secrets.BRAIN_ORIGIN }}"
+        working-directory: cloudflare/brain-api
+        env:
+          PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_PROFILE_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID"
+
+      - name: Smoke test syntax and config
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node --check src/index.js
+          echo "WORKER_DEPLOYMENT_PIPELINE=READY"
