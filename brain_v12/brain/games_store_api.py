@@ -50,11 +50,18 @@ def _stripe_configured(): return bool(os.getenv("STRIPE_SECRET_KEY") and os.gete
 def _stripe_headers():
     return {"Authorization":"Bearer "+os.environ["STRIPE_SECRET_KEY"],"Content-Type":"application/x-www-form-urlencoded"}
 
+async def _stripe_get_session(session_id):
+    async with httpx.AsyncClient(timeout=25) as client:
+        r=await client.get("https://api.stripe.com/v1/checkout/sessions/"+session_id,
+                           headers=_stripe_headers())
+    if r.status_code>=400: raise HTTPException(502,"PAYMENT_PROVIDER_ERROR")
+    return r.json()
+
 async def _stripe_checkout(order,email):
     game=GAMES[order["game_id"]]
     data={
       "mode":"payment",
-      "success_url":ORIGIN+"/games-store.html?paid=1&order_id="+order["order_id"],
+      "success_url":ORIGIN+"/games-success.html?session_id={CHECKOUT_SESSION_ID}",
       "cancel_url":ORIGIN+"/games-store.html?cancelled=1&order_id="+order["order_id"],
       "line_items[0][quantity]":"1",
       "line_items[0][price_data][currency]":"usd",
@@ -105,6 +112,29 @@ async def checkout(body:CheckoutIn):
     session=await _stripe_checkout(order,body.email.strip())
     d=_read();d[order["order_id"]]["payment"].update({"provider":"stripe","session_id":session.get("id")});_write(d)
     return {"ok":True,"order_id":order["order_id"],"checkout_url":session.get("url"),"delivery_token":token}
+
+@router.get("/checkout-result")
+async def checkout_result(session_id:str):
+    if not _stripe_configured(): raise HTTPException(503,"PAYMENT_PROVIDER_NOT_CONFIGURED")
+    if not session_id or len(session_id)>200: raise HTTPException(400,"INVALID_SESSION_ID")
+    session=await _stripe_get_session(session_id)
+    if session.get("payment_status")!="paid": raise HTTPException(409,"PAYMENT_NOT_VERIFIED")
+    oid=(session.get("metadata") or {}).get("order_id","")
+    d=_read();o=d.get(oid)
+    if not o: raise HTTPException(404,"ORDER_NOT_FOUND")
+    if (o.get("payment") or {}).get("session_id")!=session_id: raise HTTPException(409,"SESSION_MISMATCH")
+    expected=int(round(o["amount_usd"]*100))
+    if int(session.get("amount_total") or 0)!=expected or (session.get("currency") or "").lower()!="usd":
+        raise HTTPException(409,"PAYMENT_AMOUNT_MISMATCH")
+    if o.get("state") not in {"PAID","DELIVERED"}: raise HTTPException(409,"PAYMENT_NOT_RECORDED")
+    token=secrets.token_urlsafe(32)
+    o["token_hash"]=hashlib.sha256(token.encode()).hexdigest()
+    o["delivery"]={"status":"READY","url":ORIGIN+GAMES[o["game_id"]]["delivery_path"]}
+    d[oid]=o;_write(d)
+    license_token="BRAIN-"+secrets.token_hex(10).upper()
+    return {"ok":True,"order_id":oid,"game_id":o["game_id"],"game_title":o["game_title"],
+            "license":license_token,"download_url":ORIGIN+GAMES[o["game_id"]]["delivery_path"],
+            "delivery_url":ORIGIN+"/api/games/orders/"+oid+"/delivery?token="+token}
 
 @router.post("/webhook")
 async def webhook(request:Request):
