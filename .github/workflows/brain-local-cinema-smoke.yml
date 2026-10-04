@@ -45,7 +45,7 @@ jobs:
       - name: Install local cinema TTS dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y espeak-ng
+          sudo apt-get install -y espeak-ng ffmpeg
       - name: End-to-end one-shot factory smoke
         env:
           BRAIN_FILM_PARTS: "1"
