@@ -21,3 +21,8 @@ console.log("BRAIN_CLOUDFLARE_DEPLOY_STATIC_GATE=PASS");
 console.log("PAYMENT_VERIFICATION=PASS");
 console.log("CINEMA_ENTITLEMENT=PASS");
 console.log("PRIVATE_R2_BINDING=PASS");
+
+assert.match(worker, /supervisorTick/);
+assert.match(worker, /BRAIN_CONTROL_TOKEN/);
+assert.match(worker, /BRAIN_ORIGIN/);
+console.log("SUPERVISOR_CONTROL_GATE=PASS");
