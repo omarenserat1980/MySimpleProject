@@ -17,6 +17,9 @@ on:
       - "cloudflare/brain-api/test/commercial_worker_static.test.js"
       - "cloudflare/brain-api/test/cinema_worker_static.test.js"
       - ".github/workflows/brain-cloudflare-deploy.yml"
+  workflow_run:
+    workflows: ["Brain Cinema - Publish Film Page"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +31,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -122,12 +126,26 @@ jobs:
           print("CINEMA_R2_BUCKET_READY=TRUE")
           PY
 
+      - name: Acquire verified cinema master
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: brain-cinema-master-private
+          path: /tmp/brain-cinema-master
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
       - name: Upload verified cinema master to private R2
         working-directory: cloudflare/brain-api
         run: |
           set -euo pipefail
-          test -s ../../docs/assets/last_light_city.mp4
-          npx wrangler r2 object put brain-cinema-media/films/last_light_city.mp4 --file ../../docs/assets/last_light_city.mp4 --content-type video/mp4 --cache-control "private, no-store" --remote
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            MASTER="/tmp/brain-cinema-master/brain-last-light-master.mp4"
+          else
+            MASTER="../../docs/assets/last_light_city.mp4"
+          fi
+          test -s "$MASTER"
+          npx wrangler r2 object put brain-cinema-media/films/last_light_city.mp4 --file "$MASTER" --content-type video/mp4 --cache-control "private, no-store" --remote
           echo "CINEMA_MASTER_R2_UPLOAD=PASS"
 
       - name: Configure Brain control secret
