@@ -1,0 +1,6 @@
+{
+  "schema_version":"1.0",
+  "core_policy":"provider-neutral",
+  "adapters":{"runtime":[],"payment":[],"email":[],"database":[],"storage":[],"media":[]},
+  "activation":{"required_states":["DISCOVERED","CONFIGURED","HEALTHY","VERIFIED","ACTIVE"],"evidence_required":true,"secrets_in_repo":false}
+}
