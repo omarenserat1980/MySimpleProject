@@ -1,0 +1,23 @@
+name: BRAIN Provider Hub Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "brain/provider_hub/**"
+      - ".github/workflows/brain-provider-hub.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run provider safety tests
+        run: python -m pytest -q brain/provider_hub/test_router.py
