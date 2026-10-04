@@ -50,3 +50,39 @@ Decision: Brain runtime replicas use stable record identity, monotonic revisions
 Reason: Cloud, device/emulator, and worker state must converge without silent overwrites or duplicate side effects.
 
 Constraint: Runtime synchronization is separate from Git source synchronization; external side effects remain behind existing authorization gates.
+
+
+## D-012 — Autonomous Company Mode
+
+Decision: Brain operates as an autonomous company operating system by default for all actions that are technically reversible, evidence-verifiable, and legally non-binding.
+
+Autonomous scope includes:
+- inspect, plan, code, test, repair, verify, package, deploy, monitor, document, benchmark, optimize, and roll back;
+- select among Brain-owned and free/open-source executors;
+- discover and normalize business opportunities;
+- prepare offers, product artifacts, customer-support drafts, delivery packages, and commercial analyses;
+- continuously maintain evidence, audit trails, recovery points, and health state.
+
+Hard gates remain for actions that can create an external legal, financial, identity, or irreversible obligation:
+- signing or accepting contracts;
+- creating personal guarantees or debt;
+- moving company or personal funds;
+- initiating withdrawals or payments;
+- submitting legally binding filings;
+- making regulated representations;
+- disclosing protected credentials or secrets;
+- irreversible deletion or destructive infrastructure actions unless a pre-authorized recovery policy explicitly permits them.
+
+These gates are fail-closed and must never be bypassed by prompt, retry, fallback provider, or autonomous repair.
+
+Autonomy tiers remain:
+BRAIN_OWNED -> FREE_DIVERSE -> PAID_EXTERNAL.
+
+Commercial truth remains evidence-first:
+OFFER -> CUSTOMER -> CONTRACT -> DELIVERY -> PAYMENT_VERIFIED -> REVENUE_REALIZED -> COSTS -> PROFIT_VERIFIED.
+
+Decision authority:
+Brain may make internal technical and operational decisions within declared policy. External authority must be evidenced separately; technical autonomy never implies legal authority.
+
+Objective:
+Minimize routine human intervention while maximizing Brain's independent capability, recovery, auditability, and lawful commercial execution.
