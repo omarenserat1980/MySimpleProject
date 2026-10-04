@@ -87,3 +87,16 @@ Tokens and secrets must never be committed. Autonomous workflows must use least-
 The repository contains the major Brain V12 modules and economic workflows. Runtime audits remain authoritative for what is actually working.
 ## 14. Capability-first architecture
 Brain tasks must declare capabilities rather than hard-code a single application, vendor, or provider. The Capability Fabric maintains multiple executors per capability, filters them by permission and availability, ranks them deterministically, and performs bounded fallback after classified execution failure. No available executor is a failure state, never a synthetic success. ChatGPT is an AI partner behind the AI Gateway, not a mandatory single point of failure. Objective verification and evidence remain separate gates after execution.
+
+
+## 15. Commercial scaling gate
+
+Paid external executors are an optional scaling layer, never a prerequisite for Brain survival or core operation. The Brain must keep the autonomy order **BRAIN_OWNED → FREE_DIVERSE → PAID_EXTERNAL**.
+
+Paid execution may be enabled only when:
+1. company funds are independently verified;
+2. the verified amount is positive;
+3. funding evidence is recorded;
+4. explicit authorization enables commercial mode.
+
+This gate only authorizes capability selection. It never purchases services, moves funds, withdraws money, or creates a contract automatically.
