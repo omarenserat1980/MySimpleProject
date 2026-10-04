@@ -30,3 +30,6 @@ assert.match(worker, /requireClient/);
 assert.match(worker, /AUTH_REQUIRED/);
 assert.match(worker, /ORDER_ACCESS_DENIED/);
 assert.match(clientMigration, /client_email/);
+
+assert.match(worker, /listClientOrders/);
+assert.match(worker, /ORDER BY created_at DESC LIMIT 50/);
