@@ -32,6 +32,10 @@ export default {
       return listClientDeliveries(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/jobs" && request.method === "GET") {
+      return listClientJobs(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -388,11 +392,25 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'REVENUE_REALIZED', ?)"
   ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
+  const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
+  await env.BRAIN_DB.prepare(
+    "INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)"
+  ).bind(jobId, orderId).run();
   await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, revenue_state: "REVENUE_REALIZED", revenue_id: revenueId });
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function listClientJobs(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  const result = await env.BRAIN_DB.prepare(
+    "SELECT j.job_id, j.order_id, j.state, j.attempt, j.result_evidence, j.created_at, j.updated_at FROM service_jobs j JOIN orders o ON o.order_id = j.order_id WHERE o.client_email = ? ORDER BY j.created_at DESC LIMIT 50"
+  ).bind(client.email).all();
+  return json({ ok: true, jobs: result.results || [] }, 200, requestOrigin, allowedOrigin);
+}
 
 async function listClientDeliveries(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
