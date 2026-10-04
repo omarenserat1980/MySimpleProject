@@ -36,7 +36,8 @@ class FabricIntelligence:
         if not s:
             return (1000.0 if free else 0.0) - base_priority
         exploration = 1.0 / (1.0 + s.runs)
-        return (2000.0 if free else 0.0) + 1000.0 * s.reliability + 100.0 * exploration - base_priority - min(s.avg_latency_ms / 1000.0, 100.0)
+        failure_rate = s.failures / s.runs if s.runs else 0.0
+        return (1000.0 if free else 0.0) + 1000.0 * s.reliability + 100.0 * exploration - 1000.0 * failure_rate - base_priority - min(s.avg_latency_ms / 1000.0, 100.0)
 
     def rank(self, capabilities, task: str):
         eligible = [c for c in capabilities if c.enabled and ("*" in c.tasks or task in c.tasks)]
