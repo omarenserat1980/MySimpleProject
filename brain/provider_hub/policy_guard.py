@@ -30,8 +30,6 @@ class CommercialPolicyGuard:
         financial_action: bool = False,
         evidence_present: bool = False,
         contained: bool = False,
-        *,
-        **kwargs: object,
     ) -> PolicyDecision:
         # Keep the contract backward-compatible with older callers while
         # accepting the explicit keyword form used by current integrations.
