@@ -81,6 +81,7 @@ async function createCommercialOrder(request, env, requestOrigin, allowedOrigin)
   await env.BRAIN_DB.prepare(
     "INSERT INTO orders (order_id, service, plan, amount, currency, state, client_email) VALUES (?, ?, ?, ?, 'USD', 'NEW', ?)"
   ).bind(orderId, service, key, amount, client.email).run();
+  await recordOrderEvent(env, orderId, null, "NEW", "ORDER_CREATED", { client_email: client.email, service, plan: key, amount, currency: "USD" });
 
   return json({
     ok: true,
@@ -154,6 +155,7 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   await env.BRAIN_DB.prepare(
     "UPDATE orders SET state = 'PAYMENT_PENDING' WHERE order_id = ?"
   ).bind(order.order_id).run();
+  await recordOrderEvent(env, order.order_id, String(order.state), "PAYMENT_PENDING", "PAYMENT_REQUEST_CREATED", { tran_ref: result.tran_ref });
 
   return json({
     ok: true,
@@ -240,10 +242,19 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_VERIFIED', verified_at = CURRENT_TIMESTAMP, raw_evidence = ? WHERE tran_ref = ?").bind(evidence, tranRef),
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
   ]);
+  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef });
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function recordOrderEvent(env, orderId, fromState, toState, eventType, evidence) {
+  if (!env.BRAIN_DB) return;
+  const eventId = await sha256Hex(new TextEncoder().encode(orderId + ":" + (fromState || "") + ":" + toState + ":" + eventType + ":" + JSON.stringify(evidence)));
+  await env.BRAIN_DB.prepare(
+    "INSERT OR IGNORE INTO order_events (event_id, order_id, from_state, to_state, event_type, evidence) VALUES (?, ?, ?, ?, ?, ?)"
+  ).bind(eventId, orderId, fromState, toState, eventType, JSON.stringify(evidence)).run();
+}
 
 async function listClientOrders(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
