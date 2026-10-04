@@ -3,16 +3,33 @@
   "updated": "2026-10-04",
   "movies": [
     {
-      "id": "brain-last-light-city",
-      "title": "آخر ضوء في المدينة",
+      "id": "brain-room-13",
+      "title": "الغرفة 13",
       "year": 2026,
-      "genre": "دراما • سينمائي",
+      "genre": "رعب • غموض",
       "access": "planned",
-      "status": "preview_available",
-      "rating": null,
-      "href": "./cinema.html",
-      "rights": "brain_original",
       "commercial_status": "BLOCKED",
+      "href": "./film-room-13.html",
+      "evidence": []
+    },
+    {
+      "id": "brain-last-signal",
+      "title": "بعد الإشارة",
+      "year": 2026,
+      "genre": "خيال علمي • تشويق",
+      "access": "planned",
+      "commercial_status": "BLOCKED",
+      "href": "./film-last-signal.html",
+      "evidence": []
+    },
+    {
+      "id": "brain-zero-line",
+      "title": "خط الصفر",
+      "year": 2026,
+      "genre": "إثارة • مغامرة",
+      "access": "planned",
+      "commercial_status": "BLOCKED",
+      "href": "./film-zero-line.html",
       "evidence": []
     }
   ],
