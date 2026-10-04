@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - "cloud/web/**"
+      - "platform.html"
+      - "brain_v12/web/platform.html"
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
       - "docs/cinema.html"
@@ -39,6 +41,7 @@ jobs:
           rm -rf _site
           mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
+          cp platform.html _site/platform.html
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
           cp docs/cinema.html _site/cinema.html
@@ -60,6 +63,8 @@ jobs:
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
               encoding="utf-8",
           )
+          if not Path("_site/platform.html").is_file():
+              raise SystemExit("Unified Brain platform entry point is missing from artifact")
           if not Path("_site/index.html").is_file():
               raise SystemExit("Pages root entry point is missing from artifact")
           if not Path("_site/movies.html").is_file():
@@ -86,6 +91,7 @@ jobs:
       - name: Validate Pages payload
         run: |
           test -f _site/index.html
+          test -f _site/platform.html
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
