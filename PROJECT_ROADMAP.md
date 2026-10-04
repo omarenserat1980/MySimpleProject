@@ -50,8 +50,11 @@
 - [ ] Profit measurement after verified delivery and costs
 - [ ] YouTube publishing only after explicit authorization and OAuth verification
 
-## Phase 5 — Device bridge
+## Phase 5 — Device bridge and synchronization
 - [x] Device bridge modules
+- [x] Deterministic synchronization core
+- [x] Idempotent event replay and optimistic concurrency
+- [x] Tombstones, deterministic snapshot digests, and audit-chain validation
 - [ ] BRAIN Termux Emulator as primary phone-side executor
 - [ ] Secure polling/command contract
 - [ ] Offline queue and recovery
