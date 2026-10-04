@@ -65,6 +65,162 @@ FEEDBACK_STORE = FeedbackStore(STATE)
 CUSTOMER_REQUESTS = STATE / "customer_requests"
 CUSTOMER_REQUESTS.mkdir(parents=True, exist_ok=True)
 
+# ---------------------------------------------------------------------------
+# PUBLIC CLIENT ACCOUNTS / 5-DAY TRIAL
+# The trial is server-side and tied to a normalized email address. The client
+# UI is never trusted to decide eligibility.
+# ---------------------------------------------------------------------------
+CLIENT_ACCOUNTS = STATE / "client_accounts"
+CLIENT_ACCOUNTS.mkdir(parents=True, exist_ok=True)
+CLIENT_SESSIONS = STATE / "client_sessions"
+CLIENT_SESSIONS.mkdir(parents=True, exist_ok=True)
+TRIAL_SECONDS = 5 * 24 * 60 * 60
+
+def _email_key(email: str) -> str:
+    value = email.strip().lower()
+    if "@" not in value or len(value) > 254:
+        raise HTTPException(status_code=400, detail="valid email is required")
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+def _account_path(email: str) -> Path:
+    return CLIENT_ACCOUNTS / (_email_key(email) + ".json")
+
+def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
+    if len(password) < 10:
+        raise HTTPException(status_code=400, detail="password must be at least 10 characters")
+    salt = salt or os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 210_000)
+    return salt.hex(), digest.hex()
+
+def _verify_password(password: str, account: dict) -> bool:
+    try:
+        salt = bytes.fromhex(account["password_salt"])
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 210_000).hex()
+        return hmac.compare_digest(digest, account["password_hash"])
+    except (KeyError, ValueError):
+        return False
+
+def _save_account(account: dict) -> None:
+    tmp = _account_path(account["email"]).with_suffix(".tmp")
+    tmp.write_text(json.dumps(account, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(_account_path(account["email"]))
+
+def _load_account(email: str) -> dict | None:
+    path = _account_path(email)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=500, detail="account state is unreadable")
+
+def _create_client_session(email: str) -> str:
+    raw = uuid.uuid4().hex + uuid.uuid4().hex
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    record = {"email": email.strip().lower(), "expires_at": time.time() + 24 * 60 * 60}
+    (CLIENT_SESSIONS / (token_hash + ".json")).write_text(json.dumps(record), encoding="utf-8")
+    return raw
+
+def _client_account_from_token(request: Request) -> dict:
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="login required")
+    raw = header[7:].strip()
+    if not raw:
+        raise HTTPException(status_code=401, detail="login required")
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    path = CLIENT_SESSIONS / (token_hash + ".json")
+    if not path.exists():
+        raise HTTPException(status_code=401, detail="session expired")
+    try:
+        session = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=401, detail="invalid session")
+    if float(session.get("expires_at", 0)) <= time.time():
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=401, detail="session expired")
+    account = _load_account(session["email"])
+    if not account:
+        raise HTTPException(status_code=401, detail="account unavailable")
+    return account
+
+class ClientAuthRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=10, max_length=200)
+    display_name: str = Field(default="", max_length=120)
+
+class ClientOrderRequest(BaseModel):
+    service: str
+    plan: str
+    need: str = Field(min_length=10, max_length=10000)
+
+@app.post("/api/auth/register")
+def client_register(body: ClientAuthRequest):
+    email = body.email.strip().lower()
+    existing = _load_account(email)
+    if existing:
+        # Deliberately generic: do not reveal account existence.
+        raise HTTPException(status_code=409, detail="account cannot be created with these credentials")
+    salt, password_hash = _hash_password(body.password)
+    now = time.time()
+    account = {
+        "client_id": str(uuid.uuid4()),
+        "email": email,
+        "display_name": body.display_name.strip() or email.split("@")[0],
+        "password_salt": salt,
+        "password_hash": password_hash,
+        "created_at": now,
+        "trial": {"eligible": True, "started_at": now, "duration_seconds": TRIAL_SECONDS,
+                  "used": True, "state": "TRIAL_ACTIVE"},
+        "orders": [],
+        "audit": [{"event": "ACCOUNT_CREATED_AND_TRIAL_STARTED", "at": now}],
+    }
+    _save_account(account)
+    token = _create_client_session(email)
+    return {"ok": True, "token": token, "account": _client_public(account)}
+
+@app.post("/api/auth/login")
+def client_login(body: ClientAuthRequest):
+    account = _load_account(body.email)
+    if not account or not _verify_password(body.password, account):
+        raise HTTPException(status_code=401, detail="invalid email or password")
+    token = _create_client_session(account["email"])
+    return {"ok": True, "token": token, "account": _client_public(account)}
+
+def _client_public(account: dict) -> dict:
+    trial = dict(account["trial"])
+    remaining = max(0, int(trial["started_at"] + trial["duration_seconds"] - time.time()))
+    trial["remaining_seconds"] = remaining
+    trial["remaining_days"] = round(remaining / 86400, 2)
+    trial["state"] = "TRIAL_ACTIVE" if remaining > 0 else "TRIAL_EXPIRED"
+    return {"client_id": account["client_id"], "email": account["email"],
+            "display_name": account["display_name"], "trial": trial,
+            "orders": account.get("orders", [])}
+
+@app.get("/api/auth/me")
+def client_me(request: Request):
+    return {"ok": True, "account": _client_public(_client_account_from_token(request))}
+
+@app.get("/api/trial")
+def client_trial(request: Request):
+    account = _client_account_from_token(request)
+    return {"ok": True, "trial": _client_public(account)["trial"]}
+
+@app.post("/api/orders")
+def client_order(request: Request, body: ClientOrderRequest):
+    account = _client_account_from_token(request)
+    public = _client_public(account)
+    if public["trial"]["state"] != "TRIAL_ACTIVE" and body.plan.upper().startswith("FREE TRIAL"):
+        raise HTTPException(status_code=409, detail="free trial has expired")
+    order_id = "BRAIN-CLIENT-" + time.strftime("%Y%m%d") + "-" + uuid.uuid4().hex[:8].upper()
+    order = {"order_id": order_id, "service": body.service.strip(), "plan": body.plan.strip(),
+             "need": body.need.strip(), "state": "TRIAL_REQUESTED" if body.plan.upper().startswith("FREE TRIAL") else "NEW",
+             "created_at": time.time(), "payment_state": "NOT_REQUIRED_TRIAL" if body.plan.upper().startswith("FREE TRIAL") else "PAYMENT_PENDING"}
+    account.setdefault("orders", []).append(order)
+    account.setdefault("audit", []).append({"event": "SERVICE_ORDER_CREATED", "order_id": order_id, "at": time.time()})
+    _save_account(account)
+    return {"ok": True, "order": order, "account": _client_public(account)}
+
 
 class CustomerRequest(BaseModel):
     display_name: str
