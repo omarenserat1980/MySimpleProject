@@ -18,3 +18,11 @@ third-party production services.
 - deterministic export
 - QC/evidence
 - commercial release gate
+
+
+## Release evidence modules
+- `qc_engine.py`: technical master validation
+- `release_gate.py`: commercial gate
+- `export_manifest.py`: master hash and evidence manifest
+
+A release is blocked unless technical QC, rights evidence, story review, sound review and continuity review all pass.
