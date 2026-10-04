@@ -29,6 +29,7 @@ jobs:
           test -f cloudflare/brain-api/src/index.js
           test -f cloudflare/brain-api/migrations/0001_commercial.sql
           node --check cloudflare/brain-api/src/index.js
+          node cloudflare/brain-api/test/commercial_worker_static.test.js
 
       - name: Require Cloudflare and PayTabs configuration
         env:
