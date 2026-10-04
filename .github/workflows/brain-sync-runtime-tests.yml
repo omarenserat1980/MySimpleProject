@@ -5,8 +5,10 @@ on:
     paths:
       - "brain_v12/brain/sync_engine.py"
       - "brain_v12/brain/sync_runtime.py"
+      - "brain_v12/brain/task_sync_adapter.py"
       - "brain_v12/tests/test_sync_engine.py"
       - "brain_v12/tests/test_sync_runtime.py"
+      - "brain_v12/tests/test_task_sync_adapter.py"
       - "brain_v12/self_healing/self_test_matrix.py"
       - ".github/workflows/brain-sync-runtime-tests.yml"
   push:
@@ -14,8 +16,10 @@ on:
     paths:
       - "brain_v12/brain/sync_engine.py"
       - "brain_v12/brain/sync_runtime.py"
+      - "brain_v12/brain/task_sync_adapter.py"
       - "brain_v12/tests/test_sync_engine.py"
       - "brain_v12/tests/test_sync_runtime.py"
+      - "brain_v12/tests/test_task_sync_adapter.py"
       - "brain_v12/self_healing/self_test_matrix.py"
       - ".github/workflows/brain-sync-runtime-tests.yml"
 
@@ -25,6 +29,7 @@ permissions:
 jobs:
   sync-runtime:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,8 +38,6 @@ jobs:
       - name: Compile synchronization modules
         run: |
           python -m py_compile brain_v12/brain/sync_engine.py brain_v12/brain/sync_runtime.py brain_v12/brain/task_sync_adapter.py brain_v12/tests/test_sync_engine.py brain_v12/tests/test_sync_runtime.py brain_v12/tests/test_task_sync_adapter.py
-      - "brain_v12/brain/task_sync_adapter.py"
-      - "brain_v12/tests/test_task_sync_adapter.py"
       - name: Run synchronization tests
         run: |
           python -m unittest brain_v12.tests.test_sync_engine brain_v12.tests.test_sync_runtime brain_v12.tests.test_task_sync_adapter -v
