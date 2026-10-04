@@ -29,7 +29,7 @@
     <div class="meta"><span class="chip">سينمائي / Flipbook</span><span class="chip">16:9</span><span class="chip">إنتاج Brain</span><span class="chip">نسخة موثقة</span></div>
     <p class="story">مدينة تقترب من آخر لحظاتها المضيئة. تتبع الحكاية رحلة قصيرة نحو الضوء، عبر صور متتابعة وصوت سينمائي وإيقاع بصري صنعه مصنع Brain.</p>
     <div class="price">تجربة المشاهدة: 0.99 د.أ</div>
-    <div class="tiny">السعر هنا واجهة تجارية فقط حتى يتم ربط مزود دفع حقيقي وآمن؛ لا يتم تحصيل أي مبلغ من هذه الصفحة حالياً.</div>
+    <div class="tiny">الدفع يمر عبر صفحة PayTabs المستضافة؛ لا يتم إدخال بيانات البطاقة في Brain، ولا تُمنح المشاهدة إلا بعد تحقق الخادم من نتيجة الدفع.</div>
     <div class="actions" style="margin-top:16px">
       <button onclick="preview()">▶ مشاهدة الإعلان/المعاينة</button>
       <button class="secondary" onclick="openCheckout()">🔐 استئجار الفيلم</button>
@@ -44,7 +44,7 @@
     <source src="./docs/assets/last_light_city.mp4" type="video/mp4">
     متصفحك لا يدعم تشغيل الفيديو.
   </video>
-  <p class="muted">المعاينة المتاحة حالياً تستخدم نسخة الفيلم المنشورة في مستودع Brain. المشاهدة المدفوعة الكاملة يجب أن تمر عبر entitlement بعد التحقق من الدفع.</p>
+  <p class="muted">المعاينة مجانية. النسخة الكاملة تُخدم من مخزن خاص بعد منح ENTITLEMENT من الخادم.</p>
 </section>
 
 <section class="section">
@@ -61,8 +61,8 @@
 <div class="modal" id="checkout">
  <div class="box">
   <h2>🔐 استئجار «آخر ضوء في المدينة»</h2>
-  <p class="notice">هذه هي نقطة الدفع الفعلية في التصميم. لن نعتبر الطلب مدفوعاً من زر في المتصفح. يجب أن ينشئ الخادم Checkout Session مع مزود دفع، ثم يتحقق من webhook ويمنح صلاحية المشاهدة.</p>
-  <div class="method">
+  <p class="notice">سيتم تحويلك إلى صفحة دفع PayTabs المستضافة. لا يعتبر Brain العملية مدفوعة إلا بعد وصول Callback موثّق والتحقق من المبلغ والعملة ومعرّف المعاملة.</p>
+  <label class="tiny" for="email">البريد الإلكتروني لاستلام إثبات الشراء</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" style="width:100%;padding:12px;margin:8px 0 12px;border-radius:10px;border:1px solid var(--line);background:#08111d;color:#fff"><div class="method">
    <button onclick="startPayment('card')">💳 الدفع بالبطاقة — 0.99 د.أ</button>
    <button onclick="startPayment('wallet')">📱 محفظة/وسيلة دفع — 0.99 د.أ</button>
    <button class="secondary" onclick="closeCheckout()">إلغاء</button>
@@ -72,27 +72,40 @@
 </div>
 
 <script>
-const movie=document.getElementById('movie'), gate=document.getElementById('gate');
+const API='__BRAIN_CINEMA_API_URL__';\nconst movie=document.getElementById('movie'), gate=document.getElementById('gate');
 function preview(){document.getElementById('player').scrollIntoView({behavior:'smooth'});movie.currentTime=0;movie.play().catch(()=>{})}
 function openCheckout(){document.getElementById('checkout').classList.add('open')}
 function closeCheckout(){document.getElementById('checkout').classList.remove('open')}
 async function startPayment(method){
- const s=document.getElementById('paymentStatus');s.textContent='جاري طلب جلسة دفع آمنة…';
+ const s=document.getElementById('paymentStatus');
+ const email=document.getElementById('email').value.trim();
+ if(!email){s.textContent='أدخل بريدك الإلكتروني أولاً.';return}
+ s.textContent='جاري إنشاء طلب الدفع الآمن…';
  try{
-  const r=await fetch('/api/cinema/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({film_id:'brain-last-light-city',access_type:'RENT',currency:'JOD',amount:0.99,method})});
-  if(!r.ok) throw new Error('PAYMENT_BACKEND_NOT_CONFIGURED');
-  const x=await r.json();
+  const r=await fetch(API+'/api/cinema/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({film_id:'brain-last-light-city',access_type:'RENT',email,method}),credentials:'include'});
+  const x=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(x.error||'CHECKOUT_FAILED');
   if(x.checkout_url){location.href=x.checkout_url;return}
-  s.textContent='لم يُرجع الخادم رابط Checkout. لم يتم تحصيل أي مبلغ.';
- }catch(e){s.textContent='الدفع الحقيقي غير موصول بعد. لم يتم تحصيل أي مبلغ. يجب ربط /api/cinema/checkout بمزود دفع ثم التحقق من webhook.'}
+  s.textContent='لم يُرجع الخادم رابط الدفع. لم يتم تحصيل أي مبلغ.';
+ }catch(e){s.textContent='تعذر إنشاء الدفع الآن: '+e.message+' — لم يتم تحصيل أي مبلغ.'}
 }
 async function verifyAccess(){
+ const params=new URLSearchParams(location.search);
+ const token=params.get('cinema_token')||localStorage.getItem('brain_cinema_token');
+ if(!token)return;
+ localStorage.setItem('brain_cinema_token',token);
  try{
-  const r=await fetch('/api/cinema/access?film_id=brain-last-light-city');
-  if(!r.ok)return;
-  const x=await r.json();
-  if(x.access_granted && x.stream_url){movie.querySelector('source').src=x.stream_url;movie.load();gate.innerHTML='🔓 حالة الوصول: <b class="ok">ENTITLEMENT_GRANTED</b>'; }
- }catch(e){}
+  const r=await fetch(API+'/api/cinema/access?film_id=brain-last-light-city&token='+encodeURIComponent(token),{credentials:'include'});
+  const x=await r.json().catch(()=>({}));
+  if(x.access_granted && x.stream_url){
+    movie.querySelector('source').src=x.stream_url;movie.load();
+    gate.innerHTML='🔓 حالة الوصول: <b class="ok">ENTITLEMENT_GRANTED</b>';
+    history.replaceState({},'',location.pathname);
+  } else if(x.state==='PAYMENT_PENDING'){
+    gate.innerHTML='⏳ حالة الوصول: <b>PAYMENT_PENDING</b>';
+    setTimeout(verifyAccess,3000);
+  }
+ }catch(e){gate.innerHTML='⚠️ تعذر التحقق من حالة الدفع حالياً.'}
 }
 verifyAccess();
 </script>
