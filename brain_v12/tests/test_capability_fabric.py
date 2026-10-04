@@ -64,5 +64,22 @@ class CapabilityFabricTests(unittest.TestCase):
         self.assertEqual(result["attempts"][0]["error"], "POLICY_REJECTED")
 
 
+    def test_default_policy_blocks_paid_and_external_side_effects(self):
+        policy = AutonomyPolicy()
+        paid = ExecutorSpec("paid", "ai.reasoning", cost_class="PAID", metadata={"tier": "PAID_EXTERNAL"})
+        publisher = ExecutorSpec("publisher", "publish.youtube", metadata={"tier": "FREE_DIVERSE", "side_effect": True})
+        from brain_v12.brain.autonomy_policy import executor_allowed
+        self.assertFalse(executor_allowed(paid, policy=policy))
+        self.assertFalse(executor_allowed(publisher, policy=policy))
+
+    def test_commercial_mode_allows_paid_but_brain_still_wins(self):
+        policy = AutonomyPolicy(allow_paid=True)
+        paid = ExecutorSpec("paid", "ai.reasoning", priority=1, cost_class="PAID", metadata={"tier": "PAID_EXTERNAL"})
+        brain = ExecutorSpec("brain", "ai.reasoning", priority=50, cost_class="FREE", metadata={"tier": "BRAIN_OWNED"})
+        from brain_v12.brain.autonomy_policy import executor_allowed, rank_key
+        self.assertTrue(executor_allowed(paid, policy=policy))
+        self.assertLess(rank_key(brain), rank_key(paid))
+
+
 if __name__ == "__main__":
     unittest.main()
