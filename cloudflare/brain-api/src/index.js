@@ -15,6 +15,12 @@ export default {
       return json({ ok: true, service: "brain-cloud-api", mode: "adapter" });
     }
 
+    if (url.pathname === "/api/payments/paytabs/callback") {
+      // PayTabs callback must be handled by the protected BRAIN origin.
+      // Do not accept or mark payments verified in the public proxy itself.
+      return json({ ok: false, error: "PAYTABS_CALLBACK_ORIGIN_REQUIRED" }, 503, requestOrigin, allowedOrigin);
+    }
+
     const origin = String(env.BRAIN_ORIGIN || "").replace(/\/$/, "");
     if (!origin || origin.includes("REPLACE_WITH_")) {
       return json({ ok: false, error: "BRAIN_ORIGIN_NOT_CONFIGURED" }, 503);
