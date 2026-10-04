@@ -9,6 +9,7 @@ on:
       - "docs/cinema.html"
       - "docs/movies.html"
       - "docs/catalog.json"
+      - "docs/studio/**"
       - "docs/assets/last_light_city_preview.mp4"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
@@ -88,6 +89,10 @@ jobs:
           test -f _site/brain-chat/index.html
           test -f _site/cinema.html
           test -f _site/movies.html
+          cp -r docs/studio _site/studio
+          test -f _site/studio/index.html
+          test -f _site/studio/app.js
+          test -f _site/studio/studio.css
           test -f _site/catalog.json
           test -f _site/assets/last_light_city_preview.mp4
           test -f _site/brain-chat/config.js
