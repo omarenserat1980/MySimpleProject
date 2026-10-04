@@ -6,6 +6,7 @@ on:
       - "brain_v12/brain/sync_engine.py"
       - "brain_v12/brain/sync_runtime.py"
       - "brain_v12/brain/task_sync_adapter.py"
+      - "brain_v12/brain/device_sync_adapter.py"
       - "brain_v12/tests/test_sync_engine.py"
       - "brain_v12/tests/test_sync_runtime.py"
       - "brain_v12/tests/test_task_sync_adapter.py"
@@ -37,7 +38,7 @@ jobs:
           python-version: "3.11"
       - name: Compile synchronization modules
         run: |
-          python -m py_compile brain_v12/brain/sync_engine.py brain_v12/brain/sync_runtime.py brain_v12/brain/task_sync_adapter.py brain_v12/tests/test_sync_engine.py brain_v12/tests/test_sync_runtime.py brain_v12/tests/test_task_sync_adapter.py
+          python -m py_compile brain_v12/brain/sync_engine.py brain_v12/brain/sync_runtime.py brain_v12/brain/task_sync_adapter.py brain_v12/brain/device_sync_adapter.py brain_v12/tests/test_sync_engine.py brain_v12/tests/test_sync_runtime.py brain_v12/tests/test_task_sync_adapter.py
       - name: Run synchronization tests
         run: |
           python -m unittest brain_v12.tests.test_sync_engine brain_v12.tests.test_sync_runtime brain_v12.tests.test_task_sync_adapter -v
