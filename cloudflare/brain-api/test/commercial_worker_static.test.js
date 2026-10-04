@@ -6,6 +6,7 @@ const schema = fs.readFileSync("migrations/0001_commercial.sql", "utf8");
 const clientMigration = fs.readFileSync("migrations/0002_order_client.sql", "utf8");
 const auditMigration = fs.readFileSync("migrations/0003_order_audit.sql", "utf8");
 const revenueMigration = fs.readFileSync("migrations/0004_revenue_ledger.sql", "utf8");
+const deliveryMigration = fs.readFileSync("migrations/0005_delivery.sql", "utf8");
 const cinemaMigration = fs.readFileSync("migrations/0005_cinema_entitlements.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
@@ -55,3 +56,7 @@ assert.match(worker, /cinema_entitlements/);
 assert.match(worker, /BRAIN_CINEMA_TOKEN/);
 assert.match(cinemaMigration, /CREATE TABLE IF NOT EXISTS cinema_entitlements/);
 console.log("CINEMA_ENTITLEMENT_GATES=PASS");
+
+assert.match(worker, /listClientDeliveries/);
+assert.match(worker, /deliveries d JOIN orders o/);
+assert.match(deliveryMigration, /CREATE TABLE IF NOT EXISTS deliveries/);
