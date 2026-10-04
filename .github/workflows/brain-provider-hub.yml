@@ -20,4 +20,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run provider safety tests
-        run: python -m pytest -q brain/provider_hub/test_router.py
+        run: python -m pytest -q brain/provider_hub
