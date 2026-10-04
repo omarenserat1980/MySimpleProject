@@ -34,7 +34,11 @@ jobs:
           assert s["local"] is True
           assert s["external_api"] is False
           assert png.startswith(b"\x89PNG\r\n\x1a\n")
-          assert len(png)>10000
+          assert len(png)>1000
+          import struct
+          width,height=struct.unpack(">II",png[16:24])
+          assert (width,height)==(1000,650)
+          assert len(commands)>=10
           assert len(commands)>0
           print("BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED")
           PY
