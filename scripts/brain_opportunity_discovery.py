@@ -18,13 +18,25 @@ for x in SOURCES:
     x["score"] = score(x)
 SOURCES.sort(key=lambda x: x["score"], reverse=True)
 
-state = {
-    "schema":"brain.opportunity_queue.v1",
-    "generated_at":datetime.now(timezone.utc).isoformat(),
+now = datetime.now(timezone.utc).isoformat()
+selected = SOURCES[0]
+task_id = "OPP-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+queue = {
+    "schema":"brain.opportunity_queue.v2",
+    "generated_at":now,
     "commercial_truth":"DISCOVERY_ONLY_UNTIL_PAYMENT_VERIFIED",
     "autonomy_order":["BRAIN_OWNED","FREE_DIVERSE","PAID_EXTERNAL"],
     "candidates":SOURCES,
-    "selected_next":SOURCES[0]["id"],
+    "selected_next":selected["id"],
+    "selected_task":{
+        "task_id":task_id,
+        "opportunity_id":selected["id"],
+        "state":"READY_FOR_EXECUTION",
+        "required_evidence":["scope","execution_result","verification_result"],
+        "commercial_state":"MONETIZATION_PATH_DEFINED",
+        "payment_state":"NOT_VERIFIED"
+    },
     "gates":{
         "legal":True,
         "financial_side_effects_blocked":True,
@@ -32,6 +44,9 @@ state = {
         "paid_external_disabled_by_default":True
     }
 }
-Path(".brain_state").mkdir(exist_ok=True)
-Path(".brain_state/opportunity_queue.json").write_text(json.dumps(state,ensure_ascii=False,indent=2)+"\n")
-print(json.dumps(state,ensure_ascii=False,indent=2))
+
+root=Path(".brain_state")
+root.mkdir(exist_ok=True)
+(root/"opportunity_queue.json").write_text(json.dumps(queue,ensure_ascii=False,indent=2)+"\n")
+(root/"opportunity_task.json").write_text(json.dumps(queue["selected_task"],ensure_ascii=False,indent=2)+"\n")
+print(json.dumps(queue,ensure_ascii=False,indent=2))
