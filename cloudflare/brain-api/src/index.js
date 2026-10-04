@@ -28,6 +28,10 @@ export default {
       return listClientOrders(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/deliveries" && request.method === "GET") {
+      return listClientDeliveries(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -388,6 +392,16 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function listClientDeliveries(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  const result = await env.BRAIN_DB.prepare(
+    "SELECT d.delivery_id, d.order_id, d.state, d.artifact_url, d.created_at, d.delivered_at FROM deliveries d JOIN orders o ON o.order_id = d.order_id WHERE o.client_email = ? ORDER BY d.created_at DESC LIMIT 50"
+  ).bind(client.email).all();
+  return json({ ok: true, deliveries: result.results || [] }, 200, requestOrigin, allowedOrigin);
+}
 
 async function recordOrderEvent(env, orderId, fromState, toState, eventType, evidence) {
   if (!env.BRAIN_DB) return;
