@@ -55,7 +55,15 @@ def execute_allowlisted(kind: str, payload: dict[str, Any] | None = None) -> dic
             "reason": "JOB_KIND_NOT_ALLOWLISTED",
         }
 
-    timeout = int(payload.get("timeout_seconds", 30))
+    try:
+        timeout = max(1, min(300, int(payload.get("timeout_seconds", 30))))
+    except (TypeError, ValueError):
+        return {
+            "kind": kind,
+            "verified": False,
+            "status": "REJECTED",
+            "reason": "INVALID_TIMEOUT",
+        }
     if kind == "python_self_test":
         result = _run(
             [sys.executable, "-c", "import sys; print('BRAIN_PYTHON_SELF_TEST_OK'); sys.exit(0)"],
