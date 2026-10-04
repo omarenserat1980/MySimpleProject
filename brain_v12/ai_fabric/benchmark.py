@@ -14,7 +14,7 @@ class BenchmarkResult:
 def benchmark(fabric, task: str, payload: dict[str, Any], kind: str = "model") -> list[BenchmarkResult]:
     registry = getattr(fabric, kind + "s", {})
     rows=[]
-    for name, cap in fabric._candidates(registry, task):
+    for cap in fabric._candidates(registry, task):
         start=monotonic()
         try:
             result=cap.handler(payload)
@@ -24,5 +24,5 @@ def benchmark(fabric, task: str, payload: dict[str, Any], kind: str = "model") -
             verified=False; ok=False
         latency=(monotonic()-start)*1000
         score=(1.0 if ok else 0.0)+(1.0 if verified else 0.0)-(latency/100000.0)
-        rows.append(BenchmarkResult(name,ok,verified,round(latency,3),round(score,6)))
+        rows.append(BenchmarkResult(cap.name,ok,verified,round(latency,3),round(score,6)))
     return rows
