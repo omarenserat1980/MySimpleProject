@@ -4,7 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - "cloudflare/brain-api/**"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/wrangler.toml"
+      - "cloudflare/brain-api/migrations/0001_commercial.sql"
+      - "cloudflare/brain-api/migrations/0002_order_client.sql"
+      - "cloudflare/brain-api/migrations/0003_order_audit.sql"
+      - "cloudflare/brain-api/migrations/0004_revenue_ledger.sql"
+      - "cloudflare/brain-api/migrations/0007_cinema_entitlements.sql"
+      - "cloudflare/brain-api/test/cloudflare_deploy_static.test.js"
       - ".github/workflows/brain-cloudflare-deploy.yml"
   workflow_dispatch:
 
@@ -31,8 +38,7 @@ jobs:
           test -f cloudflare/brain-api/migrations/0007_cinema_entitlements.sql
           test -f cloudflare/brain-api/test/cinema_worker_static.test.js
           node --check cloudflare/brain-api/src/index.js
-          node cloudflare/brain-api/test/commercial_worker_static.test.js
-          node cloudflare/brain-api/test/cinema_worker_static.test.js
+          node cloudflare/brain-api/test/cloudflare_deploy_static.test.js
 
       - name: Require Cloudflare and PayTabs configuration
         env:
