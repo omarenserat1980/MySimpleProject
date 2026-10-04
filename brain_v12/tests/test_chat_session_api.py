@@ -113,7 +113,9 @@ class ChatSessionApiTests(unittest.TestCase):
             second = store.create("Second")
             store.add_message(first["id"], "user", "only-first")
             feed = store.sync_events(second["id"])
-            self.assertEqual(feed["events"], [])
+            self.assertEqual([e["event_type"] for e in feed["events"]], ["SESSION_CREATED"])
+            self.assertEqual(feed["events"][0]["payload"]["title"], "Second")
+            self.assertNotIn("only-first", str(feed["events"]))
 
     def test_router_builds(self):
         app = router(FakeBrain())
