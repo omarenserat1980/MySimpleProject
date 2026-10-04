@@ -54,7 +54,12 @@ class CapabilityFabric:
         candidates = [x for x in self._executors.values()
                       if x.capability == capability and x.state == "ONLINE"]
         if require_healthy:
-            candidates = [x for x in candidates if self.health.healthy(x.executor_id)]
+            # Registered executors without probes are health-neutral unless they
+            # explicitly require a probe before activation.
+            candidates = [x for x in candidates if (
+                (x.executor_id not in self.health._probes and not x.metadata.get("requires_probe"))
+                or self.health.healthy(x.executor_id)
+            )]
         return sorted(candidates, key=lambda x: (
             *rank_key(x), -self.health.score(x.executor_id)))
 
