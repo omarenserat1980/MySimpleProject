@@ -86,3 +86,12 @@ Brain may make internal technical and operational decisions within declared poli
 
 Objective:
 Minimize routine human intervention while maximizing Brain's independent capability, recovery, auditability, and lawful commercial execution.
+
+
+## 2026-10-04 — Marketing Launch Evaluation Gate
+- BRAIN AI Marketing must be evaluated from four independent perspectives: ordinary customer, marketing practitioner, marketing manager, and marketing-agency/company owner.
+- A separate customer-UX test validates signup, login, free-trial eligibility, service selection, order creation, and order-status clarity.
+- Reviewers must score evidence, clarity, trust, value proposition, usability, commercial readiness, and transparency.
+- A visual/demo impression is not sufficient for commercial launch.
+- No claim of COMMERCIAL_READY is permitted until the public API, persistent customer state, trial enforcement, service execution path, and payment path are each verified in production-like conditions.
+- Reviewer feedback becomes improvement input; no reviewer score is fabricated or inferred as an external opinion.
