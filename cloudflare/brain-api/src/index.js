@@ -36,6 +36,10 @@ export default {
       return listClientJobs(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/jobs/claim" && request.method === "POST") {
+      return claimNextJob(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -401,6 +405,22 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
 
+
+async function claimNextJob(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const control = String(env.BRAIN_CONTROL_TOKEN || "");
+  const auth = String(request.headers.get("Authorization") || "");
+  if (!control || auth !== "Bearer " + control) return json({ ok: false, error: "CONTROL_AUTH_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  const job = await env.BRAIN_DB.prepare(
+    "SELECT job_id, order_id, state, attempt FROM service_jobs WHERE state IN ('PENDING','RETRYING') AND attempt < 3 ORDER BY created_at ASC LIMIT 1"
+  ).first();
+  if (!job) return json({ ok: true, state: "NO_WORK" }, 200, requestOrigin, allowedOrigin);
+  const nextAttempt = Number(job.attempt) + 1;
+  await env.BRAIN_DB.prepare(
+    "UPDATE service_jobs SET state = 'RUNNING', attempt = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ? AND state IN ('PENDING','RETRYING')"
+  ).bind(nextAttempt, job.job_id).run();
+  return json({ ok: true, state: "RUNNING", job: { ...job, state: "RUNNING", attempt: nextAttempt } }, 200, requestOrigin, allowedOrigin);
+}
 
 async function listClientJobs(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
