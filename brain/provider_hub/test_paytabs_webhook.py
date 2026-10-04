@@ -13,9 +13,9 @@ KEY = "TEST_SECRET"
 def body():
     return json.dumps({
         "cart_id": "BRAIN-TEST-1",
-        "cart_total": "1.00",
+        "cart_amount": "1.00",
         "cart_currency": "USD",
-        "response_status": "A",
+        "payment_result": {"response_status": "A"},
         "tran_ref": "TST123",
     }, separators=(",", ":")).encode()
 
@@ -47,15 +47,40 @@ def test_valid_payment_payload():
 
 @pytest.mark.parametrize("field,value,error", [
     ("cart_id", "WRONG", "PAYTABS_ORDER_MISMATCH"),
-    ("cart_total", "99.00", "PAYTABS_AMOUNT_MISMATCH"),
+    ("cart_amount", "99.00", "PAYTABS_AMOUNT_MISMATCH"),
     ("cart_currency", "JOD", "PAYTABS_CURRENCY_MISMATCH"),
-    ("response_status", "E", "PAYTABS_PAYMENT_NOT_AUTHORISED"),
 ])
-def test_mismatches_are_rejected(field, value, error):
+def test_top_level_mismatches_are_rejected(field, value, error):
     data = json.loads(body())
     data[field] = value
     raw = json.dumps(data, separators=(",", ":")).encode()
     with pytest.raises(ValueError, match=error):
+        parse_and_validate_payment(
+            raw, signature(raw), KEY,
+            expected_order_id="BRAIN-TEST-1",
+            expected_amount="1.00",
+            expected_currency="USD",
+        )
+
+
+def test_unauthorised_payment_is_rejected():
+    data = json.loads(body())
+    data["payment_result"]["response_status"] = "E"
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    with pytest.raises(ValueError, match="PAYTABS_PAYMENT_NOT_AUTHORISED"):
+        parse_and_validate_payment(
+            raw, signature(raw), KEY,
+            expected_order_id="BRAIN-TEST-1",
+            expected_amount="1.00",
+            expected_currency="USD",
+        )
+
+
+def test_missing_transaction_reference_is_rejected():
+    data = json.loads(body())
+    data.pop("tran_ref")
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    with pytest.raises(ValueError, match="PAYTABS_TRANSACTION_REFERENCE_MISSING"):
         parse_and_validate_payment(
             raw, signature(raw), KEY,
             expected_order_id="BRAIN-TEST-1",
