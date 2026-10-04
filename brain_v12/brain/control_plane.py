@@ -46,7 +46,11 @@ class BrainControlPlane:
     def execute(self, task_id: str, executor: Callable[[str], dict[str, Any]], verifier: Callable[[dict[str, Any]], dict[str, Any] | bool]) -> dict[str, Any]:
         task = self.tasks.get(task_id)
         if task is None: return {"ok": False, "error": "TASK_NOT_FOUND"}
-        if task.status in TERMINAL: return {"ok": False, "error": "TASK_NOT_RUNNABLE", "task": self._view(task)}
+        if task.status in TERMINAL:
+            if task.status == "FAILED" and task.attempts >= task.max_attempts:
+                task.error = "RETRY_LIMIT_REACHED"
+                return {"ok": False, "error": task.error, "task": self._view(task)}
+            return {"ok": False, "error": "TASK_NOT_RUNNABLE", "task": self._view(task)}
         if task.attempts >= task.max_attempts:
             task.status = "FAILED"; task.error = "RETRY_LIMIT_REACHED"
             return {"ok": False, "error": task.error, "task": self._view(task)}
