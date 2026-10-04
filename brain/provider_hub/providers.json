@@ -1,6 +1,111 @@
 {
-  "schema_version":"1.0",
-  "core_policy":"provider-neutral",
-  "adapters":{"runtime":[],"payment":[],"email":[],"database":[],"storage":[],"media":[]},
-  "activation":{"required_states":["DISCOVERED","CONFIGURED","HEALTHY","VERIFIED","ACTIVE"],"evidence_required":true,"secrets_in_repo":false}
+  "schema_version": "1.0",
+  "core_policy": "provider-neutral",
+  "adapters": {
+    "runtime": [
+      {
+        "id": "cloudflare",
+        "status": "DISCOVERED",
+        "priority": 10,
+        "capabilities": [
+          "api",
+          "proxy"
+        ]
+      },
+      {
+        "id": "self_hosted",
+        "status": "DISCOVERED",
+        "priority": 20,
+        "capabilities": [
+          "api"
+        ]
+      }
+    ],
+    "payment": [
+      {
+        "id": "tap",
+        "status": "DISCOVERED",
+        "priority": 10,
+        "capabilities": [
+          "checkout",
+          "webhook"
+        ]
+      },
+      {
+        "id": "paytabs",
+        "status": "DISCOVERED",
+        "priority": 20,
+        "capabilities": [
+          "checkout",
+          "webhook"
+        ]
+      },
+      {
+        "id": "stripe",
+        "status": "DISCOVERED",
+        "priority": 30,
+        "capabilities": [
+          "checkout",
+          "webhook"
+        ]
+      }
+    ],
+    "email": [
+      {
+        "id": "agentmail",
+        "status": "VERIFIED",
+        "priority": 10,
+        "capabilities": [
+          "transactional_email"
+        ]
+      },
+      {
+        "id": "smtp",
+        "status": "DISCOVERED",
+        "priority": 20,
+        "capabilities": [
+          "transactional_email"
+        ]
+      }
+    ],
+    "database": [
+      {
+        "id": "sqlite",
+        "status": "VERIFIED",
+        "priority": 10,
+        "capabilities": [
+          "state",
+          "audit"
+        ]
+      },
+      {
+        "id": "postgresql",
+        "status": "DISCOVERED",
+        "priority": 20,
+        "capabilities": [
+          "state",
+          "audit"
+        ]
+      }
+    ],
+    "storage": [],
+    "media": []
+  },
+  "activation": {
+    "required_states": [
+      "DISCOVERED",
+      "CONFIGURED",
+      "HEALTHY",
+      "VERIFIED",
+      "ACTIVE"
+    ],
+    "evidence_required": true,
+    "secrets_in_repo": false
+  },
+  "routing_policy": {
+    "selection": "priority_then_health",
+    "failover": true,
+    "never_duplicate_payment": true,
+    "require_evidence_for_activation": true
+  }
 }
