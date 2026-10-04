@@ -68,6 +68,7 @@ from . import media_engine
 from . import visual_engine
 from . import short_video_factory
 from .cloud_bootstrap import bootstrap_status
+from .brain.security_middleware import apply_security_headers
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -169,6 +170,7 @@ def brain_cloud_status():
 @app.middleware("http")
 async def no_cache(request, call_next):
     response=await call_next(request)
+    apply_security_headers(response)
     response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"]="no-cache"
     return response
