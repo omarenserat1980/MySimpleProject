@@ -4,6 +4,8 @@ const fs = require("node:fs");
 const worker = fs.readFileSync("src/index.js", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 const cinema = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
+const cinemaPublish = fs.readFileSync("../../.github/workflows/brain-cinema-publish.yml", "utf8");
+const cinemaDeploy = fs.readFileSync("../../.github/workflows/brain-cloudflare-deploy.yml", "utf8");
 
 [
   "PAYTABS_SERVER_KEY","Signature","HMAC","PAYMENT_PENDING","PAYMENT_VERIFIED",
@@ -17,6 +19,12 @@ assert.match(wrangler, /binding = "BRAIN_DB"/);
 assert.match(wrangler, /binding = "CINEMA_MEDIA"/);
 assert.match(wrangler, /bucket_name = "brain-cinema-media"/);
 assert.match(cinema, /CREATE TABLE IF NOT EXISTS cinema_entitlements/);
+assert.match(cinemaPublish, /brain-cinema-master-private/);
+assert.match(cinemaPublish, /last_light_city_preview\.mp4/);
+assert.match(cinemaPublish, /Paid master must never be published under docs\/assets/);
+assert.doesNotMatch(cinemaPublish, /git add .*last_light_city\.mp4/);
+assert.match(cinemaDeploy, /brain-cinema-master-private/);
+assert.match(cinemaDeploy, /brain-cinema-media\/films\/last_light_city\.mp4/);
 console.log("BRAIN_CLOUDFLARE_DEPLOY_STATIC_GATE=PASS");
 console.log("PAYMENT_VERIFICATION=PASS");
 console.log("CINEMA_ENTITLEMENT=PASS");
