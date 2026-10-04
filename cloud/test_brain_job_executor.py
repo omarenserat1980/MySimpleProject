@@ -23,3 +23,13 @@ def test_sha256_artifact_evidence(tmp_path):
     digest = sha256_file(artifact)
     assert len(digest) == 64
     assert digest == "195254b91a5fb3fe0b866e064474fa1de9ae16867de1ccd9071d5a279ebc9918"
+
+
+def test_invalid_timeout_is_rejected():
+    result = execute_allowlisted("python_self_test", {"timeout_seconds": "not-a-number"})
+    assert result["verified"] is False
+    assert result["reason"] == "INVALID_TIMEOUT"
+
+def test_timeout_is_bounded():
+    result = execute_allowlisted("python_self_test", {"timeout_seconds": 999999})
+    assert result["verified"] is True
