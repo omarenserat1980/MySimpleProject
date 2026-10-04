@@ -1,6 +1,20 @@
 name: Brain Supervisor - Autonomy and Economic Safety
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/economic_ledger.py"
+      - "brain_v12/tests/test_brain_supervisor.py"
+      - "brain_v12/tests/test_economic_ledger.py"
+      - ".github/workflows/brain-supervisor.yml"
+      - "brain_v12/brain/repair_engine.py"
+      - "brain_v12/brain/test_repair_engine.py"
+      - "brain_v12/brain/workflow_watchdog_policy.py"
+      - "brain_v12/brain/workflow_watchdog_policy_test.py"
+      - "brain_v12/brain/workflow_watchdog_self_test.py"
+      - ".github/workflows/brain-workflow-watchdog.yml"
   # Primary connector-safe trigger: changes to Brain Supervisor paths on main.
   # Manual workflow_dispatch remains optional for interactive runs.
   workflow_dispatch:
@@ -25,6 +39,7 @@ on:
       - "brain_v12/brain/test_repair_engine.py"
       - "brain_v12/brain/workflow_watchdog_policy.py"
       - "brain_v12/brain/workflow_watchdog_policy_test.py"
+      - "brain_v12/brain/workflow_watchdog_self_test.py"
       - ".github/workflows/brain-workflow-watchdog.yml"
   schedule:
     - cron: "17 */6 * * *"
@@ -163,6 +178,15 @@ jobs:
           python-version: "3.12"
       - name: Unit tests
         run: python -m unittest brain_v12.tests.test_brain_supervisor brain_v12.tests.test_economic_ledger brain_v12.brain.test_repair_engine brain_v12.brain.workflow_watchdog_policy_test -v
+      - name: Watchdog adversarial SHA self-test
+        run: python -m brain_v12.brain.workflow_watchdog_self_test --evidence brain6_artifacts/workflow_watchdog/self-test-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: brain-watchdog-self-test-${{ github.run_id }}
+          path: brain6_artifacts/workflow_watchdog/self-test-evidence.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Supervisor smoke test
         run: python -m brain_v12.brain.brain_supervisor
       - name: Economic ledger smoke test
