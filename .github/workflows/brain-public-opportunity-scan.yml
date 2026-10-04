@@ -27,8 +27,8 @@ jobs:
           set -euo pipefail
           mkdir -p .brain/opportunities
           gh api --method GET search/issues \
-            -f q='is:open is:issue (label:"good first issue" OR label:"help wanted") (automation OR "github actions" OR CI OR workflow OR AI OR Python)' \
-            -f per_page=30 > .brain/opportunities/github_raw.json
+            --raw-field q='is:open is:issue label:"good first issue" (automation OR "github actions" OR CI OR workflow OR AI OR Python)' \
+            --raw-field per_page=30 > .brain/opportunities/github_raw.json
 
       - name: Collect live public freelance signals
         run: |
