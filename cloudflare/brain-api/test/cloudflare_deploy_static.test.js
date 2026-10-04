@@ -12,7 +12,7 @@ const cinema = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8"
   "cinema_entitlements","BRAIN_CINEMA_TOKEN"
 ].forEach(token => assert.ok(worker.includes(token), "missing: " + token));
 
-assert.ok(worker.includes("https://secure-jordan.paytabs.com/payment/request"));
+assert.ok(worker.includes('const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";'));
 assert.match(wrangler, /binding = "BRAIN_DB"/);
 assert.match(wrangler, /binding = "CINEMA_MEDIA"/);
 assert.match(wrangler, /bucket_name = "brain-cinema-media"/);
