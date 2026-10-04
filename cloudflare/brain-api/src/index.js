@@ -16,6 +16,10 @@ export default {
       return json({ ok: true, service: "brain-cloud-api", mode: "commercial-edge", d1: db ? "CONFIGURED" : "NOT_CONFIGURED" }, 200, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/orders" && request.method === "POST") {
+      return createCommercialOrder(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/create" && request.method === "POST") {
       return createPayTabsPayment(request, env, url, requestOrigin, allowedOrigin);
     }
@@ -48,6 +52,32 @@ export default {
     }
   },
 };
+
+
+async function createCommercialOrder(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+
+  const service = String(body.service || "").trim();
+  const plan = String(body.plan || "").trim();
+  const need = String(body.need || "").trim();
+  const prices = { "STARTER": 49, "GROWTH": 149, "CAMPAIGN": 299 };
+  const key = plan.toUpperCase();
+  if (!service || !need || need.length < 10) return json({ ok: false, error: "SERVICE_AND_NEED_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  if (!(key in prices)) return json({ ok: false, error: "PAID_PLAN_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+
+  const orderId = "BRAIN-MKT-" + new Date().toISOString().slice(0,10).replaceAll("-","") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
+  const amount = prices[key];
+  await env.BRAIN_DB.prepare(
+    "INSERT INTO orders (order_id, service, plan, amount, currency, state) VALUES (?, ?, ?, ?, 'USD', 'NEW')"
+  ).bind(orderId, service, key, amount).run();
+
+  return json({
+    ok: true,
+    order: { order_id: orderId, service, plan: key, amount, currency: "USD", state: "NEW", payment_state: "PAYMENT_PENDING" }
+  }, 201, requestOrigin, allowedOrigin);
+}
 
 async function createPayTabsPayment(request, env, url, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
