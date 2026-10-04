@@ -105,8 +105,6 @@ jobs:
         with:
           name: brain-cinema-preview
           path: docs/assets
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs
