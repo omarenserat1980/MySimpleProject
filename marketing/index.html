@@ -31,7 +31,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:10px 4
 <div class="brain" aria-label="رسم تجريدي أنيق للدماغ"><div class="orb"></div><div class="brain-art"></div><i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i></div>
 </section>
 
-<div class="notice">حالة الدفع التجاري: <strong>غير مفعّل بعد</strong> — الصفحة جاهزة للعرض، لكن لا يوجد هنا زر دفع وهمي ولا ادعاء بوجود إيراد.</div>
+<div class="notice">🟢 <strong>التجربة المجانية متاحة الآن</strong> — 5 أيام. يمكنك طلب الخدمات الإلكترونية مباشرة خلال فترة التجربة، وسيتم تسجيل كل طلب برقم Order ID.</div>
 
 <section id="services"><div class="section-title"><h2>اختر خطتك</h2><p>التجربة المجانية جزء من الخطط نفسها، ثم تختار الخطة المدفوعة إذا أردت الاستمرار.</p></div>
 <div class="grid">
@@ -44,7 +44,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:10px 4
 <section class="card interactive" id="request">
 <div class="service-list">
 <h2>اطلب الخدمة فعليًا</h2>
-<p class="muted">أرسل طلبًا حقيقيًا إلى صندوق طلبات BRAIN. لا يتم تحصيل أي مبلغ هنا حتى يتم ربط مزود دفع معتمد.</p>
+<p class="muted">أنت الآن في واجهة العميل. اختر الخدمة والباقة، وأرسل الطلب مباشرة. خلال FREE TRIAL يمكنك إرسال طلبات الخدمات الإلكترونية المطلوبة بدون دفع.</p>
 <button class="active" type="button" onclick="showService(0,this)">📣 استراتيجية التسويق</button>
 <button type="button" onclick="showService(1,this)">✍️ صناعة المحتوى</button>
 <button type="button" onclick="showService(2,this)">📊 تقارير الأداء</button>
@@ -67,7 +67,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:10px 4
 <div class="step">01<small>طلب</small></div><div class="step">02<small>تحقق الدفع</small></div><div class="step">03<small>تحليل</small></div><div class="step">04<small>إنشاء</small></div><div class="step">05<small>تنفيذ</small></div><div class="step">06<small>دليل</small></div>
 </div></section>
 
-<section class="card" style="margin-top:24px"><div class="proof"><strong>قاعدة BRAIN:</strong> الدليل أولًا → التنفيذ الحقيقي → التحقق → الإيراد الحقيقي.</div><p class="muted">عند ربط مزود دفع تجاري حقيقي، سيكون الدفع خارج هذه الصفحة عبر Checkout آمن، ثم يُنشأ Order ID ويُتحقق من العملية قبل بدء التنفيذ.</p></section>
+<section class="card" style="margin-top:24px"><div class="proof"><strong>قاعدة BRAIN:</strong> الدليل أولًا → التنفيذ الحقيقي → التحقق → الإيراد الحقيقي.</div><p class="muted">في FREE TRIAL لا تحتاج إلى الدفع. يبدأ احتساب الأيام عند قبول طلب التجربة، ويمكنك طلب الخدمات خلال 5 أيام. الانتقال إلى خطة مدفوعة لاحقًا يتطلب موافقة صريحة ودفعًا موثقًا.</p></section>
 <div class="footer">BRAIN AI — Client Services</div>
 </div>
 <script>
@@ -83,9 +83,9 @@ document.getElementById('orderForm').addEventListener('submit',function(e){
 e.preventDefault();
 const name=document.getElementById('customerName').value.trim(),email=document.getElementById('customerEmail').value.trim(),service=document.getElementById('customerService').value,plan=document.getElementById('customerPlan').value,brief=document.getElementById('customerBrief').value.trim();
 if(!name||!email||brief.length<10)return;
-const id='BRAIN-MKT-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(100000+Math.random()*900000);
+const now=new Date(); const trialEnd=new Date(now.getTime()+5*24*60*60*1000); const id='BRAIN-MKT-'+now.toISOString().slice(0,10).replace(/-/g,'')+'-'+Math.floor(100000+Math.random()*900000);
 const subject=encodeURIComponent('طلب خدمة '+id+' — '+plan);
-const body=encodeURIComponent('Order ID: '+id+'\nالاسم: '+name+'\nالبريد: '+email+'\nالخدمة: '+service+'\nالباقة: '+plan+'\nالوصف: '+brief+'\nالحالة: '+(plan.startsWith('FREE TRIAL')?'FREE_TRIAL_REQUESTED':'NEW / PAYMENT_PENDING')+'\nمدة التجربة: '+(plan.startsWith('FREE TRIAL')?'5 أيام':'غير منطبق')+'\nالتحول للمدفوع: موافقة العميل الصريحة مطلوبة');
+const body=encodeURIComponent('Order ID: '+id+'\nالاسم: '+name+'\nالبريد: '+email+'\nالخدمة: '+service+'\nالباقة: '+plan+'\nالوصف: '+brief+'\nالحالة: '+(plan.startsWith('FREE TRIAL')?'FREE_TRIAL_REQUESTED':'NEW / PAYMENT_PENDING')+'\nمدة التجربة: '+(plan.startsWith('FREE TRIAL')?'5 أيام':'غير منطبق')+'\nبداية التجربة: '+(plan.startsWith('FREE TRIAL')?now.toISOString():'غير منطبق')+'\nنهاية التجربة المحسوبة: '+(plan.startsWith('FREE TRIAL')?trialEnd.toISOString():'غير منطبق')+'\nالتحول للمدفوع: موافقة العميل الصريحة مطلوبة');
 document.getElementById('orderStatus').innerHTML='<strong>تم إنشاء '+id+'</strong><br>سيتم فتح بريدك لإرسال الطلب إلى صندوق BRAIN. لم يتم تحصيل أي مبلغ.';
 window.location.href='mailto:brain-marketing@agentmail.to?subject='+subject+'&body='+body;
 });
