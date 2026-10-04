@@ -3,6 +3,7 @@ const fs = require("node:fs");
 
 const worker = fs.readFileSync("src/index.js", "utf8");
 const schema = fs.readFileSync("migrations/0001_commercial.sql", "utf8");
+const clientMigration = fs.readFileSync("migrations/0002_order_client.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
 assert.match(worker, /PAYTABS_SERVER_KEY/);
@@ -28,4 +29,4 @@ console.log("NO_LIVE_SECRET_USED=TRUE");
 assert.match(worker, /requireClient/);
 assert.match(worker, /AUTH_REQUIRED/);
 assert.match(worker, /ORDER_ACCESS_DENIED/);
-assert.match(schema, /client_email/);
+assert.match(clientMigration, /client_email/);
