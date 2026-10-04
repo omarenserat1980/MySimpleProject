@@ -17,7 +17,7 @@ jobs:
       - name: Verify production artifact
         shell: bash
         run: |
-          if [ "\${{ github.event_name }}" = "workflow_run" ]; then echo "Artifact will be downloaded from the verified production run."; else test -s docs/assets/last_light_city_preview.mp4; fi
+          if [ "\${{ github.event_name }}" = "workflow_run" ]; then echo "Artifact will be downloaded from the verified production run."; else test -s docs/assets/last_light_city.mp4; fi
       - name: Prepare cinema metadata
         shell: bash
         run: |
@@ -42,9 +42,9 @@ jobs:
 
       - name: Verify production master
         run: |
-          test -s docs/assets/last_light_city_preview.mp4
+          test -s docs/assets/last_light_city.mp4
           sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
-          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json docs/assets/last_light_city_preview.mp4 > /tmp/film-probe.json
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json docs/assets/last_light_city.mp4 > /tmp/film-probe.json
           python - <<'PY'
           import json
           from pathlib import Path
@@ -54,10 +54,10 @@ jobs:
           assert float(streams[0].get('duration') or 0) > 0, 'video duration missing'
           print('published artifact verified')
           PY
-          cp docs/assets/last_light_city_preview.mp4 /tmp/brain-last-light-master.mp4
-          ffmpeg -y -loglevel error -i docs/assets/last_light_city_preview.mp4 -t 20 -vf "scale=854:-2" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart docs/assets/last_light_city_preview.mp4
+          cp docs/assets/last_light_city.mp4 /tmp/brain-last-light-master.mp4
+          ffmpeg -y -loglevel error -i docs/assets/last_light_city.mp4 -t 20 -vf "scale=854:-2" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart docs/assets/last_light_city_preview.mp4
           test -s docs/assets/last_light_city_preview.mp4
-          rm -f docs/assets/last_light_city_preview.mp4 docs/assets/ffprobe.json docs/assets/film_manifest.json docs/assets/VERIFIED_COMPLETED
+          rm -f docs/assets/last_light_city.mp4 docs/assets/ffprobe.json docs/assets/film_manifest.json docs/assets/VERIFIED_COMPLETED
 
       - name: Upload private production master artifact
         uses: actions/upload-artifact@v4
