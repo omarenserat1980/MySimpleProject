@@ -49,12 +49,18 @@ class BrainControlPlane:
         task = self.tasks.get(task_id)
         if task is None:
             return {"ok": False, "error": "TASK_NOT_FOUND"}
-        if task.status in TERMINAL:
-            return {"ok": False, "error": "TASK_NOT_RUNNABLE", "task": self._view(task)}
+
+        # Retry exhaustion takes precedence over the terminal FAILED state:
+        # callers must receive explicit RETRY_LIMIT_REACHED evidence rather
+        # than the generic TASK_NOT_RUNNABLE error on a late recovery attempt.
         if task.attempts >= task.max_attempts:
             task.status = "FAILED"
             task.error = "RETRY_LIMIT_REACHED"
             return {"ok": False, "error": task.error, "task": self._view(task)}
+
+        # A completed or cancelled task can never be executed again.
+        if task.status in {"COMPLETED", "CANCELLED"}:
+            return {"ok": False, "error": "TASK_NOT_RUNNABLE", "task": self._view(task)}
 
         task.status = "RUNNING"
         task.attempts += 1
