@@ -24,6 +24,10 @@ export default {
       return createPayTabsPayment(request, env, url, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/orders" && request.method === "GET") {
+      return listClientOrders(request, env, requestOrigin, allowedOrigin);
+    }
+
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -238,6 +242,17 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   ]);
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
+}
+
+
+async function listClientOrders(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  const result = await env.BRAIN_DB.prepare(
+    "SELECT order_id, service, plan, amount, currency, state, created_at FROM orders WHERE client_email = ? ORDER BY created_at DESC LIMIT 50"
+  ).bind(client.email).all();
+  return json({ ok: true, orders: result.results || [] }, 200, requestOrigin, allowedOrigin);
 }
 
 async function requireClient(request, env) {
