@@ -90,6 +90,7 @@ jobs:
           test -f _site/cinema.html
           test -f _site/movies.html
           cp -r docs/studio _site/studio
+          test -f _site/studio/storyboard.html
           test -f _site/studio/index.html
           test -f _site/studio/app.js
           test -f _site/studio/studio.css
