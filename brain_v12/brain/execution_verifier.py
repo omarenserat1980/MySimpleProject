@@ -27,6 +27,9 @@ class ExecutionVerifier:
     def register(self, capability: str, verifier: Callable[[Any], Any]) -> None:
         self._verifiers[capability] = verifier
 
+    def has_verifier(self, capability: str) -> bool:
+        return capability in self._verifiers
+
     def verify(self, capability: str, executor_id: str, result: Any) -> Evidence:
         verifier = self._verifiers.get(capability)
         if verifier is None:
