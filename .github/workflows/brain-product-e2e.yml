@@ -1,0 +1,30 @@
+name: Brain Product E2E Gate
+
+on:
+  push:
+    paths:
+      - "brain_v12/tests/test_brain_ai_product_smoke.py"
+      - "brain_v12/app.py"
+      - "brain_v12/brain/chat_session_store.py"
+      - "brain_v12/brain/device_bridge.py"
+      - "brain_v12/brain/evidence_store.py"
+      - "brain_v12/brain/brain_ai.py"
+      - ".github/workflows/brain-product-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  product-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Brain dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run Brain product end-to-end verification gate
+        run: python -m unittest brain_v12.tests.test_brain_ai_product_smoke -v
