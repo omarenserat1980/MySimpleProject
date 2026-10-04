@@ -32,12 +32,19 @@ def parse_and_validate_payment(
 
     if str(payload.get("cart_id", "")) != expected_order_id:
         raise ValueError("PAYTABS_ORDER_MISMATCH")
-    if str(payload.get("cart_total", "")) != str(expected_amount):
+
+    actual_amount = payload.get("cart_amount")
+    if str(actual_amount) != str(expected_amount):
         raise ValueError("PAYTABS_AMOUNT_MISMATCH")
+
     if str(payload.get("cart_currency", "")) != expected_currency:
         raise ValueError("PAYTABS_CURRENCY_MISMATCH")
-    if payload.get("response_status") != "A":
+
+    payment_result = payload.get("payment_result") or {}
+    if payment_result.get("response_status") != "A":
         raise ValueError("PAYTABS_PAYMENT_NOT_AUTHORISED")
+
     if not payload.get("tran_ref"):
         raise ValueError("PAYTABS_TRANSACTION_REFERENCE_MISSING")
+
     return payload
