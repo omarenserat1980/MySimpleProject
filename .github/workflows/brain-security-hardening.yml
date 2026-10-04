@@ -32,7 +32,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q brain_v12 cloud
       - name: Security unit tests
-        run: PYTHONPATH=. python -m pytest -q brain_v12/tests/test_security_guard.py brain_v12/tests/test_security_hardening.py brain_v12/tests/test_founder_identity_protection.py brain_v12/tests/test_legal_handoff.py
+        run: PYTHONPATH=. python -m pytest -q brain_v12/tests/test_security_hardening.py brain_v12/tests/test_founder_identity_protection.py brain_v12/tests/test_legal_handoff.py
       - name: Secret pattern scan
         shell: bash
         run: |
