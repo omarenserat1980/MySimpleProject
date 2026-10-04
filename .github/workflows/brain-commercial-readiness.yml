@@ -48,4 +48,3 @@ jobs:
         with:
           name: brain-commercial-readiness
           path: commercial_readiness.json
-          PY
