@@ -39,7 +39,7 @@ class CommercialExecutionPipeline:
             self._audit(result, action)
             return result
 
-        risk = self.risk.assess(operational_risk, evidence_score, return_score)
+        risk = self.risk.assess(\n            operational_risk=operational_risk,\n            evidence_score=evidence_score,\n            return_score=return_score,\n        )
         if risk.level == "HIGH":
             if not approval_request_id or not self.approvals.is_approved(approval_request_id):
                 result = IntegratedDecision(decision_id, order_id, False, "HUMAN_APPROVAL_REQUIRED", risk.score, risk.level)
