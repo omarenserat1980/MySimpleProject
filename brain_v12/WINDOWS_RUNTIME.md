@@ -40,3 +40,8 @@ Every retry records the attempt, failure class, ISO hash, acceleration mode, log
 The current GitHub workflow is a verification executor. The Brain-native contract in
 brain_v12/brain/windows_runtime_contract.py allows another executor to produce the
 same evidence without depending on GitHub Actions.
+
+
+## Runtime revision
+
+Windows real-boot verification is automatically requested when this runtime contract changes.
