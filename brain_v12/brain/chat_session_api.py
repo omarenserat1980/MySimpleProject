@@ -6,12 +6,15 @@ from .chat_session_store import ChatSessionStore
 
 class SessionCreateIn(BaseModel):
     title: str = "New Brain Chat"
+    account_id: str | None = None
+    device_id: str | None = None
 
 class MessageIn(BaseModel):
     message: str = Field(min_length=1)
     instructions: str = ""
     approved: bool = False
     client_message_id: str | None = None
+    device_id: str | None = None
 
 class MemoryIn(BaseModel):
     summary: str = ""
@@ -27,11 +30,13 @@ def router(brain_ai, store=None, context_limit=24):
 
     @r.post("/sessions")
     def create_session(body: SessionCreateIn = SessionCreateIn()):
-        return {"ok": True, "session": store.create(body.title)}
+        account_id = (body.account_id or "").strip() or None
+        device_id = (body.device_id or "").strip() or None
+        return {"ok": True, "session": store.create(body.title, account_id=account_id, device_id=device_id)}
 
     @r.get("/sessions")
-    def list_sessions():
-        return {"ok": True, "sessions": store.list()}
+    def list_sessions(account_id: str | None = None):
+        return {"ok": True, "sessions": store.list(account_id=(account_id or "").strip() or None)}
 
     @r.get("/sessions/{session_id}")
     def get_session(session_id: str):
@@ -41,11 +46,11 @@ def router(brain_ai, store=None, context_limit=24):
         return {"ok": True, "session": session}
 
     @r.get("/sessions/{session_id}/sync")
-    def sync_session(session_id: str, after: int = 0, limit: int = 100):
+    def sync_session(session_id: str, after: int = 0, limit: int = 100, device_id: str | None = None):
         if store.get(session_id) is None:
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
         feed = store.sync_events(session_id, after=after, limit=limit)
-        return {"ok": True, "session_id": session_id, **feed}
+        return {"ok": True, "session_id": session_id, "device_id": device_id, **feed}
 
     @r.get("/sessions/{session_id}/memory")
     def get_memory(session_id: str):
@@ -72,7 +77,7 @@ def router(brain_ai, store=None, context_limit=24):
     def send_message(session_id: str, body: MessageIn):
         if store.get(session_id) is None:
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
-        store.add_message(session_id, "user", body.message, client_message_id=body.client_message_id)
+        store.add_message(session_id, "user", body.message, client_message_id=body.client_message_id, metadata={"device_id": body.device_id} if body.device_id else None)
         history = store.context_messages(session_id, limit=context_limit)
         memory = store.get_memory(session_id)
         context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
