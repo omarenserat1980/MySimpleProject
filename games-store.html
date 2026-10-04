@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="BRAIN Games — متجر ألعاب حديث للـPS5 والكمبيوتر مع كتالوج حقيقي وروابط شراء رسمية.">
+<title>BRAIN Games — متجر الألعاب</title>
+<style>
+:root{--bg:#070a12;--panel:#101522;--panel2:#151d2d;--line:#29344d;--text:#f6f8ff;--muted:#9ca9bf;--accent:#7567ff;--accent2:#26d7c5;--danger:#ff647c;--max:1320px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#30276a 0,transparent 34%),radial-gradient(circle at 5% 30%,#063e42 0,transparent 28%),var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.65}
+a{color:inherit}.wrap{max-width:var(--max);margin:auto;padding:0 20px}
+header{position:sticky;top:0;z-index:20;background:#070a12e8;backdrop-filter:blur(18px);border-bottom:1px solid #ffffff12}
+.bar{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:950;font-size:21px}.brand small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.nav{display:flex;gap:7px;align-items:center}.nav a,.cartBtn{padding:9px 12px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;text-decoration:none}.cartBtn{cursor:pointer;color:var(--text)}
+.hero{padding:60px 0 25px;display:grid;grid-template-columns:1.35fr .65fr;gap:18px;align-items:stretch}.heroMain,.heroSide{border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,#11182a,#0c1220);padding:28px;overflow:hidden}.eyebrow{color:#bcb5ff;font-weight:900;letter-spacing:.4px}.hero h1{font-size:clamp(38px,6vw,72px);line-height:1.03;margin:10px 0}.hero p{color:var(--muted);font-size:18px;max-width:780px}.heroSide{background:linear-gradient(145deg,#1d1842,#102f34)}.heroSide h3{margin-top:0}.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:20px}.trust div{background:#0b1220aa;border:1px solid #ffffff10;padding:11px;border-radius:13px}.trust b{display:block}.muted{color:var(--muted)}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:18px 0}.search{flex:1;min-width:220px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#0b1120;color:var(--text);outline:none}.select,.pill{padding:11px 13px;border:1px solid var(--line);border-radius:13px;background:#0b1120;color:var(--text)}.pill{cursor:pointer}.pill.active{background:var(--accent);border-color:transparent}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.card{border:1px solid var(--line);background:#101522ed;border-radius:20px;overflow:hidden;display:flex;flex-direction:column}.cover{height:205px;padding:18px;display:flex;flex-direction:column;justify-content:flex-end;position:relative;background:linear-gradient(135deg,var(--c1),var(--c2))}.cover:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 20%,#000b)}.cover>*{position:relative;z-index:1}.platform{position:absolute;top:13px;right:13px;padding:5px 9px;background:#0008;border:1px solid #fff2;border-radius:999px;font-size:11px}.cover small{font-weight:800;opacity:.8}.cover h3{font-size:28px;line-height:1.05;margin:5px 0}.body{padding:16px}.meta{display:flex;gap:7px;flex-wrap:wrap;font-size:12px}.tag{background:#1c2740;border-radius:999px;padding:4px 8px;color:#cbd6e8}.price{font-size:21px;font-weight:900;margin:13px 0}.actions{display:flex;gap:8px}.btn{flex:1;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:#172139;color:var(--text);text-decoration:none;text-align:center;cursor:pointer}.primary{background:var(--accent);border-color:transparent}.btn:disabled{opacity:.45;cursor:not-allowed}
+.empty{padding:35px;text-align:center;border:1px dashed var(--line);border-radius:18px;color:var(--muted);grid-column:1/-1}
+.sectionTitle{display:flex;justify-content:space-between;align-items:end;gap:10px;margin:34px 0 13px}.sectionTitle h2{margin:0}.notice{border:1px solid #4b426c;background:#17132a;padding:13px 15px;border-radius:14px;color:#d8d2f4}
+footer{margin-top:45px;padding:35px 0;border-top:1px solid var(--line);color:var(--muted)}
+.modal{position:fixed;inset:0;background:#000b;z-index:50;display:none;align-items:center;justify-content:center;padding:18px}.modal.show{display:flex}.box{max-width:650px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:20px}.boxHead{display:flex;justify-content:space-between;gap:10px}.x{background:none;border:0;color:var(--muted);font-size:25px;cursor:pointer}.cartRow{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:12px 0}.total{font-size:22px;font-weight:900;padding:15px 0}.warning{border:1px solid #6d5360;background:#24131a;padding:12px;border-radius:12px;color:#ffd8df}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.grid{grid-template-columns:1fr}.trust{grid-template-columns:1fr}.nav a{display:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap bar">
+  <div class="brand">🎮 BRAIN Games<small>متجر ألعاب حديث — PS5 • PC • أكثر</small></div>
+  <nav class="nav"><a href="platform.html">المنصة</a><a href="index.html">العقل</a><button class="cartBtn" onclick="openCart()">🛒 السلة <b id="count">0</b></button></nav>
+</div></header>
+
+<main class="wrap">
+<section class="hero">
+  <div class="heroMain">
+    <div class="eyebrow">PLAY • BUY • VERIFY</div>
+    <h1>الألعاب التي تستحق وقتك.</h1>
+    <p>كتالوج حديث، بحث سريع، فلاتر للمنصة والنوع، صفحات منتجات، سلة محلية، وروابط شراء رسمية. لا نعرض لعبة على أنها قابلة للبيع من BRAIN ما لم تتوفر حقوق التوزيع وآلية دفع وتسليم موثقة.</p>
+    <div class="trust"><div><b>✓ كتالوج حقيقي</b><span class="muted">بيانات ألعاب فعلية</span></div><div><b>✓ شراء آمن</b><span class="muted">تحويل للمتجر الرسمي عند الحاجة</span></div><div><b>✓ بلا ادعاء</b><span class="muted">لا نجاح تجاري بلا دليل</span></div></div>
+  </div>
+  <aside class="heroSide">
+    <h3>🔥 اختياري الآن</h3>
+    <h2 style="font-size:32px;margin:5px 0">CONTROL Resonant</h2>
+    <p class="muted">أكشن خارق للطبيعة على PS5. متاح حاليًا للشراء الرسمي.</p>
+    <a class="btn primary" target="_blank" rel="noopener" href="https://store.playstation.com/en-ae/product/EP5291-PPSA34547_00-0210080241603648">شراء رسمي من PlayStation</a>
+    <p class="muted" style="font-size:12px">السعر الظاهر في متجر الإمارات وقت التحقق: $54.99 للنسخة القياسية.</p>
+  </aside>
+</section>
+
+<div class="sectionTitle"><div><h2>🕹️ متجر الألعاب</h2><div class="muted">ألعاب حديثة ومختارة بدل كتالوج وهمي</div></div><span class="muted" id="results">0 لعبة</span></div>
+<div class="toolbar">
+  <input id="search" class="search" placeholder="ابحث عن لعبة، ناشر، نوع..." oninput="render()">
+  <select id="platform" class="select" onchange="render()"><option value="all">كل المنصات</option><option>PS5</option><option>PC</option></select>
+  <select id="sort" class="select" onchange="render()"><option value="featured">مميزة</option><option value="price">الأقل سعرًا</option><option value="newest">الأحدث</option></select>
+  <button class="pill active" data-genre="all" onclick="genre(this,'all')">الكل</button>
+  <button class="pill" data-genre="Action" onclick="genre(this,'Action')">أكشن</button>
+  <button class="pill" data-genre="Racing" onclick="genre(this,'Racing')">سباقات</button>
+  <button class="pill" data-genre="Open World" onclick="genre(this,'Open World')">عالم مفتوح</button>
+</div>
+<div id="grid" class="grid"></div>
+
+<section class="sectionTitle"><div><h2>🛡️ بوابة الثقة</h2><div class="muted">ما ينقص المتجر ليصبح بائعًا مستقلًا كاملًا</div></div></section>
+<div class="notice">
+  <b>الحالة الحالية:</b> واجهة المتجر والكتالوج والسلة تعمل محليًا. بيع الألعاب التجارية مباشرة من BRAIN يحتاج عقود توزيع/مفاتيح أو اتفاقات ناشرين، بوابة دفع باسم النشاط، نظام مخزون/تسليم، وسياسة استرداد وضمان. لذلك زر الشراء للألعاب التجارية الحالية يفتح المتجر الرسمي بدل اختلاق عملية دفع داخلية.
+</div>
+</main>
+
+<footer><div class="wrap">© BRAIN Games — لا يتم بيع أو توزيع محتوى محمي بحقوق الطبع دون ترخيص. الأسعار والتوفر قد يتغيران حسب المنطقة والمتجر.</div></footer>
+
+<div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="box"><div class="boxHead"><h2 id="modalTitle" style="margin:0">السلة</h2><button class="x" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
+
+<script>
+const games=[
+ {id:"control-resonant",title:"CONTROL Resonant",platform:"PS5",genre:"Action",publisher:"Remedy Entertainment",price:54.99,date:"2026-09-24",c1:"#702b86",c2:"#151b57",status:"متاح",official:"https://store.playstation.com/en-ae/product/EP5291-PPSA34547_00-0210080241603648",desc:"أكشن خارق للطبيعة في مانهاتن مشوهة، مع قتال وقدرات متغيرة.",featured:1},
+ {id:"ace-combat-8",title:"ACE COMBAT 8: WINGS OF THEVE",platform:"PS5",genre:"Action",publisher:"Bandai Namco",price:71.99,date:"2026-10-01",c1:"#164f83",c2:"#0c1d3a",status:"متاح",official:"https://store.playstation.com/en-ae/concept/10011942",desc:"قتال جوي سريع مع طور قصة وطور أونلاين موسع.",featured:2},
+ {id:"gta-vi",title:"Grand Theft Auto VI",platform:"PS5",genre:"Open World",publisher:"Rockstar Games",price:79.99,date:"2026-11-19",c1:"#a44f5c",c2:"#28153e",status:"طلب مسبق",official:"https://store.playstation.com/ar-ae/product/EP1004-PPSA01547_00-GTAVISTANDARD001",desc:"العالم المفتوح المنتظر في Leonida، مع إصدار PS5 قادم في نوفمبر 2026.",featured:3},
+ {id:"brain-indie",title:"BRAIN: Last Light",platform:"PC",genre:"Action",publisher:"BRAIN Studio",price:0,date:"2026-10-04",c1:"#1d6a61",c2:"#071c23",status:"تجريبي مجاني",official:"",desc:"مشروع تجريبي أصلي من BRAIN؛ مجاني إلى أن يمر بوابة الجودة والإصدار.",featured:4}
+];
+let currentGenre="all";let cart=JSON.parse(localStorage.getItem("brain-games-cart")||"[]");
+function genre(el,g){currentGenre=g;document.querySelectorAll(".pill").forEach(x=>x.classList.remove("active"));el.classList.add("active");render()}
+function filtered(){
+ const q=document.getElementById("search").value.trim().toLowerCase(),p=document.getElementById("platform").value,s=document.getElementById("sort").value;
+ let a=games.filter(g=>(!q||[g.title,g.genre,g.publisher,g.platform].join(" ").toLowerCase().includes(q))&&(p==="all"||g.platform===p)&&(currentGenre==="all"||g.genre===currentGenre));
+ if(s==="price")a.sort((x,y)=>x.price-y.price); else if(s==="newest")a.sort((x,y)=>y.date.localeCompare(x.date)); else a.sort((x,y)=>x.featured-y.featured); return a;
+}
+function render(){const a=filtered();document.getElementById("results").textContent=a.length+" لعبة";document.getElementById("grid").innerHTML=a.length?a.map(card).join(""):'<div class="empty">لا توجد نتائج. جرّب كلمة أو منصة أخرى.</div>';updateCount()}
+function card(g){const buy=g.official?'<a class="btn primary" target="_blank" rel="noopener" href="'+g.official+'">شراء رسمي</a>':'<button class="btn primary" disabled>غير متاح للبيع بعد</button>';return '<article class="card"><div class="cover" style="--c1:'+g.c1+';--c2:'+g.c2+'"><span class="platform">'+g.platform+'</span><small>'+g.status+'</small><h3>'+g.title+'</h3></div><div class="body"><div class="meta"><span class="tag">'+g.genre+'</span><span class="tag">'+g.publisher+'</span></div><p class="muted">'+g.desc+'</p><div class="price">'+(g.price?'$'+g.price.toFixed(2):'مجاني')+'</div><div class="actions">'+buy+'<button class="btn" onclick="addCart(\''+g.id+'\')">أضف للسلة</button></div></div></article>'}
+function addCart(id){if(!cart.includes(id)){cart.push(id);localStorage.setItem("brain-games-cart",JSON.stringify(cart))}updateCount();openCart()}
+function updateCount(){document.getElementById("count").textContent=cart.length}
+function openCart(){document.getElementById("modalTitle").textContent="🛒 سلة BRAIN Games";const items=cart.map(id=>games.find(g=>g.id===id)).filter(Boolean);let total=items.reduce((s,g)=>s+g.price,0);document.getElementById("modalBody").innerHTML=items.length?items.map(g=>'<div class="cartRow"><span>'+g.title+'<small class="muted" style="display:block">'+g.platform+'</small></span><b>'+(g.price?'$'+g.price.toFixed(2):'مجاني')+'</b></div>').join("")+'<div class="total">الإجمالي: $'+total.toFixed(2)+'</div><div class="warning">هذه السلة لا تنفذ دفعًا حقيقيًا بعد. لا نطلب رقم بطاقة ولا ندعي إتمام بيع. استخدم زر «شراء رسمي» للمنتجات التجارية، أو فعّل لاحقًا بوابة دفع مرخصة بعد تجهيز حقوق التوزيع.</div><div class="actions" style="margin-top:12px"><button class="btn" onclick="clearCart()">تفريغ السلة</button><button class="btn primary" onclick="closeModal()">متابعة التصفح</button></div>':'<p class="muted">السلة فارغة. أضف لعبة ثم عد هنا.</p>'}
+function clearCart(){cart=[];localStorage.setItem("brain-games-cart","[]");updateCount();openCart()}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+render();
+</script>
+</body>
+</html>
