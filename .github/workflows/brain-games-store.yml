@@ -6,6 +6,12 @@ on:
     paths:
       - "games-store.html"
       - "brain_v12/brain/games_store.py"
+      - "brain_v12/brain/games_store_api.py"
+      - "brain_v12/tests/test_games_store_api.py"
+      - "games/**"
+      - "brain_v12/brain/games_store_api.py"
+      - "brain_v12/tests/test_games_store_api.py"
+      - "games/**"
       - "brain_v12/tests/test_games_store.py"
       - ".github/workflows/brain-games-store.yml"
   pull_request:
@@ -28,12 +34,15 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile store contract
-        run: python -m py_compile brain_v12/brain/games_store.py
+        run: python -m py_compile brain_v12/brain/games_store.py brain_v12/brain/games_store_api.py
       - name: Run games store contract tests
-        run: python -m unittest brain_v12.tests.test_games_store -v
+        run: python -m unittest brain_v12.tests.test_games_store brain_v12.tests.test_games_store_api -v
       - name: Verify storefront
         run: |
           test -s games-store.html
-          grep -q "BRAIN Games" games-store.html
-          grep -q "localStorage" games-store.html
-          grep -q "official" games-store.html
+          test -s games/neon-rift.html
+          test -s games/last-light.html
+          test -s games/drift-circuit.html
+          grep -q "BRAIN Originals" games-store.html
+          grep -q "api/games/checkout" games-store.html
+          grep -q "STRIPE_SECRET_KEY" brain_v12/brain/games_store_api.py
