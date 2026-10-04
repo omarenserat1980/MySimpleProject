@@ -31,7 +31,10 @@ def main():
     report={"schema":"brain-self-test-matrix/v1","status":"PASS" if passed else "FAIL","groups":results}
     out=ROOT/".brain/state/self_test_matrix.json"; out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
-    for x in results: print(f"SELF_TEST_GROUP {x['group']}={'PASS' if x['passed'] else 'FAIL'}")
+    for x in results:
+        print(f"SELF_TEST_GROUP {x['group']}={'PASS' if x['passed'] else 'FAIL'}")
+        if not x["passed"]:
+            print(f"SELF_TEST_GROUP_DIAGNOSTIC {x['group']} stdout={x.get('stdout','')[-3000:]} stderr={x.get('stderr','')[-3000:]} error={x.get('error','')}")
     print(f"SELF_TEST_MATRIX={'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 if __name__=="__main__": raise SystemExit(main())
