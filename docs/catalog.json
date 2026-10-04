@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "updated": "2026-10-04",
+  "movies": [
+    {
+      "id": "brain-last-light-city",
+      "title": "آخر ضوء في المدينة",
+      "year": 2026,
+      "genre": "دراما • سينمائي",
+      "access": "paid",
+      "status": "preview_available",
+      "rating": null,
+      "href": "./cinema.html",
+      "rights": "brain_original"
+    }
+  ]
+}
