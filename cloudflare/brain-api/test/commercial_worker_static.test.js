@@ -83,3 +83,10 @@ assert.match(worker, /confirmDelivery/);
 assert.match(worker, /DELIVERY_NOT_READY/);
 assert.match(worker, /CLIENT_DELIVERY_CONFIRMED/);
 assert.match(worker, /order_state: "COMPLETED"/);
+
+const supervisor = fs.readFileSync("src/supervisor.js", "utf8");
+assert.match(supervisor, /supervisorTick/);
+assert.match(supervisor, /30 minutes/);
+assert.match(supervisor, /attempt < 3/);
+assert.match(worker, /supervisorTick/);
+assert.match(worker, /\/api\/supervisor\/tick/);
