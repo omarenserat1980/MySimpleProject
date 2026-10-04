@@ -26,16 +26,22 @@ class VerificationGate:
             }
 
         action_verified = result.get("ok") is True and result.get("status") == "COMPLETED"
-        objective_verified = result.get("objective_verified") is True
+        objective = result.get("objective_verification")
+        structured_objective = (isinstance(objective, Mapping) and objective.get("passed") is True and isinstance(objective.get("criterion"), str) and bool(objective.get("criterion").strip()))
+        legacy_objective = result.get("objective_verified") is True
+        objective_verified = structured_objective and legacy_objective
 
         evidence = result.get("evidence")
         if evidence is None:
             evidence = result.get("verification_evidence")
         has_evidence = evidence not in (None, "", [], {}, False)
 
-        if objective_verified and not has_evidence:
+        if (structured_objective or legacy_objective) and not has_evidence:
             objective_verified = False
             reason = "OBJECTIVE_VERIFICATION_REQUIRES_EVIDENCE"
+        elif legacy_objective and not structured_objective:
+            objective_verified = False
+            reason = "OBJECTIVE_VERIFICATION_CONTRACT_REQUIRED"
         elif objective_verified and not action_verified:
             objective_verified = False
             reason = "OBJECTIVE_VERIFICATION_REQUIRES_COMPLETED_ACTION"
