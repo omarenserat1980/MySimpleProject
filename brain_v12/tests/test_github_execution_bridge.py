@@ -9,7 +9,7 @@ class GitHubExecutionBridgeTests(unittest.TestCase):
     def _bridge(self, calls=None):
         calls = calls if calls is not None else []
         tool_map = {
-            "repository": lambda **kwargs: calls.append(kwargs) or {"ok": True, "repo": "brain"},
+            "get_repo": lambda **kwargs: calls.append(kwargs) or {"ok": True, "repo": "brain"},
         }
         return BrainGitHubExecutionBridge(
             BrainGitHubAgent(tool_map),
