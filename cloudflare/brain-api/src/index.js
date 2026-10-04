@@ -1,4 +1,5 @@
 const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
+import { supervisorTick } from "./supervisor.js";
 const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
 
 export default {
@@ -14,6 +15,12 @@ export default {
     if (url.pathname === "/health") {
       const db = Boolean(env.BRAIN_DB);
       return json({ ok: true, service: "brain-cloud-api", mode: "commercial-edge", d1: db ? "CONFIGURED" : "NOT_CONFIGURED" }, 200, requestOrigin, allowedOrigin);
+    }
+
+    if (url.pathname === "/api/supervisor/tick" && request.method === "POST") {
+      const control = String(env.BRAIN_CONTROL_TOKEN || "");
+      if (!control || request.headers.get("Authorization") !== "Bearer " + control) return json({ ok: false, error: "CONTROL_AUTH_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+      return json(await supervisorTick(env), 200, requestOrigin, allowedOrigin);
     }
 
     if (url.pathname === "/api/orders" && request.method === "POST") {
