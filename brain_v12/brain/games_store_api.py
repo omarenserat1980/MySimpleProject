@@ -127,11 +127,17 @@ async def checkout_result(session_id:str):
     if int(session.get("amount_total") or 0)!=expected or (session.get("currency") or "").lower()!="usd":
         raise HTTPException(409,"PAYMENT_AMOUNT_MISMATCH")
     if o.get("state") not in {"PAID","DELIVERED"}: raise HTTPException(409,"PAYMENT_NOT_RECORDED")
+    if o.get("state")=="DELIVERED":
+        return {"ok":True,"order_id":oid,"game_id":o["game_id"],"game_title":o["game_title"],
+                "license":o.get("license",""),"download_url":ORIGIN+GAMES[o["game_id"]]["delivery_path"],
+                "already_delivered":True}
     token=secrets.token_urlsafe(32)
     o["token_hash"]=hashlib.sha256(token.encode()).hexdigest()
     o["delivery"]={"status":"READY","url":ORIGIN+GAMES[o["game_id"]]["delivery_path"]}
     d[oid]=o;_write(d)
     license_token="BRAIN-"+secrets.token_hex(10).upper()
+    o["license"]=license_token
+    d[oid]=o;_write(d)
     return {"ok":True,"order_id":oid,"game_id":o["game_id"],"game_title":o["game_title"],
             "license":license_token,"download_url":ORIGIN+GAMES[o["game_id"]]["delivery_path"],
             "delivery_url":ORIGIN+"/api/games/orders/"+oid+"/delivery?token="+token}
@@ -164,4 +170,4 @@ def delivery(order_id:str,token:str=""):
     if o.get("state")!="PAID": raise HTTPException(409,"PAYMENT_NOT_VERIFIED")
     if not token or not hmac.compare_digest(hashlib.sha256(token.encode()).hexdigest(),o.get("token_hash","")): raise HTTPException(403,"INVALID_DELIVERY_TOKEN")
     o["state"]="DELIVERED";o["delivery"]["status"]="DELIVERED";o["delivery"]["delivered_at"]=int(time.time());d[order_id]=o;_write(d)
-    return {"ok":True,"order_id":order_id,"game_id":o["game_id"],"game_title":o["game_title"],"license":"BRAIN-"+secrets.token_hex(10).upper(),"download_url":o["delivery"]["url"]}
+    return {"ok":True,"order_id":order_id,"game_id":o["game_id"],"game_title":o["game_title"],"license":o.get("license",""),"download_url":o["delivery"]["url"]}
