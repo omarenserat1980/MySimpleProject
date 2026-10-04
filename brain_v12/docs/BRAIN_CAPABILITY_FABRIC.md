@@ -15,3 +15,5 @@ Rules:
 - ChatGPT is one AI partner, not a single point of failure.
 
 Initial capability families: code, media.render, media.image, media.audio, search, browser, document, data.analysis, ai.reasoning, ai.generation, device, compute, storage, automation, publish.
+
+CI status: this contract is guarded by the dedicated Brain Capability Fabric workflow.
