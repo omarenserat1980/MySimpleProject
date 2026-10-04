@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m compileall -q cloud brain_v12
-          python -m pytest -q brain_v12/tests/test_brain_supervisor.py brain_v12/tests/test_economic_ledger.py brain_v12/tests/test_founder_compensation.py brain_v12/tests/test_founder_payout_bridge.py
+          python -m pytest -q cloud/test_company_launch_readiness.py brain_v12/tests/test_brain_supervisor.py brain_v12/tests/test_economic_ledger.py brain_v12/tests/test_founder_compensation.py brain_v12/tests/test_founder_payout_bridge.py
           python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(), indent=2))"
 
       - name: Classify launch readiness
