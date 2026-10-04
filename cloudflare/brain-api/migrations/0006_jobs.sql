@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS service_jobs (
+  job_id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL UNIQUE,
+  state TEXT NOT NULL DEFAULT 'PENDING',
+  attempt INTEGER NOT NULL DEFAULT 0,
+  result_evidence TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_service_jobs_state ON service_jobs(state);
