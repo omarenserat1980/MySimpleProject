@@ -6,6 +6,7 @@ on:
       - "cloud/web/**"
       - "platform.html"
       - "games-store.html"
+      - "games-success.html"
       - "games/**"
       - "brain_v12/web/platform.html"
       - "brain_v12/web/brain-app-v2/**"
@@ -48,6 +49,7 @@ jobs:
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
           cp games-store.html _site/games-store.html
+          cp games-success.html _site/games-success.html
           mkdir -p _site/games
           cp -a games/. _site/games/
           mkdir -p _site/brain_v12/web _site/brain_v12/film_hub _site/marketing _site/customer-portal _site/studio
@@ -70,11 +72,12 @@ jobs:
               raise SystemExit("BRAIN_API_ORIGIN must use HTTPS")
           Path("_site/brain-app-v2/config.json").write_text(
               json.dumps({"api_base": origin}, ensure_ascii=False), encoding="utf-8")
+          Path("_site/games-api-config.js").write_text("window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n", encoding="utf-8")
           Path("_site/brain-chat/config.js").write_text(
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
               encoding="utf-8")
           required = [
-              "_site/index.html", "_site/platform.html", "_site/games-store.html",
+              "_site/index.html", "_site/platform.html", "_site/games-store.html", "_site/games-success.html", "_site/games-api-config.js",
               "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html",
               "_site/movies.html", "_site/cinema.html",
               "_site/brain-chat/index.html", "_site/brain-chat/config.js",
@@ -107,6 +110,8 @@ jobs:
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
           if "api_base" not in config:
               raise SystemExit("Brain app config is missing api_base")
+          gamejs = Path("_site/games-api-config.js").read_text(encoding="utf-8")
+          assert gamejs.startswith("window.BRAIN_API_BASE = ")
           js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
           if "\\n" in js or not js.startswith("window.BRAIN_API_BASE = "):
               raise SystemExit("Brain Chat config is malformed")
@@ -125,6 +130,8 @@ jobs:
           test -f _site/index.html
           test -f _site/platform.html
           test -f _site/games-store.html
+          test -f _site/games-success.html
+          test -f _site/games-api-config.js
           test -f _site/games/neon-rift.html
           test -f _site/games/last-light.html
           test -f _site/games/drift-circuit.html
