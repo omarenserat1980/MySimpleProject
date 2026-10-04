@@ -41,6 +41,9 @@ class ChatSessionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_chat_session_messages
               ON chat_session_messages(session_id, id);
+            -- Schema migration for multi-device account/device identity.
+            -- ALTER TABLE is applied only when older Brain databases lack these columns.
+            
             CREATE TABLE IF NOT EXISTS chat_sync_events(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               session_id TEXT NOT NULL,
@@ -59,6 +62,13 @@ class ChatSessionStore:
               FOREIGN KEY(session_id) REFERENCES chat_sessions(id)
             );
             """)
+            columns = {row["name"] for row in con.execute("PRAGMA table_info(chat_sessions)").fetchall()}
+            if "account_id" not in columns:
+                con.execute("ALTER TABLE chat_sessions ADD COLUMN account_id TEXT")
+            if "device_id" not in columns:
+                con.execute("ALTER TABLE chat_sessions ADD COLUMN device_id TEXT")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_account ON chat_sessions(account_id)")
+            con.commit()
 
     def create(self, title="New Brain Chat", account_id=None, device_id=None):
         sid = str(uuid4())
