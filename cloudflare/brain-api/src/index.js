@@ -27,6 +27,9 @@ export default {
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
+    if (url.pathname === "/api/payments/paytabs/return" && request.method === "POST") {
+      return handlePayTabsReturn(request, env, allowedOrigin);
+    }
 
     const origin = String(env.BRAIN_ORIGIN || "").replace(/\/$/, "");
     if (!origin || origin.includes("REPLACE_WITH_")) {
@@ -105,7 +108,7 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   if (existing && existing.state === "PAYMENT_VERIFIED") return json({ ok: false, error: "PAYMENT_ALREADY_VERIFIED" }, 409, requestOrigin, allowedOrigin);
 
   const callback = url.origin + "/api/payments/paytabs/callback";
-  const returnUrl = String(env.BRAIN_RETURN_URL || allowedOrigin);
+  const returnUrl = url.origin + "/api/payments/paytabs/return";
 
   const payload = {
     profile_id: Number(profileId),
@@ -150,6 +153,30 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
     tran_ref: result.tran_ref,
     redirect_url: result.redirect_url || null,
   }, 200, requestOrigin, allowedOrigin);
+}
+
+
+async function handlePayTabsReturn(request, env, allowedOrigin) {
+  const serverKey = String(env.PAYTABS_SERVER_KEY || "");
+  if (!serverKey) return new Response("Payment return verification unavailable", { status: 503 });
+  const form = await request.formData();
+  const fields = {};
+  for (const [key, value] of form.entries()) {
+    if (key !== "signature") fields[key] = String(value);
+  }
+  const signature = String(form.get("signature") || "").toLowerCase();
+  if (!signature) return new Response("Invalid payment return", { status: 400 });
+  const sorted = Object.keys(fields).filter(k => fields[k] !== "").sort().map(k => encodeURIComponent(k) + "=" + encodeURIComponent(fields[k])).join("&");
+  const expected = await hmacSha256Hex(new TextEncoder().encode(sorted), serverKey);
+  if (!timingSafeEqual(expected, signature)) return new Response("Invalid payment return signature", { status: 400 });
+  const orderId = String(fields.cartId || "");
+  const tranRef = String(fields.tranRef || "");
+  const status = String(fields.respStatus || "");
+  const target = new URL(allowedOrigin);
+  target.searchParams.set("payment", status === "A" ? "return_received" : "return_failed");
+  if (orderId) target.searchParams.set("order", orderId);
+  if (tranRef) target.searchParams.set("tran_ref", tranRef);
+  return Response.redirect(target.toString(), 303);
 }
 
 async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin) {
