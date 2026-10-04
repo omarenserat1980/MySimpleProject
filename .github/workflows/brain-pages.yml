@@ -43,6 +43,7 @@ jobs:
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
           cp games-store.html _site/games-store.html
+          cp games-store.html _site/games-store.html
           mkdir -p _site/brain_v12/web _site/marketing _site/customer-portal
           cp -a brain_v12/web/. _site/brain_v12/web/
           mkdir -p _site/brain_v12/film_hub
@@ -117,6 +118,7 @@ jobs:
         run: |
           test -f _site/index.html
           test -f _site/platform.html
+          test -f _site/games-store.html
           test -f _site/games-store.html
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
