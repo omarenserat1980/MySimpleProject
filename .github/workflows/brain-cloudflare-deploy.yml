@@ -38,7 +38,7 @@ jobs:
           test -f cloudflare/brain-api/migrations/0007_cinema_entitlements.sql
           test -f cloudflare/brain-api/test/cinema_worker_static.test.js
           node --check cloudflare/brain-api/src/index.js
-          node cloudflare/brain-api/test/cloudflare_deploy_static.test.js
+          (cd cloudflare/brain-api && node test/cloudflare_deploy_static.test.js)
 
       - name: Require Cloudflare and PayTabs configuration
         env:
