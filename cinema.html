@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BRAIN Cinema — آخر ضوء في المدينة</title>
+<meta name="description" content="BRAIN Cinema — أفلام سينمائية أصلية من إنتاج Brain">
+<style>
+:root{--bg:#050911;--panel:#0d1725;--panel2:#121f31;--line:#22364d;--text:#f3f7fb;--muted:#91a5bb;--accent:#55d6ff;--gold:#ffd166;--ok:#43e0a1}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 70% 0,#18314a,#070c15 45%,#04070c);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:1250px;margin:auto;padding:18px}.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0 18px}.brand{font-weight:800;font-size:22px}.brand small{display:block;color:var(--muted);font-size:11px}.nav a{color:#d9e8f5;text-decoration:none;margin:0 6px}.hero{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:stretch}.poster{min-height:480px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(160deg,#101f31,#050910);overflow:hidden;position:relative}.poster img{width:100%;height:100%;object-fit:cover;min-height:480px}.poster .label{position:absolute;top:16px;right:16px;background:#06101ddd;border:1px solid #ffffff20;border-radius:99px;padding:7px 11px}.info{background:linear-gradient(145deg,#0e1928ee,#08101bee);border:1px solid var(--line);border-radius:22px;padding:28px}.kicker{color:var(--accent);font-size:12px;letter-spacing:.08em}.info h1{font-size:46px;line-height:1.1;margin:10px 0}.meta{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:#0a1523;border-radius:99px;padding:7px 10px;color:#c6d6e5;font-size:12px}.story{color:#b8c7d6;line-height:1.9}.price{font-size:27px;font-weight:800;margin:22px 0 8px}.actions{display:flex;gap:9px;flex-wrap:wrap}button{border:0;border-radius:12px;padding:13px 17px;background:linear-gradient(135deg,#1788ad,#3868d0);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#172a40;border:1px solid var(--line)}button:disabled{opacity:.5;cursor:not-allowed}.section{margin-top:18px;background:#0b1523cc;border:1px solid var(--line);border-radius:20px;padding:20px}.section h2{margin-top:0}.news{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.news article{background:#08111d;border:1px solid var(--line);border-radius:14px;padding:14px}.news small{color:var(--muted)}video{width:100%;background:#000;border-radius:16px;max-height:680px}.gate{padding:14px;border-radius:14px;background:#07101b;border:1px solid var(--line);margin-top:12px}.ok{color:var(--ok)}.muted{color:var(--muted)}.modal{position:fixed;inset:0;background:#000c;display:none;place-items:center;padding:16px;z-index:10}.modal.open{display:grid}.box{width:min(560px,100%);background:#0d1725;border:1px solid var(--line);border-radius:20px;padding:22px}.method{display:grid;gap:9px}.method button{text-align:right;background:#111f31;border:1px solid var(--line)}.notice{line-height:1.8;color:#b7c8d8}.tiny{font-size:11px;color:var(--muted)}@media(max-width:800px){.hero{grid-template-columns:1fr}.poster,.poster img{min-height:330px}.info h1{font-size:35px}.news{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="nav">
+  <a class="brand" href="./"><span>🧠 BRAIN Cinema</span><small>أفلام أصلية • إنتاج سينمائي • مشاهدة</small></a>
+  <nav><a href="./">الرئيسية</a><a href="./brain_v12/web/">العقل</a></nav>
+</header>
+
+<main>
+<section class="hero">
+  <div class="poster">
+    <span class="label">BRAIN ORIGINAL</span>
+    <img src="./docs/assets/poster.svg" alt="بوستر فيلم آخر ضوء في المدينة">
+  </div>
+  <div class="info">
+    <div class="kicker">الفيلم السينمائي الأول</div>
+    <h1>آخر ضوء في المدينة</h1>
+    <div class="meta"><span class="chip">سينمائي / Flipbook</span><span class="chip">16:9</span><span class="chip">إنتاج Brain</span><span class="chip">نسخة موثقة</span></div>
+    <p class="story">مدينة تقترب من آخر لحظاتها المضيئة. تتبع الحكاية رحلة قصيرة نحو الضوء، عبر صور متتابعة وصوت سينمائي وإيقاع بصري صنعه مصنع Brain.</p>
+    <div class="price">تجربة المشاهدة: 0.99 د.أ</div>
+    <div class="tiny">السعر هنا واجهة تجارية فقط حتى يتم ربط مزود دفع حقيقي وآمن؛ لا يتم تحصيل أي مبلغ من هذه الصفحة حالياً.</div>
+    <div class="actions" style="margin-top:16px">
+      <button onclick="preview()">▶ مشاهدة الإعلان/المعاينة</button>
+      <button class="secondary" onclick="openCheckout()">🔐 استئجار الفيلم</button>
+    </div>
+    <div id="gate" class="gate">🔒 حالة الوصول: <b>PREVIEW_ONLY</b></div>
+  </div>
+</section>
+
+<section class="section" id="player">
+  <h2>🎬 المشغل</h2>
+  <video id="movie" controls playsinline preload="metadata" poster="./docs/assets/poster.svg">
+    <source src="./docs/assets/last_light_city.mp4" type="video/mp4">
+    متصفحك لا يدعم تشغيل الفيديو.
+  </video>
+  <p class="muted">المعاينة المتاحة حالياً تستخدم نسخة الفيلم المنشورة في مستودع Brain. المشاهدة المدفوعة الكاملة يجب أن تمر عبر entitlement بعد التحقق من الدفع.</p>
+</section>
+
+<section class="section">
+  <h2>📰 أخبار وإعلانات Brain Cinema</h2>
+  <div class="news">
+    <article><b>🎬 أول إنتاج سينمائي</b><p class="muted">آخر ضوء في المدينة — إنتاج محلي باستخدام Python + Pillow + FFmpeg.</p><small>BRAIN ORIGINAL</small></article>
+    <article><b>🏭 مصنع الأفلام</b><p class="muted">Brain يحول القصة إلى خط إنتاج ثم يتحقق من ملف الفيلم قبل النشر.</p><small>PRODUCTION</small></article>
+    <article><b>🛡️ بوابة المشاهدة</b><p class="muted">الوصول المدفوع مصمم ليُمنح فقط بعد تأكيد الدفع من الخادم.</p><small>COMMERCE</small></article>
+  </div>
+</section>
+</main>
+</div>
+
+<div class="modal" id="checkout">
+ <div class="box">
+  <h2>🔐 استئجار «آخر ضوء في المدينة»</h2>
+  <p class="notice">هذه هي نقطة الدفع الفعلية في التصميم. لن نعتبر الطلب مدفوعاً من زر في المتصفح. يجب أن ينشئ الخادم Checkout Session مع مزود دفع، ثم يتحقق من webhook ويمنح صلاحية المشاهدة.</p>
+  <div class="method">
+   <button onclick="startPayment('card')">💳 الدفع بالبطاقة — 0.99 د.أ</button>
+   <button onclick="startPayment('wallet')">📱 محفظة/وسيلة دفع — 0.99 د.أ</button>
+   <button class="secondary" onclick="closeCheckout()">إلغاء</button>
+  </div>
+  <p id="paymentStatus" class="tiny"></p>
+ </div>
+</div>
+
+<script>
+const movie=document.getElementById('movie'), gate=document.getElementById('gate');
+function preview(){document.getElementById('player').scrollIntoView({behavior:'smooth'});movie.currentTime=0;movie.play().catch(()=>{})}
+function openCheckout(){document.getElementById('checkout').classList.add('open')}
+function closeCheckout(){document.getElementById('checkout').classList.remove('open')}
+async function startPayment(method){
+ const s=document.getElementById('paymentStatus');s.textContent='جاري طلب جلسة دفع آمنة…';
+ try{
+  const r=await fetch('/api/cinema/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({film_id:'brain-last-light-city',access_type:'RENT',currency:'JOD',amount:0.99,method})});
+  if(!r.ok) throw new Error('PAYMENT_BACKEND_NOT_CONFIGURED');
+  const x=await r.json();
+  if(x.checkout_url){location.href=x.checkout_url;return}
+  s.textContent='لم يُرجع الخادم رابط Checkout. لم يتم تحصيل أي مبلغ.';
+ }catch(e){s.textContent='الدفع الحقيقي غير موصول بعد. لم يتم تحصيل أي مبلغ. يجب ربط /api/cinema/checkout بمزود دفع ثم التحقق من webhook.'}
+}
+async function verifyAccess(){
+ try{
+  const r=await fetch('/api/cinema/access?film_id=brain-last-light-city');
+  if(!r.ok)return;
+  const x=await r.json();
+  if(x.access_granted && x.stream_url){movie.querySelector('source').src=x.stream_url;movie.load();gate.innerHTML='🔓 حالة الوصول: <b class="ok">ENTITLEMENT_GRANTED</b>'; }
+ }catch(e){}
+}
+verifyAccess();
+</script>
+</body>
+</html>
