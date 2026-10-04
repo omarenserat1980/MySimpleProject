@@ -7,7 +7,10 @@ from brain_v12.brain.memory import MemoryStore
 
 class DeviceBridgeTests(unittest.TestCase):
     def setUp(self):
-        self.old = os.environ.get("TERMUX_AGENT_KEY")
+        self.env_keys = ("TERMUX_AGENT_KEY", "BRAIN_AGENT_KEY", "BRAIN_AGENT_KEY_SHA256", "BRAIN_EMULATOR_KEY")
+        self.old_env = {k: os.environ.get(k) for k in self.env_keys}
+        for key in self.env_keys:
+            os.environ.pop(key, None)
         os.environ["TERMUX_AGENT_KEY"] = "test-device-key"
         self.tmp = tempfile.NamedTemporaryFile(delete=False)
         self.tmp.close()
@@ -16,10 +19,11 @@ class DeviceBridgeTests(unittest.TestCase):
         self.bridge = DeviceBridge(self.store)
 
     def tearDown(self):
-        if self.old is None:
-            os.environ.pop("TERMUX_AGENT_KEY", None)
-        else:
-            os.environ["TERMUX_AGENT_KEY"] = self.old
+        for key, value in self.old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         try:
             os.unlink(self.tmp.name)
         except FileNotFoundError:
