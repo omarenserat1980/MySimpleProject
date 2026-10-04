@@ -34,8 +34,10 @@
 - [x] Add permission-aware executor selection
 - [x] Add no-executor / no-fake-success behavior
 - [x] Add dedicated Capability Fabric CI gate
-- [ ] Register existing media/code/search/AI/device executors into the common fabric
-- [ ] Add health scoring and evidence-aware executor ranking
+- [x] Register existing Brain-owned media/code/AI/device executors into the common fabric
+- [x] Add health scoring and evidence-aware executor ranking
+- [x] Enforce Brain-owned → free-diverse → paid-external autonomy tiers
+- [x] Keep paid executors disabled unless commercial mode explicitly enables them
 
 ## Phase 3 — Brain Cloud execution
 - [x] Free GitHub-hosted Linux runner
