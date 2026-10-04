@@ -620,7 +620,9 @@ def decide_diwan_approval(approval_id: str, body: ApprovalDecisionRequest):
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        detail = str(exc)
+        status_code = 422 if "requires evidence_ref" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     return {"ok": True, "system": "BRAIN_DIWAN", "approval": approval}
 
 
