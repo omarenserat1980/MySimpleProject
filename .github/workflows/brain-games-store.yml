@@ -5,20 +5,20 @@ on:
     branches: [main]
     paths:
       - "games-store.html"
+      - "games/**"
       - "brain_v12/brain/games_store.py"
       - "brain_v12/brain/games_store_api.py"
-      - "brain_v12/tests/test_games_store_api.py"
-      - "games/**"
-      - "brain_v12/brain/games_store_api.py"
-      - "brain_v12/tests/test_games_store_api.py"
-      - "games/**"
       - "brain_v12/tests/test_games_store.py"
+      - "brain_v12/tests/test_games_store_api.py"
       - ".github/workflows/brain-games-store.yml"
   pull_request:
     paths:
       - "games-store.html"
+      - "games/**"
       - "brain_v12/brain/games_store.py"
+      - "brain_v12/brain/games_store_api.py"
       - "brain_v12/tests/test_games_store.py"
+      - "brain_v12/tests/test_games_store_api.py"
       - ".github/workflows/brain-games-store.yml"
   workflow_dispatch:
 
@@ -33,11 +33,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Compile store contract
+      - name: Compile store contracts
         run: python -m py_compile brain_v12/brain/games_store.py brain_v12/brain/games_store_api.py
       - name: Run games store contract tests
         run: python -m unittest brain_v12.tests.test_games_store brain_v12.tests.test_games_store_api -v
-      - name: Verify storefront
+      - name: Verify storefront and game builds
         run: |
           test -s games-store.html
           test -s games/neon-rift.html
