@@ -20,4 +20,25 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run provider safety tests
-        run: python -m pytest -q brain/provider_hub
+        run: |
+          set -o pipefail
+          python -m pytest -q brain/provider_hub 2>&1 | tee provider_hub_pytest.log
+
+      - name: Publish verification summary
+        if: always()
+        run: |
+          if grep -q "failed" provider_hub_pytest.log; then
+            echo "PROVIDER_HUB_STATUS=NOT_VERIFIED" >> "$GITHUB_STEP_SUMMARY"
+            echo "Full Provider Hub test suite failed. Commercial readiness remains blocked." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "PROVIDER_HUB_STATUS=VERIFIED" >> "$GITHUB_STEP_SUMMARY"
+          echo "Full Provider Hub test suite passed." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-provider-hub-test-evidence
+          path: provider_hub_pytest.log
+          if-no-files-found: error
