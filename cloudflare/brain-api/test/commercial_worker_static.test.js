@@ -72,3 +72,9 @@ assert.match(worker, /claimNextJob/);
 assert.match(worker, /CONTROL_AUTH_REQUIRED/);
 assert.match(worker, /attempt < 3/);
 assert.match(worker, /state = 'RUNNING'/);
+
+assert.match(worker, /completeJob/);
+assert.match(worker, /RESULT_EVIDENCE_REQUIRED/);
+assert.match(worker, /JOB_NOT_RUNNING/);
+assert.match(worker, /state = 'SUCCESS'/);
+assert.match(worker, /order_state: "READY"/);
