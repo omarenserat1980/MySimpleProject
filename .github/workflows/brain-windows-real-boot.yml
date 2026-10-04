@@ -276,7 +276,10 @@ jobs:
           e["cpu"]={"x86_64":True,"backend":"qemu-system-x86_64"}
           e["network"]["host_backend"]="qemu-user"
           e["storage"]["host_disk"]="windows-server-2025.qcow2"
-          e["qemu_status"]="QEMU_EXITED"
+          phase=pathlib.Path("windows-boot-phase.txt").read_text(encoding="utf-8")
+          assert "BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK" in phase, phase
+          e["boot_source"]="windows-installed-disk"
+          e["qemu_status"]="QEMU_EXITED_AFTER_VERIFIED_BOOT"
           pathlib.Path("windows-combined-evidence.json").write_text(json.dumps(e,indent=2,sort_keys=True))
           from brain_v12.brain.windows_completion_gate import WindowsCompletionGate
           r=WindowsCompletionGate().verify(e)
