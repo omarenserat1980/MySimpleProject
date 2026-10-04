@@ -55,9 +55,9 @@ class Feedback:
             self.events=[{"event":"CREATED","at":self.created_at,"state":self.state.value}]
 
     def transition(self,new_state:FeedbackState,actor:str,evidence_ref:str|None=None,reason:str=""):
-        if new_state not in _ALLOWED[self.state]: raise ValueError(f"invalid transition {self.state.value}->{new_state.value}")
         if new_state in {FeedbackState.RESPONDED,FeedbackState.RESOLVED,FeedbackState.CLOSED} and not evidence_ref:
             raise ValueError("response/resolution/closure requires evidence_ref")
+        if new_state not in _ALLOWED[self.state]: raise ValueError(f"invalid transition {self.state.value}->{new_state.value}")
         old=self.state.value; self.state=new_state; self.updated_at=now_iso()
         if evidence_ref: self.evidence_ref=evidence_ref
         self.events.append({"event":"STATE_CHANGED","from":old,"to":new_state.value,"actor":actor,"reason":reason,"at":self.updated_at,"evidence_ref":evidence_ref})
