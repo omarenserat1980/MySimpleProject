@@ -6,6 +6,7 @@ on:
       - "cloud/web/**"
       - "platform.html"
       - "games-store.html"
+      - "games/**"
       - "brain_v12/web/platform.html"
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
@@ -43,6 +44,8 @@ jobs:
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
           cp games-store.html _site/games-store.html
+          mkdir -p _site/games
+          cp -a games/. _site/games/
           mkdir -p _site/brain_v12/web _site/brain_v12/film_hub _site/marketing _site/customer-portal _site/studio
           cp -a brain_v12/web/. _site/brain_v12/web/
           cp -a brain_v12/film_hub/. _site/brain_v12/film_hub/
@@ -68,6 +71,7 @@ jobs:
               encoding="utf-8")
           required = [
               "_site/index.html", "_site/platform.html", "_site/games-store.html",
+              "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html",
               "_site/movies.html", "_site/cinema.html",
               "_site/brain-chat/index.html", "_site/brain-chat/config.js",
               "_site/brain-app-v2/config.json", "_site/studio/index.html",
@@ -117,6 +121,9 @@ jobs:
           test -f _site/index.html
           test -f _site/platform.html
           test -f _site/games-store.html
+          test -f _site/games/neon-rift.html
+          test -f _site/games/last-light.html
+          test -f _site/games/drift-circuit.html
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
           test -f _site/brain_v12/web/index.html
