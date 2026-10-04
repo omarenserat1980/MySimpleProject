@@ -25,3 +25,6 @@ console.log("CINEMA_ENTITLEMENT_GATES=PASS");
 console.log("CINEMA_R2_BINDING_GATES=PASS");
 console.log("CINEMA_PAGE_INTEGRATION_GATES=PASS");
 console.log("NO_LIVE_SECRET_IN_SOURCE=TRUE");
+
+assert.ok(!page.includes("\\nconst movie"), "cinema page must not contain literal escaped newline bootstrap");
+console.log("CINEMA_SCRIPT_BOOTSTRAP=PASS");
