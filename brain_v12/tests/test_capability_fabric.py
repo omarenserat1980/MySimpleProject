@@ -9,9 +9,9 @@ from brain_v12.brain.autonomy_policy import AutonomyPolicy
 
 class CapabilityFabricTests(unittest.TestCase):
     def test_fallback_requires_verified_artifact(self):
-        fabric = CapabilityFabric()
+        fabric = CapabilityFabric(autonomy_policy=AutonomyPolicy(allow_paid=True))
         fabric.register(ExecutorSpec("local", "media.render", priority=10, cost_class="FREE"))
-        fabric.register(ExecutorSpec("paid", "media.render", priority=30, cost_class="PAID"))
+        fabric.register(ExecutorSpec("paid", "media.render", priority=30, cost_class="PAID", metadata={"tier": "PAID_EXTERNAL"}))
         calls = []
 
         with tempfile.TemporaryDirectory() as d:
