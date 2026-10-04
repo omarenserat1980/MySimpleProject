@@ -1,12 +1,13 @@
 """Brain Cloud ↔ Brain Termux execution bridge."""
 from __future__ import annotations
 import hashlib,hmac,os,time
+from .device_sync_adapter import DeviceTaskSyncAdapter
 from uuid import uuid4
 AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; HEARTBEAT_STALE="STALE"
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
                    "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
-    def __init__(self,store): self.store=store; self._last_seen=None
+    def __init__(self,store,sync_adapter=None):\n        self.store=store; self._last_seen=None; self.sync_adapter=sync_adapter
     def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
@@ -31,7 +32,7 @@ class DeviceBridge:
         self.store.device_task_create(task_id,task,params or {},time.time())
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
-        task=self.store.device_task_claim(agent_id); return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
+        task=self.store.device_task_claim(agent_id)\n        if self.sync_adapter and task:\n            self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))\n        return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
     def heartbeat(self,agent_id,metadata=None):
         self.store.device_agent_touch(agent_id)
         self._last_seen=time.time()
