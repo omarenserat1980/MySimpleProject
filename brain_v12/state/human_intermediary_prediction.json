@@ -1,6 +1,6 @@
 {
   "schema": "brain-human-intermediary-prediction/v1",
-  "created_at": "2026-10-04T04:49:17.439033+00:00",
+  "created_at": "2026-10-04T06:21:19.939465+00:00",
   "source_of_truth": "GitHub repository history + roadmap + observable Actions evidence",
   "current_frontier": {
     "phase": 0,
@@ -34,10 +34,12 @@
           ]
         },
         "repair_then_verify": {
-          "hits": 3,
+          "hits": 5,
           "evidence_terms": [
             "fix",
+            "repair",
             "harden",
+            "recovery",
             "self-heal"
           ]
         },
@@ -52,13 +54,17 @@
           ]
         },
         "free_first": {
-          "hits": 0,
-          "evidence_terms": []
-        },
-        "regression_avoidance": {
           "hits": 1,
           "evidence_terms": [
-            "monotonic"
+            "free"
+          ]
+        },
+        "regression_avoidance": {
+          "hits": 3,
+          "evidence_terms": [
+            "regression",
+            "monotonic",
+            "fail-closed"
           ]
         }
       }
@@ -73,227 +79,227 @@
   "actions_observation": {
     "available": true,
     "run_count": 20,
-    "failed_count": 0,
+    "failed_count": 1,
     "runs": [
       {
-        "id": 37178091200,
-        "name": "Brain Global Workflow Watchdog",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:08Z",
-        "updated_at": "2026-10-04T04:49:09Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178091200"
-      },
-      {
-        "id": 37178083802,
-        "name": "Brain Reasoning Loop",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083802"
-      },
-      {
-        "id": 37178083806,
-        "name": "Brain Cloud Mining Control Plane",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083806"
-      },
-      {
-        "id": 37178083823,
-        "name": "Brain Freelance Worker - Research and Prepare",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083823"
-      },
-      {
-        "id": 37178083800,
-        "name": "BRAIN GitHub Brain Bootstrap",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083800"
-      },
-      {
-        "id": 37178083807,
-        "name": "Brain AI Core",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083807"
-      },
-      {
-        "id": 37178083836,
-        "name": "Brain Fabric Tests",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083836"
-      },
-      {
-        "id": 37178083843,
-        "name": "Brain Reflection E2E",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083843"
-      },
-      {
-        "id": 37178083875,
-        "name": "Brain Evolution Score",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083875"
-      },
-      {
-        "id": 37178083899,
-        "name": "Brain Master Audit",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083899"
-      },
-      {
-        "id": 37178083883,
-        "name": "Brain Revenue Engine Smoke",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083883"
-      },
-      {
-        "id": 37178083889,
-        "name": "Brain GitHub Cloud - Free Linux Control Plane",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083889"
-      },
-      {
-        "id": 37178083855,
-        "name": "Brain Opportunity Ranking Smoke",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:00Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083855"
-      },
-      {
-        "id": 37178083840,
-        "name": "Brain Continuous Self-Healing",
-        "status": "pending",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:01Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083840"
-      },
-      {
-        "id": 37178083893,
-        "name": "Brain Continuous Evolution Review",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:16Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083893"
-      },
-      {
-        "id": 37178083846,
-        "name": "Brain Benchmark Self Test",
-        "status": "in_progress",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:04Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083846"
-      },
-      {
-        "id": 37178083844,
-        "name": "Brain Continuous Evolution Review Stable",
-        "status": "queued",
-        "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
-        "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:10Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083844"
-      },
-      {
-        "id": 37178083826,
+        "id": 37182516478,
         "name": "BRAIN Release Gate",
         "status": "in_progress",
         "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
         "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:11Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083826"
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:20:42Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516478"
       },
       {
-        "id": 37178083822,
+        "id": 37182516486,
+        "name": "Brain Fabric Tests",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:20:57Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516486"
+      },
+      {
+        "id": 37182516547,
+        "name": "Brain GitHub Cloud - Free Linux Control Plane",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:02Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516547"
+      },
+      {
+        "id": 37182516491,
+        "name": "Brain Reflection E2E",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:04Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516491"
+      },
+      {
+        "id": 37182516481,
+        "name": "Brain Benchmark Self Test",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:03Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516481"
+      },
+      {
+        "id": 37182516515,
+        "name": "Brain Reasoning Loop",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:06Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516515"
+      },
+      {
+        "id": 37182516490,
+        "name": "Brain Cloud Mining Control Plane",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:06Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516490"
+      },
+      {
+        "id": 37182516496,
         "name": "Brain Human Intermediary Autopilot",
         "status": "in_progress",
         "conclusion": null,
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
         "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:12Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083822"
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:16Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516496"
       },
       {
-        "id": 37178083811,
-        "name": "Brain Global Workflow Watchdog",
+        "id": 37182516556,
+        "name": "Brain Master Audit",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "95e6dd3de1103c76f0dacc304eff331d619394d8",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:27Z",
+        "updated_at": "2026-10-04T06:21:16Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182516556"
+      },
+      {
+        "id": 37182512593,
+        "name": "Brain Fabric Tests",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:20:48Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512593"
+      },
+      {
+        "id": 37182512576,
+        "name": "Brain Media Campaign Smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:00Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512576"
+      },
+      {
+        "id": 37182512594,
+        "name": "Brain Opportunity Discovery Smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:04Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512594"
+      },
+      {
+        "id": 37182512628,
+        "name": "Brain Benchmark Self Test",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:03Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512628"
+      },
+      {
+        "id": 37182512646,
+        "name": "Brain Master Audit",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:08Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512646"
+      },
+      {
+        "id": 37182512573,
+        "name": "BRAIN Release Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:12Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512573"
+      },
+      {
+        "id": 37182512697,
+        "name": "Brain Freelance Worker - Research and Prepare",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:13Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512697"
+      },
+      {
+        "id": 37182512621,
+        "name": "Brain Capability Fabric",
+        "status": "completed",
+        "conclusion": "failure",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:13Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512621"
+      },
+      {
+        "id": 37182512712,
+        "name": "Brain Opportunity Ranking Smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:23Z",
+        "updated_at": "2026-10-04T06:21:18Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512712"
+      },
+      {
+        "id": 37182512493,
+        "name": "Brain GitHub Cloud - Free Linux Control Plane",
         "status": "completed",
         "conclusion": "cancelled",
-        "head_sha": "f1f6cd91255cdbc83a6c746a26a5fd54ef1339e5",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
         "run_attempt": 1,
-        "created_at": "2026-10-04T04:49:00Z",
-        "updated_at": "2026-10-04T04:49:10Z",
-        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37178083811"
+        "created_at": "2026-10-04T06:20:22Z",
+        "updated_at": "2026-10-04T06:20:28Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512493"
+      },
+      {
+        "id": 37182512538,
+        "name": "Brain Evolution Score",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "f8364cb86b9fe8f247c8514aa1ce6b58b0bf6d65",
+        "run_attempt": 1,
+        "created_at": "2026-10-04T06:20:22Z",
+        "updated_at": "2026-10-04T06:21:00Z",
+        "html_url": "https://github.com/omarenserat1980/MySimpleProject/actions/runs/37182512538"
       }
     ]
   },
@@ -312,7 +318,7 @@
   },
   "state": {
     "schema": "brain-human-intermediary-state/v1",
-    "updated_at": "2026-10-04T04:49:17.439062+00:00",
+    "updated_at": "2026-10-04T06:21:19.939489+00:00",
     "max_phase": 0,
     "max_step": 5,
     "regression_blocked": false,
