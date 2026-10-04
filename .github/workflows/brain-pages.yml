@@ -5,6 +5,7 @@ on:
     paths:
       - "cloud/web/**"
       - "platform.html"
+      - "games-store.html"
       - "brain_v12/web/platform.html"
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
@@ -41,6 +42,7 @@ jobs:
           mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
+          cp games-store.html _site/games-store.html
           mkdir -p _site/brain_v12/web _site/marketing _site/customer-portal
           cp -a brain_v12/web/. _site/brain_v12/web/
           cp -a marketing/. _site/marketing/
@@ -67,6 +69,8 @@ jobs:
           )
           if not Path("_site/platform.html").is_file():
               raise SystemExit("Unified Brain platform entry point is missing from artifact")
+          if not Path("_site/games-store.html").is_file():
+              raise SystemExit("BRAIN Games storefront is missing from Pages artifact")
           if not Path("_site/index.html").is_file():
               raise SystemExit("Pages root entry point is missing from artifact")
           if not Path("_site/movies.html").is_file():
@@ -111,6 +115,7 @@ jobs:
         run: |
           test -f _site/index.html
           test -f _site/platform.html
+          test -f _site/games-store.html
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
           test -f _site/brain_v12/web/index.html
