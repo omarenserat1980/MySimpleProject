@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from brain_v12.business.commercial_execution_gate import CommercialFundingEvidence, evaluate_paid_execution
+
 BRAIN_OWNED = "BRAIN_OWNED"
 FREE_DIVERSE = "FREE_DIVERSE"
 PAID_EXTERNAL = "PAID_EXTERNAL"
@@ -60,4 +62,19 @@ def rank_key(spec: Any) -> tuple:
         spec.priority,
         spec.cost_class,
         spec.executor_id,
+    )
+
+
+def policy_from_funding_evidence(
+    evidence: CommercialFundingEvidence,
+    *,
+    allow_external_side_effects: bool = False,
+) -> AutonomyPolicy:
+    """Build the autonomy policy from verified commercial funding evidence."""
+    decision = evaluate_paid_execution(evidence)
+    return AutonomyPolicy(
+        allow_paid=decision.paid_allowed,
+        allow_external_side_effects=allow_external_side_effects,
+        prefer_brain_owned=True,
+        require_independent_free_fallback=True,
     )
