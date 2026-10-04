@@ -1,0 +1,61 @@
+name: Brain Autonomous Cloud Cycle
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: brain-autonomous-cloud-cycle
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  autonomous-cycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install release-gate dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r cloud/requirements.txt pytest
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
+
+      - name: Inspect and verify
+        run: |
+          set -euo pipefail
+          python -m compileall -q cloud brain_v12
+          python -m pytest -q brain_v12/tests/test_brain_supervisor.py brain_v12/tests/test_economic_ledger.py brain_v12/tests/test_founder_compensation.py brain_v12/tests/test_founder_payout_bridge.py
+          python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(), indent=2))"
+
+      - name: Classify launch readiness
+        if: always()
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python -m cloud.company_launch_readiness
+          test -s .brain_state/company_launch_readiness.json
+          cat .brain_state/company_launch_readiness.json
+
+      - name: Publish evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-autonomous-cloud-cycle-evidence
+          path: |
+            .brain_state/release_gate/release_gate.json
+            .brain_state/company_launch_readiness.json
+          retention-days: 7
+
+      - name: Keep external side effects gated
+        run: |
+          echo "AUTONOMOUS_CYCLE=VERIFIED"
+          echo "EXTERNAL_SIDE_EFFECTS=PERMISSION_GATED"
+          echo "COMMERCIAL_TRUTH=EVIDENCE_REQUIRED"
