@@ -7,6 +7,9 @@
 - [x] Require verified attributable costs before profit verification
 - [x] Build unified monetization registry and initial capability catalog
 - [ ] Add commercial KPI/evidence dashboard
+- [ ] Run independent BRAIN AI Marketing evaluation across customer, marketer, marketing manager, and agency-owner perspectives
+- [ ] Convert reviewer findings into tracked UX/commercial improvements
+- [ ] Pass public API + account + trial + order + execution + payment production gate
 
 ## Phase 1 — Evidence and runtime foundation
 - [x] GitHub source-of-truth workflow
