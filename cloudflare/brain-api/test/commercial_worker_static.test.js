@@ -11,6 +11,7 @@ assert.match(worker, /HMAC/);
 assert.match(worker, /PAYMENT_VERIFIED/);
 assert.match(worker, /PAYMENT_PENDING/);
 assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /idempotent: true/);
 assert.match(worker, /INSERT OR IGNORE INTO payment_events/);
 assert.match(worker, /secure-jordan\.paytabs\.com\/payment\/request/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS orders/);
