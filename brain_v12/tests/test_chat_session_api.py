@@ -130,6 +130,18 @@ class ChatSessionApiTests(unittest.TestCase):
             self.assertEqual(feed["events"][0]["payload"]["title"], "Second")
             self.assertNotIn("only-first", str(feed["events"]))
 
+    def test_same_account_sessions_are_visible_across_devices(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            phone = store.create("Phone Chat", account_id="account-1", device_id="phone")
+            desktop = store.create("Desktop Chat", account_id="account-1", device_id="desktop")
+            other = store.create("Other Account", account_id="account-2", device_id="tablet")
+            visible = store.list(account_id="account-1")
+            ids = {x["id"] for x in visible}
+            self.assertEqual(ids, {phone["id"], desktop["id"]})
+            self.assertNotIn(other["id"], ids)
+
     def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
