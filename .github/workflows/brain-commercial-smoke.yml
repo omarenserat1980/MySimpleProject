@@ -19,6 +19,8 @@ jobs:
       - name: Validate commercial cycle
         run: |
           set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install pytest
           python -m py_compile brain_v12/business/*.py
           python -m pytest -q brain_v12/business/test_customer_governance.py brain_v12/business/test_revenue_ledger.py brain_v12/business/test_pipeline.py
           python - <<'PY'
