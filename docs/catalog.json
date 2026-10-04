@@ -7,11 +7,25 @@
       "title": "آخر ضوء في المدينة",
       "year": 2026,
       "genre": "دراما • سينمائي",
-      "access": "paid",
+      "access": "planned",
       "status": "preview_available",
       "rating": null,
       "href": "./cinema.html",
-      "rights": "brain_original"
+      "rights": "brain_original",
+      "commercial_status": "BLOCKED",
+      "evidence": []
     }
-  ]
+  ],
+  "release_policy": {
+    "paid_requires": "VERIFIED_COMMERCIAL",
+    "evidence": [
+      "master_sha256",
+      "qc_report",
+      "rights_manifest",
+      "story_review",
+      "sound_review",
+      "continuity_review"
+    ],
+    "fallback": "PLANNED"
+  }
 }
