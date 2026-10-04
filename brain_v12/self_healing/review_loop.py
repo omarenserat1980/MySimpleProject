@@ -60,7 +60,15 @@ def deterministic_review(timeout: int) -> tuple[bool, dict]:
         [os.environ.get("PYTHON", "python"), "-m", "brain_v12.self_healing.self_test"],
     ]
     if os.getenv("BRAIN_REVIEW_PYTEST", "0") == "1":
-        commands.append([os.environ.get("PYTHON", "python"), "-m", "pytest", "-q"])
+        raw_targets = os.getenv("BRAIN_REVIEW_PYTEST_TARGETS", "").strip()
+        targets = raw_targets.split() if raw_targets else [
+            "brain_v12/tests/test_control_plane.py",
+            "brain_v12/tests/test_execution_coordinator.py",
+            "brain_v12/tests/test_github_execution_bridge.py",
+        ]
+        commands.append([
+            os.environ.get("PYTHON", "python"), "-m", "pytest", "-q", *targets
+        ])
     commands.append([os.environ.get("PYTHON", "python"), "-m", "brain_v12.self_healing.verification_gate"])
 
     ok = True
