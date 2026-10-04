@@ -1,4 +1,5 @@
 name: Brain Cloudflare Deploy
+# Evidence gate: cinema checkout + protected R2 stream
 
 on:
   push:
