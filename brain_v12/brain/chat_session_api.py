@@ -39,6 +39,13 @@ def router(brain_ai, store=None, context_limit=24):
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
         return {"ok": True, "session": session}
 
+    @r.get("/sessions/{session_id}/sync")
+    def sync_session(session_id: str, after: int = 0, limit: int = 100):
+        if store.get(session_id) is None:
+            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+        feed = store.sync_events(session_id, after=after, limit=limit)
+        return {"ok": True, "session_id": session_id, **feed}
+
     @r.get("/sessions/{session_id}/memory")
     def get_memory(session_id: str):
         if store.get(session_id) is None:
