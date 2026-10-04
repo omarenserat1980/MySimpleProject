@@ -9,9 +9,9 @@ def test_verified_callback_becomes_payment_evidence():
     key = "TEST_SECRET"
     payload = {
         "cart_id": "BRAIN-TEST-2",
-        "cart_total": "1.00",
+        "cart_amount": "1.00",
         "cart_currency": "USD",
-        "response_status": "A",
+        "payment_result": {"response_status": "A"},
         "tran_ref": "TST456",
         "transaction_time": "2026-10-04T20:00:00Z",
     }
