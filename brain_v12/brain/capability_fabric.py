@@ -56,7 +56,7 @@ class CapabilityFabric:
         if require_healthy:
             candidates = [x for x in candidates if self.health.healthy(x.executor_id)]
         return sorted(candidates, key=lambda x: (
-            -self.health.score(x.executor_id), *rank_key(x)))
+            *rank_key(x), -self.health.score(x.executor_id)))
 
     def plan(self, capability: str, required_permissions: set[str] | None = None,
              require_healthy: bool = True, probe_before_select: bool = False) -> list[ExecutorSpec]:
