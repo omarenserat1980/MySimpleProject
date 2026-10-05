@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ensure the Brain-owned local executor supervisor is running and prove heartbeat.
+"""Ensure the Brain-owned local executor Guardian is running and prove heartbeat.
 
 This launcher is a repair utility only. It never changes the autonomy result.
 It starts the supervisor when needed, then waits for a fresh heartbeat. If the
@@ -69,6 +69,32 @@ def legacy_supervisor_pids() -> list[int]:
     except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
         return []
 
+
+def worker_pids() -> list[int]:
+    try:
+        out = subprocess.check_output(["pgrep", "-f", "brain_v12/local_worker/brain_local_worker.py"], text=True, stderr=subprocess.DEVNULL)
+        return [int(x) for x in out.split() if x.isdigit() and int(x) != os.getpid()]
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+        return []
+
+
+def stop_pids(pids: list[int]) -> None:
+    unique = sorted(set(pids))
+    for pid in unique:
+        try:
+            os.kill(pid, 15)
+        except OSError:
+            pass
+    deadline = time.time() + 5
+    while time.time() < deadline and any(running_pid(pid) for pid in unique):
+        time.sleep(0.1)
+    for pid in unique:
+        if running_pid(pid):
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+
 def heartbeat_is_fresh(max_age: float = 15.0) -> bool:
     try:
         age = time.time() - HEARTBEAT.stat().st_mtime
@@ -94,21 +120,10 @@ def main() -> int:
     legacy = legacy_supervisor_pids()
     if stale or (existing is None and legacy):
         pids = ([existing] if existing is not None else []) + legacy
-        for pid in sorted(set(pids)):
-            try:
-                os.kill(pid, 15)
-            except OSError:
-                continue
-        deadline = time.time() + 5
-        while time.time() < deadline and any(running_pid(pid) for pid in pids):
-            time.sleep(0.1)
-        for pid in pids:
-            if running_pid(pid):
-                try:
-                    os.kill(pid, 9)
-                except OSError:
-                    pass
+        stop_pids(pids)
         existing = None
+    if existing is None:
+        stop_pids(worker_pids())
     if existing is None:
         log = LOG_FILE.open("a", encoding="utf-8")
         proc = subprocess.Popen(
