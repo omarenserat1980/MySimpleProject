@@ -82,8 +82,9 @@ jobs:
               encoding="utf-8")
           for html in Path("_site").rglob("*.html"):
               s=html.read_text(encoding="utf-8")
-              marker='<script src="/brain-api-bridge.js"></script>'
-              if marker not in s:
+              rel=os.path.relpath(Path("_site/brain-api-bridge.js"), html.parent).replace(os.sep, "/")
+              marker=f'<script src="{rel}"></script>'
+              if "brain-api-bridge.js" not in s:
                   if "</head>" in s:
                       s=s.replace("</head>", marker+"</head>", 1)
                   else:
