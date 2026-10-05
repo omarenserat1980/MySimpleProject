@@ -58,20 +58,20 @@ class AuthorityApprovalLedger:
 
         def claim(record):
             if not record:
-                return record, ApprovalDecision(False, task_id, action, risk, "explicit irreversible approval is missing")
+                return False, record
             if record.get("consumed") is True:
-                return record, ApprovalDecision(False, task_id, action, risk, "explicit approval has already been consumed")
+                return False, record
             if record.get("action") != action or record.get("risk") != risk.value:
-                return record, ApprovalDecision(False, task_id, action, risk, "approval does not match requested action or risk")
-            updated = {**record, "consumed": True, "consumed_at": time.time()}
-            return updated, ApprovalDecision(True, task_id, action, risk, "explicit approval consumed")
+                return False, record
+            return True, {**record, "consumed": True, "consumed_at": time.time()}
 
-        _, decision = self.state.atomic_update(key, claim, default=None)
-        if decision.approved:
-            self.audit.record("authority.consumed", {
-                "task_id": task_id, "action": action, "risk": risk.value
-            })
-        return decision
+        changed, record = self.state.atomic_update(key, claim, default=None)
+        if not changed:
+            return self.check(task_id, action, risk)
+        self.audit.record("authority.consumed", {
+            "task_id": task_id, "action": action, "risk": risk.value
+        })
+        return ApprovalDecision(True, task_id, action, risk, "explicit approval consumed")
 
 
 __all__ = ["ApprovalDecision", "AuthorityApprovalLedger"]
