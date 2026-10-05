@@ -34,7 +34,7 @@ resource "azurerm_network_security_group" "brain" {
     name                   = "AllowWinRM"
     priority               = 100
     direction              = "Inbound"
-    access                = "Allow"
+    access                 = "Allow"
     protocol               = "Tcp"
     source_port_range      = "*"
     destination_port_range = "5986"
