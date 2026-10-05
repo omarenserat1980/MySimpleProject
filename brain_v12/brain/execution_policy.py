@@ -57,7 +57,7 @@ def choose_executor(executors: Iterable[Executor], capability: str) -> Executor:
     # Real runtime capabilities may use an explicitly configured cloud provider,
     # but must never silently fall back to GitHub CI.
 
-    if capability == WINDOWS_REAL_BOOT and selected.name == GITHUB_CI:
-        raise RuntimeError("GITHUB_CI_FORBIDDEN_FOR_WINDOWS_REAL_BOOT")
+    if capability == WINDOWS_REAL_BOOT and selected.external:
+        raise RuntimeError("EXTERNAL_EXECUTOR_FORBIDDEN")
 
     return selected
