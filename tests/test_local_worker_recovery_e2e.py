@@ -41,6 +41,7 @@ def test_stale_running_job_is_recovered_to_queue(tmp_path, monkeypatch):
 def test_recovered_job_executes_after_restart(tmp_path, monkeypatch):
     root = tmp_path / "worker"
     monkeypatch.setenv("BRAIN_LOCAL_WORKER_ROOT", str(root))
+    monkeypatch.setenv("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", "30")
     old_root = worker.ROOT
     old_dirs = (worker.QUEUED, worker.RUNNING, worker.COMPLETED, worker.FAILED)
     try:
