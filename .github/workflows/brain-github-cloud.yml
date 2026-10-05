@@ -36,6 +36,11 @@ jobs:
       BRAIN_FFMPEG_BIN: ffmpeg
       BRAIN_FFPROBE_BIN: ffprobe
     steps:
+      - name: Checkout Brain source of truth
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
       - name: Fail-closed internal runner preflight
         run: |
           set -euo pipefail
@@ -46,11 +51,6 @@ jobs:
           assert evidence["verified"] is True, evidence
           print("BRAIN_INTERNAL_RUNNER=VERIFIED")
           PY
-
-      - name: Checkout Brain source of truth
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 1
 
       - name: Resolve Brain task
         env:
