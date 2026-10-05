@@ -12,6 +12,7 @@ FORBIDDEN_TRACKED_NAMES = {
 }
 
 FORBIDDEN_OPEN_NETWORKS = {"0.0.0.0/0", "::/0"}
+SENSITIVE_TFVARS_PATTERNS = ("*.tfvars", "*.tfvars.json", "*.auto.tfvars", "*.auto.tfvars.json")
 
 
 def inspect_windows_terraform_root(root: str | Path) -> dict[str, object]:
@@ -23,6 +24,8 @@ def inspect_windows_terraform_root(root: str | Path) -> dict[str, object]:
             violations.append(f"FORBIDDEN_STATE_OR_PLAN_FILE:{name}")
 
     for path in root.rglob("*"):
+        if path.is_file() and any(path.match(pattern) for pattern in SENSITIVE_TFVARS_PATTERNS):
+            violations.append(f"SENSITIVE_TFVARS_FILE:{path.name}")
         if path.is_file():
             try:
                 text = path.read_text(encoding="utf-8")
