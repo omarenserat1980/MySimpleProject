@@ -1,4 +1,6 @@
 from platform_foundation.apm import APM
+from platform_foundation.brain_ci_executor import BrainCIExecutor
+from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 from platform_foundation.audit_chain import AuditChain
 from platform_foundation.autonomous_pipeline import AutonomousPipeline
 from platform_foundation.parallel_chunks import ParallelChunkRunner
@@ -6,9 +8,16 @@ from platform_foundation.persistent_state import SQLiteStateStore
 from platform_foundation.stage_orchestrator import StageOrchestrator
 
 
-def test_verified_checkpoint_is_persisted_after_stage(tmp_path):
+def ready_pipeline(tmp_path):
     store = SQLiteStateStore(tmp_path / "state.db")
-    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    authority = BrainExecutionAuthority(heartbeat_path=tmp_path / "heartbeat.json")
+    authority.heartbeat()
+    executor = BrainCIExecutor(store, root=tmp_path, runner=lambda _command, _root: (0, "", ""))
+    return store, AutonomousPipeline(StageOrchestrator(store), APM(store), ci_executor=executor, execution_authority=authority)
+
+
+def test_verified_checkpoint_is_persisted_after_stage(tmp_path):
+    store, p = ready_pipeline(tmp_path)
     p.run_until(execute=lambda s: s.stage, verify=lambda s, r: r == s.stage, stop_stage=2, run_id="run-17")
     cp = p.checkpoint()
     assert cp is not None
@@ -18,8 +27,7 @@ def test_verified_checkpoint_is_persisted_after_stage(tmp_path):
 
 
 def test_failed_stage_does_not_create_new_verified_checkpoint(tmp_path):
-    store = SQLiteStateStore(tmp_path / "state.db")
-    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    store, p = ready_pipeline(tmp_path)
     p.run_until(execute=lambda s: s.stage, verify=lambda s, r: True, stop_stage=1)
     before = p.checkpoint()
     try:
@@ -108,15 +116,13 @@ def test_parallel_stage_restart_reuses_verified_chunks(tmp_path):
 
 
 def test_pipeline_health_is_true_after_verified_checkpoint(tmp_path):
-    store = SQLiteStateStore(tmp_path / "state.db")
-    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    store, p = ready_pipeline(tmp_path)
     p.run_until(execute=lambda s: s.stage, verify=lambda s, r: True, stop_stage=2)
     assert p.health()["healthy"] is True
 
 
 def test_pipeline_health_detects_failed_stage(tmp_path):
-    store = SQLiteStateStore(tmp_path / "state.db")
-    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    store, p = ready_pipeline(tmp_path)
     try:
         p.run_until(execute=lambda s: s.stage, verify=lambda s, r: False, stop_stage=1, max_attempts=1)
     except RuntimeError:
