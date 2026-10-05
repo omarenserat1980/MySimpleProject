@@ -47,3 +47,13 @@ def test_external_executor_cannot_authorize_brain_capability():
     import pytest
     with pytest.raises(PermissionError):
         registry.invoke("python", executors=external)
+
+
+def test_capability_contract_mismatch_blocks_readiness():
+    registry = CapabilityRegistry()
+    registry.register(Capability("x", "brain", "2.0", "brain-local-01", contract="v2"), lambda: "ok")
+    assert not registry.readiness("x")["ready"]
+    assert registry.readiness("x")["reason"] == "contract_mismatch"
+    import pytest
+    with pytest.raises(PermissionError, match="contract_mismatch"):
+        registry.invoke("x")
