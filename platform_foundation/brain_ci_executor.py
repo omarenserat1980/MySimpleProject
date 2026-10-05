@@ -57,6 +57,15 @@ class BrainCIExecutor:
         self.policy = BrainExecutionPolicy()
         self._runner = runner or self._run_local
 
+    @classmethod
+    def from_local_worker(cls, store: SQLiteStateStore, *, root: str | Path = "."):
+        """Construct the Brain-owned executor using the local Brain runtime."""
+        return cls(store, root=root, executor_id="brain-local-ci", persistent=True)
+
+    def run_profile(self, profile: str, *, commit_sha: str | None = None, run_id: str | None = None) -> BrainCIResult:
+        """Explicit Brain runtime entrypoint; never delegates to GitHub Actions."""
+        return self.execute(profile, commit_sha=commit_sha, run_id=run_id)
+
     def _run_local(self, command: list[str], root: Path) -> tuple[int, str, str]:
         p = subprocess.run(command, cwd=root, capture_output=True, text=True)
         return p.returncode, p.stdout[-12000:], p.stderr[-12000:]
