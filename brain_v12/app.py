@@ -1239,7 +1239,7 @@ def _cloud_worker_attestation() -> dict:
         payload = json.loads(heartbeat.read_text(encoding="utf-8"))
         age = max(0.0, __import__("time").time() - float(payload.get("timestamp", 0)))
         ttl = max(5, int(os.getenv("BRAIN_WORKER_HEARTBEAT_TTL_SECONDS", "15")))
-        verified = payload.get("service") == "brain-cloud-runtime" and payload.get("state") == "RUNNING" and age <= ttl
+        verified = (payload.get("service") == "brain-cloud-runtime" and payload.get("state") == "RUNNING" and age <= ttl and isinstance(payload.get("preflight"), dict) and payload["preflight"].get("verified") is True)
         return {
             "state": "RUNNING" if verified else "STALE",
             "verified": verified,
