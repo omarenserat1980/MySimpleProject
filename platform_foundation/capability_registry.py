@@ -86,6 +86,9 @@ class CapabilityRegistry:
             raise ValueError(f"unknown_capability:{name}")
         if not item.enabled:
             raise PermissionError(f"capability_disabled:{name}")
+        readiness = self.readiness(name)
+        if not readiness["ready"]:
+            raise PermissionError(f"capability_not_ready:{name}:{readiness['reason']}")
         if executors is not None:
             authorization = self.authorize_executor(name, executors)
             if not authorization["allowed"]:
