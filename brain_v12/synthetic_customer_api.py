@@ -1,46 +1,41 @@
-"""API for Synthetic Customer proposal/approval test runs."""
+"""HTTP surface for the Synthetic Customer test client."""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from .brain.synthetic_customer import SyntheticCustomer, Proposal
+from .brain.synthetic_customer import SyntheticCustomer
 
 class CustomerRequest(BaseModel):
-    customer_type:str
-    request:str
+    customer_type: str
+    request: str
 
-class ProposalIn(BaseModel):
-    source:str
-    summary:str=""
-    scope:list[str]=[]
-    risks:list[str]=[]
-    acceptance:list[str]=[]
-    requires_approval:bool=True
-
-class ApprovalIn(BaseModel):
-    proposal:dict
-
-def router(customer:SyntheticCustomer):
-    r=APIRouter(prefix="/api/synthetic-customer",tags=["synthetic-customer"])
+def router(customer: SyntheticCustomer, capability_provider=None):
+    r = APIRouter(prefix="/api/synthetic-customer", tags=["synthetic-customer"])
 
     @r.post("/runs")
-    def create_run(body:CustomerRequest):
-        run=customer.start(body.customer_type,body.request)
-        return {"ok":True,"run":run.__dict__}
+    def create_run(body: CustomerRequest):
+        run = customer.start(body.customer_type, body.request)
+        capabilities = capability_provider() if capability_provider else {}
+        proposals = customer.generate_proposals(run, capabilities)
+        return {"ok": True, "run": run.__dict__, "proposals": proposals}
 
-    @r.post("/runs/{run_id}/proposals/merge")
-    def merge(run_id:str, body:list[ProposalIn]):
-        if len(body)!=2:
-            raise HTTPException(400,"CHATGPT_AND_BRAIN_PROPOSALS_REQUIRED")
-        p=customer.merge_proposals(
-            Proposal(**body[0].model_dump()),Proposal(**body[1].model_dump()))
-        return {"ok":True,"run_id":run_id,"proposal":p}
+    @r.get("/runs/{run_id}")
+    def get_run(run_id: str):
+        try:
+            return {"ok": True, "run": customer.get(run_id).__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
 
     @r.post("/runs/{run_id}/approve")
-    def approve(run_id:str, body:ApprovalIn):
-        # This endpoint is intentionally a test approval only; execution remains separate.
-        return {"ok":True,"run_id":run_id,"status":"APPROVED_FOR_TEST_EXECUTION","proposal":body.proposal}
+    def approve(run_id: str):
+        try:
+            run = customer.approve(customer.get(run_id))
+            return {"ok": True, "run": run.__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
 
     @r.post("/payment-safety")
-    def payment_safety(environment:str,payment_mode:str="NONE"):
-        return customer.safety_gate(environment,payment_mode)
+    def payment_safety(environment: str, payment_mode: str = "NONE"):
+        return customer.safety_gate(environment, payment_mode)
 
     return r
