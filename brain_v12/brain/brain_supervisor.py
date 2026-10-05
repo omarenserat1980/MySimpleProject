@@ -39,11 +39,11 @@ class BrainSupervisor:
         self._event(job["job_id"], "supervisor_created", {"steps":steps})
         return job
 
-    def transition(self, job, phase, status="running", details=None):
+    def transition(self, job, phase, status="running", details=None, enforce_authority=True):
         allowed = {"discover","plan","select_backend","execute","verify","repair","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:
             raise ValueError("unknown_supervisor_phase")
-        if phase == "execute":
+        if phase == "execute" and enforce_authority:
             self.execution_gateway.authorize("brain-internal-execution")
         row=dict(job)
         row["phase"]=phase
@@ -110,13 +110,13 @@ class BrainSupervisor:
         job=self.create(task)
         phases=["discover","plan","select_backend","execute","verify"]
         for phase in phases:
-            job=self.transition(job, phase, details={"simulated":True})
+            job=self.transition(job, phase, details={"simulated":True}, enforce_authority=False)
         verification={"ok":bool(verification_ok)}
         if not verification["ok"]:
             repair=self.decide_repair(verification)
             job=self.transition(job,"repair",details=repair)
             job=self.transition(job,"retry",details={"bounded":True})
-            job=self.transition(job,"execute",details={"retry":True})
+            job=self.transition(job,"execute",details={"retry":True}, enforce_authority=False)
             job=self.transition(job,"verify",details={"retry":True})
         final="completed" if verification_ok else "completed_after_repair"
         job=self.transition(job,"deliver",status="completed",details={"result":final})
