@@ -57,3 +57,23 @@ def test_capability_contract_mismatch_blocks_readiness():
     import pytest
     with pytest.raises(PermissionError, match="contract_mismatch"):
         registry.invoke("x")
+
+
+def test_capability_registry_survives_restart(tmp_path):
+    from platform_foundation.persistent_state import SQLiteStateStore
+    db = SQLiteStateStore(tmp_path / "state.db")
+    first = CapabilityRegistry(state_store=db)
+    first.register(Capability("persisted", "brain", "1.0", "brain-local-01"), lambda: "ok")
+    second = CapabilityRegistry(state_store=SQLiteStateStore(tmp_path / "state.db"))
+    assert second.get("persisted") is not None
+    assert second.readiness("persisted")["reason"] == "handler_missing"
+
+
+def test_capability_authorization_is_audited():
+    from platform_foundation.execution_policy import ExecutorDescriptor
+    registry = CapabilityRegistry()
+    registry.register(Capability("audit", "brain", "1.0", "brain-local-01", frozenset({"python"})), lambda: "ok")
+    allowed = [ExecutorDescriptor("brain-local-01", "brain", True, frozenset({"python"}))]
+    registry.authorize_executor("audit", allowed)
+    assert registry.audit_chain.verify()
+    assert any(e.event == "capability_authorization" for e in registry.audit_chain.events())
