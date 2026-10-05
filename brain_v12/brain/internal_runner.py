@@ -43,15 +43,18 @@ class InternalRunner:
         }
 
     def status(self) -> dict:
+        from .internal_runner_preflight import inspect_runner
+        preflight = inspect_runner(self.runner_id)
         return {
             "runner_id": self.runner_id,
-            "state": self.state,
+            "state": "ONLINE" if preflight.verified else "OFFLINE",
             "labels": sorted(self.labels),
             "capabilities": sorted(self.capabilities()),
             "host_os": platform.system(),
             "host_arch": platform.machine(),
             "python": platform.python_version(),
             "qemu": self._binary("qemu-system-x86_64"),
+            "preflight": preflight.evidence(),
         }
 
     @staticmethod
