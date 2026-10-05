@@ -37,7 +37,7 @@ class BrainCIExecutor:
     PROFILES = {
         "runner_policy": ("tests/test_execution_policy.py", "tests/test_runner_policy_audit.py"),
         "foundation": ("tests/test_platform_foundation.py", "tests/test_brain_supervisor_bridge.py"),
-        "autonomous_pipeline": ("tests/test_autonomous_pipeline.py",),
+        "autonomous_pipeline": ("tests/test_autonomous_pipeline.py", "tests/test_autonomous_pipeline_execution_health.py"),
     }
 
     def __init__(
@@ -124,6 +124,20 @@ class BrainCIExecutor:
         )
         self.store.set(self.STATE_KEY, asdict(result))
         return result
+
+    def evidence(self, run_id: str | None = None) -> dict[str, Any] | None:
+        last = self.store.get(self.STATE_KEY)
+        if not last:
+            return None
+        if run_id is not None and last.get("run_id") != run_id:
+            return None
+        path = last.get("evidence_path")
+        if not path:
+            return None
+        evidence_path = Path(path)
+        if not evidence_path.exists():
+            return None
+        return json.loads(evidence_path.read_text(encoding="utf-8"))
 
     def health(self) -> dict[str, Any]:
         return {
