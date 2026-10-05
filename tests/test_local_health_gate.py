@@ -9,9 +9,17 @@ def setup_tree(tmp_path):
     base = tmp_path / "local_worker"
     for name in ("queued", "running", "completed", "failed"):
         (base / name).mkdir(parents=True)
+    heartbeat = {
+        "owner": "brain",
+        "persistent": True,
+        "executor_id": "brain-local-01",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "pid": 1,
+    }
+    (base / "heartbeat.json").write_text(json.dumps(heartbeat), encoding="utf-8")
     (base / "supervisor.json").write_text(json.dumps({
         "status": "READY",
-        "heartbeat_at": datetime.now(timezone.utc).isoformat(),
+        "heartbeat_at": heartbeat["timestamp"],
     }), encoding="utf-8")
     return base
 
