@@ -131,6 +131,27 @@ def create_job(kind: str, payload: dict[str, Any], required_capabilities: list[s
         _atomic_write(_state_dir() / f"job-{job['job_id']}.json", job)
     return job
 
+def next_node_job(node_id: str, required_capabilities: list[str] | None = None) -> dict[str, Any] | None:
+    """Lease the oldest queued job assigned to a healthy node."""
+    node_id = _validate_id(node_id)
+    node = next((n for n in list_nodes() if n.get("node_id") == node_id), None)
+    if not node or not _eligible(node, set(required_capabilities or [])):
+        return None
+    with _LOCK:
+        jobs = []
+        for p in sorted(_state_dir().glob("job-*.json")):
+            item = _read(p)
+            if item and item.get("node_id") == node_id and item.get("state") == "QUEUED":
+                jobs.append((p, item))
+        if not jobs:
+            return None
+        path, job = jobs[0]
+        job["state"] = "RUNNING"
+        job["leased_at"] = _now()
+        job["updated_at"] = _now()
+        _atomic_write(path, job)
+        return job
+
 def get_job(job_id: str) -> dict[str, Any] | None:
     return _read(_state_dir() / f"job-{_validate_id(job_id)}.json")
 
