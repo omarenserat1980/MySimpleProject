@@ -170,6 +170,13 @@ class SyntheticCustomer:
             result = self.executor(run.request, run.customer_type, run.run_id)
             ok = bool(isinstance(result, dict) and result.get("ok", True))
             run.execution = {"ok": ok, "gate": gate, "result": result}
+            if ok and self.evidence_store:
+                evidence = self.evidence_store.append(run.run_id, "synthetic-customer-execution", run.execution, "synthetic-customer")
+                verification = self.evidence_store.verify_hash(evidence["evidence_id"])
+                run.execution["evidence_id"] = evidence["evidence_id"]
+                run.execution["evidence_sha256"] = evidence["sha256"]
+                run.execution["evidence_verified"] = verification["ok"]
+                ok = ok and verification["ok"]
             run.status = "VERIFIED" if ok else "EXECUTION_FAILED"
             run.evidence = run.evidence or []
             run.evidence.append({
