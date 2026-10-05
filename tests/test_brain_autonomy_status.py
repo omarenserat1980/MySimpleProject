@@ -30,6 +30,8 @@ def test_autonomy_status_requires_both_proof_and_live_authority(monkeypatch, tmp
     assert result["scoped_independence_proven"] is True
     assert result["live_brain_executor_ready"] is False
     assert result["AUTONOMOUS_WITHIN_AUTHORITY"] is False
+    assert result["status"] == "NOT_AUTONOMOUS"
+    assert result["reason"] == "live_executor:offline"
 
 
 def test_autonomy_status_is_true_only_with_live_authority(monkeypatch, tmp_path):
