@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+import inspect
 from typing import Any, Callable
 
 from .audit_chain import AuditChain
@@ -17,7 +18,7 @@ class ChunkResult:
 
 
 class ParallelChunkRunner:
-    """Bounded dependency-aware parallel runner with durable chunk checkpoints."""
+    """Bounded dependency-aware runner with durable, resumable checkpoints."""
 
     def __init__(self, store: SQLiteStateStore, audit: AuditChain) -> None:
         self.store = store
@@ -26,11 +27,27 @@ class ParallelChunkRunner:
     def _key(self, run_id: str, chunk_id: str) -> str:
         return f"pipeline.chunk:{run_id}:{chunk_id}"
 
+    @staticmethod
+    def _accepts_dependencies(execute: Callable[..., Any]) -> bool:
+        """Preserve the original execute(chunk) API while supporting execute(chunk, deps)."""
+        try:
+            signature = inspect.signature(execute)
+            parameters = list(signature.parameters.values())
+            if any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in parameters):
+                return True
+            positional = [
+                p for p in parameters
+                if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            ]
+            return len(positional) >= 2
+        except (TypeError, ValueError):
+            return True
+
     def run(
         self,
         run_id: str,
         chunks: list[str],
-        execute: Callable[[str, dict[str, Any]], Any],
+        execute: Callable[..., Any],
         verify: Callable[[str, Any], bool],
         *,
         dependencies: dict[str, list[str]] | None = None,
@@ -55,7 +72,6 @@ class ParallelChunkRunner:
             if any(dep not in known for dep in required):
                 raise ValueError(f"unknown dependency for chunk: {chunk_id}")
 
-        # Detect dependency cycles before any side effect starts.
         visiting: set[str] = set()
         visited: set[str] = set()
 
@@ -85,6 +101,8 @@ class ParallelChunkRunner:
                 outputs[chunk_id] = result.output
                 pending.discard(chunk_id)
 
+        accepts_dependencies = self._accepts_dependencies(execute)
+
         while pending:
             ready = [
                 chunk_id for chunk_id in chunks
@@ -92,10 +110,8 @@ class ParallelChunkRunner:
                 and all(dep in results and results[dep].status == "SUCCESS"
                         for dep in deps.get(chunk_id, []))
             ]
-
             if not ready:
-                blocked = sorted(pending)
-                for chunk_id in blocked:
+                for chunk_id in sorted(pending):
                     results[chunk_id] = ChunkResult(
                         chunk_id, "FAILED", error="dependency not satisfied"
                     )
@@ -103,10 +119,8 @@ class ParallelChunkRunner:
                         self._key(run_id, chunk_id),
                         {"status": "FAILED", "error": "dependency not satisfied"},
                     )
-                    self.audit.record(
-                        "pipeline.chunk.blocked",
-                        {"run_id": run_id, "chunk_id": chunk_id},
-                    )
+                    self.audit.record("pipeline.chunk.blocked",
+                                      {"run_id": run_id, "chunk_id": chunk_id})
                 break
 
             def one(chunk_id: str) -> ChunkResult:
@@ -119,17 +133,18 @@ class ParallelChunkRunner:
                     dependency_outputs = {
                         dep: outputs[dep] for dep in deps.get(chunk_id, [])
                     }
-                    result = execute(chunk_id, dependency_outputs)
+                    if accepts_dependencies:
+                        result = execute(chunk_id, dependency_outputs)
+                    else:
+                        result = execute(chunk_id)
                     if not verify(chunk_id, result):
                         raise RuntimeError("chunk independent verification failed")
                     self.store.set(
                         self._key(run_id, chunk_id),
                         {"status": "SUCCESS", "output": result},
                     )
-                    self.audit.record(
-                        "pipeline.chunk.verified",
-                        {"run_id": run_id, "chunk_id": chunk_id},
-                    )
+                    self.audit.record("pipeline.chunk.verified",
+                                      {"run_id": run_id, "chunk_id": chunk_id})
                     return ChunkResult(chunk_id, "SUCCESS", output=result)
                 except Exception as exc:
                     error = f"{type(exc).__name__}: {exc}"
