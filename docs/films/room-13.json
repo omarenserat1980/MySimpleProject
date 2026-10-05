@@ -1,1 +1,13 @@
-{"id":"brain-room-13","title":"الغرفة 13","year":2026,"genre":"رعب • غموض","runtime_target_minutes":1,"status":"FACTORY_BUILD","access":"blocked_until_verified","original":true}
+{
+  "id": "brain-room-13",
+  "title": "الغرفة 13",
+  "year": 2026,
+  "genre": "رعب • غموض",
+  "runtime_target_minutes": 1,
+  "status": "FACTORY_BUILD",
+  "access": "blocked_until_verified",
+  "original": true,
+  "storyboard": "./room-13.storyboard.json",
+  "production_status": "storyboard_locked",
+  "commercial_status": "BLOCKED"
+}
