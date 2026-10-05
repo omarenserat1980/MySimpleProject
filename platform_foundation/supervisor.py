@@ -33,7 +33,7 @@ _PHASE_ORDER = {
     SupervisorPhase.DISCOVER: {SupervisorPhase.PLAN, SupervisorPhase.BLOCKED},
     SupervisorPhase.PLAN: {SupervisorPhase.SELECT, SupervisorPhase.BLOCKED},
     SupervisorPhase.SELECT: {SupervisorPhase.EXECUTE, SupervisorPhase.BLOCKED},
-    SupervisorPhase.EXECUTE: {SupervisorPhase.VERIFY, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.FAILED},
+    SupervisorPhase.EXECUTE: {SupervisorPhase.VERIFY, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.BLOCKED, SupervisorPhase.FAILED},
     SupervisorPhase.VERIFY: {SupervisorPhase.DELIVER, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.FAILED},
     SupervisorPhase.REPAIR: {SupervisorPhase.RETRY, SupervisorPhase.FAILED},
     SupervisorPhase.RETRY: {SupervisorPhase.EXECUTE, SupervisorPhase.FAILED},
