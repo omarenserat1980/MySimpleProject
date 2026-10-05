@@ -29,6 +29,8 @@ on:
       - 'tests/test_operational_gate.py'
       - 'tests/test_operational_state.py'
       - 'tests/test_stage_orchestrator.py'
+      - 'tests/test_parallel_chunks.py'
+      - 'tests/test_autonomous_pipeline.py'
       - '.github/workflows/base-expansion-integrated-gate.yml'
 
 permissions:
@@ -69,7 +71,9 @@ jobs:
             tests/test_repair_cycle.py \
             tests/test_operational_gate.py \
             tests/test_operational_state.py \
-            tests/test_stage_orchestrator.py
+            tests/test_stage_orchestrator.py \
+            tests/test_parallel_chunks.py \
+            tests/test_autonomous_pipeline.py
       - name: Write integrated evidence
         run: |
           python - <<'PY'
@@ -100,6 +104,8 @@ jobs:
               'operational_gate': 'PASS',
               'operational_state_persistence': 'PASS',
               'stage_orchestrator': 'PASS',
+              'parallel_chunks': 'PASS',
+              'autonomous_pipeline_parallel_gate': 'PASS',
           }
           Path('integrated_execution_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
           print(json.dumps(evidence, indent=2))
