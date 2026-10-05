@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from .persistent_state import SQLiteStateStore
 
@@ -15,7 +15,7 @@ class StageState:
 
 
 class StageOrchestrator:
-    """Durable, gate-driven stage progression for the 41-stage build."""
+    """Durable, gate-driven, sequential progression for the 41-stage build."""
 
     KEY = "brain.stage_orchestrator"
     TOTAL_STAGES = 41
@@ -42,15 +42,19 @@ class StageOrchestrator:
                 "stage": 1, "step": 1, "status": "PENDING", "revision": 0
             }
             previous_stage = int(previous["stage"])
+            previous_step = int(previous["step"])
             if stage < previous_stage:
                 raise RuntimeError("stage regression is forbidden")
+            if stage > previous_stage + 1:
+                raise RuntimeError("stage skipping is forbidden")
+            if stage == previous_stage and step < previous_step:
+                raise RuntimeError("step regression is forbidden")
+
             revision = int(previous["revision"]) + 1
             status = "COMPLETE" if stage == self.TOTAL_STAGES else "READY"
             return True, {
-                "stage": stage,
-                "step": step,
-                "status": status,
-                "revision": revision,
+                "stage": stage, "step": step,
+                "status": status, "revision": revision,
             }
 
         _, value = self.store.atomic_update(self.KEY, update, default={})
