@@ -1,9 +1,6 @@
 name: synthetic-customer-smoke
 
 on:
-  push:
-    branches:
-      - "feature/synthetic-customer-proposal-gate"
   workflow_dispatch:
 
 jobs:
