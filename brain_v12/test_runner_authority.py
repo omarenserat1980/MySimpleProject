@@ -37,3 +37,21 @@ def test_supervisor_does_not_dispatch_github_hosted_runtime():
     assert "brain-github-cloud.yml/dispatches" not in text
     assert "runs-on: ubuntu-latest" not in text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
     assert "brain-internal" in text
+
+
+RUNTIME_WORKFLOWS = (
+    Path(".github/workflows/brain-github-cloud.yml"),
+    Path(".github/workflows/brain-120-minute-cinema.yml"),
+    Path(".github/workflows/brain-three-films-factory.yml"),
+    Path(".github/workflows/brain-local-cinema-smoke.yml"),
+    Path(".github/workflows/brain-continuous-self-healing.yml"),
+    Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
+)
+
+
+def test_runtime_workloads_are_brain_owned():
+    for workflow in RUNTIME_WORKFLOWS:
+        text = workflow.read_text(encoding="utf-8")
+        assert "runs-on: ubuntu-latest" not in text, workflow
+        assert "brain-internal" in text, workflow
+        assert "internal_runner_preflight" in text, workflow
