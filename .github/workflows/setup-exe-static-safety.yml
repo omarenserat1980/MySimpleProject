@@ -1,0 +1,32 @@
+name: Setup EXE Static Safety Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-safety:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download staged artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-exe-staged
+          path: setup-staged
+      - name: Static safety checks
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path setup-staged -Filter setup.exe -Recurse -File | Select-Object -First 1
+          if (-not $file) { throw "setup.exe not found" }
+          $hash = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToUpper()
+          $sig = Get-AuthenticodeSignature $file.FullName
+          $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Invalid PE/MZ header" }
+          Write-Host "STATIC_SAFETY_GATE=PASS"
+          Write-Host "SHA256=$hash"
+          Write-Host "SIZE_BYTES=$($file.Length)"
+          Write-Host "SIGNATURE_STATUS=$($sig.Status)"
+          Write-Host "EXECUTION_PERFORMED=NO"
