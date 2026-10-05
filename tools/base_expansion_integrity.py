@@ -23,6 +23,7 @@ TESTS = [
     "tests/test_audit_chain_persistence.py",
     "tests/test_task_lease_fencing.py",
     "tests/test_idempotency_and_concurrent_claim.py",
+    "tests/test_authority_boundary_gate.py",
 ]
 
 
