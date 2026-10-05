@@ -20,14 +20,17 @@ jobs:
           set -euo pipefail
           FILE="$HOME/setup-staging/setup.exe"
           test -f "$FILE"
+          cp "$FILE" ./setup.exe
           sha256sum "$FILE" | tee setup.sha256
           stat -c 'SIZE_BYTES=%s' "$FILE"
+          test -f ./setup.exe
+          test -f ./setup.sha256
       - name: Stage artifact
         uses: actions/upload-artifact@v4
         with:
           name: setup-exe-staged
           path: |
-            $HOME/setup-staging/setup.exe
+            setup.exe
             setup.sha256
           if-no-files-found: error
 
