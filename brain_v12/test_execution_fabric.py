@@ -28,6 +28,12 @@ class FabricTests(unittest.TestCase):
             self.assertEqual(result["worker_id"], "local-01")
             self.assertEqual(fabric.recover()["active_leases"], [])
 
+    def test_external_worker_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            fabric = ExecutionFabric(InternalTaskRuntime(d))
+            with self.assertRaisesRegex(RuntimeError, "EXTERNAL_WORKER_FORBIDDEN"):
+                fabric.register("github", "ci", {"tests"}, lambda *a: {"ok": True}, external=True)
+
     def test_offline_worker_is_not_selected(self):
         with tempfile.TemporaryDirectory() as d:
             fabric = ExecutionFabric(InternalTaskRuntime(d))
