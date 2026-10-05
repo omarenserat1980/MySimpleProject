@@ -100,6 +100,8 @@ def node_job_result(
     job = get_job(job_id)
     if not job or job.get("node_id") != node_id:
         raise HTTPException(status_code=404, detail="node job not found")
+    if job.get("state") != "RUNNING" or job.get("lease_node_id") != node_id:
+        raise HTTPException(status_code=409, detail="node does not hold active job lease")
     if body.state not in {"SUCCESS", "FAILED", "CANCELLED", "RETRYING"}:
         raise HTTPException(status_code=400, detail="invalid terminal job state")
     try:
