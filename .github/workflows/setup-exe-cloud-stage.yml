@@ -1,0 +1,53 @@
+name: Setup EXE Cloud Stage
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/setup-exe-cloud-stage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  stage-from-arkan:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    steps:
+      - name: Locate local setup.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f /mnt/e/setup.exe
+          sha256sum /mnt/e/setup.exe | tee setup.sha256
+          stat -c 'SIZE_BYTES=%s' /mnt/e/setup.exe
+      - name: Stage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-exe-staged
+          path: |
+            /mnt/e/setup.exe
+            setup.sha256
+          if-no-files-found: error
+
+  cloud-validate:
+    needs: stage-from-arkan
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download staged file
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-exe-staged
+          path: setup-staged
+      - name: Verify SHA-256
+        shell: pwsh
+        run: |
+          $file = Join-Path $PWD "setup-staged\setup.exe"
+          $expected = (Get-Content "setup-staged\setup.sha256" -Raw).Trim().Split()[0].ToUpper()
+          $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToUpper()
+          Write-Host "EXPECTED_SHA256=$expected"
+          Write-Host "ACTUAL_SHA256=$actual"
+          if ($expected -ne $actual) { throw "SHA-256 mismatch" }
+          Write-Host "CLOUD_STAGE_VERIFY=PASS"
+          Write-Host "SETUP_EXE_STAGED=READY"
