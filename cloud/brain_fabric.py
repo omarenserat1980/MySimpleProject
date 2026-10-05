@@ -113,6 +113,8 @@ def _eligible(node: dict[str, Any], required: set[str]) -> bool:
     return required.issubset(set(node.get("capabilities", [])))
 
 def choose_node(required_capabilities: list[str] | None = None) -> dict[str, Any]:
+    # Recover abandoned worker leases before scheduling new work.
+    recover_expired_jobs()
     required = {str(x).strip() for x in (required_capabilities or []) if str(x).strip()}
     candidates = [n for n in list_nodes() if _eligible(n, required)]
     if not candidates:
