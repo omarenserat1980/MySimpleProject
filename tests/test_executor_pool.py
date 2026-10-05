@@ -27,7 +27,11 @@ def make(tmp_path, executors=None):
 
 def test_brain_pool_executes_and_verifies(tmp_path):
     pool, store, audit = make(tmp_path)
-    pool.register("echo", lambda job: {"job": job.job_id}, lambda job, out: out["job"] == job.job_id)
+    pool.register(
+        "echo",
+        lambda job: {"job": job.job_id},
+        lambda job, out: out["job"] == job.job_id,
+    )
     pool.submit("job-1", "echo")
 
     result = pool.dispatch("job-1")
@@ -65,53 +69,74 @@ def test_external_runner_cannot_replace_brain(tmp_path):
         tmp_path,
         [ExecutorDescriptor("github-hosted", "github", False, frozenset({"python"}))],
     )
-    pool.register("echo", lambda job: "must-not-run", lambda job, out: True)
+    called = []
+
+    pool.register(
+        "echo",
+        lambda job: called.append(True) or "must-not-run",
+        lambda job, out: True,
+    )
     pool.submit("job-no-brain", "echo")
 
     result = pool.dispatch("job-no-brain")
     assert result.status == "BLOCKED"
     assert result.executor_id is None
     assert "fallback forbidden" in (result.error or "")
+    assert not called
     store.close()
 
 
-def test_expired_lease_allows_recovery_but_fences_old_owner(tmp_path):
+def test_expired_lease_recovers_and_fences_old_owner(tmp_path):
     pool, store, audit = make(tmp_path)
-    pool.register("slow", lambda job: "recovered", lambda job, out: out == "recovered")
+    pool.register(
+        "slow",
+        lambda job: "default",
+        lambda job, out: out in {"old", "new"},
+    )
     pool.submit("job-recover", "slow")
 
-    old_owner = "executor:brain-local-01:old"
-    acquired = pool.lease.acquire("job-recover", old_owner, ttl_seconds=0.01)
-    assert acquired.acquired
-    time.sleep(0.03)
+    old_started = threading.Event()
+    old_release = threading.Event()
+    old_result = []
 
-    entered = threading.Event()
-    release = threading.Event()
+    def old_handler(job):
+        old_started.set()
+        old_release.wait(timeout=2)
+        return "old"
 
-    def handler(job):
-        entered.set()
-        release.wait(timeout=2)
-        return "recovered"
+    pool.handlers["slow"] = old_handler
 
-    pool.handlers["slow"] = handler
-    thread_result = []
-
-    def run():
-        thread_result.append(
+    old_thread = threading.Thread(
+        target=lambda: old_result.append(
             pool.dispatch(
                 "job-recover",
-                lease_ttl_seconds=1.0,
-                owner_id="executor:brain-local-01:new",
+                lease_ttl_seconds=0.03,
+                owner_id="executor:brain-local-01:old",
             )
         )
+    )
+    old_thread.start()
+    assert old_started.wait(timeout=2)
 
-    thread = threading.Thread(target=run)
-    thread.start()
-    assert entered.wait(timeout=2)
-    release.set()
-    thread.join(timeout=2)
+    time.sleep(0.05)
 
-    assert thread_result[0].status == "SUCCESS"
-    assert pool.current("job-recover").status == "SUCCESS"
+    def new_handler(job):
+        return "new"
+
+    pool.handlers["slow"] = new_handler
+    new_result = pool.dispatch(
+        "job-recover",
+        lease_ttl_seconds=1.0,
+        owner_id="executor:brain-local-01:new",
+    )
+
+    assert new_result.status == "SUCCESS"
+    assert new_result.output == "new"
+    assert pool.current("job-recover").output == "new"
+
+    old_release.set()
+    old_thread.join(timeout=2)
+    assert old_result[0].status == "SUCCESS" or old_result[0].status == "RUNNING"
+    assert pool.current("job-recover").output == "new"
     assert audit.verify()
     store.close()
