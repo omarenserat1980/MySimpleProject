@@ -1,4 +1,7 @@
 from platform_foundation import PlatformRuntime
+from platform_foundation.audit_chain import AuditChain
+from platform_foundation.lease import TaskLease
+from platform_foundation.persistent_state import SQLiteStateStore
 
 
 def test_runtime_start_health_and_stop():
@@ -44,3 +47,37 @@ def test_foundation_does_not_import_brain():
     source = open("platform_foundation/runtime.py", encoding="utf-8").read()
     assert "import brain_v12" not in source
     assert "from brain_v12" not in source
+
+
+def test_lease_fences_duplicate_active_execution():
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        state = SQLiteStateStore(tmp.name)
+        audit = AuditChain()
+        lease = TaskLease(state, audit)
+        first = lease.acquire("gate-job", "worker-a", ttl_seconds=60)
+        second = lease.acquire("gate-job", "worker-b", ttl_seconds=60)
+        assert first.acquired is True
+        assert second.acquired is False
+        assert lease.is_owned("gate-job", "worker-a")
+        assert not lease.is_owned("gate-job", "worker-b")
+        state.close()
+
+
+def test_lease_recovery_fences_stale_worker():
+    import tempfile
+    import time
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        state = SQLiteStateStore(tmp.name)
+        audit = AuditChain()
+        lease = TaskLease(state, audit)
+        old = lease.acquire("recover-job", "worker-a", ttl_seconds=0.01)
+        time.sleep(0.03)
+        new = lease.acquire("recover-job", "worker-b", ttl_seconds=60)
+        assert old.acquired is True
+        assert new.acquired is True
+        assert lease.heartbeat("recover-job", "worker-a").acquired is False
+        assert lease.release("recover-job", "worker-a") is False
+        assert lease.is_owned("recover-job", "worker-b")
+        assert audit.verify()
+        state.close()
