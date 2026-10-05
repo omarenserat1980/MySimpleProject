@@ -97,16 +97,10 @@ class Supervisor:
             )
             return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=decision.reason)
 
-        if requested_risk is ActionRisk.IRREVERSIBLE:
-            if approval is None or not approval.approved:
-                self.state.set(f"supervisor:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": decision.reason})
-                self.audit.record("task.authority_denied", {"task_id": task_id, "reason": decision.reason})
-                return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=decision.reason)
-            consumed = self.authority.consume(task_id, record["action"], requested_risk)
-            if not consumed.approved:
-                self.state.set(f"supervisor:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": consumed.reason})
-                self.audit.record("task.authority_denied", {"task_id": task_id, "reason": consumed.reason})
-                return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=consumed.reason)
+        if requested_risk is ActionRisk.IRREVERSIBLE and (approval is None or not approval.approved):
+            self.state.set(f"supervisor:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": decision.reason})
+            self.audit.record("task.authority_denied", {"task_id": task_id, "reason": decision.reason})
+            return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=decision.reason)
 
         lease = self.lease.acquire(task_id, self.owner, ttl_seconds=lease_ttl_seconds)
         if not lease.acquired:
@@ -118,6 +112,12 @@ class Supervisor:
             return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error=error)
 
         try:
+            if requested_risk is ActionRisk.IRREVERSIBLE:
+                consumed = self.authority.consume(task_id, record["action"], requested_risk)
+                if not consumed.approved:
+                    self.state.set(f"supervisor:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": consumed.reason})
+                    self.audit.record("task.authority_denied", {"task_id": task_id, "reason": consumed.reason})
+                    return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=consumed.reason)
             self.state.set(
                 f"supervisor:{task_id}",
                 {**record, "status": TaskStatus.RUNNING.value},
