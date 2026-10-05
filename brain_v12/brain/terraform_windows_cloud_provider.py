@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .terraform_plan_gate import TerraformPlanGate
 from .windows_cloud_executor import CloudWindowsVM, WINDOWS_SERVER_2025
 
 
@@ -43,10 +44,10 @@ class TerraformWindowsCloudProvider:
         self._require_root()
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
             raise RuntimeError("WINDOWS_CLOUD_APPLY_REQUIRES_EXPLICIT_ENABLEMENT")
-        self._run(["init", "-input=false"])
+        self._run(["init", "-input=false"])\n        self._run(["plan", "-input=false", "-out=brain.tfplan"])
         variables = dict(self._terraform_vars())
         variables.update({k: v for k, v in kwargs.items() if k.startswith("brain_")})
-        args = ["apply", "-auto-approve", "-input=false"]
+        TerraformPlanGate(self.terraform_dir).require_reviewed_plan()\n        args = ["apply", "-input=false", "brain.tfplan"]
         for key, value in variables.items():
             args.extend(["-var", f"{key}={value}"])
         self._run(args)
