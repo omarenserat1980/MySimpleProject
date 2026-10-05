@@ -7,6 +7,8 @@ import json
 import os
 import socket
 
+from brain_v12.runner_policy_guard import RunnerPolicyGuard, RunnerPolicyViolation
+
 
 @dataclass(frozen=True)
 class ExecutionAuthority:
@@ -37,6 +39,7 @@ class BrainExecutionAuthority:
         )
         self.capabilities = tuple(capabilities)
         self.max_heartbeat_age_seconds = float(max_heartbeat_age_seconds)
+        self.runner_policy_guard = RunnerPolicyGuard()
 
     def heartbeat(self) -> dict[str, object]:
         self.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,6 +60,10 @@ class BrainExecutionAuthority:
         )
 
     def readiness(self, required_capability: str = "ci") -> dict[str, object]:
+        try:
+            policy = self.runner_policy_guard.assert_ready()
+        except RunnerPolicyViolation as exc:
+            return {"ready": False, "reason": "runner_policy_blocked", "policy_error": str(exc)}
         if not self.heartbeat_path.exists():
             return {"ready": False, "reason": "brain_executor_heartbeat_missing"}
         try:
@@ -75,6 +82,7 @@ class BrainExecutionAuthority:
                 "executor": asdict(self.descriptor()),
                 "heartbeat_age_seconds": round(age, 3),
                 "reason": None if valid else "brain_executor_not_ready",
+                "runner_policy": policy,
             }
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             return {"ready": False, "reason": "brain_executor_heartbeat_invalid"}
