@@ -61,3 +61,27 @@ def test_payment_gate_fails_closed():
     assert c.safety_gate("SANDBOX", "TEST")["allowed"]
     assert not c.safety_gate("PRODUCTION", "TEST")["allowed"]
     assert not c.safety_gate("SANDBOX", "PRODUCTION")["allowed"]
+
+
+def test_customer_acceptance_and_delivery_lifecycle():
+    c = SyntheticCustomer(executor=lambda *args: {"ok": True, "verified": True})
+    run = c.start("TEST_CUSTOMER_COMPANY", "Build a safe test service.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="TEST", payment_mode="NONE")
+    c.review(run, accepted=True, feedback="Meets acceptance criteria")
+    assert run.status == "ACCEPTED"
+    c.deliver(run)
+    assert run.status == "DELIVERED"
+
+
+def test_customer_revision_requires_review_state():
+    c = SyntheticCustomer()
+    run = c.start("TEST_CUSTOMER_COMPANY", "Build a safe test service.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    try:
+        c.revise(run, "Change the form")
+        assert False, "revision should require a revision request"
+    except ValueError as exc:
+        assert str(exc) == "REVISION_NOT_REQUESTED"
