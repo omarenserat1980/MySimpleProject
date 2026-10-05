@@ -63,6 +63,6 @@ def test_brain_executor_is_allowed():
         lambda: "executed",
     )
     executors = [
-        ExecutorDescriptor("brain-local", "brain", frozenset()),
+        ExecutorDescriptor("brain-local", "brain", True, frozenset()),
     ]
     assert registry.invoke("safe-local", executors=executors) == "executed"
