@@ -1,5 +1,6 @@
 import json
 import os
+import pytest
 import time
 from pathlib import Path
 
@@ -70,6 +71,8 @@ def test_recovered_job_executes_after_restart(tmp_path, monkeypatch):
 
 
 def test_base_expansion_integrity_executes_as_brain_worker_task(tmp_path, monkeypatch):
+    if os.environ.get("BRAIN_INTEGRITY_NESTED") == "1":
+        pytest.skip("nested integrity invocation")
     root = tmp_path / "worker"
     monkeypatch.setenv("BRAIN_LOCAL_WORKER_ROOT", str(root))
     old_root = worker.ROOT
