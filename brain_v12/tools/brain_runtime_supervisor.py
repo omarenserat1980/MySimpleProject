@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Continuous Brain supervisor: choose -> think -> act -> verify -> learn -> repeat.
+"""Continuous Brain runtime loop: schedule -> invoke canonical Brain runtime -> record evidence -> repeat.
 
 The supervisor keeps producing bounded work from goals, pending tasks, failures and
 future-evolution predictions. Safety gates remain authoritative; continuity is not
@@ -133,40 +133,14 @@ def finish_tracked_task(task: dict, status: str, evidence: dict | None = None) -
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 def evolve_from_evidence():
-    """Run the predictive engine and return only machine-readable evidence."""
-    import subprocess, sys
-    try:
-        p = subprocess.run(
-            [sys.executable, "-m", "brain_v12.self_healing.future_evolution"],
-            cwd=str(ROOT), capture_output=True, text=True, timeout=90,
-        )
-        return {"ok": p.returncode == 0, "output": (p.stdout + "\n" + p.stderr)[-8000:]}
-    except Exception as exc:
-        return {"ok": False, "output": str(exc)[:1000]}
-
-def repair_from_evidence(evidence: str):
-    """Use the bounded RepairEngine only; no arbitrary code execution."""
-    from brain_v12.brain.repair_engine import RepairEngine
-    engine = RepairEngine()
-    plan = engine.plan(evidence)
-    if not plan.safe:
-        return {"ok": False, "status": "REVIEW_REQUIRED", "classification": plan.classification,
-                "action": plan.action}
-    try:
-        result = engine.repair(ROOT, evidence)
-        return {"ok": bool(result[1]), "status": "REPAIRED" if result[1] else "REPAIR_FAILED",
-                "classification": result[0].classification, "action": result[0].action}
-    except Exception as exc:
-        return {"ok": False, "status": "REPAIR_EXCEPTION", "error": str(exc)[:1000]}
-
-def enqueue_self_test():
-    if not CONTROL:
-        return {"ok": False, "status": "CONTROL_KEY_MISSING"}
-    return request("POST", "/api/device/enqueue",
-                   {"X-Brain-Control-Key": CONTROL},
-                   {"task": "brain_self_test", "params": {"source": "continuous_supervisor"}})
+    """Compatibility telemetry hook; policy/evolution remains owned by the Brain runtime."""
+    return {"ok": True, "delegated": True}
 
 def temporal_next_action():
+    """Compatibility telemetry hook; action policy remains owned by the Brain runtime."""
+    return {"ok": True, "action": "delegated"}
+
+
     """Project known risks forward, then return the safest present action."""
     import subprocess, sys, json as _json
     try:
@@ -212,12 +186,9 @@ def main():
             })
             print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
 
-            if not verified:
-                repair = repair_from_evidence(
-                    json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
-                )
-                record({"cycle": cycle, "event": "repair", "goal": goal, **repair})
-                print(f"JET_BRAIN_CYCLE {cycle} REPAIR={repair.get('status')}", flush=True)
+            # Repair policy is owned by the canonical V12 BrainSupervisor/runtime.
+            # This loop only schedules work and records the returned evidence.
+            record({"cycle": cycle, "event": "repair_delegated", "verified": verified})
 
             prediction = evolve_from_evidence()
             record({"cycle": cycle, "event": "prediction_refresh", "ok": prediction["ok"]})
@@ -226,14 +197,13 @@ def main():
             temporal = temporal_next_action()
             record({
                 "cycle": cycle,
-                "event": "temporal_simulation",
+                "event": "temporal_policy_delegated",
                 "ok": temporal["ok"],
                 "recommended_present_action": temporal.get("action"),
             })
             print(
-                f"JET_BRAIN_CYCLE {cycle} TIME_SIM="
-                f"{'PASS' if temporal['ok'] else 'FAIL'} "
-                f"NEXT={temporal.get('action')}",
+                f"JET_BRAIN_CYCLE {cycle} TIME_POLICY="
+                f"{'DELEGATED' if temporal['ok'] else 'FAIL'}",
                 flush=True,
             )
 
