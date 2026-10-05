@@ -136,7 +136,12 @@ def test_expired_lease_recovers_and_fences_old_owner(tmp_path):
 
     old_release.set()
     old_thread.join(timeout=2)
-    assert old_result[0].status == "SUCCESS" or old_result[0].status == "RUNNING"
+    assert old_result[0].status == "SUCCESS"
+    assert any(
+        event.event == "executor.job.failed"
+        and "execution lease lost before commit" in event.payload.get("error", "")
+        for event in audit.events()
+    )
     assert pool.current("job-recover").output == "new"
     assert audit.verify()
     store.close()
