@@ -10,6 +10,7 @@ from .research_agent import ResearchAgent, ResearchEvidence, ResearchReport
 from .autonomous_pipeline import AutonomousPipeline, PipelineResult
 from .execution_policy import BrainExecutionPolicy, ExecutionMode, ExecutorDecision, ExecutorDescriptor, ExecutionDecision
 from .brain_ci_executor import BrainCIExecutor, BrainCIResult
+from .open_source_gate import OpenSourceCandidate, OpenSourceDecision, OpenSourceGate, OpenSourceGateResult
 
 __all__ = [
     "PlatformRuntime",
@@ -22,4 +23,5 @@ __all__ = [
     "AutonomousPipeline", "PipelineResult",
     "BrainExecutionPolicy", "ExecutionMode", "ExecutorDecision", "ExecutorDescriptor", "ExecutionDecision",
     "BrainCIExecutor", "BrainCIResult",
+    "OpenSourceCandidate", "OpenSourceDecision", "OpenSourceGate", "OpenSourceGateResult",
 ]
