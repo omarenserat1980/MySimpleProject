@@ -1,4 +1,6 @@
 from platform_foundation.stage_orchestrator import StageOrchestrator
+from platform_foundation.parallel_chunks import ParallelChunkRunner
+from platform_foundation.audit_chain import AuditChain
 from platform_foundation.persistent_state import SQLiteStateStore
 
 
@@ -57,3 +59,39 @@ def test_final_stage_is_marked_complete(tmp_path):
     assert state is not None
     assert state.stage == 41
     assert state.status == "COMPLETE"
+
+
+def test_stage_chunks_resume_only_unfinished_work(tmp_path):
+    path = tmp_path / "state.db"
+    store = SQLiteStateStore(str(path))
+    runner = ParallelChunkRunner(store, AuditChain())
+    calls = []
+
+    def execute(chunk):
+        calls.append(chunk)
+        if chunk == "3":
+            raise RuntimeError("temporary")
+        return chunk
+
+    first = runner.run(
+        "stage-1", ["1", "2", "3"], execute,
+        lambda chunk, output: output == chunk and chunk != "3",
+        max_workers=2,
+    )
+    assert [item.status for item in first] == ["SUCCESS", "SUCCESS", "FAILED"]
+    store.close()
+
+    reopened = SQLiteStateStore(str(path))
+    resumed_calls = []
+    resumed = ParallelChunkRunner(reopened, AuditChain())
+
+    second = resumed.run(
+        "stage-1", ["1", "2", "3"],
+        lambda chunk: resumed_calls.append(chunk) or chunk,
+        lambda _chunk, _output: True,
+        max_workers=2,
+    )
+
+    assert [item.status for item in second] == ["SUCCESS", "SUCCESS", "SUCCESS"]
+    assert resumed_calls == ["3"]
+    reopened.close()
