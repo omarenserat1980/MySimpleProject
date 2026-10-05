@@ -1,0 +1,57 @@
+name: Autonomous Pipeline Runner Gate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/autonomous-pipeline-runner-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runner-gate:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    steps:
+      - name: Runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "RUNNER_ARCH=$RUNNER_ARCH"
+          echo "RUNNER_GATE=START"
+
+      - name: Runtime gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_NAME" = "linux-runner-01"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
+          command -v bash
+          command -v python3
+          python3 --version
+          test -d "$HOME"
+          echo "RUNTIME_GATE=PASS"
+
+      - name: Evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            "runner_name=$RUNNER_NAME" \
+            "runner_os=$RUNNER_OS" \
+            "runner_arch=$RUNNER_ARCH" \
+            "runtime_gate=PASS" \
+            "autonomous_pipeline_runner_gate=PASS" \
+            > runner-gate-evidence.txt
+          cat runner-gate-evidence.txt
+
+      - name: Upload gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: autonomous-pipeline-runner-gate
+          path: runner-gate-evidence.txt
+          if-no-files-found: error
