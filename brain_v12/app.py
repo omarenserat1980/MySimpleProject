@@ -1453,6 +1453,11 @@ def brain_windows_boot(request:Request, vm_name:str):
     require_control_key(request)
     return brain_datacenter.boot_windows_server_2025(vm_name)
 
+@app.get("/api/brain/windows/cloud/readiness")
+def brain_windows_cloud_readiness():
+    from .brain.windows_cloud_executor import WindowsCloudExecutor
+    return WindowsCloudExecutor().readiness()
+
 @app.get("/api/brain/windows/status")
 def brain_windows_status():
     return brain_datacenter.status()
