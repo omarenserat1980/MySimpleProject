@@ -44,34 +44,34 @@ permissions:
   actions: write
 
 jobs:
-  dispatch_cloud_task:
+  dispatch_internal_task:
     if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    timeout-minutes: 60
     permissions:
-      actions: write
+      contents: read
+      actions: read
+    env:
+      BRAIN_INTERNAL_RUNNER_FLAG: "1"
+      TASK: ${{ inputs.task }}
     steps:
-      - name: Dispatch Brain Cloud Runner
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TASK: ${{ inputs.task }}
+      - name: Fail-closed internal runner preflight
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, urllib.request
-          task=os.environ.get("TASK","tests").strip().lower()
-          payload=json.dumps({"ref":"main","inputs":{"task":task}}).encode()
-          req=urllib.request.Request(
-              "https://api.github.com/repos/omarenserat1980/MySimpleProject/actions/workflows/brain-github-cloud.yml/dispatches",
-              data=payload,
-              headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],
-                       "Accept":"application/vnd.github+json",
-                       "X-GitHub-Api-Version":"2022-11-28",
-                       "Content-Type":"application/json"},
-              method="POST")
-          with urllib.request.urlopen(req) as resp:
-              print("BRAIN_CLOUD_DISPATCHED", resp.status, task)
+          from brain_v12.brain.internal_runner_preflight import verify_and_write
+          evidence = verify_and_write("internal-runner-preflight.json")
+          assert evidence["verified"] is True, evidence
+          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
           PY
+      - name: Checkout Brain
+        uses: actions/checkout@v5
+      - name: Execute task on Brain-owned runtime
+        run: |
+          set -euo pipefail
+          echo "BRAIN_EXECUTOR=brain-internal"
+          echo "BRAIN_TASK=$TASK"
+          python brain_v12/ci/brain_runner.py
 
   health_and_recovery:
     runs-on: ubuntu-latest
