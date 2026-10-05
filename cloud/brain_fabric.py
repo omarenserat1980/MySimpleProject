@@ -213,6 +213,17 @@ def transition_job(job_id: str, state: str, *, evidence: dict[str, Any] | None =
         job = _read(path)
         if not job:
             raise KeyError(job_id)
+        current = str(job.get("state", "")).upper()
+        allowed = {
+            "QUEUED": {"RUNNING", "CANCELLED"},
+            "RETRYING": {"RUNNING", "CANCELLED"},
+            "RUNNING": {"SUCCESS", "FAILED", "CANCELLED", "RETRYING"},
+            "SUCCESS": set(),
+            "FAILED": set(),
+            "CANCELLED": set(),
+        }
+        if state != current and state not in allowed.get(current, set()):
+            raise ValueError(f"invalid job transition: {current}->{state}")
         job["state"] = state
         job["updated_at"] = _now()
         if evidence:
