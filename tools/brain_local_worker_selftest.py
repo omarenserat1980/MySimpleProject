@@ -74,7 +74,7 @@ def main() -> int:
                 "task": "python_version",
                 "params": {},
             }), encoding="utf-8")
-            old = time.time() - 10
+            old = time.time() - 60
             os.utime(abandoned, (old, old))
 
             proc = subprocess.Popen(
