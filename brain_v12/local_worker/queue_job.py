@@ -5,7 +5,7 @@ import json, os, sys, uuid
 from pathlib import Path
 from datetime import datetime, timezone
 
-ALLOWED = {"python_version","platform","brain_home","ffmpeg_version","ffprobe_version","filesystem_probe"}
+ALLOWED = {"python_version","platform","brain_home","ffmpeg_version","ffprobe_version","filesystem_probe","brain_ci_verify"}
 ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
 task = sys.argv[1] if len(sys.argv) > 1 else "platform"
 if task not in ALLOWED:
