@@ -15,6 +15,7 @@ on:
       - "brain_v12/brain/apm_queue.py"
       - "brain_v12/brain/apm_dispatcher.py"
       - "brain_v12/brain/apm_queue_store.py"
+      - "brain_v12/brain/apm_idempotency.py"
       - "brain_v12/brain/film_segment_manager.py"
       - "brain_v12/brain/apm_film_assembly.py"
       - "brain_v7/braincore_v2/media_production_pipeline.py"
@@ -31,6 +32,7 @@ on:
       - "brain_v12/tests/test_apm_queue.py"
       - "brain_v12/tests/test_apm_dispatcher.py"
       - "brain_v12/tests/test_apm_queue_store.py"
+      - "brain_v12/tests/test_apm_idempotency.py"
       - "brain_v12/tests/test_apm_worker_protocol.py"
       - "brain_v12/tests/test_film_segment_manager.py"
       - "brain_v12/tests/test_apm_film_assembly.py"
@@ -58,7 +60,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q brain_v12/brain brain_v12/tests
       - name: APM BUILD Contract
-        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build brain_v12.tests.test_apm_stage_discovery brain_v12.tests.test_apm_profiles brain_v12.tests.test_apm_media_adapter brain_v12.tests.test_apm_media_executor brain_v12.tests.test_apm_chunk_scheduler brain_v12.tests.test_film_segment_manager brain_v12.tests.test_apm_film_assembly brain_v12.tests.test_apm_build_report brain_v12.tests.test_apm_orchestrator brain_v12.tests.test_apm_worker_protocol brain_v12.tests.test_apm_queue brain_v12.tests.test_apm_dispatcher brain_v12.tests.test_apm_queue_store -v
+        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build brain_v12.tests.test_apm_stage_discovery brain_v12.tests.test_apm_profiles brain_v12.tests.test_apm_media_adapter brain_v12.tests.test_apm_media_executor brain_v12.tests.test_apm_chunk_scheduler brain_v12.tests.test_film_segment_manager brain_v12.tests.test_apm_film_assembly brain_v12.tests.test_apm_build_report brain_v12.tests.test_apm_orchestrator brain_v12.tests.test_apm_worker_protocol brain_v12.tests.test_apm_queue brain_v12.tests.test_apm_dispatcher brain_v12.tests.test_apm_queue_store brain_v12.tests.test_apm_idempotency -v
       - name: Evidence
         run: |
           mkdir -p brain-artifacts
