@@ -25,6 +25,8 @@ class WindowsCompletionGate:
         if network.get("internet_443") is not True: reasons.append("GUEST_INTERNET_NOT_VERIFIED")
         if not storage.get("filesystem"): reasons.append("GUEST_STORAGE_NOT_VERIFIED")
         if int(storage.get("size_bytes") or 0) < 32*1024*1024*1024: reasons.append("GUEST_STORAGE_TOO_SMALL")
+        if evidence.get("boot_source")!="windows-installed-disk":
+            reasons.append("BOOT_SOURCE_NOT_INSTALLED_DISK")
         if evidence.get("qemu_status")=="QEMU_EXITED" and not guest.get("boot_verified"):
             reasons.append("QEMU_EXIT_IS_NOT_BOOT_PROOF")
         payload=json.dumps(evidence,sort_keys=True,separators=(",",":")).encode()
