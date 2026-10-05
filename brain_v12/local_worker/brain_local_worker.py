@@ -16,6 +16,9 @@ WORKER_ID = os.environ.get("BRAIN_WORKER_ID", "brain-local-01")
 POLL = max(1.0, float(os.environ.get("BRAIN_LOCAL_WORKER_POLL_SECONDS", "2")))
 RECOVERY_TTL = max(30.0, float(os.environ.get("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", "300")))
 
+def recovery_ttl() -> float:
+    return max(30.0, float(os.environ.get("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", str(RECOVERY_TTL))))
+
 def utc():
     return datetime.now(timezone.utc).isoformat()
 
@@ -30,7 +33,7 @@ def recover_stale_jobs():
     for path in sorted(RUNNING.glob("*.json")):
         try:
             age = now - path.stat().st_mtime
-            if age < RECOVERY_TTL:
+            if age < recovery_ttl():
                 continue
             target = QUEUED / path.name
             path.replace(target)
