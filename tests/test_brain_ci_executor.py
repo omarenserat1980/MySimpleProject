@@ -66,3 +66,12 @@ def test_direct_brain_entrypoint_never_uses_external_runner(tmp_path):
     assert result.status == "VERIFIED"
     assert result.executor_id == "brain-local-ci" or result.executor_id == "brain-ci-01"
     assert calls
+
+
+def test_readiness_is_brain_owned_and_fail_closed(tmp_path):
+    executor = BrainCIExecutor(SQLiteStateStore(tmp_path / "state.db"), root=tmp_path)
+    readiness = executor.readiness()
+    assert readiness["ready"] is True
+    assert readiness["decision"] == "ALLOWED"
+    assert readiness["owner"] == "brain"
+    assert readiness["persistent"] is True
