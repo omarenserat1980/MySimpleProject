@@ -17,6 +17,12 @@ class RunnerPolicyGuard:
         manifest = self.root / "brain_v12" / "execution_authority_manifest.json"
         self.manifest = json.loads(manifest.read_text(encoding="utf-8"))
 
+    def assert_ready(self) -> dict[str, object]:
+        result = self.validate()
+        if not result["healthy"]:
+            raise RunnerPolicyViolation(json.dumps(result, sort_keys=True))
+        return result
+
     def validate(self) -> dict[str, object]:
         workflows = self.manifest["authoritative_workflows"]
         violations: list[dict[str, str]] = []
