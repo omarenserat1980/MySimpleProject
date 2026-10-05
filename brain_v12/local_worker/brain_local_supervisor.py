@@ -7,17 +7,28 @@ from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / "brain6_artifacts" / "local_worker" / "supervisor.json"
-WORKER = ROOT / "brain_v12" / "local_worker" / "brain_local_worker.py"
+WORKER_MODULE = "brain_v12.local_worker.brain_local_worker"
 HEARTBEAT = max(1.0, float(os.environ.get("BRAIN_LOCAL_SUPERVISOR_HEARTBEAT_SECONDS", "10")))
+
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
 
 def write(state):
     STATE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
     tmp.replace(STATE)
+
+
+def worker_env():
+    env = os.environ.copy()
+    root = str(ROOT)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = root + os.pathsep + existing if existing else root
+    return env
+
 
 def main():
     proc = None
@@ -26,7 +37,11 @@ def main():
         if proc is None or proc.poll() is not None:
             if proc is not None:
                 restart_count += 1
-            proc = subprocess.Popen([sys.executable, str(WORKER)], cwd=ROOT)
+            proc = subprocess.Popen(
+                [sys.executable, "-m", WORKER_MODULE],
+                cwd=ROOT,
+                env=worker_env(),
+            )
         status = {
             "schema": "brain.local_worker_supervisor.v1",
             "supervisor": "brain-local-supervisor",
@@ -40,6 +55,7 @@ def main():
         }
         write(status)
         time.sleep(HEARTBEAT)
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
