@@ -14,6 +14,7 @@ ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_wo
 QUEUED, RUNNING, COMPLETED, FAILED = (ROOT / x for x in ("queued", "running", "completed", "failed"))
 WORKER_ID = os.environ.get("BRAIN_WORKER_ID", "brain-local-01")
 POLL = max(1.0, float(os.environ.get("BRAIN_LOCAL_WORKER_POLL_SECONDS", "2")))
+RECOVERY_TTL = max(30.0, float(os.environ.get("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", "300")))
 
 def utc():
     return datetime.now(timezone.utc).isoformat()
@@ -21,6 +22,22 @@ def utc():
 def setup():
     for p in (QUEUED, RUNNING, COMPLETED, FAILED):
         p.mkdir(parents=True, exist_ok=True)
+
+def recover_stale_jobs():
+    """Return abandoned RUNNING jobs to QUEUED after a bounded TTL."""
+    now = time.time()
+    recovered = []
+    for path in sorted(RUNNING.glob("*.json")):
+        try:
+            age = now - path.stat().st_mtime
+            if age < RECOVERY_TTL:
+                continue
+            target = QUEUED / path.name
+            path.replace(target)
+            recovered.append(path.name)
+        except (FileNotFoundError, OSError):
+            continue
+    return recovered
 
 def safe_command_version(binary: str):
     path = shutil.which(binary)
@@ -145,6 +162,9 @@ def main():
     print(f"Brain Local Worker {WORKER_ID} -> {ROOT}")
     while True:
         authority.heartbeat()
+        recovered = recover_stale_jobs()
+        if recovered:
+            print(json.dumps({"event": "stale_jobs_recovered", "jobs": recovered}))
         for path in sorted(QUEUED.glob("*.json")):
             process(path)
         time.sleep(POLL)
