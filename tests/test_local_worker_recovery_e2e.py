@@ -94,9 +94,12 @@ def test_base_expansion_integrity_executes_as_brain_worker_task(tmp_path, monkey
 
         worker.process(job)
 
-        result = json.loads(
-            (worker.COMPLETED / "base-expansion-integrity.json").read_text(encoding="utf-8")
+        completed = worker.COMPLETED / "base-expansion-integrity.json"
+        failed = worker.FAILED / "base-expansion-integrity.json"
+        assert completed.exists(), (
+            f"worker execution failed: {failed.read_text(encoding='utf-8') if failed.exists() else 'no failure evidence'}"
         )
+        result = json.loads(completed.read_text(encoding="utf-8"))
         assert result["status"] == "VERIFIED"
         assert result["worker_id"] == worker.WORKER_ID
         assert result["evidence"]["provider"] == "brain-local-worker"
