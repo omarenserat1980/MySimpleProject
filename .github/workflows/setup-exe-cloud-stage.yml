@@ -44,11 +44,16 @@ jobs:
       - name: Verify SHA-256
         shell: pwsh
         run: |
-          $file = Join-Path $PWD "setup-staged\setup.exe"
-          $expected = (Get-Content "setup-staged\setup.sha256" -Raw).Trim().Split()[0].ToUpper()
-          $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToUpper()
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          if (-not $file) { throw "setup.exe not found in downloaded artifact" }
+          $hashFile = Get-ChildItem -Path "setup-staged" -Filter "setup.sha256" -Recurse -File | Select-Object -First 1
+          if (-not $hashFile) { throw "setup.sha256 not found in downloaded artifact" }
+          $expected = (Get-Content $hashFile.FullName -Raw).Trim().Split()[0].ToUpper()
+          $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToUpper()
+          Write-Host "FILE=$($file.FullName)"
           Write-Host "EXPECTED_SHA256=$expected"
           Write-Host "ACTUAL_SHA256=$actual"
           if ($expected -ne $actual) { throw "SHA-256 mismatch" }
+          if ($file.Length -ne 99896) { throw "Unexpected setup.exe size" }
           Write-Host "CLOUD_STAGE_VERIFY=PASS"
           Write-Host "SETUP_EXE_STAGED=READY"
