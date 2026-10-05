@@ -48,15 +48,15 @@ def test_parallel_stage_is_integrated_with_pipeline_gate(tmp_path):
         events.append(("execute", chunk, sorted(deps)))
         return chunk
 
-    results = p.run_parallel_stage(
-        chunks=["A", "B", "C"],
-        execute_chunk=execute,
-        verify_chunk=lambda _chunk, output: output != "B",
-        dependencies={"C": ["A", "B"]},
-        max_workers=2,
-        run_id="parallel-stage-1",
-    )
-    assert [r.status for r in results] == ["SUCCESS", "FAILED", "FAILED"]
+    with pytest.raises(RuntimeError, match="parallel gate failed"):
+        p.run_parallel_stage(
+            chunks=["A", "B", "C"],
+            execute_chunk=execute,
+            verify_chunk=lambda _chunk, output: output != "B",
+            dependencies={"C": ["A", "B"]},
+            max_workers=2,
+            run_id="parallel-stage-1",
+        )
     assert p.orchestrator.current().stage == 1
 
 
