@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   real_windows_boot:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
