@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
 from brain_v12.brain.internal_task_runtime import InternalTaskRuntime
@@ -61,7 +62,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
                 },
             )
 
-    def test_local_runtime_never_executes_windows_task(self):
+    def test_local_runtime_routes_windows_task_to_cloud_adapter(self):
         runtime = InternalTaskRuntime(
             root=".brain/test-windows-cloud-routing",
             gateway=self.gateway,
@@ -78,9 +79,19 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
                 "now": 1000.0,
             },
         )
-        result = runtime.run_one()
-        self.assertEqual(result["state"], "BLOCKED")
-        self.assertIn("WINDOWS_CLOUD_EXECUTION_ADAPTER_REQUIRED", result["error"])
+        fake = {
+            "ok": True, "state": "SUCCESS", "job_id": "job-1",
+            "executor": "windows-server-2025-cloud", "verified_runtime": True,
+            "evidence": [{"returncode": 0}],
+        }
+        with patch(
+            "brain_v12.brain.internal_task_runtime.WindowsCloudTaskExecutor.run",
+            return_value=fake,
+        ):
+            result = runtime.run_one()
+        self.assertEqual(result["state"], "COMPLETED")
+        self.assertEqual(result["executor"], "windows-server-2025-cloud")
+        self.assertEqual(result["job_id"], "job-1")
 
 
 if __name__ == "__main__":
