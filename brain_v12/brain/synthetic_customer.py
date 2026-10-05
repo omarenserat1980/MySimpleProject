@@ -141,7 +141,6 @@ class SyntheticCustomer:
             run.evidence.append({"event": "EXECUTION_FAILED", "error": str(exc)[:1000]})
         return run
 
-    @staticmethod
     def review(self, run: TestRun, accepted: bool, feedback: str = "") -> TestRun:
         if run.status not in {"VERIFIED", "EXECUTION_FAILED"}:
             raise ValueError("CUSTOMER_REVIEW_NOT_READY")
