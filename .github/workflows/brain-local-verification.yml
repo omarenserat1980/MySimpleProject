@@ -7,6 +7,7 @@ on:
       - 'tools/brain_independent_gate.py'
       - 'tools/verify_brain_local.py'
       - 'tests/test_executor_pool.py'
+      - 'tests/test_local_worker_recovery_e2e.py'
       - '.github/workflows/brain-local-verification.yml'
   push:
     branches:
