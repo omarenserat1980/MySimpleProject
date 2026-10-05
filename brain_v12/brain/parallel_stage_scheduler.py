@@ -18,7 +18,7 @@ from typing import Any, Callable, Mapping
 class Stage:
     id: str
     depends_on: tuple[str, ...] = ()
-    resource: str = "default"
+    resource: str | None = None
     input_fingerprint: str = ""
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -46,6 +46,25 @@ class ParallelStageScheduler:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.max_workers = max_workers
         self.retry_limit = retry_limit
+        self._validate_acyclic()
+
+    def _validate_acyclic(self) -> None:
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(stage_id: str) -> None:
+            if stage_id in visiting:
+                raise ValueError(f"cyclic dependency involving: {stage_id}")
+            if stage_id in visited:
+                return
+            visiting.add(stage_id)
+            for dep in self.stages[stage_id].depends_on:
+                visit(dep)
+            visiting.remove(stage_id)
+            visited.add(stage_id)
+
+        for stage_id in self.stages:
+            visit(stage_id)
 
     def _record_path(self, stage: Stage) -> Path:
         return self.state_dir / f"{stage.id.replace('/', '_')}.json"
@@ -92,17 +111,35 @@ class ParallelStageScheduler:
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             while len(completed) + len(blocked) < len(self.stages):
                 candidates = self.ready(completed, {s.id for s in running.values()})
-                used_resources = {s.resource for s in running.values()}
+                used_resources = {s.resource for s in running.values() if s.resource}
 
                 for stage in candidates:
-                    if len(running) >= self.max_workers or stage.resource in used_resources:
+                    if len(running) >= self.max_workers:
+                        continue
+                    if stage.resource and stage.resource in used_resources:
                         continue
                     attempts[stage.id] += 1
-                    used_resources.add(stage.resource)
+                    if stage.resource:
+                        used_resources.add(stage.resource)
                     running[pool.submit(executor, stage)] = stage
 
                 if not running:
                     unresolved = sorted(set(self.stages) - completed - blocked)
+                    blocked_now = [
+                        sid for sid in unresolved
+                        if any(dep in blocked for dep in self.stages[sid].depends_on)
+                    ]
+                    if blocked_now:
+                        for sid in blocked_now:
+                            blocked.add(sid)
+                            stage = self.stages[sid]
+                            self._write(stage, {
+                                "stage_id": sid,
+                                "status": "BLOCKED_DEPENDENCY",
+                                "fingerprint": self._fingerprint(stage),
+                                "depends_on": list(stage.depends_on),
+                            })
+                        continue
                     raise RuntimeError("SCHEDULER_DEADLOCK_OR_CYCLE:" + ",".join(unresolved))
 
                 future = next(as_completed(list(running)))
