@@ -1,0 +1,24 @@
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-venv \
+    qemu-system-x86 qemu-utils ovmf \
+    xorriso wimtools dosfstools mtools \
+    ca-certificates curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/brain
+COPY . /opt/brain
+
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    if [ -f requirements.txt ]; then /opt/venv/bin/pip install --no-cache-dir -r requirements.txt; fi
+
+ENV PATH="/opt/venv/bin:${PATH}"
+ENV PYTHONPATH="/opt/brain"
+ENV BRAIN_INTERNAL_RUNNER_FLAG=1
+ENV BRAIN_RUNTIME_ROOT=/var/lib/brain/runtime
+
+RUN mkdir -p /var/lib/brain/runtime
+ENTRYPOINT ["python3", "-m", "brain_v12.cloud_runtime.worker"]
