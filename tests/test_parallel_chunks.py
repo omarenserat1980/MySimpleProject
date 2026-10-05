@@ -6,6 +6,7 @@ import time
 from platform_foundation.audit_chain import AuditChain
 from platform_foundation.parallel_chunks import ParallelChunkRunner
 from platform_foundation.persistent_state import SQLiteStateStore
+from platform_foundation.lease import TaskLease
 
 
 def test_chunks_run_with_bounded_parallelism(tmp_path):
@@ -132,4 +133,41 @@ def test_failed_chunk_never_becomes_success_without_verification(tmp_path):
     assert results[0].status == "FAILED"
     assert store.get("pipeline.chunk:run-3:bad")["status"] == "FAILED"
     assert audit.verify()
+    store.close()
+
+
+def test_concurrent_chunk_owner_is_fenced(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    audit = AuditChain()
+    lease = TaskLease(store, audit)
+    assert lease.acquire("run-lease:A", "other-worker", ttl_seconds=60).acquired
+    runner = ParallelChunkRunner(store, audit, lease=lease)
+
+    results = runner.run(
+        "run-lease", ["A"], lambda chunk, _deps: chunk,
+        lambda _chunk, _output: True, max_workers=1,
+    )
+    assert results[0].status == "FAILED"
+    assert "lease" in (results[0].error or "")
+    assert store.get("pipeline.chunk:run-lease:A") is None
+    store.close()
+
+
+def test_chunk_cannot_commit_after_lease_expiry(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    audit = AuditChain()
+    runner = ParallelChunkRunner(store, audit)
+
+    def execute(chunk, _deps):
+        time.sleep(0.03)
+        return chunk
+
+    results = runner.run(
+        "run-fence", ["A"], execute,
+        lambda _chunk, _output: True,
+        max_workers=1, lease_ttl_seconds=0.01,
+    )
+    assert results[0].status == "FAILED"
+    assert "lease lost" in (results[0].error or "")
+    assert store.get("pipeline.chunk:run-fence:A")["status"] != "SUCCESS"
     store.close()
