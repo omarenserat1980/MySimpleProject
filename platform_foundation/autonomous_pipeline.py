@@ -5,6 +5,7 @@ from typing import Any, Callable
 import time
 
 from .apm import APM
+from .parallel_chunks import ParallelChunkRunner, ChunkResult
 from .stage_orchestrator import StageOrchestrator, StageState
 
 
@@ -28,14 +29,20 @@ class PipelineRun:
 
 
 class AutonomousPipeline:
-    """APM-instrumented, durable, resumable driver for the 41-stage pipeline."""
+    """Durable 41-stage driver with optional dependency-aware chunk parallelism."""
 
     RUN_KEY = "brain.autonomous_pipeline.last_run"
     CHECKPOINT_KEY = "brain.autonomous_pipeline.verified_checkpoint"
 
-    def __init__(self, orchestrator: StageOrchestrator, apm: APM) -> None:
+    def __init__(
+        self,
+        orchestrator: StageOrchestrator,
+        apm: APM,
+        chunk_runner: ParallelChunkRunner | None = None,
+    ) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
+        self.chunk_runner = chunk_runner
 
     def _save_run(self, run: PipelineRun) -> None:
         self.orchestrator.store.set(self.RUN_KEY, asdict(run))
@@ -44,11 +51,70 @@ class AutonomousPipeline:
         return self.orchestrator.store.get(self.CHECKPOINT_KEY)
 
     def _save_checkpoint(self, *, state: StageState, run_id: str | None) -> None:
-        self.orchestrator.store.set(self.CHECKPOINT_KEY, {"stage": state.stage, "step": state.step, "revision": state.revision, "status": state.status, "run_id": run_id})
+        self.orchestrator.store.set(
+            self.CHECKPOINT_KEY,
+            {"stage": state.stage, "step": state.step, "revision": state.revision,
+             "status": state.status, "run_id": run_id},
+        )
 
     def last_run(self) -> PipelineRun | None:
         value = self.orchestrator.store.get(self.RUN_KEY)
         return PipelineRun(**value) if value else None
+
+    def run_parallel_stage(
+        self,
+        *,
+        chunks: list[str],
+        execute_chunk: Callable[[str, dict[str, Any]], Any],
+        verify_chunk: Callable[[str, Any], bool],
+        dependencies: dict[str, list[str]] | None = None,
+        max_workers: int = 4,
+        max_attempts: int = 1,
+        task_id: str | None = None,
+        run_id: str | None = None,
+        commit_sha: str | None = None,
+    ) -> list[ChunkResult]:
+        """Run independent work inside the current stage, then gate the stage."""
+        if self.chunk_runner is None:
+            raise RuntimeError("parallel chunk runner is not configured")
+        before = self.orchestrator.current()
+        effective_run_id = run_id or f"pipeline-{time.time_ns()}"
+        attempts = 0
+        last: list[ChunkResult] = []
+
+        while attempts < max_attempts:
+            attempts += 1
+            last = self.chunk_runner.run(
+                f"{effective_run_id}:stage-{before.stage}",
+                chunks,
+                execute_chunk,
+                verify_chunk,
+                dependencies=dependencies,
+                max_workers=max_workers,
+            )
+            if all(item.status == "SUCCESS" for item in last):
+                # The stage gate opens only after every required chunk is independently verified.
+                after = self.orchestrator.advance(
+                    stage=before.stage + 1 if before.stage < self.orchestrator.TOTAL_STAGES else before.stage,
+                    step=1,
+                    gate_passed=True,
+                )
+                self._save_checkpoint(state=after, run_id=effective_run_id)
+                self.apm.counter(
+                    "pipeline.parallel_stages.completed", 1,
+                    task_id=task_id, run_id=effective_run_id, commit_sha=commit_sha,
+                    dimensions={"stage": str(before.stage), "chunks": str(len(chunks))},
+                )
+                return last
+
+        self.apm.counter(
+            "pipeline.parallel_stages.failed", 1,
+            task_id=task_id, run_id=effective_run_id, commit_sha=commit_sha,
+            dimensions={"stage": str(before.stage)},
+        )
+        raise RuntimeError(
+            f"stage {before.stage} parallel gate failed after {attempts} attempt(s)"
+        )
 
     def run_stage(
         self, *, execute: Callable[[StageState], Any],
@@ -62,38 +128,29 @@ class AutonomousPipeline:
         def measured_execute(state: StageState) -> Any:
             nonlocal attempts
             attempts += 1
-            with self.apm.operation(
-                f"stage.{state.stage}.execute",
-                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-            ) as telemetry:
+            with self.apm.operation(f"stage.{state.stage}.execute",
+                                   task_id=task_id, run_id=run_id, commit_sha=commit_sha) as telemetry:
                 telemetry["retries"] = max(0, attempts - 1)
                 return execute(state)
 
         def measured_verify(state: StageState, result: Any) -> bool:
-            with self.apm.operation(
-                f"stage.{state.stage}.verify",
-                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-            ):
+            with self.apm.operation(f"stage.{state.stage}.verify",
+                                   task_id=task_id, run_id=run_id, commit_sha=commit_sha):
                 return bool(verify(state, result))
 
         try:
             after = self.orchestrator.run_next(
-                execute=measured_execute, verify=measured_verify,
-                max_attempts=max_attempts,
+                execute=measured_execute, verify=measured_verify, max_attempts=max_attempts,
             )
-            self.apm.counter(
-                "pipeline.stages.completed", 1,
-                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-                dimensions={"stage": str(before.stage)},
-            )
+            self.apm.counter("pipeline.stages.completed", 1, task_id=task_id,
+                             run_id=run_id, commit_sha=commit_sha,
+                             dimensions={"stage": str(before.stage)})
             self._save_checkpoint(state=after, run_id=run_id)
             return PipelineResult(before.stage, after.stage, after.status, attempts, True)
         except Exception:
-            self.apm.counter(
-                "pipeline.stages.failed", 1,
-                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-                dimensions={"stage": str(before.stage)},
-            )
+            self.apm.counter("pipeline.stages.failed", 1, task_id=task_id,
+                             run_id=run_id, commit_sha=commit_sha,
+                             dimensions={"stage": str(before.stage)})
             raise
 
     def run_until(
@@ -111,7 +168,6 @@ class AutonomousPipeline:
         effective_run_id = run_id or f"pipeline-{time.time_ns()}"
         self.apm.counter("pipeline.runs.started", 1, task_id=task_id,
                          run_id=effective_run_id, commit_sha=commit_sha)
-
         try:
             while self.orchestrator.current().stage <= target:
                 current = self.orchestrator.current()
