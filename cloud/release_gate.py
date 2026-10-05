@@ -6,6 +6,7 @@ from pathlib import Path
 import json,os,subprocess,sys,tempfile
 from cloud.company_launch_readiness import classify
 from platform_foundation.independence_contract import IndependenceContract
+from tools.brain_autonomy_status import evaluate as evaluate_autonomy
 
 @dataclass
 class Gate:
@@ -16,7 +17,7 @@ class ReleaseGate:
   self.root=Path(root or os.getenv("BRAIN_STATE_DIR",".brain_state"))/"release_gate"; self.root.mkdir(parents=True,exist_ok=True)
 
  def run(self):
-  gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._quran_layer(),self._cinema_truth(),self._governance(),self._independence_contract()]
+  gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._quran_layer(),self._cinema_truth(),self._governance(),self._independence_contract(),self._autonomy_status()]
   all_required=all(g.passed for g in gates if g.required)
   status="RELEASE_ALLOWED" if all_required else "RELEASE_BLOCKED"
   readiness=classify({"status":status}, None)
@@ -95,6 +96,13 @@ class ReleaseGate:
    return Gate("independence_contract",True,result["allowed"],"runtime://independence_contract",json.dumps(result,ensure_ascii=False,sort_keys=True))
   except Exception as e:
    return Gate("independence_contract",True,False,"runtime://independence_contract",repr(e))
+
+ def _autonomy_status(self):
+  try:
+   result=evaluate_autonomy()
+   return Gate("autonomous_within_authority",True,result["AUTONOMOUS_WITHIN_AUTHORITY"],"runtime://brain_autonomy_status",json.dumps(result,ensure_ascii=False,sort_keys=True))
+  except Exception as e:
+   return Gate("autonomous_within_authority",True,False,"runtime://brain_autonomy_status",repr(e))
 
  def _governance(self):
   req=["COMMERCIAL_GOVERNANCE_SPEC.md","PAYMENT_POLICY.md","PUBLIC_IDENTITY_AND_LIMITED_LIABILITY_POLICY.md"]; missing=[x for x in req if not Path(x).exists()]
