@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from .audit_chain import AuditChain
+from .lease import TaskLease
 from .permissions import ActionRisk, PermissionBoundary
 from .persistent_state import SQLiteStateStore
 from .recovery import RecoveryRunner
@@ -33,6 +35,8 @@ class Supervisor:
         self.audit = audit
         self.permissions = permissions
         self.recovery = RecoveryRunner(state, audit)
+        self.lease = TaskLease(state, audit)
+        self.owner = f"supervisor:{uuid.uuid4().hex}"
 
     def register(
         self,
@@ -54,18 +58,14 @@ class Supervisor:
                 "max_attempts": max_attempts,
             },
         )
-        self.state.set(
-            f"handler:{task_id}",
-            {"registered": True},
-        )
-        # Handlers are process-local by design; durable state never stores executable code.
+        self.state.set(f"handler:{task_id}", {"registered": True})
         setattr(self, f"_handler_{task_id}", (handler, retryable))
         self.audit.record(
             "task.registered",
             {"task_id": task_id, "action": action, "risk": risk.value},
         )
 
-    def run(self, task_id: str) -> SupervisorResult:
+    def run(self, task_id: str, *, lease_ttl_seconds: float = 60.0) -> SupervisorResult:
         record = self.state.get(f"supervisor:{task_id}")
         if record is None:
             error = "task is not registered"
@@ -84,53 +84,65 @@ class Supervisor:
             )
             return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=decision.reason)
 
-        self.state.set(
-            f"supervisor:{task_id}",
-            {**record, "status": TaskStatus.RUNNING.value},
-        )
-        self.audit.record("task.execution_started", {"task_id": task_id})
-
-        handler, retryable = getattr(self, f"_handler_{task_id}", (None, None))
-        if handler is None:
-            error = "execution handler is unavailable"
-            self.state.set(
-                f"supervisor:{task_id}",
-                {**record, "status": TaskStatus.FAILED.value, "error": error},
+        lease = self.lease.acquire(task_id, self.owner, ttl_seconds=lease_ttl_seconds)
+        if not lease.acquired:
+            error = "task lease unavailable"
+            self.audit.record(
+                "task.lease_denied",
+                {"task_id": task_id, "owner": self.owner},
             )
-            self.audit.record("task.supervisor_failed", {"task_id": task_id, "error": error})
             return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error=error)
 
-        result = self.recovery.run(
-            task_id,
-            handler,
-            max_attempts=int(record["max_attempts"]),
-            retryable=retryable,
-        )
-        final_record = self.state.get(f"supervisor:{task_id}") or record
-        self.state.set(
-            f"supervisor:{task_id}",
-            {
-                **final_record,
-                "status": result.status.value,
-                "error": result.error,
-            },
-        )
-        self.audit.record(
-            "task.execution_verified",
-            {
-                "task_id": task_id,
-                "status": result.status.value,
-                "attempts": result.attempts,
-            },
-        )
-        return SupervisorResult(
-            task_id,
-            result.status,
-            True,
-            result.attempts,
-            output=result.output,
-            error=result.error,
-        )
+        try:
+            self.state.set(
+                f"supervisor:{task_id}",
+                {**record, "status": TaskStatus.RUNNING.value},
+            )
+            self.audit.record("task.execution_started", {"task_id": task_id})
+
+            handler, retryable = getattr(self, f"_handler_{task_id}", (None, None))
+            if handler is None:
+                error = "execution handler is unavailable"
+                self.state.set(
+                    f"supervisor:{task_id}",
+                    {**record, "status": TaskStatus.FAILED.value, "error": error},
+                )
+                self.audit.record("task.supervisor_failed", {"task_id": task_id, "error": error})
+                return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error=error)
+
+            result = self.recovery.run(
+                task_id,
+                handler,
+                max_attempts=int(record["max_attempts"]),
+                retryable=retryable,
+            )
+            final_record = self.state.get(f"supervisor:{task_id}") or record
+            self.state.set(
+                f"supervisor:{task_id}",
+                {
+                    **final_record,
+                    "status": result.status.value,
+                    "error": result.error,
+                },
+            )
+            self.audit.record(
+                "task.execution_verified",
+                {
+                    "task_id": task_id,
+                    "status": result.status.value,
+                    "attempts": result.attempts,
+                },
+            )
+            return SupervisorResult(
+                task_id,
+                result.status,
+                True,
+                result.attempts,
+                output=result.output,
+                error=result.error,
+            )
+        finally:
+            self.lease.release(task_id, self.owner)
 
 
 __all__ = ["Supervisor", "SupervisorResult"]
