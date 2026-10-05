@@ -78,6 +78,19 @@ def main() -> int:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     existing = find_existing()
     started = False
+    # A stale supervisor may still be running code from before a fix.
+    # Replace it instead of reporting ALREADY_RUNNING without a fresh heartbeat.
+    if existing is not None and not heartbeat_is_fresh():
+        try:
+            os.kill(existing, 15)
+            deadline = time.time() + 5
+            while time.time() < deadline and running_pid(existing):
+                time.sleep(0.1)
+            if running_pid(existing):
+                os.kill(existing, 9)
+        except OSError:
+            pass
+        existing = None
     if existing is None:
         log = LOG_FILE.open("a", encoding="utf-8")
         proc = subprocess.Popen(
