@@ -16,25 +16,26 @@ class PipelineResult:
     verified: bool
 
 
-class AutonomousPipeline:
-    """APM-instrumented driver for the durable 41-stage orchestrator.
+@dataclass(frozen=True)
+class PipelineRun:
+    start_stage: int
+    end_stage: int
+    stages_completed: int
+    stopped_stage: int | None
+    status: str
 
-    It coordinates execution and telemetry but never bypasses StageOrchestrator
-    gates, authority checks, or independent verification.
-    """
+
+class AutonomousPipeline:
+    """APM-instrumented, resumable driver for the durable 41-stage pipeline."""
 
     def __init__(self, orchestrator: StageOrchestrator, apm: APM) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
 
     def run_stage(
-        self,
-        *,
-        execute: Callable[[StageState], Any],
-        verify: Callable[[StageState, Any], bool],
-        max_attempts: int = 3,
-        task_id: str | None = None,
-        run_id: str | None = None,
+        self, *, execute: Callable[[StageState], Any],
+        verify: Callable[[StageState, Any], bool], max_attempts: int = 3,
+        task_id: str | None = None, run_id: str | None = None,
         commit_sha: str | None = None,
     ) -> PipelineResult:
         before = self.orchestrator.current()
@@ -56,14 +57,13 @@ class AutonomousPipeline:
             with self.apm.operation(
                 f"stage.{state.stage}.verify",
                 task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-            ) as telemetry:
+            ):
                 verified = bool(verify(state, result))
                 return verified
 
         try:
             after = self.orchestrator.run_next(
-                execute=measured_execute,
-                verify=measured_verify,
+                execute=measured_execute, verify=measured_verify,
                 max_attempts=max_attempts,
             )
             self.apm.counter(
@@ -80,18 +80,45 @@ class AutonomousPipeline:
             )
             raise
 
+    def run_until(
+        self, *,
+        execute: Callable[[StageState], Any],
+        verify: Callable[[StageState, Any], bool],
+        stop_stage: int | None = None,
+        max_attempts: int = 3,
+        task_id: str | None = None,
+        run_id: str | None = None,
+        commit_sha: str | None = None,
+    ) -> PipelineRun:
+        """Continue from the durable checkpoint until a gate fails or target is reached."""
+        if stop_stage is not None and not 1 <= stop_stage <= self.orchestrator.TOTAL_STAGES:
+            raise ValueError("stop_stage must be between 1 and 41")
+        start = self.orchestrator.current().stage
+        target = stop_stage or self.orchestrator.TOTAL_STAGES
+        completed = 0
+
+        while self.orchestrator.current().stage <= target:
+            current = self.orchestrator.current()
+            if current.status == "FAILED":
+                return PipelineRun(start, current.stage, completed, current.stage, "BLOCKED")
+            result = self.run_stage(
+                execute=execute, verify=verify, max_attempts=max_attempts,
+                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
+            )
+            completed += 1
+            if result.stage_before == target:
+                return PipelineRun(start, result.stage_after, completed, None, result.status)
+        return PipelineRun(start, self.orchestrator.current().stage, completed, None, "COMPLETE")
+
     def progress(self) -> dict[str, Any]:
         state = self.orchestrator.current()
         return {
-            "stage": state.stage,
-            "total_stages": self.orchestrator.TOTAL_STAGES,
+            "stage": state.stage, "total_stages": self.orchestrator.TOTAL_STAGES,
             "completed_stages": max(0, state.stage - 1),
             "progress_percent": round((state.stage - 1) / self.orchestrator.TOTAL_STAGES * 100, 2),
-            "status": state.status,
-            "attempts": state.attempts,
-            "last_error": state.last_error,
-            "apm": self.apm.summary(),
+            "status": state.status, "attempts": state.attempts,
+            "last_error": state.last_error, "apm": self.apm.summary(),
         }
 
 
-__all__ = ["AutonomousPipeline", "PipelineResult"]
+__all__ = ["AutonomousPipeline", "PipelineResult", "PipelineRun"]
