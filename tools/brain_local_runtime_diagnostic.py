@@ -27,6 +27,25 @@ def pgrep(pattern):
     except Exception:
         return []
 
+def process_detail(pattern):
+    rows=[]
+    for line in pgrep(pattern):
+        parts=line.split(None,1)
+        if not parts or not parts[0].isdigit():
+            continue
+        pid=int(parts[0])
+        row={"pid":pid,"command":parts[1] if len(parts)>1 else ""}
+        try:
+            row["cwd"]=os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            row["cwd"]=None
+        try:
+            row["cmdline"]=open(f"/proc/{pid}/cmdline","rb").read().replace(b"\\x00",b" ").decode(errors="replace")
+        except OSError:
+            row["cmdline"]=None
+        rows.append(row)
+    return rows
+
 def tail(path,n=80):
     try:return path.read_text(encoding="utf-8",errors="replace").splitlines()[-n:]
     except Exception:return []
@@ -41,11 +60,15 @@ def main():
       "supervisor":{"state":json.loads(SUP.read_text()) if SUP.exists() else None},
       "guardian":{"state":json.loads(GUARD.read_text()) if GUARD.exists() else None},
       "processes":{
-        "supervisor":pgrep("brain_local_supervisor"),
-        "guardian":pgrep("brain_local_guardian"),
-        "worker":pgrep("brain_local_worker"),
+        "supervisor":process_detail("brain_local_supervisor"),
+        "guardian":process_detail("brain_local_guardian"),
+        "worker":process_detail("brain_local_worker"),
       },
-      "logs":{"legacy_supervisor":tail(LOG),"guardian":tail(GUARD_LOG)},
+      "logs":{
+        "legacy_supervisor":tail(LOG),
+        "guardian":tail(GUARD_LOG),
+        "guardian_log_exists":GUARD_LOG.exists(),
+      },
       "checks":{
         "heartbeat_file_exists":HB.exists(),
         "heartbeat_fresh":hb_age is not None and hb_age <= 30,
