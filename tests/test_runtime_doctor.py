@@ -38,6 +38,7 @@ def test_runtime_doctor_checks_independence_contract(tmp_path):
         report = json.loads(result.stdout)
         names = {item["name"] for item in report["checks"]}
         assert "independence_contract" in names
+        assert "external_runtime_dependency" in names
     finally:
         if backup is None:
             proof.unlink(missing_ok=True)
