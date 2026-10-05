@@ -142,6 +142,43 @@ class SyntheticCustomer:
         return run
 
     @staticmethod
+    def review(self, run: TestRun, accepted: bool, feedback: str = "") -> TestRun:
+        if run.status not in {"VERIFIED", "EXECUTION_FAILED"}:
+            raise ValueError("CUSTOMER_REVIEW_NOT_READY")
+        run.evidence = run.evidence or []
+        run.evidence.append({
+            "event": "CUSTOMER_ACCEPTANCE" if accepted else "CUSTOMER_REVISION_REQUESTED",
+            "feedback": feedback,
+            "at": datetime.now(timezone.utc).isoformat(),
+        })
+        if accepted:
+            run.status = "ACCEPTED"
+        else:
+            run.status = "REVISION_REQUESTED"
+        return run
+
+    def revise(self, run: TestRun, feedback: str) -> TestRun:
+        if run.status != "REVISION_REQUESTED":
+            raise ValueError("REVISION_NOT_REQUESTED")
+        run.approved = False
+        run.status = "WAITING_CUSTOMER_APPROVAL"
+        run.evidence = run.evidence or []
+        run.evidence.append({
+            "event": "REVISION_CAPTURED",
+            "feedback": feedback,
+            "at": datetime.now(timezone.utc).isoformat(),
+        })
+        return run
+
+    def deliver(self, run: TestRun) -> TestRun:
+        if run.status != "ACCEPTED":
+            raise ValueError("CUSTOMER_ACCEPTANCE_REQUIRED")
+        run.status = "DELIVERED"
+        run.evidence = run.evidence or []
+        run.evidence.append({"event": "DELIVERED", "at": datetime.now(timezone.utc).isoformat()})
+        return run
+
+    @staticmethod
     def safety_gate(environment: str, payment_mode: str | None = None) -> dict[str, Any]:
         safe = environment.upper() in {"TEST", "SANDBOX"} and (payment_mode or "NONE").upper() != "PRODUCTION"
         return {"allowed": safe, "environment": environment, "payment_mode": payment_mode or "NONE",
