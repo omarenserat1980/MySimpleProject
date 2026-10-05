@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from shutil import which
 import json
 import platform
+import os
 from pathlib import Path
 
 
@@ -48,6 +49,8 @@ def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
     binaries = {name: which(name) is not None for name in REQUIRED_BINARIES}
     reasons: list[str] = []
 
+    if os.environ.get("BRAIN_INTERNAL_RUNNER_FLAG") != "1":
+        reasons.append("INTERNAL_RUNNER_FLAG_MISSING")
     if platform.system() != "Linux":
         reasons.append("HOST_OS_NOT_LINUX")
     if platform.machine().lower() not in {"x86_64", "amd64"}:
@@ -57,7 +60,7 @@ def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
 
     return RunnerPreflight(
         runner_id=runner_id,
-        online=False,
+        online=(os.environ.get("BRAIN_INTERNAL_RUNNER_FLAG") == "1"),
         os=platform.system(),
         arch=platform.machine(),
         binaries=binaries,
