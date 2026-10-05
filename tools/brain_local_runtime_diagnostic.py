@@ -45,7 +45,7 @@ def main():
         "guardian":pgrep("brain_local_guardian"),
         "worker":pgrep("brain_local_worker"),
       },
-      "logs":{"supervisor":tail(LOG),"guardian":tail(GUARD_LOG)},
+      "logs":{"legacy_supervisor":tail(LOG),"guardian":tail(GUARD_LOG)},
       "checks":{
         "heartbeat_file_exists":HB.exists(),
         "heartbeat_fresh":hb_age is not None and hb_age <= 30,
