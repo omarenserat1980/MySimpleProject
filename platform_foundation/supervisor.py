@@ -137,7 +137,7 @@ class Supervisor:
 
             lease_lost = threading.Event()
             stop_heartbeat = threading.Event()
-            interval = max(0.05, min(5.0, lease_ttl_seconds / 3.0))
+            interval = max(0.01, min(1.0, lease_ttl_seconds / 4.0))
 
             def heartbeat_loop() -> None:
                 while not stop_heartbeat.wait(interval):
