@@ -14,8 +14,10 @@ on:
       - "brain_v12/tests/test_windows_cloud_executor.py"
       - "brain_v12/brain/execution_gateway.py"
       - "brain_v12/tests/test_execution_gateway_windows_cloud.py"
-      - "brain_v12/tests/test_windows_cloud_task_routing.py"
+      - "brain_v12/tests/test_windows_cloud_task_routing.py brain_v12/tests/test_windows_cloud_agent.py"
       - "brain_v12/brain/internal_task_runtime.py"
+      - "brain_v12/cloud_windows_agent.py"
+      - "brain_v12/tests/test_windows_cloud_agent.py"
       - ".github/workflows/brain-windows-cloud-terraform-plan.yml"
   workflow_dispatch:
 
