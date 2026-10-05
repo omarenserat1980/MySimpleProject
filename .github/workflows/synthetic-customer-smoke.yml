@@ -17,6 +17,6 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -q pytest fastapi pydantic
       - name: Compile Synthetic Customer
-        run: python -m compileall -q brain_v12/brain/synthetic_customer.py brain_v12/synthetic_customer_api.py
+        run: python -m compileall -q brain_v12/app.py brain_v12/brain/synthetic_customer.py brain_v12/synthetic_customer_api.py
       - name: Run Synthetic Customer tests
         run: python -m pytest -q brain_v12/tests/test_synthetic_customer.py
