@@ -32,7 +32,7 @@ def main():
     started = datetime.now(timezone.utc).isoformat()
     integrity = run([sys.executable, "tools/base_expansion_integrity.py"])
     worker = run([sys.executable, "tools/brain_local_worker_selftest.py"])
-    authority = run([sys.executable, "-m", "pytest", "-q", "tests/test_authority_boundary_gate.py"])
+    authority = run([sys.executable, "-m", "pytest", "-q", "tests/test_authority_boundary_gate.py", "tests/test_independence_contract.py"])
     checks = {
         "base_expansion_integrity": integrity["passed"],
         "real_worker_execution": worker["passed"],
