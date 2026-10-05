@@ -2,7 +2,7 @@
 
 Runs the Brain-owned durable queue inside a cloud VM/container. It does not
 register as a GitHub Actions runner and does not require GitHub to execute.
-The heartbeat is the runtime attestation used by the API; configuration flags
+The heartbeat is a runtime attestation used by the API; configuration flags
 alone never prove that the worker is online.
 """
 from __future__ import annotations
@@ -13,6 +13,7 @@ import socket
 import time
 from pathlib import Path
 
+from ..brain.internal_runner_preflight import inspect_runner
 from ..brain.internal_task_runtime import InternalTaskRuntime
 
 
@@ -38,15 +39,37 @@ def _write_heartbeat(path: Path, state: str, **extra: object) -> None:
 def run_forever() -> None:
     os.environ.setdefault("BRAIN_INTERNAL_RUNNER_FLAG", "1")
     root = Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
-    runtime = InternalTaskRuntime(root)
     heartbeat = _heartbeat_path(root)
+    preflight = inspect_runner("brain-cloud-runtime")
+    if not preflight.verified:
+        _write_heartbeat(
+            heartbeat,
+            "BLOCKED_PREFLIGHT",
+            preflight=preflight.evidence(),
+        )
+        raise RuntimeError(
+            "BRAIN_CLOUD_RUNTIME_PREFLIGHT_FAILED:"
+            + ",".join(preflight.reasons)
+        )
+
+    runtime = InternalTaskRuntime(root)
     poll = max(1, int(os.getenv("BRAIN_WORKER_POLL_SECONDS", "2")))
     timeout = int(os.getenv("BRAIN_TASK_TIMEOUT", "3600"))
     print("BRAIN_CLOUD_RUNTIME=STARTING", flush=True)
-    _write_heartbeat(heartbeat, "RUNNING", poll_seconds=poll)
+    _write_heartbeat(
+        heartbeat,
+        "RUNNING",
+        poll_seconds=poll,
+        preflight=preflight.evidence(),
+    )
     try:
         while True:
-            _write_heartbeat(heartbeat, "RUNNING", poll_seconds=poll)
+            _write_heartbeat(
+                heartbeat,
+                "RUNNING",
+                poll_seconds=poll,
+                preflight=preflight.evidence(),
+            )
             result = runtime.run_one(timeout=timeout)
             if result.get("state") != "IDLE":
                 print(
