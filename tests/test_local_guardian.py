@@ -16,3 +16,10 @@ def test_runtime_diagnostic_is_read_only():
     s=p.read_text(encoding="utf-8")
     assert "diagnostic" in s.lower()
     assert "pgrep" in s
+
+
+def test_launcher_requires_live_pid_in_heartbeat():
+    p=Path(__file__).resolve().parents[1]/"tools/ensure_brain_local_executor.py"
+    s=p.read_text(encoding="utf-8")
+    assert 'payload.get("pid", 0)' in s
+    assert "not running_pid(pid)" in s
