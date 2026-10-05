@@ -2,8 +2,18 @@
   "policy": "BRAIN_ONLY",
   "external_fallback": false,
   "execution_authority": "brain_local_executor",
-  "github_role": ["source", "evidence", "mirror"],
-  "authoritative_workflows": [
+  "github_role": [
+    "source",
+    "evidence",
+    "mirror"
+  ],
+  "authoritative_workflows": [],
+  "required_runner_labels": [
+    "self-hosted",
+    "brain-runner"
+  ],
+  "missing_executor_action": "BLOCKED",
+  "verification_workflows": [
     "base-expansion-foundation.yml",
     "base-expansion-integrated-gate.yml",
     "base-expansion-lease-gate.yml",
@@ -11,6 +21,5 @@
     "base-expansion-stale-recovery-gate.yml",
     "brain-local-worker-ci.yml"
   ],
-  "required_runner_labels": ["self-hosted", "brain-runner"],
-  "missing_executor_action": "BLOCKED"
+  "runtime_rule": "GitHub workflows are verification/evidence only; Brain-owned local executor is the runtime authority."
 }
