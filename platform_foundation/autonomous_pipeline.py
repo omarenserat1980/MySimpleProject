@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Callable
+import time
 
 from .apm import APM
 from .stage_orchestrator import StageOrchestrator, StageState
@@ -23,14 +24,24 @@ class PipelineRun:
     stages_completed: int
     stopped_stage: int | None
     status: str
+    run_id: str | None = None
 
 
 class AutonomousPipeline:
-    """APM-instrumented, resumable driver for the durable 41-stage pipeline."""
+    """APM-instrumented, durable, resumable driver for the 41-stage pipeline."""
+
+    RUN_KEY = "brain.autonomous_pipeline.last_run"
 
     def __init__(self, orchestrator: StageOrchestrator, apm: APM) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
+
+    def _save_run(self, run: PipelineRun) -> None:
+        self.orchestrator.store.set(self.RUN_KEY, asdict(run))
+
+    def last_run(self) -> PipelineRun | None:
+        value = self.orchestrator.store.get(self.RUN_KEY)
+        return PipelineRun(**value) if value else None
 
     def run_stage(
         self, *, execute: Callable[[StageState], Any],
@@ -40,7 +51,6 @@ class AutonomousPipeline:
     ) -> PipelineResult:
         before = self.orchestrator.current()
         attempts = 0
-        verified = False
 
         def measured_execute(state: StageState) -> Any:
             nonlocal attempts
@@ -53,13 +63,11 @@ class AutonomousPipeline:
                 return execute(state)
 
         def measured_verify(state: StageState, result: Any) -> bool:
-            nonlocal verified
             with self.apm.operation(
                 f"stage.{state.stage}.verify",
                 task_id=task_id, run_id=run_id, commit_sha=commit_sha,
             ):
-                verified = bool(verify(state, result))
-                return verified
+                return bool(verify(state, result))
 
         try:
             after = self.orchestrator.run_next(
@@ -71,7 +79,7 @@ class AutonomousPipeline:
                 task_id=task_id, run_id=run_id, commit_sha=commit_sha,
                 dimensions={"stage": str(before.stage)},
             )
-            return PipelineResult(before.stage, after.stage, after.status, attempts, verified)
+            return PipelineResult(before.stage, after.stage, after.status, attempts, True)
         except Exception:
             self.apm.counter(
                 "pipeline.stages.failed", 1,
@@ -81,34 +89,49 @@ class AutonomousPipeline:
             raise
 
     def run_until(
-        self, *,
-        execute: Callable[[StageState], Any],
+        self, *, execute: Callable[[StageState], Any],
         verify: Callable[[StageState, Any], bool],
-        stop_stage: int | None = None,
-        max_attempts: int = 3,
-        task_id: str | None = None,
-        run_id: str | None = None,
+        stop_stage: int | None = None, max_attempts: int = 3,
+        task_id: str | None = None, run_id: str | None = None,
         commit_sha: str | None = None,
     ) -> PipelineRun:
-        """Continue from the durable checkpoint until a gate fails or target is reached."""
         if stop_stage is not None and not 1 <= stop_stage <= self.orchestrator.TOTAL_STAGES:
             raise ValueError("stop_stage must be between 1 and 41")
         start = self.orchestrator.current().stage
         target = stop_stage or self.orchestrator.TOTAL_STAGES
         completed = 0
+        effective_run_id = run_id or f"pipeline-{time.time_ns()}"
+        self.apm.counter("pipeline.runs.started", 1, task_id=task_id,
+                         run_id=effective_run_id, commit_sha=commit_sha)
 
-        while self.orchestrator.current().stage <= target:
-            current = self.orchestrator.current()
-            if current.status == "FAILED":
-                return PipelineRun(start, current.stage, completed, current.stage, "BLOCKED")
-            result = self.run_stage(
-                execute=execute, verify=verify, max_attempts=max_attempts,
-                task_id=task_id, run_id=run_id, commit_sha=commit_sha,
-            )
-            completed += 1
-            if result.stage_before == target:
-                return PipelineRun(start, result.stage_after, completed, None, result.status)
-        return PipelineRun(start, self.orchestrator.current().stage, completed, None, "COMPLETE")
+        try:
+            while self.orchestrator.current().stage <= target:
+                current = self.orchestrator.current()
+                if current.status == "FAILED":
+                    result = PipelineRun(start, current.stage, completed, current.stage, "BLOCKED", effective_run_id)
+                    self._save_run(result)
+                    return result
+                result = self.run_stage(
+                    execute=execute, verify=verify, max_attempts=max_attempts,
+                    task_id=task_id, run_id=effective_run_id, commit_sha=commit_sha,
+                )
+                completed += 1
+                if result.stage_before == target:
+                    final = PipelineRun(start, result.stage_after, completed, None, result.status, effective_run_id)
+                    self._save_run(final)
+                    self.apm.counter("pipeline.runs.completed", 1, task_id=task_id,
+                                     run_id=effective_run_id, commit_sha=commit_sha)
+                    return final
+            final = PipelineRun(start, self.orchestrator.current().stage, completed, None, "COMPLETE", effective_run_id)
+            self._save_run(final)
+            return final
+        except Exception:
+            failed = PipelineRun(start, self.orchestrator.current().stage, completed,
+                                 self.orchestrator.current().stage, "FAILED", effective_run_id)
+            self._save_run(failed)
+            self.apm.counter("pipeline.runs.failed", 1, task_id=task_id,
+                             run_id=effective_run_id, commit_sha=commit_sha)
+            raise
 
     def progress(self) -> dict[str, Any]:
         state = self.orchestrator.current()
@@ -117,7 +140,8 @@ class AutonomousPipeline:
             "completed_stages": max(0, state.stage - 1),
             "progress_percent": round((state.stage - 1) / self.orchestrator.TOTAL_STAGES * 100, 2),
             "status": state.status, "attempts": state.attempts,
-            "last_error": state.last_error, "apm": self.apm.summary(),
+            "last_error": state.last_error, "last_run": self.last_run(),
+            "apm": self.apm.summary(),
         }
 
 
