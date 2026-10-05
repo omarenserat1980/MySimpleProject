@@ -62,6 +62,8 @@ from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
+from .brain.synthetic_customer import SyntheticCustomer
+from .synthetic_customer_api import router as synthetic_customer_router
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
@@ -108,6 +110,7 @@ workforce=WorkforceControl(store)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
+synthetic_customer=SyntheticCustomer(evidence_store=None)
 workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
@@ -169,6 +172,7 @@ app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json"))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(synthetic_customer_router(synthetic_customer))
 app.include_router(commercial_dashboard_router())
 
 
