@@ -1,0 +1,109 @@
+name: Setup EXE Cloud Execution Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type RUN_SETUP_EXE to authorize cloud execution"
+        required: true
+        type: string
+      timeout_seconds:
+        description: "Maximum execution time"
+        required: false
+        default: "120"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-execution-gate:
+    if: ${{ inputs.confirm == 'RUN_SETUP_EXE' }}
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download staged setup.exe
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-exe-staged
+          path: setup-staged
+
+      - name: Verify staged artifact
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          $hashFile = Get-ChildItem -Path "setup-staged" -Filter "setup.sha256" -Recurse -File | Select-Object -First 1
+          if (-not $file) { throw "setup.exe not found" }
+          if (-not $hashFile) { throw "setup.sha256 not found" }
+
+          $expected = (Get-Content $hashFile.FullName -Raw).Trim().Split()[0].ToUpper()
+          $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToUpper()
+
+          if ($expected -ne $actual) { throw "SHA-256 mismatch" }
+          if ($file.Length -ne 99896) { throw "Unexpected setup.exe size" }
+
+          $sig = Get-AuthenticodeSignature $file.FullName
+          $version = (Get-Item $file.FullName).VersionInfo
+
+          Write-Host "EXECUTION_GATE=PASS"
+          Write-Host "FILE=$($file.FullName)"
+          Write-Host "SHA256=$actual"
+          Write-Host "SIZE_BYTES=$($file.Length)"
+          Write-Host "SIGNATURE_STATUS=$($sig.Status)"
+          Write-Host "SIGNER=$($sig.SignerCertificate.Subject)"
+          Write-Host "FILE_VERSION=$($version.FileVersion)"
+
+          New-Item -ItemType Directory -Force -Path evidence | Out-Null
+          @(
+            "execution_gate=PASS"
+            "sha256=$actual"
+            "size_bytes=$($file.Length)"
+            "signature_status=$($sig.Status)"
+            "signer=$($sig.SignerCertificate.Subject)"
+            "file_version=$($version.FileVersion)"
+          ) | Set-Content evidence/setup-exe-preflight.txt
+
+      - name: Execute setup.exe
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          $seconds = [int]"${{ inputs.timeout_seconds }}"
+          if ($seconds -lt 1 -or $seconds -gt 600) { throw "timeout_seconds must be between 1 and 600" }
+
+          Write-Host "SETUP_EXE_EXECUTION=START"
+          $p = Start-Process -FilePath $file.FullName -Wait -PassThru
+          Write-Host "SETUP_EXE_EXIT_CODE=$($p.ExitCode)"
+
+          if ($p.ExitCode -ne 0) {
+            throw "setup.exe exited with code $($p.ExitCode)"
+          }
+
+          Write-Host "SETUP_EXE_EXECUTION=PASS"
+
+      - name: Post-execution evidence
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path evidence | Out-Null
+          "execution_completed_at=$([DateTime]::UtcNow.ToString('o'))" | Set-Content evidence/execution.txt
+          if (Test-Path evidence/setup-exe-preflight.txt) {
+            Get-Content evidence/setup-exe-preflight.txt
+          }
+
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-exe-cloud-execution-evidence
+          path: evidence
+          if-no-files-found: error
+
+  authorization-failed:
+    if: ${{ inputs.confirm != 'RUN_SETUP_EXE' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject unauthorized execution
+        run: |
+          echo "EXECUTION_GATE=NOT_AUTHORIZED"
+          echo "No setup.exe execution was performed."
+          exit 1
