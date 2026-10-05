@@ -12,6 +12,7 @@ from .execution_policy import BrainExecutionPolicy, ExecutionMode, ExecutorDecis
 from .brain_ci_executor import BrainCIExecutor, BrainCIResult
 from .executor_pool import BrainExecutorPool, ExecutorJob
 from .open_source_gate import OpenSourceCandidate, OpenSourceDecision, OpenSourceGate, OpenSourceGateResult
+from .capability_registry import Capability, CapabilityRegistry
 
 __all__ = [
     "PlatformRuntime",
@@ -26,4 +27,5 @@ __all__ = [
     "BrainCIExecutor", "BrainCIResult",
     "BrainExecutorPool", "ExecutorJob",
     "OpenSourceCandidate", "OpenSourceDecision", "OpenSourceGate", "OpenSourceGateResult",
+    "Capability", "CapabilityRegistry",
 ]
