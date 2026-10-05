@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from cloud.brain_fabric import (
     register_node, heartbeat, list_nodes, choose_node, create_job,
-    get_job, transition_job, snapshot, update_node,
+    get_job, transition_job, snapshot, update_node, next_node_job,
 )
 from cloud.brain_node_security import create_enrollment, verify_enrollment
 
@@ -75,6 +75,38 @@ def add_node(body: NodeRequest):
 @router.get("/nodes", dependencies=[Depends(fabric_auth)])
 def nodes():
     return {"ok": True, "nodes": list_nodes()}
+
+@router.get("/nodes/{node_id}/jobs/next")
+def node_next_job(node_id: str, authorization: str | None = Header(default=None)):
+    token = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    if not verify_enrollment(node_id, token):
+        raise HTTPException(status_code=401, detail="invalid or expired enrollment token")
+    job = next_node_job(
+        node_id,
+        required_capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    return {"ok": True, "job": job}
+
+@router.post("/nodes/{node_id}/jobs/{job_id}/result")
+def node_job_result(
+    node_id: str,
+    job_id: str,
+    body: TransitionRequest,
+    authorization: str | None = Header(default=None),
+):
+    token = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else ""
+    if not verify_enrollment(node_id, token):
+        raise HTTPException(status_code=401, detail="invalid or expired enrollment token")
+    job = get_job(job_id)
+    if not job or job.get("node_id") != node_id:
+        raise HTTPException(status_code=404, detail="node job not found")
+    if body.state not in {"SUCCESS", "FAILED", "CANCELLED", "RETRYING"}:
+        raise HTTPException(status_code=400, detail="invalid terminal job state")
+    try:
+        result = transition_job(job_id, body.state, evidence=body.evidence)
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "job": result}
 
 @router.post("/nodes/{node_id}/heartbeat")
 def node_heartbeat(node_id: str, body: HeartbeatRequest):
