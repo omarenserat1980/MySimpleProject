@@ -56,3 +56,12 @@ def test_runtime_workloads_are_brain_owned():
         assert "runs-on: ubuntu-latest" not in text, workflow
         assert "brain-internal" in text, workflow
         assert "internal_runner_preflight" in text, workflow
+
+
+def test_canonical_internal_runtime_modules_exist():
+    gateway = Path("brain_v12/brain/execution_gateway.py")
+    runtime = Path("brain_v12/brain/internal_task_runtime.py")
+    assert gateway.exists()
+    assert runtime.exists()
+    assert "BrainExecutionGateway" in gateway.read_text(encoding="utf-8")
+    assert "github_dependency" in runtime.read_text(encoding="utf-8")
