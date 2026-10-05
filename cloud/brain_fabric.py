@@ -141,7 +141,7 @@ def next_node_job(node_id: str, required_capabilities: list[str] | None = None) 
         jobs = []
         for p in sorted(_state_dir().glob("job-*.json")):
             item = _read(p)
-            if item and item.get("node_id") == node_id and item.get("state") == "QUEUED":
+            if item and item.get("node_id") == node_id and item.get("state") in {"QUEUED", "RETRYING"}:
                 jobs.append((p, item))
         if not jobs:
             return None
