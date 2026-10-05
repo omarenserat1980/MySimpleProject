@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 from .execution_gateway import BrainExecutionGateway
+from .windows_cloud_executor import CloudWindowsVM
+from .windows_cloud_task_executor import WindowsCloudTaskExecutor
 
 
 class InternalTaskRuntime:
@@ -62,12 +64,49 @@ class InternalTaskRuntime:
         started = time.time()
         try:
             if item["capability"] == "windows-server-2025-real-boot":
-                decision = self.gateway.authorize_task(
-                    item["capability"], item.get("metadata")
+                metadata = item.get("metadata") or {}
+                vm_data = metadata.get("vm")
+                node = metadata.get("node")
+                if not isinstance(vm_data, dict) or not isinstance(node, dict):
+                    raise RuntimeError("WINDOWS_CLOUD_RUNTIME_EVIDENCE_REQUIRED")
+                decision = self.gateway.authorize_task(item["capability"], metadata)
+                vm = CloudWindowsVM(
+                    vm_id=str(vm_data.get("vm_id", "")),
+                    provider=str(vm_data.get("provider", "")),
+                    region=str(vm_data.get("region", "")),
+                    state=str(vm_data.get("state", "")),
+                    os=str(vm_data.get("os", "Windows Server 2025")),
+                    architecture=str(vm_data.get("architecture", "x86_64")),
+                    metadata=vm_data.get("metadata", {}),
                 )
-                raise RuntimeError(
-                    "WINDOWS_CLOUD_EXECUTION_ADAPTER_REQUIRED:" + decision.reason
+                remote = WindowsCloudTaskExecutor().run(
+                    vm, node, item["argv"],
+                    cwd=metadata.get("cwd"),
+                    timeout=timeout,
+                    heartbeat_timeout=float(metadata.get("heartbeat_timeout", 120.0)),
+                    now=metadata.get("now"),
                 )
+                state = "COMPLETED" if remote["ok"] else "FAILED"
+                evidence = {
+                    "task_id": item["id"], "task": item["task"], "state": state,
+                    "executor": remote["executor"], "authority": "brain-cloud-fabric",
+                    "verified_executor": decision.verified, "job_id": remote["job_id"],
+                    "remote_evidence": remote.get("evidence", []),
+                    "duration_seconds": round(time.time() - started, 3),
+                }
+                raw = json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode()
+                evidence["sha256"] = hashlib.sha256(raw).hexdigest()
+                ref = self.evidence_dir / f"{item['id']}.json"
+                ref.write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
+                state_data = self._load_state()
+                terminal = set(state_data.get("terminal_ids", []))
+                terminal.add(item["id"])
+                state_data["terminal_ids"] = sorted(terminal)
+                state_data["last_task_id"] = item["id"]
+                state_data["last_state"] = state
+                state_data["last_evidence"] = str(ref)
+                self.state_file.write_text(json.dumps(state_data, indent=2), encoding="utf-8")
+                return {**evidence, "evidence_ref": str(ref)}
             result = self.gateway.run(
                 item["argv"], capability=item["capability"], timeout=timeout
             )
