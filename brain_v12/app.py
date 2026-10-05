@@ -69,6 +69,9 @@ from . import media_engine
 from . import visual_engine
 from . import short_video_factory
 from .cloud_bootstrap import bootstrap_status
+from .brain.windows_cloud_discovery import discover_windows_cloud_nodes
+from cloud.brain_fabric import list_nodes as list_fabric_nodes
+
 from .brain.security_middleware import apply_security_headers
 
 ROOT=os.path.dirname(__file__)
@@ -166,6 +169,14 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+
+
+@app.get("/api/brain/windows/cloud/status")
+def brain_windows_cloud_status():
+    """Return only freshly heartbeating, verified Windows Cloud nodes."""
+    nodes = list_fabric_nodes()
+    timeout = float(os.getenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120"))
+    return discover_windows_cloud_nodes(nodes, heartbeat_timeout=timeout)
 
 @app.get("/api/brain/cloud/status")
 def brain_cloud_status():
