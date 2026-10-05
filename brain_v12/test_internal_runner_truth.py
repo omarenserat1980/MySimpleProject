@@ -24,3 +24,9 @@ class InternalRunnerTruthTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_direct_run_rejects_unverified_host(self):
+        with patch.dict(os.environ, {"BRAIN_INTERNAL_RUNNER_FLAG": "0"}, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "BRAIN_INTERNAL_RUNNER_NOT_VERIFIED"):
+                InternalRunner().run(["python", "-c", "print('must not run')"])
