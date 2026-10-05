@@ -162,6 +162,115 @@ def test_expired_job_stops_after_lease_retry_limit(tmp_path, monkeypatch):
     assert get_job(job["job_id"])["state"] == "FAILED"
 
 
+def test_api_rejects_stale_worker_result_after_lease_expiry_and_release(tmp_path, monkeypatch):
+    import importlib
+    import json
+    import sys
+
+    monkeypatch.setenv("BRAIN_FABRIC_STATE_DIR", str(tmp_path / "fabric"))
+    monkeypatch.setenv("BRAIN_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("BRAIN_CONTROL_TOKEN", "test-control-token")
+    monkeypatch.setenv("BRAIN_API_QUEUE_WORKER", "0")
+    monkeypatch.setenv("BRAIN_FABRIC_JOB_LEASE_TIMEOUT", "1")
+
+    for name in list(sys.modules):
+        if name == "cloud.api_server" or name.startswith("cloud.api_server."):
+            sys.modules.pop(name, None)
+
+    api_server = importlib.import_module("cloud.api_server")
+    client = TestClient(api_server.app)
+    auth = {"Authorization": "Bearer test-control-token"}
+
+    enrollment = client.post(
+        "/v1/fabric/enroll",
+        headers=auth,
+        json={"node_id": "api-stale-worker", "ttl_seconds": 300},
+    )
+    assert enrollment.status_code == 200
+    token = enrollment.json()["enrollment_token"]
+    worker_auth = {"Authorization": f"Bearer {token}"}
+
+    heartbeat = client.post(
+        "/v1/fabric/nodes/api-stale-worker/heartbeat",
+        json={
+            "enrollment_token": token,
+            "state": "READY",
+            "jobs_running": 0,
+            "architecture": "x86_64",
+            "cpu": 4,
+            "memory_mb": 8192,
+            "storage_gb": 50,
+            "capabilities": ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+        },
+    )
+    assert heartbeat.status_code == 200
+
+    job_response = client.post(
+        "/v1/fabric/jobs",
+        headers=auth,
+        json={
+            "kind": "api-stale-lease",
+            "payload": {"test": True},
+            "required_capabilities": [
+                "windows-server-2025", "windows-cloud", "brain-task-execution"
+            ],
+        },
+    )
+    assert job_response.status_code == 200
+    job_id = job_response.json()["job"]["job_id"]
+
+    first = client.get(
+        "/v1/fabric/nodes/api-stale-worker/jobs/next",
+        headers=worker_auth,
+    )
+    assert first.status_code == 200
+    first_job = first.json()["job"]
+    assert first_job["job_id"] == job_id
+    old_lease_id = first_job["lease_id"]
+
+    path = tmp_path / "fabric" / f"job-{job_id}.json"
+    item = json.loads(path.read_text(encoding="utf-8"))
+    item["leased_at"] = 0
+    path.write_text(json.dumps(item), encoding="utf-8")
+
+    from cloud.brain_fabric import recover_expired_jobs
+    assert recover_expired_jobs(lease_timeout=1) == [job_id]
+
+    second = client.get(
+        "/v1/fabric/nodes/api-stale-worker/jobs/next",
+        headers=worker_auth,
+    )
+    assert second.status_code == 200
+    second_job = second.json()["job"]
+    assert second_job["job_id"] == job_id
+    assert second_job["lease_id"]
+    assert second_job["lease_id"] != old_lease_id
+
+    stale_result = client.post(
+        f"/v1/fabric/nodes/api-stale-worker/jobs/{job_id}/result",
+        headers=worker_auth,
+        json={
+            "state": "SUCCESS",
+            "lease_id": old_lease_id,
+            "evidence": {"worker": "old", "result": "stale"},
+        },
+    )
+    assert stale_result.status_code == 409
+    assert stale_result.json()["detail"] == "stale or invalid job lease"
+
+    current_result = client.post(
+        f"/v1/fabric/nodes/api-stale-worker/jobs/{job_id}/result",
+        headers=worker_auth,
+        json={
+            "state": "SUCCESS",
+            "lease_id": second_job["lease_id"],
+            "evidence": {"worker": "current", "result": "accepted"},
+        },
+    )
+    assert current_result.status_code == 200
+    assert current_result.json()["job"]["state"] == "SUCCESS"
+
+
 def test_old_node_cannot_complete_released_lease(tmp_path, monkeypatch):
     from cloud.brain_fabric import register_node, create_job, next_node_job, recover_expired_jobs
     import json
