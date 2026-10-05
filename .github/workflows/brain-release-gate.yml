@@ -27,6 +27,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng
 
+      - name: Verify Windows Cloud secret readiness gate
+        run: |
+          python -m pytest -q brain_v12/tests/test_windows_cloud_secret_gate.py brain_v12/tests/test_secret_control.py
+
       - name: Run release gate
         run: |
           python -c "from cloud.release_gate import ReleaseGate; import json; print(json.dumps(ReleaseGate().run(), indent=2))"
