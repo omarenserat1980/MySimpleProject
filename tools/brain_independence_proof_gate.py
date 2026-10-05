@@ -9,6 +9,8 @@ import hashlib, json, os, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from platform_foundation.independence_contract import IndependenceContract
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "brain6_artifacts" / "independence_gate" / "independence_proof.json"
 
@@ -71,6 +73,11 @@ def main():
     OUT.parent.mkdir(parents=True, exist_ok=True)
     canonical = json.dumps(report, indent=2, ensure_ascii=False)
     OUT.write_text(canonical, encoding="utf-8")
+    contract = IndependenceContract(OUT).evaluate()
+    report["independence_contract"] = contract
+    proof_allowed = proof_allowed and contract["allowed"]
+    report["status"] = "PROVEN_WITHIN_TEST_SCOPE" if proof_allowed else "NOT_PROVEN"
+    report["independence_claim_allowed"] = proof_allowed
     report["report_sha256"] = hashlib.sha256(OUT.read_bytes()).hexdigest()
     OUT.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))
