@@ -135,6 +135,7 @@ def create_job(kind: str, payload: dict[str, Any], required_capabilities: list[s
 
 def next_node_job(node_id: str, required_capabilities: list[str] | None = None) -> dict[str, Any] | None:
     """Lease the oldest queued job assigned to a healthy node."""
+    recover_expired_jobs()
     node_id = _validate_id(node_id)
     node = next((n for n in list_nodes() if n.get("node_id") == node_id), None)
     if not node or not _eligible(node, set(required_capabilities or [])):
