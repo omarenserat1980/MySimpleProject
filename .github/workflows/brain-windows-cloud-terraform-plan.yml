@@ -12,6 +12,8 @@ on:
       - "brain_v12/brain/windows_cloud_executor.py"
       - "brain_v12/brain/windows_cloud_gate.py"
       - "brain_v12/tests/test_windows_cloud_executor.py"
+      - "brain_v12/brain/execution_gateway.py"
+      - "brain_v12/tests/test_execution_gateway_windows_cloud.py"
       - ".github/workflows/brain-windows-cloud-terraform-plan.yml"
   workflow_dispatch:
 
@@ -69,7 +71,7 @@ jobs:
       - name: Verify Windows cloud runtime gate
         working-directory: .
         run: |
-          python -m pytest -q brain_v12/tests/test_windows_cloud_gate.py brain_v12/tests/test_windows_cloud_executor.py
+          python -m pytest -q brain_v12/tests/test_windows_cloud_gate.py brain_v12/tests/test_windows_cloud_executor.py brain_v12/tests/test_execution_gateway_windows_cloud.py
 
       - name: Verify no provisioning command is present
         working-directory: .
