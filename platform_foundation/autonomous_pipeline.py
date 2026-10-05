@@ -7,6 +7,7 @@ import time
 from .apm import APM
 from .parallel_chunks import ParallelChunkRunner, ChunkResult
 from .stage_orchestrator import StageOrchestrator, StageState
+from .brain_ci_executor import BrainCIExecutor
 
 
 @dataclass(frozen=True)
@@ -39,10 +40,12 @@ class AutonomousPipeline:
         orchestrator: StageOrchestrator,
         apm: APM,
         chunk_runner: ParallelChunkRunner | None = None,
+        ci_executor: BrainCIExecutor | None = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
         self.chunk_runner = chunk_runner
+        self.ci_executor = ci_executor
 
     def _save_run(self, run: PipelineRun) -> None:
         self.orchestrator.store.set(self.RUN_KEY, asdict(run))
@@ -197,6 +200,14 @@ class AutonomousPipeline:
                              run_id=effective_run_id, commit_sha=commit_sha)
             raise
 
+    def execution_health(self) -> dict[str, Any]:
+        if self.ci_executor is None:
+            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_not_configured"}
+        health = self.ci_executor.health()
+        if not health["healthy"]:
+            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_unavailable", "executor": health}
+        return {"healthy": True, "status": "READY", "executor": health}
+
     def health(self) -> dict[str, Any]:
         state = self.orchestrator.current()
         checkpoint = self.checkpoint()
@@ -207,7 +218,10 @@ class AutonomousPipeline:
             issues.append("checkpoint_mismatch")
         if checkpoint is None and state.stage > 1:
             issues.append("missing_checkpoint")
-        return {"healthy": not issues, "stage": state.stage, "status": state.status, "issues": issues, "checkpoint": checkpoint}
+        execution = self.execution_health()
+        if not execution["healthy"]:
+            issues.append("brain_ci_executor_unavailable")
+        return {"healthy": not issues, "stage": state.stage, "status": state.status, "issues": issues, "checkpoint": checkpoint, "execution": execution}
 
     def progress(self) -> dict[str, Any]:
         state = self.orchestrator.current()
