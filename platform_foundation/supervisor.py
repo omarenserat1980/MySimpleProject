@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from .audit_chain import AuditChain
 from .authority import AuthorityApprovalLedger
+from .diagnostics import capture_exception
 from .lease import TaskLease
 from .permissions import ActionRisk, PermissionBoundary
 from .persistent_state import SQLiteStateStore
@@ -166,6 +167,15 @@ class Supervisor:
                 )
                 self.audit.record("task.lease_lost", {"task_id": task_id, "owner": self.owner})
                 return SupervisorResult(task_id, TaskStatus.FAILED, True, result.attempts, error=error)
+            if result.status is TaskStatus.FAILED and result.error:
+                diagnostic = {
+                    "task_id": task_id,
+                    "error_type": "TaskExecutionFailure",
+                    "error": result.error,
+                    "attempts": result.attempts,
+                }
+                self.state.set(f"diagnostic:{task_id}", diagnostic)
+                self.audit.record("task.diagnostic", diagnostic)
             final_record = self.state.get(f"supervisor:{task_id}") or record
             self.state.set(
                 f"supervisor:{task_id}",
