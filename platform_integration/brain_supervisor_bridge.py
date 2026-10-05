@@ -129,5 +129,28 @@ class BrainSupervisorBridge:
             output=result.output, error=verified.error,
         )
 
+    def load_verified_execution(self, task_id: str) -> BrainVerifiedExecution | None:
+        """Load only a durably persisted execution that passed the verification gate."""
+        record = self.state.get(f"brain_bridge:{task_id}")
+        verification = self.state.get(f"verification:{task_id}")
+        if not record or not verification:
+            return None
+        if not (
+            record.get("executed") is True
+            and record.get("verified") is True
+            and record.get("status") == "SUCCESS"
+            and verification.get("verified") is True
+            and verification.get("status") == "SUCCESS"
+        ):
+            return None
+        return BrainVerifiedExecution(
+            task_id=task_id,
+            executed=True,
+            verified=True,
+            status="SUCCESS",
+            attempts=int(record.get("attempts", 0)),
+            error=record.get("error"),
+        )
+
 
 __all__ = ["BrainAdmissionResult", "BrainVerifiedExecution", "BrainSupervisorBridge"]
