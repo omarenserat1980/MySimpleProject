@@ -3,9 +3,16 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from .brain.synthetic_customer import SyntheticCustomer
 
+
 class CustomerRequest(BaseModel):
     customer_type: str
     request: str
+
+
+class CustomerExecuteRequest(BaseModel):
+    environment: str = "TEST"
+    payment_mode: str = "NONE"
+
 
 def router(customer: SyntheticCustomer, capability_provider=None):
     r = APIRouter(prefix="/api/synthetic-customer", tags=["synthetic-customer"])
@@ -29,6 +36,20 @@ def router(customer: SyntheticCustomer, capability_provider=None):
         try:
             run = customer.approve(customer.get(run_id))
             return {"ok": True, "run": run.__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @r.post("/runs/{run_id}/execute")
+    def execute(run_id: str, body: CustomerExecuteRequest):
+        try:
+            run = customer.execute(
+                customer.get(run_id),
+                environment=body.environment,
+                payment_mode=body.payment_mode,
+            )
+            return {"ok": run.status == "VERIFIED", "run": run.__dict__}
         except KeyError:
             raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
         except ValueError as exc:
