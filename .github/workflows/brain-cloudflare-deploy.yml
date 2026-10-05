@@ -150,15 +150,18 @@ jobs:
           echo "CINEMA_MASTER_R2_UPLOAD=PASS"
 
       - name: Configure Brain control secret (optional)
-        if: ${{ secrets.BRAIN_CONTROL_TOKEN != '' }}
         working-directory: cloudflare/brain-api
         env:
           BRAIN_CONTROL_TOKEN: ${{ secrets.BRAIN_CONTROL_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${BRAIN_CONTROL_TOKEN:-}" ]; then
+            echo "BRAIN_CONTROL_TOKEN_CONFIGURED=FALSE"
+            echo "BRAIN_CONTROL_TOKEN_OPTIONAL=TRUE"
+            exit 0
+          fi
           printf '%s' "$BRAIN_CONTROL_TOKEN" | npx wrangler secret put BRAIN_CONTROL_TOKEN
           echo "BRAIN_CONTROL_TOKEN_CONFIGURED=TRUE"
-
       - name: Configure PayTabs Worker secret
         working-directory: cloudflare/brain-api
         env:
