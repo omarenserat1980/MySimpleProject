@@ -63,6 +63,9 @@ def load_pipeline(path: Path) -> tuple[str, list[StageSpec], CommandSpec | None]
         ids.add(sid)
         repair = tuple(command_from(x) for x in item.get("repair", []))
         max_retries = int(item.get("max_retries", 2))
+        verify_wait_seconds = int(item.get("verify_wait_seconds", 0))
+        if verify_wait_seconds < 0 or verify_wait_seconds > 300:
+            raise APMError("verify_wait_seconds must be between 0 and 300")
         if max_retries < 0 or max_retries > 10:
             raise APMError("max_retries must be between 0 and 10")
         stages.append(StageSpec(
@@ -72,6 +75,7 @@ def load_pipeline(path: Path) -> tuple[str, list[StageSpec], CommandSpec | None]
             rollback=command_from(item["rollback"]) if item.get("rollback") else None,
             repair_allowed=bool(item.get("repair_allowed", False)),
             max_retries=max_retries,
+            verify_wait_seconds=verify_wait_seconds,
             dependencies=tuple(str(x) for x in item.get("dependencies", [])),
             enabled=bool(item.get("enabled", True)),
         ))
@@ -207,6 +211,11 @@ class APMEngine:
                     state.updated_at = utc_now()
                     self._save_state(state)
                     run_result = self._run(stage.run)
+                    state.current_step = "WAITING_FOR_VERIFY"
+                    state.updated_at = utc_now()
+                    self._save_state(state)
+                    if stage.verify_wait_seconds:
+                        time.sleep(stage.verify_wait_seconds)
                     state.current_step = "VERIFY"
                     verify_result = self._run(stage.verify)
                     last = {"run": run_result, "verify": verify_result}
