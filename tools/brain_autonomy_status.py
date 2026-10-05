@@ -7,12 +7,16 @@ durable independence proof plus the currently live Brain-owned executor.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+# Make direct execution from tools/ work without requiring PYTHONPATH.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 from platform_foundation.independence_contract import IndependenceContract
-
-ROOT = Path(__file__).resolve().parents[1]
 PROOF = ROOT / "brain6_artifacts" / "independence_gate" / "independence_proof.json"
 
 
