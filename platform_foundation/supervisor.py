@@ -107,7 +107,7 @@ class Supervisor:
 
         lease = self.lease.acquire(task_id, self.owner, ttl_seconds=lease_ttl_seconds)
         if not lease.acquired:
-            self._set_phase(task_id, SupervisorPhase.BLOCKED, reason="task lease unavailable")
+            self.audit.record("task.lease_denied", {"task_id": task_id, "owner": self.owner, "reason": "task lease unavailable"})
             return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error="task lease unavailable")
 
         try:
