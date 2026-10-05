@@ -102,6 +102,6 @@ def test_parallel_stage_restart_reuses_verified_chunks(tmp_path):
         run_id="restart-stage-2",
     )
     assert sorted(resumed_calls) == ["C", "D"]
-    assert reopened.get("pipeline.chunk:restart-stage:A")["status"] == "SUCCESS"
-    assert reopened.get("pipeline.chunk:restart-stage:B")["status"] == "SUCCESS"
+    assert reopened.get("pipeline.chunk:restart-stage:stage-1:A")["status"] == "SUCCESS"
+    assert reopened.get("pipeline.chunk:restart-stage:stage-1:B")["status"] == "SUCCESS"
     reopened.close()
