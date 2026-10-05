@@ -135,7 +135,7 @@ class Supervisor:
                 stop_heartbeat.set()
                 heartbeat_thread.join(timeout=max(1.0, interval * 2))
 
-            if lease_lost.is_set():
+            if lease_lost.is_set() or not self.lease.is_owned(task_id, self.owner):
                 error = "execution lease lost"
                 self.state.set(
                     f"supervisor:{task_id}",
