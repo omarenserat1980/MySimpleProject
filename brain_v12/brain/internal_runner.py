@@ -71,9 +71,13 @@ class InternalRunner:
             raise RuntimeError(f"INTERNAL_RUNNER_MISSING_CAPABILITY:{capability}")
 
     def run(self, argv: Sequence[str], *, cwd: str | Path | None = None,
-            timeout: int = 3600) -> dict:
+            timeout: int = 3600, capability: str = "brain-internal-execution") -> dict:
         if not argv:
             raise ValueError("EMPTY_COMMAND")
+        # Direct runner callers must pass the same fail-closed preflight as the
+        # canonical BrainExecutionGateway. The gateway remains the production
+        # policy owner; this prevents the CLI/direct path from bypassing it.
+        self.require(capability)
         started = time.time()
         completed = subprocess.run(
             list(argv),
