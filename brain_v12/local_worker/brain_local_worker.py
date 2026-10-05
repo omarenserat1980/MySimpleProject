@@ -74,6 +74,11 @@ def execute(task: str, params: dict):
             "stdout": p.stdout[-12000:],
             "stderr": p.stderr[-12000:],
         }
+    if task == "brain_base_expansion_integrity":
+        root = Path(__file__).resolve().parents[2]
+        script = root / "tools" / "base_expansion_integrity.py"
+        p = subprocess.run([sys.executable, str(script)], cwd=str(root), capture_output=True, text=True, timeout=60*60)
+        return {"provider": "brain-local-worker", "verified": p.returncode == 0, "status": "VERIFIED" if p.returncode == 0 else "FAILED", "returncode": p.returncode, "stdout": p.stdout[-20000:], "stderr": p.stderr[-12000:]}
     if task == "brain_local_verification":
         script = Path(__file__).resolve().parents[2] / "tools" / "verify_brain_local.py"
         p = subprocess.run([sys.executable, str(script)], cwd=str(Path(__file__).resolve().parents[2]),
