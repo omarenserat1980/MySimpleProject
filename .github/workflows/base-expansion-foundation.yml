@@ -1,0 +1,58 @@
+name: Base Expansion V2 Foundation Gate
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+      - main
+  pull_request:
+    paths:
+      - "platform_foundation/**"
+      - "tests/test_platform_foundation.py"
+      - ".github/workflows/base-expansion-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundation-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run foundation tests
+        run: python -m pytest -q tests/test_platform_foundation.py
+
+      - name: Enforce Brain-independent foundation
+        run: |
+          if grep -R -nE '(^|[[:space:]])(from|import)[[:space:]]+brain_v12' platform_foundation; then
+            echo "Foundation import boundary violated"
+            exit 1
+          fi
+
+      - name: Foundation gate evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              "status": "PASS",
+              "gate": "BASE_EXPANSION_FOUNDATION",
+              "foundation_import_boundary": "PASS",
+              "tests": "PASS",
+          }
+          Path("foundation_gate.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+          print(json.dumps(evidence, indent=2))
+          PY
+
+      - name: Upload gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-foundation-evidence
+          path: foundation_gate.json
