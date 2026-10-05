@@ -27,10 +27,31 @@ permissions:
 
 jobs:
   real_windows_boot:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 70
     steps:
+    # This workflow is an evidence adapter for the Brain-owned runner.
+    # It intentionally fails closed if the runner did not advertise the Brain flag.
       - uses: actions/checkout@v4
+
+      - name: Verify Brain-owned runner
+        run: |
+          set -euo pipefail
+          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
+          test "${{ runner.os }}" = "Linux"
+          test "${{ runner.arch }}" = "X64"
+          for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy; do
+            command -v "$tool" >/dev/null || { echo "MISSING_INTERNAL_RUNNER_TOOL=$tool"; exit 2; }
+          done
+          python - <<'PY'
+          from brain_v12.brain.internal_runner import InternalRunner
+          import json
+          r=InternalRunner()
+          print(json.dumps(r.status(), indent=2, sort_keys=True))
+          r.require("windows-server-2025-real-boot")
+          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
+          PY
+
 
       - name: Install real VM tooling
         run: |
