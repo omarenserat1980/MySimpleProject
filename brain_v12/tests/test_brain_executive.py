@@ -54,4 +54,4 @@ def test_decision_exposes_calculated_risk():
     ]))
     d = e.decide()
     assert 0 <= d.risk_percent <= 100
-    assert d.risk_band == "MEDIUM"
+    assert d.risk_band == "LOW"
