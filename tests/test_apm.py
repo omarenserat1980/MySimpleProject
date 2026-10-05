@@ -85,3 +85,15 @@ def test_apm_record_request_and_summary(tmp_path):
     health = apm.health()
     assert health["requests"] == 2.0
     assert health["errors"] == 1.0
+
+
+def test_apm_operation_records_success_failure_and_retries(tmp_path):
+    store = SQLiteStateStore(tmp_path / "apm.db")
+    now = [10.0]
+    apm = APM(store, clock=lambda: now[0])
+    with apm.operation("build", task_id="t1") as state:
+        state["retries"] = 2
+        now[0] = 10.05
+    with apm.operation("verify", task_id="t1"):
+        now[0] = 10.08
+        raise RuntimeError("boom")
