@@ -1,4 +1,4 @@
-name: Brain Parallel Stage Pipeline
+name: APM BUILD - Parallel Stage Pipeline
 on:
   push:
     paths:
@@ -23,13 +23,13 @@ jobs:
           python-version: "3.11"
       - name: Compile
         run: python -m compileall -q brain_v12/brain brain_v12/tests
-      - name: Contract
+      - name: APM BUILD Contract
         run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler -v
       - name: Evidence
         run: |
           mkdir -p brain-artifacts
-          printf '%s\n' "BRAIN_PARALLEL_STAGE_PIPELINE_VERIFIED" > brain-artifacts/PARALLEL_STAGE_PIPELINE_VERIFIED.txt
+          printf '%s\n' "APM_BUILD_VERIFIED" > brain-artifacts/APM_BUILD_VERIFIED.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: brain-parallel-stage-pipeline-verified
+          name: apm-build-verified
           path: brain-artifacts/PARALLEL_STAGE_PIPELINE_VERIFIED.txt
