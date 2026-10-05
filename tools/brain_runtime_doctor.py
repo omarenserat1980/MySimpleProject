@@ -36,6 +36,8 @@ def main():
 
     gate = ROOT / "tools" / "brain_independent_gate.py"
     checks.append(check("independent_gate", gate.is_file(), str(gate)))
+    health = ROOT / "brain_v12" / "local_worker" / "local_health_gate.py"
+    checks.append(check("local_health_gate", health.is_file(), str(health)))
 
     passed = all(item["ok"] for item in checks)
     report = {
