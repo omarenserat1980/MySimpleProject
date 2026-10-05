@@ -9,6 +9,7 @@ from .parallel_chunks import ParallelChunkRunner, ChunkResult
 from .stage_orchestrator import StageOrchestrator, StageState
 from .brain_ci_executor import BrainCIExecutor
 from .open_source_gate import OpenSourceCandidate, OpenSourceGate
+from .brain_execution_authority import BrainExecutionAuthority
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,7 @@ class AutonomousPipeline:
         ci_executor: BrainCIExecutor | None = None,
         open_source_gate: OpenSourceGate | None = None,
         open_source_candidates: list[OpenSourceCandidate] | None = None,
+        execution_authority: BrainExecutionAuthority | None = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
@@ -51,6 +53,7 @@ class AutonomousPipeline:
         self.ci_executor = ci_executor
         self.open_source_gate = open_source_gate
         self.open_source_candidates = tuple(open_source_candidates or ())
+        self.execution_authority = execution_authority or BrainExecutionAuthority()
 
     def _save_run(self, run: PipelineRun) -> None:
         self.orchestrator.store.set(self.RUN_KEY, asdict(run))
@@ -224,8 +227,11 @@ class AutonomousPipeline:
                 "results": report["results"]}
 
     def execution_health(self) -> dict[str, Any]:
+        authority = self.execution_authority.readiness("ci")
+        if not authority["ready"]:
+            return {"healthy": False, "status": "BLOCKED", "reason": "brain_execution_authority_unavailable", "authority": authority}
         if self.ci_executor is None:
-            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_not_configured"}
+            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_not_configured", "authority": authority}
         readiness = self.ci_executor.readiness()
         health = self.ci_executor.health()
         if not readiness["ready"] or not health["healthy"]:
