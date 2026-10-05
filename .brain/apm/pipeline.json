@@ -1,0 +1,22 @@
+{
+  "schema_version": "apm-pipeline/v1",
+  "pipeline_id": "brain-apm-self-test",
+  "stages": [
+    {
+      "id": "01",
+      "name": "APM contract",
+      "run": {"command": ["python", "-m", "pytest", "-q", "tests/test_apm_engine.py"], "timeout_seconds": 900},
+      "verify": {"command": ["python", "-m", "pytest", "-q", "tests/test_apm_engine.py"], "timeout_seconds": 900},
+      "max_retries": 1
+    },
+    {
+      "id": "02",
+      "name": "APM evidence gate",
+      "dependencies": ["01"],
+      "run": {"command": ["python", "-m", "brain_v12.apm.cli", "verify", "--state-dir", ".brain/apm/state"], "timeout_seconds": 120},
+      "verify": {"command": ["python", "-m", "brain_v12.apm.cli", "verify", "--state-dir", ".brain/apm/state"], "timeout_seconds": 120},
+      "max_retries": 1
+    }
+  ],
+  "final_verify": {"command": ["python", "-m", "pytest", "-q", "tests/test_apm_engine.py"], "timeout_seconds": 900}
+}
