@@ -30,6 +30,21 @@ class WindowsCloudAgentTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["shell"], False)
         self.assertEqual(run.call_args.kwargs["check"], False)
 
+    def test_post_result_requires_and_forwards_lease(self):
+        captured = {}
+
+        def fake_post(url, payload, token):
+            captured.update({"url": url, "payload": payload, "token": token})
+            return {"ok": True}
+
+        with patch.object(agent, "_post", side_effect=fake_post):
+            result = agent._post_result(
+                "https://fabric", "node-1", "job-1", "token",
+                "SUCCESS", {"lease_id": "lease-1", "ok": True},
+            )
+        self.assertEqual(captured["payload"]["lease_id"], "lease-1")
+        self.assertEqual(result["ok"], True)
+
     def test_job_heartbeat_loop_sends_running_heartbeat(self):
         stop = agent.threading.Event()
         calls = []
