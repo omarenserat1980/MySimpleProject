@@ -43,7 +43,14 @@ def main():
         "network_dependency_for_gate": False,
     }
     # This gate proves local execution/recovery, not unrestricted autonomy.
-    proof_allowed = all(checks.values())
+    # A network dependency of False is a required security property, not a failed check.
+    positive_checks = (
+        "base_expansion_integrity",
+        "real_worker_execution",
+        "authority_boundary_negative_tests",
+        "github_credentials_removed",
+    )
+    proof_allowed = all(checks[name] is True for name in positive_checks) and checks["network_dependency_for_gate"] is False
     report = {
         "schema": "brain.independence_proof.v1",
         "started_at": started,
