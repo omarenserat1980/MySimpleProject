@@ -177,14 +177,24 @@ def recover_expired_jobs(*, lease_timeout: float | None = None) -> list[str]:
             leased_at = float(job.get("leased_at", job.get("updated_at", 0)))
             if now - leased_at <= timeout:
                 continue
-            job["state"] = "RETRYING"
+            retries = int(job.get("lease_retries", 0))
+            max_retries = int(os.getenv("BRAIN_FABRIC_MAX_LEASE_RETRIES", "3"))
+            job["lease_retries"] = retries + 1
             job["updated_at"] = now
             job.setdefault("evidence", []).append({
                 "at": now,
                 "event": "LEASE_EXPIRED",
                 "previous_state": "RUNNING",
                 "lease_timeout": timeout,
+                "lease_retry": retries + 1,
             })
+            job["state"] = "FAILED" if retries + 1 > max_retries else "RETRYING"
+            if job["state"] == "FAILED":
+                job["evidence"].append({
+                    "at": now,
+                    "event": "LEASE_RETRY_LIMIT_EXCEEDED",
+                    "max_retries": max_retries,
+                })
             _atomic_write(path, job)
             recovered.append(str(job["job_id"]))
     return recovered
