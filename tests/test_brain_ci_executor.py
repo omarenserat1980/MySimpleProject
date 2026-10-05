@@ -50,3 +50,19 @@ def test_nonpersistent_brain_executor_blocks_without_fallback(tmp_path):
     assert result.status == "BLOCKED"
     assert result.executor_id is None
     assert "fallback forbidden" in (result.error or "")
+
+
+def test_direct_brain_entrypoint_never_uses_external_runner(tmp_path):
+    calls = []
+    def runner(command, root):
+        calls.append(command)
+        return 0, "pass", ""
+    executor = BrainCIExecutor(
+        SQLiteStateStore(tmp_path / "state.db"),
+        root=tmp_path,
+        runner=runner,
+    )
+    result = executor.run_profile("runner_policy", commit_sha="brain-local")
+    assert result.status == "VERIFIED"
+    assert result.executor_id == "brain-local-ci" or result.executor_id == "brain-ci-01"
+    assert calls
