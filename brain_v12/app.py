@@ -1230,13 +1230,36 @@ def freelance_payment_verified(body:dict):
 def workforce_health():
     return workforce.health()
 
+def _cloud_worker_attestation() -> dict:
+    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
+    heartbeat = root / "cloud-worker-heartbeat.json"
+    if not heartbeat.exists():
+        return {"state": "NOT_RUNNING", "verified": False, "reason": "HEARTBEAT_MISSING"}
+    try:
+        payload = json.loads(heartbeat.read_text(encoding="utf-8"))
+        age = max(0.0, __import__("time").time() - float(payload.get("timestamp", 0)))
+        ttl = max(5, int(os.getenv("BRAIN_WORKER_HEARTBEAT_TTL_SECONDS", "15")))
+        verified = payload.get("service") == "brain-cloud-runtime" and payload.get("state") == "RUNNING" and age <= ttl
+        return {
+            "state": "RUNNING" if verified else "STALE",
+            "verified": verified,
+            "age_seconds": round(age, 3),
+            "ttl_seconds": ttl,
+            "heartbeat": payload,
+        }
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return {"state": "NOT_RUNNING", "verified": False, "reason": f"HEARTBEAT_INVALID:{str(exc)[:200]}"}
+
 @app.get("/health")
 def health():
+    worker = _cloud_worker_attestation()
     return {
         "ok": True,
         "status": "healthy",
+        "state": "RUNNING" if worker["verified"] else "NOT_RUNNING",
         "version": APP_VERSION,
         "runtime": "BRAIN_CLOUD_NATIVE",
+        "worker": worker,
         "deployment": _deployment_snapshot() if "_deployment_snapshot" in globals() else {"converged": False},
     }
 
