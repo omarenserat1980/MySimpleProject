@@ -122,7 +122,6 @@ def execute(task: str, params: dict):
         prompt = str(params.get("prompt", "")).strip()
         if not prompt:
             raise ValueError("prompt_required")
-        import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
         from brain_v12.brain.draw_gateway import draw_local
         result = draw_local(prompt)
