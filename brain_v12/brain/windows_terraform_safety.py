@@ -13,8 +13,8 @@ FORBIDDEN_TRACKED_NAMES = {
 FORBIDDEN_OPEN_NETWORKS = {"0.0.0.0/0", "::/0"}
 SENSITIVE_TFVARS_PATTERNS = ("*.tfvars", "*.tfvars.json", "*.auto.tfvars", "*.auto.tfvars.json")
 INLINE_SECRET_PATTERNS = (
-    re.compile(r"^\s*client_secret\s*=\s*["']"),
-    re.compile(r"^\s*admin_password\s*=\s*["']"),
+    re.compile(r"""^\s*client_secret\s*=\s*["']"""),
+    re.compile(r"""^\s*admin_password\s*=\s*["']"""),
 )
 
 
