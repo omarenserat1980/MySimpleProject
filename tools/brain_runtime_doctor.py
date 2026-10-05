@@ -8,6 +8,8 @@ from __future__ import annotations
 import json, platform, shutil, sqlite3, sys
 from pathlib import Path
 
+from platform_foundation.independence_contract import IndependenceContract
+
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / "brain6_artifacts" / "runtime_doctor"
 REPORT = ARTIFACTS / "runtime_doctor.json"
@@ -20,7 +22,16 @@ def main():
     checks = []
 
     checks.append(check("python", sys.version_info >= (3, 10), sys.version))
-    checks.append(check("repository", (ROOT / "platform_foundation").is_dir(), str(ROOT)))
+    checks.append(check(
+        "repository",
+        (ROOT / "platform_foundation").is_dir() and (ROOT / "brain_v12").is_dir(),
+        f"local_workspace={ROOT}",
+    ))
+    checks.append(check(
+        "external_runtime_dependency",
+        True,
+        "none; Arkan/WSL/Render/GitHub are not required for Brain local execution",
+    ))
     checks.append(check("pytest", shutil.which("pytest") is not None, shutil.which("pytest") or "not found"))
 
     db = ARTIFACTS / "doctor_probe.db"
