@@ -21,6 +21,8 @@ on:
       - 'tests/test_supervisor_heartbeat.py'
       - 'tests/test_supervisor_final_fencing.py'
       - 'tests/test_stale_task_recovery.py'
+      - 'tests/test_repair_policy.py'
+      - 'tests/test_repair_executor.py'
       - '.github/workflows/base-expansion-integrated-gate.yml'
 
 permissions:
@@ -53,7 +55,9 @@ jobs:
             tests/test_lease_ownership.py \
             tests/test_supervisor_heartbeat.py \
             tests/test_supervisor_final_fencing.py \
-            tests/test_stale_task_recovery.py
+            tests/test_stale_task_recovery.py \
+            tests/test_repair_policy.py \
+            tests/test_repair_executor.py
       - name: Write integrated evidence
         run: |
           python - <<'PY'
@@ -77,6 +81,8 @@ jobs:
               'persistent_irreversible_authority': 'PASS',
               'brain_bridge': 'PASS',
               'brain_bridge_authority_boundary': 'PASS',
+              'bounded_repair_policy': 'PASS',
+              'bounded_repair_execution': 'PASS',
           }
           Path('integrated_execution_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
           print(json.dumps(evidence, indent=2))
