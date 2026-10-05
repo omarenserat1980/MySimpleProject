@@ -5,6 +5,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 import json,os,subprocess,sys,tempfile
 from cloud.company_launch_readiness import classify
+from platform_foundation.independence_contract import IndependenceContract
 
 @dataclass
 class Gate:
@@ -15,7 +16,7 @@ class ReleaseGate:
   self.root=Path(root or os.getenv("BRAIN_STATE_DIR",".brain_state"))/"release_gate"; self.root.mkdir(parents=True,exist_ok=True)
 
  def run(self):
-  gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._quran_layer(),self._cinema_truth(),self._governance()]
+  gates=[self._compile(),self._pytest_feedback(),self._pytest_task_engine(),self._api_routes(),self._quran_layer(),self._cinema_truth(),self._governance(),self._independence_contract()]
   all_required=all(g.passed for g in gates if g.required)
   status="RELEASE_ALLOWED" if all_required else "RELEASE_BLOCKED"
   readiness=classify({"status":status}, None)
@@ -87,6 +88,13 @@ class ReleaseGate:
   if p.returncode: raise RuntimeError(p.stderr.strip() or "ffprobe failed")
   d=json.loads(p.stdout); streams=d.get("streams",[])
   return {"duration":float((d.get("format") or {}).get("duration") or 0),"video":any(x.get("codec_type")=="video" for x in streams),"audio":any(x.get("codec_type")=="audio" for x in streams),"width":next((x.get("width") for x in streams if x.get("codec_type")=="video"),0),"height":next((x.get("height") for x in streams if x.get("codec_type")=="video"),0)}
+
+ def _independence_contract(self):
+  try:
+   result=IndependenceContract().evaluate()
+   return Gate("independence_contract",True,result["allowed"],"runtime://independence_contract",json.dumps(result,ensure_ascii=False,sort_keys=True))
+  except Exception as e:
+   return Gate("independence_contract",True,False,"runtime://independence_contract",repr(e))
 
  def _governance(self):
   req=["COMMERCIAL_GOVERNANCE_SPEC.md","PAYMENT_POLICY.md","PUBLIC_IDENTITY_AND_LIMITED_LIABILITY_POLICY.md"]; missing=[x for x in req if not Path(x).exists()]
