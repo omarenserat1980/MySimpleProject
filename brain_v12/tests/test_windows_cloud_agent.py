@@ -30,6 +30,23 @@ class WindowsCloudAgentTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["shell"], False)
         self.assertEqual(run.call_args.kwargs["check"], False)
 
+    def test_job_heartbeat_loop_sends_running_heartbeat(self):
+        stop = agent.threading.Event()
+        calls = []
+
+        def fake_wait(_):
+            if not calls:
+                calls.append("wait")
+                return False
+            return True
+
+        with patch.object(stop, "wait", side_effect=fake_wait), patch.object(
+            agent, "heartbeat", side_effect=lambda **kwargs: calls.append(kwargs)
+        ):
+            agent._job_heartbeat_loop(stop, interval=30)
+
+        self.assertIn({"jobs_running": 1}, calls)
+
     def test_execute_job_uses_controller_timeout_field(self):
         completed = type("Completed", (), {
             "returncode": 0, "stdout": "ok", "stderr": ""
