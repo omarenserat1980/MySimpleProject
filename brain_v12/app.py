@@ -132,17 +132,32 @@ brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 def synthetic_customer_executor(request, customer_type, run_id):
-    cognitive_result = cognitive.run(request)
-    execution = cognitive_result.get("execution", {}) if isinstance(cognitive_result, dict) else {}
-    verification = cognitive_result.get("verification", {}) if isinstance(cognitive_result, dict) else {}
+    brain_result = problem_solver.solve(request)
+    execution = brain_result.get("execution", {}) if isinstance(brain_result, dict) else {}
+    verification = brain_result.get("verification", {}) if isinstance(brain_result, dict) else {}
     verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
-    return {"ok": verified, "verified": verified, "run_id": run_id, "customer_type": customer_type, "cognitive": cognitive_result}
+    return {"ok": verified, "verified": verified, "run_id": run_id, "customer_type": customer_type, "cognitive": brain_result}
+
+def synthetic_customer_repair_executor(request, result, customer_type, run_id):
+    gap = result.get("verification", {}) if isinstance(result, dict) else {}
+    repair_request = (
+        f"Repair the missing capability for synthetic customer request: {request}. "
+        f"Observed execution result: {gap}. "
+        "Inspect the available Brain capabilities and perform the safest bounded repair/test path."
+    )
+    repair_result = problem_solver.solve(repair_request)
+    execution = repair_result.get("execution", {}) if isinstance(repair_result, dict) else {}
+    verification = repair_result.get("verification", {}) if isinstance(repair_result, dict) else {}
+    verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
+    return {"ok": verified, "verified": verified, "repair": repair_result, "run_id": run_id}
 
 synthetic_customer=SyntheticCustomer(
     evidence_store=evidence_store,
     chatgpt_advisor=synthetic_customer_advisors[0],
     brain_advisor=synthetic_customer_advisors[1],
     executor=synthetic_customer_executor,
+    repair_executor=synthetic_customer_repair_executor,
+    max_repair_attempts=int(os.getenv("BRAIN_SYNTHETIC_MAX_REPAIR_ATTEMPTS", "1")),
 )
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
