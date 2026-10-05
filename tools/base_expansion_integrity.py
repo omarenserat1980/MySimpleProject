@@ -25,6 +25,8 @@ TESTS = [
     "tests/test_idempotency_and_concurrent_claim.py",
     "tests/test_authority_boundary_gate.py",
     "tests/test_independence_contract.py",
+        "tests/test_brain_autonomy_status.py",
+        "tests/test_brain_autonomy_gate.py",
 ]
 
 
