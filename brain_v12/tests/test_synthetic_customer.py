@@ -75,6 +75,25 @@ def test_customer_acceptance_and_delivery_lifecycle():
     assert run.status == "DELIVERED"
 
 
+def test_customer_feedback_is_forwarded_to_brain_revision_path():
+    calls = []
+
+    def feedback(request, text, customer_type, run_id):
+        calls.append((request, text, customer_type, run_id))
+        return {"ok": True, "revision_planned": True}
+
+    c = SyntheticCustomer(feedback_executor=feedback)
+    run = c.start("TEST_CUSTOMER_MARKETING", "Create a test campaign.")
+    c.generate_proposals(run, {})
+    run.status = "VERIFIED"
+    c.review(run, accepted=False, feedback="The campaign needs a stronger conversion path.")
+    assert run.status == "REVISION_REQUESTED"
+    assert len(calls) == 1
+    c.revise(run, "Add a stronger conversion path.")
+    assert run.status == "WAITING_CUSTOMER_APPROVAL"
+    assert "Customer revision feedback" in run.request
+
+
 def test_customer_can_request_bounded_brain_repair_before_final_verification():
     calls = {"execute": 0, "repair": 0}
 
