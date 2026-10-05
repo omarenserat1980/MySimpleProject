@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from .persistent_state import SQLiteStateStore
 
@@ -53,14 +53,29 @@ class StageOrchestrator:
             revision = int(previous["revision"]) + 1
             status = "COMPLETE" if stage == self.TOTAL_STAGES else "READY"
             return True, {
-                "stage": stage,
-                "step": step,
-                "status": status,
-                "revision": revision,
+                "stage": stage, "step": step,
+                "status": status, "revision": revision,
             }
 
         _, value = self.store.atomic_update(self.KEY, update, default={})
         return StageState(**value)
+
+    def run_next(
+        self,
+        *,
+        execute: Callable[[StageState], Any],
+        verify: Callable[[StageState, Any], bool],
+    ) -> StageState:
+        """Execute the current stage and advance only after independent verification."""
+        current = self.current()
+        result = execute(current)
+        if not verify(current, result):
+            raise RuntimeError("stage execution failed independent verification")
+        return self.advance(
+            stage=current.stage + 1 if current.stage < self.TOTAL_STAGES else current.stage,
+            step=1,
+            gate_passed=True,
+        )
 
 
 __all__ = ["StageOrchestrator", "StageState"]
