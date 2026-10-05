@@ -78,3 +78,43 @@ def test_fabric_api_rejects_bad_control_token(tmp_path, monkeypatch):
     client = TestClient(api_server.app)
     response = client.get("/v1/fabric", headers={"Authorization": "Bearer wrong-token"})
     assert response.status_code == 401
+
+
+def test_expired_job_lease_is_recovered_and_released_again(tmp_path, monkeypatch):
+    from cloud.brain_fabric import (
+        register_node, create_job, next_node_job, recover_expired_jobs, get_job
+    )
+
+    monkeypatch.setenv("BRAIN_FABRIC_STATE_DIR", str(tmp_path / "fabric"))
+    monkeypatch.setenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120")
+
+    register_node(
+        "win-node", provider="azure", architecture="x86_64",
+        capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    job = create_job(
+        "windows-command", {"argv": ["cmd.exe", "/c", "echo", "x"]},
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    leased = next_node_job(
+        "win-node",
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    assert leased["job_id"] == job["job_id"]
+
+    path = tmp_path / "fabric" / f"job-{job['job_id']}.json"
+    import json
+    item = json.loads(path.read_text(encoding="utf-8"))
+    item["leased_at"] = 0
+    path.write_text(json.dumps(item), encoding="utf-8")
+
+    recovered = recover_expired_jobs(lease_timeout=1)
+    assert recovered == [job["job_id"]]
+    assert get_job(job["job_id"])["state"] == "RETRYING"
+
+    leased_again = next_node_job(
+        "win-node",
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    assert leased_again["job_id"] == job["job_id"]
+    assert leased_again["state"] == "RUNNING"
