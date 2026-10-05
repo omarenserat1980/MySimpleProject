@@ -14,8 +14,16 @@ OUT = ROOT / "brain6_artifacts" / "independence_gate" / "brain_local_verificatio
 
 
 def run(path):
-    p = subprocess.run([sys.executable, str(path)], cwd=ROOT, text=True,
-                       capture_output=True)
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(ROOT) if not existing else f"{ROOT}{os.pathsep}{existing}"
+    p = subprocess.run(
+        [sys.executable, str(path)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+    )
     return {
         "script": str(path.relative_to(ROOT)),
         "returncode": p.returncode,
