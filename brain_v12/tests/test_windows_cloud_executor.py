@@ -56,3 +56,39 @@ def test_windows_cloud_executor_reports_unconfigured_without_provider():
     assert result["ready"] is False
     assert result["status"] == "NOT_CONFIGURED"
     assert result["reason"] == "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED"
+
+
+def test_windows_cloud_executor_requires_fresh_guest_heartbeat_for_runtime():
+    now = 2_000.0
+    vm = CloudWindowsVM("test-vm-01", "test-cloud", "test-region", "RUNNING")
+    node = {
+        "node_id": "test-vm-01",
+        "provider": "test-cloud",
+        "state": "RUNNING",
+        "architecture": "x86_64",
+        "last_heartbeat": now - 10,
+        "capabilities": ["windows-server-2025", "windows-cloud", "brain-heartbeat"],
+    }
+    result = WindowsCloudExecutor(FakeProvider()).verify_runtime(
+        vm, node, heartbeat_timeout=120, now=now
+    )
+    assert result["runtime_verified"] is True
+    assert result["status"] == "WINDOWS_CLOUD_RUNTIME_VERIFIED"
+
+
+def test_windows_cloud_executor_rejects_stale_guest_heartbeat():
+    now = 2_000.0
+    vm = CloudWindowsVM("test-vm-01", "test-cloud", "test-region", "RUNNING")
+    node = {
+        "node_id": "test-vm-01",
+        "provider": "test-cloud",
+        "state": "RUNNING",
+        "architecture": "x86_64",
+        "last_heartbeat": now - 121,
+        "capabilities": ["windows-server-2025", "windows-cloud", "brain-heartbeat"],
+    }
+    result = WindowsCloudExecutor(FakeProvider()).verify_runtime(
+        vm, node, heartbeat_timeout=120, now=now
+    )
+    assert result["runtime_verified"] is False
+    assert result["reason"] == "WINDOWS_CLOUD_HEARTBEAT_STALE"
