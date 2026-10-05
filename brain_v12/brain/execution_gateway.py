@@ -60,6 +60,42 @@ class BrainExecutionGateway:
             reason="WINDOWS_CLOUD_RUNTIME_VERIFIED",
         )
 
+    def authorize_task(
+        self,
+        capability: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> ExecutionDecision:
+        """Authorize a task using its explicit runtime contract.
+
+        Windows real-boot tasks must carry a verified Windows Cloud VM/node
+        contract. They are never silently executed by the local runner.
+        """
+        metadata = metadata or {}
+        if capability == WINDOWS_REAL_BOOT:
+            executor_type = str(metadata.get("executor", "")).strip().lower()
+            if executor_type != WINDOWS_CLOUD:
+                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_EXPLICIT_WINDOWS_CLOUD")
+            vm_data = metadata.get("vm")
+            node = metadata.get("node")
+            if not isinstance(vm_data, dict) or not isinstance(node, dict):
+                raise RuntimeError("WINDOWS_CLOUD_RUNTIME_EVIDENCE_REQUIRED")
+            vm = CloudWindowsVM(
+                vm_id=str(vm_data.get("vm_id", "")),
+                provider=str(vm_data.get("provider", "")),
+                region=str(vm_data.get("region", "")),
+                state=str(vm_data.get("state", "")),
+                os=str(vm_data.get("os", "Windows Server 2025")),
+                architecture=str(vm_data.get("architecture", "x86_64")),
+                metadata=vm_data.get("metadata", {}),
+            )
+            return self.authorize_windows_cloud(
+                vm,
+                node,
+                heartbeat_timeout=float(metadata.get("heartbeat_timeout", 120.0)),
+                now=metadata.get("now"),
+            )
+        return self.authorize(capability)
+
     def authorize(self, capability: str) -> ExecutionDecision:
         # Production execution is Brain-owned. External executors are not
         # considered candidates for runtime work.
