@@ -16,7 +16,7 @@ jobs:
       - name: Compile Synthetic Customer stack
         run: python -m compileall -q brain_v12/app.py brain_v12/brain/synthetic_customer.py brain_v12/brain/synthetic_customer_suite.py brain_v12/synthetic_customer_api.py
       - name: Run Synthetic Customer unit tests
-        run: python -m pytest -q brain_v12/tests/test_synthetic_customer.py
+        run: python -m pytest -q brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
       - name: Run real FastAPI wiring smoke test
         run: |
           python - <<'PY'
