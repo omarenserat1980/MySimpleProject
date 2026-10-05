@@ -27,7 +27,7 @@ class StageOrchestrator:
 
     def current(self) -> StageState:
         value = self.store.get(self.KEY) or {
-            "stage": 1, "step": 1, "status": "PENDING", "revision": 0,
+            "stage": 1, "step": 1, "status": "READY", "revision": 0,
             "attempts": 0, "last_error": None,
         }
         return StageState(**value)
@@ -42,7 +42,7 @@ class StageOrchestrator:
 
         def update(current: Any) -> tuple[bool, dict[str, Any]]:
             previous = current or {
-                "stage": 1, "step": 1, "status": "PENDING", "revision": 0,
+                "stage": 1, "step": 1, "status": "READY", "revision": 0,
                 "attempts": 0, "last_error": None,
             }
             previous_stage = int(previous["stage"])
