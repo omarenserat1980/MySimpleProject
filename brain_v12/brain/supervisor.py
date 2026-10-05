@@ -2,6 +2,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from .execution_gateway import BrainExecutionGateway
+
 @dataclass
 class SupervisorPolicy:
     max_retries: int = 2
@@ -10,10 +12,11 @@ class SupervisorPolicy:
 
 class BrainSupervisor:
     """Coordinates inspect -> execute -> verify -> repair -> retry without device affinity."""
-    def __init__(self, store, device_bridge, policy=None):
+    def __init__(self, store, device_bridge, policy=None, execution_gateway=None):
         self.store=store
         self.device_bridge=device_bridge
         self.policy=policy or SupervisorPolicy()
+        self.execution_gateway=execution_gateway or BrainExecutionGateway()
 
     def inspect(self):
         status=self.device_bridge.status()
@@ -30,12 +33,19 @@ class BrainSupervisor:
                 "required_capabilities":sorted(required)}
 
     def submit(self, task, params=None, required_capabilities=None):
+        try:
+            authority=self.execution_gateway.authorize("brain-internal-execution")
+        except Exception as exc:
+            self.store.event("BRAIN_SUPERVISOR_SUBMIT_BLOCKED", {"task": task, "error": str(exc)})
+            return {"ok": False, "status": "BLOCKED_NO_INTERNAL_EXECUTOR", "error": str(exc)}
         choice=self.choose_executor(required_capabilities)
         result=self.device_bridge.enqueue(task, params or {})
         self.store.event("BRAIN_SUPERVISOR_SUBMIT",{
             "task":task,"task_id":result.get("task",{}).get("task_id"),
             "required_capabilities":required_capabilities or [],
-            "executor_selected":choice.get("executor",{}).get("agent_id") if choice.get("executor") else None})
+            "executor_selected":choice.get("executor",{}).get("agent_id") if choice.get("executor") else None,
+            "execution_authority": authority.executor,
+            "execution_authority_verified": authority.verified})
         return result
 
     def verify(self, task_id):
