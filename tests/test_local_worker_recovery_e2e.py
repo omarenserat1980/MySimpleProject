@@ -67,3 +67,39 @@ def test_recovered_job_executes_after_restart(tmp_path, monkeypatch):
     finally:
         worker.ROOT = old_root
         worker.QUEUED, worker.RUNNING, worker.COMPLETED, worker.FAILED = old_dirs
+
+
+def test_base_expansion_integrity_executes_as_brain_worker_task(tmp_path, monkeypatch):
+    root = tmp_path / "worker"
+    monkeypatch.setenv("BRAIN_LOCAL_WORKER_ROOT", str(root))
+    old_root = worker.ROOT
+    old_dirs = (worker.QUEUED, worker.RUNNING, worker.COMPLETED, worker.FAILED)
+    try:
+        worker.ROOT = root
+        worker.QUEUED, worker.RUNNING, worker.COMPLETED, worker.FAILED = (
+            root / x for x in ("queued", "running", "completed", "failed")
+        )
+        worker.setup()
+
+        job = worker.QUEUED / "base-expansion-integrity.json"
+        job.write_text(json.dumps({
+            "job_id": "base-expansion-integrity",
+            "task": "brain_base_expansion_integrity",
+            "params": {},
+        }), encoding="utf-8")
+
+        worker.process(job)
+
+        result = json.loads(
+            (worker.COMPLETED / "base-expansion-integrity.json").read_text(encoding="utf-8")
+        )
+        assert result["status"] == "VERIFIED"
+        assert result["worker_id"] == worker.WORKER_ID
+        assert result["evidence"]["provider"] == "brain-local-worker"
+        assert result["evidence"]["status"] in {"VERIFIED", "FAILED"}
+        assert "returncode" in result["evidence"]
+        assert (Path(__file__).resolve().parents[1] / "brain6_artifacts" /
+                "base_expansion" / "integrity_report.json").exists()
+    finally:
+        worker.ROOT = old_root
+        worker.QUEUED, worker.RUNNING, worker.COMPLETED, worker.FAILED = old_dirs
