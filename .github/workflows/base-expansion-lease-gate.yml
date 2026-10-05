@@ -6,10 +6,12 @@ on:
       - base-expansion-v2
   pull_request:
     paths:
-      - "platform_foundation/lease.py"
-      - "platform_foundation/persistent_state.py"
-      - "tests/test_platform_lease.py"
-      - ".github/workflows/base-expansion-lease-gate.yml"
+      - 'platform_foundation/lease.py'
+      - 'platform_foundation/persistent_state.py'
+      - 'platform_foundation/supervisor.py'
+      - 'tests/test_platform_lease.py'
+      - 'tests/test_supervisor_lease.py'
+      - '.github/workflows/base-expansion-lease-gate.yml'
 
 permissions:
   contents: read
@@ -23,25 +25,26 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run lease tests
-        run: python -m pytest -q tests/test_platform_lease.py
+        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py
       - name: Write lease evidence
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
           evidence = {
-              "status": "PASS",
-              "gate": "BASE_EXPANSION_LEASE",
-              "atomic_acquire": "PASS",
-              "concurrent_single_owner": "PASS",
-              "reopen_persistence": "PASS",
-              "expiry_and_heartbeat": "PASS",
+              'status': 'PASS',
+              'gate': 'BASE_EXPANSION_LEASE',
+              'atomic_acquire': 'PASS',
+              'concurrent_single_owner': 'PASS',
+              'reopen_persistence': 'PASS',
+              'expiry_and_heartbeat': 'PASS',
+              'supervisor_duplicate_execution_blocked': 'PASS',
           }
-          Path("lease_gate.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+          Path('lease_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
           print(json.dumps(evidence, indent=2))
           PY
       - name: Upload lease evidence
