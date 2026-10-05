@@ -56,6 +56,11 @@ jobs:
         run: |
           python -m pytest -q brain_v12/tests/test_windows_terraform_safety.py brain_v12/tests/test_terraform_plan_gate.py
 
+      - name: Verify no provisioning command is present
+        working-directory: .
+        run: |
+          ! grep -R -nE '(^|[[:space:]])terraform[[:space:]]+apply([[:space:]]|$)' .github/workflows/brain-windows-cloud-terraform-plan.yml
+
       - name: Verify plan must remain an explicit runtime action
         run: |
           echo "CI validates Terraform structure only."
