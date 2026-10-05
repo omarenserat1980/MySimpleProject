@@ -1,5 +1,6 @@
 name: Brain Cloudflare Deploy
 # Evidence gate: cinema checkout + protected R2 stream
+# Production trigger: keep Cloudflare deployment on the same main-branch gate as its source/tests.
 
 on:
   push:
