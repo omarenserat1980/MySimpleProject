@@ -12,6 +12,7 @@ class Capability:
     executor_id: str
     required_capabilities: frozenset[str] = frozenset()
     enabled: bool = True
+    contract: str = "v1"
 
 class CapabilityRegistry:
     """Brain-owned registry for executable capabilities and their authority boundary."""
@@ -38,15 +39,17 @@ class CapabilityRegistry:
     def list(self) -> list[Capability]:
         return list(self._items.values())
 
-    def readiness(self, name: str) -> dict[str, Any]:
+    def readiness(self, name: str, *, expected_contract: str = "v1") -> dict[str, Any]:
         item = self.get(name)
         if item is None:
             return {"ready": False, "reason": "unknown_capability"}
-        return {
-            "ready": item.enabled and name in self._handlers,
-            "capability": asdict(item),
-            "reason": "enabled" if item.enabled else "disabled",
-        }
+        if not item.enabled:
+            return {"ready": False, "capability": asdict(item), "reason": "disabled"}
+        if item.contract != expected_contract:
+            return {"ready": False, "capability": asdict(item), "reason": "contract_mismatch"}
+        if name not in self._handlers:
+            return {"ready": False, "capability": asdict(item), "reason": "handler_missing"}
+        return {"ready": True, "capability": asdict(item), "reason": "ready"}
 
     def authorize_executor(self, name: str, executors: list[ExecutorDescriptor]) -> dict[str, Any]:
         item = self.get(name)
