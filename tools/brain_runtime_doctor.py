@@ -39,6 +39,9 @@ def main():
     health = ROOT / "brain_v12" / "local_worker" / "local_health_gate.py"
     checks.append(check("local_health_gate", health.is_file(), str(health)))
 
+    contract = IndependenceContract().evaluate()
+    checks.append(check("independence_contract", contract["allowed"], contract))
+
     passed = all(item["ok"] for item in checks)
     report = {
         "schema": "brain.runtime_doctor.v1",
