@@ -1,0 +1,40 @@
+name: Brain Base Expansion Integrity
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "platform_foundation/**"
+      - "brain_v12/brain/**"
+      - "brain_v12/local_worker/**"
+      - "tools/base_expansion_integrity.py"
+      - "tools/phase_*_gate.py"
+      - "tests/test_*.py"
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -U pip pytest
+
+      - name: Run Base Expansion Integrity
+        run: python tools/base_expansion_integrity.py
+
+      - name: Upload integrity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-base-expansion-integrity
+          path: brain6_artifacts/base_expansion/integrity_report.json
+          if-no-files-found: error
