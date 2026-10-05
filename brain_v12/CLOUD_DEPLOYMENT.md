@@ -37,12 +37,13 @@ upload when available.
 Deployment is not considered verified until all are true:
 
 1. API health returns 200.
-2. Cloud runtime worker is running.
-3. Internal runner preflight passes.
-4. A durable task survives worker restart.
-5. A task executes and produces evidence.
-6. Recovery replays pending work correctly.
-7. GitHub-hosted execution is not involved.
-8. The authority gate blocks an unverified runner.
+2. `/health` reports `state=RUNNING` from a fresh `brain-cloud-runtime` heartbeat; environment flags alone are not accepted as proof.
+3. Cloud runtime worker is running.
+4. Internal runner preflight passes.
+5. A durable task survives worker restart.
+6. A task executes and produces evidence.
+7. Recovery replays pending work correctly.
+8. GitHub-hosted execution is not involved.
+9. The authority gate blocks an unverified runner.
 
 Only then can the autonomy certification be evaluated.
