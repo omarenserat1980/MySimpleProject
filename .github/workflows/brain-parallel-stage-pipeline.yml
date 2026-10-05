@@ -3,7 +3,9 @@ on:
   push:
     paths:
       - "brain_v12/brain/parallel_stage_scheduler.py"
+      - "brain_v12/brain/apm_build.py"
       - "brain_v12/tests/test_parallel_stage_scheduler.py"
+      - "brain_v12/tests/test_apm_build.py"
       - ".github/workflows/brain-parallel-stage-pipeline.yml"
   pull_request:
     paths:
@@ -24,7 +26,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q brain_v12/brain brain_v12/tests
       - name: APM BUILD Contract
-        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler -v
+        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build -v
       - name: Evidence
         run: |
           mkdir -p brain-artifacts
