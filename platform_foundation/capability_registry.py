@@ -2,6 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any, Callable
 
+from .execution_policy import BrainExecutionPolicy, ExecutorDescriptor, ExecutorDecision
+
 @dataclass(frozen=True)
 class Capability:
     name: str
@@ -13,9 +15,10 @@ class Capability:
 
 class CapabilityRegistry:
     """Brain-owned registry for executable capabilities and their authority boundary."""
-    def __init__(self):
+    def __init__(self, policy: BrainExecutionPolicy | None = None):
         self._items: dict[str, Capability] = {}
         self._handlers: dict[str, Callable[..., Any]] = {}
+        self.policy = policy or BrainExecutionPolicy()
 
     def register(self, capability: Capability, handler: Callable[..., Any]) -> None:
         if not capability.name or not capability.owner or not capability.executor_id:
@@ -45,12 +48,23 @@ class CapabilityRegistry:
             "reason": "enabled" if item.enabled else "disabled",
         }
 
-    def invoke(self, name: str, **kwargs: Any) -> Any:
+    def authorize_executor(self, name: str, executors: list[ExecutorDescriptor]) -> dict[str, Any]:
+        item = self.get(name)
+        if item is None:
+            return {"allowed": False, "reason": "unknown_capability"}
+        decision = self.policy.select([e for e in executors if e.executor_id == item.executor_id], required_capabilities=set(item.required_capabilities))
+        return {"allowed": decision.decision is ExecutorDecision.ALLOWED, "executor_id": decision.executor_id, "reason": decision.reason}
+
+    def invoke(self, name: str, *, executors: list[ExecutorDescriptor] | None = None, **kwargs: Any) -> Any:
         item = self.get(name)
         if item is None:
             raise ValueError(f"unknown_capability:{name}")
         if not item.enabled:
             raise PermissionError(f"capability_disabled:{name}")
+        if executors is not None:
+            authorization = self.authorize_executor(name, executors)
+            if not authorization["allowed"]:
+                raise PermissionError(f"executor_not_authorized:{name}:{authorization['reason']}")
         return self._handlers[name](**kwargs)
 
 __all__ = ["Capability", "CapabilityRegistry"]
