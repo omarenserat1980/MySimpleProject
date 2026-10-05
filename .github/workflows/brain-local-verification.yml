@@ -1,0 +1,36 @@
+name: Brain Local Verification Contract
+
+on:
+  pull_request:
+    paths:
+      - 'tools/brain_runtime_doctor.py'
+      - 'tools/brain_independent_gate.py'
+      - 'tools/verify_brain_local.py'
+      - 'tests/test_executor_pool.py'
+      - '.github/workflows/brain-local-verification.yml'
+  push:
+    branches:
+      - brain-independent-executor-pool
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pytest
+      - name: Verify local contract
+        run: python tools/verify_brain_local.py
+      - name: Upload Brain local evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-local-verification-evidence
+          path: |
+            brain6_artifacts/independence_gate/brain_local_verification.json
+            brain6_artifacts/independence_gate/independence_gate.json
+            brain6_artifacts/runtime_doctor/runtime_doctor.json
