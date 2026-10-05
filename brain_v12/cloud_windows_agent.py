@@ -27,7 +27,7 @@ def _post(url: str, payload: dict, token: str) -> dict:
         return json.loads(response.read().decode())
 
 
-def heartbeat() -> dict:
+def heartbeat(*, jobs_running: int = 0) -> dict:
     origin = os.getenv("BRAIN_FABRIC_URL", "").rstrip("/")
     node_id = os.getenv("BRAIN_WINDOWS_NODE_ID", platform.node()).strip()
     token = os.getenv("BRAIN_ENROLLMENT_TOKEN", "").strip()
@@ -41,7 +41,7 @@ def heartbeat() -> dict:
     payload = {
         "enrollment_token": token,
         "state": "READY",
-        "jobs_running": 0,
+        "jobs_running": max(0, int(jobs_running)),
         "architecture": "x86_64" if platform.machine().lower() in {"amd64", "x86_64"} else platform.machine(),
         "capabilities": [
             "windows-server-2025",
@@ -104,6 +104,21 @@ def execute_job(job: dict) -> dict:
     }
 
 
+def _job_heartbeat_loop(stop: threading.Event, interval: float = 30.0) -> None:
+    while not stop.wait(max(5.0, min(interval, 60.0))):
+        try:
+            heartbeat(jobs_running=1)
+        except Exception as exc:
+            print(
+                json.dumps(
+                    {"ok": False, "status": "JOB_HEARTBEAT_RETRY",
+                     "error": f"{type(exc).__name__}:{exc}"},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+
+
 def poll_once() -> dict:
     origin = os.getenv("BRAIN_FABRIC_URL", "").rstrip("/")
     node_id = os.getenv("BRAIN_WINDOWS_NODE_ID", platform.node()).strip()
@@ -117,7 +132,13 @@ def poll_once() -> dict:
     job = job_response.get("job")
     if not job:
         return {"ok": True, "status": "IDLE"}
+    stop_heartbeat = threading.Event()
+    worker = threading.Thread(
+        target=_job_heartbeat_loop, args=(stop_heartbeat,), daemon=True
+    )
+    worker.start()
     try:
+        heartbeat(jobs_running=1)
         evidence = execute_job(job)
         state = "SUCCESS" if evidence["exit_code"] == 0 else "FAILED"
     except subprocess.TimeoutExpired as exc:
@@ -134,6 +155,12 @@ def poll_once() -> dict:
             "executor": "windows-server-2025-cloud-agent",
         }
         state = "FAILED"
+    finally:
+        stop_heartbeat.set()
+        try:
+            heartbeat(jobs_running=0)
+        except Exception:
+            pass
     result = _post_result(origin, node_id, job["job_id"], token, state, evidence)
     return {"ok": True, "status": "JOB_COMPLETED", "job_id": job["job_id"], "state": state, "result": result}
 
