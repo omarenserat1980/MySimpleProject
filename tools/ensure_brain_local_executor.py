@@ -3,7 +3,7 @@
 
 This launcher is a repair utility only. It never changes the autonomy result.
 It starts the supervisor when needed, then waits for a fresh heartbeat. If the
-worker cannot start, it returns the supervisor log as failure evidence.
+worker cannot start, it returns the guardian log as failure evidence.
 """
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GUARDIAN = ROOT / "brain_v12" / "local_worker" / "brain_local_guardian.py"
 ARTIFACTS = ROOT / "brain6_artifacts" / "local_worker"
-PID_FILE = ARTIFACTS / "supervisor.pid"
-LOG_FILE = ARTIFACTS / "supervisor.log"
+PID_FILE = ARTIFACTS / "guardian.pid"
+LOG_FILE = ARTIFACTS / "guardian.log"
 STATE_FILE = ARTIFACTS / "launcher.json"
 HEARTBEAT = ARTIFACTS / "heartbeat.json"
 WAIT_SECONDS = max(5.0, float(os.environ.get("BRAIN_EXECUTOR_STARTUP_WAIT_SECONDS", "15")))
@@ -130,7 +130,7 @@ def main() -> int:
             result = {
                 "schema": "brain.local_executor_launcher.v3",
                 "status": "READY",
-                "supervisor_pid": existing,
+                "guardian_pid": existing,
                 "started_by_launcher": started,
                 "heartbeat": str(HEARTBEAT),
             }
@@ -143,7 +143,7 @@ def main() -> int:
         "schema": "brain.local_executor_launcher.v3",
         "status": "FAILED",
         "reason": "fresh_heartbeat_not_observed",
-        "supervisor_pid": existing,
+        "guardian_pid": existing,
         "started_by_launcher": started,
         "heartbeat": str(HEARTBEAT),
         "log_tail": log_tail(),
