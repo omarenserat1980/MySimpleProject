@@ -143,7 +143,8 @@ class SyntheticCustomer:
         return bool(result.get("verified") is True)
 
     def execute(self, run: TestRun, environment: str = "TEST", payment_mode: str = "NONE") -> TestRun:
-        if not run.approved: raise ValueError("CUSTOMER_APPROVAL_REQUIRED")
+        if not run.approved:
+            raise ValueError("CUSTOMER_APPROVAL_REQUIRED")
         gate = self.safety_gate(environment, payment_mode)
         if not gate["allowed"]:
             run.status, run.execution = "PAYMENT_SAFETY_GATE_BLOCKED", {"ok": False, "gate": gate}
@@ -154,20 +155,36 @@ class SyntheticCustomer:
             run.status, run.execution = "EXECUTION_UNAVAILABLE", {"ok": False, "status": "EXECUTION_UNAVAILABLE", "gate": gate}
             return run
         run.status = "EXECUTING"
+        attempts = []
         try:
-            result = self.executor(run.request, run.customer_type, run.run_id)
-            ok = self._execution_verified(result)
-            run.execution = {"ok": ok, "gate": gate, "result": result}
-            if ok and self.evidence_store:
-                evidence = self.evidence_store.append(run.run_id, "synthetic-customer-execution", run.execution, "synthetic-customer")
-                verification = self.evidence_store.verify_hash(evidence["evidence_id"])
-                run.execution.update({"evidence_id": evidence["evidence_id"], "evidence_sha256": evidence["sha256"], "evidence_verified": verification["ok"]})
-                ok = ok and verification["ok"]
-            run.status = "VERIFIED" if ok else "EXECUTION_FAILED"
+            for attempt in range(self.max_repair_attempts + 1):
+                result = self.executor(run.request, run.customer_type, run.run_id)
+                ok = self._execution_verified(result)
+                attempts.append({"attempt": attempt + 1, "verified": ok, "result": result})
+                if ok:
+                    run.execution = {"ok": True, "gate": gate, "result": result, "attempts": attempts}
+                    if self.evidence_store:
+                        evidence = self.evidence_store.append(run.run_id, "synthetic-customer-execution", run.execution, "synthetic-customer")
+                        verification = self.evidence_store.verify_hash(evidence["evidence_id"])
+                        run.execution.update({"evidence_id": evidence["evidence_id"], "evidence_sha256": evidence["sha256"], "evidence_verified": verification["ok"]})
+                        ok = verification["ok"]
+                    run.status = "VERIFIED" if ok else "EXECUTION_FAILED"
+                    break
+                if attempt >= self.max_repair_attempts or not self.repair_executor:
+                    run.execution = {"ok": False, "gate": gate, "result": result, "attempts": attempts}
+                    run.status = "EXECUTION_FAILED"
+                    break
+                gap = self.repair_executor(run.request, result, run.customer_type, run.run_id)
+                run.evidence = run.evidence or []
+                run.evidence.append({"event": "BRAIN_GAP_REPAIR_ATTEMPT", "attempt": attempt + 1, "gap": gap, "at": datetime.now(timezone.utc).isoformat()})
+                if not isinstance(gap, dict) or gap.get("ok") is not True:
+                    run.execution = {"ok": False, "gate": gate, "result": result, "repair": gap, "attempts": attempts}
+                    run.status = "EXECUTION_FAILED"
+                    break
             run.evidence = run.evidence or []
-            run.evidence.append({"event": "EXECUTION_VERIFIED" if ok else "EXECUTION_FAILED", "at": datetime.now(timezone.utc).isoformat(), "result": result})
+            run.evidence.append({"event": "EXECUTION_VERIFIED" if run.status == "VERIFIED" else "EXECUTION_FAILED", "at": datetime.now(timezone.utc).isoformat(), "result": run.execution})
         except Exception as exc:
-            run.status, run.execution = "EXECUTION_FAILED", {"ok": False, "gate": gate, "error": str(exc)[:1000]}
+            run.status, run.execution = "EXECUTION_FAILED", {"ok": False, "gate": gate, "error": str(exc)[:1000], "attempts": attempts}
             run.evidence = run.evidence or []
             run.evidence.append({"event": "EXECUTION_FAILED", "error": str(exc)[:1000]})
         return run
