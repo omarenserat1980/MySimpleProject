@@ -203,10 +203,12 @@ class AutonomousPipeline:
     def execution_health(self) -> dict[str, Any]:
         if self.ci_executor is None:
             return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_not_configured"}
+        readiness = self.ci_executor.readiness()
         health = self.ci_executor.health()
-        if not health["healthy"]:
-            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_unavailable", "executor": health}
-        return {"healthy": True, "status": "READY", "executor": health}
+        if not readiness["ready"] or not health["healthy"]:
+            return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_unavailable",
+                    "readiness": readiness, "executor": health}
+        return {"healthy": True, "status": "READY", "readiness": readiness, "executor": health}
 
     def health(self) -> dict[str, Any]:
         state = self.orchestrator.current()
