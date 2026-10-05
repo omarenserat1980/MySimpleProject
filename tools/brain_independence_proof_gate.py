@@ -32,9 +32,11 @@ def main():
     started = datetime.now(timezone.utc).isoformat()
     integrity = run([sys.executable, "tools/base_expansion_integrity.py"])
     worker = run([sys.executable, "tools/brain_local_worker_selftest.py"])
+    authority = run([sys.executable, "-m", "pytest", "-q", "tests/test_authority_boundary_gate.py"])
     checks = {
         "base_expansion_integrity": integrity["passed"],
         "real_worker_execution": worker["passed"],
+        "authority_boundary_negative_tests": authority["passed"],
         "github_credentials_removed": True,
         "network_dependency_for_gate": False,
     }
@@ -52,16 +54,17 @@ def main():
             "restart_recovery": worker["passed"],
             "base_integrity": integrity["passed"],
             "external_github_required": False,
-            "authority_boundary": "NOT_FULLY_PROVEN_BY_THIS_GATE",
+            "authority_boundary": authority["passed"],
         },
         "checks": checks,
         "evidence": {
             "integrity": integrity,
             "worker_selftest": worker,
+            "authority_boundary": authority,
         },
         "limitations": [
             "This gate does not prove unrestricted autonomy.",
-            "Authority boundaries require separate negative tests.",
+            "Authority proof is limited to the explicit negative/positive cases covered by tests/test_authority_boundary_gate.py.",
             "External integrations remain optional capabilities, not runtime requirements.",
         ],
     }
