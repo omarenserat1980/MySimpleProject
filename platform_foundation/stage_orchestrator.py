@@ -12,10 +12,12 @@ class StageState:
     step: int
     status: str
     revision: int
+    attempts: int = 0
+    last_error: str | None = None
 
 
 class StageOrchestrator:
-    """Durable, gate-driven, sequential progression for the 41-stage build."""
+    """Durable, gate-driven, sequential progression with resumable execution."""
 
     KEY = "brain.stage_orchestrator"
     TOTAL_STAGES = 41
@@ -25,7 +27,8 @@ class StageOrchestrator:
 
     def current(self) -> StageState:
         value = self.store.get(self.KEY) or {
-            "stage": 1, "step": 1, "status": "PENDING", "revision": 0
+            "stage": 1, "step": 1, "status": "PENDING", "revision": 0,
+            "attempts": 0, "last_error": None,
         }
         return StageState(**value)
 
@@ -39,7 +42,8 @@ class StageOrchestrator:
 
         def update(current: Any) -> tuple[bool, dict[str, Any]]:
             previous = current or {
-                "stage": 1, "step": 1, "status": "PENDING", "revision": 0
+                "stage": 1, "step": 1, "status": "PENDING", "revision": 0,
+                "attempts": 0, "last_error": None,
             }
             previous_stage = int(previous["stage"])
             previous_step = int(previous["step"])
@@ -49,12 +53,11 @@ class StageOrchestrator:
                 raise RuntimeError("stage skipping is forbidden")
             if stage == previous_stage and step < previous_step:
                 raise RuntimeError("step regression is forbidden")
-
             revision = int(previous["revision"]) + 1
             status = "COMPLETE" if stage == self.TOTAL_STAGES else "READY"
             return True, {
-                "stage": stage, "step": step,
-                "status": status, "revision": revision,
+                "stage": stage, "step": step, "status": status,
+                "revision": revision, "attempts": 0, "last_error": None,
             }
 
         _, value = self.store.atomic_update(self.KEY, update, default={})
@@ -65,17 +68,44 @@ class StageOrchestrator:
         *,
         execute: Callable[[StageState], Any],
         verify: Callable[[StageState, Any], bool],
+        max_attempts: int = 3,
     ) -> StageState:
-        """Execute the current stage and advance only after independent verification."""
+        """Execute, persist retry/failure state, verify, then advance durably."""
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be >= 1")
+
         current = self.current()
-        result = execute(current)
-        if not verify(current, result):
-            raise RuntimeError("stage execution failed independent verification")
-        return self.advance(
-            stage=current.stage + 1 if current.stage < self.TOTAL_STAGES else current.stage,
-            step=1,
-            gate_passed=True,
-        )
+        attempts = current.attempts
+        while attempts < max_attempts:
+            attempts += 1
+            self.store.set(self.KEY, {
+                "stage": current.stage, "step": current.step,
+                "status": "RUNNING", "revision": current.revision,
+                "attempts": attempts, "last_error": None,
+            })
+            try:
+                result = execute(current)
+                if not verify(current, result):
+                    raise RuntimeError("stage execution failed independent verification")
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                status = "RETRYING" if attempts < max_attempts else "FAILED"
+                self.store.set(self.KEY, {
+                    "stage": current.stage, "step": current.step,
+                    "status": status, "revision": current.revision,
+                    "attempts": attempts, "last_error": error,
+                })
+                if attempts < max_attempts:
+                    continue
+                raise RuntimeError(error) from exc
+
+            return self.advance(
+                stage=current.stage + 1 if current.stage < self.TOTAL_STAGES else current.stage,
+                step=1,
+                gate_passed=True,
+            )
+
+        raise RuntimeError("stage retry budget exhausted")
 
 
 __all__ = ["StageOrchestrator", "StageState"]
