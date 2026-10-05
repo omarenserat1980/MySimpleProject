@@ -5,9 +5,11 @@ import json, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCTOR = ROOT / "tools" / "brain_runtime_doctor.py"
+PROOF = ROOT / "tools" / "brain_independence_proof_gate.py"
 GATE = ROOT / "tools" / "brain_independent_gate.py"
+DOCTOR = ROOT / "tools" / "brain_runtime_doctor.py"
 OUT = ROOT / "brain6_artifacts" / "independence_gate" / "brain_local_verification.json"
+
 
 def run(path):
     p = subprocess.run([sys.executable, str(path)], cwd=ROOT, text=True,
@@ -20,24 +22,30 @@ def run(path):
         "status": "PASS" if p.returncode == 0 else "FAIL",
     }
 
+
 def main():
-    doctor = run(DOCTOR)
-    if doctor["returncode"] != 0:
+    # Proof must be established before the doctor consumes it.
+    proof = run(PROOF)
+    if proof["returncode"] != 0:
         result = {
-            "schema": "brain.local_verification.v1",
+            "schema": "brain.local_verification.v2",
             "status": "NOT_READY",
             "verified": False,
-            "doctor": doctor,
+            "proof": proof,
+            "doctor": None,
             "gate": None,
             "github_runner_required": False,
             "windows_required": False,
         }
     else:
         gate = run(GATE)
+        doctor = run(DOCTOR)
+        verified = gate["returncode"] == 0 and doctor["returncode"] == 0
         result = {
-            "schema": "brain.local_verification.v1",
-            "status": "VERIFIED" if gate["returncode"] == 0 else "FAILED",
-            "verified": gate["returncode"] == 0,
+            "schema": "brain.local_verification.v2",
+            "status": "VERIFIED" if verified else "FAILED",
+            "verified": verified,
+            "proof": proof,
             "doctor": doctor,
             "gate": gate,
             "github_runner_required": False,
@@ -48,6 +56,7 @@ def main():
     OUT.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result["verified"] else 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
