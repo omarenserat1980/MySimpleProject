@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: brain-apm-${{ github.ref }}
@@ -40,6 +41,23 @@ jobs:
 
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check -q pytest
+
+      - name: Restore latest APM checkpoint artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/apm/state
+          latest="$(gh run list --workflow apm.yml --branch "$GITHUB_REF_NAME" --limit 10 --json databaseId,status,conclusion --jq '.[] | select(.databaseId != '"'"'$GITHUB_RUN_ID'"'"') | .databaseId' | head -n 1 || true)"
+          if [ -n "$latest" ]; then
+            echo "APM_PREVIOUS_RUN=$latest"
+            gh run download "$latest" -n "brain-apm-evidence-$latest" -D .brain/apm/state || true
+          else
+            echo "APM_PREVIOUS_RUN=NONE"
+          fi
+          if [ -f .brain/apm/state/checkpoint.json ]; then
+            python -m brain_v12.apm.cli status --state-dir .brain/apm/state
+          fi
 
       - name: Validate pipeline definition
         run: |
