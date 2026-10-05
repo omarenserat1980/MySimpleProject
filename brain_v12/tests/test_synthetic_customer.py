@@ -85,3 +85,21 @@ def test_customer_revision_requires_review_state():
         assert False, "revision should require a revision request"
     except ValueError as exc:
         assert str(exc) == "REVISION_NOT_REQUESTED"
+
+
+def test_scenario_suite_plans_multiple_customer_levels():
+    from brain_v12.brain.synthetic_customer_suite import SyntheticCustomerScenarioSuite
+    suite = SyntheticCustomerScenarioSuite(lambda: SyntheticCustomer())
+    plan = suite.plan()
+    assert plan["scenario_count"] >= 7
+    assert plan["production_allowed"] is False
+    assert set(plan["levels"]) == {1, 2, 3, 4, 5}
+
+
+def test_scenario_suite_runs_proposal_discovery_without_execution():
+    from brain_v12.brain.synthetic_customer_suite import SyntheticCustomerScenarioSuite
+    suite = SyntheticCustomerScenarioSuite(lambda: SyntheticCustomer())
+    result = suite.run({"capabilities": {"website": True}, "tools": ["test"]}, limit=2)
+    assert result["ok"] is True
+    assert result["count"] == 2
+    assert all(item["proposal_ready"] for item in result["results"])
