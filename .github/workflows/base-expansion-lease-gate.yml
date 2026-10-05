@@ -12,6 +12,7 @@ on:
       - 'tests/test_platform_lease.py'
       - 'tests/test_supervisor_lease.py'
       - 'tests/test_lease_recovery.py'
+      - 'tests/test_lease_ownership.py'
       - '.github/workflows/base-expansion-lease-gate.yml'
 
 permissions:
@@ -30,7 +31,7 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run lease tests
-        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py tests/test_lease_recovery.py
+        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py tests/test_lease_recovery.py tests/test_lease_ownership.py
       - name: Write lease evidence
         run: |
           python - <<'PY'
