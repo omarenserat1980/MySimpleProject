@@ -22,8 +22,22 @@ def test_execution_requires_customer_approval():
         assert str(exc) == "CUSTOMER_APPROVAL_REQUIRED"
 
 
-def test_execution_uses_safe_environment_and_records_evidence():
+def test_execution_does_not_trust_ok_without_verification():
     c = SyntheticCustomer(executor=lambda *args: {"ok": True, "artifact": "test-result"})
+    run = c.start("TEST_CUSTOMER_SOFTWARE", "Build a test utility.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="SANDBOX", payment_mode="TEST")
+    assert run.status == "EXECUTION_FAILED"
+    assert run.execution["ok"] is False
+
+
+def test_execution_requires_cognitive_completion_and_verification():
+    result = {"ok": True, "cognitive": {
+        "execution": {"status": "COMPLETED"},
+        "verification": {"status": "VERIFIED"},
+    }}
+    c = SyntheticCustomer(executor=lambda *args: result)
     run = c.start("TEST_CUSTOMER_SOFTWARE", "Build a test utility.")
     c.generate_proposals(run, {})
     c.approve(run)
@@ -31,6 +45,15 @@ def test_execution_uses_safe_environment_and_records_evidence():
     assert run.status == "VERIFIED"
     assert run.execution["ok"] is True
     assert any(e["event"] == "EXECUTION_VERIFIED" for e in run.evidence)
+
+
+def test_execution_uses_explicit_verified_result_when_no_cognitive_trace():
+    c = SyntheticCustomer(executor=lambda *args: {"ok": True, "verified": True, "artifact": "test-result"})
+    run = c.start("TEST_CUSTOMER_SOFTWARE", "Build a test utility.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="SANDBOX", payment_mode="TEST")
+    assert run.status == "VERIFIED"
 
 
 def test_payment_gate_fails_closed():
