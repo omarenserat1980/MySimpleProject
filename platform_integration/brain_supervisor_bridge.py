@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from platform_foundation.audit_chain import AuditChain
+from platform_foundation.authority import AuthorityApprovalLedger
 from platform_foundation.integration_gate import IntegrationGate
 from platform_foundation.permissions import ActionRisk, PermissionBoundary
 from platform_foundation.persistent_state import SQLiteStateStore
@@ -50,9 +51,10 @@ class BrainSupervisorBridge:
         self.state = state
         self.audit = audit
         self.permissions = permissions
+        self.authority = AuthorityApprovalLedger(state, audit)
         self.gate = IntegrationGate(state, audit, permissions)
         self.supervisor = BrainSupervisor(root=root, max_cycles=max_cycles)
-        self.execution = Supervisor(state, audit, permissions)
+        self.execution = Supervisor(state, audit, permissions, authority=self.authority)
         self.verification = VerificationGate(state, audit)
 
     def admit(self) -> BrainAdmissionResult:
@@ -71,6 +73,10 @@ class BrainSupervisorBridge:
     def simulate_verified_path(self, task: str) -> Any:
         self._require_admission()
         return self.supervisor.run_simulation(task, verification_ok=True)
+
+    def approve_irreversible(self, task_id: str, action: str, approver: str) -> bool:
+        decision = self.authority.approve(task_id, action, ActionRisk.IRREVERSIBLE, approver)
+        return decision.approved
 
     def execute_verified(
         self,
