@@ -52,8 +52,9 @@ def assert_runtime_contract() -> dict:
     fabric = ROOT / "brain_v12/brain/execution_fabric.py"
     gateway = ROOT / "brain_v12/brain/execution_gateway.py"
     runtime = ROOT / "brain_v12/brain/internal_task_runtime.py"
+    problem_solver = ROOT / "brain_v12/brain/problem_solver.py"
 
-    for path in (fabric, gateway, runtime):
+    for path in (fabric, gateway, runtime, problem_solver):
         if not path.exists():
             failures.append(f"MISSING_EXECUTION_COMPONENT:{path}")
 
@@ -63,6 +64,13 @@ def assert_runtime_contract() -> dict:
             failures.append("GATEWAY_CLASS_MISSING")
         if "github" in gateway_text.lower() and "fallback" in gateway_text.lower():
             failures.append("GATEWAY_EXTERNAL_FALLBACK_MARKER")
+
+    if problem_solver.exists():
+        solver_text = problem_solver.read_text(encoding="utf-8")
+        if "self.execution_gateway" not in solver_text:
+            failures.append("PROBLEM_SOLVER_GATEWAY_MISSING")
+        if "EXTERNAL_ALTERNATIVE_EXECUTOR_FORBIDDEN" not in solver_text:
+            failures.append("PROBLEM_SOLVER_EXTERNAL_EXECUTOR_GUARD_MISSING")
 
     if fabric.exists():
         fabric_text = fabric.read_text(encoding="utf-8")
