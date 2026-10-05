@@ -148,10 +148,14 @@ def process(path: Path):
         task = job.get("task")
         if not isinstance(task, str):
             raise ValueError("task_required")
+        evidence = execute(task, job.get("params", {}))
+        verified = evidence.get("verified", True) if isinstance(evidence, dict) else True
         result = {"job_id": job.get("job_id", claimed.stem), "worker_id": WORKER_ID,
-                  "status": "VERIFIED", "started_at": started, "completed_at": utc(),
-                  "evidence": execute(task, job.get("params", {}))}
-        (COMPLETED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
+                  "status": "VERIFIED" if verified else "FAILED",
+                  "started_at": started, "completed_at": utc(),
+                  "evidence": evidence}
+        target = COMPLETED if verified else FAILED
+        (target / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
         claimed.unlink(missing_ok=True)
     except Exception as exc:
         result = {"job_id": claimed.stem, "worker_id": WORKER_ID, "status": "FAILED",
