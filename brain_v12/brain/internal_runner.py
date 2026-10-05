@@ -32,7 +32,7 @@ INTERNAL_RUNNER_LABELS = frozenset(
 class InternalRunner:
     runner_id: str = INTERNAL_RUNNER_ID
     labels: frozenset[str] = INTERNAL_RUNNER_LABELS
-    state: str = "ONLINE"
+    state: str = "OFFLINE"
     metadata: dict[str, str] = field(default_factory=dict)
 
     def capabilities(self) -> set[str]:
@@ -60,8 +60,10 @@ class InternalRunner:
         return which(name) is not None
 
     def require(self, capability: str) -> None:
-        if self.state != "ONLINE":
-            raise RuntimeError("INTERNAL_RUNNER_OFFLINE")
+        from .internal_runner_preflight import inspect_runner
+        preflight = inspect_runner(self.runner_id)
+        if not preflight.verified:
+            raise RuntimeError("BRAIN_INTERNAL_RUNNER_NOT_VERIFIED:" + ",".join(preflight.reasons))
         if capability not in self.capabilities():
             raise RuntimeError(f"INTERNAL_RUNNER_MISSING_CAPABILITY:{capability}")
 
