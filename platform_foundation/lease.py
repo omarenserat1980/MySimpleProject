@@ -33,11 +33,11 @@ class TaskLease:
         key = f"lease:{task_id}"
 
         def claim(current):
-            if current and float(current["expires_at"]) > now and current["owner"] != owner:
+            if current and float(current["expires_at"]) > now:
                 return False, current
             return True, {"owner": owner, "expires_at": expires_at}
 
-        acquired, current = self.state.atomic_update(key, claim)
+        acquired, _ = self.state.atomic_update(key, claim)
         if not acquired:
             self.audit.record("lease.denied", {
                 "task_id": task_id, "owner": owner, "reason": "owned",
@@ -59,7 +59,7 @@ class TaskLease:
                 return False, current
             return True, {"owner": owner, "expires_at": expires_at}
 
-        renewed, current = self.state.atomic_update(f"lease:{task_id}", renew)
+        renewed, _ = self.state.atomic_update(f"lease:{task_id}", renew)
         if not renewed:
             self.audit.record("lease.heartbeat_denied", {"task_id": task_id, "owner": owner})
             return LeaseResult(task_id, owner, False, reason="lease not owned")
