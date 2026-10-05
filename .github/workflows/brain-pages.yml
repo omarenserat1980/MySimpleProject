@@ -9,6 +9,8 @@ on:
       - "games-success.html"
       - "games/**"
       - "brain_v12/web/platform.html"
+      - "brain_v12/web/index.html"
+      - "brain_v12/web/**/*.html"
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
       - "docs/cinema.html"
@@ -68,8 +70,25 @@ jobs:
           import json, os
           from pathlib import Path
           origin = os.environ.get("BRAIN_API_ORIGIN", "").strip().rstrip("/")
-          if origin and not origin.startswith("https://"):
+          if not origin:
+              raise SystemExit("BRAIN_API_ORIGIN is required: refusing to deploy a disconnected Brain UI")
+          if not origin.startswith("https://"):
               raise SystemExit("BRAIN_API_ORIGIN must use HTTPS")
+          bridge = """(function(){\n  const base=(window.BRAIN_API_BASE||"").replace(/\\/$/,"");\n  if(!base)return;\n  const nativeFetch=window.fetch.bind(window);\n  function rewrite(input){\n    if(typeof input==="string"){\n      if(input.startsWith("/api/")) return base+input;\n      return input;\n    }\n    if(input instanceof Request){\n      const u=new URL(input.url, location.href);\n      if(u.origin===location.origin && u.pathname.startsWith("/api/")){\n        return new Request(base+u.pathname+u.search, input);\n      }\n    }\n    return input;\n  }\n  window.fetch=function(input,init){return nativeFetch(rewrite(input),init);};\n})();\n"""
+          Path("_site/brain-api-config.js").write_text(
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n", encoding="utf-8")
+          Path("_site/brain-api-bridge.js").write_text(
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n" + bridge,
+              encoding="utf-8")
+          for html in Path("_site").rglob("*.html"):
+              s=html.read_text(encoding="utf-8")
+              marker='<script src="/brain-api-bridge.js"></script>'
+              if marker not in s:
+                  if "</head>" in s:
+                      s=s.replace("</head>", marker+"</head>", 1)
+                  else:
+                      s=s.replace("</body>", marker+"</body>", 1)
+                  html.write_text(s, encoding="utf-8")
           Path("_site/brain-app-v2/config.json").write_text(
               json.dumps({"api_base": origin}, ensure_ascii=False), encoding="utf-8")
           Path("_site/games-api-config.js").write_text("window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n", encoding="utf-8")
@@ -78,7 +97,7 @@ jobs:
               encoding="utf-8")
           required = [
               "_site/index.html", "_site/platform.html", "_site/games-store.html", "_site/games-success.html", "_site/games-api-config.js",
-              "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html",
+              "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html", "_site/brain-api-config.js", "_site/brain-api-bridge.js",
               "_site/movies.html", "_site/cinema.html",
               "_site/brain-chat/index.html", "_site/brain-chat/config.js",
               "_site/brain-app-v2/config.json", "_site/studio/index.html",
@@ -121,7 +140,7 @@ jobs:
           if summary:
               with open(summary, "a", encoding="utf-8") as stream:
                   stream.write("## Brain Pages build\n")
-                  stream.write("- Brain API origin: " + ("configured" if origin else "not configured; deployed UI remains backend-disconnected until an API origin is supplied") + "\n")
+                  stream.write("- Brain API origin: configured\n")
                   stream.write(f"- Local platform links validated: {len(parser.hrefs)}\n")
                   stream.write("- Studio artifact: present\n")
           PY
@@ -135,6 +154,8 @@ jobs:
           test -f _site/games/neon-rift.html
           test -f _site/games/last-light.html
           test -f _site/games/drift-circuit.html
+          test -f _site/brain-api-config.js
+          test -f _site/brain-api-bridge.js
           test -f _site/marketing/index.html
           test -f _site/customer-portal/index.html
           test -f _site/brain_v12/web/index.html
@@ -157,6 +178,10 @@ jobs:
           js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
           assert "\\n" not in js
           assert js.startswith("window.BRAIN_API_BASE = ")
+          bridge = Path("_site/brain-api-bridge.js").read_text(encoding="utf-8")
+          assert "window.fetch=function" in bridge
+          assert "BRAIN_API_BASE" in bridge
+          assert "brain-api-bridge.js" in Path("_site/index.html").read_text(encoding="utf-8")
           print("Pages payload validation: OK")
           PY
       - uses: actions/upload-pages-artifact@v4
