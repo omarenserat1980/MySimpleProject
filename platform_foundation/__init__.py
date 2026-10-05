@@ -6,6 +6,7 @@ from .decision_engine import DecisionEngine, DecisionOption, DecisionRecord, Dec
 from .authority_gate import AuthorityGate, AuthorityLevel, AuthorityPolicy
 from .github_code_agent import GitHubCodeAgent, ChangePlan, AgentResult
 from .apm import APM, MetricPoint
+from .research_agent import ResearchAgent, ResearchEvidence, ResearchReport
 
 __all__ = [
     "PlatformRuntime",
@@ -14,4 +15,5 @@ __all__ = [
     "AuthorityGate", "AuthorityLevel", "AuthorityPolicy",
     "GitHubCodeAgent", "ChangePlan", "AgentResult",
     "APM", "MetricPoint",
+    "ResearchAgent", "ResearchEvidence", "ResearchReport",
 ]
