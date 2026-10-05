@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 
 from platform_foundation.audit_chain import AuditChain
 from platform_foundation.authority import AuthorityApprovalLedger
+from platform_foundation.lease import TaskLease
 from platform_foundation.permissions import ActionRisk, PermissionBoundary
 from platform_foundation.persistent_state import SQLiteStateStore
 from platform_foundation.supervisor import Supervisor
@@ -80,4 +82,69 @@ def test_approval_cannot_be_replayed_for_different_action() -> None:
         )
         assert mismatch.approved is False
         assert "match" in mismatch.reason
+        state.close()
+
+
+def test_lease_denial_does_not_consume_irreversible_approval() -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        state = SQLiteStateStore(tmp.name)
+        audit = AuditChain()
+        permissions = PermissionBoundary({"delete": ActionRisk.IRREVERSIBLE})
+        authority = AuthorityApprovalLedger(state, audit)
+        blocker = TaskLease(state, audit)
+        holder = blocker.acquire("blocked-task", "existing-owner", ttl_seconds=60)
+        assert holder.acquired is True
+
+        supervisor = Supervisor(state, audit, permissions, authority=authority)
+        supervisor.register(
+            "blocked-task",
+            "delete",
+            ActionRisk.IRREVERSIBLE,
+            lambda: {"deleted": True},
+        )
+        assert authority.approve(
+            "blocked-task", "delete", ActionRisk.IRREVERSIBLE, "human"
+        ).approved is True
+
+        result = supervisor.run("blocked-task", lease_ttl_seconds=1)
+        assert result.allowed is True
+        assert result.status.value == "FAILED"
+        assert result.error == "task lease unavailable"
+        assert authority.check(
+            "blocked-task", "delete", ActionRisk.IRREVERSIBLE
+        ).approved is True
+        state.close()
+
+
+def test_concurrent_consumers_can_claim_approval_only_once() -> None:
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        state = SQLiteStateStore(tmp.name)
+        audit = AuditChain()
+        ledger = AuthorityApprovalLedger(state, audit)
+        assert ledger.approve(
+            "race-task", "delete", ActionRisk.IRREVERSIBLE, "human"
+        ).approved is True
+
+        results = []
+        lock = threading.Lock()
+
+        def consume() -> None:
+            decision = ledger.consume(
+                "race-task", "delete", ActionRisk.IRREVERSIBLE
+            )
+            with lock:
+                results.append(decision.approved)
+
+        threads = [threading.Thread(target=consume) for _ in range(16)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert results.count(True) == 1
+        assert results.count(False) == 15
+        assert ledger.check(
+            "race-task", "delete", ActionRisk.IRREVERSIBLE
+        ).approved is False
+        assert audit.verify() is True
         state.close()
