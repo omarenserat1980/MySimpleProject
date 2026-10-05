@@ -1,0 +1,81 @@
+name: Base Expansion V2 Integrated Execution Gate
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+  pull_request:
+    paths:
+      - 'platform_foundation/**'
+      - 'platform_integration/**'
+      - 'tests/test_platform_foundation.py'
+      - 'tests/test_brain_supervisor_bridge.py'
+      - 'tests/test_brain_supervisor_bridge_boundary.py'
+      - 'tests/test_brain_verified_recovery_e2e.py'
+      - 'tests/test_platform_lease.py'
+      - 'tests/test_supervisor_lease.py'
+      - 'tests/test_lease_recovery.py'
+      - 'tests/test_lease_ownership.py'
+      - 'tests/test_supervisor_heartbeat.py'
+      - 'tests/test_supervisor_final_fencing.py'
+      - 'tests/test_stale_task_recovery.py'
+      - '.github/workflows/base-expansion-integrated-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-execution-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run independent foundation and integration tests
+        run: |
+          python -m pytest -q \
+            tests/test_platform_foundation.py \
+            tests/test_brain_supervisor_bridge.py \
+            tests/test_brain_supervisor_bridge_boundary.py \
+            tests/test_brain_verified_recovery_e2e.py \
+            tests/test_platform_lease.py \
+            tests/test_supervisor_lease.py \
+            tests/test_lease_recovery.py \
+            tests/test_lease_ownership.py \
+            tests/test_supervisor_heartbeat.py \
+            tests/test_supervisor_final_fencing.py \
+            tests/test_stale_task_recovery.py
+      - name: Write integrated evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              'status': 'PASS',
+              'gate': 'BASE_EXPANSION_INTEGRATED_EXECUTION',
+              'foundation': 'PASS',
+              'permission_boundary': 'PASS',
+              'persistent_state': 'PASS',
+              'audit_chain': 'PASS',
+              'lease_single_owner': 'PASS',
+              'lease_heartbeat': 'PASS',
+              'lease_fencing': 'PASS',
+              'stale_recovery': 'PASS',
+              'durable_retry': 'PASS',
+              'independent_verification': 'PASS',
+              'brain_bridge': 'PASS',
+              'brain_bridge_authority_boundary': 'PASS',
+          }
+          Path('integrated_execution_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Upload integrated evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-integrated-execution-evidence
+          path: integrated_execution_gate.json
