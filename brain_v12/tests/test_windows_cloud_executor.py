@@ -49,3 +49,10 @@ def test_windows_cloud_executor_rejects_missing_provider():
         assert str(exc) == "CLOUD_PROVIDER_REQUIRED"
     else:
         raise AssertionError("missing provider was accepted")
+
+
+def test_windows_cloud_executor_reports_unconfigured_without_provider():
+    result = WindowsCloudExecutor().readiness()
+    assert result["ready"] is False
+    assert result["status"] == "NOT_CONFIGURED"
+    assert result["reason"] == "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED"
