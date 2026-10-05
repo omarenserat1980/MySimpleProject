@@ -8,6 +8,7 @@ from .github_code_agent import GitHubCodeAgent, ChangePlan, AgentResult
 from .apm import APM, MetricPoint
 from .research_agent import ResearchAgent, ResearchEvidence, ResearchReport
 from .autonomous_pipeline import AutonomousPipeline, PipelineResult
+from .execution_policy import BrainExecutionPolicy, ExecutionMode, ExecutorDecision, ExecutorDescriptor, ExecutionDecision
 
 __all__ = [
     "PlatformRuntime",
@@ -18,4 +19,5 @@ __all__ = [
     "APM", "MetricPoint",
     "ResearchAgent", "ResearchEvidence", "ResearchReport",
     "AutonomousPipeline", "PipelineResult",
+    "BrainExecutionPolicy", "ExecutionMode", "ExecutorDecision", "ExecutorDescriptor", "ExecutionDecision",
 ]
