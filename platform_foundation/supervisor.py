@@ -33,7 +33,7 @@ _PHASE_ORDER = {
     SupervisorPhase.DISCOVER: {SupervisorPhase.PLAN, SupervisorPhase.BLOCKED},
     SupervisorPhase.PLAN: {SupervisorPhase.SELECT, SupervisorPhase.BLOCKED},
     SupervisorPhase.SELECT: {SupervisorPhase.EXECUTE, SupervisorPhase.BLOCKED},
-    SupervisorPhase.EXECUTE: {SupervisorPhase.VERIFY, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.FAILED},
+    SupervisorPhase.EXECUTE: {SupervisorPhase.VERIFY, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.BLOCKED, SupervisorPhase.FAILED},
     SupervisorPhase.VERIFY: {SupervisorPhase.DELIVER, SupervisorPhase.REPAIR, SupervisorPhase.RETRY, SupervisorPhase.FAILED},
     SupervisorPhase.REPAIR: {SupervisorPhase.RETRY, SupervisorPhase.FAILED},
     SupervisorPhase.RETRY: {SupervisorPhase.EXECUTE, SupervisorPhase.FAILED},
@@ -111,6 +111,11 @@ class Supervisor:
             return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error="task lease unavailable")
 
         try:
+            if requested_risk is ActionRisk.IRREVERSIBLE:
+                consumed = self.authority.consume(task_id, record["action"], requested_risk)
+                if not consumed.approved:
+                    self._set_phase(task_id, SupervisorPhase.BLOCKED, reason=consumed.reason)
+                    return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=consumed.reason)
             self._set_phase(task_id, SupervisorPhase.PLAN)
             self._set_phase(task_id, SupervisorPhase.SELECT)
             self._set_phase(task_id, SupervisorPhase.EXECUTE)
@@ -135,6 +140,8 @@ class Supervisor:
                 stop.set()
                 thread.join(timeout=max(1.0, interval * 2))
             if lease_lost.is_set() or not self.lease.is_owned(task_id, self.owner):
+                self._set_phase(task_id, SupervisorPhase.BLOCKED, reason="execution lease lost")
+                self.audit.record("task.lease_lost", {"task_id": task_id, "owner": self.owner})
                 self._set_phase(task_id, SupervisorPhase.FAILED, reason="execution lease lost")
                 return SupervisorResult(task_id, TaskStatus.FAILED, True, result.attempts, error="execution lease lost")
             self._set_phase(task_id, SupervisorPhase.VERIFY, status=result.status.value)
