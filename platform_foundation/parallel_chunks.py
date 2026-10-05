@@ -3,10 +3,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 import inspect
+import uuid
 from typing import Any, Callable
 
 from .audit_chain import AuditChain
 from .persistent_state import SQLiteStateStore
+from .lease import TaskLease
 
 
 @dataclass(frozen=True)
@@ -20,9 +22,10 @@ class ChunkResult:
 class ParallelChunkRunner:
     """Bounded dependency-aware runner with durable, resumable checkpoints."""
 
-    def __init__(self, store: SQLiteStateStore, audit: AuditChain) -> None:
+    def __init__(self, store: SQLiteStateStore, audit: AuditChain, lease: TaskLease | None = None) -> None:
         self.store = store
         self.audit = audit
+        self.lease = lease or TaskLease(store, audit)
 
     def _key(self, run_id: str, chunk_id: str) -> str:
         return f"pipeline.chunk:{run_id}:{chunk_id}"
@@ -52,6 +55,7 @@ class ParallelChunkRunner:
         *,
         dependencies: dict[str, list[str]] | None = None,
         max_workers: int = 4,
+        lease_ttl_seconds: float = 300.0,
     ) -> list[ChunkResult]:
         if not run_id:
             raise ValueError("run_id is required")
@@ -61,6 +65,9 @@ class ParallelChunkRunner:
             raise ValueError("chunk ids must be unique")
         if max_workers < 1:
             raise ValueError("max_workers must be >= 1")
+        if lease_ttl_seconds <= 0:
+            raise ValueError("lease_ttl_seconds must be positive")
+        owner = f"parallel-runner:{uuid.uuid4().hex}"
 
         deps = dependencies or {}
         known = set(chunks)
@@ -124,39 +131,36 @@ class ParallelChunkRunner:
                 break
 
             def one(chunk_id: str) -> ChunkResult:
+                task_id = f"{run_id}:{chunk_id}"
+                lease_result = self.lease.acquire(task_id, owner, ttl_seconds=lease_ttl_seconds)
+                if not lease_result.acquired:
+                    error = "chunk lease not acquired"
+                    self.audit.record("pipeline.chunk.lease_denied", {"run_id": run_id, "chunk_id": chunk_id})
+                    return ChunkResult(chunk_id, "FAILED", error=error)
+
                 self.audit.record(
                     "pipeline.chunk.started",
                     {"run_id": run_id, "chunk_id": chunk_id,
                      "dependencies": deps.get(chunk_id, [])},
                 )
                 try:
-                    dependency_outputs = {
-                        dep: outputs[dep] for dep in deps.get(chunk_id, [])
-                    }
-                    if accepts_dependencies:
-                        result = execute(chunk_id, dependency_outputs)
-                    else:
-                        result = execute(chunk_id)
+                    dependency_outputs = {dep: outputs[dep] for dep in deps.get(chunk_id, [])}
+                    result = execute(chunk_id, dependency_outputs) if accepts_dependencies else execute(chunk_id)
                     if not verify(chunk_id, result):
                         raise RuntimeError("chunk independent verification failed")
-                    self.store.set(
-                        self._key(run_id, chunk_id),
-                        {"status": "SUCCESS", "output": result},
-                    )
-                    self.audit.record("pipeline.chunk.verified",
-                                      {"run_id": run_id, "chunk_id": chunk_id})
+                    if not self.lease.is_owned(task_id, owner):
+                        raise RuntimeError("chunk lease lost before commit")
+                    self.store.set(self._key(run_id, chunk_id), {"status": "SUCCESS", "output": result})
+                    self.audit.record("pipeline.chunk.verified", {"run_id": run_id, "chunk_id": chunk_id})
                     return ChunkResult(chunk_id, "SUCCESS", output=result)
                 except Exception as exc:
                     error = f"{type(exc).__name__}: {exc}"
-                    self.store.set(
-                        self._key(run_id, chunk_id),
-                        {"status": "FAILED", "error": error},
-                    )
-                    self.audit.record(
-                        "pipeline.chunk.failed",
-                        {"run_id": run_id, "chunk_id": chunk_id, "error": error},
-                    )
+                    if self.lease.is_owned(task_id, owner):
+                        self.store.set(self._key(run_id, chunk_id), {"status": "FAILED", "error": error})
+                    self.audit.record("pipeline.chunk.failed", {"run_id": run_id, "chunk_id": chunk_id, "error": error})
                     return ChunkResult(chunk_id, "FAILED", error=error)
+                finally:
+                    self.lease.release(task_id, owner)
 
             with ThreadPoolExecutor(max_workers=min(max_workers, len(ready))) as pool:
                 futures = {pool.submit(one, chunk_id): chunk_id for chunk_id in ready}
