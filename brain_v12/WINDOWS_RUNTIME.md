@@ -45,3 +45,27 @@ same evidence without depending on GitHub Actions.
 ## Runtime revision
 
 Windows real-boot verification is automatically requested when this runtime contract changes.
+
+
+## Internal Runner Authority
+
+Windows Server 2025 real boot is a Brain-owned runtime capability. The authoritative
+executor is the Brain Internal Runner, not a GitHub-hosted runner.
+
+Required internal labels for the GitHub evidence adapter are:
+- `self-hosted`
+- `linux`
+- `x64`
+- `brain-internal`
+- `qemu`
+- `windows-real-boot`
+
+The Brain execution policy forbids an external executor from becoming a silent
+fallback for `windows-server-2025-real-boot`. GitHub remains the source of truth
+for committed code, evidence, audit history and verification; it is not the
+runtime dependency.
+
+A real internal runner is only considered online after its runner process is
+connected and idle and its host preflight proves QEMU/OVMF/xorriso/wimlib and
+the required filesystem tools are available. A queued GitHub job is never
+treated as proof of runner availability or Windows boot.
