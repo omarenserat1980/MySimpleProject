@@ -152,6 +152,41 @@ def next_node_job(node_id: str, required_capabilities: list[str] | None = None) 
         _atomic_write(path, job)
         return job
 
+def recover_expired_jobs(*, lease_timeout: float | None = None) -> list[str]:
+    """Return abandoned RUNNING jobs to the durable queue.
+
+    A worker crash must not permanently strand a job. Recovery is conservative:
+    only RUNNING jobs with an expired lease are re-queued as RETRYING, preserving
+    the previous lease evidence.
+    """
+    timeout = float(
+        lease_timeout
+        if lease_timeout is not None
+        else os.getenv("BRAIN_FABRIC_JOB_LEASE_TIMEOUT", "600")
+    )
+    now = _now()
+    recovered: list[str] = []
+    with _LOCK:
+        for path in sorted(_state_dir().glob("job-*.json")):
+            job = _read(path)
+            if not job or job.get("state") != "RUNNING":
+                continue
+            leased_at = float(job.get("leased_at", job.get("updated_at", 0)))
+            if now - leased_at <= timeout:
+                continue
+            job["state"] = "RETRYING"
+            job["updated_at"] = now
+            job.setdefault("evidence", []).append({
+                "at": now,
+                "event": "LEASE_EXPIRED",
+                "previous_state": "RUNNING",
+                "lease_timeout": timeout,
+            })
+            _atomic_write(path, job)
+            recovered.append(str(job["job_id"]))
+    return recovered
+
+
 def get_job(job_id: str) -> dict[str, Any] | None:
     return _read(_state_dir() / f"job-{_validate_id(job_id)}.json")
 
