@@ -16,6 +16,35 @@ class Proposal:
     requires_approval: bool = True
 
 
+@dataclass(frozen=True)
+class SyntheticExecutiveProfile:
+    title: str = "CEO / General Manager"
+    industries: tuple[str, ...] = (
+        "software", "finance", "marketing", "sales", "social_media",
+        "media", "cinema", "ecommerce", "education", "operations",
+        "product", "strategy", "customer_success", "legal_compliance",
+        "security", "data_ai", "hr", "procurement",
+    )
+    expertise: tuple[str, ...] = (
+        "software_engineering", "architecture", "qa", "devops", "ai",
+        "financial_planning", "unit_economics", "budgeting", "pricing",
+        "sales", "branding", "seo", "content_marketing", "social_media",
+        "performance_marketing", "analytics", "product_management",
+        "operations", "risk_management", "business_strategy",
+    )
+    scale_target: str = "millions_of_logical_customer_scenarios"
+    service_model: str = "long_running_advisory_and_acceptance"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "title": self.title,
+            "industries": list(self.industries),
+            "expertise": list(self.expertise),
+            "scale_target": self.scale_target,
+            "service_model": self.service_model,
+        }
+
+
 @dataclass
 class TestRun:
     run_id: str
@@ -33,12 +62,14 @@ class TestRun:
 
 class SyntheticCustomer:
     def __init__(self, evidence_store=None, chatgpt_advisor: Callable | None = None,
-                 brain_advisor: Callable | None = None, executor: Callable | None = None):
+                 brain_advisor: Callable | None = None, executor: Callable | None = None,
+                 executive_profile: SyntheticExecutiveProfile | None = None):
         self.evidence_store = evidence_store
         self.chatgpt_advisor = chatgpt_advisor
         self.brain_advisor = brain_advisor
         self.executor = executor
         self.runs: dict[str, TestRun] = {}
+        self.executive_profile = executive_profile or SyntheticExecutiveProfile()
 
     def discover(self, capabilities: dict[str, Any]) -> dict[str, Any]:
         names = set()
@@ -47,7 +78,7 @@ class SyntheticCustomer:
             if isinstance(value, dict): names.update(value.keys())
             elif isinstance(value, list):
                 names.update(str(x.get("id", x.get("name", x))) if isinstance(x, dict) else str(x) for x in value)
-        return {"known": sorted(names)}
+        return {"known": sorted(names), "executive_profile": self.executive_profile.as_dict()}
 
     def start(self, customer_type: str, request: str) -> TestRun:
         run = TestRun(str(uuid4()), f"synthetic-client-{uuid4().hex[:12]}", customer_type,
