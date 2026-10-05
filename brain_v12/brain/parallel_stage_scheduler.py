@@ -182,3 +182,33 @@ class ParallelStageScheduler:
             "blocked": sorted(blocked), "attempts": attempts,
             "evidence": evidence, "max_workers": self.max_workers,
         }
+
+
+class APMBuildOrchestrator:
+    """APM BUILD facade: schedule stages while preserving Brain execution gates."""
+
+    def __init__(self, scheduler: ParallelStageScheduler) -> None:
+        self.scheduler = scheduler
+
+    def run(
+        self,
+        executor: Executor,
+        verifier: Verifier,
+        final_gate: Callable[[dict[str, Any]], dict[str, Any] | bool] | None = None,
+    ) -> dict[str, Any]:
+        result = self.scheduler.run(executor, verifier)
+        if result["status"] != "VERIFIED_COMPLETED":
+            result["apm_status"] = "BLOCKED"
+            return result
+        if final_gate is not None:
+            gate = final_gate(result)
+            gate_ok = gate is True or (
+                isinstance(gate, dict) and gate.get("verified") is True
+            )
+            result["final_gate"] = gate
+            if not gate_ok:
+                result["status"] = "BLOCKED"
+                result["apm_status"] = "FINAL_GATE_FAILED"
+                return result
+        result["apm_status"] = "VERIFIED_COMPLETED"
+        return result
