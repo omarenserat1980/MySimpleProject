@@ -19,9 +19,22 @@ PROOF = ROOT / "brain6_artifacts" / "independence_gate" / "independence_proof.js
 def evaluate() -> dict[str, object]:
     contract = IndependenceContract(PROOF).evaluate()
     authority = BrainExecutionAuthority().readiness()
-    autonomous = bool(contract.get("allowed")) and bool(authority.get("ready"))
+    proof_ok = bool(contract.get("allowed"))
+    authority_ok = bool(authority.get("ready"))
+    autonomous = proof_ok and authority_ok
+    if autonomous:
+        status = "AUTONOMOUS_WITHIN_AUTHORITY"
+        reason = "scoped_proof_and_live_brain_executor_ready"
+    elif not proof_ok:
+        status = "NOT_AUTONOMOUS"
+        reason = f"independence_contract:{contract.get('reason', 'rejected')}"
+    else:
+        status = "NOT_AUTONOMOUS"
+        reason = f"live_executor:{authority.get('reason', 'not_ready')}"
     return {
         "schema": "brain.autonomy_status.v1",
+        "status": status,
+        "reason": reason,
         "AUTONOMOUS_WITHIN_AUTHORITY": autonomous,
         "scoped_independence_proven": bool(contract.get("allowed")),
         "live_brain_executor_ready": bool(authority.get("ready")),
