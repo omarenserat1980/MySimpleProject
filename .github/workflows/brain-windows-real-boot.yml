@@ -1,0 +1,330 @@
+name: Brain Windows Real Boot Evidence
+
+on:
+  push:
+    paths:
+      - ".github/workflows/brain-windows-real-boot.yml"
+      - "brain_v12/windows_boot_evidence.ps1"
+      - "brain_v12/windows_setupcomplete.cmd"
+      - "brain_v12/brain/windows_completion_gate.py"
+      - "brain_v12/brain/windows_runtime_contract.py"
+      - "brain_v12/WINDOWS_RUNTIME.md"
+  workflow_dispatch:
+    inputs:
+      iso_url:
+        description: "Direct Microsoft Windows Server 2025 x64 ISO URL after registration"
+        required: true
+        default: "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us"
+        type: string
+      timeout_minutes:
+        description: "Maximum guest boot/install time"
+        required: true
+        default: "55"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  real_windows_boot:
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    timeout-minutes: 70
+    steps:
+    # This workflow is an evidence adapter for the Brain-owned runner.
+    # It intentionally fails closed if the runner did not advertise the Brain flag.
+      - uses: actions/checkout@v4
+
+      - name: Install real VM tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf xorriso wimtools dosfstools mtools
+
+      - name: Download and validate Microsoft media
+        env:
+          ISO_URL: ${{ inputs.iso_url }}
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
+          test -s windows-server-2025.iso
+          xorriso -indev windows-server-2025.iso -toc 2>&1 | tee iso-toc.txt
+          grep -Eq 'ISO 9660|El Torito' iso-toc.txt
+          sha256sum windows-server-2025.iso | tee windows-server-2025.iso.sha256
+
+      - name: Inspect Windows image
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/ws
+          sudo mount -o loop,ro windows-server-2025.iso /mnt/ws
+          trap 'sudo umount /mnt/ws || true' EXIT
+          test -f /mnt/ws/sources/install.wim
+          wimlib-imagex info /mnt/ws/sources/install.wim | tee wim-info.txt
+          grep -Eq 'Windows Server 2025|SERVERSTANDARD' wim-info.txt
+          image_index="$(
+            awk '
+              /^Index:/ {idx=$2}
+              /^Name:[[:space:]]+Windows Server 2025 SERVERDATACENTER$/ {print idx; exit}
+            ' wim-info.txt
+          )"
+          if [ -z "$image_index" ]; then
+            image_index="$(
+              awk '
+                /^Index:/ {idx=$2}
+                /^Name:[[:space:]]+Windows Server 2025 SERVERSTANDARD$/ {print idx; exit}
+              ' wim-info.txt
+            )"
+          fi
+          test -n "$image_index"
+          printf 'IMAGE_INDEX=%s\n' "$image_index" | tee windows-image-index.txt
+          echo "Selected Windows Server 2025 image index: $image_index"
+
+      - name: Build evidence-enabled unattended media
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_index="$(cut -d= -f2 windows-image-index.txt)"
+          test -n "$image_index"
+          sudo umount /mnt/ws 2>/dev/null || true
+          rm -rf /tmp/brain-ws-oem
+          python - <<'PY'
+          from pathlib import Path
+          root = Path("/tmp/brain-ws-oem") / "$OEM$" / "$$" / "Setup" / "Scripts"
+          root.mkdir(parents=True, exist_ok=True)
+          print(root)
+          PY
+          oem_scripts="/tmp/brain-ws-oem/\$OEM\$/\$\$/Setup/Scripts"
+          test -d "$oem_scripts"
+          cp brain_v12/windows_boot_evidence.ps1 "$oem_scripts/brain-windows-evidence.ps1"
+          cp brain_v12/windows_setupcomplete.cmd "$oem_scripts/SetupComplete.cmd"
+
+          # FirstLogonCommands only fires after a real user logon. Create a
+          # one-shot, runner-generated Administrator password so the evidence
+          # agent cannot stall at the Server OOBE/login boundary.
+          BRAIN_AUTOPASS="$(openssl rand -hex 24)"
+          export BRAIN_AUTOPASS
+
+          cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <settings pass="windowsPE">
+              <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <SetupUILanguage><UILanguage>en-US</UILanguage></SetupUILanguage>
+                <InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale>
+              </component>
+              <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <DiskConfiguration>
+                  <Disk wcm:action="add">
+                    <DiskID>0</DiskID><WillWipeDisk>true</WillWipeDisk>
+                    <CreatePartitions>
+                      <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>100</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>
+                      <CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+                    </CreatePartitions>
+                    <ModifyPartitions>
+                      <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>
+                      <ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Windows</Label><Letter>C</Letter></ModifyPartition>
+                    </ModifyPartitions>
+                  </Disk>
+                  <WillShowUI>OnError</WillShowUI>
+                </DiskConfiguration>
+                <ImageInstall>
+                  <OSImage>
+                    <InstallFrom>
+                      <MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>$image_index</Value></MetaData>
+                    </InstallFrom>
+                    <InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo>
+                  </OSImage>
+                </ImageInstall>
+                <UserData><AcceptEula>true</AcceptEula></UserData>
+              </component>
+            </settings>
+            <settings pass="oobeSystem">
+              <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+                <AutoLogon>
+                  <Password><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></Password>
+                  <Enabled>true</Enabled><LogonCount>1</LogonCount><Username>Administrator</Username>
+                </AutoLogon>
+                <UserAccounts>
+                  <AdministratorPassword><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></AdministratorPassword>
+                </UserAccounts>
+                <FirstLogonCommands>
+                  <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\brain-windows-evidence.ps1</CommandLine>
+                    <Description>Brain Windows boot evidence</Description>
+                    <RequiresUserInput>false</RequiresUserInput>
+                  </SynchronousCommand>
+                  <SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable further automatic logon</Description>
+                    <RequiresUserInput>false</RequiresUserInput>
+                  </SynchronousCommand>
+                </FirstLogonCommands>
+              </component>
+            </settings>
+          </unattend>
+          XML
+
+          xorriso -indev windows-server-2025.iso \
+            -outdev brain-windows-server-2025-proof.iso \
+            -boot_image any replay \
+            -map /tmp/brain-ws-oem/Autounattend.xml /Autounattend.xml \
+            -map "$oem_scripts" "/sources/\$OEM\$/\$\$/Setup/Scripts" \
+            -commit
+          test -s brain-windows-server-2025-proof.iso
+          sha256sum brain-windows-server-2025-proof.iso | tee proof-iso.sha256
+
+      - name: Validate proof media before boot
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          p="/tmp/brain-ws-oem/Autounattend.xml"
+          ET.parse(p)
+          xml=open(p,encoding="utf-8").read()
+          assert "FirstLogonCommands" in xml
+          assert "AutoLogon" in xml
+          assert "Administrator" in xml
+          assert "brain-windows-evidence.ps1" in xml
+          print("AUTOUNATTEND_PREFLIGHT=PASS")
+          PY
+          xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
+          xorriso -indev brain-windows-server-2025-proof.iso -find / -name Autounattend.xml -print 2>&1 | tee proof-iso-autounattend.txt
+          xorriso -indev brain-windows-server-2025-proof.iso -find / -name SetupComplete.cmd -print 2>&1 | tee proof-iso-setupcomplete.txt
+          grep -q 'Autounattend.xml' proof-iso-autounattend.txt
+          grep -q 'SetupComplete.cmd' proof-iso-setupcomplete.txt
+
+      - name: Prepare virtual blade storage
+        run: |
+          set -euo pipefail
+          qemu-img create -f qcow2 windows-server-2025.qcow2 64G
+          truncate -s 64M windows-evidence.img
+          mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+          if [ -e /dev/kvm ]; then
+            echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
+          else
+            echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
+          fi
+
+      - name: Boot and install Windows Server 2025
+        env:
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout "$BOOT_TIMEOUT"m qemu-system-x86_64 \
+            -machine q35,accel=kvm:tcg -cpu max -m 4G -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
+            -device ich9-ahci,id=sata \
+            -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk \
+            -device ide-hd,bus=sata.2,drive=osdisk \
+            -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
+            -device ide-hd,bus=sata.3,drive=evidence \
+            -nic user,model=e1000 \
+            -drive file=brain-windows-server-2025-proof.iso,media=cdrom,if=none,id=installmedia,readonly=on \
+            -device ide-cd,bus=sata.1,drive=installmedia \
+            -boot once=d,menu=off \
+            -display none -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
+            > qemu-console.log 2>&1 &
+          QPID=$!
+          deadline=$((SECONDS + BOOT_TIMEOUT*60))
+          found=0
+          boot_source="unknown"
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
+              found=1
+              boot_source="windows-installed-disk"
+              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
+              echo "WINDOWS_BOOT_SOURCE=$boot_source"
+              break
+            fi
+            if ! kill -0 "$QPID" 2>/dev/null; then
+              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$found" -ne 1 ]; then
+            tail -200 qemu-console.log || true
+            tail -200 qemu-serial.log || true
+            exit 1
+          fi
+          python - <<'PY'
+          import json,socket,time
+          s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+          s.connect("qmp.sock")
+          for o in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
+              s.sendall((json.dumps(o)+"\r\n").encode()); time.sleep(.5)
+          s.close()
+          PY
+          sleep 15
+          printf 'BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\nBOOT_SOURCE=%s\n' "$boot_source" | tee windows-boot-phase.txt
+          kill "$QPID" 2>/dev/null || true
+          wait "$QPID" 2>/dev/null || true
+
+      - name: Read guest evidence and apply independent completion gate
+        run: |
+          set -euo pipefail
+          mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
+          python - <<'PY'
+          import json,pathlib
+          e=json.loads(pathlib.Path("windows-boot-evidence.json").read_text(encoding="utf-8-sig"))
+          assert e["status"]=="WINDOWS_BOOT_VERIFIED", e
+          assert e["guest"]["os"]=="Windows Server 2025", e
+          assert e["guest"]["architecture"]=="AMD64", e
+          assert e["guest"]["boot_verified"] is True, e
+          assert e["network"]["adapter_up"] is True, e
+          assert e["network"]["internet_443"] is True, e
+          assert e["storage"]["filesystem"], e
+          e["guest"]["architecture"]="x86_64"
+          e["media"]={"sha256":pathlib.Path("windows-server-2025.iso.sha256").read_text().split()[0]}
+          e["uefi"]={"ready":True,"firmware":"OVMF"}
+          e["cpu"]={"x86_64":True,"backend":"qemu-system-x86_64"}
+          e["network"]["host_backend"]="qemu-user"
+          e["storage"]["host_disk"]="windows-server-2025.qcow2"
+          phase=pathlib.Path("windows-boot-phase.txt").read_text(encoding="utf-8")
+          assert "BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK" in phase, phase
+          e["boot_source"]="windows-installed-disk"
+          e["qemu_status"]="QEMU_EXITED_AFTER_VERIFIED_BOOT"
+          pathlib.Path("windows-combined-evidence.json").write_text(json.dumps(e,indent=2,sort_keys=True))
+          from brain_v12.brain.windows_completion_gate import WindowsCompletionGate
+          r=WindowsCompletionGate().verify(e)
+          pathlib.Path("windows-completion-gate.json").write_text(json.dumps(r,indent=2,sort_keys=True))
+          print(json.dumps(r,indent=2,sort_keys=True))
+          assert r["status"]=="WINDOWS_BOOT_VERIFIED", r
+          print("WINDOWS_SERVER_2025_REAL_BOOT=VERIFIED")
+          print("EVIDENCE_SHA256="+r["evidence_sha256"])
+          PY
+
+      - name: Upload immutable Windows evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-windows-server-2025-real-boot-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            windows-server-2025.iso.sha256
+            proof-iso.sha256
+            wim-info.txt
+            windows-image-index.txt
+            windows-boot-evidence.json
+            windows-combined-evidence.json
+            windows-completion-gate.json
+            proof-iso-toc.txt
+            proof-iso-autounattend.txt
+            proof-iso-setupcomplete.txt
+            qemu-accel.txt
+            windows-boot-phase.txt
+            qemu-console.log
+            qemu-serial.log
+
+      - name: Final Windows evidence gate
+        run: |
+          set -euo pipefail
+          test -f windows-completion-gate.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
