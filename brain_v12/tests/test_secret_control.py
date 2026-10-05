@@ -12,14 +12,20 @@ class SecretControlPlaneTests(unittest.TestCase):
         self.assertNotIn("render-secret-value", raw)
         self.assertNotIn("openai-secret-value", raw)
         self.assertFalse(any(x.get("value_exposed") for x in status["secrets"]))
-        self.assertEqual(status["missing"], [])
+        self.assertEqual(status["missing"], [
+            "BRAIN_CONTROL_KEY",
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID",
+            "PAYTABS_SERVER_KEY",
+            "PAYTABS_PROFILE_ID",
+        ])
 
     def test_missing_secret_is_reported_without_value(self):
         env = {}
         status = SecretControlPlane(env).status()
         self.assertEqual(
             set(status["missing"]),
-            {"OPENAI_API_KEY"},
+            {"OPENAI_API_KEY", "BRAIN_CONTROL_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "PAYTABS_SERVER_KEY", "PAYTABS_PROFILE_ID"},
         )
 
     def test_plan_requires_external_connector_for_remote_write(self):
