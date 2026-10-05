@@ -98,9 +98,23 @@ def stop_pids(pids: list[int]) -> None:
 def heartbeat_is_fresh(max_age: float = 15.0) -> bool:
     try:
         age = time.time() - HEARTBEAT.stat().st_mtime
-        return age <= max_age
-    except OSError:
+        if age > max_age:
+            return False
+        payload = json.loads(HEARTBEAT.read_text(encoding="utf-8"))
+        pid = int(payload.get("pid", 0))
+        if pid <= 0 or not running_pid(pid):
+            return False
+        return True
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
         return False
+
+def heartbeat_pid() -> int | None:
+    try:
+        payload = json.loads(HEARTBEAT.read_text(encoding="utf-8"))
+        pid = int(payload.get("pid", 0))
+        return pid if pid > 0 else None
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 
 def log_tail(limit: int = 12000) -> str:
