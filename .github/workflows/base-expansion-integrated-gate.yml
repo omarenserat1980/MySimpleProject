@@ -68,6 +68,7 @@ jobs:
               'stale_recovery': 'PASS',
               'durable_retry': 'PASS',
               'independent_verification': 'PASS',
+              'durable_verified_execution_recovery': 'PASS',
               'brain_bridge': 'PASS',
               'brain_bridge_authority_boundary': 'PASS',
           }
