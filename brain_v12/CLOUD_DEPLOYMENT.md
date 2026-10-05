@@ -47,3 +47,30 @@ Deployment is not considered verified until all are true:
 9. The authority gate blocks an unverified runner.
 
 Only then can the autonomy certification be evaluated.
+
+## Remote VM bootstrap and deployment
+
+From a trusted management machine, configure:
+
+```bash
+export BRAIN_CLOUD_HOST=<cloud-vm-ip-or-hostname>
+export BRAIN_CLOUD_USER=<ssh-user>
+export BRAIN_CLOUD_REPO_DIR=/opt/brain
+```
+
+Bootstrap the host:
+
+```bash
+ssh "$BRAIN_CLOUD_USER@$BRAIN_CLOUD_HOST" 'git clone https://github.com/omarenserat1980/MySimpleProject.git /opt/brain'
+ssh "$BRAIN_CLOUD_USER@$BRAIN_CLOUD_HOST" 'cd /opt/brain && ./cloud/bootstrap_brain_cloud_vm.sh'
+```
+
+Deploy and verify:
+
+```bash
+./tools/deploy_brain_cloud.sh
+```
+
+The deployment script refuses to report success unless the remote `/health`
+endpoint reports a fresh, preflight-verified `state=RUNNING`. A reachable VM
+or a running API alone is not sufficient.
