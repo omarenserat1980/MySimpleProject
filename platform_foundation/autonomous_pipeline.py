@@ -169,6 +169,16 @@ class AutonomousPipeline:
         target = stop_stage or self.orchestrator.TOTAL_STAGES
         completed = 0
         effective_run_id = run_id or f"pipeline-{time.time_ns()}"
+        execution = self.execution_health()
+        if not execution["healthy"]:
+            blocked = PipelineRun(
+                start, self.orchestrator.current().stage, 0,
+                self.orchestrator.current().stage, "BLOCKED", effective_run_id
+            )
+            self._save_run(blocked)
+            self.apm.counter("pipeline.runs.blocked", 1, task_id=task_id,
+                             run_id=effective_run_id, commit_sha=commit_sha)
+            return blocked
         self.apm.counter("pipeline.runs.started", 1, task_id=task_id,
                          run_id=effective_run_id, commit_sha=commit_sha)
         try:
