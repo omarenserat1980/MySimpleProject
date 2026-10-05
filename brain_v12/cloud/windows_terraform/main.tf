@@ -61,13 +61,13 @@ resource "azurerm_network_interface_security_group_association" "brain" {
 }
 
 resource "azurerm_windows_virtual_machine" "brain" {
-  name                = var.vm_name
-  computer_name       = "BRAINWIN2025"
-  resource_group_name = azurerm_resource_group.brain.name
-  location            = azurerm_resource_group.brain.location
-  size                = var.vm_size
-  admin_username      = var.admin_username
-  admin_password      = var.admin_password
+  name                  = var.vm_name
+  computer_name         = "BRAINWIN2025"
+  resource_group_name   = azurerm_resource_group.brain.name
+  location              = azurerm_resource_group.brain.location
+  size                  = var.vm_size
+  admin_username        = var.admin_username
+  admin_password        = var.admin_password
   network_interface_ids = [azurerm_network_interface.brain.id]
 
   os_disk {
