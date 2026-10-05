@@ -2,12 +2,18 @@ from __future__ import annotations
 
 """Fail-closed gate for a real Windows Server 2025 cloud node."""
 
+import time
 from typing import Any
 
 WINDOWS_CLOUD = "windows-server-2025-cloud"
 
 
-def verify_windows_cloud_node(node: dict[str, Any]) -> dict[str, Any]:
+def verify_windows_cloud_node(
+    node: dict[str, Any],
+    *,
+    heartbeat_timeout: float | None = None,
+    now: float | None = None,
+) -> dict[str, Any]:
     required = {
         "node_id": node.get("node_id"),
         "provider": node.get("provider"),
@@ -43,7 +49,7 @@ def verify_windows_cloud_node(node: dict[str, Any]) -> dict[str, Any]:
             "reason": "WINDOWS_CLOUD_NODE_NOT_READY",
         }
 
-    return {
+    result = {
         "verified": True,
         "status": "WINDOWS_CLOUD_VERIFIED",
         "executor": WINDOWS_CLOUD,
@@ -52,3 +58,19 @@ def verify_windows_cloud_node(node: dict[str, Any]) -> dict[str, Any]:
         "architecture": required["architecture"],
         "capabilities": sorted(capabilities),
     }
+
+    if heartbeat_timeout is not None:
+        current = time.time() if now is None else float(now)
+        heartbeat = float(required["last_heartbeat"] or 0)
+        fresh = heartbeat > 0 and current - heartbeat <= heartbeat_timeout
+        if not fresh:
+            return {
+                **result,
+                "verified": False,
+                "status": "WINDOWS_CLOUD_NOT_VERIFIED",
+                "reason": "WINDOWS_CLOUD_HEARTBEAT_STALE",
+                "heartbeat_timeout_seconds": heartbeat_timeout,
+            }
+        result["heartbeat_fresh"] = True
+
+    return result
