@@ -29,7 +29,7 @@ def test_internal_runtime_never_uses_github_hosted_runner():
     assert "brain-internal" in text
     assert "BRAIN_INTERNAL_RUNNER_FLAG" in text
     assert "internal_runner_preflight" in text
-    assert "github_hosted_runtime":false in text or '"github_hosted_runtime":false' in text
+    assert '"github_hosted_runtime":false' in text
 
 
 def test_supervisor_does_not_dispatch_github_hosted_runtime():
