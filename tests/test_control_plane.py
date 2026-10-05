@@ -41,4 +41,7 @@ def test_handler_failure_is_recorded(tmp_path: Path) -> None:
     plane.register("t3", "compute", ActionRisk.READ, boom)
     result = plane.run("t3")
     assert result.status is TaskStatus.FAILED
+    assert plane.evidence.events()[-2].event == "task_diagnostic"
+    assert plane.evidence.events()[-2].payload["error_type"] == "RuntimeError"
+    assert plane.state.get("task:t3")["diagnostic"]["error"] == "boom"
     assert plane.evidence.events()[-1].event == "task_failed"
