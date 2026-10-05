@@ -14,19 +14,20 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 10
     steps:
-      - name: Locate local setup.exe
+      - name: Locate staged setup.exe
         shell: bash
         run: |
           set -euo pipefail
-          test -f /mnt/e/setup.exe
-          sha256sum /mnt/e/setup.exe | tee setup.sha256
-          stat -c 'SIZE_BYTES=%s' /mnt/e/setup.exe
+          FILE="$HOME/setup-staging/setup.exe"
+          test -f "$FILE"
+          sha256sum "$FILE" | tee setup.sha256
+          stat -c 'SIZE_BYTES=%s' "$FILE"
       - name: Stage artifact
         uses: actions/upload-artifact@v4
         with:
           name: setup-exe-staged
           path: |
-            /mnt/e/setup.exe
+            $HOME/setup-staging/setup.exe
             setup.sha256
           if-no-files-found: error
 
