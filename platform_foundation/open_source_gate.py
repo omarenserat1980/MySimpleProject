@@ -56,6 +56,17 @@ class OpenSourceGate:
         )
         return OpenSourceGateResult(decision, candidate.name, tuple(reasons))
 
+    def evaluate_all(self, candidates: list[OpenSourceCandidate]) -> dict[str, object]:
+        results = tuple(self.evaluate(candidate) for candidate in candidates)
+        blocked = tuple(result.candidate for result in results if result.decision is OpenSourceDecision.BLOCKED)
+        return {
+            "healthy": not blocked,
+            "status": "READY" if not blocked else "BLOCKED",
+            "approved": tuple(result.candidate for result in results if result.decision is OpenSourceDecision.APPROVED),
+            "blocked": blocked,
+            "results": results,
+        }
+
 
 __all__ = [
     "OpenSourceCandidate",
