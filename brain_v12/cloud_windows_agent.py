@@ -80,7 +80,7 @@ def execute_job(job: dict) -> dict:
     argv = payload.get("argv")
     if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
         raise RuntimeError("WINDOWS_JOB_REQUIRES_ARGV_LIST")
-    timeout = max(1, min(int(payload.get("timeout_seconds", 900)), 3600))
+    timeout = max(1, min(int(payload.get("timeout", payload.get("timeout_seconds", 900))), 3600))
     cwd = payload.get("cwd")
     if cwd is not None and not isinstance(cwd, str):
         raise RuntimeError("WINDOWS_JOB_CWD_INVALID")
