@@ -1,19 +1,50 @@
 services:
+  brain-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.brain-cloud
+    restart: unless-stopped
+    privileged: true
+    command: ["python3", "-m", "uvicorn", "brain_v12.app:app", "--host", "0.0.0.0", "--port", "8012"]
+    ports:
+      - "8012:8012"
+    volumes:
+      - brain-runtime:/var/lib/brain/runtime
+      - brain-state:/opt/brain/.brain
+      - brain-data:/opt/brain/brain_data
+    environment:
+      BRAIN_INTERNAL_RUNNER_FLAG: "1"
+      BRAIN_RUNTIME_ROOT: /var/lib/brain/runtime
+      BRAIN_CLOUD_MODE: "1"
+      BRAIN_DB: /opt/brain/brain_data/brain_v12.db
+      BRAIN_WORKER_POLL_SECONDS: "2"
+      BRAIN_TASK_TIMEOUT: "3600"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8012/health', timeout=5); raise SystemExit(0 if r.status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   brain-cloud-runtime:
     build:
       context: .
       dockerfile: Dockerfile.brain-cloud
     restart: unless-stopped
     privileged: true
+    command: ["python3", "-m", "brain_v12.cloud_runtime.worker"]
     volumes:
       - brain-runtime:/var/lib/brain/runtime
       - brain-state:/opt/brain/.brain
+      - brain-data:/opt/brain/brain_data
     environment:
       BRAIN_INTERNAL_RUNNER_FLAG: "1"
       BRAIN_RUNTIME_ROOT: /var/lib/brain/runtime
+      BRAIN_CLOUD_MODE: "1"
       BRAIN_WORKER_POLL_SECONDS: "2"
       BRAIN_TASK_TIMEOUT: "3600"
 
 volumes:
   brain-runtime:
   brain-state:
+  brain-data:
