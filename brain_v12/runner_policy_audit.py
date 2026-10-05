@@ -9,15 +9,11 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-PROTECTED = (
-    "base-expansion-",
-)
+PROTECTED = ("",)
 
 def audit_workflows(root: Path) -> list[str]:
     findings: list[str] = []
     for path in sorted((root / ".github" / "workflows").glob("*.yml")):
-        if not path.name.startswith(PROTECTED):
-            continue
         text = path.read_text(encoding="utf-8")
         if re.search(r"runs-on:\s*ubuntu-[^\n]+", text):
             findings.append(f"{path}: github-hosted runner is forbidden")
