@@ -20,7 +20,7 @@ assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
 assert.match(worker, /idempotent: true/);
 assert.match(worker, /INSERT OR IGNORE INTO payment_events/);
 assert.match(worker, /secure-jordan\.paytabs\.com/);
-assert.match(worker, /PAYTABS_BASE_URL \\+ "\/payment\/request"/);
+assert.ok(worker.includes('PAYTABS_BASE_URL + "/payment/request"'), "PayTabs request URL contract missing");
 assert.match(schema, /CREATE TABLE IF NOT EXISTS orders/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS payments/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS payment_events/);
