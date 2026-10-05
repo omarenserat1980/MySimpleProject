@@ -9,6 +9,7 @@ on:
       - "brain_v12/brain/apm_media_adapter.py"
       - "brain_v12/brain/apm_media_executor.py"
       - "brain_v12/brain/apm_chunk_scheduler.py"
+      - "brain_v12/brain/film_segment_manager.py"
       - "brain_v7/braincore_v2/media_production_pipeline.py"
       - "brain_v12/tests/test_parallel_stage_scheduler.py"
       - "brain_v12/tests/test_apm_build.py"
@@ -17,6 +18,7 @@ on:
       - "brain_v12/tests/test_apm_media_adapter.py"
       - "brain_v12/tests/test_apm_media_executor.py"
       - "brain_v12/tests/test_apm_chunk_scheduler.py"
+      - "brain_v12/tests/test_film_segment_manager.py"
       - ".github/workflows/brain-parallel-stage-pipeline.yml"
   pull_request:
     paths:
@@ -37,7 +39,7 @@ jobs:
       - name: Compile
         run: python -m compileall -q brain_v12/brain brain_v12/tests
       - name: APM BUILD Contract
-        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build brain_v12.tests.test_apm_stage_discovery brain_v12.tests.test_apm_profiles brain_v12.tests.test_apm_media_adapter brain_v12.tests.test_apm_media_executor brain_v12.tests.test_apm_chunk_scheduler -v
+        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build brain_v12.tests.test_apm_stage_discovery brain_v12.tests.test_apm_profiles brain_v12.tests.test_apm_media_adapter brain_v12.tests.test_apm_media_executor brain_v12.tests.test_apm_chunk_scheduler brain_v12.tests.test_film_segment_manager -v
       - name: Evidence
         run: |
           mkdir -p brain-artifacts
