@@ -30,6 +30,21 @@ class WindowsCloudAgentTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs["shell"], False)
         self.assertEqual(run.call_args.kwargs["check"], False)
 
+    def test_execute_job_uses_controller_timeout_field(self):
+        completed = type("Completed", (), {
+            "returncode": 0, "stdout": "ok", "stderr": ""
+        })()
+        with patch.object(agent.os, "name", "nt"), patch.object(
+            agent.subprocess, "run", return_value=completed
+        ) as run:
+            agent.execute_job({
+                "payload": {
+                    "argv": ["cmd.exe", "/c", "echo", "ok"],
+                    "timeout": 17,
+                }
+            })
+        self.assertEqual(run.call_args.kwargs["timeout"], 17)
+
 
 if __name__ == "__main__":
     unittest.main()
