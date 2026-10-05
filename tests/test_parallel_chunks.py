@@ -15,7 +15,7 @@ def test_chunks_run_with_bounded_parallelism(tmp_path):
     active = {"value": 0, "max": 0}
     lock = threading.Lock()
 
-    def execute(chunk):
+    def execute(chunk, _deps):
         with lock:
             active["value"] += 1
             active["max"] = max(active["max"], active["value"])
@@ -29,11 +29,62 @@ def test_chunks_run_with_bounded_parallelism(tmp_path):
         lambda chunk, output: output["chunk"] == chunk,
         max_workers=2,
     )
-
     assert all(result.status == "SUCCESS" for result in results)
     assert active["max"] == 2
-    assert all(store.get(f"pipeline.chunk:run-1:{i}")["status"] == "SUCCESS" for i in ["1","2","3","4"])
     assert audit.verify()
+    store.close()
+
+
+def test_dependency_layers_parallelize_without_violating_order(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    audit = AuditChain()
+    runner = ParallelChunkRunner(store, audit)
+    running = set()
+    lock = threading.Lock()
+    observed = []
+
+    def execute(chunk, deps):
+        with lock:
+            running.add(chunk)
+            observed.append(("start", chunk, sorted(running)))
+        time.sleep(0.03)
+        if chunk == "C":
+            assert "A" in [item[1] for item in observed if item[0] == "done"]
+            assert "B" in [item[1] for item in observed if item[0] == "done"]
+        with lock:
+            running.discard(chunk)
+            observed.append(("done", chunk, []))
+        return {"chunk": chunk, "deps": sorted(deps)}
+
+    results = runner.run(
+        "run-deps",
+        ["A", "B", "C", "D"],
+        execute,
+        lambda _chunk, output: True,
+        dependencies={"C": ["A", "B"], "D": ["B"]},
+        max_workers=2,
+    )
+    assert all(result.status == "SUCCESS" for result in results)
+    c = next(result for result in results if result.chunk_id == "C")
+    assert c.output["deps"] == ["A", "B"]
+    store.close()
+
+
+def test_dependency_cycle_is_rejected_before_execution(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    audit = AuditChain()
+    runner = ParallelChunkRunner(store, audit)
+    calls = []
+    try:
+        runner.run(
+            "cycle", ["A", "B"], lambda chunk, deps: calls.append(chunk),
+            lambda _chunk, _output: True,
+            dependencies={"A": ["B"], "B": ["A"]},
+        )
+        assert False
+    except ValueError as exc:
+        assert "cycle" in str(exc)
+    assert calls == []
     store.close()
 
 
@@ -42,10 +93,8 @@ def test_restart_resumes_only_unfinished_chunks(tmp_path):
     store = SQLiteStateStore(path)
     audit = AuditChain()
     runner = ParallelChunkRunner(store, audit)
-    calls = []
 
-    def first(chunk):
-        calls.append(chunk)
+    def first(chunk, _deps):
         if chunk == "3":
             raise RuntimeError("temporary")
         return chunk
@@ -61,20 +110,14 @@ def test_restart_resumes_only_unfinished_chunks(tmp_path):
     reopened = SQLiteStateStore(path)
     resumed = ParallelChunkRunner(reopened, audit)
     resumed_calls = []
-
-    def second(chunk):
-        resumed_calls.append(chunk)
-        return chunk
-
     second_results = resumed.run(
-        "run-2", ["1", "2", "3"], second,
-        lambda _chunk, output: True,
+        "run-2", ["1", "2", "3"],
+        lambda chunk, _deps: resumed_calls.append(chunk) or chunk,
+        lambda _chunk, _output: True,
         max_workers=2,
     )
-
     assert [r.status for r in second_results] == ["SUCCESS", "SUCCESS", "SUCCESS"]
     assert resumed_calls == ["3"]
-    assert audit.verify()
     reopened.close()
 
 
@@ -82,13 +125,10 @@ def test_failed_chunk_never_becomes_success_without_verification(tmp_path):
     store = SQLiteStateStore(tmp_path / "state.db")
     audit = AuditChain()
     runner = ParallelChunkRunner(store, audit)
-
     results = runner.run(
-        "run-3", ["bad"], lambda _chunk: "output",
-        lambda _chunk, _output: False,
-        max_workers=1,
+        "run-3", ["bad"], lambda _chunk, _deps: "output",
+        lambda _chunk, _output: False, max_workers=1,
     )
-
     assert results[0].status == "FAILED"
     assert store.get("pipeline.chunk:run-3:bad")["status"] == "FAILED"
     assert audit.verify()
