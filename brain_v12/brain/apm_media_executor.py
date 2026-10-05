@@ -28,6 +28,16 @@ class APMMediaExecutor:
 
         quality_scores = quality_scores or {}
         stages = stages_from_media_pipeline(self.media_pipeline)
+        # Restore verified stage outputs before scheduling dependents.
+        for stage in stages:
+            record = self.state_dir / f"{stage.id.replace('/', '_')}.json"
+            if record.is_file():
+                try:
+                    data = __import__("json").loads(record.read_text(encoding="utf-8"))
+                    if data.get("status") == "VERIFIED_COMPLETED" and data.get("result") is not None:
+                        self._artifacts[stage.id] = data["result"]
+                except Exception:
+                    pass
         scheduler = ParallelStageScheduler(
             stages, self.state_dir, max_workers=self.max_workers,
             retry_limit=self.retry_limit,
