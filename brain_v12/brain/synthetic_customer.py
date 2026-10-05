@@ -63,11 +63,17 @@ class TestRun:
 class SyntheticCustomer:
     def __init__(self, evidence_store=None, chatgpt_advisor: Callable | None = None,
                  brain_advisor: Callable | None = None, executor: Callable | None = None,
-                 executive_profile: SyntheticExecutiveProfile | None = None):
+                 repair_executor: Callable | None = None,
+                 feedback_executor: Callable | None = None,
+                 executive_profile: SyntheticExecutiveProfile | None = None,
+                 max_repair_attempts: int = 1):
         self.evidence_store = evidence_store
         self.chatgpt_advisor = chatgpt_advisor
         self.brain_advisor = brain_advisor
         self.executor = executor
+        self.repair_executor = repair_executor
+        self.feedback_executor = feedback_executor
+        self.max_repair_attempts = max(0, min(int(max_repair_attempts), 3))
         self.runs: dict[str, TestRun] = {}
         self.executive_profile = executive_profile or SyntheticExecutiveProfile()
 
@@ -202,6 +208,9 @@ class SyntheticCustomer:
             run.status = "ACCEPTED"
         else:
             run.status = "REVISION_REQUESTED"
+            if self.feedback_executor:
+                feedback_result = self.feedback_executor(run.request, feedback, run.customer_type, run.run_id)
+                run.evidence.append({"event": "CUSTOMER_FEEDBACK_FORWARDED_TO_BRAIN", "feedback": feedback, "feedback_result": feedback_result, "at": datetime.now(timezone.utc).isoformat()})
         return run
 
     def revise(self, run: TestRun, feedback: str) -> TestRun:
@@ -209,6 +218,7 @@ class SyntheticCustomer:
             raise ValueError("REVISION_NOT_REQUESTED")
         run.approved = False
         run.status = "WAITING_CUSTOMER_APPROVAL"
+        run.request = f"{run.request}\nCustomer revision feedback: {feedback}"
         run.evidence = run.evidence or []
         run.evidence.append({
             "event": "REVISION_CAPTURED",
