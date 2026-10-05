@@ -75,6 +75,29 @@ def test_customer_acceptance_and_delivery_lifecycle():
     assert run.status == "DELIVERED"
 
 
+def test_customer_can_request_bounded_brain_repair_before_final_verification():
+    calls = {"execute": 0, "repair": 0}
+
+    def execute(*args):
+        calls["execute"] += 1
+        if calls["execute"] == 1:
+            return {"ok": False, "verified": False, "gap": "missing test interface"}
+        return {"ok": True, "verified": True, "artifact": "repaired-test-interface"}
+
+    def repair(*args):
+        calls["repair"] += 1
+        return {"ok": True, "verified": True, "action": "bounded-repair"}
+
+    c = SyntheticCustomer(executor=execute, repair_executor=repair, max_repair_attempts=1)
+    run = c.start("TEST_CUSTOMER_SOFTWARE", "Provide a test interface.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="SANDBOX", payment_mode="TEST")
+    assert run.status == "VERIFIED"
+    assert calls == {"execute": 2, "repair": 1}
+    assert any(e["event"] == "BRAIN_GAP_REPAIR_ATTEMPT" for e in run.evidence)
+
+
 def test_customer_review_is_instance_method_and_accepts_verified_run():
     c = SyntheticCustomer(executor=lambda *args: {"ok": True, "verified": True})
     run = c.start("TEST_CUSTOMER_COMPANY", "Build a safe test service.")
