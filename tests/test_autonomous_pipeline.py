@@ -6,6 +6,7 @@ from platform_foundation.autonomous_pipeline import AutonomousPipeline
 from platform_foundation.parallel_chunks import ParallelChunkRunner
 from platform_foundation.persistent_state import SQLiteStateStore
 from platform_foundation.stage_orchestrator import StageOrchestrator
+import pytest
 
 
 def ready_pipeline(tmp_path):
