@@ -31,6 +31,7 @@ class AutonomousPipeline:
     """APM-instrumented, durable, resumable driver for the 41-stage pipeline."""
 
     RUN_KEY = "brain.autonomous_pipeline.last_run"
+    CHECKPOINT_KEY = "brain.autonomous_pipeline.verified_checkpoint"
 
     def __init__(self, orchestrator: StageOrchestrator, apm: APM) -> None:
         self.orchestrator = orchestrator
@@ -38,6 +39,12 @@ class AutonomousPipeline:
 
     def _save_run(self, run: PipelineRun) -> None:
         self.orchestrator.store.set(self.RUN_KEY, asdict(run))
+
+    def checkpoint(self) -> dict[str, Any] | None:
+        return self.orchestrator.store.get(self.CHECKPOINT_KEY)
+
+    def _save_checkpoint(self, *, state: StageState, run_id: str | None) -> None:
+        self.orchestrator.store.set(self.CHECKPOINT_KEY, {"stage": state.stage, "step": state.step, "revision": state.revision, "status": state.status, "run_id": run_id})
 
     def last_run(self) -> PipelineRun | None:
         value = self.orchestrator.store.get(self.RUN_KEY)
@@ -79,6 +86,7 @@ class AutonomousPipeline:
                 task_id=task_id, run_id=run_id, commit_sha=commit_sha,
                 dimensions={"stage": str(before.stage)},
             )
+            self._save_checkpoint(state=after, run_id=run_id)
             return PipelineResult(before.stage, after.stage, after.status, attempts, True)
         except Exception:
             self.apm.counter(
