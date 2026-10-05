@@ -55,6 +55,43 @@ def router(customer: SyntheticCustomer, capability_provider=None):
         except ValueError as exc:
             raise HTTPException(409, str(exc))
 
+    class CustomerReviewRequest(BaseModel):
+        accepted: bool
+        feedback: str = ""
+
+    class CustomerRevisionRequest(BaseModel):
+        feedback: str
+
+    @r.post("/runs/{run_id}/review")
+    def review(run_id: str, body: CustomerReviewRequest):
+        try:
+            run = customer.review(customer.get(run_id), body.accepted, body.feedback)
+            return {"ok": True, "run": run.__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @r.post("/runs/{run_id}/revise")
+    def revise(run_id: str, body: CustomerRevisionRequest):
+        try:
+            run = customer.revise(customer.get(run_id), body.feedback)
+            return {"ok": True, "run": run.__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @r.post("/runs/{run_id}/deliver")
+    def deliver(run_id: str):
+        try:
+            run = customer.deliver(customer.get(run_id))
+            return {"ok": True, "run": run.__dict__}
+        except KeyError:
+            raise HTTPException(404, "SYNTHETIC_RUN_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
     @r.post("/payment-safety")
     def payment_safety(environment: str, payment_mode: str = "NONE"):
         return customer.safety_gate(environment, payment_mode)
