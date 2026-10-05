@@ -39,6 +39,8 @@ class AutonomyCertificationTests(unittest.TestCase):
             self.assertEqual(evidence["status"], "AUTONOMOUS_WITHIN_AUTHORITY")
             self.assertTrue(evidence["github_independent"])
             self.assertTrue(evidence["evidence_ref"])
+            self.assertTrue(evidence["execution_contract"]["verified"])
+            self.assertIn("BRAIN_EXECUTION_FABRIC", evidence["execution_contract"]["contract"])
 
     def test_uncertified_state_cannot_be_claimed(self):
         with self.assertRaisesRegex(
