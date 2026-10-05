@@ -19,6 +19,7 @@ class StageSpec:
     max_retries: int = 2
     dependencies: tuple[str, ...] = ()
     enabled: bool = True
+    verify_wait_seconds: int = 0
 
 @dataclass
 class StageResult:
