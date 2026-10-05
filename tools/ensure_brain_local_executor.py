@@ -59,6 +59,16 @@ def find_existing() -> int | None:
     return None
 
 
+def legacy_supervisor_pids() -> list[int]:
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-f", "brain_v12/local_worker/brain_local_supervisor.py"],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        return [int(x) for x in out.split() if x.isdigit() and int(x) != os.getpid()]
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+        return []
+
 def heartbeat_is_fresh(max_age: float = 15.0) -> bool:
     try:
         age = time.time() - HEARTBEAT.stat().st_mtime
@@ -78,18 +88,26 @@ def main() -> int:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     existing = find_existing()
     started = False
-    # A stale supervisor may still be running code from before a fix.
-    # Replace it instead of reporting ALREADY_RUNNING without a fresh heartbeat.
-    if existing is not None and not heartbeat_is_fresh():
-        try:
-            os.kill(existing, 15)
-            deadline = time.time() + 5
-            while time.time() < deadline and running_pid(existing):
-                time.sleep(0.1)
-            if running_pid(existing):
-                os.kill(existing, 9)
-        except OSError:
-            pass
+    # Retire the legacy supervisor whenever the heartbeat is stale, so an old
+    # process cannot race the hardened guardian or hide its failure.
+    stale = existing is not None and not heartbeat_is_fresh()
+    legacy = legacy_supervisor_pids()
+    if stale or (existing is None and legacy):
+        pids = ([existing] if existing is not None else []) + legacy
+        for pid in sorted(set(pids)):
+            try:
+                os.kill(pid, 15)
+            except OSError:
+                continue
+        deadline = time.time() + 5
+        while time.time() < deadline and any(running_pid(pid) for pid in pids):
+            time.sleep(0.1)
+        for pid in pids:
+            if running_pid(pid):
+                try:
+                    os.kill(pid, 9)
+                except OSError:
+                    pass
         existing = None
     if existing is None:
         log = LOG_FILE.open("a", encoding="utf-8")
@@ -122,7 +140,7 @@ def main() -> int:
         time.sleep(0.5)
 
     result = {
-        "schema": "brain.local_executor_launcher.v2",
+        "schema": "brain.local_executor_launcher.v3",
         "status": "FAILED",
         "reason": "fresh_heartbeat_not_observed",
         "supervisor_pid": existing,
