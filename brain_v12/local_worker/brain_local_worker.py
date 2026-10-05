@@ -57,6 +57,14 @@ def execute(task: str, params: dict):
             "stdout": p.stdout[-12000:],
             "stderr": p.stderr[-12000:],
         }
+    if task == "brain_local_verification":
+        script = Path(__file__).resolve().parents[2] / "tools" / "verify_brain_local.py"
+        p = subprocess.run([sys.executable, str(script)], cwd=str(Path(__file__).resolve().parents[2]),
+                           capture_output=True, text=True, timeout=30*60)
+        if p.returncode != 0:
+            raise RuntimeError("brain_local_verification_failed:" + (p.stderr or p.stdout)[-4000:])
+        return {"provider": "brain-local-worker", "verified": True,
+                "status": "VERIFIED", "stdout": p.stdout[-12000:]}
     if task == "python_version":
         return {"python": platform.python_version()}
     if task == "platform":
