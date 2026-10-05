@@ -66,6 +66,21 @@ class BrainCIExecutor:
         """Explicit Brain runtime entrypoint; never delegates to GitHub Actions."""
         return self.execute(profile, commit_sha=commit_sha, run_id=run_id)
 
+    def readiness(self) -> dict[str, Any]:
+        """Fail-closed readiness check for the Brain-owned execution path."""
+        decision = self.policy.select(
+            [self.executor],
+            required_capabilities={"python", "pytest"},
+        )
+        return {
+            "ready": decision.decision is ExecutorDecision.ALLOWED,
+            "decision": decision.decision.value,
+            "executor_id": self.executor.executor_id if decision.decision is ExecutorDecision.ALLOWED else None,
+            "reason": decision.reason,
+            "owner": self.executor.owner,
+            "persistent": self.executor.persistent,
+        }
+
     def _run_local(self, command: list[str], root: Path) -> tuple[int, str, str]:
         p = subprocess.run(command, cwd=root, capture_output=True, text=True)
         return p.returncode, p.stdout[-12000:], p.stderr[-12000:]
