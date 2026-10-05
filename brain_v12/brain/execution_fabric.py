@@ -21,6 +21,7 @@ class Worker:
     kind: str
     executor: Callable[[list[str], str, int | None], dict[str, Any]]
     online: bool = True
+    external: bool = False
     last_seen: float = field(default_factory=time.time)
 
 
@@ -31,7 +32,10 @@ class ExecutionFabric:
         self.leases: dict[str, dict[str, Any]] = {}
 
     def register(self, worker_id: str, kind: str, capabilities: set[str],
-                 executor: Callable[[list[str], str, int | None], dict[str, Any]]) -> None:
+                 executor: Callable[[list[str], str, int | None], dict[str, Any]],
+                 *, external: bool = False) -> None:
+        if external:
+            raise RuntimeError("EXTERNAL_WORKER_FORBIDDEN")
         self.workers[worker_id] = Worker(
             worker_id=worker_id, kind=kind, capabilities=set(capabilities),
             executor=executor,
@@ -45,7 +49,7 @@ class ExecutionFabric:
     def resolve(self, capability: str) -> Worker:
         candidates = [
             w for w in self.workers.values()
-            if w.online and capability in w.capabilities
+            if w.online and not w.external and capability in w.capabilities
         ]
         if not candidates:
             raise RuntimeError(f"NO_BRAIN_WORKER_FOR:{capability}")
@@ -110,6 +114,7 @@ class ExecutionFabric:
                     "worker_id": w.worker_id, "kind": w.kind,
                     "capabilities": sorted(w.capabilities),
                     "online": w.online,
+                    "external": w.external,
                     "last_seen": w.last_seen,
                 }
                 for w in self.workers.values()
