@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import os
 
 
 @dataclass(frozen=True)
@@ -33,4 +34,6 @@ class TerraformPlanGate:
             raise RuntimeError("TERRAFORM_INIT_REQUIRED")
         if not state["plan_present"]:
             raise RuntimeError("TERRAFORM_PLAN_REQUIRED")
+        if os.environ.get("BRAIN_WINDOWS_CLOUD_PLAN_APPROVED", "").lower() != "true":
+            raise RuntimeError("TERRAFORM_PLAN_EXPLICIT_APPROVAL_REQUIRED")
         return self.root / "brain.tfplan"
