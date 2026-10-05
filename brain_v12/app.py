@@ -131,7 +131,19 @@ brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROO
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
-synthetic_customer=SyntheticCustomer(evidence_store=evidence_store, chatgpt_advisor=synthetic_customer_advisors[0], brain_advisor=synthetic_customer_advisors[1], executor=lambda request, customer_type, run_id: {"ok": True, "run_id": run_id, "customer_type": customer_type, "cognitive": cognitive.run(request)})
+def synthetic_customer_executor(request, customer_type, run_id):
+    cognitive_result = cognitive.run(request)
+    execution = cognitive_result.get("execution", {}) if isinstance(cognitive_result, dict) else {}
+    verification = cognitive_result.get("verification", {}) if isinstance(cognitive_result, dict) else {}
+    verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
+    return {"ok": verified, "verified": verified, "run_id": run_id, "customer_type": customer_type, "cognitive": cognitive_result}
+
+synthetic_customer=SyntheticCustomer(
+    evidence_store=evidence_store,
+    chatgpt_advisor=synthetic_customer_advisors[0],
+    brain_advisor=synthetic_customer_advisors[1],
+    executor=synthetic_customer_executor,
+)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
