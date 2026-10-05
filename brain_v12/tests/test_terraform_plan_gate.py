@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -18,8 +19,9 @@ def test_requires_plan(tmp_path: Path) -> None:
         gate.require_reviewed_plan()
 
 
-def test_accepts_initialized_review_plan(tmp_path: Path) -> None:
+def test_accepts_initialized_review_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / ".terraform").mkdir()
     (tmp_path / "brain.tfplan").write_bytes(b"opaque-plan")
+    monkeypatch.setenv("BRAIN_WINDOWS_CLOUD_PLAN_APPROVED", "true")
     gate = TerraformPlanGate(tmp_path)
     assert gate.require_reviewed_plan().name == "brain.tfplan"
