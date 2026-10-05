@@ -75,3 +75,15 @@ def test_readiness_is_brain_owned_and_fail_closed(tmp_path):
     assert readiness["decision"] == "ALLOWED"
     assert readiness["owner"] == "brain"
     assert readiness["persistent"] is True
+
+def test_evidence_is_durable_and_bound_to_run(tmp_path):
+    executor = BrainCIExecutor(
+        SQLiteStateStore(tmp_path / "state.db"),
+        root=tmp_path,
+        runner=lambda *_: (0, "pass", ""),
+    )
+    result = executor.run_profile("runner_policy", run_id="brain-proof-01")
+    evidence = executor.evidence("brain-proof-01")
+    assert evidence["run_id"] == "brain-proof-01"
+    assert evidence["executor_id"] == result.executor_id
+    assert executor.evidence("other-run") is None
