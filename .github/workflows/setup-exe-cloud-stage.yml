@@ -2,6 +2,17 @@ name: Setup EXE Cloud Stage
 
 on:
   workflow_dispatch:
+    inputs:
+      execute:
+        description: "Set true to execute setup.exe on the disposable GitHub Windows runner after validation"
+        required: true
+        default: false
+        type: boolean
+      timeout_seconds:
+        description: "Maximum setup.exe runtime in seconds"
+        required: false
+        default: "120"
+        type: string
   push:
     paths:
       - ".github/workflows/setup-exe-cloud-stage.yml"
@@ -44,19 +55,76 @@ jobs:
         with:
           name: setup-exe-staged
           path: setup-staged
-      - name: Verify SHA-256
+      - name: Verify SHA-256 and PE metadata
         shell: pwsh
         run: |
           $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
-          if (-not $file) { throw "setup.exe not found in downloaded artifact" }
           $hashFile = Get-ChildItem -Path "setup-staged" -Filter "setup.sha256" -Recurse -File | Select-Object -First 1
-          if (-not $hashFile) { throw "setup.sha256 not found in downloaded artifact" }
+          if (-not $file) { throw "setup.exe not found" }
+          if (-not $hashFile) { throw "setup.sha256 not found" }
           $expected = (Get-Content $hashFile.FullName -Raw).Trim().Split()[0].ToUpper()
           $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToUpper()
+          if ($expected -ne $actual) { throw "SHA-256 mismatch" }
+          if ($file.Length -ne 99896) { throw "Unexpected setup.exe size" }
+          $sig = Get-AuthenticodeSignature $file.FullName
+          $v = $file.VersionInfo
           Write-Host "FILE=$($file.FullName)"
           Write-Host "EXPECTED_SHA256=$expected"
           Write-Host "ACTUAL_SHA256=$actual"
-          if ($expected -ne $actual) { throw "SHA-256 mismatch" }
-          if ($file.Length -ne 99896) { throw "Unexpected setup.exe size" }
+          Write-Host "SIZE_BYTES=$($file.Length)"
+          Write-Host "SIGNATURE_STATUS=$($sig.Status)"
+          Write-Host "SIGNER=$($sig.SignerCertificate.Subject)"
+          Write-Host "FILE_VERSION=$($v.FileVersion)"
           Write-Host "CLOUD_STAGE_VERIFY=PASS"
           Write-Host "SETUP_EXE_STAGED=READY"
+
+  cloud-execute:
+    needs: cloud-validate
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.execute == true }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download validated artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: setup-exe-staged
+          path: setup-staged
+      - name: Re-verify before execution
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          $hashFile = Get-ChildItem -Path "setup-staged" -Filter "setup.sha256" -Recurse -File | Select-Object -First 1
+          if (-not $file -or -not $hashFile) { throw "Validated artifact missing" }
+          $expected = (Get-Content $hashFile.FullName -Raw).Trim().Split()[0].ToUpper()
+          $actual = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToUpper()
+          if ($expected -ne $actual) { throw "Pre-execution SHA-256 mismatch" }
+          if ($file.Length -ne 99896) { throw "Pre-execution size mismatch" }
+          Write-Host "PRE_EXECUTION_INTEGRITY=PASS"
+      - name: Execute setup.exe
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          $seconds = [int]"${{ inputs.timeout_seconds }}"
+          if ($seconds -lt 1 -or $seconds -gt 600) { throw "timeout_seconds must be 1..600" }
+          Write-Host "SETUP_EXE_EXECUTION=START"
+          $p = Start-Process -FilePath $file.FullName -Wait -PassThru
+          Write-Host "SETUP_EXE_EXIT_CODE=$($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "setup.exe exited with code $($p.ExitCode)" }
+          Write-Host "SETUP_EXE_EXECUTION=PASS"
+      - name: Execution evidence
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          @(
+            "execution_run=$env:GITHUB_RUN_ID"
+            "execution_job=$env:GITHUB_JOB"
+            "completed_at=$([DateTime]::UtcNow.ToString('o'))"
+          ) | Set-Content evidence/execution.txt
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup-exe-cloud-execution-evidence
+          path: evidence
+          if-no-files-found: error
