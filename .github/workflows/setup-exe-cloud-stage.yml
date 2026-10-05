@@ -55,6 +55,18 @@ jobs:
         with:
           name: setup-exe-staged
           path: setup-staged
+      - name: Static safety gate (no execution)
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path "setup-staged" -Filter "setup.exe" -Recurse -File | Select-Object -First 1
+          if (-not $file) { throw "setup.exe not found for static safety gate" }
+          $bytes = [System.IO.File]::ReadAllBytes($file.FullName)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Invalid PE/MZ header" }
+          $sig = Get-AuthenticodeSignature $file.FullName
+          Write-Host "STATIC_SAFETY_GATE=PASS"
+          Write-Host "SIGNATURE_STATUS=$($sig.Status)"
+          Write-Host "EXECUTION_PERFORMED=NO"
+
       - name: Verify SHA-256 and PE metadata
         shell: pwsh
         run: |
