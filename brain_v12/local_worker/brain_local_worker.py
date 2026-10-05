@@ -8,6 +8,12 @@ from __future__ import annotations
 import json, os, platform, shutil, subprocess, time, sys
 from pathlib import Path
 from datetime import datetime, timezone
+
+# Make the repository importable even when this worker is launched directly.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 
 ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
