@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from .audit import EvidenceLedger
+from .diagnostics import capture_exception
 from .permissions import ActionRisk, PermissionBoundary
 from .persistent_state import SQLiteStateStore
 from .task_state import InvalidTaskTransition, TaskStatus, transition
@@ -58,7 +59,9 @@ class ControlPlane:
         try:
             output = handler()
         except Exception as exc:
-            self.state.set(f"task:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": str(exc)})
+            diagnostic = capture_exception(task_id, exc)
+            self.state.set(f"task:{task_id}", {**record, "status": TaskStatus.FAILED.value, "error": str(exc), "diagnostic": diagnostic.as_dict()})
+            self.evidence.record("task_diagnostic", diagnostic.as_dict())
             self.evidence.record("task_failed", {"task_id": task_id, "error": str(exc)})
             return ControlResult(task_id, TaskStatus.FAILED, True, error=str(exc))
         self.state.set(f"task:{task_id}", {**record, "status": TaskStatus.SUCCESS.value})
