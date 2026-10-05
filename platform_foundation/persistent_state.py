@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 class SQLiteStateStore:
@@ -33,6 +33,33 @@ class SQLiteStateStore:
     def get(self, key: str, default: Any = None) -> Any:
         row = self._conn.execute("SELECT value FROM state WHERE key=?", (key,)).fetchone()
         return default if row is None else json.loads(row[0])
+
+    def atomic_update(
+        self,
+        key: str,
+        updater: Callable[[Any], tuple[bool, Any]],
+        default: Any = None,
+    ) -> tuple[bool, Any]:
+        """Run a read/decision/write cycle under one SQLite write transaction."""
+        if not key:
+            raise ValueError("state key is required")
+        self._conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = self._conn.execute("SELECT value FROM state WHERE key=?", (key,)).fetchone()
+            current = default if row is None else json.loads(row[0])
+            changed, value = updater(current)
+            if changed:
+                encoded = json.dumps(value, sort_keys=True, separators=(",", ":"))
+                self._conn.execute(
+                    "INSERT INTO state(key,value) VALUES(?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (key, encoded),
+                )
+            self._conn.commit()
+            return changed, value
+        except Exception:
+            self._conn.rollback()
+            raise
 
     def snapshot(self) -> dict[str, Any]:
         rows = self._conn.execute("SELECT key,value FROM state ORDER BY key").fetchall()
