@@ -205,6 +205,47 @@ class APM:
             self.observe("requests.latency_ms", duration_ms, task_id=task_id,
                          run_id=run_id, commit_sha=commit_sha, dimensions=dimensions)
 
+    def record_operation(self, *, operation: str, success: bool, duration_ms: float | None = None,
+                         retries: int = 0, task_id: str | None = None,
+                         run_id: str | None = None, commit_sha: str | None = None) -> None:
+        if not isinstance(operation, str) or not operation.strip():
+            raise ValueError("operation is required")
+        if retries < 0:
+            raise ValueError("retries cannot be negative")
+        dimensions = {"operation": operation.strip()[:128]}
+        self.counter("operations.total", 1, dimensions=dimensions,
+                     task_id=task_id, run_id=run_id, commit_sha=commit_sha)
+        if success:
+            self.counter("operations.success", 1, dimensions=dimensions,
+                         task_id=task_id, run_id=run_id, commit_sha=commit_sha)
+        else:
+            self.counter("operations.errors", 1, dimensions=dimensions,
+                         task_id=task_id, run_id=run_id, commit_sha=commit_sha)
+        if retries:
+            self.counter("operations.retries", retries, dimensions=dimensions,
+                         task_id=task_id, run_id=run_id, commit_sha=commit_sha)
+        if duration_ms is not None:
+            self.observe("operations.duration_ms", duration_ms, dimensions=dimensions,
+                          task_id=task_id, run_id=run_id, commit_sha=commit_sha)
+
+    def operation(self, operation: str, *, task_id: str | None = None,
+                  run_id: str | None = None, commit_sha: str | None = None):
+        started = self.clock()
+        state = {"success": False, "retries": 0}
+        @contextmanager
+        def scope():
+            try:
+                yield state
+                state["success"] = True
+            finally:
+                self.record_operation(
+                    operation=operation, success=state["success"],
+                    duration_ms=max(0.0, (self.clock() - started) * 1000.0),
+                    retries=int(state["retries"]), task_id=task_id,
+                    run_id=run_id, commit_sha=commit_sha,
+                )
+        return scope()
+
     def summary(self) -> dict[str, Any]:
         points = self.snapshot()
         return {"series": len(points), "metrics": sorted({p["metric"] for p in points}),
