@@ -23,6 +23,7 @@ on:
       - 'tests/test_stale_task_recovery.py'
       - 'tests/test_repair_policy.py'
       - 'tests/test_repair_executor.py'
+      - 'tests/test_workflow_inspector.py'
       - '.github/workflows/base-expansion-integrated-gate.yml'
 
 permissions:
@@ -57,7 +58,8 @@ jobs:
             tests/test_supervisor_final_fencing.py \
             tests/test_stale_task_recovery.py \
             tests/test_repair_policy.py \
-            tests/test_repair_executor.py
+            tests/test_repair_executor.py \\
+            tests/test_workflow_inspector.py
       - name: Write integrated evidence
         run: |
           python - <<'PY'
