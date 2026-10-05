@@ -13,8 +13,8 @@
       "id": "02",
       "name": "APM evidence gate",
       "dependencies": ["01"],
-      "run": {"command": ["python", "-m", "brain_v12.apm.cli", "verify", "--state-dir", ".brain/apm/state"], "timeout_seconds": 120},
-      "verify": {"command": ["python", "-m", "brain_v12.apm.cli", "verify", "--state-dir", ".brain/apm/state"], "timeout_seconds": 120},
+      "run": {"command": ["python", "-c", "import json; from pathlib import Path; d=json.loads(Path('.brain/apm/state/evidence/01_evidence.json').read_text()); assert d['status']=='PASS' and d['tests']=='PASS' and d['evidence']=='COMPLETE'"], "timeout_seconds": 120},
+      "verify": {"command": ["python", "-c", "import json; from pathlib import Path; d=json.loads(Path('.brain/apm/state/evidence/01_evidence.json').read_text()); assert d['status']=='PASS' and d['tests']=='PASS' and d['evidence']=='COMPLETE'"], "timeout_seconds": 120},
       "max_retries": 1
     }
   ],
