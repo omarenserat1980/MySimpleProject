@@ -4,10 +4,16 @@ from __future__ import annotations
 
 Provider credentials and infrastructure operations stay outside this module.
 A concrete adapter must implement WindowsCloudProvider.
+
+Infrastructure state and guest-runtime proof are intentionally separate:
+Terraform/Azure may prove that a VM exists, while the Fabric Windows Agent
+heartbeat proves that the intended Windows runtime is actually alive.
 """
 
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
+
+from .windows_cloud_gate import verify_windows_cloud_node
 
 
 WINDOWS_SERVER_2025 = "Windows Server 2025"
@@ -73,16 +79,80 @@ class WindowsCloudExecutor:
         return self.verify(vm)
 
     def verify(self, vm: CloudWindowsVM) -> dict[str, Any]:
+        """Verify infrastructure identity/state only.
+
+        This deliberately does not claim that the guest agent is alive.
+        Use verify_runtime() for the stronger operational proof.
+        """
         self._validate(vm)
+        running = vm.state == "RUNNING"
         return {
-            "status": "CLOUD_WINDOWS_VM_READY" if vm.state == "RUNNING" else "CLOUD_WINDOWS_VM_NOT_READY",
-            "verified": vm.state == "RUNNING",
+            "status": "CLOUD_WINDOWS_VM_READY" if running else "CLOUD_WINDOWS_VM_NOT_READY",
+            "verified": running,
+            "runtime_verified": False,
+            "verification_scope": "infrastructure_only",
             "executor": self.capability,
             "provider": vm.provider,
             "vm_id": vm.vm_id,
             "region": vm.region,
             "os": vm.os,
             "architecture": vm.architecture,
+        }
+
+    def verify_runtime(
+        self,
+        vm: CloudWindowsVM,
+        node: dict[str, Any],
+        *,
+        heartbeat_timeout: float = 120.0,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        """Require both infrastructure identity and fresh Windows guest proof."""
+        infrastructure = self.verify(vm)
+        if not infrastructure["verified"]:
+            return {
+                **infrastructure,
+                "status": "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED",
+                "runtime_verified": False,
+                "reason": "CLOUD_WINDOWS_VM_NOT_RUNNING",
+            }
+
+        if str(node.get("provider", "")).strip().lower() != vm.provider.strip().lower():
+            return {
+                **infrastructure,
+                "status": "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED",
+                "runtime_verified": False,
+                "reason": "WINDOWS_CLOUD_PROVIDER_MISMATCH",
+            }
+
+        if str(node.get("node_id", "")).strip() not in {"", vm.vm_id}:
+            return {
+                **infrastructure,
+                "status": "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED",
+                "runtime_verified": False,
+                "reason": "WINDOWS_CLOUD_VM_ID_MISMATCH",
+            }
+
+        guest = verify_windows_cloud_node(
+            node,
+            heartbeat_timeout=heartbeat_timeout,
+            now=now,
+        )
+        if not guest["verified"]:
+            return {
+                **infrastructure,
+                "status": "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED",
+                "runtime_verified": False,
+                "reason": guest.get("reason", "WINDOWS_CLOUD_GUEST_EVIDENCE_INVALID"),
+                "guest_gate": guest,
+            }
+
+        return {
+            **infrastructure,
+            "status": "WINDOWS_CLOUD_RUNTIME_VERIFIED",
+            "runtime_verified": True,
+            "verification_scope": "infrastructure_plus_guest_heartbeat",
+            "guest_gate": guest,
         }
 
     @staticmethod
