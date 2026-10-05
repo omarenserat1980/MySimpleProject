@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from platform_foundation.audit_chain import AuditChain
 from platform_foundation.integration_gate import IntegrationGate
 from platform_foundation.permissions import ActionRisk, PermissionBoundary
 from platform_foundation.persistent_state import SQLiteStateStore
+from platform_foundation.supervisor import Supervisor
+from platform_foundation.verification import VerificationGate
 from brain_v12.brain.brain_supervisor import BrainSupervisor
 
 
@@ -17,8 +19,24 @@ class BrainAdmissionResult:
     checks: dict[str, bool]
 
 
+@dataclass(frozen=True)
+class BrainVerifiedExecution:
+    task_id: str
+    executed: bool
+    verified: bool
+    status: str
+    attempts: int
+    output: Any = None
+    error: str | None = None
+
+
 class BrainSupervisorBridge:
-    """Admission-controlled bridge from the independent foundation to Brain Supervisor."""
+    """Admission-controlled bridge from the independent foundation to Brain Supervisor.
+
+    Higher-level Brain orchestration is admitted only after the independent foundation
+    is healthy. Executions that cross this bridge also require an independent verifier
+    before they can be reported as verified.
+    """
 
     def __init__(
         self,
@@ -29,24 +47,87 @@ class BrainSupervisorBridge:
         root: str,
         max_cycles: int = 5,
     ) -> None:
+        self.state = state
+        self.audit = audit
+        self.permissions = permissions
         self.gate = IntegrationGate(state, audit, permissions)
         self.supervisor = BrainSupervisor(root=root, max_cycles=max_cycles)
+        self.execution = Supervisor(state, audit, permissions)
+        self.verification = VerificationGate(state, audit)
 
     def admit(self) -> BrainAdmissionResult:
         result = self.gate.admit()
         return BrainAdmissionResult(result.admitted, result.reason, result.checks)
 
-    def create_job(self, task: str, *, steps: list[str] | None = None) -> Any:
+    def _require_admission(self) -> None:
         admission = self.admit()
         if not admission.admitted:
             raise RuntimeError(f"brain integration blocked: {admission.reason}")
+
+    def create_job(self, task: str, *, steps: list[str] | None = None) -> Any:
+        self._require_admission()
         return self.supervisor.create(task, steps=steps)
 
     def simulate_verified_path(self, task: str) -> Any:
-        admission = self.admit()
-        if not admission.admitted:
-            raise RuntimeError(f"brain integration blocked: {admission.reason}")
+        self._require_admission()
         return self.supervisor.run_simulation(task, verification_ok=True)
 
+    def execute_verified(
+        self,
+        task_id: str,
+        action: str,
+        risk: ActionRisk,
+        handler: Callable[[], Any],
+        verifier: Callable[[Any], bool],
+        *,
+        max_attempts: int = 3,
+    ) -> BrainVerifiedExecution:
+        """Execute through foundation controls, then independently verify the result."""
+        self._require_admission()
+        self.execution.register(
+            task_id,
+            action,
+            risk,
+            handler,
+            max_attempts=max_attempts,
+        )
+        result = self.execution.run(task_id)
+        if not result.allowed or result.status.value != "SUCCESS":
+            self.audit.record(
+                "brain.bridge.execution_failed",
+                {"task_id": task_id, "status": result.status.value, "error": result.error},
+            )
+            return BrainVerifiedExecution(
+                task_id, False, False, result.status.value, result.attempts,
+                output=result.output, error=result.error,
+            )
 
-__all__ = ["BrainAdmissionResult", "BrainSupervisorBridge"]
+        verified = self.verification.verify(task_id, result.output, verifier)
+        status = verified.status.value
+        self.state.set(
+            f"brain_bridge:{task_id}",
+            {
+                "task_id": task_id,
+                "executed": True,
+                "verified": verified.verified,
+                "status": status,
+                "attempts": result.attempts,
+                "error": verified.error,
+            },
+        )
+        self.audit.record(
+            "brain.bridge.verification_gate",
+            {
+                "task_id": task_id,
+                "executed": True,
+                "verified": verified.verified,
+                "status": status,
+            },
+        )
+        return BrainVerifiedExecution(
+            task_id, True, verified.verified, status, result.attempts,
+            output=result.output, error=verified.error,
+        )
+
+
+__all__ = ["BrainAdmissionResult", "BrainVerifiedExecution", "BrainSupervisorBridge"]
