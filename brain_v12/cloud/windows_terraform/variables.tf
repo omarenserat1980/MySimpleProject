@@ -5,13 +5,13 @@ variable "resource_group_location" {
 }
 
 variable "vm_name" {
-  type        = string
-  default     = "brain-windows-2025"
+  type    = string
+  default = "brain-windows-2025"
 }
 
 variable "resource_group_name" {
-  type        = string
-  default     = "brain-windows-rg"
+  type    = string
+  default = "brain-windows-rg"
 }
 
 variable "admin_username" {
