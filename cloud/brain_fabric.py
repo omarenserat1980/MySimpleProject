@@ -152,6 +152,7 @@ def next_node_job(node_id: str, required_capabilities: list[str] | None = None) 
         job["state"] = "RUNNING"
         job["leased_at"] = _now()
         job["lease_node_id"] = node_id
+        job["lease_id"] = uuid.uuid4().hex
         job["updated_at"] = _now()
         _atomic_write(path, job)
         return job
@@ -182,6 +183,7 @@ def recover_expired_jobs(*, lease_timeout: float | None = None) -> list[str]:
             max_retries = int(os.getenv("BRAIN_FABRIC_MAX_LEASE_RETRIES", "3"))
             job["lease_retries"] = retries + 1
             job["updated_at"] = now
+            job["lease_id"] = None
             job.setdefault("evidence", []).append({
                 "at": now,
                 "event": "LEASE_EXPIRED",
