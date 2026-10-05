@@ -32,14 +32,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify Brain-owned runner and VM toolchain
+        env:
+          BRAIN_INTERNAL_RUNNER_FLAG: ${{ env.BRAIN_INTERNAL_RUNNER_FLAG }}
+        run: |
+          set -euo pipefail
+          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
+          test "${{ runner.os }}" = "Linux"
+          test "${{ runner.arch }}" = "X64"
+          for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy; do
+            command -v "$tool" >/dev/null || { echo "MISSING_INTERNAL_RUNNER_TOOL=$tool"; exit 2; }
+          done
+          test -e /usr/share/OVMF/OVMF_CODE_4M.fd
+          python - <<'PY'
+          from brain_v12.brain.internal_runner_preflight import verify_and_write
+          import json
+          r=verify_and_write("internal-runner-preflight.json")
+          print(json.dumps(r, indent=2, sort_keys=True))
+          PY
+          echo "BRAIN_INTERNAL_RUNNER=VERIFIED"
+
       - name: Install real VM tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf xorriso wimtools dosfstools mtools
+          # Brain-owned hosts are provisioned before registration.
+          # No GitHub-hosted runtime dependency and no package installation is required here.
+          echo "BRAIN_VM_TOOLCHAIN=PREPROVISIONED"
 
       - name: Download and validate Microsoft media
         env:
-          ISO_URL: ${{ inputs.iso_url }}
+          ISO_URL: ${{ inputs.iso_url || 'https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us' }}
         run: |
           set -euo pipefail
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
@@ -209,7 +230,7 @@ jobs:
 
       - name: Boot and install Windows Server 2025
         env:
-          BOOT_TIMEOUT: ${{ inputs.timeout_minutes }}
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes || '55' }}
         shell: bash
         run: |
           set -euo pipefail
