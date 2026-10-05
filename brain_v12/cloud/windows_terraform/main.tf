@@ -31,14 +31,14 @@ resource "azurerm_network_security_group" "brain" {
   resource_group_name = azurerm_resource_group.brain.name
 
   security_rule {
-    name                       = "AllowWinRM"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "5986"
-    source_address_prefix      = var.allowed_source_ip
+    name                   = "AllowWinRM"
+    priority               = 100
+    direction              = "Inbound"
+    access                = "Allow"
+    protocol               = "Tcp"
+    source_port_range      = "*"
+    destination_port_range = "5986"
+    source_address_prefix  = var.allowed_source_ip
   }
 }
 
