@@ -37,6 +37,12 @@ def run_independence_test(
 ) -> dict[str, Any]:
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
+
+    # Certification is downstream of the immutable execution contract.
+    # If the production execution surface is structurally unsafe, autonomy
+    # certification must fail before any proof task is attempted.
+    from ..execution_fabric_contract import assert_runtime_contract
+    contract = assert_runtime_contract()
     run_id = uuid.uuid4().hex
 
     # Phase 1: create durable work, then simulate process loss.
@@ -78,11 +84,12 @@ def run_independence_test(
         verification=bool(verification),
         recovery=recovery,
         authority_boundary=boundary,
-        github_independent=True,
-        certified=all((persistence, execution, bool(verification), recovery, boundary)),
+        github_independent=bool(contract.get("verified")),
+        certified=all((persistence, execution, bool(verification), recovery, boundary, bool(contract.get("verified")))),
         timestamp=time.time(),
     ).to_dict()
 
+    evidence["execution_contract"] = contract
     evidence["status"] = (
         "AUTONOMOUS_WITHIN_AUTHORITY"
         if evidence["certified"]
