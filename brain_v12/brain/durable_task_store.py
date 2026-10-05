@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 class DurableTaskStore:
-    """Transactional task state: immutable spec, separate result, leases and attempts."""
+    """Transactional task state with fenced leases and attempts."""
     def __init__(self,path="brain6_artifacts/virtual_tasks/tasks.db"):
         self.path=Path(path); self.path.parent.mkdir(parents=True,exist_ok=True)
         self.lock=threading.RLock()
@@ -61,19 +61,19 @@ class DurableTaskStore:
     def heartbeat(self,task_id,lease_id,lease_seconds=300):
         now=time.time(); lease=now+max(5,int(lease_seconds))
         with self.lock:
-            cur=self.db.execute("UPDATE tasks SET lease_expires_at=?,updated_at=? WHERE task_id=? AND status='RUNNING' AND lease_id=?",
-                (lease,now,task_id,lease_id))
+            cur=self.db.execute("UPDATE tasks SET lease_expires_at=?,updated_at=? WHERE task_id=? AND status='RUNNING' AND lease_id=? AND lease_expires_at>?",
+                (lease,now,task_id,lease_id,now))
             self.db.commit(); return cur.rowcount==1
 
-    def finish(self,task_id,ok,result):
+    def finish(self,task_id,lease_id,ok,result):
         status="COMPLETED" if ok else "FAILED"; now=time.time()
         with self.lock:
-            row=self.db.execute("SELECT lease_id FROM tasks WHERE task_id=? AND status='RUNNING'",(task_id,)).fetchone()
-            if not row: return self.get(task_id)
             error=None if ok else json.dumps(result,ensure_ascii=False)
-            self.db.execute("""UPDATE tasks SET status=?,result_json=?,error_json=?,lease_id=NULL,lease_expires_at=NULL,updated_at=?
-              WHERE task_id=? AND status='RUNNING'""",(status,json.dumps(result,ensure_ascii=False),error,now,task_id))
-            self.db.commit(); return self.get(task_id)
+            cur=self.db.execute("""UPDATE tasks SET status=?,result_json=?,error_json=?,lease_id=NULL,lease_expires_at=NULL,updated_at=?
+              WHERE task_id=? AND status='RUNNING' AND lease_id=? AND lease_expires_at>?""",
+              (status,json.dumps(result,ensure_ascii=False),error,now,task_id,lease_id,now))
+            self.db.commit()
+            return self.get(task_id) if cur.rowcount else None
 
     def requeue(self,task_id):
         now=time.time()
