@@ -1,0 +1,80 @@
+name: Brain APM
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline_file:
+        description: "Committed APM pipeline definition"
+        required: true
+        default: ".brain/apm/pipeline.json"
+      resume:
+        description: "Resume from checkpoint when present"
+        required: true
+        default: "true"
+  push:
+    paths:
+      - "brain_v12/apm/**"
+      - "tests/test_apm_engine.py"
+      - ".brain/apm/**"
+      - ".github/workflows/apm.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-apm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check -q pytest
+
+      - name: Validate pipeline definition
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from brain_v12.apm.engine import load_pipeline, topo_order
+          p = Path("${{ inputs.pipeline_file || '.brain/apm/pipeline.json' }}")
+          pipeline_id, stages, _ = load_pipeline(p)
+          ordered = topo_order(stages)
+          print(f"APM_PIPELINE={pipeline_id}")
+          print(f"APM_TOTAL_STAGES={len(ordered)}")
+          print("APM_STAGE_ORDER=" + ",".join(s.id for s in ordered))
+          PY
+
+      - name: Run APM
+        env:
+          APM_PIPELINE_FILE: ${{ inputs.pipeline_file || '.brain/apm/pipeline.json' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.resume || 'true' }}" = "false" ]; then
+            python -m brain_v12.apm.cli run --pipeline "$APM_PIPELINE_FILE"
+          else
+            python -m brain_v12.apm.cli resume --pipeline "$APM_PIPELINE_FILE"
+          fi
+
+      - name: Independent final verification
+        if: always()
+        run: |
+          set -euo pipefail
+          python -m brain_v12.apm.cli verify --state-dir .brain/apm/state
+
+      - name: Publish APM evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-apm-evidence-${{ github.run_id }}
+          path: .brain/apm/state/
+          if-no-files-found: error
