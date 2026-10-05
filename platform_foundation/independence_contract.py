@@ -37,10 +37,14 @@ class IndependenceContract:
         if missing:
             return {"allowed": False, "reason": "checks_incomplete", "missing": missing}
 
-        failed = [name for name in self.REQUIRED_CHECKS if (
-            checks[name] is not True and
-            not (name == "network_dependency_for_gate" and checks[name] is False)
-        )]
+        failed = [
+            name for name in self.REQUIRED_CHECKS
+            if (
+                checks[name] is not True
+                if name != "network_dependency_for_gate"
+                else checks[name] is not False
+            )
+        ]
         if failed:
             return {"allowed": False, "reason": "checks_failed", "failed": failed}
 
