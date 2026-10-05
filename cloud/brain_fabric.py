@@ -151,6 +151,7 @@ def next_node_job(node_id: str, required_capabilities: list[str] | None = None) 
         path, job = jobs[0]
         job["state"] = "RUNNING"
         job["leased_at"] = _now()
+        job["lease_node_id"] = node_id
         job["updated_at"] = _now()
         _atomic_write(path, job)
         return job
