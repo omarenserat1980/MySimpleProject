@@ -1,0 +1,64 @@
+name: BRAIN Windows Cloud Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/cloud/windows_terraform/**"
+      - "brain_v12/brain/terraform_windows_cloud_provider.py"
+      - "brain_v12/brain/terraform_plan_gate.py"
+      - "brain_v12/brain/windows_terraform_safety.py"
+      - ".github/workflows/brain-windows-cloud-terraform-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-24.04
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform version
+        run: terraform version
+
+      - name: Terraform format check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Verify Brain Terraform safety contract
+        working-directory: .
+        run: |
+          python -m pytest -q brain_v12/tests/test_windows_terraform_safety.py brain_v12/tests/test_terraform_plan_gate.py
+
+      - name: Plan without credentials or apply
+        run: |
+          echo "Infrastructure validation only."
+          echo "No terraform apply is permitted by this workflow."
+          terraform plan -refresh=false -input=false -lock=false -out=brain.tfplan
+        env:
+          TF_VAR_admin_username: "ci-validation-user"
+          TF_VAR_admin_password: "CI_VALIDATION_ONLY_NotARealPassword_ChangeMe123!"
+          TF_VAR_allowed_source_ip: "192.0.2.1/32"
+
+      - name: Remove local Terraform artifacts
+        if: always()
+        run: |
+          rm -rf .terraform
+          rm -f brain.tfplan terraform.tfstate terraform.tfstate.backup
