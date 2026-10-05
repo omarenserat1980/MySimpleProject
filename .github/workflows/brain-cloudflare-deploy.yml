@@ -52,15 +52,14 @@ jobs:
           (cd cloudflare/brain-api && node test/commercial_worker_static.test.js)
           (cd cloudflare/brain-api && node test/cinema_worker_static.test.js)
 
-      - name: Require Cloudflare and PayTabs configuration
+      - name: Validate Cloudflare and PayTabs configuration
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SERVER_KEY }}
           PAYTABS_PROFILE_ID: ${{ vars.PAYTABS_PROFILE_ID || secrets.PAYTABS_PROFILE_ID }}
-          BRAIN_ORIGIN: ${{ vars.BRAIN_ORIGIN || secrets.BRAIN_ORIGIN }}
-          BRAIN_CONTROL_TOKEN: ${{ secrets.BRAIN_CONTROL_TOKEN }}
         run: |
+          set -euo pipefail
           missing=0
           for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID PAYTABS_SERVER_KEY PAYTABS_PROFILE_ID; do
             eval "value=\${$name:-}"
@@ -73,9 +72,11 @@ jobs:
           done
           if [ "$missing" -ne 0 ]; then
             echo "COMMERCIAL_DEPLOYMENT_BLOCKED=TRUE"
+            echo "CONFIGURATION_ACTION_REQUIRED=TRUE"
             exit 1
           fi
           echo "COMMERCIAL_DEPLOYMENT_BLOCKED=FALSE"
+          echo "CONFIGURATION_ACTION_REQUIRED=FALSE"
       - name: Ensure D1 database exists
         id: d1
         env:
