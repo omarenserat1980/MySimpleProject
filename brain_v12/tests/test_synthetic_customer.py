@@ -75,6 +75,16 @@ def test_customer_acceptance_and_delivery_lifecycle():
     assert run.status == "DELIVERED"
 
 
+def test_customer_review_is_instance_method_and_accepts_verified_run():
+    c = SyntheticCustomer(executor=lambda *args: {"ok": True, "verified": True})
+    run = c.start("TEST_CUSTOMER_COMPANY", "Build a safe test service.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="TEST", payment_mode="NONE")
+    c.review(run, accepted=True, feedback="accepted")
+    assert run.status == "ACCEPTED"
+
+
 def test_customer_revision_requires_review_state():
     c = SyntheticCustomer()
     run = c.start("TEST_CUSTOMER_COMPANY", "Build a safe test service.")
