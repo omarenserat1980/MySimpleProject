@@ -13,6 +13,7 @@ from typing import Iterable
 WINDOWS_REAL_BOOT = "windows-server-2025-real-boot"
 BRAIN_INTERNAL = "brain-internal"
 GITHUB_CI = "github-ci"
+WINDOWS_CLOUD = "windows-server-2025-cloud"
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,12 @@ def default_executors() -> tuple[Executor, ...]:
             external=False,
         ),
         Executor(
+            name=WINDOWS_CLOUD,
+            capabilities=frozenset({WINDOWS_CLOUD, WINDOWS_REAL_BOOT}),
+            priority=50,
+            external=True,
+        ),
+        Executor(
             name=GITHUB_CI,
             capabilities=frozenset({"ci-verification"}),
             priority=1000,
@@ -47,8 +54,10 @@ def choose_executor(executors: Iterable[Executor], capability: str) -> Executor:
 
     selected = sorted(candidates, key=lambda e: (e.priority, e.name))[0]
 
-    # Real runtime capabilities must never silently fall back to external CI.
-    if capability == WINDOWS_REAL_BOOT and selected.external:
-        raise RuntimeError("EXTERNAL_EXECUTOR_FORBIDDEN_FOR_WINDOWS_REAL_BOOT")
+    # Real runtime capabilities may use an explicitly configured cloud provider,
+    # but must never silently fall back to GitHub CI.
+
+    if capability == WINDOWS_REAL_BOOT and selected.name == GITHUB_CI:
+        raise RuntimeError("GITHUB_CI_FORBIDDEN_FOR_WINDOWS_REAL_BOOT")
 
     return selected
