@@ -151,12 +151,23 @@ def synthetic_customer_repair_executor(request, result, customer_type, run_id):
     verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
     return {"ok": verified, "verified": verified, "repair": repair_result, "run_id": run_id}
 
+def synthetic_customer_feedback_executor(request, feedback, customer_type, run_id):
+    feedback_request = (
+        f"Customer feedback for service request: {request}. "
+        f"Customer revision feedback: {feedback}. "
+        "Treat this as a real bounded revision request. Inspect the current result, identify the gap, "
+        "and prepare the safest Brain execution/revision path. Do not perform production side effects."
+    )
+    result = problem_solver.solve(feedback_request)
+    return {"ok": True, "run_id": run_id, "customer_type": customer_type, "brain_revision": result}
+
 synthetic_customer=SyntheticCustomer(
     evidence_store=evidence_store,
     chatgpt_advisor=synthetic_customer_advisors[0],
     brain_advisor=synthetic_customer_advisors[1],
     executor=synthetic_customer_executor,
     repair_executor=synthetic_customer_repair_executor,
+    feedback_executor=synthetic_customer_feedback_executor,
     max_repair_attempts=int(os.getenv("BRAIN_SYNTHETIC_MAX_REPAIR_ATTEMPTS", "1")),
 )
 cognitive.device_bridge=device_bridge
