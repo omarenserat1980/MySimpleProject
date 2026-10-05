@@ -65,3 +65,14 @@ def test_canonical_internal_runtime_modules_exist():
     assert runtime.exists()
     assert "BrainExecutionGateway" in gateway.read_text(encoding="utf-8")
     assert "github_dependency" in runtime.read_text(encoding="utf-8")
+def test_v12_supervisor_policy_has_single_canonical_owner():
+    canonical = Path("brain_v12/brain/brain_supervisor.py")
+    compatibility = Path("brain_v12/brain/supervisor.py")
+    canonical_text = canonical.read_text(encoding="utf-8")
+    compatibility_text = compatibility.read_text(encoding="utf-8")
+
+    assert "class BrainSupervisor" in canonical_text
+    assert "class BrainSupervisor" not in compatibility_text
+    assert "from .brain_supervisor import BrainSupervisor" in compatibility_text
+    assert "BrainSupervisor" in Path("brain_v12/app.py").read_text(encoding="utf-8")
+
