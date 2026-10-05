@@ -76,3 +76,16 @@ def test_v12_supervisor_policy_has_single_canonical_owner():
     assert "from .brain_supervisor import BrainSupervisor" in compatibility_text
     assert "BrainSupervisor" in Path("brain_v12/app.py").read_text(encoding="utf-8")
 
+
+
+def test_v12_orchestrator_ownership_boundary_is_explicit():
+    v12 = Path("brain_v12/brain/orchestrator.py").read_text(encoding="utf-8")
+    app = Path("brain_v12/app.py").read_text(encoding="utf-8")
+    v7 = Path("brain_v7/braincore_v2/cognitive_orchestrator.py").read_text(encoding="utf-8")
+    autonomous = Path("brain_v12/brain/autonomous_supervisor.py").read_text(encoding="utf-8")
+
+    assert "class CognitiveOrchestrator" in v12
+    assert "CognitiveOrchestrator" in app
+    assert "class CognitiveOrchestrator" in v7  # legacy remains frozen
+    assert "BrainAutonomousSupervisor" in autonomous
+    assert "BrainSupervisor" not in autonomous
