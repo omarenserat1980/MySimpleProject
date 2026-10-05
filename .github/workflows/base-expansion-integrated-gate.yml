@@ -27,6 +27,7 @@ on:
       - 'tests/test_repair_evidence.py'
       - 'tests/test_repair_cycle.py'
       - 'tests/test_operational_gate.py'
+      - 'tests/test_operational_state.py'
       - '.github/workflows/base-expansion-integrated-gate.yml'
 
 permissions:
@@ -65,7 +66,8 @@ jobs:
             tests/test_workflow_inspector.py \
             tests/test_repair_evidence.py \
             tests/test_repair_cycle.py \
-            tests/test_operational_gate.py
+            tests/test_operational_gate.py \
+            tests/test_operational_state.py
       - name: Write integrated evidence
         run: |
           python - <<'PY'
@@ -94,6 +96,7 @@ jobs:
               'repair_evidence': 'PASS',
               'bounded_repair_cycle': 'PASS',
               'operational_gate': 'PASS',
+              'operational_state_persistence': 'PASS',
           }
           Path('integrated_execution_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
           print(json.dumps(evidence, indent=2))
