@@ -67,9 +67,12 @@ def _get(url: str, token: str) -> dict:
 
 
 def _post_result(origin: str, node_id: str, job_id: str, token: str, state: str, evidence: dict) -> dict:
+    lease_id = str(evidence.pop("lease_id", "")).strip()
+    if not lease_id:
+        raise RuntimeError("WINDOWS_JOB_LEASE_ID_REQUIRED")
     return _post(
         f"{origin}/v1/fabric/nodes/{node_id}/jobs/{job_id}/result",
-        {"state": state, "evidence": evidence},
+        {"state": state, "evidence": evidence, "lease_id": lease_id},
         token,
     )
 
@@ -162,7 +165,13 @@ def poll_once() -> dict:
             heartbeat(jobs_running=0)
         except Exception:
             pass
-    result = _post_result(origin, node_id, job["job_id"], token, state, evidence)
+    lease_id = str(job.get("lease_id", "")).strip()
+    if not lease_id:
+        raise RuntimeError("WINDOWS_JOB_LEASE_ID_REQUIRED")
+    result = _post_result(
+        origin, node_id, job["job_id"], token, state,
+        {**evidence, "lease_id": lease_id},
+    )
     return {"ok": True, "status": "JOB_COMPLETED", "job_id": job["job_id"], "state": state, "result": result}
 
 
