@@ -8,6 +8,7 @@ from .apm import APM
 from .parallel_chunks import ParallelChunkRunner, ChunkResult
 from .stage_orchestrator import StageOrchestrator, StageState
 from .brain_ci_executor import BrainCIExecutor
+from .open_source_gate import OpenSourceCandidate, OpenSourceGate
 
 
 @dataclass(frozen=True)
@@ -41,11 +42,15 @@ class AutonomousPipeline:
         apm: APM,
         chunk_runner: ParallelChunkRunner | None = None,
         ci_executor: BrainCIExecutor | None = None,
+        open_source_gate: OpenSourceGate | None = None,
+        open_source_candidates: list[OpenSourceCandidate] | None = None,
     ) -> None:
         self.orchestrator = orchestrator
         self.apm = apm
         self.chunk_runner = chunk_runner
         self.ci_executor = ci_executor
+        self.open_source_gate = open_source_gate
+        self.open_source_candidates = tuple(open_source_candidates or ())
 
     def _save_run(self, run: PipelineRun) -> None:
         self.orchestrator.store.set(self.RUN_KEY, asdict(run))
@@ -210,6 +215,14 @@ class AutonomousPipeline:
                              run_id=effective_run_id, commit_sha=commit_sha)
             raise
 
+    def open_source_health(self) -> dict[str, Any]:
+        if self.open_source_gate is None or not self.open_source_candidates:
+            return {"healthy": True, "status": "READY", "checked": 0}
+        report = self.open_source_gate.evaluate_all(list(self.open_source_candidates))
+        return {"healthy": bool(report["healthy"]), "status": report["status"],
+                "approved": report["approved"], "blocked": report["blocked"],
+                "results": report["results"]}
+
     def execution_health(self) -> dict[str, Any]:
         if self.ci_executor is None:
             return {"healthy": False, "status": "BLOCKED", "reason": "brain_ci_executor_not_configured"}
@@ -233,7 +246,10 @@ class AutonomousPipeline:
         execution = self.execution_health()
         if not execution["healthy"]:
             issues.append("brain_ci_executor_unavailable")
-        return {"healthy": not issues, "stage": state.stage, "status": state.status, "issues": issues, "checkpoint": checkpoint, "execution": execution}
+        open_source = self.open_source_health()
+        if not open_source["healthy"]:
+            issues.append("open_source_gate_blocked")
+        return {"healthy": not issues, "stage": state.stage, "status": state.status, "issues": issues, "checkpoint": checkpoint, "execution": execution, "open_source": open_source}
 
     def progress(self) -> dict[str, Any]:
         state = self.orchestrator.current()
