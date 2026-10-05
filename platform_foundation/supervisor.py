@@ -72,7 +72,7 @@ class Supervisor:
             self.audit.record("task.supervisor_failed", {"task_id": task_id, "error": error})
             return SupervisorResult(task_id, TaskStatus.FAILED, False, 0, error=error)
 
-        decision = self.permissions.check(record["action"], ActionRisk(record["risk"]))
+        decision = self.permissions.decide(record["action"], ActionRisk(record["risk"]))
         if not decision.allowed:
             self.state.set(
                 f"supervisor:{task_id}",
