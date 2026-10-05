@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .synthetic_customer import SyntheticExecutiveProfile
+
 
 @dataclass(frozen=True)
 class Scenario:
@@ -20,6 +22,9 @@ DEFAULT_SCENARIOS = (
     Scenario("media-cinematic", "TEST_CUSTOMER_MEDIA", 3, "Produce and verify a sandbox cinematic media workflow."),
     Scenario("startup-multi-service", "TEST_CUSTOMER_STARTUP", 4, "Exercise a multi-service startup workflow with verification."),
     Scenario("full-e2e", "TEST_CUSTOMER_FILM_PRODUCER", 5, "Run the complete sandbox customer lifecycle through delivery."),
+    Scenario("executive-business", "TEST_CUSTOMER_EXECUTIVE", 5, "Evaluate strategy, pricing, marketing, finance, software and operations as one integrated sandbox business."),
+    Scenario("social-marketing", "TEST_CUSTOMER_MARKETING", 4, "Plan, execute and verify a sandbox social media and performance marketing campaign."),
+    Scenario("finance-operations", "TEST_CUSTOMER_FINANCE", 4, "Evaluate a sandbox financial planning, pricing, unit economics and operations workflow."),
 )
 
 
@@ -27,6 +32,7 @@ class SyntheticCustomerScenarioSuite:
     def __init__(self, customer_factory, scenarios=DEFAULT_SCENARIOS):
         self.customer_factory = customer_factory
         self.scenarios = tuple(scenarios)
+        self.executive_profile = SyntheticExecutiveProfile()
 
     def plan(self, limit: int | None = None) -> dict[str, Any]:
         selected = self.scenarios[:limit] if limit else self.scenarios
@@ -36,6 +42,7 @@ class SyntheticCustomerScenarioSuite:
             "scenarios": [x.__dict__ for x in selected],
             "execution_mode": "BOUNDED_TEST",
             "production_allowed": False,
+            "executive_profile": self.executive_profile.as_dict(),
         }
 
     def run(self, capabilities: dict[str, Any] | None = None, limit: int | None = None) -> dict[str, Any]:
