@@ -110,7 +110,7 @@ workforce=WorkforceControl(store)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
-synthetic_customer=SyntheticCustomer(evidence_store=None)
+synthetic_customer=SyntheticCustomer(evidence_store=None, chatgpt_advisor=lambda request: chatgpt_reply(request), brain_advisor=lambda request, caps: builder.plan("synthetic-customer", request) if request else {})
 workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
@@ -172,7 +172,7 @@ app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json"))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
-app.include_router(synthetic_customer_router(synthetic_customer))
+app.include_router(synthetic_customer_router(synthetic_customer, capability_provider=lambda: {"capabilities": CAPABILITIES, "tools": TOOLS, "plugins": PLUGINS}))
 app.include_router(commercial_dashboard_router())
 
 
