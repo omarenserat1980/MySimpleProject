@@ -43,7 +43,7 @@ jobs:
         run: terraform version
 
       - name: Terraform format check
-        run: terraform fmt -check -recursive
+        run: terraform fmt -diff -check -recursive
 
       - name: Terraform init
         run: terraform init -backend=false -input=false
@@ -66,4 +66,3 @@ jobs:
           echo "CI validates Terraform structure only."
           echo "A real terraform plan requires authenticated Azure runtime context."
           echo "This workflow never runs terraform apply."
-          
