@@ -11,6 +11,7 @@ on:
       - 'platform_foundation/supervisor.py'
       - 'tests/test_platform_lease.py'
       - 'tests/test_supervisor_lease.py'
+      - 'tests/test_lease_recovery.py'
       - '.github/workflows/base-expansion-lease-gate.yml'
 
 permissions:
@@ -29,7 +30,7 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run lease tests
-        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py
+        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py tests/test_lease_recovery.py
       - name: Write lease evidence
         run: |
           python - <<'PY'
@@ -43,6 +44,7 @@ jobs:
               'reopen_persistence': 'PASS',
               'expiry_and_heartbeat': 'PASS',
               'supervisor_duplicate_execution_blocked': 'PASS',
+              'crashed_worker_recovery': 'PASS',
           }
           Path('lease_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
           print(json.dumps(evidence, indent=2))
