@@ -59,3 +59,29 @@ def test_apm_enforces_cardinality_and_counter_rules(tmp_path):
         assert False
     except RuntimeError:
         pass
+
+
+def test_apm_measure_emits_duration_and_preserves_exception(tmp_path):
+    store = SQLiteStateStore(tmp_path / "apm.db")
+    now = [10.0]
+    apm = APM(store, clock=lambda: now[0])
+    try:
+        with apm.measure("operation.duration_ms", task_id="t1"):
+            now[0] = 10.25
+            raise RuntimeError("expected")
+    except RuntimeError:
+        pass
+    assert apm.snapshot()[0]["last"] == 250.0
+
+
+def test_apm_record_request_and_summary(tmp_path):
+    store = SQLiteStateStore(tmp_path / "apm.db")
+    apm = APM(store, clock=lambda: 10.0)
+    apm.record_request(success=True, duration_ms=10, task_id="t1")
+    apm.record_request(success=False, duration_ms=30, task_id="t1")
+    summary = apm.summary()
+    assert summary["ready"] is True
+    assert summary["series"] == 3
+    health = apm.health()
+    assert health["requests"] == 2.0
+    assert health["errors"] == 1.0
