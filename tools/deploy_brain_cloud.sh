@@ -7,7 +7,8 @@ set -euo pipefail
 
 SSH_TARGET="${BRAIN_CLOUD_USER}@${BRAIN_CLOUD_HOST}"
 
-ssh "${SSH_TARGET}" "test -d '${BRAIN_CLOUD_REPO_DIR}'"
+ssh "${SSH_TARGET}" "if [ ! -d '${BRAIN_CLOUD_REPO_DIR}/.git' ]; then git clone https://github.com/omarenserat1980/MySimpleProject.git '${BRAIN_CLOUD_REPO_DIR}'; fi"
+ssh "${SSH_TARGET}" "cd '${BRAIN_CLOUD_REPO_DIR}' && git fetch origin main && git reset --hard origin/main"
 ssh "${SSH_TARGET}" "cd '${BRAIN_CLOUD_REPO_DIR}' && ./tools/brain_cloud_preflight.sh"
 ssh "${SSH_TARGET}" "cd '${BRAIN_CLOUD_REPO_DIR}' && docker compose -f docker-compose.brain-cloud.yml up -d --build"
 
