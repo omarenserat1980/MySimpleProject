@@ -12,6 +12,7 @@ on:
       - 'tests/test_brain_supervisor_bridge.py'
       - 'tests/test_brain_supervisor_bridge_boundary.py'
       - 'tests/test_brain_verified_recovery_e2e.py'
+      - 'tests/test_brain_supervisor_crash_restart_e2e.py'
       - 'tests/test_platform_lease.py'
       - 'tests/test_supervisor_lease.py'
       - 'tests/test_lease_recovery.py'
@@ -43,6 +44,7 @@ jobs:
             tests/test_brain_supervisor_bridge.py \
             tests/test_brain_supervisor_bridge_boundary.py \
             tests/test_brain_verified_recovery_e2e.py \
+            tests/test_brain_supervisor_crash_restart_e2e.py \
             tests/test_platform_lease.py \
             tests/test_supervisor_lease.py \
             tests/test_lease_recovery.py \
@@ -69,6 +71,7 @@ jobs:
               'durable_retry': 'PASS',
               'independent_verification': 'PASS',
               'durable_verified_execution_recovery': 'PASS',
+              'crash_restart_e2e': 'PASS',
               'brain_bridge': 'PASS',
               'brain_bridge_authority_boundary': 'PASS',
           }
