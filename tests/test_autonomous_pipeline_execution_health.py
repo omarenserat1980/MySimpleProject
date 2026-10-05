@@ -6,7 +6,7 @@ from platform_foundation.persistent_state import SQLiteStateStore
 
 def make_pipeline(tmp_path, ci_executor=None):
     store = SQLiteStateStore(tmp_path / "state.db")
-    return AutonomousPipeline(StageOrchestrator(store), APM(), ci_executor=ci_executor)
+    return AutonomousPipeline(StageOrchestrator(store), APM(store), ci_executor=ci_executor)
 
 
 def test_pipeline_health_blocks_without_brain_ci_executor(tmp_path):
