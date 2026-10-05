@@ -2,9 +2,8 @@ from __future__ import annotations
 
 """Provider-neutral contract for a real cloud Windows Server 2025 executor.
 
-This module deliberately does not create infrastructure itself. A provider
-adapter must implement the small interface below. This prevents Brain from
-mistaking local QEMU/GitHub CI for a cloud Windows VM.
+Provider credentials and infrastructure operations stay outside this module.
+A concrete adapter must implement WindowsCloudProvider.
 """
 
 from dataclasses import dataclass, field
@@ -37,13 +36,41 @@ class WindowsCloudProvider(Protocol):
 class WindowsCloudExecutor:
     capability = WINDOWS_CLOUD
 
-    def __init__(self, provider: WindowsCloudProvider):
+    def __init__(self, provider: WindowsCloudProvider | None = None):
         self.provider = provider
 
+    def readiness(self) -> dict[str, Any]:
+        if self.provider is None:
+            return {
+                "status": "NOT_CONFIGURED",
+                "ready": False,
+                "executor": self.capability,
+                "reason": "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED",
+            }
+        return {
+            "status": "CONFIGURED",
+            "ready": True,
+            "executor": self.capability,
+            "provider": self.provider.name,
+        }
+
     def provision(self, **kwargs: Any) -> CloudWindowsVM:
+        if self.provider is None:
+            raise RuntimeError("CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED")
         vm = self.provider.provision_windows_server_2025(**kwargs)
         self._validate(vm)
         return vm
+
+    def status(self, vm_id: str) -> dict[str, Any]:
+        if self.provider is None:
+            return {
+                "status": "NOT_CONFIGURED",
+                "verified": False,
+                "executor": self.capability,
+                "reason": "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED",
+            }
+        vm = self.provider.status(vm_id)
+        return self.verify(vm)
 
     def verify(self, vm: CloudWindowsVM) -> dict[str, Any]:
         self._validate(vm)
