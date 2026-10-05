@@ -197,6 +197,18 @@ class AutonomousPipeline:
                              run_id=effective_run_id, commit_sha=commit_sha)
             raise
 
+    def health(self) -> dict[str, Any]:
+        state = self.orchestrator.current()
+        checkpoint = self.checkpoint()
+        issues = []
+        if state.status == "FAILED":
+            issues.append("stage_failed")
+        if checkpoint and int(checkpoint["stage"]) != state.stage:
+            issues.append("checkpoint_mismatch")
+        if checkpoint is None and state.stage > 1:
+            issues.append("missing_checkpoint")
+        return {"healthy": not issues, "stage": state.stage, "status": state.status, "issues": issues, "checkpoint": checkpoint}
+
     def progress(self) -> dict[str, Any]:
         state = self.orchestrator.current()
         return {
