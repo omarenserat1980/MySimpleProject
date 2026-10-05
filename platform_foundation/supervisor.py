@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -110,12 +111,38 @@ class Supervisor:
                 self.audit.record("task.supervisor_failed", {"task_id": task_id, "error": error})
                 return SupervisorResult(task_id, TaskStatus.FAILED, True, 0, error=error)
 
-            result = self.recovery.run(
-                task_id,
-                handler,
-                max_attempts=int(record["max_attempts"]),
-                retryable=retryable,
-            )
+            lease_lost = threading.Event()
+            stop_heartbeat = threading.Event()
+            interval = max(0.05, min(5.0, lease_ttl_seconds / 3.0))
+
+            def heartbeat_loop() -> None:
+                while not stop_heartbeat.wait(interval):
+                    beat = self.lease.heartbeat(task_id, self.owner, ttl_seconds=lease_ttl_seconds)
+                    if not beat.acquired:
+                        lease_lost.set()
+                        return
+
+            heartbeat_thread = threading.Thread(target=heartbeat_loop, name=f"lease-heartbeat:{task_id}", daemon=True)
+            heartbeat_thread.start()
+            try:
+                result = self.recovery.run(
+                    task_id,
+                    handler,
+                    max_attempts=int(record["max_attempts"]),
+                    retryable=retryable,
+                )
+            finally:
+                stop_heartbeat.set()
+                heartbeat_thread.join(timeout=max(1.0, interval * 2))
+
+            if lease_lost.is_set():
+                error = "execution lease lost"
+                self.state.set(
+                    f"supervisor:{task_id}",
+                    {**record, "status": TaskStatus.FAILED.value, "error": error},
+                )
+                self.audit.record("task.lease_lost", {"task_id": task_id, "owner": self.owner})
+                return SupervisorResult(task_id, TaskStatus.FAILED, True, result.attempts, error=error)
             final_record = self.state.get(f"supervisor:{task_id}") or record
             self.state.set(
                 f"supervisor:{task_id}",
