@@ -32,4 +32,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: apm-build-verified
-          path: brain-artifacts/PARALLEL_STAGE_PIPELINE_VERIFIED.txt
+          path: brain-artifacts/APM_BUILD_VERIFIED.txt
