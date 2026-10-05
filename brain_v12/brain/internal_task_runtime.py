@@ -61,8 +61,16 @@ class InternalTaskRuntime:
         item = items[0]
         started = time.time()
         try:
-            result = self.gateway.run(item["argv"], capability=item["capability"],
-                                     timeout=timeout)
+            if item["capability"] == "windows-server-2025-real-boot":
+                decision = self.gateway.authorize_task(
+                    item["capability"], item.get("metadata")
+                )
+                raise RuntimeError(
+                    "WINDOWS_CLOUD_EXECUTION_ADAPTER_REQUIRED:" + decision.reason
+                )
+            result = self.gateway.run(
+                item["argv"], capability=item["capability"], timeout=timeout
+            )
             state = "COMPLETED" if result["ok"] else "FAILED"
             evidence = {
                 "task_id": item["id"],
