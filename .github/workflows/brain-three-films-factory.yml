@@ -25,6 +25,16 @@ jobs:
           python brain_v12/media/three_film_factory.py room-13 --out /tmp/films
           python brain_v12/media/three_film_factory.py last-signal --out /tmp/films
           python brain_v12/media/three_film_factory.py zero-line --out /tmp/films
+      - name: Commercial gate precheck
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from brain_v12.media.commercial_catalog_gate import evaluate
+          for p in ['docs/films/room-13.manifest.json','docs/films/last-signal.manifest.json','docs/films/zero-line.manifest.json']:
+              m=json.load(open(p,encoding='utf-8')); r=evaluate(m); print(p,r)
+              assert not r['sellable'], 'A placeholder manifest must never be sellable'
+          PY
       - name: Technical QC
         run: |
           set -euo pipefail
