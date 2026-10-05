@@ -105,3 +105,21 @@ def test_parallel_stage_restart_reuses_verified_chunks(tmp_path):
     assert reopened.get("pipeline.chunk:restart-stage:stage-1:A")["status"] == "SUCCESS"
     assert reopened.get("pipeline.chunk:restart-stage:stage-1:B")["status"] == "SUCCESS"
     reopened.close()
+
+
+def test_pipeline_health_is_true_after_verified_checkpoint(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    p.run_until(execute=lambda s: s.stage, verify=lambda s, r: True, stop_stage=2)
+    assert p.health()["healthy"] is True
+
+
+def test_pipeline_health_detects_failed_stage(tmp_path):
+    store = SQLiteStateStore(tmp_path / "state.db")
+    p = AutonomousPipeline(StageOrchestrator(store), APM(store))
+    try:
+        p.run_until(execute=lambda s: s.stage, verify=lambda s, r: False, stop_stage=1, max_attempts=1)
+    except RuntimeError:
+        pass
+    assert p.health()["healthy"] is False
+    assert "stage_failed" in p.health()["issues"]
