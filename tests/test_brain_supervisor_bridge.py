@@ -4,6 +4,7 @@ import tempfile
 
 from brain_v12.brain.brain_supervisor import BrainSupervisor
 from platform_foundation.audit_chain import AuditChain
+from platform_foundation.durable_audit import SQLiteAuditChain
 from platform_foundation.permissions import ActionRisk, PermissionBoundary
 from platform_foundation.persistent_state import SQLiteStateStore
 from platform_integration.brain_supervisor_bridge import BrainSupervisorBridge
@@ -108,3 +109,54 @@ def test_bridge_denies_irreversible_execution_before_handler() -> None:
         assert called["value"] is False
         assert result.status == "FAILED"
         state.close()
+
+
+def test_bridge_recovers_after_process_restart_and_keeps_durable_evidence() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        state_path = root + "/state.db"
+        audit_path = root + "/audit.db"
+        permissions = PermissionBoundary({"build": ActionRisk.WRITE})
+        calls = {"count": 0}
+
+        def flaky_handler():
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise RuntimeError("simulated process interruption")
+            return {"artifact": "recovered"}
+
+        state1 = SQLiteStateStore(state_path)
+        audit1 = SQLiteAuditChain(audit_path)
+        bridge1 = BrainSupervisorBridge(
+            state1, audit1, permissions, root=root + "/brain"
+        )
+        first = bridge1.execute_verified(
+            "restart-recovery", "build", ActionRisk.WRITE,
+            flaky_handler, lambda output: output == {"artifact": "recovered"},
+            max_attempts=1,
+        )
+        assert first.executed is False
+        assert first.verified is False
+        assert first.status == "FAILED"
+        state1.close()
+        audit1.close()
+
+        state2 = SQLiteStateStore(state_path)
+        audit2 = SQLiteAuditChain(audit_path)
+        bridge2 = BrainSupervisorBridge(
+            state2, audit2, permissions, root=root + "/brain"
+        )
+        second = bridge2.execute_verified(
+            "restart-recovery", "build", ActionRisk.WRITE,
+            flaky_handler, lambda output: output == {"artifact": "recovered"},
+            max_attempts=3,
+        )
+        assert second.executed is True
+        assert second.verified is True
+        assert second.status == "SUCCESS"
+        assert second.attempts == 2
+        assert state2.get("recovery:restart-recovery")["status"] == "SUCCESS"
+        assert state2.get("verification:restart-recovery")["verified"] is True
+        assert audit2.verify() is True
+        assert len(audit2.events()) >= 6
+        state2.close()
+        audit2.close()
