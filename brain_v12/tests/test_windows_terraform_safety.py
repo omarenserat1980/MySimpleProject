@@ -29,3 +29,13 @@ def test_rejects_state_and_plan(tmp_path: Path) -> None:
     assert result["safe"] is False
     assert any("terraform.tfstate" in x for x in result["violations"])
     assert any("brain.tfplan" in x for x in result["violations"])
+
+
+def test_rejects_tfvars_files(tmp_path: Path) -> None:
+    (tmp_path / "secrets.auto.tfvars").write_text(
+        'admin_password = "not-for-repo"\n',
+        encoding="utf-8",
+    )
+    result = inspect_windows_terraform_root(tmp_path)
+    assert result["safe"] is False
+    assert any("SENSITIVE_TFVARS_FILE" in x for x in result["violations"])
