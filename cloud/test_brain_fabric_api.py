@@ -160,3 +160,38 @@ def test_expired_job_stops_after_lease_retry_limit(tmp_path, monkeypatch):
 
     assert recover_expired_jobs(lease_timeout=1) == [job["job_id"]]
     assert get_job(job["job_id"])["state"] == "FAILED"
+
+
+def test_old_node_cannot_complete_released_lease(tmp_path, monkeypatch):
+    from cloud.brain_fabric import register_node, create_job, next_node_job, recover_expired_jobs
+    import json
+
+    monkeypatch.setenv("BRAIN_FABRIC_STATE_DIR", str(tmp_path / "fabric"))
+    monkeypatch.setenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120")
+
+    register_node(
+        "win-node-stale", provider="azure", architecture="x86_64",
+        capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    job = create_job(
+        "windows-command", {"argv": ["cmd.exe"]},
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    first = next_node_job(
+        "win-node-stale",
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    assert first["lease_node_id"] == "win-node-stale"
+
+    path = tmp_path / "fabric" / f"job-{job['job_id']}.json"
+    item = json.loads(path.read_text(encoding="utf-8"))
+    item["leased_at"] = 0
+    path.write_text(json.dumps(item), encoding="utf-8")
+    assert recover_expired_jobs(lease_timeout=1) == [job["job_id"]]
+
+    second = next_node_job(
+        "win-node-stale",
+        ["windows-server-2025", "windows-cloud", "brain-task-execution"],
+    )
+    assert second["state"] == "RUNNING"
+    assert second["lease_node_id"] == "win-node-stale"
