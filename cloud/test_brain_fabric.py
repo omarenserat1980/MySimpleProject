@@ -32,3 +32,12 @@ def test_update_node_persists_capabilities_and_capacity(tmp_path, monkeypatch):
     assert updated["architecture"] == "arm64"
     assert updated["capacity"] == {"cpu": 4.0, "memory_mb": 8192, "storage_gb": 50}
     assert updated["capabilities"] == ["ffmpeg", "python"]
+
+
+def test_fabric_rejects_invalid_terminal_transition(tmp_path, monkeypatch):
+    import pytest
+    monkeypatch.setenv("BRAIN_FABRIC_STATE_DIR", str(tmp_path))
+    register_node("transition-node", capabilities=["ffmpeg"])
+    job = create_job("film", {"title": "test"}, ["ffmpeg"])
+    with pytest.raises(ValueError, match="invalid job transition"):
+        transition_job(job["job_id"], "SUCCESS")
