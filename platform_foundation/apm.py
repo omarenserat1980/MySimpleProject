@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
 from .persistent_state import SQLiteStateStore
@@ -179,6 +180,35 @@ class APM:
                 commit_sha=commit_sha, dimensions=dimensions,
             )
         return finish
+
+    @contextmanager
+    def measure(self, metric: str, *, task_id: str | None = None, run_id: str | None = None,
+                commit_sha: str | None = None, dimensions: Mapping[str, str] | None = None):
+        """Measure a block and always emit one duration sample."""
+        finish = self.duration(metric, task_id=task_id, run_id=run_id,
+                               commit_sha=commit_sha, dimensions=dimensions)
+        try:
+            yield
+        finally:
+            finish()
+
+    def record_request(self, *, success: bool, duration_ms: float | None = None,
+                       task_id: str | None = None, run_id: str | None = None,
+                       commit_sha: str | None = None,
+                       dimensions: Mapping[str, str] | None = None) -> None:
+        self.counter("requests.total", 1, task_id=task_id, run_id=run_id,
+                     commit_sha=commit_sha, dimensions=dimensions)
+        if not success:
+            self.counter("requests.errors", 1, task_id=task_id, run_id=run_id,
+                         commit_sha=commit_sha, dimensions=dimensions)
+        if duration_ms is not None:
+            self.observe("requests.latency_ms", duration_ms, task_id=task_id,
+                         run_id=run_id, commit_sha=commit_sha, dimensions=dimensions)
+
+    def summary(self) -> dict[str, Any]:
+        points = self.snapshot()
+        return {"series": len(points), "metrics": sorted({p["metric"] for p in points}),
+                "ready": self.is_ready()}
 
     def snapshot(self) -> list[dict[str, Any]]:
         state = self.store.get(self.STATE_KEY, {})
