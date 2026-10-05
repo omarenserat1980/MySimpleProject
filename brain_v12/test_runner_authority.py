@@ -46,6 +46,7 @@ RUNTIME_WORKFLOWS = (
     Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-continuous-self-healing.yml"),
     Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
+    Path(".github/workflows/brain-supervisor.yml"),
 )
 
 
