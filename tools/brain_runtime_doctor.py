@@ -7,10 +7,13 @@ It never treats GitHub Actions or Windows as required dependencies.
 from __future__ import annotations
 import json, platform, shutil, sqlite3, sys
 from pathlib import Path
-
-from platform_foundation.independence_contract import IndependenceContract
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from platform_foundation.independence_contract import IndependenceContract
 ARTIFACTS = ROOT / "brain6_artifacts" / "runtime_doctor"
 REPORT = ARTIFACTS / "runtime_doctor.json"
 
