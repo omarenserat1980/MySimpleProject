@@ -113,7 +113,6 @@ youtube_oauth=YouTubeOAuth(store)
 synthetic_customer=None
 synthetic_customer_advisors=(lambda request: chatgpt_reply(request), lambda request, caps: builder.plan("synthetic-customer", request) if request else {})
 # Synthetic Customer is constructed after the canonical EvidenceStore exists.
-lambda request: chatgpt_reply(request), brain_advisor=lambda request, caps: builder.plan("synthetic-customer", request) if request else {}, executor=lambda request, customer_type, run_id: {"ok": True, "run_id": run_id, "customer_type": customer_type, "cognitive": cognitive.run(request)})
 workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
