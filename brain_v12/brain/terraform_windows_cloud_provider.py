@@ -43,7 +43,7 @@ class TerraformWindowsCloudProvider:
 
     def provision_windows_server_2025(self, **kwargs: Any) -> CloudWindowsVM:
         self._require_root()
-        safety = inspect_windows_terraform_root(self.terraform_dir)
+        safety = inspect_windows_terraform_root(self.terraform_dir, allow_runtime_plan=True)
         if not safety["safe"]:
             raise RuntimeError("WINDOWS_TERRAFORM_SAFETY_GATE_FAILED")
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
