@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SUPERVISOR = ROOT / "brain_v12" / "local_worker" / "brain_local_supervisor.py"
+GUARDIAN = ROOT / "brain_v12" / "local_worker" / "brain_local_guardian.py"
 ARTIFACTS = ROOT / "brain6_artifacts" / "local_worker"
 PID_FILE = ARTIFACTS / "supervisor.pid"
 LOG_FILE = ARTIFACTS / "supervisor.log"
@@ -44,7 +44,7 @@ def find_existing() -> int | None:
             pass
     try:
         out = subprocess.check_output(
-            ["pgrep", "-f", "brain_v12/local_worker/brain_local_supervisor.py"],
+            ["pgrep", "-f", "brain_v12/local_worker/brain_local_guardian.py"],
             text=True, stderr=subprocess.DEVNULL,
         )
         for item in out.split():
@@ -94,7 +94,7 @@ def main() -> int:
     if existing is None:
         log = LOG_FILE.open("a", encoding="utf-8")
         proc = subprocess.Popen(
-            [sys.executable, str(SUPERVISOR)],
+            [sys.executable, str(GUARDIAN)],
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
             stdout=log,
@@ -110,7 +110,7 @@ def main() -> int:
     while time.time() < deadline:
         if heartbeat_is_fresh():
             result = {
-                "schema": "brain.local_executor_launcher.v2",
+                "schema": "brain.local_executor_launcher.v3",
                 "status": "READY",
                 "supervisor_pid": existing,
                 "started_by_launcher": started,
