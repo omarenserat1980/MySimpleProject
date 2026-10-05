@@ -40,7 +40,7 @@ permissions:
 
 jobs:
   integrated-execution-gate:
-    runs-on: [self-hosted, brain-runner]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,32 +52,7 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run independent foundation and integration tests
         run: |
-          python -m pytest -q \
-            tests/test_platform_foundation.py \
-            tests/test_brain_supervisor_bridge.py \
-            tests/test_brain_supervisor_bridge_boundary.py \
-            tests/test_brain_verified_recovery_e2e.py \
-            tests/test_brain_supervisor_crash_restart_e2e.py \
-            tests/test_authority_persistence.py \
-            tests/test_platform_lease.py \
-            tests/test_supervisor_lease.py \
-            tests/test_lease_recovery.py \
-            tests/test_lease_ownership.py \
-            tests/test_supervisor_heartbeat.py \
-            tests/test_supervisor_final_fencing.py \
-            tests/test_stale_task_recovery.py \
-            tests/test_repair_policy.py \
-            tests/test_repair_executor.py \
-            tests/test_workflow_inspector.py \
-            tests/test_repair_evidence.py \
-            tests/test_repair_cycle.py \
-            tests/test_operational_gate.py \
-            tests/test_operational_state.py \
-            tests/test_stage_orchestrator.py \
-            tests/test_parallel_chunks.py \
-            tests/test_autonomous_pipeline.py \
-            tests/test_autonomous_pipeline_execution_health.py \
-            tests/test_executor_pool.py
+          python -m pytest -q             tests/test_platform_foundation.py             tests/test_brain_supervisor_bridge.py             tests/test_brain_supervisor_bridge_boundary.py             tests/test_brain_verified_recovery_e2e.py             tests/test_brain_supervisor_crash_restart_e2e.py             tests/test_authority_persistence.py             tests/test_platform_lease.py             tests/test_supervisor_lease.py             tests/test_lease_recovery.py             tests/test_lease_ownership.py             tests/test_supervisor_heartbeat.py             tests/test_supervisor_final_fencing.py             tests/test_stale_task_recovery.py             tests/test_repair_policy.py             tests/test_repair_executor.py             tests/test_workflow_inspector.py             tests/test_repair_evidence.py             tests/test_repair_cycle.py             tests/test_operational_gate.py             tests/test_operational_state.py             tests/test_stage_orchestrator.py             tests/test_parallel_chunks.py             tests/test_autonomous_pipeline.py             tests/test_autonomous_pipeline_execution_health.py             tests/test_executor_pool.py
       - name: Write integrated evidence
         run: |
           python - <<'PY'
