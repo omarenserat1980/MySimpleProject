@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Single entrypoint for proving the local Brain execution path."""
 from __future__ import annotations
-import json, subprocess, sys
+import json, os, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 PROOF = ROOT / "tools" / "brain_independence_proof_gate.py"
 GATE = ROOT / "tools" / "brain_independent_gate.py"
 DOCTOR = ROOT / "tools" / "brain_runtime_doctor.py"
