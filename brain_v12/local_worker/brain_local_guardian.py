@@ -43,12 +43,18 @@ def write_state(**data):
     tmp.write_text(json.dumps({"schema":"brain.local_guardian.v1", **data}, indent=2), encoding="utf-8")
     tmp.replace(STATE)
 
-def fresh_heartbeat():
+def fresh_heartbeat(expected_pid=None, started_at=None):
     try:
         payload = json.loads(HB.read_text(encoding="utf-8"))
         ts = datetime.fromisoformat(str(payload["timestamp"]))
         age = (datetime.now(timezone.utc) - ts).total_seconds()
-        return age <= STALE_AFTER, round(age, 3), payload
+        pid = int(payload.get("pid", 0))
+        valid = age <= STALE_AFTER and pid > 0
+        if expected_pid is not None:
+            valid = valid and pid == expected_pid
+        if started_at is not None:
+            valid = valid and ts.timestamp() >= started_at
+        return valid, round(age, 3), payload
     except Exception as exc:
         return False, None, {"error": f"{type(exc).__name__}:{exc}"}
 
@@ -98,7 +104,7 @@ def main():
                     append_receipt("worker_crashed_during_startup", pid=proc.pid, returncode=code)
                     proc = None
                     break
-                ok, age, _ = fresh_heartbeat()
+                ok, age, _ = fresh_heartbeat(expected_pid=proc.pid, started_at=started)
                 if ok:
                     backoff = 1.0
                     write_state(status="READY", worker_pid=proc.pid, heartbeat_age_seconds=age,
@@ -108,7 +114,7 @@ def main():
             if proc is None:
                 pass
             else:
-                ok, age, _ = fresh_heartbeat()
+                ok, age, _ = fresh_heartbeat(expected_pid=proc.pid, started_at=started)
                 if not ok:
                     append_receipt("startup_heartbeat_timeout", pid=proc.pid, heartbeat_age_seconds=age)
                     terminate(proc)
@@ -133,7 +139,7 @@ def main():
             proc = None
             continue
 
-        ok, age, payload = fresh_heartbeat()
+        ok, age, payload = fresh_heartbeat(expected_pid=proc.pid)
         if not ok:
             append_receipt("heartbeat_stale", pid=proc.pid, heartbeat_age_seconds=age, heartbeat=payload)
             terminate(proc)
