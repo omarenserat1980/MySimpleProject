@@ -46,8 +46,9 @@ def test_full_supervisor_crash_restart_recovery() -> None:
         audit = AuditChain()
         permissions = PermissionBoundary({"build": ActionRisk.WRITE})
         recovery = StaleTaskRecovery(state, audit)
-        recovered = recovery.recover()
-        assert recovered == ["crash-restart"]
+        recovered = recovery.recover_expired()
+        assert [item.task_id for item in recovered] == ["crash-restart"]
+        assert recovered[0].status == "RETRYING"
         assert state.get("supervisor:crash-restart")["status"] == "RETRYING"
 
         bridge = BrainSupervisorBridge(
