@@ -169,5 +169,6 @@ def test_chunk_cannot_commit_after_lease_expiry(tmp_path):
     )
     assert results[0].status == "FAILED"
     assert "lease lost" in (results[0].error or "")
-    assert store.get("pipeline.chunk:run-fence:A")["status"] != "SUCCESS"
+    saved = store.get("pipeline.chunk:run-fence:A")
+    assert saved is None or saved.get("status") != "SUCCESS"
     store.close()
