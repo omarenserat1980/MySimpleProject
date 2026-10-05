@@ -2,6 +2,7 @@ from __future__ import annotations
 import argparse,math,subprocess,shutil
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageFont
+STORYBOARDS={"room-13":"docs/films/room-13.storyboard.json","last-signal":"docs/films/last-signal.storyboard.json","zero-line":"docs/films/zero-line.storyboard.json"}
 FILMS={
 "room-13":{"title":"الغرفة 13","genre":"رعب • غموض","tone":1,"seconds":60},
 "last-signal":{"title":"بعد الإشارة","genre":"خيال علمي • تشويق","tone":2,"seconds":60},
