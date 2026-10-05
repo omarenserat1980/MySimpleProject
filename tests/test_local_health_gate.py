@@ -29,6 +29,7 @@ def test_health_gate_ready(tmp_path, monkeypatch, capsys):
     evidence = tmp_path / "brain_local_verification.json"
     evidence.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(local_health_gate, "BASE", base)
+    monkeypatch.setattr(local_health_gate, "HEARTBEAT", base / "heartbeat.json")
     monkeypatch.setattr(local_health_gate, "SUPERVISOR", base / "supervisor.json")
     monkeypatch.setattr(local_health_gate, "QUEUED", base / "queued")
     monkeypatch.setattr(local_health_gate, "RUNNING", base / "running")
@@ -48,6 +49,7 @@ def test_health_gate_degraded_without_supervisor(tmp_path, monkeypatch):
     evidence = tmp_path / "brain_local_verification.json"
     evidence.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(local_health_gate, "BASE", base)
+    monkeypatch.setattr(local_health_gate, "HEARTBEAT", base / "heartbeat.json")
     monkeypatch.setattr(local_health_gate, "SUPERVISOR", base / "supervisor.json")
     monkeypatch.setattr(local_health_gate, "QUEUED", base / "queued")
     monkeypatch.setattr(local_health_gate, "RUNNING", base / "running")
