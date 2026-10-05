@@ -11,6 +11,7 @@ from typing import Any
 
 from .execution_policy import BRAIN_INTERNAL, WINDOWS_REAL_BOOT, Executor, choose_executor
 from .internal_runner import InternalRunner
+from .windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,38 @@ class BrainExecutionGateway:
 
     def __init__(self, runner: InternalRunner | None = None) -> None:
         self.runner = runner or InternalRunner()
+
+    def authorize_windows_cloud(
+        self,
+        vm: CloudWindowsVM,
+        node: dict[str, Any],
+        *,
+        heartbeat_timeout: float = 120.0,
+        now: float | None = None,
+    ) -> ExecutionDecision:
+        """Authorize Windows Cloud only after fresh guest-runtime proof.
+
+        Infrastructure RUNNING state alone is insufficient. This path is the
+        explicit runtime exception to the internal-only default and never
+        falls back to GitHub CI or another external executor.
+        """
+        verification = WindowsCloudExecutor().verify_runtime(
+            vm,
+            node,
+            heartbeat_timeout=heartbeat_timeout,
+            now=now,
+        )
+        if not verification.get("runtime_verified"):
+            raise RuntimeError(
+                "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED:"
+                + str(verification.get("reason", "UNKNOWN"))
+            )
+        return ExecutionDecision(
+            executor="windows-server-2025-cloud",
+            capability=WINDOWS_REAL_BOOT,
+            verified=True,
+            reason="WINDOWS_CLOUD_RUNTIME_VERIFIED",
+        )
 
     def authorize(self, capability: str) -> ExecutionDecision:
         # Production execution is Brain-owned. External executors are not
