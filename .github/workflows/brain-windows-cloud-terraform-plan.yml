@@ -1,4 +1,4 @@
-name: BRAIN Windows Cloud Terraform Plan
+name: BRAIN Windows Cloud Terraform Validation
 
 on:
   pull_request:
@@ -47,18 +47,9 @@ jobs:
         run: |
           python -m pytest -q brain_v12/tests/test_windows_terraform_safety.py brain_v12/tests/test_terraform_plan_gate.py
 
-      - name: Plan without credentials or apply
+      - name: Verify plan must remain an explicit runtime action
         run: |
-          echo "Infrastructure validation only."
-          echo "No terraform apply is permitted by this workflow."
-          terraform plan -refresh=false -input=false -lock=false -out=brain.tfplan
-        env:
-          TF_VAR_admin_username: "ci-validation-user"
-          TF_VAR_admin_password: "CI_VALIDATION_ONLY_NotARealPassword_ChangeMe123!"
-          TF_VAR_allowed_source_ip: "192.0.2.1/32"
-
-      - name: Remove local Terraform artifacts
-        if: always()
-        run: |
-          rm -rf .terraform
-          rm -f brain.tfplan terraform.tfstate terraform.tfstate.backup
+          echo "CI validates Terraform structure only."
+          echo "A real terraform plan requires authenticated Azure runtime context."
+          echo "This workflow never runs terraform apply."
+          
