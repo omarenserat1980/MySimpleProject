@@ -67,3 +67,16 @@ Consolidation is accepted only when:
 - Continuous runtime delegates rather than duplicates policy.
 - Existing functionality remains covered by tests.
 - Evidence identifies the canonical owner.
+
+
+## A-004 — Orchestrator ownership boundary
+
+**Status: RESOLVED / BOUNDARY CONFIRMED**
+
+- `brain_v12/brain/orchestrator.py` is the V12 `CognitiveOrchestrator` used by `brain_v12/app.py` and owns the V12 perceive → decide → plan → observe → learn flow.
+- `brain_v7/braincore_v2/cognitive_orchestrator.py` is a legacy V7 implementation and remains frozen; it is not imported by the V12 application.
+- `brain_v12/brain/autonomous_supervisor.py` is a tool-plan executor/approval gate, not the system-level Supervisor. It must not become a second system policy owner.
+- The canonical system-level authority remains `brain_v12/brain/brain_supervisor.py`.
+- Runtime continuity remains delegated through `brain_v12/tools/brain_runtime_supervisor.py`.
+
+This establishes the ownership boundary without deleting legacy V7 code.
