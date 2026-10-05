@@ -62,7 +62,7 @@ jobs:
           BRAIN_CONTROL_TOKEN: ${{ secrets.BRAIN_CONTROL_TOKEN }}
         run: |
           missing=0
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID PAYTABS_SERVER_KEY PAYTABS_PROFILE_ID BRAIN_ORIGIN BRAIN_CONTROL_TOKEN; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID PAYTABS_SERVER_KEY PAYTABS_PROFILE_ID; do
             eval "value=\${$name:-}"
             if [ -z "$value" ]; then
               echo "::error title=Missing deployment configuration::$name is not configured in GitHub Actions."
@@ -149,7 +149,8 @@ jobs:
           npx wrangler r2 object put brain-cinema-media/films/last_light_city.mp4 --file "$MASTER" --content-type video/mp4 --cache-control "private, no-store" --remote
           echo "CINEMA_MASTER_R2_UPLOAD=PASS"
 
-      - name: Configure Brain control secret
+      - name: Configure Brain control secret (optional)
+        if: ${{ secrets.BRAIN_CONTROL_TOKEN != '' }}
         working-directory: cloudflare/brain-api
         env:
           BRAIN_CONTROL_TOKEN: ${{ secrets.BRAIN_CONTROL_TOKEN }}
