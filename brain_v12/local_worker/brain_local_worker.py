@@ -8,6 +8,7 @@ from __future__ import annotations
 import json, os, platform, shutil, subprocess, time, sys
 from pathlib import Path
 from datetime import datetime, timezone
+from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 
 ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
 QUEUED, RUNNING, COMPLETED, FAILED = (ROOT / x for x in ("queued", "running", "completed", "failed"))
@@ -131,8 +132,11 @@ def process(path: Path):
 
 def main():
     setup()
+    authority = BrainExecutionAuthority(executor_id=WORKER_ID)
+    authority.heartbeat()
     print(f"Brain Local Worker {WORKER_ID} -> {ROOT}")
     while True:
+        authority.heartbeat()
         for path in sorted(QUEUED.glob("*.json")):
             process(path)
         time.sleep(POLL)
