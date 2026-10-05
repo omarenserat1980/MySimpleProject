@@ -593,7 +593,7 @@ function corsHeaders(requestOrigin = "", allowedOrigin = DEFAULT_ALLOWED_ORIGIN)
   return {
     "access-control-allow-origin": allowedOrigin,
     "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "Content-Type, Authorization, X-V12-Agent-Key, Signature",
+    "access-control-allow-headers": "Content-Type, Authorization, X-V12-Agent-Key, Signature, X-BRAIN-CONTROL-KEY, X-Brain-Control-Key",
     "access-control-allow-credentials": "true",
   };
 }
