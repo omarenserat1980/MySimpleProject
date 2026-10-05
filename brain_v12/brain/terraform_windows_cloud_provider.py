@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .terraform_plan_gate import TerraformPlanGate
+from .windows_terraform_safety import inspect_windows_terraform_root
 from .windows_cloud_executor import CloudWindowsVM, WINDOWS_SERVER_2025
 
 
@@ -42,6 +43,9 @@ class TerraformWindowsCloudProvider:
 
     def provision_windows_server_2025(self, **kwargs: Any) -> CloudWindowsVM:
         self._require_root()
+        safety = inspect_windows_terraform_root(self.terraform_dir)
+        if not safety["safe"]:
+            raise RuntimeError("WINDOWS_TERRAFORM_SAFETY_GATE_FAILED")
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
             raise RuntimeError("WINDOWS_CLOUD_APPLY_REQUIRES_EXPLICIT_ENABLEMENT")
         self._run(["init", "-input=false"])
