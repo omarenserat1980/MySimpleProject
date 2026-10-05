@@ -141,8 +141,20 @@ def poll_once() -> dict:
 def run_forever(poll_seconds: float = 5.0) -> None:
     interval = max(1.0, float(poll_seconds))
     while True:
-        heartbeat()
-        poll_once()
+        try:
+            hb = heartbeat()
+            if hb.get("ok"):
+                poll_once()
+        except Exception as exc:
+            # Network/control-plane interruptions must not terminate the VM agent.
+            # The next cycle retries and the node becomes stale if the outage persists.
+            print(
+                json.dumps(
+                    {"ok": False, "status": "FABRIC_RETRY", "error": f"{type(exc).__name__}:{exc}"},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
         time.sleep(interval)
 
 
