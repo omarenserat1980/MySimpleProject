@@ -39,6 +39,7 @@ def run() -> dict:
         "test_count": len(TESTS),
         "return_code": proc.returncode,
         "status": "PASS" if proc.returncode == 0 else "FAIL",
+        "execution_evidence": "LOCAL_PROCESS_EXECUTION_REQUIRED",
         "independence_claim_allowed": False,
         "independence_claim_reason": (
             "A passing verification suite is evidence of implementation correctness; "
