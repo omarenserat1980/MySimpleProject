@@ -44,13 +44,18 @@ class TerraformWindowsCloudProvider:
         self._require_root()
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
             raise RuntimeError("WINDOWS_CLOUD_APPLY_REQUIRES_EXPLICIT_ENABLEMENT")
-        self._run(["init", "-input=false"])\n        self._run(["plan", "-input=false", "-out=brain.tfplan"])
-        variables = dict(self._terraform_vars())
-        variables.update({k: v for k, v in kwargs.items() if k.startswith("brain_")})
-        TerraformPlanGate(self.terraform_dir).require_reviewed_plan()\n        args = ["apply", "-input=false", "brain.tfplan"]
-        for key, value in variables.items():
-            args.extend(["-var", f"{key}={value}"])
-        self._run(args)
+        self._run(["init", "-input=false"])
+        plan_path = self.terraform_dir / "brain.tfplan"
+        if not plan_path.is_file():
+            variables = dict(self._terraform_vars())
+            variables.update({k: v for k, v in kwargs.items() if k.startswith("brain_")})
+            args = ["plan", "-input=false", "-out=brain.tfplan"]
+            for key, value in variables.items():
+                args.extend(["-var", f"{key}={value}"])
+            self._run(args)
+            raise RuntimeError("TERRAFORM_PLAN_CREATED_REVIEW_REQUIRED")
+        TerraformPlanGate(self.terraform_dir).require_reviewed_plan()
+        self._run(["apply", "-input=false", "brain.tfplan"])
         return self._read_vm()
 
     def status(self, vm_id: str) -> CloudWindowsVM:
