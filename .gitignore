@@ -8,3 +8,11 @@ assets/*
 output/*
 !assets/.gitkeep
 !output/.gitkeep
+
+# Terraform runtime state, plans, and local metadata
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
