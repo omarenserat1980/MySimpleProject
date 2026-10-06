@@ -134,7 +134,7 @@ class ClientRevenueGuardian:
             "CAPTURE_BASELINE_AND_START_ONE_REVENUE_PATH" if trend == "BASELINE"
             else "PROTECT_VERIFIED_PATH_AND_SCALE_ONE_STEP" if trend == "INCREASED"
             else "ADVANCE_ONE_EXISTING_OPPORTUNITY_AND_RECHECK_REVENUE" if trend == "UNCHANGED"
-            else "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK" if trend == "DECREASED"
+            else "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK"
         )
         escalation = (
             "NONE" if trend in {"BASELINE", "INCREASED"}
