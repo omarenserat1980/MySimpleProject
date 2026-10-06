@@ -59,3 +59,19 @@ def test_nudge_is_single_bounded_request():
     assert len(calls) == 1
     assert calls[0]["client_id"] == "CL-000003"
     assert calls[0]["constraint"] == "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE"
+
+def test_deep_audit_uses_existing_income_lifecycle():
+    class Income:
+        def snapshot(self):
+            return {"verified_revenue_jod": 0, "opportunities": [{"status": "READY_TO_APPLY"}]}
+    class Lifecycle:
+        ORDER = ("DISCOVERY", "QUALIFIED", "READY_TO_APPLY", "SUBMITTED", "CLIENT_RESPONDED", "ACCEPTED", "DELIVERING", "COMPLETED", "PAYMENT_VERIFIED")
+        def summary(self):
+            return {"counts": {"READY_TO_APPLY": 1}, "payment_verified_jod": 0}
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda _id: {},
+        revenue_reader=lambda _id: {"verified_revenue_jod": 0},
+    )
+    report = guardian.deep_inspect(Income(), Lifecycle())
+    assert report["deep_audit"]["highest_priority"] == "CONVERT_READY_TO_APPLY_TO_SUBMITTED_WITH_EXTERNAL_EVIDENCE"
+    assert report["deep_audit"]["hard_gate"] == "PAYMENT_VERIFIED + payment_evidence"
