@@ -222,6 +222,11 @@ class BrainCouncil:
             device_endpoint = arkan_agents[0] if arkan_agents else (online_agents[0] if online_agents else None)
             action["device_endpoint"] = str(device_endpoint.get("agent_id")) if device_endpoint else None
             action["device_presence_required"] = bool(device_endpoint)
+            action["device_identity_gate"] = "ONLINE_AGENT_REQUIRED"
+            action["device_capability_gate"] = "PRIMARY_PIPELINE_CAPABILITY_REQUIRED"
+            action["pre_execution_evidence_required"] = True
+            action["post_execution_evidence_required"] = True
+            action["audit_trace_required"] = True
             if self.action_requester is None:
                 result = {"accepted": False, "status": "NO_PRIMARY_ACTION_REQUESTER"}
             elif client_id == "CL-000003":
