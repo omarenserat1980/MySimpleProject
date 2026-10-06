@@ -40,8 +40,8 @@ class IncomeLifecycle:
     def _now(self):
         return datetime.now(timezone.utc).isoformat()
 
-    def _find(self, opportunity_id):
-        rows = self.store.income_opportunities(500)
+    def _find(self, opportunity_id, client_id=None):
+        rows = self.store.income_opportunities(500, client_id=client_id)
         return next((x for x in rows if x.get("opportunity_id") == opportunity_id), None)
 
     def _save(self, row, **updates):
@@ -51,8 +51,8 @@ class IncomeLifecycle:
         self.store.upsert_income_opportunity(data)
         return data
 
-    def _transition(self, opportunity_id, target, evidence="", actor="external_executor"):
-        row = self._find(opportunity_id)
+    def _transition(self, opportunity_id, target, evidence="", actor="external_executor", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND", "opportunity_id": opportunity_id}
         current = str(row.get("status") or "DISCOVERY")
@@ -78,18 +78,18 @@ class IncomeLifecycle:
         })
         return {"ok": True, "status": target, "opportunity": data}
 
-    def qualify(self, opportunity_id, notes=""):
-        row = self._find(opportunity_id)
+    def qualify(self, opportunity_id, notes="", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND"}
         req = str((row.get("data") or {}).get("requirements") or "")
         url = str(row.get("source_url") or "")
         if not url.startswith(("http://", "https://")) or len(req.strip()) < 8:
             return {"ok": False, "status": "NOT_QUALIFIED", "reason": "MISSING_SOURCE_OR_REQUIREMENTS"}
-        return self._transition(opportunity_id, "QUALIFIED", actor="brain")
+        return self._transition(opportunity_id, "QUALIFIED", actor="brain", client_id=client_id)
 
-    def prepare(self, opportunity_id, proposal=""):
-        row = self._find(opportunity_id)
+    def prepare(self, opportunity_id, proposal="", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND"}
         data = dict(row.get("data") or {})
@@ -112,12 +112,12 @@ class IncomeLifecycle:
         return {"ok": True, "status": "READY_TO_APPLY", "opportunity": data,
                 "external_submission": "NOT_PERFORMED"}
 
-    def record_external(self, opportunity_id, status, evidence):
+    def record_external(self, opportunity_id, status, evidence, client_id=None):
         """Record an externally completed step only when its evidence is supplied."""
-        return self._transition(opportunity_id, status, evidence=evidence, actor="external_executor")
+        return self._transition(opportunity_id, status, evidence=evidence, actor="external_executor", client_id=client_id)
 
-    def summary(self):
-        rows = self.store.income_opportunities(500)
+    def summary(self, client_id=None):
+        rows = self.store.income_opportunities(500, client_id=client_id)
         counts = {s: 0 for s in self.ORDER}
         for row in rows:
             s = str(row.get("status") or "DISCOVERY")
@@ -127,4 +127,5 @@ class IncomeLifecycle:
             "external_execution_ready": False,
             "reason": "لا توجد قناة تنفيذ خارجية متصلة بالحسابات؛ يمكن تجهيز العروض وتسجيل الأدلة فقط.",
             "payment_verified_jod": sum(float(x.get("verified_amount_jod") or 0) for x in rows),
+            "client_id": client_id,
         }
