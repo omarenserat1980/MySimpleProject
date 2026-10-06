@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane with strict identity and monetary binding."""
+"""Evidence-gated commercial control plane with strict identity, money and source integrity."""
 
 from __future__ import annotations
 
@@ -56,12 +56,23 @@ class CommercialEvidence:
     order_id: str = ""
     amount: float | Decimal | None = None
     currency: str = ""
+    source_digest: str = ""
+    verified_at_utc: str = ""
+
+    def integrity_supported(self) -> bool:
+        return (
+            bool(self.source_digest.strip())
+            and len(self.source_digest.strip()) == 64
+            and all(c in "0123456789abcdefABCDEF" for c in self.source_digest.strip())
+            and bool(self.verified_at_utc.strip())
+        )
 
     def independently_supported(self) -> bool:
         return (
             self.verified
             and bool(self.reference.strip())
             and self.provenance in ALLOWED_PROVENANCE
+            and self.integrity_supported()
         )
 
 
