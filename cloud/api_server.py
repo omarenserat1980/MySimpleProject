@@ -264,6 +264,22 @@ def client_order(request: Request, body: ClientOrderRequest):
     public = _client_public(account)
     if public["trial"]["state"] != "TRIAL_ACTIVE" and body.plan.upper().startswith("FREE TRIAL"):
         raise HTTPException(status_code=409, detail="free trial has expired")
+    # One active request per client: completed/cancelled orders are allowed,
+    # but a second live request is rejected instead of accumulating work.
+    terminal_order_states = {"COMPLETED", "CLOSED", "CANCELLED", "VERIFIED_COMPLETED", "FAILED"}
+    active_orders = [
+        item for item in account.get("orders", [])
+        if str(item.get("state", "")).upper() not in terminal_order_states
+    ]
+    if active_orders:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ACTIVE_REQUEST_EXISTS",
+                "message": "client already has one active request; finish it before creating another",
+                "active_order_id": active_orders[0].get("order_id"),
+            },
+        )
     order_id = "BRAIN-CLIENT-" + time.strftime("%Y%m%d") + "-" + uuid.uuid4().hex[:8].upper()
     order = {"order_id": order_id, "service": body.service.strip(), "plan": body.plan.strip(),
              "need": body.need.strip(), "state": "TRIAL_REQUESTED" if body.plan.upper().startswith("FREE TRIAL") else "NEW",
