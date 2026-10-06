@@ -161,7 +161,16 @@ class CommerceStore:
                     raise HTTPException(status_code=409, detail="PAYMENT_NOT_VERIFIED")
                 if order.get("delivery", {}).get("status") != "DELIVERED":
                     raise HTTPException(status_code=409, detail="DELIVERY_NOT_VERIFIED")
-                order["revenue"] = {"status": "REALIZED", "delivery_evidence_ref": delivery_ref, "reconciliation_ref": reconciliation_ref}
+                # Revenue realization is owned by an independently verified commercial
+                # authority, not by this HTTP endpoint. Local refs alone are insufficient.
+                authority = order.get("revenue_authority", {})
+                if authority.get("status") != "INDEPENDENTLY_VERIFIED":
+                    raise HTTPException(status_code=409, detail="REVENUE_AUTHORITY_REQUIRED")
+                if authority.get("order_id") != order_id:
+                    raise HTTPException(status_code=409, detail="REVENUE_AUTHORITY_ORDER_MISMATCH")
+                if authority.get("payment_transaction_id") != order.get("payment", {}).get("transaction_id"):
+                    raise HTTPException(status_code=409, detail="REVENUE_AUTHORITY_PAYMENT_MISMATCH")
+                order["revenue"] = {"status": "REALIZED", "delivery_evidence_ref": delivery_ref, "reconciliation_ref": reconciliation_ref, "authority_ref": authority.get("evidence_ref")}
             elif target == "DELIVERED":
                 order["delivery"] = {"status": "DELIVERED", "evidence_ref": evidence_ref.strip()}
             order["state"] = target
