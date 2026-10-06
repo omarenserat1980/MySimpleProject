@@ -24,6 +24,27 @@ cat > "$BUILD/src/brain_boot.S" <<'ASM'
 .type _start,@function
 _start:
     cli
+    mov $0x3f9, %dx
+    xor %al, %al
+    out %al, (%dx)
+    mov $0x3fb, %dx
+    mov $0x80, %al
+    out %al, (%dx)
+    mov $0x3f8, %dx
+    mov $0x01, %al
+    out %al, (%dx)
+    mov $0x3f9, %dx
+    xor %al, %al
+    out %al, (%dx)
+    mov $0x3fb, %dx
+    mov $0x03, %al
+    out %al, (%dx)
+    mov $0x3fc, %dx
+    mov $0x03, %al
+    out %al, (%dx)
+    mov $0x3f9, %dx
+    xor %al, %al
+    out %al, (%dx)
     mov $message, %esi
 1:
     lodsb
