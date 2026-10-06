@@ -266,6 +266,8 @@ class ClientRevenueGuardian:
         project_revenue_before = float(candidate.get("verified_amount_jod") or project_data.get("verified_amount_jod") or 0)
         marketing_baselines = dict(previous.get("marketing_revenue_baselines") or {})
         marketing_baselines[project_id] = project_revenue_before
+        media_path = str(project_data.get("media_path") or "").strip()
+        marketing_asset_ready = bool(media_path)
         action = {
             "client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -273,6 +275,9 @@ class ClientRevenueGuardian:
             "project_id": project_id,
             "project_title": title,
             "channel": "SOCIAL_MEDIA",
+            "marketing_asset_ready": marketing_asset_ready,
+            "media_path": media_path,
+            "execution_gate": "REQUIRE_PUBLISH_PROVIDER_AND_VALID_MEDIA_BEFORE_EXTERNAL_PUBLISH",
             "constraint": "ONE_SUCCESSFUL_PROJECT_ONE_BOUNDED_MARKETING_ACTION",
             "revenue_tracking_required": True,
             "payment_verification_required": True,
