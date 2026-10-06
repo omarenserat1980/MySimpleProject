@@ -1978,16 +1978,19 @@ def render_monitor_status():
 
 class IncomeLifecycleRequest(BaseModel):
     opportunity_id:str
+    client_id:str
     notes:str=""
 
 
 class IncomePrepareRequest(BaseModel):
     opportunity_id:str
+    client_id:str
     proposal:str=""
 
 
 class IncomeExternalEvidence(BaseModel):
     opportunity_id:str
+    client_id:str
     status:str
     evidence:str
 
@@ -2020,13 +2023,13 @@ def income_lifecycle_status():
 @app.post("/api/income/qualify")
 def income_qualify(request:Request, body:IncomeLifecycleRequest):
     require_control_key(request)
-    return income_lifecycle.qualify(body.opportunity_id, body.notes)
+    return income_lifecycle.qualify(body.opportunity_id, body.notes, client_id=body.client_id)
 
 
 @app.post("/api/income/prepare")
 def income_prepare(request:Request, body:IncomePrepareRequest):
     require_control_key(request)
-    return income_lifecycle.prepare(body.opportunity_id, body.proposal)
+    return income_lifecycle.prepare(body.opportunity_id, body.proposal, client_id=body.client_id)
 
 
 @app.post("/api/income/external-evidence")
@@ -2035,11 +2038,12 @@ def income_external_evidence(request:Request, body:IncomeExternalEvidence):
     allowed={"SUBMITTED","CLIENT_RESPONDED","ACCEPTED","DELIVERING","COMPLETED"}
     if body.status not in allowed:
         return {"ok":False,"status":"INVALID_EXTERNAL_STATUS","allowed":sorted(allowed)}
-    return income_lifecycle.record_external(body.opportunity_id, body.status, body.evidence)
+    return income_lifecycle.record_external(body.opportunity_id, body.status, body.evidence, client_id=body.client_id)
 
 
 class IncomeVerification(BaseModel):
     opportunity_id:str
+    client_id:str
     amount_jod:float
     evidence:str
 
@@ -2047,13 +2051,13 @@ class IncomeVerification(BaseModel):
 @app.post("/api/income/verify")
 def income_verify(request:Request, body:IncomeVerification):
     require_control_key(request)
-    row=income_lifecycle._find(body.opportunity_id)
+    row=income_lifecycle._find(body.opportunity_id, client_id=body.client_id)
     if not row:
         return {"ok":False,"status":"NOT_FOUND"}
     if str(row.get("status")) not in ("COMPLETED", "PAYMENT_VERIFIED"):
         return {"ok":False,"status":"DELIVERY_NOT_VERIFIED","current":row.get("status"),
                 "reason":"يجب إثبات القبول/التنفيذ/التسليم قبل تسجيل الدفع."}
-    result=workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence)
+    result=workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence,client_id=body.client_id)
     if result.get("ok"):
         income_lifecycle._save(row,status="PAYMENT_VERIFIED",payment_evidence=body.evidence[:4000],
                                payment_verified_at=income_lifecycle._now())
