@@ -24,6 +24,7 @@ from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
 from .brain.decision_engine import DecisionEngine
 from .brain.client_suggestion_bridge import ClientSuggestionBridge
+from .brain.brain_council import BrainCouncil
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
@@ -115,6 +116,16 @@ client_suggestion_bridge=ClientSuggestionBridge(
     decision_engine,
     workforce.request_revenue_guardian_action,
 )
+brain_council=BrainCouncil(
+    os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")),
+    openai_provider,
+    decision_engine,
+    state_reader=lambda client_id: {
+        "industrial_request": store.industrial_client_request_state(client_id),
+        "income": income_lifecycle.summary(client_id=client_id),
+    },
+    action_requester=workforce.request_revenue_guardian_action,
+)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
@@ -197,6 +208,39 @@ class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
     target: str = "arkan"
+
+
+@app.post("/api/brain/council/convene")
+def brain_council_convene(request: Request, body: dict | None = None):
+    """Convene Brain + ChatGPT + current clients and store durable minutes."""
+    require_control_key(request)
+    body = body or {}
+    title = str(body.get("title") or "اجتماع عقل برين والعملاء").strip()
+    agenda = body.get("agenda") if isinstance(body.get("agenda"), list) else None
+    return brain_council.convene(title=title, agenda=agenda)
+
+
+@app.post("/api/brain/council/{meeting_id}/execute")
+def brain_council_execute(request: Request, meeting_id: int):
+    """Execute the bounded decisions recorded for a council meeting."""
+    require_control_key(request)
+    return brain_council.execute_minutes(meeting_id)
+
+
+@app.get("/api/brain/council/{meeting_id}")
+def brain_council_minutes(request: Request, meeting_id: int):
+    """Read a durable council meeting and its execution evidence."""
+    require_control_key(request)
+    return brain_council.minutes(meeting_id)
+
+
+@app.get("/api/brain/council")
+def brain_council_latest(request: Request):
+    """Read the latest council meeting without mutating state."""
+    require_control_key(request)
+    with store.connect() as con:
+        row = con.execute("SELECT id FROM brain_council_meetings ORDER BY id DESC LIMIT 1").fetchone()
+    return brain_council.minutes(int(row["id"])) if row else {"ok": True, "status": "NO_MEETINGS"}
 
 
 @app.post("/api/brain/client-3/suggestion")
