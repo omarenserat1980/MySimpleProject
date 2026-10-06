@@ -37,3 +37,11 @@ def test_invalid_email_is_rejected():
     import pytest
     with pytest.raises(ValueError):
         InquiryIn(company="Test Industrial", contact_name="A User", email="not-an-email", category="Hydraulics", message="Please send availability and a quote.")
+
+
+def test_admin_ui_avoids_raw_innerhtml_rendering():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    admin = (root / "web" / "industrial-quote-portal" / "admin.html").read_text(encoding="utf-8")
+    assert "rows.innerHTML" not in admin
+    assert "textContent=value" in admin
