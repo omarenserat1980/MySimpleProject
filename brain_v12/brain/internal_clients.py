@@ -17,6 +17,12 @@ from ..business.two_customer_execution_contract import CUSTOMER_SCOPE, public_sc
 
 
 INTERNAL_CLIENTS = {
+    "BRAIN-REVENUE-CL-000003": {
+        "customer_id": "CL-000003",
+        "tool_role": "EXTERNAL_REVENUE_CANDIDATE",
+        "request": "ACQUIRE_AND_DELIVER_FIRST_PAID_BRAIN_SERVICE",
+        "target": "CUSTOMER_REQUIRED",
+    },
     "BRAIN-INTERNAL-CL-000001": {
         "customer_id": "CL-000001",
         "tool_role": "INDUSTRIAL_ISO_CLIENT",
