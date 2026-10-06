@@ -62,12 +62,14 @@ def test_nudge_is_single_bounded_request():
 
 def test_deep_audit_uses_existing_income_lifecycle():
     class Income:
-        def snapshot(self):
-            return {"verified_revenue_jod": 0, "opportunities": [{"status": "READY_TO_APPLY"}]}
+        def snapshot(self, client_id=None):
+            assert client_id == "CL-000003"
+            return {"verified_revenue_jod": 0, "opportunities": [{"status": "READY_TO_APPLY", "client_id": client_id}]}
     class Lifecycle:
         ORDER = ("DISCOVERY", "QUALIFIED", "READY_TO_APPLY", "SUBMITTED", "CLIENT_RESPONDED", "ACCEPTED", "DELIVERING", "COMPLETED", "PAYMENT_VERIFIED")
-        def summary(self):
-            return {"counts": {"READY_TO_APPLY": 1}, "payment_verified_jod": 0}
+        def summary(self, client_id=None):
+            assert client_id == "CL-000003"
+            return {"counts": {"READY_TO_APPLY": 1}, "payment_verified_jod": 0, "client_id": client_id}
     guardian = ClientRevenueGuardian(
         activity_reader=lambda _id: {},
         revenue_reader=lambda _id: {"verified_revenue_jod": 0},
@@ -75,3 +77,22 @@ def test_deep_audit_uses_existing_income_lifecycle():
     report = guardian.deep_inspect(Income(), Lifecycle())
     assert report["deep_audit"]["highest_priority"] == "CONVERT_READY_TO_APPLY_TO_SUBMITTED_WITH_EXTERNAL_EVIDENCE"
     assert report["deep_audit"]["hard_gate"] == "PAYMENT_VERIFIED + payment_evidence"
+
+
+def test_deep_audit_enables_client_data_isolation():
+    class Income:
+        def snapshot(self, client_id=None):
+            assert client_id == "CL-000003"
+            return {"verified_revenue_jod": 0, "opportunities": []}
+    class Lifecycle:
+        ORDER = ("DISCOVERY", "PAYMENT_VERIFIED")
+        def summary(self, client_id=None):
+            assert client_id == "CL-000003"
+            return {"counts": {}, "payment_verified_jod": 0, "client_id": client_id}
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda client_id: {"client_id": client_id},
+        revenue_reader=lambda client_id: {"verified_revenue_jod": 0, "client_id": client_id},
+    )
+    report = guardian.deep_inspect(Income(), Lifecycle(), "CL-000003")
+    assert report["deep_audit"]["client_data_isolation"] is True
+    assert report["policy"]["client_data_isolation"] is True
