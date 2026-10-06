@@ -147,6 +147,18 @@ class CommercialCase:
             seen.add(reference)
         return duplicates
 
+    def duplicate_evidence_types(self) -> set[str]:
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for item in self.evidence:
+            evidence_type = item.evidence_type.strip()
+            if not evidence_type:
+                continue
+            if evidence_type in seen:
+                duplicates.add(evidence_type)
+            seen.add(evidence_type)
+        return duplicates
+
     def duplicate_source_digests(self) -> set[str]:
         seen: set[str] = set()
         duplicates: set[str] = set()
@@ -160,7 +172,11 @@ class CommercialCase:
         return duplicates
 
     def evidence_set_integrity_ok(self) -> bool:
-        return not self.duplicate_references() and not self.duplicate_source_digests()
+        return (
+            not self.duplicate_references()
+            and not self.duplicate_source_digests()
+            and not self.duplicate_evidence_types()
+        )
 
     def chronology_integrity_ok(self) -> bool:
         by_type: dict[str, CommercialEvidence] = {}
@@ -225,6 +241,14 @@ class CommercialCase:
         )
 
     def transition(self, target: CommercialState) -> None:
+        if target == self.state:
+            return
+        if target == CommercialState.PROSPECT:
+            raise ValueError("Commercial state cannot move backward to PROSPECT.")
+        state_order = list(CommercialState)
+        if self.state in state_order and target in state_order:
+            if state_order.index(target) < state_order.index(self.state):
+                raise ValueError(f"Commercial state cannot move backward: {self.state.value} -> {target.value}")
         if not self.can_enter(target):
             missing = sorted(REQUIRED_EVIDENCE.get(target, frozenset()) - self.verified_types())
             raise ValueError(f"Transition blocked; missing evidence: {missing}")
