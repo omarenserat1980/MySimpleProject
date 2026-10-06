@@ -21,7 +21,7 @@ from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
 from cloud.customer_communications import Channel, CommunicationHub, MessageState
 from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
-from cloud.brain_fabric_api import router as fabric_router
+from cloud.brain_fabric_api import router as fabric_router\nfrom brain_v12.business.customer_activity_supervisor import CustomerActivitySupervisor
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -224,6 +224,30 @@ def _client_public(account: dict) -> dict:
     return {"client_id": account["client_id"], "email": account["email"],
             "display_name": account["display_name"], "trial": trial,
             "orders": account.get("orders", [])}
+
+# ---------------------------------------------------------------------------
+# AUTHORIZED CUSTOMER ACTIVITY REPORT + CONTINUATION
+# Cross-customer visibility is intentionally restricted to the Brain control
+# plane. A customer session may access only its own account/orders.
+# ---------------------------------------------------------------------------
+CUSTOMER_ACTIVITY_SUPERVISOR = CustomerActivitySupervisor(STATE)
+
+@app.get("/api/brain/customers/activity-report", dependencies=[Depends(require_auth)])
+def brain_customer_activity_report(include_completed: bool = True):
+    """Return the current customer/activity inventory for an authorized operator."""
+    return CUSTOMER_ACTIVITY_SUPERVISOR.report(include_completed=include_completed)
+
+
+@app.post("/api/brain/customers/activity-continue", dependencies=[Depends(require_auth)])
+def brain_customer_activity_continue(customer_id: str | None = None, limit: int = 50):
+    """Inspect unfinished activities and continue them through an injected executor.
+
+    The executor must return completed=True plus structured verification:
+    passed=True, a non-empty criterion, and evidence. Without that proof the
+    activity remains incomplete.
+    """
+    return CUSTOMER_ACTIVITY_SUPERVISOR.continue_unfinished(customer_id=customer_id, limit=limit)
+
 
 @app.get("/api/auth/me")
 def client_me(request: Request):
