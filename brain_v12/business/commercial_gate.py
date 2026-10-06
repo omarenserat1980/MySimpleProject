@@ -74,7 +74,7 @@ def _verified_evidence_of_type(case: CommercialCase, evidence_type: str):
     return [
         item for item in case.evidence
         if item.evidence_type == evidence_type
-        and item.evidence_matches_case(item)
+        and case.evidence_matches_case(item)
         and item.independently_supported()
     ]
 
