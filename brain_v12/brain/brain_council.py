@@ -79,6 +79,10 @@ class BrainCouncil:
         ]
 
     def convene(self, title: str = "اجتماع عقل برين والعملاء", agenda: list[str] | None = None) -> dict[str, Any]:
+        with self._connect() as con:
+            previous = con.execute("SELECT id,status FROM brain_council_meetings ORDER BY id DESC LIMIT 1").fetchone()
+        if previous and str(previous["status"]) not in {"VERIFIED"}:
+            return {"ok": False, "status": "PREVIOUS_COUNCIL_NOT_CLOSED", "previous_meeting_id": int(previous["id"]), "previous_status": str(previous["status"]), "required_action": "VERIFY_OR_REPAIR_PREVIOUS_MEETING"}
         participants = [
             {"id": "BRAIN", "role": "chair_and_executor"},
             {"id": "CHATGPT", "role": "advisor_and_reviewer"},
