@@ -65,7 +65,8 @@ def execute(task, params):
             ["python", "-m", "unittest", *SELF_TESTS, "-v"],
             cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=180,
         )
-        ok = p.returncode == 0 and "Ran " in (p.stdout or "") and "OK" in (p.stdout or "")
+        combined_output = "\n".join((p.stdout or "", p.stderr or ""))
+        ok = p.returncode == 0 and "Ran " in combined_output and "OK" in combined_output
         return ok, {
             "returncode": p.returncode,
             "stdout": p.stdout[-12000:],
