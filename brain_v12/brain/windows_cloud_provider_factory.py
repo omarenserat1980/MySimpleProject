@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from .opennebula_windows_cloud_provider import OpenNebulaWindowsCloudProvider
 from .terraform_windows_cloud_provider import TerraformWindowsCloudProvider
 from .windows_cloud_executor import WindowsCloudProvider
 
@@ -19,6 +20,11 @@ def build_windows_cloud_provider() -> WindowsCloudProvider | None:
         if provider.readiness()["ready"]:
             return provider
         return None
+    if backend == "opennebula":
+        provider = OpenNebulaWindowsCloudProvider()
+        if provider.readiness()["ready"]:
+            return provider
+        return None
     raise RuntimeError(f"UNSUPPORTED_WINDOWS_CLOUD_PROVIDER:{backend}")
 
 
@@ -28,4 +34,6 @@ def windows_cloud_provider_readiness() -> dict[str, Any]:
         return {"ready": False, "provider": None, "reason": "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED"}
     if backend == "terraform":
         return TerraformWindowsCloudProvider().readiness()
+    if backend == "opennebula":
+        return OpenNebulaWindowsCloudProvider().readiness()
     return {"ready": False, "provider": backend, "reason": "UNSUPPORTED_WINDOWS_CLOUD_PROVIDER"}
