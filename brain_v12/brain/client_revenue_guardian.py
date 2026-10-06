@@ -25,11 +25,15 @@ class ClientRevenueGuardian:
         revenue_reader: Callable[[str], dict[str, Any]],
         blocker_reader: Callable[[str], list[dict[str, Any]]] | None = None,
         action_requester: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        progress_reader: Callable[[str], dict[str, Any] | None] | None = None,
+        progress_writer: Callable[[str, dict[str, Any]], Any] | None = None,
     ) -> None:
         self.activity_reader = activity_reader
         self.revenue_reader = revenue_reader
         self.blocker_reader = blocker_reader or (lambda _client_id: [])
         self.action_requester = action_requester
+        self.progress_reader = progress_reader or (lambda _client_id: None)
+        self.progress_writer = progress_writer or (lambda _client_id, _record: None)
 
     def inspect(self, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         client_id = str(client_id).strip()
@@ -100,6 +104,36 @@ class ClientRevenueGuardian:
             priority = "ADVANCE_HIGHEST_FIT_ACTIVE_OPPORTUNITY"
         else:
             priority = "CREATE_FRESH_EVIDENCE_BACKED_OPPORTUNITY_PIPELINE"
+        previous = self.progress_reader(client_id) or {}
+        previous_revenue = float(previous.get("verified_revenue_jod", 0) or 0)
+        delta = verified - previous_revenue
+        if not previous:
+            trend = "BASELINE"
+        elif delta > 0:
+            trend = "INCREASED"
+        elif delta < 0:
+            trend = "DECREASED"
+        else:
+            trend = "UNCHANGED"
+        progress_record = {
+            "target_client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "previous_verified_revenue_jod": previous_revenue,
+            "current_verified_revenue_jod": verified,
+            "delta_jod": delta,
+            "trend": trend,
+            "state": report.get("state"),
+            "highest_priority": priority,
+            "active_opportunities": len(active),
+            "ready_to_apply": len(ready),
+            "step": (
+                "BASELINE_CAPTURED" if trend == "BASELINE"
+                else "REVENUE_INCREASE_CONFIRMED" if trend == "INCREASED"
+                else "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP" if trend == "UNCHANGED"
+                else "REVENUE_DECREASE_REQUIRES_RECOVERY_STEP"
+            ),
+        }
+        self.progress_writer(client_id, progress_record)
         report["deep_audit"] = {
             "verified_revenue_jod": verified,
             "revenue_gap_exists": verified <= 0,
@@ -110,6 +144,10 @@ class ClientRevenueGuardian:
             "hard_gate": "PAYMENT_VERIFIED + payment_evidence",
             "evidence_chain": list(getattr(income_lifecycle, "ORDER", ())),
             "client_data_isolation": True,
+            "revenue_trend": trend,
+            "revenue_delta_jod": delta,
+            "progress_step": progress_record["step"],
+            "progress_history_saved": True,
         }
         return report
 
