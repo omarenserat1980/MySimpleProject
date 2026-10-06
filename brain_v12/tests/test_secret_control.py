@@ -13,6 +13,7 @@ class SecretControlPlaneTests(unittest.TestCase):
         self.assertNotIn("openai-secret-value", raw)
         self.assertFalse(any(x.get("value_exposed") for x in status["secrets"]))
         self.assertEqual(status["missing"], [
+            "BRAIN_INDUSTRIAL_CLIENT_KEY_SHA256",
             "BRAIN_CONTROL_KEY",
             "CLOUDFLARE_API_TOKEN",
             "CLOUDFLARE_ACCOUNT_ID",
@@ -25,7 +26,15 @@ class SecretControlPlaneTests(unittest.TestCase):
         status = SecretControlPlane(env).status()
         self.assertEqual(
             set(status["missing"]),
-            {"OPENAI_API_KEY", "BRAIN_CONTROL_KEY", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "PAYTABS_SERVER_KEY", "PAYTABS_PROFILE_ID"},
+            {
+                "BRAIN_INDUSTRIAL_CLIENT_KEY_SHA256",
+                "OPENAI_API_KEY",
+                "BRAIN_CONTROL_KEY",
+                "CLOUDFLARE_API_TOKEN",
+                "CLOUDFLARE_ACCOUNT_ID",
+                "PAYTABS_SERVER_KEY",
+                "PAYTABS_PROFILE_ID",
+            },
         )
 
     def test_plan_requires_external_connector_for_remote_write(self):
