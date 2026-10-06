@@ -141,6 +141,43 @@ class BrainCouncil:
             "new_client_policy": "PROPOSAL_ONLY_UNTIL_EXPLICIT_ADMISSION",
         }
 
+    def verify_device_presence(self, meeting_id: int) -> dict[str, Any]:
+        with self._connect() as con:
+            row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
+        if not row:
+            return {"ok": False, "status": "MEETING_NOT_FOUND"}
+        device = self.device_reader() or {}
+        agents = list(device.get("agents") or [])
+        online = [a for a in agents if a.get("online")]
+        arkan = [a for a in online if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"}]
+        selected = arkan[0] if arkan else (online[0] if online else None)
+        presence = {
+            "present": bool(selected),
+            "agent_id": str(selected.get("agent_id")) if selected else None,
+            "state": selected.get("state") if selected else "NO_ONLINE_AGENT",
+            "online": bool(selected),
+            "preferred_arkan": bool(arkan),
+            "checked_at": _now(),
+            "ttl_seconds": device.get("ttl_seconds"),
+        }
+        with self._connect() as con:
+            participants = json.loads(row["participants"] or "[]")
+            participants = [p for p in participants if p.get("role") != "device_observer_and_execution_endpoint"]
+            if selected:
+                participants.append({
+                    "id": str(selected.get("agent_id")),
+                    "role": "device_observer_and_execution_endpoint",
+                    "online": True,
+                    "state": selected.get("state", "ONLINE"),
+                    "presence_checked_at": presence["checked_at"],
+                })
+            con.execute(
+                "UPDATE brain_council_meetings SET participants=?,updated_at=? WHERE id=?",
+                (json.dumps(participants, ensure_ascii=False), _now(), int(meeting_id)),
+            )
+            con.commit()
+        return {"ok": True, "meeting_id": int(meeting_id), "status": "DEVICE_PRESENT" if selected else "DEVICE_UNAVAILABLE", "presence": presence}
+
     def execute_minutes(self, meeting_id: int) -> dict[str, Any]:
         with self._connect() as con:
             row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
