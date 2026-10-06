@@ -1,8 +1,4 @@
-"""Evidence-gated commercial control plane.
-
-This module models commercial progress; it does not execute contracts,
-payments, purchases, withdrawals, or financial transfers.
-"""
+"""Evidence-gated commercial control plane."""
 
 from __future__ import annotations
 
@@ -26,29 +22,11 @@ class CommercialState(str, Enum):
 REQUIRED_EVIDENCE: dict[CommercialState, FrozenSet[str]] = {
     CommercialState.OFFER_PREPARED: frozenset({"offer"}),
     CommercialState.CUSTOMER_VALIDATED: frozenset({"offer", "customer_acceptance"}),
-    CommercialState.ORDER_ACCEPTED: frozenset(
-        {"offer", "customer_acceptance", "order"}
-    ),
-    CommercialState.DELIVERY_VERIFIED: frozenset(
-        {"offer", "customer_acceptance", "order", "delivery"}
-    ),
-    CommercialState.PAYMENT_VERIFIED: frozenset(
-        {"offer", "customer_acceptance", "order", "delivery", "payment"}
-    ),
-    CommercialState.REVENUE_REALIZED: frozenset(
-        {"offer", "customer_acceptance", "order", "delivery", "payment"}
-    ),
-    CommercialState.PROFIT_VERIFIED: frozenset(
-        {
-            "offer",
-            "customer_acceptance",
-            "order",
-            "delivery",
-            "payment",
-            "cost",
-            "reconciliation",
-        }
-    ),
+    CommercialState.ORDER_ACCEPTED: frozenset({"offer", "customer_acceptance", "order"}),
+    CommercialState.DELIVERY_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery"}),
+    CommercialState.PAYMENT_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment"}),
+    CommercialState.REVENUE_REALIZED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment"}),
+    CommercialState.PROFIT_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment", "cost", "reconciliation"}),
 }
 
 
@@ -73,45 +51,25 @@ class CommercialCase:
         }
 
     def can_enter(self, target: CommercialState) -> bool:
-        required = REQUIRED_EVIDENCE.get(target, frozenset())
-        return required.issubset(self.verified_types())
+        return REQUIRED_EVIDENCE.get(target, frozenset()).issubset(self.verified_types())
+
+    def state_integrity_ok(self) -> bool:
+        return REQUIRED_EVIDENCE.get(self.state, frozenset()).issubset(self.verified_types())
 
     def transition(self, target: CommercialState) -> None:
-        if target == CommercialState.REVENUE_REALIZED:
-            if not self.can_enter(CommercialState.PAYMENT_VERIFIED):
-                raise ValueError(
-                    "REVENUE_REALIZED blocked: independently verified payment "
-                    "and delivery evidence are required."
-                )
-
-        if target == CommercialState.PROFIT_VERIFIED:
-            if not self.can_enter(CommercialState.PROFIT_VERIFIED):
-                raise ValueError(
-                    "PROFIT_VERIFIED blocked: payment, delivery, cost and "
-                    "reconciliation evidence are required."
-                )
-
         if not self.can_enter(target):
             missing = sorted(REQUIRED_EVIDENCE.get(target, frozenset()) - self.verified_types())
             raise ValueError(f"Transition blocked; missing evidence: {missing}")
-
         self.state = target
 
 
 def revenue_claim_allowed(case: CommercialCase) -> bool:
-    return case.state == CommercialState.REVENUE_REALIZED
+    return case.state == CommercialState.REVENUE_REALIZED and case.state_integrity_ok()
 
 
 def profit_claim_allowed(case: CommercialCase) -> bool:
-    return case.state == CommercialState.PROFIT_VERIFIED
+    return case.state == CommercialState.PROFIT_VERIFIED and case.state_integrity_ok()
 
 
 def forbidden_financial_side_effect(action: str) -> bool:
-    blocked = {
-        "auto_contract",
-        "auto_charge",
-        "auto_purchase",
-        "auto_withdrawal",
-        "auto_transfer",
-    }
-    return action in blocked
+    return action in {"auto_contract", "auto_charge", "auto_purchase", "auto_withdrawal", "auto_transfer"}
