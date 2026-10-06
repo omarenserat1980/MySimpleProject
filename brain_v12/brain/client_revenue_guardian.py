@@ -231,6 +231,73 @@ class ClientRevenueGuardian:
             "verification_required": True,
         }
 
+    def promote_successful_projects_once(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Find completed client projects, count them, and request one bounded social-marketing action."""
+        snapshot = income_engine.snapshot(client_id=client_id)
+        rows = list(snapshot.get("opportunities") or [])
+        successful = [
+            r for r in rows
+            if str(r.get("status") or "") in ("COMPLETED", "PAYMENT_VERIFIED")
+            and str((r.get("data") or {}).get("delivery_evidence") or "").strip()
+        ]
+        previous = self.progress_reader(client_id) or {}
+        marketed = set(previous.get("marketed_successful_project_ids") or [])
+        candidate = next((r for r in successful if str(r.get("opportunity_id")) not in marketed), None)
+        revenue = float(snapshot.get("verified_revenue_jod", 0) or 0)
+        record = {
+            **previous,
+            "successful_projects_count": len({str(r.get("opportunity_id")) for r in successful}),
+            "successful_projects_revenue_jod": revenue,
+            "successful_projects_checked": True,
+        }
+        if not candidate:
+            record["marketing_status"] = "NO_NEW_SUCCESSFUL_PROJECT"
+            self.progress_writer(client_id, record)
+            return {
+                "status": "SUCCESSFUL_PROJECTS_CHECKED",
+                "successful_projects_count": record["successful_projects_count"],
+                "verified_revenue_jod": revenue,
+                "marketing_requested": False,
+            }
+
+        project_id = str(candidate.get("opportunity_id"))
+        title = str((candidate.get("data") or {}).get("title") or candidate.get("title") or project_id)
+        action = {
+            "client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "objective": "MARKET_SUCCESSFUL_PROJECT_ON_SOCIAL_MEDIA",
+            "project_id": project_id,
+            "project_title": title,
+            "channel": "SOCIAL_MEDIA",
+            "constraint": "ONE_SUCCESSFUL_PROJECT_ONE_BOUNDED_MARKETING_ACTION",
+            "revenue_tracking_required": True,
+            "payment_verification_required": True,
+            "no_fabricated_results": True,
+        }
+        result = self.action_requester(client_id, action) if self.action_requester else {
+            "accepted": False, "status": "ACTION_REQUESTER_NOT_REGISTERED"
+        }
+        outcome = result if isinstance(result, dict) else {"result": result}
+        marketed.add(project_id)
+        record.update({
+            "marketed_successful_project_ids": sorted(marketed),
+            "marketing_status": "PENDING_EXTERNAL_EVIDENCE",
+            "last_marketed_project_id": project_id,
+            "last_marketing_action": action,
+            "last_marketing_outcome": outcome,
+        })
+        self.progress_writer(client_id, record)
+        return {
+            "status": "SUCCESSFUL_PROJECT_MARKETING_REQUESTED",
+            "successful_projects_count": record["successful_projects_count"],
+            "project_id": project_id,
+            "project_title": title,
+            "marketing_requested": True,
+            "marketing_result": outcome,
+            "verified_revenue_jod": revenue,
+            "revenue_tracking_required": True,
+        }
+
     def first_revenue_mission(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Create a bounded first-revenue mission; never fabricates a buyer, action, or payment."""
         audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
