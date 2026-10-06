@@ -84,6 +84,7 @@ class CommercialEvidence:
     currency: str = ""
     source_digest: str = ""
     verified_at_utc: str = ""
+    event_at_utc: str = ""
 
     def canonical_payload(self) -> str:
         amount = "" if self.amount is None else str(Decimal(str(self.amount)))
@@ -95,6 +96,7 @@ class CommercialEvidence:
             self.order_id.strip(),
             amount,
             self.currency.strip().upper(),
+            self.event_at_utc.strip(),
             self.verified_at_utc.strip(),
         ))
 
@@ -103,10 +105,15 @@ class CommercialEvidence:
 
     def integrity_supported(self) -> bool:
         supplied = self.source_digest.strip().lower()
+        event_time = _parse_time(self.event_at_utc)
+        verification_time = _parse_time(self.verified_at_utc)
         return (
             len(supplied) == 64
             and all(c in "0123456789abcdef" for c in supplied)
-            and _valid_verification_time(self.verified_at_utc)
+            and event_time is not None
+            and verification_time is not None
+            and verification_time <= datetime.now(timezone.utc)
+            and event_time <= verification_time
             and supplied == self.calculated_source_digest()
         )
 
@@ -149,14 +156,14 @@ class CommercialCase:
             if item.evidence_type in _EVIDENCE_ORDER:
                 if item.evidence_type in by_type:
                     return False
-                if not _parse_time(item.verified_at_utc):
+                if _parse_time(item.event_at_utc) is None:
                     return False
                 by_type[item.evidence_type] = item
 
         ordered = sorted(by_type.items(), key=lambda pair: _EVIDENCE_ORDER[pair[0]])
         previous_time: datetime | None = None
         for _, item in ordered:
-            current_time = _parse_time(item.verified_at_utc)
+            current_time = _parse_time(item.event_at_utc)
             if current_time is None:
                 return False
             if previous_time is not None and current_time < previous_time:
