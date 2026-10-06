@@ -104,5 +104,39 @@
   "revenue_target": {
     "status": "ACTIVE",
     "rule": "Do not stop at marketing activity; pursue qualified opportunities through order, delivery, independently verified payment, and reconciliation."
+  },
+  "operating_loop": {
+    "enabled": true,
+    "objective": "REAL_MATERIAL_GAIN",
+    "repeat_until": "REVENUE_REALIZED",
+    "cycle_order": [
+      "DISCOVER",
+      "PRIORITIZE",
+      "SPECIFY",
+      "BUILD",
+      "VERIFY",
+      "MARKET",
+      "QUALIFY_LEADS",
+      "PREPARE_OFFER",
+      "REQUEST_CUSTOMER_ACCEPTANCE",
+      "DELIVER",
+      "VERIFY_PAYMENT",
+      "RECONCILE",
+      "REALIZE"
+    ],
+    "measurement": {
+      "required_metrics": [
+        "qualified_leads",
+        "offers_prepared",
+        "customer_acceptances",
+        "orders",
+        "deliveries",
+        "verified_payments",
+        "realized_revenue"
+      ],
+      "zero_revenue_rule": "If realized_revenue remains zero, Brain must not declare success and must continue diagnosis and permitted opportunity development."
+    },
+    "blocker_policy": "At each cycle identify the first blocking condition, produce evidence, repair or choose the next viable path, and record the result.",
+    "reporting": "When CL-000003 asks for financial gains, report cycle progress and evidence without inflating financial status."
   }
 }
