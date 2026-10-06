@@ -13,11 +13,11 @@ form{display:grid;gap:12px}label{font-size:12px;color:#b8c9dc}input,select,texta
 @media(max-width:800px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
 </style></head>
 <body><main class="wrap">
-<header class="top"><div class="brand">BRAIN · INDUSTRIAL COMMERCE</div><div class="badge">DEMO / MVP · No contract</div></header>
+<header class="top"><div class="brand">BRAIN · INDUSTRIAL COMMERCE</div><div><button id="lang" class="lang">EN</button><span class="badge">DEMO / MVP · No contract</span></div></header>
 <section class="hero">
-<div><h1>اطلب عرض سعر صناعي بوضوح.</h1><p>بوابة ثنائية اللغة لتحويل الاستفسارات الصناعية إلى طلبات قابلة للمتابعة. هذه نسخة تجريبية؛ إرسال الطلب لا ينشئ عقداً ولا دفعة.</p>
+<div><h1 data-ar="اطلب عرض سعر صناعي بوضوح." data-en="Request an industrial quote clearly.">اطلب عرض سعر صناعي بوضوح.</h1><p data-ar="بوابة ثنائية اللغة لتحويل الاستفسارات الصناعية إلى طلبات قابلة للمتابعة. هذه نسخة تجريبية؛ إرسال الطلب لا ينشئ عقداً ولا دفعة." data-en="A bilingual portal that turns industrial inquiries into traceable quote requests. This is a demo; submission creates no contract or payment.">بوابة ثنائية اللغة لتحويل الاستفسارات الصناعية إلى طلبات قابلة للمتابعة. هذه نسخة تجريبية؛ إرسال الطلب لا ينشئ عقداً ولا دفعة.</p>
 <div class="kpis"><div class="kpi"><b>AR / EN</b><span>واجهة ثنائية اللغة</span></div><div class="kpi"><b>Q-ID</b><span>رقم طلب فريد</span></div><div class="kpi"><b>Traceable</b><span>قابل للتتبع</span></div></div></div>
-<div class="panel"><h2>طلب عرض سعر</h2><form id="quote">
+<div class="panel"><h2 data-ar="طلب عرض سعر" data-en="Request a Quote">طلب عرض سعر</h2><form id="quote">
 <div class="grid"><label>الشركة<input name="company" required minlength="2"></label><label>جهة الاتصال<input name="contact_name" required minlength="2"></label></div>
 <div class="grid"><label>البريد الإلكتروني<input type="email" name="email" required></label><label>الهاتف<input name="phone"></label></div>
 <div class="grid"><label>الفئة<input name="category" required></label><label>المنتج<input name="product"></label></div>
@@ -25,9 +25,14 @@ form{display:grid;gap:12px}label{font-size:12px;color:#b8c9dc}input,select,texta
 <label>التفاصيل<textarea name="message" required minlength="10" placeholder="ما المنتج أو الخدمة التي تحتاجها؟"></textarea></label>
 <button class="btn" type="submit">إرسال طلب العرض</button><div id="status" class="status"></div>
 </form></div></section>
-<section class="panel section"><h3>ما الذي يحدث بعد الإرسال؟</h3><p class="note">يتم إنشاء رقم طلب فريد وحفظ الاستفسار في سجل المتابعة. لا يتم إنشاء سعر أو عقد أو تحصيل مالي تلقائياً. فريق المبيعات يراجع الطلب قبل أي التزام تجاري.</p></section>
+<section class="panel section"><h3 data-ar="ما الذي يحدث بعد الإرسال؟" data-en="What happens next?">ما الذي يحدث بعد الإرسال؟</h3><p class="note" data-ar="يتم إنشاء رقم طلب فريد وحفظ الاستفسار في سجل المتابعة. لا يتم إنشاء سعر أو عقد أو تحصيل مالي تلقائياً. فريق المبيعات يراجع الطلب قبل أي التزام تجاري." data-en="A unique inquiry ID is created and stored for follow-up. No price, contract, or payment is created automatically. Sales reviews the inquiry before any commercial commitment.">يتم إنشاء رقم طلب فريد وحفظ الاستفسار في سجل المتابعة. لا يتم إنشاء سعر أو عقد أو تحصيل مالي تلقائياً. فريق المبيعات يراجع الطلب قبل أي التزام تجاري.</p></section>
 </main>
 <script>
+const translations={ar:{title:"طلب عرض سعر صناعي",submit:"إرسال طلب العرض",sending:"جاري إرسال الطلب…",ok:"تم استلام الطلب: ",error:"تعذر الإرسال: "},en:{title:"Industrial Quote Request",submit:"Send Quote Request",sending:"Submitting…",ok:"Request received: ",error:"Submission failed: "}};
+let lang="ar";
+const setLang=()=>{document.documentElement.lang=lang;document.documentElement.dir=lang==="ar"?"rtl":"ltr";document.querySelector("#lang").textContent=lang==="ar"?"EN":"AR";document.querySelectorAll("[data-ar]").forEach(el=>el.textContent=el.dataset[lang]);document.querySelector("button[type=submit]").textContent=translations[lang].submit;document.querySelector("title").textContent=translations[lang].title};
+document.querySelector("#lang").onclick=()=>{lang=lang==="ar"?"en":"ar";setLang()};
+setLang();
 const form=document.querySelector("#quote"),status=document.querySelector("#status");
 form.addEventListener("submit",async e=>{e.preventDefault();status.textContent="جاري إرسال الطلب…";const body=Object.fromEntries(new FormData(form));try{const r=await fetch("/api/industrial-quotes/inquiries",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.detail||"REQUEST_FAILED");status.textContent="تم استلام الطلب: "+d.inquiry_id+" — الحالة "+d.status;form.reset()}catch(err){status.textContent="تعذر الإرسال: "+err.message}});
 </script></body></html>
