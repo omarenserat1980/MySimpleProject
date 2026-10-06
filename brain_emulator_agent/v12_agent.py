@@ -210,6 +210,9 @@ def main():
                       "result": result, "error": error}
             request("POST", "/api/device/report", payload=report)
             print(f"[Brain-Termux] REPORTED {task_id} ok={ok}")
+            if task_name == "brain_self_test" and ok:
+                verified = request("GET", f"/api/device/verify/{task_id}")
+                print(f"[Brain-Termux] VERIFIED {task_id} verified={verified.get('verified', False)}")
             completed += 1
             if STOP_ON_ERROR and not ok:
                 return
