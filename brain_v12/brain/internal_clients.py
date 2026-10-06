@@ -87,6 +87,11 @@ def launch_plan(client_id: str, device_bridge: Any) -> dict[str, Any]:
         "plan": plan,
         "execution_policy": "EXISTING_PRIMARY_PIPELINE",
         "completion_policy": "VERIFY_AND_EVIDENCE_REQUIRED",
+        "recovery": {
+            "durable_request_state": True,
+            "resume_from_checkpoint": True,
+            "reconcile_existing_run_before_dispatch": True,
+        },
     }
 
 
