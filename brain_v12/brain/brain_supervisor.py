@@ -10,6 +10,7 @@ from pathlib import Path
 from .autonomy_control_plane import ControlPlane
 from .autonomous_reasoner import AutonomousReasoner
 from .execution_gateway import BrainExecutionGateway
+from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 
 SAFE_EXTERNAL_ACTIONS = {"submit_application", "publish_external", "move_money", "withdraw"}
 
@@ -66,8 +67,29 @@ class BrainSupervisor:
         self._event(evidence.get("job_id", "unknown"), "reasoning_decision", self.reasoner.explain(decision))
         return decision
 
+    def _completion_decision(self, verification):
+        contract = verification.get("completion_contract")
+        if not contract:
+            return None
+        gate = ProblemCompletionGate(CompletionContract(
+            desired=contract.get("desired", {}),
+            invariants=contract.get("invariants", {}),
+            evidence_required=contract.get("evidence_required", True),
+        ))
+        return gate.decision(
+            verification.get("verified_world", {}),
+            verification.get("evidence", verification),
+        )
+
     def next_action(self, job, verification):
-        """Return the next bounded action from real verification evidence."""
+        """Return the next bounded action; completion is reality-verified, not executor-verified."""
+        completion = self._completion_decision(verification)
+        if completion:
+            if completion["action"] == "deliver":
+                return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
+            if job.get("attempts",0) >= job.get("max_attempts",self.max_cycles):
+                return {"action":"blocked","reason":"attempt_limit_after_reality_check","completion":completion}
+            return {"action":"treat","reason":"problem_not_complete","completion":completion}
         if verification.get("verified") or verification.get("ok"):
             return {"action":"deliver","reason":"verified"}
         if job.get("attempts",0) >= job.get("max_attempts",self.max_cycles):
@@ -83,7 +105,7 @@ class BrainSupervisor:
         repaired=self.transition(job,"repair",details=action)
         retried=self.control.start_attempt(repaired)
         self._event(retried["job_id"],"repair_retry_started",action)
-        return self.transition(retried,"retry",details={"action":action["action"]})
+        return self.transition(retried,"retry",details={"action":action["action"],"completion":action.get("completion")})
 
     def decide_repair(self, verification):
         if verification.get("ok"):
