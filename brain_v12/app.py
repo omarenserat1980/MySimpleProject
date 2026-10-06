@@ -221,6 +221,13 @@ def brain_council_convene(request: Request, body: dict | None = None):
     return brain_council.convene(title=title, agenda=agenda)
 
 
+@app.post("/api/brain/council/{meeting_id}/device-presence")
+def brain_council_device_presence(request: Request, meeting_id: int):
+    """Record fresh Arkan/fallback Brain Agent presence for the council."""
+    require_control_key(request)
+    return brain_council.verify_device_presence(meeting_id)
+
+
 @app.post("/api/brain/council/{meeting_id}/execute")
 def brain_council_execute(request: Request, meeting_id: int):
     """Execute the bounded decisions recorded for a council meeting."""
