@@ -24,19 +24,14 @@ on:
         required: false
         default: "false"
   schedule:
-    - cron: "*/5 * * * *"
-  push:
-    paths:
-      - "brain_v12/**"
-      - "brain0/**"
-      - ".github/workflows/brain-continuous-self-healing.yml"
+    - cron: "17 3 * * *"
 
 permissions:
   contents: write
 
 concurrency:
   group: brain-self-healing
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   heal:
