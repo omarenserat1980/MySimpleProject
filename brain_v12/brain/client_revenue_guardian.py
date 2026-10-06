@@ -174,6 +174,18 @@ class ClientRevenueGuardian:
         """Choose and request exactly one next step, then persist its outcome."""
         audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
         deep = audit["deep_audit"]
+        previous = self.progress_reader(client_id) or {}
+        previous_action = str(previous.get("action_status") or "")
+        previous_measurement = float(previous.get("current_verified_revenue_jod", 0) or 0)
+        current_measurement = float(deep.get("verified_revenue_jod", 0) or 0)
+        if previous_action == "REQUESTED" and current_measurement == previous_measurement:
+            return {
+                **audit,
+                "status": "WAITING_FOR_RECHECK",
+                "action_requested": False,
+                "reason": "ONE_ACTION_ALREADY_REQUESTED_WITHOUT_NEW_REVENUE_MEASUREMENT",
+                "verification_required": True,
+            }
         if self.action_requester is None:
             return {**audit, "status": "ACTION_REQUESTER_NOT_REGISTERED", "action_requested": False}
 
