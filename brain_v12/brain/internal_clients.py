@@ -1,0 +1,111 @@
+"""Unified internal Brain-client launch path.
+
+Software tools inside Brain address work through this gateway instead of
+calling executors/workflows directly. The gateway resolves the active customer
+scope, probes the existing backend, builds the bounded staged plan, and fails
+closed when the backend is not ready.
+
+This module does not create workflows or perform external side effects.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from .windows_cloud_provider_factory import windows_cloud_provider_readiness
+from ..business.customer_execution_router import CustomerExecutionRouter
+from ..business.two_customer_execution_contract import CUSTOMER_SCOPE, public_scope
+
+
+INTERNAL_CLIENTS = {
+    "BRAIN-INTERNAL-CL-000001": {
+        "customer_id": "CL-000001",
+        "tool_role": "INDUSTRIAL_ISO_CLIENT",
+        "request": "LOAD_AND_BOOT_BRAIN_ISO",
+        "target": "arkan",
+    },
+    "BRAIN-INTERNAL-CL-000002": {
+        "customer_id": "CL-000002",
+        "tool_role": "CLOUD_WINDOWS_SERVER_2025_CLIENT",
+        "request": "PROVISION_AND_PREPARE_WINDOWS_SERVER_2025",
+        "target": "brain-cloud",
+    },
+}
+
+
+def _device_bridge_probe(device_bridge: Any) -> dict[str, Any]:
+    status = device_bridge.status()
+    return {
+        "ready": bool(status.get("enabled") and status.get("agents", {}).get("online")),
+        "backend": "DEVICE_BRIDGE",
+        "status": status,
+    }
+
+
+def _cloud_probe() -> dict[str, Any]:
+    readiness = windows_cloud_provider_readiness()
+    return {
+        "ready": bool(readiness.get("ready")),
+        "backend": "CLOUD_WINDOWS_RUNTIME",
+        "status": readiness,
+    }
+
+
+def build_gateway(device_bridge: Any) -> CustomerExecutionRouter:
+    return CustomerExecutionRouter({
+        "DEVICE_BRIDGE": lambda: _device_bridge_probe(device_bridge),
+        "CLOUD_WINDOWS_RUNTIME": _cloud_probe,
+    })
+
+
+def resolve_internal_client(client_id: str) -> dict[str, Any]:
+    item = INTERNAL_CLIENTS.get(str(client_id).strip())
+    if item is None:
+        return {"ok": False, "status": "UNKNOWN_INTERNAL_CLIENT"}
+    customer_id = item["customer_id"]
+    scope = CUSTOMER_SCOPE[customer_id]
+    return {
+        "ok": True,
+        "client_id": client_id,
+        "customer_id": customer_id,
+        **item,
+        "activity_id": scope["activity_id"],
+        "objective": scope["objective"],
+        "backend": scope["backend"],
+    }
+
+
+def launch_plan(client_id: str, device_bridge: Any) -> dict[str, Any]:
+    client = resolve_internal_client(client_id)
+    if not client["ok"]:
+        return client
+    router = build_gateway(device_bridge)
+    plan = router.build_plan(client["customer_id"])
+    return {
+        "ok": bool(plan["dispatch_allowed"]),
+        "status": "READY_TO_LAUNCH" if plan["dispatch_allowed"] else "LAUNCH_BLOCKED",
+        "client": client,
+        "plan": plan,
+        "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        "completion_policy": "VERIFY_AND_EVIDENCE_REQUIRED",
+    }
+
+
+def public_registry() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "mode": "BRAIN_INTERNAL_CLIENTS",
+        "customer_scope": public_scope(),
+        "clients": [
+            {
+                "client_id": client_id,
+                **{k: v for k, v in item.items()},
+            }
+            for client_id, item in INTERNAL_CLIENTS.items()
+        ],
+        "rules": {
+            "one_active_request_per_client": True,
+            "existing_primary_pipeline_only": True,
+            "completion_requires_verification_and_evidence": True,
+            "new_workflow_creation": False,
+        },
+    }
