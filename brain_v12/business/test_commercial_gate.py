@@ -271,6 +271,25 @@ def test_event_chronology_out_of_order_is_rejected():
     assert not revenue_claim_allowed(configured_case(items))
 
 
+def test_duplicate_source_digest_is_rejected():
+    items = valid_evidence()
+    original = items[0]
+    duplicate_digest = CommercialEvidence(
+        evidence_type="customer_acceptance",
+        reference="accept-duplicate",
+        verified=True,
+        provenance="CUSTOMER_ACCEPTANCE",
+        client_id="CL-000003",
+        order_id="ORD-001",
+        amount=100.0,
+        currency="JOD",
+        source_digest=original.source_digest,
+        verified_at_utc=VERIFIED_AT,
+        event_at_utc=BASE_EVENT["customer_acceptance"],
+    )
+    assert not revenue_claim_allowed(configured_case(items[:-1] + [duplicate_digest]))
+
+
 def test_duplicate_reference_is_rejected():
     items = valid_evidence()
     items[4] = evidence(
