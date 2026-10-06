@@ -17,9 +17,19 @@ class RevenueRecord:
             raise ValueError("structured payment evidence required")
         transaction_id = str(evidence.get("transaction_id", "")).strip()
         evidence_ref = str(evidence.get("evidence_ref", "")).strip()
-        if not transaction_id or not evidence_ref:
-            raise ValueError("transaction_id and evidence_ref required")
-        self.evidence.append(f"payment:{transaction_id}:{evidence_ref}")
+        source = str(evidence.get("source", "")).strip()
+        verification_status = str(evidence.get("verification_status", "")).strip().upper()
+        verified_amount = evidence.get("amount")
+        verified_currency = str(evidence.get("currency", "")).strip()
+        if not transaction_id or not evidence_ref or not source:
+            raise ValueError("transaction_id, evidence_ref, and independent source required")
+        if verification_status != "INDEPENDENTLY_VERIFIED":
+            raise ValueError("independent payment verification required")
+        if verified_amount is None or str(verified_currency).upper() != str(self.currency).upper():
+            raise ValueError("verified payment amount/currency required")
+        if str(verified_amount) != str(self.amount_note):
+            raise ValueError("verified payment amount mismatch")
+        self.evidence.append(f"payment:{source}:{transaction_id}:{evidence_ref}")
         self.status = "PAYMENT_VERIFIED"
         return self.snapshot()
 
