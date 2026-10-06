@@ -1,0 +1,35 @@
+name: CL-000003 Industrial Quote Portal QC
+on:
+  push:
+    paths:
+      - "brain_v12/brain/industrial_quote_portal.py"
+      - "brain_v12/tests/test_industrial_quote_portal.py"
+      - "brain_v12/web/industrial-quote-portal/**"
+      - "brain_v12/app.py"
+      - ".github/workflows/cl-000003-industrial-portal-qc.yml"
+  workflow_dispatch:
+jobs:
+  qc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -U pip pytest fastapi pydantic
+      - name: Compile portal backend
+        run: python -m py_compile brain_v12/brain/industrial_quote_portal.py
+      - name: Portal unit tests
+        run: python -m pytest -q brain_v12/tests/test_industrial_quote_portal.py
+      - name: UI contract checks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("brain_v12/web/industrial-quote-portal/index.html")
+          s=p.read_text(encoding="utf-8")
+          required=["/api/industrial-quotes/inquiries","type=\"email\"","minlength=\"10\"","dir=\"rtl\"","@media(max-width:800px)"]
+          missing=[x for x in required if x not in s]
+          assert not missing, missing
+          print("UI_CONTRACT_PASS")
+          PY
