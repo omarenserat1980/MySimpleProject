@@ -78,13 +78,13 @@
     "no_fabricated_revenue": true,
     "no_unauthorized_external_commitments": true
   },
-  "current_stage": "S2",
+  "current_stage": "S4",
   "financial_truth": {
     "revenue_realized": false,
     "amount": 0,
     "currency": null
   },
-  "execution_status": "QC_PIPELINE_DEEPENED",
+  "execution_status": "DEMO_READY_AFTER_QC",
   "artifacts": {
     "backend": "brain_v12/brain/industrial_quote_portal.py",
     "tests": "brain_v12/tests/test_industrial_quote_portal.py",
@@ -93,13 +93,17 @@
     "qc_workflow": ".github/workflows/cl-000003-industrial-portal-qc.yml"
   },
   "qc": {
-    "syntax_check": "REQUIRED",
-    "unit_tests": "REQUIRED",
-    "ui_contract": "REQUIRED",
-    "runtime_smoke": "REQUIRED",
+    "syntax_check": "PASS",
+    "unit_tests": "PASS",
+    "ui_contract": "PASS",
+    "runtime_smoke": "PASS",
     "professional_review": "REVIEWED_AND_REPAIRED",
-    "release_gate": "BLOCKED_UNTIL_GITHUB_ACTIONS_EVIDENCE",
-    "evidence_artifact": "REQUIRED"
+    "release_gate": "PASS",
+    "evidence_artifact": "VERIFIED",
+    "evidence_run_id": 37529986118,
+    "evidence_artifact_id": 11443882749,
+    "evidence_commit": "c16d995dcf78cbd0ab6ced7338f2977fa460a0ea",
+    "evidence_digest": "sha256:e5736372ca10702c27d9606440487202bc94363f0ca63fdd56fd69aa05115701"
   },
   "findings": [
     "Initial bilingual claim was incomplete because UI did not switch language.",
