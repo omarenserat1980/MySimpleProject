@@ -115,6 +115,23 @@ class ClientRevenueGuardian:
             trend = "DECREASED"
         else:
             trend = "UNCHANGED"
+        step = (
+            "BASELINE_CAPTURED" if trend == "BASELINE"
+            else "REVENUE_INCREASE_CONFIRMED" if trend == "INCREASED"
+            else "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP" if trend == "UNCHANGED"
+            else "REVENUE_DECREASE_REQUIRES_RECOVERY_STEP"
+        )
+        next_action = (
+            "CAPTURE_BASELINE_AND_START_ONE_REVENUE_PATH" if trend == "BASELINE"
+            else "PROTECT_VERIFIED_PATH_AND_SCALE_ONE_STEP" if trend == "INCREASED"
+            else "ADVANCE_ONE_EXISTING_OPPORTUNITY_AND_RECHECK_REVENUE" if trend == "UNCHANGED"
+            else "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK" if trend == "DECREASED"
+        )
+        escalation = (
+            "NONE" if trend in {"BASELINE", "INCREASED"}
+            else "ACTIVITY_ESCALATION" if trend == "UNCHANGED"
+            else "REVENUE_RECOVERY_ESCALATION"
+        )
         progress_record = {
             "target_client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -126,12 +143,11 @@ class ClientRevenueGuardian:
             "highest_priority": priority,
             "active_opportunities": len(active),
             "ready_to_apply": len(ready),
-            "step": (
-                "BASELINE_CAPTURED" if trend == "BASELINE"
-                else "REVENUE_INCREASE_CONFIRMED" if trend == "INCREASED"
-                else "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP" if trend == "UNCHANGED"
-                else "REVENUE_DECREASE_REQUIRES_RECOVERY_STEP"
-            ),
+            "step": step,
+            "next_action": next_action,
+            "escalation": escalation,
+            "action_constraint": "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE",
+            "dispatch_allowed": False,
         }
         self.progress_writer(client_id, progress_record)
         report["deep_audit"] = {
@@ -147,6 +163,9 @@ class ClientRevenueGuardian:
             "revenue_trend": trend,
             "revenue_delta_jod": delta,
             "progress_step": progress_record["step"],
+            "next_action": progress_record["next_action"],
+            "escalation": progress_record["escalation"],
+            "dispatch_allowed": False,
             "progress_history_saved": True,
         }
         return report
