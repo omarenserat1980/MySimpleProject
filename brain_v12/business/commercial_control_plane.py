@@ -1,10 +1,11 @@
-"""Evidence-gated commercial control plane with strict identity, money and source integrity."""
+"""Evidence-gated commercial control plane with cryptographic evidence binding."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from enum import Enum
+from hashlib import sha256
 from typing import FrozenSet
 
 
@@ -29,7 +30,6 @@ REQUIRED_EVIDENCE: dict[CommercialState, FrozenSet[str]] = {
     CommercialState.REVENUE_REALIZED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment"}),
     CommercialState.PROFIT_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment", "cost", "reconciliation"}),
 }
-
 
 ALLOWED_PROVENANCE = frozenset({
     "CUSTOMER_ACCEPTANCE", "ORDER_RECORD", "DELIVERY_RECORD",
@@ -59,12 +59,29 @@ class CommercialEvidence:
     source_digest: str = ""
     verified_at_utc: str = ""
 
+    def canonical_payload(self) -> str:
+        amount = "" if self.amount is None else str(Decimal(str(self.amount)))
+        return "|".join((
+            self.evidence_type.strip(),
+            self.reference.strip(),
+            self.provenance.strip(),
+            self.client_id.strip(),
+            self.order_id.strip(),
+            amount,
+            self.currency.strip().upper(),
+            self.verified_at_utc.strip(),
+        ))
+
+    def calculated_source_digest(self) -> str:
+        return sha256(self.canonical_payload().encode("utf-8")).hexdigest()
+
     def integrity_supported(self) -> bool:
+        supplied = self.source_digest.strip().lower()
         return (
-            bool(self.source_digest.strip())
-            and len(self.source_digest.strip()) == 64
-            and all(c in "0123456789abcdefABCDEF" for c in self.source_digest.strip())
+            len(supplied) == 64
+            and all(c in "0123456789abcdef" for c in supplied)
             and bool(self.verified_at_utc.strip())
+            and supplied == self.calculated_source_digest()
         )
 
     def independently_supported(self) -> bool:
