@@ -220,6 +220,8 @@ def brain_revenue_guardian(request: Request, client_id: str):
     guardian = ClientRevenueGuardian(
         activity_reader=_client_activity,
         revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
     )
     result = guardian.deep_inspect(workforce.income_engine, income_lifecycle, client_id)
     store.event("REVENUE_GUARDIAN_DEEP_AUDIT", {
@@ -228,6 +230,9 @@ def brain_revenue_guardian(request: Request, client_id: str):
         "state": result.get("state"),
         "verified_revenue_jod": result.get("deep_audit", {}).get("verified_revenue_jod", 0),
         "priority": result.get("deep_audit", {}).get("highest_priority"),
+        "revenue_trend": result.get("deep_audit", {}).get("revenue_trend"),
+        "revenue_delta_jod": result.get("deep_audit", {}).get("revenue_delta_jod", 0),
+        "progress_step": result.get("deep_audit", {}).get("progress_step"),
     })
     return result
 @app.post("/api/brain/internal-clients/plan")
