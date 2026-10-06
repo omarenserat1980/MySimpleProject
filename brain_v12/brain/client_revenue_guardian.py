@@ -1,3 +1,4 @@
+from threading import Lock
 """Bounded revenue guardian for an active Brain client.
 
 The guardian observes one target client, distinguishes verified revenue from
@@ -16,7 +17,15 @@ TARGET_CLIENT_ID = "CL-000003"
 GUARDIAN_CLIENT_ID = "CL-000004"
 
 
+def _guardian_advance_lock(method):
+    def wrapped(self, income_engine, income_lifecycle, client_id=TARGET_CLIENT_ID):
+        with self._advance_lock:
+            return method(self, income_engine, income_lifecycle, client_id)
+    return wrapped
+
+
 class ClientRevenueGuardian:
+    _advance_lock = Lock()
     """Supervisory client focused on turning verified gaps into bounded action."""
 
     def __init__(
@@ -170,6 +179,7 @@ class ClientRevenueGuardian:
         }
         return report
 
+    @_guardian_advance_lock
     def advance_once(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Choose and request exactly one next step, then persist its outcome."""
         audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
