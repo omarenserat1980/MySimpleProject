@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane with provenance checks."""
+"""Evidence-gated commercial control plane with provenance and identity binding."""
 
 from __future__ import annotations
 
@@ -29,15 +29,9 @@ REQUIRED_EVIDENCE: dict[CommercialState, FrozenSet[str]] = {
     CommercialState.PROFIT_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment", "cost", "reconciliation"}),
 }
 
-
 ALLOWED_PROVENANCE = frozenset({
-    "CUSTOMER_ACCEPTANCE",
-    "ORDER_RECORD",
-    "DELIVERY_RECORD",
-    "PAYMENT_RECEIPT",
-    "COST_RECORD",
-    "RECONCILIATION",
-    "OFFER_RECORD",
+    "CUSTOMER_ACCEPTANCE", "ORDER_RECORD", "DELIVERY_RECORD",
+    "PAYMENT_RECEIPT", "COST_RECORD", "RECONCILIATION", "OFFER_RECORD",
 })
 
 
@@ -47,6 +41,10 @@ class CommercialEvidence:
     reference: str
     verified: bool = False
     provenance: str = ""
+    client_id: str = ""
+    order_id: str = ""
+    amount: float | None = None
+    currency: str = ""
 
     def independently_supported(self) -> bool:
         return (
@@ -61,13 +59,27 @@ class CommercialCase:
     client_id: str
     state: CommercialState = CommercialState.PROSPECT
     evidence: list[CommercialEvidence] = field(default_factory=list)
+    expected_order_id: str = ""
+    expected_amount: float | None = None
+    expected_currency: str = ""
 
     def verified_types(self) -> set[str]:
         return {
             item.evidence_type
             for item in self.evidence
-            if item.independently_supported()
+            if self.evidence_matches_case(item) and item.independently_supported()
         }
+
+    def evidence_matches_case(self, item: CommercialEvidence) -> bool:
+        if item.client_id and item.client_id != self.client_id:
+            return False
+        if self.expected_order_id and item.order_id and item.order_id != self.expected_order_id:
+            return False
+        if self.expected_amount is not None and item.amount is not None and item.amount != self.expected_amount:
+            return False
+        if self.expected_currency and item.currency and item.currency.upper() != self.expected_currency.upper():
+            return False
+        return True
 
     def can_enter(self, target: CommercialState) -> bool:
         return REQUIRED_EVIDENCE.get(target, frozenset()).issubset(self.verified_types())
