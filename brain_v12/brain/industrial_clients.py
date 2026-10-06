@@ -13,7 +13,7 @@ from typing import Any
 
 
 INDUSTRIAL_CLIENT_ID = "BRAIN-CLIENT-ARKAN-ISO-01"
-PRIMARY_WORKFLOW = ".github/workflows/brain-windows-real-boot.yml"
+PRIMARY_WORKFLOW = "372137841"  # Existing Brain Windows Real Boot Evidence workflow ID
 ALLOWED_REQUEST = "LOAD_AND_BOOT_BRAIN_ISO"
 
 

@@ -34,7 +34,7 @@ jobs:
 
       - name: Verify Brain-owned runner and VM toolchain
         env:
-          BRAIN_INTERNAL_RUNNER_FLAG: ${{ env.BRAIN_INTERNAL_RUNNER_FLAG }}
+          BRAIN_INTERNAL_RUNNER_FLAG: "1"
         run: |
           set -euo pipefail
           test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
