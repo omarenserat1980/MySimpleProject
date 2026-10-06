@@ -27,5 +27,5 @@ jobs:
       - name: Commercial evidence gate
         run: python -m brain_v12.business.commercial_gate
 
-      - name: Commercial transition tests
+      - name: Commercial transition and integrity tests
         run: python -m pytest -q brain_v12/business/test_commercial_gate.py
