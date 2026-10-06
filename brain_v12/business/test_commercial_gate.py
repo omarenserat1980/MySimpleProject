@@ -11,13 +11,13 @@ from brain_v12.business.commercial_control_plane import (
 
 
 BASE_EVENT = {
-    "offer": "2026-10-06T10:00:00Z",
-    "customer_acceptance": "2026-10-06T11:00:00Z",
-    "order": "2026-10-06T12:00:00Z",
-    "delivery": "2026-10-06T13:00:00Z",
-    "payment": "2026-10-06T14:00:00Z",
+    "offer": "2026-10-04T10:00:00Z",
+    "customer_acceptance": "2026-10-04T11:00:00Z",
+    "order": "2026-10-04T12:00:00Z",
+    "delivery": "2026-10-04T13:00:00Z",
+    "payment": "2026-10-04T14:00:00Z",
 }
-VERIFIED_AT = "2026-10-06T22:00:00Z"
+VERIFIED_AT = "2026-10-05T22:00:00Z"
 
 
 def evidence(
@@ -204,7 +204,7 @@ def test_tampered_event_time_after_digest_is_rejected():
         currency=original.currency,
         source_digest=original.source_digest,
         verified_at_utc=original.verified_at_utc,
-        event_at_utc="2026-10-06T15:00:00Z",
+        event_at_utc="2026-10-04T15:00:00Z",
     )
     assert not revenue_claim_allowed(configured_case(items[:-1] + [tampered]))
 
@@ -252,7 +252,7 @@ def test_event_before_verification_is_required():
     original = items[-1]
     items[-1] = evidence(
         "payment", "payment-001", "PAYMENT_RECEIPT",
-        event_at="2026-10-06T23:00:00Z",
+        event_at="2026-10-05T23:00:00Z",
         verified_at="2026-10-06T22:00:00Z",
     )
     assert not revenue_claim_allowed(configured_case(items))
@@ -285,7 +285,7 @@ def test_verification_can_be_later_without_changing_event_order():
     items[0] = evidence(
         "offer", "offer-001", "OFFER_RECORD",
         event_at=BASE_EVENT["offer"],
-        verified_at="2026-10-07T00:00:00Z",
+        verified_at="2026-10-05T23:30:00Z",
     )
     assert revenue_claim_allowed(configured_case(items))
 
