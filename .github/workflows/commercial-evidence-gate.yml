@@ -6,6 +6,7 @@ on:
     paths:
       - "brain_v12/business/commercial_control_plane.py"
       - "brain_v12/business/commercial_gate.py"
+      - "brain_v12/business/test_commercial_gate.py"
       - "brain_v12/business/cl_000003_evidence_record.json"
 
 permissions:
@@ -25,3 +26,6 @@ jobs:
 
       - name: Commercial evidence gate
         run: python -m brain_v12.business.commercial_gate
+
+      - name: Commercial transition tests
+        run: python -m pytest -q brain_v12/business/test_commercial_gate.py
