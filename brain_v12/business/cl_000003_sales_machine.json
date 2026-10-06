@@ -1,0 +1,87 @@
+{
+  "client_id": "CL-000003",
+  "opportunity_id": "OP-CL3-001",
+  "status": "READY",
+  "machine": "BRAIN_SELLABLE_SERVICE_MACHINE",
+  "stages": [
+    {
+      "id": "S1",
+      "name": "DISCOVERY",
+      "output": "validated problem hypothesis"
+    },
+    {
+      "id": "S2",
+      "name": "MVP",
+      "output": "working portal MVP"
+    },
+    {
+      "id": "S3",
+      "name": "QC",
+      "output": "technical verification evidence"
+    },
+    {
+      "id": "S4",
+      "name": "DEMO",
+      "output": "reviewable demo"
+    },
+    {
+      "id": "S5",
+      "name": "OFFER",
+      "output": "commercial offer draft"
+    },
+    {
+      "id": "S6",
+      "name": "MARKETING",
+      "output": "authorized promotional assets"
+    },
+    {
+      "id": "S7",
+      "name": "LEAD_CAPTURE",
+      "output": "qualified lead evidence"
+    },
+    {
+      "id": "S8",
+      "name": "CUSTOMER_RESPONSE",
+      "output": "acceptance/objection evidence"
+    },
+    {
+      "id": "S9",
+      "name": "ORDER",
+      "output": "accepted order evidence"
+    },
+    {
+      "id": "S10",
+      "name": "DELIVERY",
+      "output": "delivery evidence"
+    },
+    {
+      "id": "S11",
+      "name": "PAYMENT",
+      "output": "independent payment evidence"
+    },
+    {
+      "id": "S12",
+      "name": "RECONCILIATION",
+      "output": "bound financial/delivery evidence"
+    },
+    {
+      "id": "S13",
+      "name": "REVENUE",
+      "output": "REVENUE_REALIZED"
+    }
+  ],
+  "rules": {
+    "one_active_stage": true,
+    "evidence_required_for_advancement": true,
+    "failure_requires_diagnosis": true,
+    "no_vanity_success": true,
+    "no_fabricated_revenue": true,
+    "no_unauthorized_external_commitments": true
+  },
+  "current_stage": "S1",
+  "financial_truth": {
+    "revenue_realized": false,
+    "amount": 0,
+    "currency": null
+  }
+}
