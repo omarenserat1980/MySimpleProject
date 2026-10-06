@@ -35,7 +35,7 @@ INTERNAL_CLIENTS = {
 def _device_bridge_probe(device_bridge: Any) -> dict[str, Any]:
     status = device_bridge.status()
     return {
-        "ready": bool(status.get("enabled") and status.get("agents", {}).get("online")),
+        "ready": bool(status.get("enabled") and status.get("online")),
         "backend": "DEVICE_BRIDGE",
         "status": status,
     }
