@@ -14,7 +14,7 @@ from threading import Lock
 from uuid import uuid4
 from datetime import datetime, timezone
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class InquiryIn(BaseModel):
     company: str = Field(min_length=2, max_length=120)
@@ -27,6 +27,7 @@ class InquiryIn(BaseModel):
     message: str = Field(min_length=10, max_length=3000)
     language: str = Field(default="ar", pattern="^(ar|en)$")
 
+    @field_validator("email")
     @classmethod
     def validate_email(cls, value: str) -> str:
         value = value.strip()
