@@ -1,8 +1,10 @@
-"""Deterministic evidence report for the commercial gate."""
+"""Deterministic commercial evidence report with provenance metadata."""
 
 from __future__ import annotations
 
+import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from brain_v12.business.commercial_control_plane import (
@@ -15,7 +17,8 @@ SOURCE = Path(__file__).with_name("cl_000003_evidence_record.json")
 
 
 def build_report() -> dict:
-    data = json.loads(SOURCE.read_text(encoding="utf-8"))
+    source_bytes = SOURCE.read_bytes()
+    data = json.loads(source_bytes)
     evidence = [
         CommercialEvidence(
             evidence_type=item["evidence_type"],
@@ -32,6 +35,11 @@ def build_report() -> dict:
     verified = case.verified_types()
 
     return {
+        "report_type": "COMMERCIAL_EVIDENCE_GATE",
+        "schema_version": "1",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source_file": SOURCE.name,
+        "source_sha256": hashlib.sha256(source_bytes).hexdigest(),
         "client_id": case.client_id,
         "observed_state": case.state.value,
         "verified_evidence_types": sorted(verified),
