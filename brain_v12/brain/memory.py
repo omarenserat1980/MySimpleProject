@@ -47,6 +47,21 @@ class MemoryStore:
               id INTEGER PRIMARY KEY CHECK(id=1),
               data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS revenue_guardian_history(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              client_id TEXT NOT NULL,
+              recorded_at TEXT NOT NULL,
+              previous_verified_revenue_jod REAL NOT NULL DEFAULT 0,
+              current_verified_revenue_jod REAL NOT NULL DEFAULT 0,
+              delta_jod REAL NOT NULL DEFAULT 0,
+              trend TEXT NOT NULL,
+              state TEXT,
+              highest_priority TEXT,
+              active_opportunities INTEGER NOT NULL DEFAULT 0,
+              ready_to_apply INTEGER NOT NULL DEFAULT 0,
+              step TEXT NOT NULL,
+              data TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS income_opportunities(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               opportunity_id TEXT UNIQUE NOT NULL,
@@ -332,22 +347,43 @@ class MemoryStore:
             if len(out)>=limit: break
         return out
 
-    def revenue_guardian_checkpoint(self, client_id):
-        key = f"revenue_guardian:{client_id}:checkpoint"
+    def revenue_guardian_history(self, client_id, limit=100):
         with self.connect() as con:
-            row = con.execute("SELECT value FROM memories WHERE key=?", (key,)).fetchone()
-        if not row:
-            return None
-        try:
-            return json.loads(row["value"])
-        except Exception:
-            return None
+            rows = con.execute(
+                """SELECT * FROM revenue_guardian_history
+                   WHERE client_id=? ORDER BY id DESC LIMIT ?""",
+                (client_id, max(1, min(int(limit), 500))),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def save_revenue_guardian_checkpoint(self, client_id, record):
         key = f"revenue_guardian:{client_id}:checkpoint"
-        self.save_memory(key, json.dumps(record, ensure_ascii=False))
-        self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(record))
-        return record
+        payload = dict(record)
+        payload["recorded_at"] = now()
+        self.save_memory(key, json.dumps(payload, ensure_ascii=False))
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO revenue_guardian_history(
+                     client_id,recorded_at,previous_verified_revenue_jod,
+                     current_verified_revenue_jod,delta_jod,trend,state,
+                     highest_priority,active_opportunities,ready_to_apply,step,data
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    client_id, payload["recorded_at"],
+                    float(payload.get("previous_verified_revenue_jod", 0) or 0),
+                    float(payload.get("current_verified_revenue_jod", 0) or 0),
+                    float(payload.get("delta_jod", 0) or 0),
+                    str(payload.get("trend") or "UNKNOWN"),
+                    payload.get("state"), payload.get("highest_priority"),
+                    int(payload.get("active_opportunities", 0) or 0),
+                    int(payload.get("ready_to_apply", 0) or 0),
+                    str(payload.get("step") or "UNKNOWN"),
+                    json.dumps(payload, ensure_ascii=False),
+                ),
+            )
+            con.commit()
+        self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(payload))
+        return payload
 
     def monitor_state(self):
         for item in self.memories():
