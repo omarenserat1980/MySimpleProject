@@ -4,7 +4,7 @@ OUT="${1:-brain-boot-self-trust.iso}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/.brain-iso-build"
 rm -rf "$BUILD"
-mkdir -p "$BUILD/iso/boot/grub" "$BUILD/iso/brain" "$BUILD/src"
+mkdir -p "$BUILD/iso/boot/grub" "$BUILD/iso/brain/runtime" "$BUILD/src"
 command -v grub-mkrescue >/dev/null || { echo 'MISSING=grub-mkrescue'; exit 2; }
 command -v xorriso >/dev/null || { echo 'MISSING=xorriso'; exit 2; }
 command -v gcc >/dev/null || { echo 'MISSING=gcc'; exit 2; }
@@ -60,7 +60,7 @@ _start:
     jmp 2b
 .section .rodata
 message:
-    .asciz "BRAIN-BOOT-1 SELF-TRUST BOOTSTRAP\r\n"
+    .asciz "BRAIN-BOOT-1 SELF-TRUST BOOTSTRAP\r\nBRAIN-BOOT-STAGE=1\r\nBRAIN-RUNTIME-HANDOFF=READY\r\n"
 ASM
 cat > "$BUILD/src/linker.ld" <<'LD'
 ENTRY(_start)
@@ -94,11 +94,25 @@ cat > "$BUILD/iso/brain/boot-gate.json" <<'JSON'
   "kernel": "/boot/brain_boot.elf"
 }
 JSON
+sha256sum brain_v12/app.py brain_v12/brain/self_trust_boot_gate.py > "$BUILD/iso/brain/runtime/source-sha256.txt"
+cat > "$BUILD/iso/brain/runtime/runtime-handoff.json" <<'JSON'
+{
+  "schema": "BRAIN-RUNTIME-HANDOFF-1",
+  "stage": 2,
+  "runtime_source": "brain_v12",
+  "entrypoint": "brain_v12.app:app",
+  "launch": "python3 -m uvicorn brain_v12.app:app --host 0.0.0.0 --port 8012",
+  "required_before_ready": ["LOCAL_TRUST_ROOT","RUNTIME_READY","AGENT_ONLINE","SELF_TEST_VERIFIED"],
+  "ready_status": "BRAIN_READY",
+  "bootstrap_status": "BRAIN_BOOTSTRAP_VERIFIED"
+}
+JSON
 cat > "$BUILD/iso/brain/README.txt" <<'TXT'
 ELECTRONIC BRAIN BOOT ISO
-This image contains a real x86 Multiboot bootstrap kernel and the Brain Self-Trust Gate contract.
-The bootstrap kernel proves ISO execution; it does not pretend to be the full Python Brain runtime.
-The runtime becomes BRAIN_READY only after the self-trust evidence gate passes.
+Stage 1 is a real x86 Multiboot bootstrap and is verified by QEMU serial evidence.
+Stage 2 is the runtime handoff contract for the Python Brain source tree.
+This image does not falsely claim that Python/Linux/network runtime is already executing.
+BRAIN_READY is reserved for the full runtime after the Self-Trust Gate passes.
 TXT
 grub-mkrescue -o "$OUT" "$BUILD/iso" >/tmp/brain-iso-build.log 2>&1
 test -s "$OUT"
