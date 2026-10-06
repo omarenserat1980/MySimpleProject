@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane with strict identity, money, source and time integrity."""
+"""Evidence-gated commercial control plane with strict identity, money, source and chronology integrity."""
 
 from __future__ import annotations
 
@@ -37,6 +37,14 @@ ALLOWED_PROVENANCE = frozenset({
     "PAYMENT_RECEIPT", "COST_RECORD", "RECONCILIATION", "OFFER_RECORD",
 })
 
+_EVIDENCE_ORDER = {
+    "offer": 0,
+    "customer_acceptance": 1,
+    "order": 2,
+    "delivery": 3,
+    "payment": 4,
+}
+
 
 def _money_equal(left: float | Decimal | None, right: float | Decimal | None) -> bool:
     if left is None or right is None:
@@ -47,16 +55,21 @@ def _money_equal(left: float | Decimal | None, right: float | Decimal | None) ->
         return False
 
 
-def _valid_verification_time(value: str) -> bool:
+def _parse_time(value: str) -> datetime | None:
     if not value.strip():
-        return False
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return False
+        return None
     if parsed.tzinfo is None:
-        return False
-    return parsed.astimezone(timezone.utc) <= datetime.now(timezone.utc)
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _valid_verification_time(value: str) -> bool:
+    parsed = _parse_time(value)
+    return parsed is not None and parsed <= datetime.now(timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -130,8 +143,29 @@ class CommercialCase:
     def evidence_set_integrity_ok(self) -> bool:
         return not self.duplicate_references()
 
+    def chronology_integrity_ok(self) -> bool:
+        by_type: dict[str, CommercialEvidence] = {}
+        for item in self.evidence:
+            if item.evidence_type in _EVIDENCE_ORDER:
+                if item.evidence_type in by_type:
+                    return False
+                if not _parse_time(item.verified_at_utc):
+                    return False
+                by_type[item.evidence_type] = item
+
+        ordered = sorted(by_type.items(), key=lambda pair: _EVIDENCE_ORDER[pair[0]])
+        previous_time: datetime | None = None
+        for _, item in ordered:
+            current_time = _parse_time(item.verified_at_utc)
+            if current_time is None:
+                return False
+            if previous_time is not None and current_time < previous_time:
+                return False
+            previous_time = current_time
+        return True
+
     def verified_types(self) -> set[str]:
-        if not self.evidence_set_integrity_ok():
+        if not self.evidence_set_integrity_ok() or not self.chronology_integrity_ok():
             return set()
         return {
             item.evidence_type
@@ -165,7 +199,11 @@ class CommercialCase:
         return REQUIRED_EVIDENCE.get(target, frozenset()).issubset(self.verified_types())
 
     def state_integrity_ok(self) -> bool:
-        return self.evidence_set_integrity_ok() and REQUIRED_EVIDENCE.get(self.state, frozenset()).issubset(self.verified_types())
+        return (
+            self.evidence_set_integrity_ok()
+            and self.chronology_integrity_ok()
+            and REQUIRED_EVIDENCE.get(self.state, frozenset()).issubset(self.verified_types())
+        )
 
     def transition(self, target: CommercialState) -> None:
         if not self.can_enter(target):
