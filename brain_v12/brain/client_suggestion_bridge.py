@@ -88,6 +88,38 @@ class ClientSuggestionBridge:
         if status in {"RECEIVED","ACTION_REQUESTED"}:
             return {"ok":True,"allowed":False,"reason":"PREVIOUS_SUGGESTION_REQUIRES_VERIFICATION","suggestion_id":row["id"],"status":status}
         return {"ok":True,"allowed":True,"reason":"PREVIOUS_SUGGESTION_RESOLVED","suggestion_id":row["id"],"status":status}
+
+    def reconcile(self, suggestion_id: int, outcome: dict[str, Any]) -> dict[str, Any]:
+        """Record one measured outcome, obtain ChatGPT review, and classify the next bounded path."""
+        with self._connect() as con:
+            row=con.execute("SELECT * FROM client_suggestions WHERE id=? AND client_id='CL-000003'",(int(suggestion_id),)).fetchone()
+        if not row:
+            return {"ok":False,"status":"SUGGESTION_NOT_FOUND"}
+        measured=dict(outcome or {})
+        verified=bool(measured.get("payment_verified") and measured.get("payment_evidence"))
+        objective_verified=bool(measured.get("objective_verified"))
+        if verified:
+            next_path="VERIFIED_SUCCESS"
+        elif objective_verified:
+            next_path="CONTINUE_ONE_BOUNDED_STEP"
+        elif measured.get("blocked"):
+            next_path="REPAIR_FIRST_BLOCKER"
+        else:
+            next_path="CHANGE_ONE_BOUNDED_PATH"
+        review=self.chatgpt_provider.respond(
+            user_text=f"راجع نتيجة اقتراح العميل 3 رقم {suggestion_id}. النتيجة المقاسة: {json.dumps(measured,ensure_ascii=False)}. صنّف الخطوة التالية فقط.",
+            instructions="أنت مراجع ChatGPT داخل Electronic Brain. لا تعتبر النجاح مثبتاً إلا بدليل خارجي. اختر: VERIFIED_SUCCESS أو CONTINUE_ONE_BOUNDED_STEP أو REPAIR_FIRST_BLOCKER أو CHANGE_ONE_BOUNDED_PATH. لا تدّعِ تنفيذًا غير مثبت."
+        )
+        record={"outcome":measured,"payment_verified":verified,"objective_verified":objective_verified,"next_path":next_path,
+                "chatgpt_review":str(review.get("reply") or "")[:12000],"reconciled_at":_now()}
+        status="VERIFIED_SUCCESS" if verified else "RECONCILED"
+        with self._connect() as con:
+            con.execute("UPDATE client_suggestions SET action_result=?,status=?,updated_at=? WHERE id=?",
+                        (json.dumps(record,ensure_ascii=False),status,_now(),int(suggestion_id)))
+            con.commit()
+        return {"ok":True,"status":status,"suggestion_id":int(suggestion_id),"client_id":"CL-000003",
+                "next_path":next_path,"chatgpt_review":review,"payment_verified":verified,
+                "success_requires_payment_evidence":True}
     def history(self,client_id="CL-000003",limit=20):
         with self._connect() as con:
             rows=con.execute("SELECT * FROM client_suggestions WHERE client_id=? ORDER BY id DESC LIMIT ?",(client_id,max(1,min(int(limit),100)))).fetchall()
