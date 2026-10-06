@@ -194,6 +194,30 @@ def brain_internal_clients():
     return internal_clients.public_registry()
 
 
+@app.post("/api/brain/revenue-guardian/{client_id}/first-revenue")
+def brain_revenue_guardian_first_revenue(request: Request, client_id: str):
+    """Create/retrieve the bounded first-revenue mission."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.first_revenue_mission(
+        workforce.income_engine,
+        income_lifecycle,
+        client_id,
+    )
+    store.event("REVENUE_GUARDIAN_FIRST_REVENUE_MISSION", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "target_jod": 10.0,
+    })
+    return result
+
+
 @app.get("/api/brain/revenue-guardian/{client_id}/status")
 def brain_revenue_guardian_status(request: Request, client_id: str):
     """Return the persisted guardian state/history without mutating it."""
