@@ -1,8 +1,9 @@
-"""Evidence-gated commercial control plane with strict identity binding."""
+"""Evidence-gated commercial control plane with strict identity and monetary binding."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import FrozenSet
 
@@ -29,10 +30,20 @@ REQUIRED_EVIDENCE: dict[CommercialState, FrozenSet[str]] = {
     CommercialState.PROFIT_VERIFIED: frozenset({"offer", "customer_acceptance", "order", "delivery", "payment", "cost", "reconciliation"}),
 }
 
+
 ALLOWED_PROVENANCE = frozenset({
     "CUSTOMER_ACCEPTANCE", "ORDER_RECORD", "DELIVERY_RECORD",
     "PAYMENT_RECEIPT", "COST_RECORD", "RECONCILIATION", "OFFER_RECORD",
 })
+
+
+def _money_equal(left: float | Decimal | None, right: float | Decimal | None) -> bool:
+    if left is None or right is None:
+        return left is right
+    try:
+        return Decimal(str(left)) == Decimal(str(right))
+    except (InvalidOperation, ValueError):
+        return False
 
 
 @dataclass(frozen=True)
@@ -43,7 +54,7 @@ class CommercialEvidence:
     provenance: str = ""
     client_id: str = ""
     order_id: str = ""
-    amount: float | None = None
+    amount: float | Decimal | None = None
     currency: str = ""
 
     def independently_supported(self) -> bool:
@@ -60,7 +71,7 @@ class CommercialCase:
     state: CommercialState = CommercialState.PROSPECT
     evidence: list[CommercialEvidence] = field(default_factory=list)
     expected_order_id: str = ""
-    expected_amount: float | None = None
+    expected_amount: float | Decimal | None = None
     expected_currency: str = ""
 
     def verified_types(self) -> set[str]:
@@ -77,7 +88,7 @@ class CommercialCase:
                 return False
             if not item.order_id or not self.expected_order_id or item.order_id != self.expected_order_id:
                 return False
-            if item.amount is None or self.expected_amount is None or item.amount != self.expected_amount:
+            if item.amount is None or self.expected_amount is None or not _money_equal(item.amount, self.expected_amount):
                 return False
             if not item.currency or not self.expected_currency or item.currency.upper() != self.expected_currency.upper():
                 return False
@@ -86,7 +97,7 @@ class CommercialCase:
                 return False
             if item.order_id and self.expected_order_id and item.order_id != self.expected_order_id:
                 return False
-            if item.amount is not None and self.expected_amount is not None and item.amount != self.expected_amount:
+            if item.amount is not None and self.expected_amount is not None and not _money_equal(item.amount, self.expected_amount):
                 return False
             if item.currency and self.expected_currency and item.currency.upper() != self.expected_currency.upper():
                 return False
