@@ -21,7 +21,8 @@ from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
 from cloud.customer_communications import Channel, CommunicationHub, MessageState
 from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
-from cloud.brain_fabric_api import router as fabric_router\nfrom brain_v12.business.customer_activity_supervisor import CustomerActivitySupervisor
+from cloud.brain_fabric_api import router as fabric_router
+from brain_v12.business.customer_activity_supervisor import CustomerActivitySupervisor
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
