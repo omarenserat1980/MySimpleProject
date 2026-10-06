@@ -228,6 +228,13 @@ def brain_council_execute(request: Request, meeting_id: int):
     return brain_council.execute_minutes(meeting_id)
 
 
+@app.post("/api/brain/council/{meeting_id}/verify")
+def brain_council_verify(request: Request, meeting_id: int):
+    """Verify council actions against fresh evidence before allowing the next council cycle."""
+    require_control_key(request)
+    return brain_council.verify_minutes(meeting_id)
+
+
 @app.get("/api/brain/council/{meeting_id}")
 def brain_council_minutes(request: Request, meeting_id: int):
     """Read a durable council meeting and its execution evidence."""
