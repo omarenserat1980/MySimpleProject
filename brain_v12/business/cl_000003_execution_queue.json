@@ -138,5 +138,39 @@
     },
     "blocker_policy": "At each cycle identify the first blocking condition, produce evidence, repair or choose the next viable path, and record the result.",
     "reporting": "When CL-000003 asks for financial gains, report cycle progress and evidence without inflating financial status."
+  },
+  "adaptive_revenue_policy": {
+    "enabled": true,
+    "decision_rule": "Optimize for verified commercial progress, not code volume.",
+    "checkpoints": [
+      "NEED_SIGNAL",
+      "SOLUTION_VALUE",
+      "BUILD_READINESS",
+      "DEMO_QUALITY",
+      "MARKETING_RESPONSE",
+      "QUALIFIED_LEAD",
+      "CUSTOMER_ACCEPTANCE",
+      "ORDER",
+      "DELIVERY",
+      "PAYMENT",
+      "RECONCILIATION"
+    ],
+    "pivot_rules": [
+      "If no credible need signal, improve discovery rather than building blindly.",
+      "If need exists but offer is weak, refine value proposition and demo.",
+      "If offer exists but no qualified leads, improve targeting/content/channel within authorization.",
+      "If qualified leads exist but no acceptance, diagnose objections and refine the offer.",
+      "If acceptance exists but no order, identify the missing commercial authorization or purchasing step.",
+      "If order exists but no payment, track the permitted payment blocker and request required action.",
+      "If payment exists but cannot be independently verified, block revenue recognition and resolve evidence gap.",
+      "If delivery exists but reconciliation is incomplete, repair the evidence chain before recognizing revenue."
+    ],
+    "stop_conditions": [
+      "REVENUE_REALIZED",
+      "CUSTOMER_REQUEST_CANCELLED",
+      "AUTHORIZATION_REQUIRED_AND_NOT_AVAILABLE",
+      "SAFETY_OR_LEGAL_BOUNDARY_BLOCKS_EXECUTION"
+    ],
+    "progress_rule": "Every cycle must produce new commercial evidence, a working artifact, a verified test, a qualified lead, a customer response, or a diagnosed blocker. Otherwise diagnose the stalled loop."
   }
 }
