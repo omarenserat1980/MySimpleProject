@@ -216,6 +216,12 @@ class BrainCouncil:
                 "constraint": "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE",
                 "external_evidence_required": True,
             }
+            device = self.device_reader() or {}
+            online_agents = [a for a in list(device.get("agents") or []) if a.get("online")]
+            arkan_agents = [a for a in online_agents if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"}]
+            device_endpoint = arkan_agents[0] if arkan_agents else (online_agents[0] if online_agents else None)
+            action["device_endpoint"] = str(device_endpoint.get("agent_id")) if device_endpoint else None
+            action["device_presence_required"] = bool(device_endpoint)
             if self.action_requester is None:
                 result = {"accepted": False, "status": "NO_PRIMARY_ACTION_REQUESTER"}
             elif client_id == "CL-000003":
