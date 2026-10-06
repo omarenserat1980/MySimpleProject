@@ -276,6 +276,8 @@ def industrial_client_request_status():
     conclusion = latest.get("conclusion")
     state = latest.get("status")
     verified = state == "completed" and conclusion == "success"
+    if state == "completed":
+        store.release_industrial_client(industrial_clients.INDUSTRIAL_CLIENT_ID)
     return {
         "ok": True,
         "status": "VERIFIED" if verified else ("RUNNING" if state != "completed" else "FAILED"),
