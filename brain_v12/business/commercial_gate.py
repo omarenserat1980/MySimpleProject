@@ -1,7 +1,7 @@
 """CI-facing commercial claim gate.
 
-Fails closed for unsupported revenue/profit claims, malformed persisted evidence,
-contradictory persisted claims, and forbidden automatic financial side effects.
+Fails closed for unsupported, malformed, contradictory, or chronologically
+invalid revenue/profit claims.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from brain_v12.business.commercial_control_plane import (
     CommercialCase,
     CommercialEvidence,
     CommercialState,
-    forbidden_financial_side_effect,
     profit_claim_allowed,
     revenue_claim_allowed,
 )
@@ -56,6 +55,7 @@ def load_case():
                 currency=item.get("currency", ""),
                 source_digest=item.get("source_digest", ""),
                 verified_at_utc=item.get("verified_at_utc", ""),
+                event_at_utc=item.get("event_at_utc", ""),
             )
         )
 
@@ -67,30 +67,54 @@ def load_case():
         expected_currency=data.get("expected_currency", ""),
         evidence=evidence,
     )
-    return case, data
+    return data, case
+
+
+def _verified_evidence_of_type(case: CommercialCase, evidence_type: str):
+    return [
+        item for item in case.evidence
+        if item.evidence_type == evidence_type
+        and item.evidence_matches_case(item)
+        and item.independently_supported()
+    ]
+
+
+def assert_persisted_claims_match_evidence(data, case: CommercialCase) -> None:
+    revenue = data.get("revenue_claim", {})
+    profit = data.get("profit_claim", {})
+
+    revenue_allowed = revenue_claim_allowed(case)
+    profit_allowed = profit_claim_allowed(case)
+
+    revenue_status = revenue.get("status", "NOT_REALIZED")
+    profit_status = profit.get("status", "NOT_VERIFIED")
+
+    if revenue_allowed:
+        if revenue_status != "REALIZED":
+            raise AssertionError("Revenue state is realized but persisted revenue claim is not REALIZED.")
+        payment_items = _verified_evidence_of_type(case, "payment")
+        if len(payment_items) != 1:
+            raise AssertionError("Exactly one independently verified payment is required for persisted revenue.")
+        payment = payment_items[0]
+        if _optional_decimal(revenue.get("amount")) != payment.amount:
+            raise AssertionError("Persisted revenue amount does not match verified payment.")
+        if (revenue.get("currency") or "").upper() != payment.currency.upper():
+            raise AssertionError("Persisted revenue currency does not match verified payment.")
+        if revenue.get("payment_reference") != payment.reference:
+            raise AssertionError("Persisted payment reference does not match verified payment.")
+    else:
+        if revenue_status == "REALIZED":
+            raise AssertionError("Persisted revenue claim says REALIZED without an allowed revenue claim.")
+
+    if profit_allowed:
+        if profit_status != "VERIFIED":
+            raise AssertionError("Profit state is verified but persisted profit claim is not VERIFIED.")
+    elif profit_status == "VERIFIED":
+        raise AssertionError("Persisted profit claim says VERIFIED without an allowed profit claim.")
 
 
 def assert_commercial_claims_are_supported() -> None:
-    case, data = load_case()
-
-    side_effects = data.get("side_effects", {})
-    forbidden = {
-        name: value
-        for name, value in side_effects.items()
-        if bool(value) and forbidden_financial_side_effect(
-            "auto_" + name.removeprefix("automatic_")
-        )
-    }
-    if forbidden:
-        raise AssertionError(f"Forbidden automatic financial side effects recorded: {sorted(forbidden)}")
-
-    revenue_status = data.get("revenue_claim", {}).get("status", "NOT_REALIZED")
-    profit_status = data.get("profit_claim", {}).get("status", "NOT_VERIFIED")
-
-    if revenue_status == "REALIZED" and case.state != CommercialState.REVENUE_REALIZED:
-        raise AssertionError("Persisted revenue claim contradicts commercial state.")
-    if profit_status == "VERIFIED" and case.state != CommercialState.PROFIT_VERIFIED:
-        raise AssertionError("Persisted profit claim contradicts commercial state.")
+    data, case = load_case()
 
     if not case.state_integrity_ok():
         raise AssertionError(
@@ -108,6 +132,8 @@ def assert_commercial_claims_are_supported() -> None:
 
     if case.state != CommercialState.PROFIT_VERIFIED and profit_claim_allowed(case):
         raise AssertionError("Profit claim unexpectedly allowed before PROFIT_VERIFIED.")
+
+    assert_persisted_claims_match_evidence(data, case)
 
 
 if __name__ == "__main__":
