@@ -214,7 +214,7 @@ class IncomeEngine:
         except Exception:
             return False
 
-    def ingest_live_opportunities(self, results: list[dict[str, Any]], max_age_hours: float = 72) -> list[dict[str, Any]]:
+    def ingest_live_opportunities(self, results: list[dict[str, Any]], max_age_hours: float = 72, client_id: str | None = None) -> list[dict[str, Any]]:
         """Persist only evidence-backed, fresh, externally discovered job/project records."""
         accepted = []; self.run_count += 1
         for raw in results or []:
@@ -227,8 +227,9 @@ class IncomeEngine:
             if not canonical_url:
                 continue
             source_text = re.sub(r"\s+", " ", str(item.get("source") or canonical_url))[:300]
-            fingerprint = hashlib.sha1(canonical_url.encode("utf-8")).hexdigest()[:12]
-            existing = next((x for x in self.store.income_opportunities(500)
+            fingerprint_source = f"{client_id}|{canonical_url}" if client_id else canonical_url
+            fingerprint = hashlib.sha1(fingerprint_source.encode("utf-8")).hexdigest()[:12]
+            existing = next((x for x in self.store.income_opportunities(500, client_id=client_id)
                              if x.get("opportunity_id") == "LIVE-" + fingerprint), None)
             if existing and existing.get("data", {}).get("retrieved_at") == retrieved_at:
                 continue
@@ -257,7 +258,7 @@ class IncomeEngine:
             lifecycle = "UPDATED" if changed else ("UNCHANGED" if existing else "NEW")
             history.append({"retrieved_at": retrieved_at, "title": title[:300], "score": fit_score, "lifecycle": lifecycle})
             history = history[-10:]
-            record = {"opportunity_id":"LIVE-"+fingerprint,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":canonical_url,
+            record = {"opportunity_id":"LIVE-"+fingerprint,"client_id":client_id,"category":str(item.get("category") or "FREELANCE_JOB"),"title":title[:300],"source_url":canonical_url,
                       "evidence":f"مصدر حي: {source_text}; retrieved_at={retrieved_at}; هذه فرصة معلنة وليست إيرادًا.","requirements":requirements[:4000],"budget":budget,
                       "posted_at":item.get("posted_at"),"retrieved_at":retrieved_at,"source_kind":"LIVE_OPPORTUNITY","status":"DISCOVERY",
                       "score":fit_score,"fit_matches":fit_matches,"lifecycle":lifecycle,"verification_status":"UNVERIFIED","verified_amount_jod":0.0,"expected_value_jod":None,
@@ -313,11 +314,11 @@ class IncomeEngine:
     def prioritize(self, limit: int = 10) -> list[dict[str, Any]]:
         return self.store.income_opportunities(limit)
 
-    def verify_payment(self, opportunity_id: str, amount_jod: float, evidence: str) -> dict[str, Any]:
+    def verify_payment(self, opportunity_id: str, amount_jod: float, evidence: str, client_id: str | None = None) -> dict[str, Any]:
         amount = float(amount_jod)
         if amount <= 0 or not evidence.strip():
             return {"ok": False, "status": "REJECTED", "reason": "PAYMENT_EVIDENCE_REQUIRED"}
-        rows = self.store.income_opportunities(500)
+        rows = self.store.income_opportunities(500, client_id=client_id)
         target = next((x for x in rows if x["opportunity_id"] == opportunity_id), None)
         if not target:
             return {"ok": False, "status": "NOT_FOUND"}
@@ -336,18 +337,19 @@ class IncomeEngine:
         })
         return {"ok": True, "status": "VERIFIED", "opportunity_id": opportunity_id, "amount_jod": amount}
 
-    def snapshot(self) -> dict[str, Any]:
-        summary = self.store.income_summary()
+    def snapshot(self, client_id: str | None = None) -> dict[str, Any]:
+        summary = self.store.income_summary(client_id=client_id)
         return {
             **summary,
             "verified_revenue_jod": float(summary.get("verified", 0) or 0),
-            "opportunities": self.store.income_opportunities(20),
+            "opportunities": self.store.income_opportunities(20, client_id=client_id),
             "principle": "الفرصة ليست دخلًا؛ الدخل لا يُحتسب قبل إثبات الدفع.",
             "run_count": self.run_count,
+            "client_id": client_id,
         }
 
 
-    def verified_total(self):
+    def verified_total(self, client_id: str | None = None):
         """Return only revenue explicitly recorded as verified by the engine ledger."""
-        summary = self.store.income_summary()
+        summary = self.store.income_summary(client_id=client_id)
         return float(summary.get("verified", 0) or 0)
