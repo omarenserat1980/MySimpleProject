@@ -332,6 +332,23 @@ class MemoryStore:
             if len(out)>=limit: break
         return out
 
+    def revenue_guardian_checkpoint(self, client_id):
+        key = f"revenue_guardian:{client_id}:checkpoint"
+        with self.connect() as con:
+            row = con.execute("SELECT value FROM memories WHERE key=?", (key,)).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["value"])
+        except Exception:
+            return None
+
+    def save_revenue_guardian_checkpoint(self, client_id, record):
+        key = f"revenue_guardian:{client_id}:checkpoint"
+        self.save_memory(key, json.dumps(record, ensure_ascii=False))
+        self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(record))
+        return record
+
     def monitor_state(self):
         for item in self.memories():
             if item.get("key")=="render.monitor.state":
