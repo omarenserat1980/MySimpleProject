@@ -22,6 +22,10 @@ class ReconciliationRequest(BaseModel):
     payment_transaction_id: str
     payment_evidence_ref: str
     delivery_evidence_ref: str
+    payment_source: str
+    payment_status: str
+    payment_amount_usd: float
+    payment_currency: str
     amount_usd: float
     currency: str = "USD"
 
@@ -44,8 +48,12 @@ class ReconciliationStore:
     def reconcile(self, body: ReconciliationRequest) -> Dict[str, Any]:
         if not body.payment_transaction_id.strip() or not body.payment_evidence_ref.strip() or not body.delivery_evidence_ref.strip():
             raise ValueError("payment transaction, payment evidence, and delivery evidence are required")
+        if not body.payment_source.strip() or body.payment_status != "VERIFIED":
+            raise ValueError("independent verified payment source required")
         if body.currency != "USD" or body.amount_usd <= 0:
             raise ValueError("unsupported currency or invalid amount")
+        if body.payment_currency != body.currency or body.payment_amount_usd != body.amount_usd:
+            raise ValueError("payment amount/currency mismatch")
 
         data = self._load()
         if body.order_id in data["records"]:
@@ -58,6 +66,10 @@ class ReconciliationStore:
             "currency": body.currency,
             "payment_transaction_id": body.payment_transaction_id,
             "payment_evidence_ref": body.payment_evidence_ref,
+            "payment_source": body.payment_source,
+            "payment_status": body.payment_status,
+            "payment_amount_usd": body.payment_amount_usd,
+            "payment_currency": body.payment_currency,
             "delivery_evidence_ref": body.delivery_evidence_ref,
             "money_movement": False,
             "audit_fingerprint": hashlib.sha256(
