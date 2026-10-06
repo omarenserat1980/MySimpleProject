@@ -35,6 +35,9 @@ class ClientSuggestionBridge:
             return {"ok":False,"status":"INVALID_SUGGESTION"}
         if client_id != "CL-000003":
             return {"ok":False,"status":"CLIENT_NOT_IN_SUGGESTION_BRIDGE"}
+        gate=self.can_accept_next(client_id)
+        if not gate.get("allowed"):
+            return {"ok":True,"status":"WAITING_FOR_PREVIOUS_VERIFICATION","client_id":client_id,"gate":gate}
         stamp=_now()
         with self._connect() as con:
             cur=con.execute("INSERT INTO client_suggestions(client_id,suggestion,status,created_at,updated_at) VALUES(?,?,?,?,?)",
@@ -74,6 +77,17 @@ class ClientSuggestionBridge:
                         (advice,json.dumps(decision,ensure_ascii=False),json.dumps(result,ensure_ascii=False),status,_now(),sid))
             con.commit()
 
+
+    def can_accept_next(self, client_id="CL-000003"):
+        """Allow a new suggestion only after the previous action has a fresh outcome."""
+        with self._connect() as con:
+            row=con.execute("SELECT * FROM client_suggestions WHERE client_id=? ORDER BY id DESC LIMIT 1",(client_id,)).fetchone()
+        if not row:
+            return {"ok":True,"allowed":True,"reason":"NO_PREVIOUS_SUGGESTION"}
+        status=str(row["status"] or "")
+        if status in {"RECEIVED","ACTION_REQUESTED"}:
+            return {"ok":True,"allowed":False,"reason":"PREVIOUS_SUGGESTION_REQUIRES_VERIFICATION","suggestion_id":row["id"],"status":status}
+        return {"ok":True,"allowed":True,"reason":"PREVIOUS_SUGGESTION_RESOLVED","suggestion_id":row["id"],"status":status}
     def history(self,client_id="CL-000003",limit=20):
         with self._connect() as con:
             rows=con.execute("SELECT * FROM client_suggestions WHERE client_id=? ORDER BY id DESC LIMIT ?",(client_id,max(1,min(int(limit),100)))).fetchall()
