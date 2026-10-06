@@ -256,6 +256,16 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         "target": body.target,
         "workflow": workflow,
     })
+    store.industrial_client_request(
+        body.client_id,
+        request_id,
+        activity_id=contract.get("request", body.request),
+        target=body.target,
+        backend="INDUSTRIAL_PRIMARY_WORKFLOW",
+        workflow=workflow,
+        stage="QUEUED",
+        status="ACTIVE",
+    )
     try:
         dispatch = industrial_actions.dispatch(
             repo,
@@ -270,10 +280,19 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
     except Exception:
         store.release_industrial_client(body.client_id, request_id)
         raise
+    run_id = dispatch.get("run_id") or dispatch.get("id")
+    store.update_industrial_client_request(
+        body.client_id,
+        stage="EXECUTING",
+        status="ACTIVE",
+        run_id=run_id or "",
+        checkpoint={"stage": "EXECUTING", "request_id": request_id},
+    )
     store.event("INDUSTRIAL_CLIENT_DISPATCHED", {
         "request_id": request_id,
         "client_id": body.client_id,
         "workflow": workflow,
+        "run_id": run_id,
         "dispatch_status": dispatch.get("state"),
     })
     return {
@@ -302,6 +321,14 @@ def industrial_client_request_status():
     state = latest.get("status")
     verified = state == "completed" and conclusion == "success"
     if state == "completed":
+        final_status = "VERIFIED_COMPLETED" if verified else "FAILED"
+        store.update_industrial_client_request(
+            industrial_clients.INDUSTRIAL_CLIENT_ID,
+            stage="VERIFIED" if verified else "FAILED",
+            status=final_status,
+            run_id=str(latest.get("id") or ""),
+            checkpoint={"stage": "VERIFIED" if verified else "FAILED", "conclusion": conclusion},
+        )
         store.release_industrial_client(industrial_clients.INDUSTRIAL_CLIENT_ID)
     return {
         "ok": True,
