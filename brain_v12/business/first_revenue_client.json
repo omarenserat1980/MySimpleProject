@@ -29,27 +29,73 @@
     "status": "NOT_REALIZED",
     "amount": 0,
     "currency": null,
-    "reason": "No external customer payment has been independently verified yet."
+    "reason": "No external customer payment has been independently verified yet; the new request authorizes deep commercial execution but does not itself prove a customer, order, or payment."
   },
   "customer_request": {
     "status": "REQUESTED",
-    "request_type": "REVENUE_COLLECTION",
-    "instruction": "Customer explicitly asks Brain to actively pursue collection of real revenue from the approved commercial opportunity.",
-    "brain_duties": [
-      "identify the current revenue-blocking step",
-      "prepare and track the next permitted collection action",
-      "request or surface required customer authorization when external action is needed",
-      "verify payment independently when evidence becomes available",
-      "continue through delivery/reconciliation evidence",
-      "do not declare revenue without verified payment evidence"
+    "request_type": "DEEP_COMMERCIAL_EXECUTION",
+    "instruction": "Customer explicitly asks Brain to deeply pursue fulfillment of the customer's real business needs by researching, designing, developing, building, testing, delivering, and iterating sellable digital products and services.",
+    "objectives": [
+      "discover and validate concrete customer needs before building",
+      "identify the smallest commercially useful deliverable first",
+      "design and build web applications and electronic services",
+      "build websites and landing pages",
+      "produce promotional, explanatory, and product videos",
+      "integrate forms, quote/request flows, analytics, reporting, and operational tooling where useful",
+      "test every deliverable technically and against the customer's stated acceptance criteria",
+      "prepare a verifiable delivery package",
+      "track customer feedback and iterate within the active request",
+      "pursue conversion from validated need to accepted order and independently verified payment"
+    ],
+    "execution_loop": [
+      "DISCOVER_NEED",
+      "QUALIFY",
+      "DESIGN",
+      "BUILD",
+      "TEST",
+      "DEMO",
+      "CUSTOMER_ACCEPTANCE",
+      "DELIVER",
+      "PAYMENT_VERIFY",
+      "RECONCILE",
+      "REVENUE_REALIZED"
+    ],
+    "service_capabilities": [
+      "WEB_APPLICATION",
+      "WEBSITE",
+      "LANDING_PAGE",
+      "DIGITAL_SERVICE",
+      "BUSINESS_WORKFLOW",
+      "VIDEO_PRODUCTION",
+      "PRODUCT_DEMO_VIDEO",
+      "MARKETING_VIDEO",
+      "REPORTING_DASHBOARD",
+      "QUOTE_REQUEST_SYSTEM",
+      "CUSTOMER_INQUIRY_SYSTEM",
+      "API_INTEGRATION"
+    ],
+    "deep_research_rules": [
+      "prefer existing open-source components and Brain capabilities when legally compatible",
+      "do not build large systems before validating the customer's actual need",
+      "reuse proven components instead of duplicating functionality",
+      "keep each build bounded by acceptance criteria and delivery evidence",
+      "record blockers, failed experiments, repairs, and rejected approaches",
+      "never represent a prototype as a paid delivery",
+      "never represent an offer, invoice, traffic, lead, click, forecast, or test payment as realized revenue"
+    ],
+    "customer_interaction": [
+      "Brain may prepare proposals, prototypes, demos, technical specifications, and delivery packages.",
+      "External communication, contracts, pricing commitments, charges, purchases, transfers, and withdrawals require the required human/customer authorization.",
+      "Brain must surface the exact approval or information needed instead of silently assuming it."
     ],
     "financial_boundary": {
       "automatic_contract": false,
       "automatic_charge": false,
+      "automatic_purchase": false,
       "automatic_transfer": false,
       "automatic_withdrawal": false,
       "funds_moved_by_brain": false
     },
-    "success_condition": "REVENUE_REALIZED only after independently verified real payment plus required delivery/reconciliation evidence."
+    "success_condition": "The active customer request is considered commercially successful only when the customer accepts the delivered work and real payment is independently verified; REVENUE_REALIZED additionally requires delivery/reconciliation evidence."
   }
 }
