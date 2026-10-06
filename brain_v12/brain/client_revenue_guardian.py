@@ -82,6 +82,35 @@ class ClientRevenueGuardian:
             },
         }
 
+    def deep_inspect(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Aggregate the existing income lifecycle without mutating it."""
+        report = self.inspect(client_id)
+        snapshot = income_engine.snapshot()
+        lifecycle = income_lifecycle.summary()
+        opportunities = list(snapshot.get("opportunities") or [])
+        verified = float(snapshot.get("verified_revenue_jod", 0) or 0)
+        active = [x for x in opportunities if str(x.get("status") or "").upper() not in {"STALE", "COMPLETED", "PAYMENT_VERIFIED"}]
+        ready = [x for x in active if str(x.get("status") or "").upper() == "READY_TO_APPLY"]
+        if verified > 0:
+            priority = "PROTECT_AND_SCALE_VERIFIED_PATH"
+        elif ready:
+            priority = "CONVERT_READY_TO_APPLY_TO_SUBMITTED_WITH_EXTERNAL_EVIDENCE"
+        elif active:
+            priority = "ADVANCE_HIGHEST_FIT_ACTIVE_OPPORTUNITY"
+        else:
+            priority = "CREATE_FRESH_EVIDENCE_BACKED_OPPORTUNITY_PIPELINE"
+        report["deep_audit"] = {
+            "verified_revenue_jod": verified,
+            "revenue_gap_exists": verified <= 0,
+            "lifecycle_counts": dict(lifecycle.get("counts") or {}),
+            "active_opportunities": len(active),
+            "ready_to_apply": len(ready),
+            "highest_priority": priority,
+            "hard_gate": "PAYMENT_VERIFIED + payment_evidence",
+            "evidence_chain": list(getattr(income_lifecycle, "ORDER", ())),
+        }
+        return report
+
     def nudge_once(self, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Request at most one bounded action; execution remains elsewhere."""
         report = self.inspect(client_id)
