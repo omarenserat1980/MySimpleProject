@@ -35,17 +35,16 @@
   ],
   "selection_reason": "Highest initial combination of industrial sales value, fast demonstrability, measurable customer outcome, and clear delivery evidence.",
   "next_steps": [
-    "SPECIFY_ACCEPTANCE_CRITERIA",
-    "BUILD_BOUNDED_MVP",
-    "RUN_TECHNICAL_QC",
-    "PREPARE_DEMO",
-    "SEEK_CUSTOMER_VALIDATION"
+    "PREPARE_DEMO_PACKAGE",
+    "SEEK_CUSTOMER_VALIDATION",
+    "PREPARE_OFFER_IF_VALIDATED"
   ],
   "financial_truth": {
     "realized_revenue": 0,
     "currency": null,
     "payment_verified": false,
-    "delivery_verified": false
+    "delivery_verified": false,
+    "revenue_stage": "DEMO_READY"
   },
   "active_lane_contract": {
     "opportunity_id": "OP-CL3-001",
