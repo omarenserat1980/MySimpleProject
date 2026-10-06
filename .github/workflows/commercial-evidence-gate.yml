@@ -1,0 +1,27 @@
+name: commercial-evidence-gate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "brain_v12/business/commercial_control_plane.py"
+      - "brain_v12/business/commercial_gate.py"
+      - "brain_v12/business/cl_000003_evidence_record.json"
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Commercial evidence gate
+        run: python -m brain_v12.business.commercial_gate
