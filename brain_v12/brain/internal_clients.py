@@ -14,6 +14,7 @@ from typing import Any
 from .windows_cloud_provider_factory import windows_cloud_provider_readiness
 from ..business.customer_execution_router import CustomerExecutionRouter
 from ..business.two_customer_execution_contract import CUSTOMER_SCOPE, public_scope
+from .client_revenue_guardian import GUARDIAN_CLIENT_ID, TARGET_CLIENT_ID
 
 
 INTERNAL_CLIENTS = {
@@ -28,6 +29,13 @@ INTERNAL_CLIENTS = {
         "tool_role": "CLOUD_WINDOWS_SERVER_2025_CLIENT",
         "request": "PROVISION_AND_PREPARE_WINDOWS_SERVER_2025",
         "target": "brain-cloud",
+    },
+    GUARDIAN_CLIENT_ID: {
+        "customer_id": TARGET_CLIENT_ID,
+        "tool_role": "REVENUE_ACTIVITY_GUARDIAN",
+        "request": "MONITOR_AND_ACCELERATE_VERIFIED_REVENUE",
+        "target": TARGET_CLIENT_ID,
+        "supervisory_only": True,
     },
 }
 
@@ -62,6 +70,15 @@ def resolve_internal_client(client_id: str) -> dict[str, Any]:
     if item is None:
         return {"ok": False, "status": "UNKNOWN_INTERNAL_CLIENT"}
     customer_id = item["customer_id"]
+    if item.get("supervisory_only"):
+        return {
+            "ok": True,
+            "client_id": client_id,
+            "customer_id": customer_id,
+            **item,
+            "objective": "مراقبة نشاط CL-000003 والإيراد الفعلي المثبت ودفع مسار محدود نحو الإيراد",
+            "backend": "REVENUE_GUARDIAN",
+        }
     scope = CUSTOMER_SCOPE[customer_id]
     return {
         "ok": True,
