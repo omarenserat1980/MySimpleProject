@@ -323,6 +323,27 @@ class IncomeEngine:
         if not target:
             return {"ok": False, "status": "NOT_FOUND"}
         data = dict(target.get("data") or {})
+        already_verified = (
+            str(data.get("verification_status")) == "VERIFIED"
+            or str(data.get("status")) == "PAYMENT_VERIFIED"
+        )
+        if already_verified:
+            previous_amount = float(data.get("verified_amount_jod", 0) or 0)
+            previous_evidence = str(data.get("payment_evidence") or "")
+            if previous_amount == amount and previous_evidence == evidence[:2000]:
+                return {
+                    "ok": True,
+                    "status": "ALREADY_VERIFIED",
+                    "opportunity_id": opportunity_id,
+                    "amount_jod": previous_amount,
+                    "idempotent": True,
+                }
+            return {
+                "ok": False,
+                "status": "PAYMENT_ALREADY_VERIFIED_IMMUTABLE",
+                "opportunity_id": opportunity_id,
+                "amount_jod": previous_amount,
+            }
         data.update({
             "status": "COMPLETED",
             "verification_status": "VERIFIED",
