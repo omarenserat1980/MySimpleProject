@@ -1,0 +1,50 @@
+{
+  "client_id": "CL-000003",
+  "request_id": "REQ-CL-000003-DEEP-001",
+  "status": "ACTIVE",
+  "active_lane": "OP-CL3-001",
+  "lanes": [
+    {
+      "opportunity_id": "OP-CL3-001",
+      "type": "WEB_APPLICATION",
+      "name": "Industrial Quote & Inquiry Portal",
+      "state": "SELECTED",
+      "revenue": "NOT_REALIZED"
+    },
+    {
+      "opportunity_id": "OP-CL3-002",
+      "type": "WEBSITE",
+      "name": "Industrial Digital Presence Website",
+      "state": "PARKED",
+      "revenue": "NOT_REALIZED"
+    },
+    {
+      "opportunity_id": "OP-CL3-003",
+      "type": "VIDEO_PRODUCTION",
+      "name": "Industrial Product Video Pack",
+      "state": "PARKED",
+      "revenue": "NOT_REALIZED"
+    },
+    {
+      "opportunity_id": "OP-CL3-004",
+      "type": "REPORTING_DASHBOARD",
+      "name": "Sales Reporting Dashboard",
+      "state": "PARKED",
+      "revenue": "NOT_REALIZED"
+    }
+  ],
+  "selection_reason": "Highest initial combination of industrial sales value, fast demonstrability, measurable customer outcome, and clear delivery evidence.",
+  "next_steps": [
+    "SPECIFY_ACCEPTANCE_CRITERIA",
+    "BUILD_BOUNDED_MVP",
+    "RUN_TECHNICAL_QC",
+    "PREPARE_DEMO",
+    "SEEK_CUSTOMER_VALIDATION"
+  ],
+  "financial_truth": {
+    "realized_revenue": 0,
+    "currency": null,
+    "payment_verified": false,
+    "delivery_verified": false
+  }
+}
