@@ -2,13 +2,24 @@ from brain_v12.business.commercial_control_plane import (
     CommercialCase,
     CommercialEvidence,
     CommercialState,
+    profit_claim_allowed,
+    revenue_claim_allowed,
 )
 
 
 def test_prospect_is_not_revenue():
     case = CommercialCase(client_id="CL-000003")
     assert case.state == CommercialState.PROSPECT
-    assert case.state != CommercialState.REVENUE_REALIZED
+    assert not revenue_claim_allowed(case)
+
+
+def test_direct_revenue_state_without_evidence_is_rejected():
+    forged = CommercialCase(
+        client_id="CL-000003",
+        state=CommercialState.REVENUE_REALIZED,
+    )
+    assert not forged.state_integrity_ok()
+    assert not revenue_claim_allowed(forged)
 
 
 def test_revenue_requires_payment_and_delivery():
@@ -43,6 +54,7 @@ def test_revenue_can_be_realized_only_with_required_evidence():
 
     case.transition(CommercialState.REVENUE_REALIZED)
     assert case.state == CommercialState.REVENUE_REALIZED
+    assert revenue_claim_allowed(case)
 
 
 def test_profit_requires_cost_and_reconciliation():
@@ -57,6 +69,8 @@ def test_profit_requires_cost_and_reconciliation():
             CommercialEvidence("payment", "payment-001", True),
         ],
     )
+
+    assert not profit_claim_allowed(case)
 
     try:
         case.transition(CommercialState.PROFIT_VERIFIED)
