@@ -46,5 +46,58 @@
     "currency": null,
     "payment_verified": false,
     "delivery_verified": false
+  },
+  "active_lane_contract": {
+    "opportunity_id": "OP-CL3-001",
+    "product": "Industrial Quote & Inquiry Portal",
+    "value_hypothesis": "زيادة وتحسين التقاط طلبات عروض الأسعار والاستفسارات الصناعية وتحويلها إلى مسار متابعة قابل للقياس.",
+    "delivery_units": [
+      "responsive customer-facing portal",
+      "Arabic/English inquiry flow",
+      "unique inquiry/quote request identifier",
+      "admin tracking view",
+      "basic reporting",
+      "deployment/package documentation",
+      "demo scenario using clearly labeled synthetic data"
+    ],
+    "acceptance_gate": [
+      "all primary flows pass smoke tests",
+      "data persistence is verified",
+      "mobile and desktop behavior is checked",
+      "Arabic and English paths are checked",
+      "admin tracking is traceable to source inquiry",
+      "no fabricated customer or financial data is presented as real"
+    ],
+    "commercial_assets": [
+      "one-page service offer",
+      "demo landing page",
+      "short product/demo video",
+      "social media content variants",
+      "lead capture CTA",
+      "customer discovery questions"
+    ],
+    "measurement_loop": {
+      "funnel": [
+        "content",
+        "visit",
+        "inquiry",
+        "qualified_lead",
+        "offer",
+        "acceptance",
+        "order",
+        "delivery",
+        "payment_verified",
+        "revenue_realized"
+      ],
+      "rule": "Do not optimize vanity metrics when the next commercial gate is blocked."
+    },
+    "pivot_thresholds": {
+      "build_blocked": "repair first blocking technical cause within bounded retries",
+      "demo_not_clear": "simplify UX and value demonstration",
+      "no_interest": "revise targeting/value proposition before adding features",
+      "leads_unqualified": "tighten audience and qualification",
+      "acceptance_blocked": "identify customer objection and revise offer",
+      "payment_blocked": "surface exact permitted payment action; never infer payment"
+    }
   }
 }
