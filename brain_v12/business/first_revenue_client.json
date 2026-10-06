@@ -1,0 +1,34 @@
+{
+  "client_id": "CL-000003",
+  "record_type": "EXTERNAL_REVENUE_CANDIDATE",
+  "status": "PROSPECT",
+  "active_request_limit": 1,
+  "offer": {
+    "status": "TO_BE_DEFINED_WITH_REAL_CUSTOMER",
+    "principle": "sell an existing Brain capability that can be delivered and verified without inventing capability"
+  },
+  "commercial_gate": {
+    "customer_acceptance_required": true,
+    "payment_verification_required": true,
+    "delivery_evidence_required": true,
+    "cost_evidence_required_for_profit": true,
+    "automatic_contract": false,
+    "automatic_payment": false,
+    "automatic_withdrawal": false
+  },
+  "state_machine": [
+    "PROSPECT",
+    "OFFER_PREPARED",
+    "CUSTOMER_VALIDATED",
+    "PAYMENT_VERIFIED",
+    "REVENUE_REALIZED",
+    "PROFIT_VERIFIED",
+    "CLOSED"
+  ],
+  "revenue_claim": {
+    "status": "NOT_REALIZED",
+    "amount": 0,
+    "currency": null,
+    "reason": "No external customer payment has been independently verified yet."
+  }
+}
