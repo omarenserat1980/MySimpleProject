@@ -236,6 +236,40 @@ def brain_revenue_guardian(request: Request, client_id: str):
         "progress_step": result.get("deep_audit", {}).get("progress_step"),
     })
     return result
+@app.post("/api/brain/revenue-guardian/{client_id}/advance")
+def brain_revenue_guardian_advance(request: Request, client_id: str):
+    """Request exactly one bounded internal revenue action; no payment is claimed."""
+    require_control_key(request)
+    from .brain.client_revenue_guardian import ClientRevenueGuardian
+
+    def _client_activity(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        counts = summary.get("counts") or {}
+        return {"opportunities": sum(int(v or 0) for v in counts.values()),
+                "completed": int(counts.get("COMPLETED", 0) or 0)}
+
+    def _client_revenue(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        return {"verified_revenue_jod": float(summary.get("payment_verified_jod", 0) or 0)}
+
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.advance_once(workforce.income_engine, income_lifecycle, client_id)
+    store.event("REVENUE_GUARDIAN_ADVANCE", {
+        "guardian_client_id": "CL-000004",
+        "target_client_id": client_id,
+        "status": result.get("status"),
+        "action_requested": result.get("action_requested", False),
+        "payment_verified": False,
+    })
+    return result
+
+
 @app.post("/api/brain/internal-clients/plan")
 def brain_internal_client_plan(request: Request, body: BrainInternalClientRequest):
     """Build a fail-closed launch plan; no external side effect occurs here."""
