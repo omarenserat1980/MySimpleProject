@@ -326,8 +326,22 @@ def industrial_client_request_status():
 
     repo = _github_repo()
     workflow = industrial_clients.PRIMARY_WORKFLOW
+    persisted = store.industrial_client_request_state(industrial_clients.INDUSTRIAL_CLIENT_ID) or {}
+    persisted_run_id = str(persisted.get("run_id") or "")
     latest = industrial_actions.latest_run(repo, workflow)
-    if not latest:
+    # Reconcile against the persisted request first; never claim an unrelated
+    # newer workflow run as this client's execution.
+    if persisted_run_id:
+        if not latest or str(latest.get("id") or "") != persisted_run_id:
+            return {
+                "ok": True,
+                "status": "RECONCILIATION_PENDING",
+                "workflow": workflow,
+                "request_id": persisted.get("request_id"),
+                "run_id": persisted_run_id,
+                "checkpoint": persisted.get("checkpoint", {}),
+            }
+    elif not latest:
         return {"ok": True, "status": "NO_RUN_OBSERVED", "workflow": workflow}
     conclusion = latest.get("conclusion")
     state = latest.get("status")
