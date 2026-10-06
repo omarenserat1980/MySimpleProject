@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane with cryptographic evidence binding."""
+"""Evidence-gated commercial control plane with strict identity, money and source integrity."""
 
 from __future__ import annotations
 
@@ -102,7 +102,24 @@ class CommercialCase:
     expected_amount: float | Decimal | None = None
     expected_currency: str = ""
 
+    def duplicate_references(self) -> set[str]:
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for item in self.evidence:
+            reference = item.reference.strip()
+            if not reference:
+                continue
+            if reference in seen:
+                duplicates.add(reference)
+            seen.add(reference)
+        return duplicates
+
+    def evidence_set_integrity_ok(self) -> bool:
+        return not self.duplicate_references()
+
     def verified_types(self) -> set[str]:
+        if not self.evidence_set_integrity_ok():
+            return set()
         return {
             item.evidence_type
             for item in self.evidence
@@ -135,7 +152,7 @@ class CommercialCase:
         return REQUIRED_EVIDENCE.get(target, frozenset()).issubset(self.verified_types())
 
     def state_integrity_ok(self) -> bool:
-        return REQUIRED_EVIDENCE.get(self.state, frozenset()).issubset(self.verified_types())
+        return self.evidence_set_integrity_ok() and REQUIRED_EVIDENCE.get(self.state, frozenset()).issubset(self.verified_types())
 
     def transition(self, target: CommercialState) -> None:
         if not self.can_enter(target):
