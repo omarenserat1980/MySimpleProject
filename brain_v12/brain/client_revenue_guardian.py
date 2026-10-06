@@ -231,6 +231,43 @@ class ClientRevenueGuardian:
             "verification_required": True,
         }
 
+    def reconcile_once(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Reconcile the last requested action against a fresh revenue measurement."""
+        current = self.deep_inspect(income_engine, income_lifecycle, client_id)
+        deep = current["deep_audit"]
+        previous = self.progress_reader(client_id) or {}
+        action_status = str(previous.get("action_status") or "")
+        if action_status != "REQUESTED":
+            return {**current, "status": "NO_PENDING_ACTION", "reconciliation": "NONE"}
+
+        before = float(previous.get("previous_verified_revenue_jod", previous.get("current_verified_revenue_jod", 0)) or 0)
+        after = float(deep.get("verified_revenue_jod", 0) or 0)
+        if after > before:
+            reconciliation = "ACTION_EFFECTIVE"
+        elif after < before:
+            reconciliation = "ACTION_REQUIRES_RECOVERY"
+        else:
+            reconciliation = "ACTION_NO_PROGRESS_NEEDS_EVIDENCE"
+
+        record = {
+            **previous,
+            "target_client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "action_status": reconciliation,
+            "reconciled_verified_revenue_jod": after,
+            "reconciliation_required": False,
+            "dispatch_allowed": False,
+        }
+        self.progress_writer(client_id, record)
+        return {
+            **current,
+            "status": "ACTION_RECONCILED",
+            "reconciliation": reconciliation,
+            "before_verified_revenue_jod": before,
+            "after_verified_revenue_jod": after,
+            "next_action_allowed": reconciliation != "ACTION_NO_PROGRESS_NEEDS_EVIDENCE",
+        }
+
     def nudge_once(self, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Request at most one bounded action; execution remains elsewhere."""
         report = self.inspect(client_id)
