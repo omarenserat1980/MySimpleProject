@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "tools/build_brain_boot_iso.sh"
+      - "tools/verify_brain_iso_qemu.sh"
       - "brain_v12/brain/self_trust_boot_gate.py"
       - ".github/workflows/brain-boot-iso.yml"
 
@@ -28,7 +29,7 @@ jobs:
       - name: Build Brain Boot ISO
         run: |
           set -euo pipefail
-          chmod +x tools/build_brain_boot_iso.sh
+          chmod +x tools/build_brain_boot_iso.sh tools/verify_brain_iso_qemu.sh
           tools/build_brain_boot_iso.sh brain-boot-self-trust.iso
           test -s brain-boot-self-trust.iso
       - name: Inspect ISO contract
@@ -42,18 +43,7 @@ jobs:
       - name: Boot ISO with QEMU
         run: |
           set -euo pipefail
-          rm -f brain-iso-debug.log
-          timeout 20s qemu-system-x86_64 \
-            -machine q35 -m 128M -cdrom brain-boot-self-trust.iso \
-            -display none -debugcon file:brain-iso-debug.log \
-            -global isa-debugcon.iobase=0xe9 >/tmp/brain-qemu.log 2>&1 || true
-          grep -q 'BRAIN-BOOT-1 SELF-TRUST BOOTSTRAP' brain-iso-debug.log || {
-            cat brain-iso-debug.log || true
-            cat /tmp/brain-qemu.log || true
-            echo 'BOOT_EVIDENCE_NOT_CAPTURED'
-            exit 1
-          }
-          echo 'BRAIN_BOOT_ISO_QEMU=VERIFIED'
+          ./tools/verify_brain_iso_qemu.sh
       - name: Publish evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,4 +56,5 @@ jobs:
             iso-toc.txt
             iso-kernel.txt
             iso-gate.txt
+            brain-iso-serial.log
             brain-iso-debug.log
