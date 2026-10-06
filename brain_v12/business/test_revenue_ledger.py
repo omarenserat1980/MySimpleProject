@@ -51,6 +51,19 @@ def test_free_form_payment_evidence_cannot_verify():
 
 def test_incomplete_structured_evidence_cannot_realize():
     ledger = RevenueRecord("commercial-guard-002", "payment", "USD")
-    ledger.verify({"transaction_id": "tx-guard-002", "evidence_ref": "evidence://payment/tx-guard-002"})
-    with pytest.raises(ValueError, match="delivery_evidence_ref"):
-        ledger.realize({"delivery_evidence_ref": "evidence://delivery/guard-002"})
+    with pytest.raises(ValueError, match="independent source required"):
+        ledger.verify({"transaction_id": "tx-guard-002", "evidence_ref": "evidence://payment/tx-guard-002"})
+
+
+def test_verified_payment_still_requires_delivery_reconciliation():
+    ledger = RevenueRecord("commercial-guard-003", "100", "USD")
+    ledger.verify({
+        "transaction_id": "tx-guard-003",
+        "evidence_ref": "evidence://payment/tx-guard-003",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    })
+    with pytest.raises(ValueError, match="delivery_evidence_ref and reconciliation_ref"):
+        ledger.realize({"delivery_evidence_ref": "evidence://delivery/guard-003"})
