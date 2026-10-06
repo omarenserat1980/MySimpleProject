@@ -127,6 +127,16 @@ class BrainCouncil:
             row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
         if not row:
             return {"ok": False, "status": "MEETING_NOT_FOUND"}
+        if str(row["status"]) == "MINUTES_EXECUTED":
+            return {
+                "ok": True,
+                "meeting_id": int(meeting_id),
+                "status": "ALREADY_EXECUTED",
+                "execution_results": json.loads(row["execution_results"] or "[]"),
+                "decisions": json.loads(row["decisions"] or "[]"),
+                "new_client_proposals": json.loads(row["new_client_proposals"] or "[]"),
+                "no_duplicate_execution": True,
+            }
 
         decisions = []
         results = []
@@ -178,7 +188,11 @@ class BrainCouncil:
             "proposal_id": f"NEW-CLIENT-REVIEW-{meeting_id}",
             "status": "REVIEW_ONLY",
             "reason": "A new client is proposed only if an unmet demand, capacity need, or distinct accountable request cannot be represented by an existing client without violating one-active-request-per-client.",
-            "required_fields": ["business_need", "requested_outcome", "owner", "capacity_impact", "acceptance_evidence"],
+            "required_fields": [
+                "business_need", "requested_outcome", "owner", "capacity_impact",
+                "acceptance_evidence", "why_existing_client_cannot_own_request"
+            ],
+            "admission_gate": "EXPLICIT_GOVERNANCE_APPROVAL",
             "automatic_admission": False,
         })
 
