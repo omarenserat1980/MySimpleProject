@@ -299,6 +299,15 @@ class ClientRevenueGuardian:
             "last_marketing_revenue_before_jod": project_revenue_before,
         })
         self.progress_writer(client_id, record)
+        if hasattr(self.progress_writer, "__self__") and hasattr(self.progress_writer.__self__, "save_revenue_project_marketing_result"):
+            self.progress_writer.__self__.save_revenue_project_marketing_result(client_id, {
+                "project_id": project_id,
+                "project_title": title,
+                "marketing_status": record["marketing_status"],
+                "marketing_result": outcome,
+                "revenue_before_jod": project_revenue_before,
+                "verified_revenue_jod_at_request": revenue,
+            })
         return {
             "status": "SUCCESSFUL_PROJECT_MARKETING_REQUESTED",
             "successful_projects_count": record["successful_projects_count"],
