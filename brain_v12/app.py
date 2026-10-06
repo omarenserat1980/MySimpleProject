@@ -212,6 +212,18 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         }
 
     request_id = "industrial-" + uuid4().hex
+    claim = store.claim_industrial_client(body.client_id, request_id)
+    if not claim.get("ok"):
+        return {
+            "ok": True,
+            "status": "ALREADY_RUNNING",
+            "client_id": body.client_id,
+            "request": body.request,
+            "target": body.target,
+            "workflow": workflow,
+            "request_id": claim.get("request_id"),
+            "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        }
     store.event("INDUSTRIAL_CLIENT_REQUESTED", {
         "request_id": request_id,
         "client_id": body.client_id,
@@ -219,16 +231,20 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         "target": body.target,
         "workflow": workflow,
     })
-    dispatch = industrial_actions.dispatch(
-        repo,
-        workflow,
-        ref="main",
-        inputs={
-            "iso_url": "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us",
-            "timeout_minutes": "55",
-        },
-        approved=True,
-    )
+    try:
+        dispatch = industrial_actions.dispatch(
+            repo,
+            workflow,
+            ref="main",
+            inputs={
+                "iso_url": "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us",
+                "timeout_minutes": "55",
+            },
+            approved=True,
+        )
+    except Exception:
+        store.release_industrial_client(body.client_id, request_id)
+        raise
     store.event("INDUSTRIAL_CLIENT_DISPATCHED", {
         "request_id": request_id,
         "client_id": body.client_id,
