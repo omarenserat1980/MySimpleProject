@@ -262,6 +262,10 @@ class ClientRevenueGuardian:
 
         project_id = str(candidate.get("opportunity_id"))
         title = str((candidate.get("data") or {}).get("title") or candidate.get("title") or project_id)
+        project_data = dict(candidate.get("data") or {})
+        project_revenue_before = float(candidate.get("verified_amount_jod") or project_data.get("verified_amount_jod") or 0)
+        marketing_baselines = dict(previous.get("marketing_revenue_baselines") or {})
+        marketing_baselines[project_id] = project_revenue_before
         action = {
             "client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -286,6 +290,8 @@ class ClientRevenueGuardian:
             "last_marketed_project_id": project_id,
             "last_marketing_action": action,
             "last_marketing_outcome": outcome,
+            "marketing_revenue_baselines": marketing_baselines,
+            "last_marketing_revenue_before_jod": project_revenue_before,
         })
         self.progress_writer(client_id, record)
         return {
@@ -297,6 +303,8 @@ class ClientRevenueGuardian:
             "marketing_result": outcome,
             "verified_revenue_jod": revenue,
             "revenue_tracking_required": True,
+            "revenue_baseline_jod": project_revenue_before,
+            "revenue_attribution_scope": "PROJECT_ONLY_WHEN_PROJECT_PAYMENT_EVIDENCE_IS_CLIENT_SCOPED",
         }
 
     def first_revenue_mission(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
