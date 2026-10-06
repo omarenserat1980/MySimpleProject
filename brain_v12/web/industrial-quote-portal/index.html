@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Industrial Quote Portal — Brain Demo</title>
+<style>
+:root{--bg:#07111f;--panel:#0d1b2e;--text:#edf5ff;--muted:#9eb0c6;--line:#203550;--accent:#62d5ff;--accent2:#8b7cff;--ok:#63e6be}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0%,#142d4b 0,#07111f 45%,#050b14 100%);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;min-height:100vh}
+.wrap{max-width:1120px;margin:auto;padding:28px 18px 60px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:34px}.brand{font-weight:800;letter-spacing:.3px}.badge{padding:7px 11px;border:1px solid #31516f;border-radius:999px;color:#bcecff;font-size:12px}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:stretch}.hero h1{font-size:clamp(34px,6vw,64px);line-height:1.03;margin:0 0 16px}.hero p{color:var(--muted);font-size:17px;line-height:1.8}.panel{background:rgba(13,27,46,.82);border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:0 18px 60px #0004;backdrop-filter:blur(12px)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}.kpi{padding:14px;border:1px solid var(--line);border-radius:15px}.kpi b{display:block;font-size:20px}.kpi span{color:var(--muted);font-size:12px}
+form{display:grid;gap:12px}label{font-size:12px;color:#b8c9dc}input,select,textarea{width:100%;margin-top:6px;background:#081525;color:var(--text);border:1px solid #29435e;border-radius:12px;padding:12px 13px;font:inherit;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--accent)}textarea{min-height:120px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.btn{border:0;border-radius:13px;padding:13px 16px;background:linear-gradient(100deg,var(--accent),var(--accent2));color:#06101d;font-weight:800;cursor:pointer}.status{min-height:24px;color:var(--ok);font-size:13px;margin-top:5px}.section{margin-top:24px}.note{color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:800px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+</style></head>
+<body><main class="wrap">
+<header class="top"><div class="brand">BRAIN · INDUSTRIAL COMMERCE</div><div class="badge">DEMO / MVP · No contract</div></header>
+<section class="hero">
+<div><h1>اطلب عرض سعر صناعي بوضوح.</h1><p>بوابة ثنائية اللغة لتحويل الاستفسارات الصناعية إلى طلبات قابلة للمتابعة. هذه نسخة تجريبية؛ إرسال الطلب لا ينشئ عقداً ولا دفعة.</p>
+<div class="kpis"><div class="kpi"><b>AR / EN</b><span>واجهة ثنائية اللغة</span></div><div class="kpi"><b>Q-ID</b><span>رقم طلب فريد</span></div><div class="kpi"><b>Traceable</b><span>قابل للتتبع</span></div></div></div>
+<div class="panel"><h2>طلب عرض سعر</h2><form id="quote">
+<div class="grid"><label>الشركة<input name="company" required minlength="2"></label><label>جهة الاتصال<input name="contact_name" required minlength="2"></label></div>
+<div class="grid"><label>البريد الإلكتروني<input type="email" name="email" required></label><label>الهاتف<input name="phone"></label></div>
+<div class="grid"><label>الفئة<input name="category" required></label><label>المنتج<input name="product"></label></div>
+<div class="grid"><label>الكمية<input name="quantity"></label><label>اللغة<select name="language"><option value="ar">العربية</option><option value="en">English</option></select></label></div>
+<label>التفاصيل<textarea name="message" required minlength="10" placeholder="ما المنتج أو الخدمة التي تحتاجها؟"></textarea></label>
+<button class="btn" type="submit">إرسال طلب العرض</button><div id="status" class="status"></div>
+</form></div></section>
+<section class="panel section"><h3>ما الذي يحدث بعد الإرسال؟</h3><p class="note">يتم إنشاء رقم طلب فريد وحفظ الاستفسار في سجل المتابعة. لا يتم إنشاء سعر أو عقد أو تحصيل مالي تلقائياً. فريق المبيعات يراجع الطلب قبل أي التزام تجاري.</p></section>
+</main>
+<script>
+const form=document.querySelector("#quote"),status=document.querySelector("#status");
+form.addEventListener("submit",async e=>{e.preventDefault();status.textContent="جاري إرسال الطلب…";const body=Object.fromEntries(new FormData(form));try{const r=await fetch("/api/industrial-quotes/inquiries",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.detail||"REQUEST_FAILED");status.textContent="تم استلام الطلب: "+d.inquiry_id+" — الحالة "+d.status;form.reset()}catch(err){status.textContent="تعذر الإرسال: "+err.message}});
+</script></body></html>
