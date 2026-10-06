@@ -385,6 +385,26 @@ class MemoryStore:
         self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(payload))
         return payload
 
+    def revenue_guardian_status(self, client_id, history_limit=20):
+        checkpoint = self.revenue_guardian_checkpoint(client_id) or {}
+        history = self.revenue_guardian_history(client_id, history_limit)
+        latest = history[0] if history else checkpoint
+        return {
+            "client_id": client_id,
+            "checkpoint": checkpoint,
+            "latest_step": latest,
+            "history_count": len(history),
+            "history": history,
+            "status": (
+                "NO_RECORDED_GUARDIAN_STATE" if not latest
+                else "REVENUE_INCREASED" if latest.get("trend") == "INCREASED"
+                else "REVENUE_DECREASED" if latest.get("trend") == "DECREASED"
+                else "REVENUE_UNCHANGED" if latest.get("trend") == "UNCHANGED"
+                else "BASELINE_RECORDED" if latest.get("trend") == "BASELINE"
+                else "GUARDIAN_STATE_RECORDED"
+            ),
+        }
+
     def monitor_state(self):
         for item in self.memories():
             if item.get("key")=="render.monitor.state":
