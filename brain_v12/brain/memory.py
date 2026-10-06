@@ -65,7 +65,6 @@ class MemoryStore:
               updated_at TEXT NOT NULL,
               data TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id)
             );
             CREATE TABLE IF NOT EXISTS incidents(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
