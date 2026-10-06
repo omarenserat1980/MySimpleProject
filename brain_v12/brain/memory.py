@@ -210,8 +210,14 @@ class MemoryStore:
         oid=data["opportunity_id"]
         with self.connect() as con:
             client_id=data.get("client_id")
-            row=con.execute("SELECT id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
+            row=con.execute("SELECT id,client_id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
             if row:
+                existing_client_id=row["client_id"]
+                if existing_client_id and client_id and existing_client_id != client_id:
+                    raise ValueError("CLIENT_SCOPE_MISMATCH")
+                if existing_client_id and not client_id:
+                    client_id=existing_client_id
+                data["client_id"]=client_id
                 con.execute("""UPDATE income_opportunities
                                SET client_id=?,category=?,title=?,source_url=?,evidence=?,status=?,score=?,
                                    expected_value_jod=?,verified_amount_jod=?,verification_status=?,
