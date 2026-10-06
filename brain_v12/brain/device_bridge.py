@@ -13,8 +13,33 @@ class DeviceBridge:
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
-    def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
-    def enabled(self): return os.getenv(ENABLE_ENV, "0").strip().lower() in {"1", "true", "yes", "on"} and self.configured()
+    def _key_file(self):
+        return os.path.expanduser(
+            os.getenv("BRAIN_AGENT_KEY_FILE")
+            or os.getenv("V12_AGENT_KEY_FILE")
+            or "~/v12-agent/agent.key"
+        )
+
+    def configured(self):
+        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"):
+            return True
+        key_file = self._key_file()
+        try:
+            with open(key_file, encoding="utf-8") as f:
+                return bool(f.read().strip())
+        except OSError:
+            return False
+
+    def enabled(self):
+        configured = self.configured()
+        if not configured:
+            return False
+        raw = os.getenv(ENABLE_ENV)
+        if raw is None:
+            # Local Trust Root is the bootstrap switch. Cloud deployments can
+            # still opt out explicitly with BRAIN_ENABLE_DEVICE_BRIDGE=0.
+            return True
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
