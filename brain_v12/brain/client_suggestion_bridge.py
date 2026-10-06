@@ -52,7 +52,9 @@ class ClientSuggestionBridge:
             self._update(sid,"CHATGPT_UNAVAILABLE","",{},advice)
             return {"ok":True,"status":"CHATGPT_UNAVAILABLE","suggestion_id":sid,"client_id":client_id,"chatgpt":advice,"execution_allowed":False}
         advice_text=str(advice.get("reply") or "")
-        decision=self.decision_engine.choose(suggestion,self.decision_engine.generate(suggestion),permissions=set())
+        options=self.decision_engine.generate(suggestion)
+        # ChatGPT is advisory; Brain decides from governed candidates and permissions.
+        decision=self.decision_engine.choose(suggestion,options,permissions=set())
         if decision.get("status")!="DECIDED":
             self._update(sid,"DECISION_BLOCKED",advice_text,decision,{})
             return {"ok":True,"status":"DECISION_BLOCKED","suggestion_id":sid,"client_id":client_id,
