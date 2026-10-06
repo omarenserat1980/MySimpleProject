@@ -154,7 +154,7 @@ DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key"])
+app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
 from .brain_git.api import router as brain_git_router
 from .brain.commerce_api import router as commerce_router
 from .brain.games_store_api import router as games_store_router
@@ -220,7 +220,14 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         "workflow": workflow,
     })
     dispatch = industrial_actions.dispatch(
-        repo, workflow, ref="main", inputs={}, approved=True
+        repo,
+        workflow,
+        ref="main",
+        inputs={
+            "iso_url": "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us",
+            "timeout_minutes": "55",
+        },
+        approved=True,
     )
     store.event("INDUSTRIAL_CLIENT_DISPATCHED", {
         "request_id": request_id,
