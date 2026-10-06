@@ -81,18 +81,16 @@ class WorkforceControl:
             f"Revenue Guardian {client_id}: {action.get('next_action', action.get('recommended_action', 'ADVANCE_REVENUE_PATH'))}",
             department_id="DEPT-003",
         )
-        result = self.organization.complete_task(
-            task.task_id,
-            success=True,
-            result={
-                "kind": "revenue_guardian_action",
-                "client_id": client_id,
-                "action": action,
-                "external_side_effects": False,
-                "payment_verified": False,
-                "requires_external_evidence": True,
-            },
-        )
+        # This is an internal queueing step, not completion of the client's revenue work.
+        result = {
+            "kind": "revenue_guardian_action",
+            "client_id": client_id,
+            "action": action,
+            "external_side_effects": False,
+            "payment_verified": False,
+            "requires_external_evidence": True,
+            "execution_state": "PENDING_EXTERNAL_EVIDENCE",
+        }
         self.store.event("REVENUE_GUARDIAN_ACTION_REQUESTED", {
             "client_id": client_id,
             "task_id": task.task_id,
@@ -102,7 +100,7 @@ class WorkforceControl:
         })
         return {
             "accepted": True,
-            "status": "INTERNAL_ACTION_RECORDED",
+            "status": "PENDING_EXTERNAL_EVIDENCE",
             "task_id": task.task_id,
             "client_id": client_id,
             "payment_verified": False,
