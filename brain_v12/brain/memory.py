@@ -65,11 +65,8 @@ class MemoryStore:
               updated_at TEXT NOT NULL,
               data TEXT NOT NULL
             );
-            cols={r["name"] for r in con.execute("PRAGMA table_info(income_opportunities)").fetchall()}
-            if "client_id" not in cols:
-                con.execute("ALTER TABLE income_opportunities ADD COLUMN client_id TEXT")
-                con.execute("UPDATE income_opportunities SET client_id=json_extract(data,'$.client_id') WHERE client_id IS NULL")
-            con.execute("CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id)")
+            CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id)
+            );
             CREATE TABLE IF NOT EXISTS incidents(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fingerprint TEXT UNIQUE NOT NULL,
@@ -106,6 +103,12 @@ class MemoryStore:
             );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
+            cols={r["name"] for r in con.execute("PRAGMA table_info(income_opportunities)").fetchall()}
+            if "client_id" not in cols:
+                con.execute("ALTER TABLE income_opportunities ADD COLUMN client_id TEXT")
+            con.execute("UPDATE income_opportunities SET client_id=json_extract(data,'$.client_id') WHERE client_id IS NULL")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id)")
+            con.commit()
 
     def industrial_client_request(self, client_id, request_id, *, activity_id="", target="", backend="", workflow="", stage="RECEIVED", status="ACTIVE", checkpoint=None, run_id=""):
         """Create or refresh the durable state for one client request."""
