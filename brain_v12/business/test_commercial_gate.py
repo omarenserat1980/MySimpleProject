@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from brain_v12.business.commercial_control_plane import (
     CommercialCase,
     CommercialEvidence,
@@ -22,7 +24,7 @@ def configured_case(evidence, state=CommercialState.REVENUE_REALIZED):
         client_id="CL-000003",
         state=state,
         expected_order_id="ORD-001",
-        expected_amount=100.0,
+        expected_amount=Decimal("100.00"),
         expected_currency="JOD",
         evidence=evidence,
     )
@@ -80,6 +82,16 @@ def test_wrong_amount_or_currency_is_rejected():
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
+def test_decimal_money_representation_is_exact():
+    evidence = valid_evidence(amount=Decimal("100.00"))
+    assert revenue_claim_allowed(configured_case(evidence))
+
+
+def test_fractional_money_mismatch_is_rejected():
+    evidence = valid_evidence(amount=Decimal("100.01"))
+    assert not revenue_claim_allowed(configured_case(evidence))
+
+
 def test_verified_flag_without_approved_provenance_is_rejected():
     evidence = valid_evidence()
     evidence[-1] = CommercialEvidence("payment", "payment-001", True, "INTERNAL_NOTE", "CL-000003", "ORD-001", 100.0, "JOD")
@@ -87,12 +99,7 @@ def test_verified_flag_without_approved_provenance_is_rejected():
 
 
 def test_revenue_requires_payment_and_delivery():
-    case = configured_case([
-        CommercialEvidence("offer", "offer-001", True, "OFFER_RECORD", "CL-000003", "ORD-001", 100.0, "JOD"),
-        CommercialEvidence("customer_acceptance", "accept-001", True, "CUSTOMER_ACCEPTANCE", "CL-000003", "ORD-001", 100.0, "JOD"),
-        CommercialEvidence("order", "ORD-001", True, "ORDER_RECORD", "CL-000003", "ORD-001", 100.0, "JOD"),
-    ])
-    case.evidence = case.evidence[:3]
+    case = configured_case(valid_evidence()[:3])
     assert not revenue_claim_allowed(case)
 
 
