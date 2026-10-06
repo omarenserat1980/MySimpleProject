@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib,hmac,os,time
 from uuid import uuid4
 from .device_sync_adapter import DeviceTaskSyncAdapter
-AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; HEARTBEAT_STALE="STALE"
+AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
@@ -14,13 +14,14 @@ class DeviceBridge:
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
     def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"))
+    def enabled(self): return os.getenv(ENABLE_ENV, "0").strip().lower() in {"1", "true", "yes", "on"} and self.configured()
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
-        if not supplied:return False
+        if not self.enabled() or not supplied:return False
         expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
@@ -32,21 +33,25 @@ class DeviceBridge:
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
     def enqueue(self,task,params=None):
+        if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED"}
         if task not in self.ALLOWED_TASKS:return {"ok":False,"status":"TASK_NOT_ALLOWED","task":task}
         task_id="brain-termux-"+uuid4().hex
         self.store.device_task_create(task_id,task,params or {},time.time())
         self.sync_adapter.task_transition(task_id,status="QUEUED",task=task)
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
+        if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","task":None}
         task=self.store.device_task_claim(agent_id)
         if self.sync_adapter and task:
             self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))
         return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
     def heartbeat(self,agent_id,metadata=None):
+        if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","agent_id":agent_id}
         self.store.device_agent_touch(agent_id); self._last_seen=time.time()
         self.sync_adapter.heartbeat(agent_id,metadata=metadata)
         return {"ok":True,"status":"HEARTBEAT","agent_id":agent_id,"metadata":metadata or {}}
     def report(self,task_id,agent_id,ok,result=None,error=""):
+        if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED"}
         status=self.store.device_task_report(task_id,agent_id,ok,result or {},error)
         if status is None:return {"ok":False,"status":"TASK_NOT_FOUND"}
         if status=="AGENT_MISMATCH":return {"ok":False,"status":status}
@@ -92,4 +97,4 @@ class DeviceBridge:
         return self.requeue_stale(max_age_seconds=max(30,int(os.getenv("DEVICE_TASK_STALE_SECONDS","120"))))
     def status(self):
         counts=self.store.device_task_counts()
-        return {"ok":True,"configured":self.configured(),"auth_env":AGENT_KEY_ENV,"auth_mode":self.auth_mode(),"queued":counts.get("QUEUED",0),"pending":counts.get("CLAIMED",0),"completed":counts.get("COMPLETED",0),"failed":counts.get("FAILED",0),"last_agent_seen":self._last_seen,"agents":self.agent_status()}
+        return {"ok":True,"enabled":self.enabled(),"configured":self.configured(),"auth_env":AGENT_KEY_ENV,"auth_mode":self.auth_mode(),"queued":counts.get("QUEUED",0),"pending":counts.get("CLAIMED",0),"completed":counts.get("COMPLETED",0),"failed":counts.get("FAILED",0),"last_agent_seen":self._last_seen,"agents":self.agent_status()}
