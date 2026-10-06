@@ -1,6 +1,6 @@
 """CI-facing commercial claim gate.
 
-Fails closed for unsupported revenue/profit claims.
+Fails closed for unsupported revenue/profit claims and malformed evidence.
 """
 
 from __future__ import annotations
@@ -27,13 +27,24 @@ def load_case() -> CommercialCase:
             evidence_type=item["evidence_type"],
             reference=item["reference"],
             verified=bool(item.get("verified", False)),
+            provenance=item.get("provenance", ""),
+            client_id=item.get("client_id", ""),
+            order_id=item.get("order_id", ""),
+            amount=item.get("amount"),
+            currency=item.get("currency", ""),
+            source_digest=item.get("source_digest", ""),
+            verified_at_utc=item.get("verified_at_utc", ""),
         )
         for item in data.get("evidence", [])
     ]
+    expected = data.get("expected_transaction", {})
     return CommercialCase(
         client_id=data["client_id"],
         state=CommercialState(data["state"]),
         evidence=evidence,
+        expected_order_id=expected.get("order_id", ""),
+        expected_amount=expected.get("amount"),
+        expected_currency=expected.get("currency", ""),
     )
 
 
@@ -42,11 +53,11 @@ def assert_commercial_claims_are_supported() -> None:
 
     if case.state == CommercialState.REVENUE_REALIZED:
         if not revenue_claim_allowed(case):
-            raise AssertionError("Revenue claim is not supported by control-plane state.")
+            raise AssertionError("Revenue claim is not supported by complete evidence integrity.")
 
     if case.state == CommercialState.PROFIT_VERIFIED:
         if not profit_claim_allowed(case):
-            raise AssertionError("Profit claim is not supported by control-plane state.")
+            raise AssertionError("Profit claim is not supported by complete evidence integrity.")
 
     if case.state in {
         CommercialState.PROSPECT,
@@ -56,7 +67,6 @@ def assert_commercial_claims_are_supported() -> None:
         CommercialState.DELIVERY_VERIFIED,
         CommercialState.PAYMENT_VERIFIED,
     }:
-        # These states must never be interpreted as realized revenue/profit.
         return
 
 
