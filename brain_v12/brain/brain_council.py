@@ -27,12 +27,14 @@ class BrainCouncil:
         decision_engine: Any,
         state_reader: Callable[[str], dict[str, Any]] | None = None,
         action_requester: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+        device_reader: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self.db_path = db_path
         self.chatgpt_provider = chatgpt_provider
         self.decision_engine = decision_engine
         self.state_reader = state_reader or (lambda _client_id: {})
         self.action_requester = action_requester
+        self.device_reader = device_reader or (lambda: {})
         self._init()
 
     def _connect(self):
@@ -82,6 +84,17 @@ class BrainCouncil:
             {"id": "CHATGPT", "role": "advisor_and_reviewer"},
             *self._formal_clients(),
         ]
+        device = self.device_reader() or {}
+        agents = list(device.get("agents") or [])
+        preferred = [a for a in agents if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"} and a.get("online")]
+        online = preferred or [a for a in agents if a.get("online")]
+        if online:
+            selected = online[0]
+            participants.append({"id": str(selected.get("agent_id")), "role": "device_observer_and_execution_endpoint", "online": True, "state": selected.get("state", "ONLINE")})
+            device_invitation = {"included": True, "endpoint": str(selected.get("agent_id")), "reason": "Arkan is online" if selected in preferred else "Arkan unavailable; online Brain Agent selected as fallback"}
+        else:
+            participants.append({"id": "DEVICE_UNAVAILABLE", "role": "device_observer", "online": False, "state": "NO_ONLINE_AGENT"})
+            device_invitation = {"included": False, "endpoint": None, "reason": "No online Arkan or replacement Brain Agent"}
         states = []
         for client in self._formal_clients():
             state = self.state_reader(client["client_id"]) or {}
@@ -118,6 +131,8 @@ class BrainCouncil:
             "agenda": meeting_agenda,
             "client_states": states,
             "chatgpt": advice,
+            "device_invitation": device_invitation,
+            "device_status": device,
             "execution_policy": "ONE_BOUNDED_ACTION_PER_CLIENT_THROUGH_EXISTING_PRIMARY_PIPELINE",
             "new_client_policy": "PROPOSAL_ONLY_UNTIL_EXPLICIT_ADMISSION",
         }
