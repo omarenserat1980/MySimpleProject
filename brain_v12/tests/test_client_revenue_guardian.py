@@ -96,3 +96,25 @@ def test_deep_audit_enables_client_data_isolation():
     report = guardian.deep_inspect(Income(), Lifecycle(), "CL-000003")
     assert report["deep_audit"]["client_data_isolation"] is True
     assert report["policy"]["client_data_isolation"] is True
+
+
+def test_history_is_append_only_and_preserves_each_step():
+    class Store:
+        def __init__(self):
+            self.records = []
+        def revenue_guardian_checkpoint(self, client_id):
+            if not self.records:
+                return None
+            return self.records[-1]
+        def save_revenue_guardian_checkpoint(self, client_id, record):
+            self.records.append(dict(record))
+    store = Store()
+    assert store.revenue_guardian_checkpoint("CL-000003") is None
+    store.save_revenue_guardian_checkpoint("CL-000003", {"step": "BASELINE_CAPTURED", "current_verified_revenue_jod": 0})
+    store.save_revenue_guardian_checkpoint("CL-000003", {"step": "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP", "current_verified_revenue_jod": 0})
+    store.save_revenue_guardian_checkpoint("CL-000003", {"step": "REVENUE_INCREASE_CONFIRMED", "current_verified_revenue_jod": 25})
+    assert [x["step"] for x in store.records] == [
+        "BASELINE_CAPTURED",
+        "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP",
+        "REVENUE_INCREASE_CONFIRMED",
+    ]
