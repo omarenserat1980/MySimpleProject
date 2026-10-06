@@ -25,17 +25,12 @@ cat > "$BUILD/src/brain_boot.S" <<'ASM'
 _start:
     cli
     mov $message, %esi
-    mov $0xb8000, %edi
 1:
     lodsb
     test %al,%al
     jz 2f
     mov %al, %bl
-    movb $0x0f,(%edi)
-    inc %edi
-    movb %bl,(%edi)
-    inc %edi
-    mov $0xe9, %dx
+    mov $0x3f8, %dx
     mov %bl, %al
     out %al, (%dx)
     jmp 1b
@@ -44,7 +39,7 @@ _start:
     jmp 2b
 .section .rodata
 message:
-    .asciz "BRAIN-BOOT-1 SELF-TRUST BOOTSTRAP"
+    .asciz "BRAIN-BOOT-1 SELF-TRUST BOOTSTRAP\r\n"
 ASM
 cat > "$BUILD/src/linker.ld" <<'LD'
 ENTRY(_start)
@@ -60,6 +55,9 @@ cp "$BUILD/brain_boot.elf" "$BUILD/iso/boot/brain_boot.elf"
 cat > "$BUILD/iso/boot/grub/grub.cfg" <<'CFG'
 set timeout=0
 set default=0
+serial --unit=0 --speed=115200
+terminal_input console serial
+terminal_output console serial
 menuentry 'Electronic Brain Self-Trust Bootstrap' {
   multiboot /boot/brain_boot.elf
   boot
