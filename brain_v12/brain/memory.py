@@ -385,6 +385,25 @@ class MemoryStore:
         self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(payload))
         return payload
 
+    def save_revenue_project_marketing_result(self, client_id, result):
+        """Append one immutable project-marketing measurement to guardian history."""
+        payload = dict(result or {})
+        payload["client_id"] = client_id
+        payload["recorded_at"] = datetime.now(timezone.utc).isoformat()
+        with self.connect() as con:
+            con.execute(
+                "CREATE TABLE IF NOT EXISTS revenue_project_marketing_history "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, client_id TEXT NOT NULL, "
+                "recorded_at TEXT NOT NULL, project_id TEXT NOT NULL, data TEXT NOT NULL)"
+            )
+            con.execute(
+                "INSERT INTO revenue_project_marketing_history(client_id, recorded_at, project_id, data) "
+                "VALUES(?,?,?,?)",
+                (client_id, payload["recorded_at"], str(payload.get("project_id") or ""), json.dumps(payload, ensure_ascii=False))
+            )
+            con.commit()
+        return payload
+
     def revenue_guardian_status(self, client_id, history_limit=20):
         checkpoint = self.revenue_guardian_checkpoint(client_id) or {}
         history = self.revenue_guardian_history(client_id, history_limit)
