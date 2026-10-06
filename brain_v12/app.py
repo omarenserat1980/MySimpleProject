@@ -62,6 +62,8 @@ from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
+from .brain.synthetic_customer import SyntheticCustomer
+from .synthetic_customer_api import router as synthetic_customer_router
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
@@ -108,6 +110,9 @@ workforce=WorkforceControl(store)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
+synthetic_customer=None
+synthetic_customer_advisors=(lambda request: chatgpt_reply(request), lambda request, caps: builder.plan("synthetic-customer", request) if request else {})
+# Synthetic Customer is constructed after the canonical EvidenceStore exists.
 workforce.youtube_publisher.credentials_provider = youtube_oauth.credentials
 income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
@@ -128,6 +133,45 @@ brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
+def synthetic_customer_executor(request, customer_type, run_id):
+    brain_result = problem_solver.solve(request)
+    execution = brain_result.get("execution", {}) if isinstance(brain_result, dict) else {}
+    verification = brain_result.get("verification", {}) if isinstance(brain_result, dict) else {}
+    verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
+    return {"ok": verified, "verified": verified, "run_id": run_id, "customer_type": customer_type, "cognitive": brain_result}
+
+def synthetic_customer_repair_executor(request, result, customer_type, run_id):
+    gap = result.get("verification", {}) if isinstance(result, dict) else {}
+    repair_request = (
+        f"Repair the missing capability for synthetic customer request: {request}. "
+        f"Observed execution result: {gap}. "
+        "Inspect the available Brain capabilities and perform the safest bounded repair/test path."
+    )
+    repair_result = problem_solver.solve(repair_request)
+    execution = repair_result.get("execution", {}) if isinstance(repair_result, dict) else {}
+    verification = repair_result.get("verification", {}) if isinstance(repair_result, dict) else {}
+    verified = execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
+    return {"ok": verified, "verified": verified, "repair": repair_result, "run_id": run_id}
+
+def synthetic_customer_feedback_executor(request, feedback, customer_type, run_id):
+    feedback_request = (
+        f"Customer feedback for service request: {request}. "
+        f"Customer revision feedback: {feedback}. "
+        "Treat this as a real bounded revision request. Inspect the current result, identify the gap, "
+        "and prepare the safest Brain execution/revision path. Do not perform production side effects."
+    )
+    result = problem_solver.solve(feedback_request)
+    return {"ok": True, "run_id": run_id, "customer_type": customer_type, "brain_revision": result}
+
+synthetic_customer=SyntheticCustomer(
+    evidence_store=evidence_store,
+    chatgpt_advisor=synthetic_customer_advisors[0],
+    brain_advisor=synthetic_customer_advisors[1],
+    executor=synthetic_customer_executor,
+    repair_executor=synthetic_customer_repair_executor,
+    feedback_executor=synthetic_customer_feedback_executor,
+    max_repair_attempts=int(os.getenv("BRAIN_SYNTHETIC_MAX_REPAIR_ATTEMPTS", "1")),
+)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -171,6 +215,7 @@ app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json"))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(synthetic_customer_router(synthetic_customer, capability_provider=lambda: {"capabilities": CAPABILITIES, "tools": TOOLS, "plugins": PLUGINS}))
 app.include_router(commercial_dashboard_router())
 
 

@@ -1,0 +1,46 @@
+name: synthetic-customer-smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  synthetic-customer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -q pytest fastapi pydantic httpx
+      - name: Compile Synthetic Customer stack
+        run: python -m compileall -q brain_v12/app.py brain_v12/brain/synthetic_customer.py brain_v12/brain/synthetic_customer_suite.py brain_v12/synthetic_customer_api.py
+      - name: Run Synthetic Customer unit tests
+        run: python -m pytest -q brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
+      - name: Run real FastAPI wiring smoke test
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from brain_v12.app import app
+
+          client = TestClient(app)
+
+          plan = client.get("/api/synthetic-customer/suite/plan")
+          assert plan.status_code == 200, plan.text
+          payload = plan.json()
+          assert payload["ok"] is True
+          assert payload["suite"]["scenario_count"] >= 7
+          assert payload["suite"]["production_allowed"] is False
+
+          run = client.post("/api/synthetic-customer/suite/run?limit=2")
+          assert run.status_code == 200, run.text
+          result = run.json()
+          assert result["ok"] is True
+          assert result["count"] == 2
+          assert all(item["proposal_ready"] for item in result["results"])
+          assert all(item["approval_required"] for item in result["results"])
+
+          print("SYNTHETIC_CUSTOMER_API_WIRING=VERIFIED")
+          print("SCENARIO_SUITE_COUNT=", payload["suite"]["scenario_count"])
+          print("EXECUTED_PROPOSAL_SCENARIOS=", result["count"])
+          PY
