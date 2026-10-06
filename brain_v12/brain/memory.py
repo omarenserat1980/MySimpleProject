@@ -101,6 +101,43 @@ class MemoryStore:
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
 
+    def industrial_client_request(self, client_id, request_id, *, activity_id="", target="", backend="", workflow="", stage="RECEIVED", status="ACTIVE", checkpoint=None, run_id=""):
+        """Create or refresh the durable state for one client request."""
+        payload = {
+            "request_id": request_id,
+            "client_id": client_id,
+            "activity_id": activity_id,
+            "target": target,
+            "backend": backend,
+            "workflow": workflow,
+            "stage": stage,
+            "status": status,
+            "checkpoint": checkpoint or {},
+            "run_id": run_id,
+            "updated_at": now(),
+        }
+        key = f"industrial_client:{client_id}:request"
+        self.save_memory(key, json.dumps(payload, ensure_ascii=False))
+        return payload
+
+    def industrial_client_request_state(self, client_id):
+        key = f"industrial_client:{client_id}:request"
+        with self.connect() as con:
+            row = con.execute("SELECT value FROM memories WHERE key=?", (key,)).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["value"])
+        except Exception:
+            return None
+
+    def update_industrial_client_request(self, client_id, **changes):
+        current = self.industrial_client_request_state(client_id) or {"client_id": client_id}
+        current.update(changes)
+        current["updated_at"] = now()
+        self.save_memory(f"industrial_client:{client_id}:request", json.dumps(current, ensure_ascii=False))
+        return current
+
     def state(self):
         with self.connect() as con:
             row=con.execute("SELECT data FROM state WHERE id=1").fetchone()
