@@ -1,0 +1,33 @@
+{
+  "client_id": "CL-000003",
+  "case_type": "FIRST_REVENUE_EXPERIMENT",
+  "state": "PROSPECT",
+  "evidence": [],
+  "revenue_claim": {
+    "status": "NOT_REALIZED",
+    "amount": 0,
+    "currency": null,
+    "payment_reference": null
+  },
+  "profit_claim": {
+    "status": "NOT_VERIFIED",
+    "amount": 0,
+    "currency": null
+  },
+  "side_effects": {
+    "automatic_contract": false,
+    "automatic_charge": false,
+    "automatic_purchase": false,
+    "automatic_withdrawal": false,
+    "automatic_transfer": false
+  },
+  "rules": {
+    "one_active_request": true,
+    "customer_must_accept": true,
+    "payment_must_be_independently_verified": true,
+    "delivery_must_be_evidenced": true,
+    "costs_required_for_profit": true,
+    "forecasts_are_not_revenue": true,
+    "leads_are_not_revenue": true
+  }
+}
