@@ -1,0 +1,45 @@
+{
+  "client_id": "CL-000003",
+  "mode": "DEEP_COMMERCIAL_EXECUTION",
+  "status": "READY_FOR_DISCOVERY",
+  "active_request_limit": 1,
+  "current_request": {
+    "id": "REQ-CL-000003-DEEP-001",
+    "type": "DIGITAL_SERVICES_AND_REVENUE",
+    "objective": "Discover, build, validate, and deliver a useful digital solution for the prospect while pursuing a real paid outcome.",
+    "allowed_build_types": [
+      "WEB_APPLICATION",
+      "WEBSITE",
+      "LANDING_PAGE",
+      "DIGITAL_SERVICE",
+      "BUSINESS_WORKFLOW",
+      "VIDEO_PRODUCTION",
+      "REPORTING_DASHBOARD",
+      "QUOTE_REQUEST_SYSTEM",
+      "API_INTEGRATION"
+    ],
+    "phase": "DISCOVER",
+    "blockers": [],
+    "evidence_refs": []
+  },
+  "gates": {
+    "customer_need_validated": false,
+    "solution_built": false,
+    "technical_verification": false,
+    "customer_acceptance": false,
+    "order_accepted": false,
+    "delivery_verified": false,
+    "payment_verified": false,
+    "revenue_realized": false,
+    "profit_verified": false
+  },
+  "financial_boundary": {
+    "automatic_contract": false,
+    "automatic_charge": false,
+    "automatic_purchase": false,
+    "automatic_transfer": false,
+    "automatic_withdrawal": false,
+    "funds_moved_by_brain": false
+  },
+  "success_rule": "Do not mark REVENUE_REALIZED until independent payment verification and delivery/reconciliation evidence exist."
+}
