@@ -9,13 +9,17 @@ from brain_v12.business.commercial_control_plane import (
 )
 
 
+DIGEST = "a" * 64
+VERIFIED_AT = "2026-10-06T22:00:00Z"
+
+
 def valid_evidence(client_id="CL-000003", order_id="ORD-001", amount=100.0, currency="JOD"):
     return [
-        CommercialEvidence("offer", "offer-001", True, "OFFER_RECORD", client_id, order_id, amount, currency),
-        CommercialEvidence("customer_acceptance", "accept-001", True, "CUSTOMER_ACCEPTANCE", client_id, order_id, amount, currency),
-        CommercialEvidence("order", order_id, True, "ORDER_RECORD", client_id, order_id, amount, currency),
-        CommercialEvidence("delivery", "delivery-001", True, "DELIVERY_RECORD", client_id, order_id, amount, currency),
-        CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", client_id, order_id, amount, currency),
+        CommercialEvidence("offer", "offer-001", True, "OFFER_RECORD", client_id, order_id, amount, currency, DIGEST, VERIFIED_AT),
+        CommercialEvidence("customer_acceptance", "accept-001", True, "CUSTOMER_ACCEPTANCE", client_id, order_id, amount, currency, DIGEST, VERIFIED_AT),
+        CommercialEvidence("order", order_id, True, "ORDER_RECORD", client_id, order_id, amount, currency, DIGEST, VERIFIED_AT),
+        CommercialEvidence("delivery", "delivery-001", True, "DELIVERY_RECORD", client_id, order_id, amount, currency, DIGEST, VERIFIED_AT),
+        CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", client_id, order_id, amount, currency, DIGEST, VERIFIED_AT),
     ]
 
 
@@ -42,43 +46,61 @@ def test_direct_revenue_state_without_evidence_is_rejected():
 
 def test_missing_client_identity_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "", "ORD-001", 100.0, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "", "ORD-001", 100.0, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_missing_order_identity_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "", 100.0, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "", 100.0, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_missing_amount_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", None, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", None, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_missing_currency_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 100.0, "")
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 100.0, "", DIGEST, VERIFIED_AT)
+    assert not revenue_claim_allowed(configured_case(evidence))
+
+
+def test_missing_source_digest_is_rejected():
+    evidence = valid_evidence()
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 100.0, "JOD", "", VERIFIED_AT)
+    assert not revenue_claim_allowed(configured_case(evidence))
+
+
+def test_malformed_source_digest_is_rejected():
+    evidence = valid_evidence()
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 100.0, "JOD", "not-a-sha256", VERIFIED_AT)
+    assert not revenue_claim_allowed(configured_case(evidence))
+
+
+def test_missing_verification_time_is_rejected():
+    evidence = valid_evidence()
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 100.0, "JOD", DIGEST, "")
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_wrong_client_payment_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-999999", "ORD-001", 100.0, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-999999", "ORD-001", 100.0, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_wrong_order_payment_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-999", 100.0, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-999", 100.0, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
 def test_wrong_amount_or_currency_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 999.0, "USD")
+    evidence[-1] = CommercialEvidence("payment", "payment-other", True, "PAYMENT_RECEIPT", "CL-000003", "ORD-001", 999.0, "USD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
@@ -94,7 +116,7 @@ def test_fractional_money_mismatch_is_rejected():
 
 def test_verified_flag_without_approved_provenance_is_rejected():
     evidence = valid_evidence()
-    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "INTERNAL_NOTE", "CL-000003", "ORD-001", 100.0, "JOD")
+    evidence[-1] = CommercialEvidence("payment", "payment-001", True, "INTERNAL_NOTE", "CL-000003", "ORD-001", 100.0, "JOD", DIGEST, VERIFIED_AT)
     assert not revenue_claim_allowed(configured_case(evidence))
 
 
