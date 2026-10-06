@@ -9,8 +9,11 @@ class _Store:
         self.rows = {}
         self.events = []
 
-    def income_opportunities(self, limit=500):
-        return list(self.rows.values())
+    def income_opportunities(self, limit=500, client_id=None):
+        rows = list(self.rows.values())
+        if client_id is None:
+            return rows
+        return [row for row in rows if row.get("data", {}).get("client_id") == client_id]
 
     def upsert_income_opportunity(self, item):
         self.rows[item["opportunity_id"]] = {
@@ -119,6 +122,45 @@ class IncomeEngineTests(unittest.TestCase):
         self.assertIn("python", matches)
         self.assertIn("api", matches)
         self.assertIn("automation", matches)
+
+
+    def test_payment_verification_is_idempotent_and_immutable(self):
+        store = _Store()
+        engine = IncomeEngine(store)
+        item = {
+            "opportunity_id": "LIVE-PAY-1",
+            "client_id": "CL-000003",
+            "data": {
+                "opportunity_id": "LIVE-PAY-1",
+                "client_id": "CL-000003",
+                "status": "COMPLETED",
+                "verification_status": "UNVERIFIED",
+                "verified_amount_jod": 0.0,
+            },
+        }
+        store.rows[item["opportunity_id"]] = item
+        first = engine.verify_payment("LIVE-PAY-1", 25, "payment-ref-1", client_id="CL-000003")
+        self.assertTrue(first["ok"])
+        second = engine.verify_payment("LIVE-PAY-1", 25, "payment-ref-1", client_id="CL-000003")
+        self.assertEqual(second["status"], "ALREADY_VERIFIED")
+        changed = engine.verify_payment("LIVE-PAY-1", 30, "payment-ref-2", client_id="CL-000003")
+        self.assertEqual(changed["status"], "PAYMENT_ALREADY_VERIFIED_IMMUTABLE")
+
+    def test_payment_verification_isolated_by_client(self):
+        store = _Store()
+        engine = IncomeEngine(store)
+        store.rows["LIVE-PAY-2"] = {
+            "opportunity_id": "LIVE-PAY-2",
+            "data": {
+                "opportunity_id": "LIVE-PAY-2",
+                "client_id": "CL-000002",
+                "status": "COMPLETED",
+                "verification_status": "UNVERIFIED",
+                "verified_amount_jod": 0.0,
+            },
+        }
+        result = engine.verify_payment("LIVE-PAY-2", 40, "payment-ref", client_id="CL-000003")
+        self.assertEqual(result["status"], "NOT_FOUND")
 
 
 if __name__ == "__main__":
