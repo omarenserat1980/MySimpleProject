@@ -1456,6 +1456,11 @@ def device_self_test_request(request:Request):
 def device_result(task_id:str):
     return device_bridge.result(task_id)
 
+@app.get("/api/device/verify/{task_id}")
+def device_verify(request:Request, task_id:str):
+    require_device_agent(request)
+    return device_bridge.verify_result(task_id)
+
 
 @app.post("/api/brain-git/cinema/start")
 def brain_git_cinema_start():
