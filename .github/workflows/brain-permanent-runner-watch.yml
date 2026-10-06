@@ -1,0 +1,168 @@
+name: Brain Permanent Runner System Watch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: brain-permanent-runner-watch
+  cancel-in-progress: true
+
+env:
+  REPO: omarenserat1980/MySimpleProject
+  REQUIRED_LABELS: '["brain-internal","linux","x64","qemu","windows-real-boot","self-hosted"]'
+
+jobs:
+  detect:
+    name: Detect Runner State (external watcher)
+    runs-on: ubuntu-latest
+    outputs:
+      runner_online: ${{ steps.inspect.outputs.runner_online }}
+      runner_id: ${{ steps.inspect.outputs.runner_id }}
+      runner_name: ${{ steps.inspect.outputs.runner_name }}
+      runner_busy: ${{ steps.inspect.outputs.runner_busy }}
+    steps:
+      - name: Inspect registration, labels and online state
+        id: inspect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/state
+          json="$(gh api "/repos/${REPO}/actions/runners?per_page=100")"
+
+          runner="$(printf '%s' "$json" | jq -c --argjson required "${REQUIRED_LABELS}" '
+            .runners[]
+            | select(([.labels[].name] | map(ascii_downcase)) as $labels
+              | ($required | all(. as $x | ($labels | index($x)) != null)))
+            | {id,name,status,busy,labels:[.labels[].name]}
+          ' | head -n1 || true)"
+
+          if [ -z "$runner" ]; then
+            status="NOT_REGISTERED"
+            online="false"
+            id=""
+            name=""
+            busy="false"
+          else
+            status="$(jq -r '.status' <<<"$runner")"
+            online="$(jq -r '(.status == "online")' <<<"$runner")"
+            id="$(jq -r '.id' <<<"$runner")"
+            name="$(jq -r '.name' <<<"$runner")"
+            busy="$(jq -r '.busy' <<<"$runner")"
+          fi
+
+          cat > .brain/state/runner-watch.json <<EOF
+          {
+            "watch": "PERMANENT_RUNNER_SYSTEM_WATCH",
+            "timestamp_utc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "repository": "${REPO}",
+            "status": "${status}",
+            "online": ${online},
+            "runner_id": "${id}",
+            "runner_name": "${name}",
+            "busy": ${busy},
+            "required_labels": ${REQUIRED_LABELS}
+          }
+          EOF
+
+          cat .brain/state/runner-watch.json
+          echo "runner_online=${online}" >> "$GITHUB_OUTPUT"
+          echo "runner_id=${id}" >> "$GITHUB_OUTPUT"
+          echo "runner_name=${name}" >> "$GITHUB_OUTPUT"
+          echo "runner_busy=${busy}" >> "$GITHUB_OUTPUT"
+
+  probe:
+    name: Prove Job Execution Capability
+    needs: detect
+    if: needs.detect.outputs.runner_online == 'true'
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    timeout-minutes: 5
+    steps:
+      - name: Prove runner can execute
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUNNER_EXECUTION_PROBE=PASS"
+          echo "RUNNER_NAME=${RUNNER_NAME}"
+          echo "RUNNER_OS=${RUNNER_OS}"
+          echo "RUNNER_ARCH=${RUNNER_ARCH}"
+          test -n "${RUNNER_NAME}"
+          test -n "${RUNNER_OS}"
+          test -n "${RUNNER_ARCH}"
+
+      - name: Verify required runtime surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cmd in python gh; do
+            command -v "$cmd" >/dev/null || {
+              echo "RUNNER_RUNTIME_MISSING=$cmd"
+              exit 20
+            }
+          done
+          python --version
+          gh --version | head -n1
+          echo "RUNNER_RUNTIME_SURFACE=PASS"
+
+  evidence:
+    name: Evidence and Health Gate
+    needs: [detect, probe]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Write final health evidence
+        env:
+          DETECT_ONLINE: ${{ needs.detect.outputs.runner_online }}
+          RUNNER_ID: ${{ needs.detect.outputs.runner_id }}
+          RUNNER_NAME: ${{ needs.detect.outputs.runner_name }}
+          PROBE_RESULT: ${{ needs.probe.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/state
+          if [ "${DETECT_ONLINE}" = "true" ] && [ "${PROBE_RESULT}" = "success" ]; then
+            health="VERIFIED"
+          elif [ "${DETECT_ONLINE}" = "true" ]; then
+            health="ONLINE_BUT_EXECUTION_UNVERIFIED"
+          else
+            health="NOT_VERIFIED"
+          fi
+
+          cat > .brain/state/runner-health.json <<EOF
+          {
+            "health": "${health}",
+            "online": ${DETECT_ONLINE:-false},
+            "runner_id": "${RUNNER_ID}",
+            "runner_name": "${RUNNER_NAME}",
+            "execution_probe": "${PROBE_RESULT}",
+            "rule": "Installed + Registered + Online + Job-Capable + Verified",
+            "next_action": "WATCH_AGAIN"
+          }
+          EOF
+
+          cat .brain/state/runner-health.json
+
+          if [ "${health}" = "NOT_VERIFIED" ]; then
+            echo "::warning::Brain internal runner is not verified; inspect registration/WSL/service/network."
+          elif [ "${health}" = "ONLINE_BUT_EXECUTION_UNVERIFIED" ]; then
+            echo "::warning::Runner is online but failed the execution proof."
+          else
+            echo "RUNNER_HEALTH=VERIFIED"
+          fi
+
+      - name: Upload permanent watch evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-runner-health-${{ github.run_id }}
+          path: .brain/state/runner-health.json
+          retention-days: 14
