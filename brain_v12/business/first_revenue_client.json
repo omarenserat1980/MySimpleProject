@@ -30,5 +30,26 @@
     "amount": 0,
     "currency": null,
     "reason": "No external customer payment has been independently verified yet."
+  },
+  "customer_request": {
+    "status": "REQUESTED",
+    "request_type": "REVENUE_COLLECTION",
+    "instruction": "Customer explicitly asks Brain to actively pursue collection of real revenue from the approved commercial opportunity.",
+    "brain_duties": [
+      "identify the current revenue-blocking step",
+      "prepare and track the next permitted collection action",
+      "request or surface required customer authorization when external action is needed",
+      "verify payment independently when evidence becomes available",
+      "continue through delivery/reconciliation evidence",
+      "do not declare revenue without verified payment evidence"
+    ],
+    "financial_boundary": {
+      "automatic_contract": false,
+      "automatic_charge": false,
+      "automatic_transfer": false,
+      "automatic_withdrawal": false,
+      "funds_moved_by_brain": false
+    },
+    "success_condition": "REVENUE_REALIZED only after independently verified real payment plus required delivery/reconciliation evidence."
   }
 }
