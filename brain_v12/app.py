@@ -208,6 +208,13 @@ def brain_client_3_suggestion(request: Request, body: dict):
     return client_suggestion_bridge.submit("CL-000003", suggestion, context)
 
 
+@app.post("/api/brain/client-3/suggestions/{suggestion_id}/reconcile")
+def brain_client_3_reconcile(request: Request, suggestion_id: int, body: dict):
+    """Record one measured Client 3 outcome and route the next bounded path."""
+    require_control_key(request)
+    return client_suggestion_bridge.reconcile(suggestion_id, body)
+
+
 @app.get("/api/brain/client-3/suggestions")
 def brain_client_3_suggestions(request: Request):
     """Read Client 3 suggestion/decision/action history without mutating it."""
