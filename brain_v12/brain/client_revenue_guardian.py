@@ -1,4 +1,3 @@
-from threading import Lock
 """Bounded revenue guardian for an active Brain client.
 
 The guardian observes one target client, distinguishes verified revenue from
@@ -9,6 +8,8 @@ It never fabricates revenue, never treats opportunities as payments, and never
 creates parallel workflows.
 """
 from __future__ import annotations
+
+from threading import Lock
 
 from typing import Any, Callable
 
