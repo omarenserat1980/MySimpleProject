@@ -1,7 +1,7 @@
 {
   "client_id": "CL-000003",
   "mode": "DEEP_COMMERCIAL_EXECUTION",
-  "status": "READY_FOR_DISCOVERY",
+  "status": "REVENUE_PURSUIT_REQUESTED",
   "active_request_limit": 1,
   "current_request": {
     "id": "REQ-CL-000003-DEEP-001",
@@ -20,7 +20,9 @@
     ],
     "phase": "DISCOVER",
     "blockers": [],
-    "evidence_refs": []
+    "evidence_refs": [],
+    "customer_instruction": "حقق مكاسب مادية حقيقية للعميل من خلال تطوير وتسويق وبيع خدمات Brain الرقمية، ومتابعة الفرص حتى الدفع والتحقق.",
+    "started_at": "2026-10-06"
   },
   "gates": {
     "customer_need_validated": false,
@@ -98,5 +100,9 @@
     "no_progress_rule": "If a cycle produces no new evidence, artifact, validated opportunity, or blocker diagnosis, do not claim progress; diagnose the stalled phase.",
     "evidence_rule": "Every advancement must reference inspectable evidence.",
     "commercial_rule": "Technical completion never implies customer acceptance, payment, revenue, or profit."
+  },
+  "revenue_target": {
+    "status": "ACTIVE",
+    "rule": "Do not stop at marketing activity; pursue qualified opportunities through order, delivery, independently verified payment, and reconciliation."
   }
 }
