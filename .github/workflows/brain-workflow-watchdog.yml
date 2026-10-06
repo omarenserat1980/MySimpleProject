@@ -1,21 +1,9 @@
 name: Brain Global Workflow Watchdog
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - "brain_v12/brain/**"
-      - "brain0/**"
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
-  workflow_run:
-    workflows:
-      - "BRAIN 120 Minute Cinema"
-      - "Brain Windows Real Boot Evidence"
-      - "Brain Virtual Computer"
-    types: [completed]
+    - cron: "47 * * * *"
 
 permissions:
   contents: read
