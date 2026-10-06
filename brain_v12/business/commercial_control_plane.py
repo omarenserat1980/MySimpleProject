@@ -1,8 +1,9 @@
-"""Evidence-gated commercial control plane with strict identity, money and source integrity."""
+"""Evidence-gated commercial control plane with strict identity, money, source and time integrity."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from hashlib import sha256
@@ -46,6 +47,18 @@ def _money_equal(left: float | Decimal | None, right: float | Decimal | None) ->
         return False
 
 
+def _valid_verification_time(value: str) -> bool:
+    if not value.strip():
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    return parsed.astimezone(timezone.utc) <= datetime.now(timezone.utc)
+
+
 @dataclass(frozen=True)
 class CommercialEvidence:
     evidence_type: str
@@ -80,7 +93,7 @@ class CommercialEvidence:
         return (
             len(supplied) == 64
             and all(c in "0123456789abcdef" for c in supplied)
-            and bool(self.verified_at_utc.strip())
+            and _valid_verification_time(self.verified_at_utc)
             and supplied == self.calculated_source_digest()
         )
 
