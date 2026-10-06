@@ -321,6 +321,56 @@ class ClientRevenueGuardian:
             "revenue_attribution_scope": "PROJECT_ONLY_WHEN_PROJECT_PAYMENT_EVIDENCE_IS_CLIENT_SCOPED",
         }
 
+    def reconcile_marketing_once(self, income_engine: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Measure a marketed project's revenue delta without over-attributing unrelated revenue."""
+        previous = self.progress_reader(client_id) or {}
+        project_id = str(previous.get("last_marketed_project_id") or "")
+        if not project_id:
+            return {"status": "NO_MARKETED_PROJECT_TO_RECONCILE"}
+
+        snapshot = income_engine.snapshot(client_id=client_id)
+        rows = list(snapshot.get("opportunities") or [])
+        row = next((r for r in rows if str(r.get("opportunity_id")) == project_id), None)
+        if not row:
+            return {"status": "PROJECT_NOT_FOUND", "project_id": project_id}
+
+        data = dict(row.get("data") or {})
+        after = float(row.get("verified_amount_jod") or data.get("verified_amount_jod") or 0)
+        before = float((previous.get("marketing_revenue_baselines") or {}).get(project_id, 0) or 0)
+        delta = after - before
+        evidence = str(data.get("payment_evidence") or "").strip()
+
+        if delta > 0 and evidence:
+            attribution = "PROJECT_REVENUE_INCREASE_WITH_PAYMENT_EVIDENCE"
+        elif delta == 0:
+            attribution = "NO_PROJECT_REVENUE_CHANGE"
+        else:
+            attribution = "UNATTRIBUTED_OR_INSUFFICIENT_PROJECT_EVIDENCE"
+
+        result = {
+            "status": "MARKETING_RECONCILED",
+            "project_id": project_id,
+            "revenue_before_jod": before,
+            "revenue_after_jod": after,
+            "revenue_delta_jod": delta,
+            "payment_evidence_present": bool(evidence),
+            "attribution": attribution,
+            "verified_revenue_jod": float(snapshot.get("verified_revenue_jod", 0) or 0),
+            "successful_projects_count": sum(
+                1 for r in rows
+                if str(r.get("status") or "") in ("COMPLETED", "PAYMENT_VERIFIED")
+                and str((r.get("data") or {}).get("delivery_evidence") or "").strip()
+            ),
+        }
+        self.progress_writer(client_id, {
+            **previous,
+            "last_marketing_reconciliation": result,
+            "last_marketing_attribution": attribution,
+        })
+        if hasattr(self.progress_writer, "__self__") and hasattr(self.progress_writer.__self__, "save_revenue_project_marketing_result"):
+            self.progress_writer.__self__.save_revenue_project_marketing_result(client_id, result)
+        return result
+
     def first_revenue_mission(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Create a bounded first-revenue mission; never fabricates a buyer, action, or payment."""
         audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
