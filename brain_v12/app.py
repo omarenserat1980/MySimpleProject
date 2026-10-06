@@ -125,6 +125,7 @@ brain_council=BrainCouncil(
         "income": income_lifecycle.summary(client_id=client_id),
     },
     action_requester=workforce.request_revenue_guardian_action,
+    device_reader=lambda: device_bridge.agent_status(),
 )
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
