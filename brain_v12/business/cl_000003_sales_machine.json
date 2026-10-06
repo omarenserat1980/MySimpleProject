@@ -84,7 +84,7 @@
     "amount": 0,
     "currency": null
   },
-  "execution_status": "MVP_BUILT_QC_PENDING",
+  "execution_status": "QC_PIPELINE_DEEPENED",
   "artifacts": {
     "backend": "brain_v12/brain/industrial_quote_portal.py",
     "tests": "brain_v12/tests/test_industrial_quote_portal.py",
@@ -93,12 +93,13 @@
     "qc_workflow": ".github/workflows/cl-000003-industrial-portal-qc.yml"
   },
   "qc": {
-    "syntax_check": "QUEUED",
-    "unit_tests": "QUEUED",
-    "ui_contract": "QUEUED",
-    "runtime_smoke": "NOT_RUN",
+    "syntax_check": "REQUIRED",
+    "unit_tests": "REQUIRED",
+    "ui_contract": "REQUIRED",
+    "runtime_smoke": "REQUIRED",
     "professional_review": "REVIEWED_AND_REPAIRED",
-    "release_gate": "BLOCKED_UNTIL_VERIFIED"
+    "release_gate": "BLOCKED_UNTIL_GITHUB_ACTIONS_EVIDENCE",
+    "evidence_artifact": "REQUIRED"
   },
   "findings": [
     "Initial bilingual claim was incomplete because UI did not switch language.",
