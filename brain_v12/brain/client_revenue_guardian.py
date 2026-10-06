@@ -278,7 +278,8 @@ class ClientRevenueGuardian:
             "accepted": False, "status": "ACTION_REQUESTER_NOT_REGISTERED"
         }
         outcome = result if isinstance(result, dict) else {"result": result}
-        marketed.add(project_id)
+        if bool(outcome.get("accepted")):
+            marketed.add(project_id)
         record.update({
             "marketed_successful_project_ids": sorted(marketed),
             "marketing_status": "PENDING_EXTERNAL_EVIDENCE",
