@@ -75,6 +75,41 @@ class WorkforceControl:
         completed = self.organization.complete_task(task.task_id, success=True, result=result)
         return asdict(completed)
 
+    def request_revenue_guardian_action(self, client_id: str, action: dict[str, Any]) -> dict[str, Any]:
+        """Queue one internal, auditable revenue action; never marks revenue or payment."""
+        task = self.organization.assign_task(
+            f"Revenue Guardian {client_id}: {action.get('next_action', action.get('recommended_action', 'ADVANCE_REVENUE_PATH'))}",
+            department_id="DEPT-003",
+        )
+        result = self.organization.complete_task(
+            task.task_id,
+            success=True,
+            result={
+                "kind": "revenue_guardian_action",
+                "client_id": client_id,
+                "action": action,
+                "external_side_effects": False,
+                "payment_verified": False,
+                "requires_external_evidence": True,
+            },
+        )
+        self.store.event("REVENUE_GUARDIAN_ACTION_REQUESTED", {
+            "client_id": client_id,
+            "task_id": task.task_id,
+            "next_action": action.get("next_action", action.get("recommended_action")),
+            "external_side_effects": False,
+            "payment_verified": False,
+        })
+        return {
+            "accepted": True,
+            "status": "INTERNAL_ACTION_RECORDED",
+            "task_id": task.task_id,
+            "client_id": client_id,
+            "payment_verified": False,
+            "external_side_effects": False,
+            "requires_external_evidence": True,
+        }
+
     def dispatch(self, trigger: str = "scheduled", *, include_revenue: bool = True) -> dict[str, Any]:
         self.dispatch_count += 1
         results = []
