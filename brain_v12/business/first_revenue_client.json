@@ -96,6 +96,63 @@
       "automatic_withdrawal": false,
       "funds_moved_by_brain": false
     },
-    "success_condition": "The active customer request is considered commercially successful only when the customer accepts the delivered work and real payment is independently verified; REVENUE_REALIZED additionally requires delivery/reconciliation evidence."
+    "success_condition": "The active customer request is considered commercially successful only when the customer accepts the delivered work and real payment is independently verified; REVENUE_REALIZED additionally requires delivery/reconciliation evidence.",
+    "reporting": {
+      "revenue_request_updates": true,
+      "update_policy": "Whenever the customer requests material revenue, Brain must report the current commercial phase, work completed, verified evidence, blockers, next permitted action, and whether real revenue has been independently verified.",
+      "truth_labels": [
+        "DEVELOPMENT_PROGRESS",
+        "CUSTOMER_ACCEPTANCE",
+        "ORDER_STATUS",
+        "PAYMENT_STATUS",
+        "REVENUE_REALIZED",
+        "PROFIT_VERIFIED"
+      ],
+      "never_claim_revenue_from": [
+        "prototype",
+        "demo",
+        "social_views",
+        "social_clicks",
+        "followers",
+        "leads",
+        "invoices",
+        "quotes",
+        "forecasts",
+        "test_payments"
+      ]
+    }
+  },
+  "self_marketing": {
+    "enabled": true,
+    "objective": "Market Brain's lawful digital services to generate qualified opportunities and real paid work.",
+    "channels": [
+      "SOCIAL_MEDIA"
+    ],
+    "activities": [
+      "service_showcase",
+      "portfolio_demo",
+      "educational_content",
+      "case_study_when_evidence_exists",
+      "call_to_action",
+      "lead_capture"
+    ],
+    "content_rules": [
+      "do not fabricate customers, results, revenue, testimonials, case studies, or capabilities",
+      "clearly label prototypes and demonstrations",
+      "use only assets Brain is authorized to publish",
+      "respect platform policies and rate limits",
+      "do not spam, impersonate, or mislead",
+      "track posts, responses, qualified leads, offers, orders, payments, and revenue separately"
+    ],
+    "external_action_boundary": {
+      "posting_requires_connected_authorized_channel": true,
+      "automatic_contract": false,
+      "automatic_charge": false,
+      "automatic_purchase": false,
+      "automatic_transfer": false,
+      "automatic_withdrawal": false
+    },
+    "commercial_funnel": "CONTENT -> INTEREST -> QUALIFIED_LEAD -> OFFER -> CUSTOMER_ACCEPTED -> ORDER -> DELIVERY -> PAYMENT_VERIFIED -> REVENUE_REALIZED",
+    "revenue_rule": "Social activity is marketing evidence only. It cannot by itself create PAYMENT_VERIFIED or REVENUE_REALIZED."
   }
 }
