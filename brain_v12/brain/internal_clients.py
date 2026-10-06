@@ -95,6 +95,32 @@ def launch_plan(client_id: str, device_bridge: Any) -> dict[str, Any]:
     client = resolve_internal_client(client_id)
     if not client["ok"]:
         return client
+    if client.get("supervisory_only"):
+        return {
+            "ok": True,
+            "status": "SUPERVISORY_READY",
+            "client": client,
+            "plan": {
+                "target_client_id": TARGET_CLIENT_ID,
+                "stages": [
+                    "INSPECT_ACTIVITY",
+                    "INSPECT_VERIFIED_REVENUE",
+                    "DIAGNOSE_BLOCKER",
+                    "NUDGE_ONE_BOUNDED_ACTION",
+                    "VERIFY",
+                    "EVIDENCE",
+                ],
+                "dispatch_allowed": False,
+                "completion_allowed": False,
+            },
+            "execution_policy": "SUPERVISORY_ONLY_EXISTING_PRIMARY_PIPELINE",
+            "completion_policy": "VERIFY_AND_EVIDENCE_REQUIRED",
+            "recovery": {
+                "durable_request_state": True,
+                "resume_from_checkpoint": True,
+                "reconcile_existing_run_before_dispatch": True,
+            },
+        }
     router = build_gateway(device_bridge)
     plan = router.build_plan(client["customer_id"])
     return {
