@@ -31,3 +31,9 @@ def test_bilingual_ui_and_admin_contract():
         assert marker in ui
     for marker in ["/api/industrial-quotes/admin/inquiries", "X-BRAIN-CONTROL-KEY", "type="password""]:
         assert marker in admin
+
+
+def test_invalid_email_is_rejected():
+    import pytest
+    with pytest.raises(ValueError):
+        InquiryIn(company="Test Industrial", contact_name="A User", email="not-an-email", category="Hydraulics", message="Please send availability and a quote.")
