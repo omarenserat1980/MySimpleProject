@@ -10,12 +10,14 @@ class TenLayerReleaseAttackTests(unittest.TestCase):
         }
 
     def assert_blocked(self, evidence):
-        r=decide(evidence)
-        self.assertFalse(r["publish_authorized"])
+        self.assertFalse(decide(evidence)["publish_authorized"])
 
     def test_01_empty(self): self.assert_blocked({})
-    def test_02_fake_status(self):
-        e=self.good(); e["status"]="MASTER_RELEASE_PASS"; self.assert_blocked(e)
+    def test_02_publication_recomputes_gates(self):
+        e=self.good()
+        self.assertTrue(require_master_release(e)["authorized"])
+        e["cinematic"]["passed"]=False
+        self.assertFalse(require_master_release(e)["authorized"])
     def test_03_missing_film_id(self):
         e=self.good(); e.pop("film_id"); self.assert_blocked(e)
     def test_04_missing_version(self):
@@ -28,11 +30,13 @@ class TenLayerReleaseAttackTests(unittest.TestCase):
         e=self.good(); e["rights"].pop("evidence_sha256"); self.assert_blocked(e)
     def test_08_bad_hash_length(self):
         e=self.good(); e["legal_policy"]["evidence_sha256"]="bad"; self.assert_blocked(e)
-    def test_09_publication_guard_fake_pass(self):
-        r=require_master_release({"status":"MASTER_RELEASE_PASS","publish_authorized":True,"identity":{}})
-        self.assertFalse(r["authorized"])
-    def test_10_publication_guard_no_evidence(self):
-        r=require_master_release({"status":"MASTER_RELEASE_PASS","publish_authorized":True})
-        self.assertFalse(r["authorized"])
+    def test_09_forged_publish_status_is_ignored(self):
+        e=self.good(); e["status"]="MASTER_RELEASE_PASS"; e["publish_authorized"]=True
+        e["rights"]["passed"]=False
+        self.assertFalse(require_master_release(e)["authorized"])
+    def test_10_forged_gate_decision_is_recomputed(self):
+        e=self.good(); e["status"]="MASTER_RELEASE_PASS"; e["publish_authorized"]=True
+        e["legal_policy"]["passed"]=False
+        self.assertFalse(require_master_release(e)["authorized"])
 
 if __name__=="__main__": unittest.main()
