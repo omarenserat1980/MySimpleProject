@@ -24,3 +24,11 @@ def test_launch_plan_uses_existing_backend_and_pipeline_policy():
     assert result["plan"]["backend"] == "DEVICE_BRIDGE"
     assert result["execution_policy"] == "EXISTING_PRIMARY_PIPELINE"
     assert result["completion_policy"] == "VERIFY_AND_EVIDENCE_REQUIRED"
+
+
+def test_revenue_guardian_is_supervisory_only():
+    result = launch_plan("BRAIN-INTERNAL-CL-000004", FakeBridge())
+    assert result["status"] == "SUPERVISORY_READY"
+    assert result["client"]["customer_id"] == "CL-000003"
+    assert result["plan"]["dispatch_allowed"] is False
+    assert result["execution_policy"] == "SUPERVISORY_ONLY_EXISTING_PRIMARY_PIPELINE"
