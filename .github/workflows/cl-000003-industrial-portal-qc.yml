@@ -22,6 +22,22 @@ jobs:
         run: python -m py_compile brain_v12/brain/industrial_quote_portal.py
       - name: Portal unit tests
         run: python -m pytest -q brain_v12/tests/test_industrial_quote_portal.py
+      - name: Runtime smoke checks
+        run: |
+          python - <<'PY'
+          from fastapi import FastAPI
+          from fastapi.testclient import TestClient
+          from brain_v12.brain.industrial_quote_portal import router
+          app=FastAPI()
+          app.include_router(router("/tmp/brain-v12-industrial-qc.json"))
+          c=TestClient(app)
+          assert c.get("/api/industrial-quotes/health").status_code == 200
+          r=c.post("/api/industrial-quotes/inquiries", json={"company":"QC Industrial","contact_name":"QC User","email":"qc@example.com","category":"Hydraulics","message":"Runtime smoke inquiry for verification."})
+          assert r.status_code == 200, r.text
+          assert r.json()["inquiry_id"].startswith("Q-")
+          print("RUNTIME_SMOKE_PASS")
+          PY
+
       - name: UI contract checks
         run: |
           python - <<'PY'
@@ -33,3 +49,14 @@ jobs:
           assert not missing, missing
           print("UI_CONTRACT_PASS")
           PY
+      - name: Write QC evidence
+        if: always()
+        run: |
+          mkdir -p qc-evidence
+          printf '%s\n' '{"workflow":"cl-000003-industrial-portal-qc","commit":"${{ github.sha }}","checks":["compile","unit_tests","runtime_smoke","ui_contract"],"evidence_source":"github_actions"}' > qc-evidence/industrial_portal_qc.json
+      - name: Upload QC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cl-000003-industrial-portal-qc-evidence
+          path: qc-evidence/industrial_portal_qc.json
