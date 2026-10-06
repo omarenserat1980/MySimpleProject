@@ -172,5 +172,45 @@
       "SAFETY_OR_LEGAL_BOUNDARY_BLOCKS_EXECUTION"
     ],
     "progress_rule": "Every cycle must produce new commercial evidence, a working artifact, a verified test, a qualified lead, a customer response, or a diagnosed blocker. Otherwise diagnose the stalled loop."
+  },
+  "revenue_portfolio": {
+    "enabled": true,
+    "principle": "One active customer request may contain multiple bounded commercial experiments, but financial claims remain isolated and evidence-bound per opportunity/order.",
+    "portfolio_limit": 5,
+    "candidate_lanes": [
+      "WEB_APPLICATION",
+      "WEBSITE",
+      "DIGITAL_SERVICE",
+      "VIDEO_PRODUCTION",
+      "REPORTING_DASHBOARD"
+    ],
+    "lane_selection": {
+      "score_dimensions": [
+        "customer_need",
+        "time_to_demo",
+        "buildability",
+        "delivery_verifiability",
+        "marketability",
+        "payment_path_clarity"
+      ],
+      "rule": "Select the highest-scoring viable lane; keep other candidates parked rather than building all simultaneously."
+    },
+    "isolation_rules": [
+      "Each opportunity gets a unique opportunity_id.",
+      "Each offer/order/delivery/payment evidence chain must bind to its opportunity_id.",
+      "A successful experiment must not transfer revenue status to another opportunity.",
+      "A failed experiment becomes evidence for reprioritization, not a fabricated success.",
+      "The portfolio never bypasses the single active customer-request limit."
+    ],
+    "escalation": {
+      "trigger": "No verified commercial progress after bounded cycles on the current lane.",
+      "action": "Re-rank parked lanes using fresh evidence and select one next lane.",
+      "prohibition": "Do not create parallel uncontrolled execution streams."
+    },
+    "revenue_target": {
+      "metric": "verified_realized_revenue",
+      "target_state": "REVENUE_REALIZED",
+      "proof": "independent payment + delivery/reconciliation evidence"
+    }
   }
 }
