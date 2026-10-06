@@ -41,5 +41,62 @@
     "automatic_withdrawal": false,
     "funds_moved_by_brain": false
   },
-  "success_rule": "Do not mark REVENUE_REALIZED until independent payment verification and delivery/reconciliation evidence exist."
+  "success_rule": "Do not mark REVENUE_REALIZED until independent payment verification and delivery/reconciliation evidence exist.",
+  "cycle_policy": {
+    "mode": "BOUNDED_CONTINUOUS",
+    "required_output_per_cycle": "OPPORTUNITY_OR_BUILD_OR_TEST_OR_BLOCKER",
+    "phases": [
+      {
+        "phase": "DISCOVER",
+        "output": "validated_problem_candidates"
+      },
+      {
+        "phase": "PRIORITIZE",
+        "output": "ranked_solution_candidate"
+      },
+      {
+        "phase": "SPECIFY",
+        "output": "acceptance_criteria"
+      },
+      {
+        "phase": "BUILD",
+        "output": "working_artifact"
+      },
+      {
+        "phase": "VERIFY",
+        "output": "test_and_artifact_evidence"
+      },
+      {
+        "phase": "DEMO",
+        "output": "reviewable_demo"
+      },
+      {
+        "phase": "REQUEST_APPROVAL",
+        "output": "approval_or_explicit_blocker"
+      },
+      {
+        "phase": "DELIVER",
+        "output": "delivery_evidence"
+      },
+      {
+        "phase": "COLLECT",
+        "output": "payment_path_status"
+      },
+      {
+        "phase": "VERIFY_PAYMENT",
+        "output": "independent_payment_evidence"
+      },
+      {
+        "phase": "RECONCILE",
+        "output": "bound_financial_and_delivery_evidence"
+      },
+      {
+        "phase": "REALIZE",
+        "output": "revenue_realized_only_if_gate_passes"
+      }
+    ],
+    "no_progress_rule": "If a cycle produces no new evidence, artifact, validated opportunity, or blocker diagnosis, do not claim progress; diagnose the stalled phase.",
+    "evidence_rule": "Every advancement must reference inspectable evidence.",
+    "commercial_rule": "Technical completion never implies customer acceptance, payment, revenue, or profit."
+  }
 }
