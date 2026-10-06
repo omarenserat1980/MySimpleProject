@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import re
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -25,6 +26,13 @@ class InquiryIn(BaseModel):
     quantity: str = Field(default="", max_length=60)
     message: str = Field(min_length=10, max_length=3000)
     language: str = Field(default="ar", pattern="^(ar|en)$")
+
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        value = value.strip()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]{2,}", value):
+            raise ValueError("invalid email")
+        return value
 
 class InquiryStore:
     def __init__(self, path: str):
