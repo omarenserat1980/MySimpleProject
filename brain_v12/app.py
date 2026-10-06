@@ -245,6 +245,28 @@ def brain_revenue_guardian_promote_successful(request: Request, client_id: str):
     return result
 
 
+@app.post("/api/brain/revenue-guardian/{client_id}/reconcile-marketing")
+def brain_revenue_guardian_reconcile_marketing(request: Request, client_id: str):
+    """Reconcile one marketed project against client-scoped payment evidence."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.reconcile_marketing_once(workforce.income_engine, client_id)
+    store.event("REVENUE_GUARDIAN_MARKETING_RECONCILED", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "project_id": result.get("project_id"),
+        "revenue_delta_jod": result.get("revenue_delta_jod", 0),
+        "attribution": result.get("attribution"),
+    })
+    return result
+
+
 @app.get("/api/brain/revenue-guardian/{client_id}/status")
 def brain_revenue_guardian_status(request: Request, client_id: str):
     """Return the persisted guardian state/history without mutating it."""
