@@ -147,8 +147,20 @@ class CommercialCase:
             seen.add(reference)
         return duplicates
 
+    def duplicate_source_digests(self) -> set[str]:
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for item in self.evidence:
+            digest = item.source_digest.strip().lower()
+            if not digest:
+                continue
+            if digest in seen:
+                duplicates.add(digest)
+            seen.add(digest)
+        return duplicates
+
     def evidence_set_integrity_ok(self) -> bool:
-        return not self.duplicate_references()
+        return not self.duplicate_references() and not self.duplicate_source_digests()
 
     def chronology_integrity_ok(self) -> bool:
         by_type: dict[str, CommercialEvidence] = {}
