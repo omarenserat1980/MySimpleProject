@@ -230,6 +230,74 @@ class BrainCouncil:
             "no_fabricated_execution": True,
         }
 
+    def verify_minutes(self, meeting_id: int) -> dict[str, Any]:
+        with self._connect() as con:
+            row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
+            actions = con.execute("SELECT * FROM brain_council_actions WHERE meeting_id=? ORDER BY id", (int(meeting_id),)).fetchall()
+        if not row:
+            return {"ok": False, "status": "MEETING_NOT_FOUND"}
+        if str(row["status"]) == "VERIFIED":
+            return {"ok": True, "status": "ALREADY_VERIFIED", "meeting_id": int(meeting_id), "no_duplicate_verification": True}
+        if str(row["status"]) != "MINUTES_EXECUTED":
+            return {"ok": False, "status": "VERIFICATION_NOT_READY", "meeting_id": int(meeting_id), "meeting_status": str(row["status"])}
+        results = []
+        verified = 0
+        pending = 0
+        blocked = 0
+        for action_row in actions:
+            client_id = str(action_row["client_id"])
+            state = self.state_reader(client_id) or {}
+            recorded = json.loads(action_row["result"] or "{}")
+            status = "PENDING_EXTERNAL_EVIDENCE"
+            evidence = {"client_id": client_id, "state": state, "recorded_request": recorded}
+            if client_id == "CL-000003":
+                income = state.get("income") if isinstance(state, dict) else {}
+                verified_revenue = float((income or {}).get("verified_revenue_jod", 0) or 0)
+                payment_evidence = bool((income or {}).get("payment_evidence"))
+                if payment_evidence and verified_revenue > 0:
+                    status = "VERIFIED"
+                elif recorded.get("accepted") is False:
+                    status = "BLOCKED"
+            else:
+                industrial = state.get("industrial_request") if isinstance(state, dict) else {}
+                request_status = str((industrial or {}).get("status") or "").upper()
+                if request_status in {"COMPLETED", "VERIFIED", "VERIFIED_COMPLETED"}:
+                    status = "VERIFIED"
+                elif request_status in {"FAILED", "BLOCKED", "ERROR"}:
+                    status = "BLOCKED"
+            if status == "VERIFIED":
+                verified += 1
+            elif status == "BLOCKED":
+                blocked += 1
+            else:
+                pending += 1
+            con_status = status
+            with self._connect() as con:
+                con.execute("UPDATE brain_council_actions SET status=?,result=?,updated_at=? WHERE id=?",
+                            (con_status, json.dumps(evidence, ensure_ascii=False), _now(), int(action_row["id"])))
+                con.commit()
+            results.append({"action_id": int(action_row["id"]), "client_id": client_id, "status": status, "evidence": evidence})
+        if blocked:
+            meeting_status = "REQUIRES_REPAIR"
+        elif pending:
+            meeting_status = "PENDING_VERIFICATION"
+        else:
+            meeting_status = "VERIFIED"
+        with self._connect() as con:
+            con.execute("UPDATE brain_council_meetings SET status=?,execution_results=?,updated_at=? WHERE id=?",
+                        (meeting_status, json.dumps(results, ensure_ascii=False), _now(), int(meeting_id)))
+            con.commit()
+        return {
+            "ok": True,
+            "meeting_id": int(meeting_id),
+            "status": meeting_status,
+            "verified_actions": verified,
+            "pending_actions": pending,
+            "blocked_actions": blocked,
+            "results": results,
+            "next_council_allowed": meeting_status == "VERIFIED",
+        }
+
     def minutes(self, meeting_id: int) -> dict[str, Any]:
         with self._connect() as con:
             row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
