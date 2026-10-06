@@ -220,6 +220,31 @@ def brain_revenue_guardian_first_revenue(request: Request, client_id: str):
     return result
 
 
+@app.post("/api/brain/revenue-guardian/{client_id}/promote-successful")
+def brain_revenue_guardian_promote_successful(request: Request, client_id: str):
+    """Check successful projects, request one bounded social-marketing action, and track revenue."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.promote_successful_projects_once(
+        workforce.income_engine,
+        income_lifecycle,
+        client_id,
+    )
+    store.event("REVENUE_GUARDIAN_SUCCESSFUL_PROJECT_MARKETING", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "successful_projects_count": result.get("successful_projects_count", 0),
+        "verified_revenue_jod": result.get("verified_revenue_jod", 0),
+    })
+    return result
+
+
 @app.get("/api/brain/revenue-guardian/{client_id}/status")
 def brain_revenue_guardian_status(request: Request, client_id: str):
     """Return the persisted guardian state/history without mutating it."""
