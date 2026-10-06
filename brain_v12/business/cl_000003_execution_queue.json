@@ -18,16 +18,20 @@
       "QUOTE_REQUEST_SYSTEM",
       "API_INTEGRATION"
     ],
-    "phase": "DISCOVER",
+    "phase": "DEMO",
     "blockers": [],
-    "evidence_refs": [],
+    "evidence_refs": [
+      "brain_v12/business/cl_000003_demo_package.md",
+      "QC_RUN_37529986118",
+      "QC_ARTIFACT_11443882749"
+    ],
     "customer_instruction": "حقق مكاسب مادية حقيقية للعميل من خلال تطوير وتسويق وبيع خدمات Brain الرقمية، ومتابعة الفرص حتى الدفع والتحقق.",
     "started_at": "2026-10-06"
   },
   "gates": {
     "customer_need_validated": false,
-    "solution_built": false,
-    "technical_verification": false,
+    "solution_built": true,
+    "technical_verification": true,
     "customer_acceptance": false,
     "order_accepted": false,
     "delivery_verified": false,
