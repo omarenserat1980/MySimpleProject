@@ -222,6 +222,7 @@ def brain_revenue_guardian(request: Request, client_id: str):
         revenue_reader=_client_revenue,
         progress_reader=store.revenue_guardian_checkpoint,
         progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
     )
     result = guardian.deep_inspect(workforce.income_engine, income_lifecycle, client_id)
     store.event("REVENUE_GUARDIAN_DEEP_AUDIT", {
