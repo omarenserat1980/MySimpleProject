@@ -8,10 +8,11 @@ from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
 from .bootloader import VirtualBootloader
+from ..brain.self_trust_boot_gate import BootGateEvidence, evaluate
 
 @dataclass
 class VirtualComputer:
-    """Software-defined computer: CPU, RAM, bus, firmware, kernel and devices."""
+    """Software-defined computer with an optional Brain self-trust boot gate."""
     name: str
     ram_size: int = 65536
     storage_size: int = 1024*1024
@@ -35,7 +36,13 @@ class VirtualComputer:
         self.boot_count=0
         self.boot_record=None
 
-    def power_on(self):
+    def power_on(self, boot_evidence: BootGateEvidence | None = None):
+        if boot_evidence is not None:
+            gate=evaluate(boot_evidence)
+            if not gate.ok:
+                self.powered=False
+                self.boot_record={"ok":False,"status":gate.status,"boot_gate":gate.__dict__}
+                raise RuntimeError("BRAIN_BOOT_BLOCKED")
         self.powered=True
         self.boot_count+=1
         self.cpu.reset()
@@ -48,6 +55,8 @@ class VirtualComputer:
         if not self.boot_record.get("ok"):
             self.powered=False
             raise RuntimeError("FIRMWARE_BOOT_FAILED")
+        if boot_evidence is not None:
+            self.boot_record["boot_gate"]={"ok":True,"status":"BRAIN_READY","task_id":boot_evidence.task_id}
         return self.status()
 
     def power_off(self):
@@ -73,7 +82,6 @@ class VirtualComputer:
                 "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
                 "cpu":{"pc":self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted},
-                "ram":{"size":self.ram.size},
-                "devices":self.bus.device_names(),
+                "ram":{"size":self.ram.size},"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":{"mac":self.nic.mac},"gpu":{"width":self.gpu.width,"height":self.gpu.height}}
