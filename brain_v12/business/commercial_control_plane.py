@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane with provenance and identity binding."""
+"""Evidence-gated commercial control plane with strict identity binding."""
 
 from __future__ import annotations
 
@@ -71,14 +71,25 @@ class CommercialCase:
         }
 
     def evidence_matches_case(self, item: CommercialEvidence) -> bool:
-        if item.client_id and item.client_id != self.client_id:
-            return False
-        if self.expected_order_id and item.order_id and item.order_id != self.expected_order_id:
-            return False
-        if self.expected_amount is not None and item.amount is not None and item.amount != self.expected_amount:
-            return False
-        if self.expected_currency and item.currency and item.currency.upper() != self.expected_currency.upper():
-            return False
+        sensitive = item.evidence_type in {"payment", "order", "delivery", "customer_acceptance"}
+        if sensitive:
+            if not item.client_id or item.client_id != self.client_id:
+                return False
+            if not item.order_id or not self.expected_order_id or item.order_id != self.expected_order_id:
+                return False
+            if item.amount is None or self.expected_amount is None or item.amount != self.expected_amount:
+                return False
+            if not item.currency or not self.expected_currency or item.currency.upper() != self.expected_currency.upper():
+                return False
+        else:
+            if item.client_id and item.client_id != self.client_id:
+                return False
+            if item.order_id and self.expected_order_id and item.order_id != self.expected_order_id:
+                return False
+            if item.amount is not None and self.expected_amount is not None and item.amount != self.expected_amount:
+                return False
+            if item.currency and self.expected_currency and item.currency.upper() != self.expected_currency.upper():
+                return False
         return True
 
     def can_enter(self, target: CommercialState) -> bool:
