@@ -308,6 +308,18 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
     }
 
 
+@app.get("/api/brain/internal-clients/state/{client_id}")
+def brain_internal_client_state(client_id: str):
+    """Return the durable lifecycle state without exposing credentials."""
+    from .brain import industrial_clients
+    if client_id not in industrial_clients.INTERNAL_CLIENTS:
+        raise HTTPException(status_code=404, detail="UNKNOWN_INTERNAL_CLIENT")
+    state = store.industrial_client_request_state(
+        industrial_clients.INTERNAL_CLIENTS[client_id]["customer_id"]
+    )
+    return {"ok": True, "client_id": client_id, "state": state}
+
+
 @app.get("/api/industrial-clients/request/status")
 def industrial_client_request_status():
     from .brain import industrial_clients
