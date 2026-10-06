@@ -194,6 +194,13 @@ def brain_internal_clients():
     return internal_clients.public_registry()
 
 
+@app.get("/api/brain/revenue-guardian/{client_id}/status")
+def brain_revenue_guardian_status(request: Request, client_id: str):
+    """Return the persisted guardian state/history without mutating it."""
+    require_control_key(request)
+    return store.revenue_guardian_status(client_id, history_limit=20)
+
+
 @app.get("/api/brain/revenue-guardian/{client_id}")
 def brain_revenue_guardian(request: Request, client_id: str):
     """Deep evidence audit for the revenue guardian; no external side effects."""
