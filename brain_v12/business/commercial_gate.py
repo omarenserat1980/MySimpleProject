@@ -116,6 +116,21 @@ def assert_persisted_claims_match_evidence(data, case: CommercialCase) -> None:
 def assert_commercial_claims_are_supported() -> None:
     data, case = load_case()
 
+    # Fail closed if persisted state enables any automatic financial side effect.
+    side_effects = data.get("side_effects", {})
+    forbidden = {
+        "automatic_contract": "auto_contract",
+        "automatic_charge": "auto_charge",
+        "automatic_purchase": "auto_purchase",
+        "automatic_withdrawal": "auto_withdrawal",
+        "automatic_transfer": "auto_transfer",
+    }
+    for persisted_name, policy_name in forbidden.items():
+        if bool(side_effects.get(persisted_name, False)):
+            raise AssertionError(
+                f"Forbidden automatic financial side effect enabled: {policy_name}"
+            )
+
     if not case.state_integrity_ok():
         raise AssertionError(
             f"Commercial state {case.state.value} is not supported by persisted evidence."
