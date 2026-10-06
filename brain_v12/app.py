@@ -1432,6 +1432,26 @@ def device_report(request:Request, body:DeviceReport):
     store.event("DEVICE_TASK_RESULT", {"task_id": body.task_id, "agent_id": body.agent_id, "ok": body.ok})
     return result
 
+@app.post("/api/device/self-test/request")
+def device_self_test_request(request:Request):
+    """Least-privilege self-test request for an authenticated device agent.
+
+    This endpoint intentionally accepts only the fixed brain_self_test task and
+    requires the device-agent credential, not the Brain control-plane secret.
+    It is a bootstrap capability, not a general task-enqueue API.
+    """
+    require_device_agent(request)
+    agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
+    result = device_bridge.enqueue("brain_self_test", {"requested_by_agent": agent_id, "bootstrap": True})
+    store.event("DEVICE_SELF_TEST_REQUESTED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "agent_id": agent_id,
+        "status": result.get("status"),
+    })
+    return result
+
 @app.get("/api/device/result/{task_id}")
 def device_result(task_id:str):
     return device_bridge.result(task_id)
