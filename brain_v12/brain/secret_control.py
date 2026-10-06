@@ -14,6 +14,12 @@ class SecretControlPlane:
 
     REQUIRED = (
         {
+            "name": "BRAIN_INDUSTRIAL_CLIENT_KEY_SHA256",
+            "scope": ("industrial_clients",),
+            "purpose": "SHA-256 verification material for bounded industrial-client authentication",
+            "provider_action": "attach_generated_client_hash",
+        },
+        {
             "name": "OPENAI_API_KEY",
             "scope": ("web",),
             "purpose": "OpenAI API access for the V12 AI gateway",
