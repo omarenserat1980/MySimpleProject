@@ -11,6 +11,7 @@ from .autonomy_control_plane import ControlPlane
 from .autonomous_reasoner import AutonomousReasoner
 from .execution_gateway import BrainExecutionGateway
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
+from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
 SAFE_EXTERNAL_ACTIONS = {"submit_application", "publish_external", "move_money", "withdraw"}
 
@@ -24,6 +25,7 @@ class BrainSupervisor:
         self.control = ControlPlane(str(self.root / "control_plane"))
         self.reasoner = AutonomousReasoner()
         self.execution_gateway = execution_gateway or BrainExecutionGateway()
+        self.resource_guard = EmergencyResourceGuard()
 
     def _event(self, job_id, event, data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
@@ -44,6 +46,12 @@ class BrainSupervisor:
         allowed = {"discover","plan","select_backend","execute","verify","repair","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:
             raise ValueError("unknown_supervisor_phase")
+        if phase in {"execute", "retry"} and enforce_authority:
+            resource = self.resource_guard.sample()
+            if resource.get("emergency"):
+                details = {"emergency": "RESOURCE_OVERLOAD", "resource": resource, "previous_phase": phase}
+                phase = "blocked"
+                status = "blocked"
         if phase == "execute" and enforce_authority:
             self.execution_gateway.authorize("brain-internal-execution")
         row=dict(job)
