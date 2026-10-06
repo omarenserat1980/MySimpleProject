@@ -74,7 +74,6 @@ def execute(task, params):
             "verified": ok,
         }, "" if ok else "BRAIN_SELF_TEST_FAILED"
 
-def execute(task, params):
     if task == "python_version":
         p = subprocess.run(["python", "--version"], capture_output=True, text=True, timeout=20)
         output = (p.stdout or p.stderr).strip()
