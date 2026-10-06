@@ -22,6 +22,8 @@ from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
+from .brain.decision_engine import DecisionEngine
+from .brain.client_suggestion_bridge import ClientSuggestionBridge
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
@@ -106,6 +108,13 @@ cognitive.code_tool=code_tool
 
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
+decision_engine=DecisionEngine()
+client_suggestion_bridge=ClientSuggestionBridge(
+    os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")),
+    openai_provider,
+    decision_engine,
+    workforce.request_revenue_guardian_action,
+)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
@@ -188,6 +197,22 @@ class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
     target: str = "arkan"
+
+
+@app.post("/api/brain/client-3/suggestion")
+def brain_client_3_suggestion(request: Request, body: dict):
+    """Route one Client 3 suggestion through ChatGPT advice, Brain decision, and one bounded action."""
+    require_control_key(request)
+    suggestion = str(body.get("suggestion") or body.get("request") or "").strip()
+    context = body.get("context") if isinstance(body.get("context"), dict) else {}
+    return client_suggestion_bridge.submit("CL-000003", suggestion, context)
+
+
+@app.get("/api/brain/client-3/suggestions")
+def brain_client_3_suggestions(request: Request):
+    """Read Client 3 suggestion/decision/action history without mutating it."""
+    require_control_key(request)
+    return client_suggestion_bridge.history("CL-000003", limit=50)
 
 
 @app.get("/api/brain/internal-clients")
