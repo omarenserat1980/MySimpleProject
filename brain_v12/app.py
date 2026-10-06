@@ -194,6 +194,24 @@ def brain_internal_clients():
     return internal_clients.public_registry()
 
 
+@app.get("/api/brain/revenue-guardian/{client_id}")
+def brain_revenue_guardian(request: Request, client_id: str):
+    """Deep evidence audit for the revenue guardian; no external side effects."""
+    require_control_key(request)
+    from .brain.client_revenue_guardian import ClientRevenueGuardian
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda _id: {"source": "income_lifecycle", "client_id": _id},
+        revenue_reader=lambda _id: {"verified_revenue_jod": income_lifecycle.summary().get("payment_verified_jod", 0)},
+    )
+    result = guardian.deep_inspect(workforce.income_engine, income_lifecycle, client_id)
+    store.event("REVENUE_GUARDIAN_DEEP_AUDIT", {
+        "guardian_client_id": "CL-000004",
+        "target_client_id": client_id,
+        "state": result.get("state"),
+        "verified_revenue_jod": result.get("deep_audit", {}).get("verified_revenue_jod", 0),
+        "priority": result.get("deep_audit", {}).get("highest_priority"),
+    })
+    return result
 @app.post("/api/brain/internal-clients/plan")
 def brain_internal_client_plan(request: Request, body: BrainInternalClientRequest):
     """Build a fail-closed launch plan; no external side effect occurs here."""
