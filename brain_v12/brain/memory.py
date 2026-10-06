@@ -65,7 +65,6 @@ class MemoryStore:
               updated_at TEXT NOT NULL,
               data TEXT NOT NULL
             );
-            );
             CREATE TABLE IF NOT EXISTS incidents(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fingerprint TEXT UNIQUE NOT NULL,
