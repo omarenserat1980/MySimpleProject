@@ -118,9 +118,11 @@ sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
 sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
 task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
+from .github_actions_operator import GitHubActionsOperator
 from .brain.execution_gateway import BrainExecutionGateway
 execution_gateway=BrainExecutionGateway()
 brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")), execution_gateway=execution_gateway)
+industrial_actions=GitHubActionsOperator()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
@@ -172,6 +174,95 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+
+
+class IndustrialClientRequest(BaseModel):
+    client_id: str
+    request: str
+    target: str = "arkan"
+
+
+@app.post("/api/industrial-clients/request")
+def industrial_client_request(request: Request, body: IndustrialClientRequest):
+    """Accept one bounded industrial-client request and dispatch only the primary ISO workflow."""
+    from .brain import industrial_clients
+
+    client_key = request.headers.get("X-Brain-Client-Key", "")
+    if not industrial_clients.authenticate(body.client_id, client_key):
+        raise HTTPException(status_code=403, detail="INDUSTRIAL_CLIENT_UNAUTHORIZED")
+
+    contract = industrial_clients.build_request(body.client_id, body.request, body.target)
+    if not contract.get("ok"):
+        return contract
+
+    repo = _github_repo()
+    workflow = contract["workflow"]
+    latest = industrial_actions.latest_run(repo, workflow)
+    if latest and latest.get("status") in {"queued", "in_progress", "waiting", "requested"}:
+        return {
+            "ok": True,
+            "status": "ALREADY_RUNNING",
+            "client_id": body.client_id,
+            "request": body.request,
+            "target": body.target,
+            "workflow": workflow,
+            "run_id": latest.get("id"),
+            "run_url": latest.get("html_url"),
+            "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        }
+
+    request_id = "industrial-" + uuid4().hex
+    store.event("INDUSTRIAL_CLIENT_REQUESTED", {
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "request": body.request,
+        "target": body.target,
+        "workflow": workflow,
+    })
+    dispatch = industrial_actions.dispatch(
+        repo, workflow, ref="main", inputs={}, approved=True
+    )
+    store.event("INDUSTRIAL_CLIENT_DISPATCHED", {
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "workflow": workflow,
+        "dispatch_status": dispatch.get("state"),
+    })
+    return {
+        "ok": True,
+        "status": "DISPATCH_ACCEPTED",
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "request": body.request,
+        "target": body.target,
+        "workflow": workflow,
+        "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        "verification": "PENDING_RUN_OBSERVATION",
+    }
+
+
+@app.get("/api/industrial-clients/request/status")
+def industrial_client_request_status():
+    from .brain import industrial_clients
+
+    repo = _github_repo()
+    workflow = industrial_clients.PRIMARY_WORKFLOW
+    latest = industrial_actions.latest_run(repo, workflow)
+    if not latest:
+        return {"ok": True, "status": "NO_RUN_OBSERVED", "workflow": workflow}
+    conclusion = latest.get("conclusion")
+    state = latest.get("status")
+    verified = state == "completed" and conclusion == "success"
+    return {
+        "ok": True,
+        "status": "VERIFIED" if verified else ("RUNNING" if state != "completed" else "FAILED"),
+        "workflow": workflow,
+        "run_id": latest.get("id"),
+        "run_url": latest.get("html_url"),
+        "github_status": state,
+        "conclusion": conclusion,
+        "verified": verified,
+    }
 
 
 @app.get("/api/brain/windows/cloud/status")
