@@ -92,6 +92,12 @@ class MemoryStore:
               agent_id TEXT PRIMARY KEY,
               last_seen REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS industrial_client_locks(
+              client_id TEXT PRIMARY KEY,
+              status TEXT NOT NULL,
+              request_id TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
 
@@ -217,6 +223,42 @@ class MemoryStore:
                                       COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
                                FROM income_opportunities""").fetchone()
         return dict(row)
+
+
+    def claim_industrial_client(self, client_id, request_id):
+        """Atomically claim one active industrial request per client."""
+        with self.connect() as con:
+            con.execute("BEGIN IMMEDIATE")
+            row=con.execute(
+                "SELECT status,request_id FROM industrial_client_locks WHERE client_id=?",
+                (client_id,),
+            ).fetchone()
+            if row and row["status"] == "ACTIVE":
+                con.rollback()
+                return {"ok": False, "status": "ALREADY_ACTIVE", "request_id": row["request_id"]}
+            con.execute(
+                """INSERT INTO industrial_client_locks(client_id,status,request_id,updated_at)
+                   VALUES(?,?,?,?)
+                   ON CONFLICT(client_id) DO UPDATE SET status=excluded.status,
+                     request_id=excluded.request_id,updated_at=excluded.updated_at""",
+                (client_id,"ACTIVE",request_id,now()),
+            )
+            con.commit()
+            return {"ok": True, "status": "CLAIMED", "request_id": request_id}
+
+    def release_industrial_client(self, client_id, request_id=None):
+        with self.connect() as con:
+            if request_id:
+                con.execute(
+                    "UPDATE industrial_client_locks SET status='IDLE',updated_at=? WHERE client_id=? AND request_id=?",
+                    (now(),client_id,request_id),
+                )
+            else:
+                con.execute(
+                    "UPDATE industrial_client_locks SET status='IDLE',updated_at=? WHERE client_id=?",
+                    (now(),client_id),
+                )
+            con.commit()
 
     def events_for_run(self,run_id,limit=100):
         with self.connect() as con:
