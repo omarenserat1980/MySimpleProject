@@ -1,4 +1,4 @@
-"""Evidence-gated commercial control plane."""
+"""Evidence-gated commercial control plane with provenance checks."""
 
 from __future__ import annotations
 
@@ -30,11 +30,30 @@ REQUIRED_EVIDENCE: dict[CommercialState, FrozenSet[str]] = {
 }
 
 
+ALLOWED_PROVENANCE = frozenset({
+    "CUSTOMER_ACCEPTANCE",
+    "ORDER_RECORD",
+    "DELIVERY_RECORD",
+    "PAYMENT_RECEIPT",
+    "COST_RECORD",
+    "RECONCILIATION",
+    "OFFER_RECORD",
+})
+
+
 @dataclass(frozen=True)
 class CommercialEvidence:
     evidence_type: str
     reference: str
     verified: bool = False
+    provenance: str = ""
+
+    def independently_supported(self) -> bool:
+        return (
+            self.verified
+            and bool(self.reference.strip())
+            and self.provenance in ALLOWED_PROVENANCE
+        )
 
 
 @dataclass
@@ -47,7 +66,7 @@ class CommercialCase:
         return {
             item.evidence_type
             for item in self.evidence
-            if item.verified and item.reference.strip()
+            if item.independently_supported()
         }
 
     def can_enter(self, target: CommercialState) -> bool:
