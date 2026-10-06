@@ -231,6 +231,51 @@ class ClientRevenueGuardian:
             "verification_required": True,
         }
 
+    def first_revenue_mission(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Create a bounded first-revenue mission; never fabricates a buyer, action, or payment."""
+        audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
+        deep = audit["deep_audit"]
+        revenue = float(deep.get("verified_revenue_jod", 0) or 0)
+        if revenue >= 10:
+            return {**audit, "status": "FIRST_REVENUE_TARGET_REACHED", "target_jod": 10.0}
+
+        previous = self.progress_reader(client_id) or {}
+        if previous.get("first_revenue_mission_status") == "PENDING_EXTERNAL_EVIDENCE":
+            return {
+                **audit,
+                "status": "FIRST_REVENUE_MISSION_PENDING",
+                "target_jod": 10.0,
+                "verification_required": True,
+            }
+
+        mission = {
+            "client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "target_jod": 10.0,
+            "objective": "ACHIEVE_FIRST_VERIFIED_REVENUE",
+            "opportunity_limit": 1,
+            "external_action_limit": 1,
+            "payment_verification_required": True,
+            "constraint": "ONE_OPPORTUNITY_ONE_EXTERNAL_ACTION",
+            "no_fabricated_buyer_or_payment": True,
+        }
+        record = {
+            **previous,
+            "target_client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "first_revenue_mission_status": "PENDING_EXTERNAL_EVIDENCE",
+            "first_revenue_target_jod": 10.0,
+            "first_revenue_mission": mission,
+            "dispatch_allowed": False,
+        }
+        self.progress_writer(client_id, record)
+        return {
+            **audit,
+            "status": "FIRST_REVENUE_MISSION_CREATED",
+            "mission": mission,
+            "verification_required": True,
+        }
+
     def reconcile_once(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Reconcile the last requested action against a fresh revenue measurement."""
         current = self.deep_inspect(income_engine, income_lifecycle, client_id)
