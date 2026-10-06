@@ -118,3 +118,26 @@ def test_history_is_append_only_and_preserves_each_step():
         "REVENUE_UNCHANGED_REQUIRES_NEXT_STEP",
         "REVENUE_INCREASE_CONFIRMED",
     ]
+
+
+def test_deep_inspect_derives_bounded_recovery_action_on_decrease():
+    class Income:
+        def snapshot(self, client_id=None):
+            return {"verified_revenue_jod": 80, "opportunities": []}
+    class Lifecycle:
+        ORDER = ("DISCOVERY", "PAYMENT_VERIFIED")
+        def summary(self, client_id=None):
+            return {"counts": {}, "payment_verified_jod": 80}
+    saved = []
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda _id: {},
+        revenue_reader=lambda _id: {"verified_revenue_jod": 80},
+        progress_reader=lambda _id: {"verified_revenue_jod": 100},
+        progress_writer=lambda _id, record: saved.append(record),
+    )
+    report = guardian.deep_inspect(Income(), Lifecycle())
+    assert report["deep_audit"]["revenue_trend"] == "DECREASED"
+    assert report["deep_audit"]["next_action"] == "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK"
+    assert report["deep_audit"]["escalation"] == "REVENUE_RECOVERY_ESCALATION"
+    assert report["deep_audit"]["dispatch_allowed"] is False
+    assert saved[-1]["action_constraint"] == "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE"
