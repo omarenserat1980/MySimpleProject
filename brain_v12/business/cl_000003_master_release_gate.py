@@ -1,4 +1,4 @@
-"""Fail-closed, evidence-bound master release decision for CL-000003 films."""
+"""Evidence-bound release contract with artifact binding."""
 from __future__ import annotations
 import hashlib
 import json
@@ -12,34 +12,37 @@ def _digest(value: Any) -> str:
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+def _expected_evidence_prefix(identity):
+    return f"{identity['film_id']}/{identity['film_version']}/{identity['production_run']}/"
+
 def decide(evidence: dict[str, Any]) -> dict[str, Any]:
-    failures = []
-    states = {}
+    failures, states = [], {}
     identity = {k: str(evidence.get(k) or "").strip() for k in IDENTITY_REQUIRED}
-    for key, value in identity.items():
-        if not value:
-            failures.append(f"{key.upper()}_REQUIRED")
+    for k,v in identity.items():
+        if not v: failures.append(f"{k.upper()}_REQUIRED")
+    prefix = _expected_evidence_prefix(identity) if not failures else ""
+    artifact_sha = str(evidence.get("artifact_sha256") or "").strip().lower()
+    if not artifact_sha: failures.append("ARTIFACT_SHA256_REQUIRED")
+    elif len(artifact_sha) != 64: failures.append("ARTIFACT_SHA256_INVALID")
     for key in REQUIRED:
-        item = evidence.get(key)
-        passed = isinstance(item, dict) and item.get("passed") is True
-        states[key] = "PASS" if passed else "FAIL"
+        item=evidence.get(key)
+        passed=isinstance(item,dict) and item.get("passed") is True
+        states[key]="PASS" if passed else "FAIL"
         if not passed:
-            failures.append(f"{key.upper()}_PASS_REQUIRED")
-            continue
+            failures.append(f"{key.upper()}_PASS_REQUIRED"); continue
         for field in EVIDENCE_REQUIRED:
             if not str(item.get(field) or "").strip():
                 failures.append(f"{key.upper()}_{field.upper()}_REQUIRED")
-        supplied = str(item.get("evidence_sha256") or "").strip().lower()
-        if supplied and len(supplied) != 64:
+        ref=str(item.get("evidence_ref") or "").strip()
+        if prefix and ref and not ref.startswith(prefix):
+            failures.append(f"{key.upper()}_EVIDENCE_IDENTITY_MISMATCH")
+        supplied=str(item.get("evidence_sha256") or "").strip().lower()
+        if supplied and len(supplied)!=64:
             failures.append(f"{key.upper()}_EVIDENCE_HASH_INVALID")
-    release = not failures
-    decision = {
-        "status": "MASTER_RELEASE_PASS" if release else "DO_NOT_PUBLISH",
-        "publish_authorized": release,
-        "gates": states,
-        "failures": failures,
-        "next_action": "PUBLISH" if release else "DIAGNOSE_REWORK_REPLACE",
-        "identity": identity,
-    }
-    decision["decision_sha256"] = _digest(decision)
+    release=not failures
+    decision={"status":"MASTER_RELEASE_PASS" if release else "DO_NOT_PUBLISH","publish_authorized":release,
+              "gates":states,"failures":failures,
+              "next_action":"PUBLISH" if release else "DIAGNOSE_REWORK_REPLACE",
+              "identity":identity,"artifact_sha256":artifact_sha}
+    decision["decision_sha256"]=_digest(decision)
     return decision
