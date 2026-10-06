@@ -167,3 +167,30 @@ def test_advance_once_requests_one_persisted_next_step():
     assert calls[0]["constraint"] == "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE"
     assert saved[-1]["action_status"] == "REQUESTED"
     assert saved[-1]["dispatch_allowed"] is False
+
+
+def test_advance_once_blocks_duplicate_without_new_measurement():
+    calls = []
+    class Income:
+        def snapshot(self, client_id=None):
+            return {"verified_revenue_jod": 80, "opportunities": []}
+    class Lifecycle:
+        ORDER = ("DISCOVERY", "PAYMENT_VERIFIED")
+        def summary(self, client_id=None):
+            return {"counts": {}, "payment_verified_jod": 80}
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda _id: {},
+        revenue_reader=lambda _id: {"verified_revenue_jod": 80},
+        progress_reader=lambda _id: {
+            "current_verified_revenue_jod": 80,
+            "verified_revenue_jod": 80,
+            "action_status": "REQUESTED",
+            "action_requested": "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK",
+        },
+        progress_writer=lambda _id, _record: None,
+        action_requester=lambda _id, action: calls.append(action) or {"accepted": True},
+    )
+    result = guardian.advance_once(Income(), Lifecycle())
+    assert result["status"] == "WAITING_FOR_RECHECK"
+    assert result["action_requested"] is False
+    assert calls == []
