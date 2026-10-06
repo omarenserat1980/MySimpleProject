@@ -79,14 +79,15 @@ class ClientRevenueGuardian:
                 "existing_primary_pipeline_only": True,
                 "no_parallel_workflows": True,
                 "no_revenue_without_payment_evidence": True,
+                "client_data_isolation": True,
             },
         }
 
     def deep_inspect(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Aggregate the existing income lifecycle without mutating it."""
         report = self.inspect(client_id)
-        snapshot = income_engine.snapshot()
-        lifecycle = income_lifecycle.summary()
+        snapshot = income_engine.snapshot(client_id=client_id)
+        lifecycle = income_lifecycle.summary(client_id=client_id)
         opportunities = list(snapshot.get("opportunities") or [])
         verified = float(snapshot.get("verified_revenue_jod", 0) or 0)
         active = [x for x in opportunities if str(x.get("status") or "").upper() not in {"STALE", "COMPLETED", "PAYMENT_VERIFIED"}]
@@ -108,6 +109,7 @@ class ClientRevenueGuardian:
             "highest_priority": priority,
             "hard_gate": "PAYMENT_VERIFIED + payment_evidence",
             "evidence_chain": list(getattr(income_lifecycle, "ORDER", ())),
+            "client_data_isolation": True,
         }
         return report
 
