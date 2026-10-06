@@ -199,9 +199,27 @@ def brain_revenue_guardian(request: Request, client_id: str):
     """Deep evidence audit for the revenue guardian; no external side effects."""
     require_control_key(request)
     from .brain.client_revenue_guardian import ClientRevenueGuardian
+    def _client_activity(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        counts = summary.get("counts") or {}
+        return {
+            "source": "income_lifecycle",
+            "client_id": target_id,
+            "opportunities": sum(int(v or 0) for v in counts.values()),
+            "completed": int(counts.get("COMPLETED", 0) or 0),
+            "payment_verified": int(counts.get("PAYMENT_VERIFIED", 0) or 0),
+        }
+
+    def _client_revenue(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        return {
+            "client_id": target_id,
+            "verified_revenue_jod": float(summary.get("payment_verified_jod", 0) or 0),
+        }
+
     guardian = ClientRevenueGuardian(
-        activity_reader=lambda _id: {"source": "income_lifecycle", "client_id": _id},
-        revenue_reader=lambda _id: {"verified_revenue_jod": income_lifecycle.summary().get("payment_verified_jod", 0)},
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
     )
     result = guardian.deep_inspect(workforce.income_engine, income_lifecycle, client_id)
     store.event("REVENUE_GUARDIAN_DEEP_AUDIT", {
