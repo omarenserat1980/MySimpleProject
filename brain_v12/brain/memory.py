@@ -50,6 +50,7 @@ class MemoryStore:
             CREATE TABLE IF NOT EXISTS income_opportunities(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               opportunity_id TEXT UNIQUE NOT NULL,
+              client_id TEXT,
               category TEXT NOT NULL,
               title TEXT NOT NULL,
               source_url TEXT,
@@ -64,6 +65,7 @@ class MemoryStore:
               updated_at TEXT NOT NULL,
               data TEXT NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id);
             CREATE TABLE IF NOT EXISTS incidents(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               fingerprint TEXT UNIQUE NOT NULL,
@@ -202,24 +204,25 @@ class MemoryStore:
         data=dict(opportunity)
         oid=data["opportunity_id"]
         with self.connect() as con:
+            client_id=data.get("client_id")
             row=con.execute("SELECT id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
             if row:
                 con.execute("""UPDATE income_opportunities
-                               SET category=?,title=?,source_url=?,evidence=?,status=?,score=?,
+                               SET client_id=?,category=?,title=?,source_url=?,evidence=?,status=?,score=?,
                                    expected_value_jod=?,verified_amount_jod=?,verification_status=?,
                                    owner_role=?,updated_at=?,data=? WHERE opportunity_id=?""",
-                            (data.get("category",""),data.get("title",""),data.get("source_url"),
+                            (client_id,data.get("category",""),data.get("title",""),data.get("source_url"),
                              data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
                              data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
                              data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
                              now_iso,json.dumps(data,ensure_ascii=False),oid))
             else:
                 con.execute("""INSERT INTO income_opportunities
-                               (opportunity_id,category,title,source_url,evidence,status,score,
+                               (opportunity_id,client_id,category,title,source_url,evidence,status,score,
                                 expected_value_jod,verified_amount_jod,verification_status,owner_role,
                                 created_at,updated_at,data)
-                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                            (oid,data.get("category",""),data.get("title",""),data.get("source_url"),
+                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (oid,client_id,data.get("category",""),data.get("title",""),data.get("source_url"),
                              data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
                              data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
                              data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
@@ -240,10 +243,13 @@ class MemoryStore:
         if removed: self.event("INCOME_LEGACY_CHANNELS_PURGED", {"removed":removed})
         return removed
 
-    def income_opportunities(self, limit=100):
+    def income_opportunities(self, limit=100, client_id=None):
         with self.connect() as con:
-            rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",
-                             (max(1,min(int(limit),500)),)).fetchall()
+            lim=max(1,min(int(limit),500))
+            if client_id is None:
+                rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",(lim,)).fetchall()
+            else:
+                rows=con.execute("SELECT * FROM income_opportunities WHERE client_id=? ORDER BY score DESC,id DESC LIMIT ?",(client_id,lim)).fetchall()
         out=[]
         for row in rows:
             item=dict(row)
@@ -252,13 +258,20 @@ class MemoryStore:
             out.append(item)
         return out
 
-    def income_summary(self):
+    def income_summary(self, client_id=None):
         with self.connect() as con:
-            row=con.execute("""SELECT COUNT(*) total,
-                                      COALESCE(SUM(verified_amount_jod),0) verified,
-                                      COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
-                                      COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
-                               FROM income_opportunities""").fetchone()
+            if client_id is None:
+                row=con.execute("""SELECT COUNT(*) total,
+                                          COALESCE(SUM(verified_amount_jod),0) verified,
+                                          COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
+                                          COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
+                                   FROM income_opportunities""").fetchone()
+            else:
+                row=con.execute("""SELECT COUNT(*) total,
+                                          COALESCE(SUM(verified_amount_jod),0) verified,
+                                          COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
+                                          COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
+                                   FROM income_opportunities WHERE client_id=?""",(client_id,)).fetchone()
         return dict(row)
 
 
