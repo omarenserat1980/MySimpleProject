@@ -141,3 +141,29 @@ def test_deep_inspect_derives_bounded_recovery_action_on_decrease():
     assert report["deep_audit"]["escalation"] == "REVENUE_RECOVERY_ESCALATION"
     assert report["deep_audit"]["dispatch_allowed"] is False
     assert saved[-1]["action_constraint"] == "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE"
+
+
+def test_advance_once_requests_one_persisted_next_step():
+    calls = []
+    saved = []
+    class Income:
+        def snapshot(self, client_id=None):
+            return {"verified_revenue_jod": 80, "opportunities": []}
+    class Lifecycle:
+        ORDER = ("DISCOVERY", "PAYMENT_VERIFIED")
+        def summary(self, client_id=None):
+            return {"counts": {}, "payment_verified_jod": 80}
+    guardian = ClientRevenueGuardian(
+        activity_reader=lambda _id: {},
+        revenue_reader=lambda _id: {"verified_revenue_jod": 80},
+        progress_reader=lambda _id: {"verified_revenue_jod": 100},
+        progress_writer=lambda _id, record: saved.append(record),
+        action_requester=lambda _id, action: calls.append(action) or {"accepted": True},
+    )
+    result = guardian.advance_once(Income(), Lifecycle())
+    assert result["status"] == "NEXT_STEP_REQUESTED"
+    assert len(calls) == 1
+    assert calls[0]["next_action"] == "RECOVER_ONE_REVENUE_PATH_BEFORE_ACCEPTING_NEW_WORK"
+    assert calls[0]["constraint"] == "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE"
+    assert saved[-1]["action_status"] == "REQUESTED"
+    assert saved[-1]["dispatch_allowed"] is False
