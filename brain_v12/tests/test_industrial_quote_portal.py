@@ -29,7 +29,7 @@ def test_bilingual_ui_and_admin_contract():
     admin = (root / "web" / "industrial-quote-portal" / "admin.html").read_text(encoding="utf-8")
     for marker in ["data-ar=", "data-en=", 'id="lang"', "/api/industrial-quotes/inquiries", "@media(max-width:800px)"]:
         assert marker in ui
-    for marker in ["/api/industrial-quotes/admin/inquiries", "X-BRAIN-CONTROL-KEY", "type="password""]:
+    for marker in ["/api/industrial-quotes/admin/inquiries", "X-BRAIN-CONTROL-KEY", 'type="password"']:
         assert marker in admin
 
 
