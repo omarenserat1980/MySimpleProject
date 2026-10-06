@@ -71,6 +71,7 @@ from . import short_video_factory
 from .cloud_bootstrap import bootstrap_status
 from .brain.windows_cloud_discovery import discover_windows_cloud_nodes
 from .brain.windows_cloud_secret_gate import check_windows_cloud_secret_readiness
+from .brain import internal_clients
 from cloud.brain_fabric import list_nodes as list_fabric_nodes
 
 from .brain.security_middleware import apply_security_headers
@@ -176,10 +177,34 @@ app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_comme
 app.include_router(commercial_dashboard_router())
 
 
+class BrainInternalClientRequest(BaseModel):
+    client_id: str
+    approved: bool = False
+
+
 class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
     target: str = "arkan"
+
+
+@app.get("/api/brain/internal-clients")
+def brain_internal_clients():
+    """Expose the bounded active Brain-client registry to internal software tools."""
+    return internal_clients.public_registry()
+
+
+@app.post("/api/brain/internal-clients/plan")
+def brain_internal_client_plan(request: Request, body: BrainInternalClientRequest):
+    """Build a fail-closed launch plan; no external side effect occurs here."""
+    require_control_key(request)
+    result = internal_clients.launch_plan(body.client_id, device_bridge)
+    store.event("BRAIN_INTERNAL_CLIENT_PLAN", {
+        "client_id": body.client_id,
+        "status": result.get("status"),
+        "approved": body.approved,
+    })
+    return result
 
 
 @app.post("/api/industrial-clients/request")
