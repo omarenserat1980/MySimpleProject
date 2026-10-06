@@ -170,6 +170,45 @@ class ClientRevenueGuardian:
         }
         return report
 
+    def advance_once(self, income_engine: Any, income_lifecycle: Any, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
+        """Choose and request exactly one next step, then persist its outcome."""
+        audit = self.deep_inspect(income_engine, income_lifecycle, client_id)
+        deep = audit["deep_audit"]
+        if self.action_requester is None:
+            return {**audit, "status": "ACTION_REQUESTER_NOT_REGISTERED", "action_requested": False}
+
+        action = {
+            "client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "objective": "MOVE_TOWARD_VERIFIED_REVENUE",
+            "next_action": deep["next_action"],
+            "trend": deep["revenue_trend"],
+            "delta_jod": deep["revenue_delta_jod"],
+            "escalation": deep["escalation"],
+            "constraint": "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE",
+            "verified_revenue_only": True,
+        }
+        result = self.action_requester(client_id, action)
+        outcome = result if isinstance(result, dict) else {"result": result}
+        record = {
+            **(self.progress_reader(client_id) or {}),
+            "target_client_id": client_id,
+            "guardian_client_id": GUARDIAN_CLIENT_ID,
+            "action_requested": deep["next_action"],
+            "action_outcome": outcome,
+            "action_status": "REQUESTED",
+            "dispatch_allowed": False,
+        }
+        self.progress_writer(client_id, record)
+        return {
+            **audit,
+            "status": "NEXT_STEP_REQUESTED",
+            "action_requested": True,
+            "action": action,
+            "action_result": outcome,
+            "verification_required": True,
+        }
+
     def nudge_once(self, client_id: str = TARGET_CLIENT_ID) -> dict[str, Any]:
         """Request at most one bounded action; execution remains elsewhere."""
         report = self.inspect(client_id)
