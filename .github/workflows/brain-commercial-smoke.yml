@@ -51,10 +51,14 @@ jobs:
             "reconciliation_ref":"evidence://reconciliation/tx-commercial-001"
           })
 
-          ledger=RevenueRecord(opp.opportunity_id,"verified amount","USD")
+          ledger=RevenueRecord(opp.opportunity_id,"100","USD")
           ledger.verify({
             "transaction_id":"tx-commercial-001",
-            "evidence_ref":"evidence://payment/tx-commercial-001"
+            "evidence_ref":"evidence://payment/tx-commercial-001",
+            "source":"independent-test-bank-record",
+            "verification_status":"INDEPENDENTLY_VERIFIED",
+            "amount":"100",
+            "currency":"USD"
           })
           ledger.realize({
             "delivery_evidence_ref":"evidence://delivery/OPP-000001",
