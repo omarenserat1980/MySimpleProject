@@ -64,6 +64,7 @@ class ExecutorService : Service() {
             try {
                 // Keep Brain's device registry fresh even when no task is queued.
                 heartbeat(baseUrl, agentId, key)
+                requestLiveAndroidTestOnce(baseUrl, agentId, key, prefs)
                 // Resume one persisted production task on every executor cycle.
                 queueWorker.resumeOnce()
 
@@ -105,6 +106,28 @@ class ExecutorService : Service() {
         c.inputStream.close()
         c.disconnect()
     }
+    private fun requestLiveAndroidTestOnce(baseUrl: String, agentId: String, key: String, prefs: android.content.SharedPreferences) {
+        if (prefs.getBoolean("live_android_test_done", false)) return
+        val c = URL(baseUrl + "/api/device/android-open-app-test").openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        c.doOutput = true
+        c.connectTimeout = 10000
+        c.readTimeout = 10000
+        c.setRequestProperty("X-V12-Agent-Key", key)
+        c.setRequestProperty("X-V12-Agent-Id", agentId)
+        c.setRequestProperty("Content-Type", "application/json")
+        c.outputStream.use { it.write("{}".toByteArray(StandardCharsets.UTF_8)) }
+        val code = c.responseCode
+        val body = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+        c.disconnect()
+        if (code !in 200..299) throw IllegalStateException("ANDROID_TEST_HTTP_$code")
+        val root = JSONObject(body)
+        if (root.optString("status") == "QUEUED") {
+            prefs.edit().putBoolean("live_android_test_done", true).apply()
+            updateNotification("LIVE TEST QUEUED: Android Settings")
+        }
+    }
+
     private fun poll(baseUrl: String, agentId: String, key: String): JSONObject? {
         val url = URL(baseUrl + "/api/device/poll?agent_id=" + URLEncoder.encode(agentId, "UTF-8"))
         val c = url.openConnection() as HttpURLConnection
