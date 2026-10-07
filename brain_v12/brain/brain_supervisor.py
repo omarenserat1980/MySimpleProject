@@ -28,8 +28,7 @@ class BrainSupervisor:
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
-        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"
-")
+        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"\\n")
 
     def create(self,task,steps=None,budget=8):
         steps=steps or ["discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver"]
