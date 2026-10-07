@@ -20,6 +20,9 @@ class PathRecord:
     steps: list[str]
     status: str = "candidate"
     score: float = 0.0
+    source_strategy: str = "local"
+    open_source_regions: list[str] | None = None
+    license_required: str = "compatible"
     runs: int = 0
     successes: int = 0
     failures: int = 0
@@ -30,6 +33,8 @@ class PathRecord:
     def __post_init__(self) -> None:
         if self.evidence is None:
             self.evidence = []
+        if self.open_source_regions is None:
+            self.open_source_regions = []
 
     @property
     def success_rate(self) -> float:
@@ -103,6 +108,13 @@ class PathEvolutionRegistry:
         raw = max(candidates, key=lambda item: item.get("score", 0.0))
         return PathRecord(**raw)
 
+    def source_policy(self) -> dict[str, Any]:
+        return {
+            "strategy": "global-open-source-evidence-first",
+            "regions": ["US", "China", "India", "Germany", "UK", "Canada", "Japan", "South Korea", "Israel", "Singapore"],
+            "rules": ["search mature open-source implementations first", "check license compatibility", "check security and maintenance", "adapt only after local reproduction and tests", "record source and evidence"],
+        }
+
     def snapshot(self) -> dict[str, Any]:
         return json.loads(json.dumps(self._data))
 
@@ -120,6 +132,7 @@ def bootstrap_default_paths(registry: PathEvolutionRegistry) -> None:
         ("PATH-ANDROID-EXECUTOR", "connectivity", ["apk", "android-executor-redmi3-01", "poll", "task", "result", "verify"]),
         ("PATH-FAST-SCAN", "scan", ["github", "ci", "runtime", "device", "deep-scan-on-demand"]),
         ("PATH-FAST-RECOVERY", "recovery", ["evidence", "classify", "best-alternative", "one-repair", "verify", "record"]),
+        ("PATH-GLOBAL-OPEN-SOURCE", "open-source", ["problem", "global-source-search", "license-check", "security-check", "local-adapt", "test", "verify", "record"]),
     ]
     for path_id, goal, steps in defaults:
         if path_id not in registry._data["paths"]:
