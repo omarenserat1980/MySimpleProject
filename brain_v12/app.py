@@ -185,6 +185,7 @@ from .brain.customer_portal import router as customer_router
 from .brain.economic_reconciliation import router as economic_reconciliation_router
 from .brain.industrial_quote_portal import router as industrial_quote_portal_router
 from .brain.commerce_reversals import router as commerce_reversals_router
+from .brain.habitat.api import router as habitat_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(ai_fabric_router(fabric))
@@ -197,6 +198,7 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_industrial_quotes.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(habitat_router)
 app.include_router(commercial_dashboard_router())
 
 
