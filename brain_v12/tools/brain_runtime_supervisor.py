@@ -6,7 +6,7 @@ future-evolution predictions. Safety gates remain authoritative; continuity is n
 permission to bypass them.
 """
 from __future__ import annotations
-import json, os, time, urllib.parse, urllib.request, fcntl
+import json, os, time, urllib.parse, urllib.request, fcntl, fcntl
 from pathlib import Path
 
 BASE = os.environ.get("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
@@ -137,6 +137,18 @@ def temporal_next_action():
     return {"ok": True, "action": "delegated"}
 
 
+SUPERVISOR_LOCK = STATE / "continuous_supervisor.lock"
+
+def acquire_supervisor_lock():
+    """Prevent duplicate runtime supervisors from competing for the same queue."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    handle = SUPERVISOR_LOCK.open("w", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        handle.close()
+        raise RuntimeError("SUPERVISOR_ALREADY_RUNNING")
+    return handle
 def main():
     lock_handle = acquire_supervisor_lock()
     print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION single_instance=true", flush=True)
