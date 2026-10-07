@@ -31,7 +31,7 @@ class BrainSupervisor:
         with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"\n")
 
     def create(self,task,steps=None,budget=8):
-        steps=steps or ["discover","plan","select_backend","execute","verify","repair","retry","deliver"]
+        steps=steps or ["discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver"]
         job=self.control.create(task,steps,max_attempts=self.max_cycles,budget=budget); job=self.control.start_attempt(job)
         self.missions[job["job_id"]]=Mission(job["job_id"],task,max_attempts=self.max_cycles)
         self._event(job["job_id"],"supervisor_created",{"steps":steps,"v13":"enabled"}); return job
@@ -42,12 +42,17 @@ class BrainSupervisor:
         c.validate(); self._event(job["job_id"],"execution_contract",c.as_dict()); return c
 
     def observe(self,job_id,key,value,source="supervisor",confidence=1.0,evidence_ids=()):
+        mission=self.missions.get(job_id)
+        if mission is not None:
+            from .mission import MissionState
+            if mission.state == MissionState.EXECUTING:
+                mission.transition(MissionState.OBSERVING, reason="observation")
         recorded=self.evidence.append(job_id,key,{"value":value,"confidence":confidence,"evidence_ids":list(evidence_ids)},producer=source)
         obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)+(recorded["evidence_id"],)))
         self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence(),"evidence_id":recorded["evidence_id"]}); return obs
 
     def transition(self,job,phase,status="running",details=None,enforce_authority=True,required_evidence_kind=None):
-        allowed={"discover","plan","select_backend","execute","verify","repair","retry","deliver","blocked","completed","failed"}
+        allowed={"discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:raise ValueError("unknown_supervisor_phase")
         if phase=="deliver" and status=="completed":
             result=self.verification.assert_success(job["job_id"],required_kind=required_evidence_kind)
@@ -58,7 +63,7 @@ class BrainSupervisor:
             resource=self.resource_guard.sample()
             if resource.get("emergency"): details={"emergency":"RESOURCE_OVERLOAD","resource":resource,"previous_phase":phase}; phase="blocked"; status="blocked"
         mission=self.missions.get(job["job_id"])
-        mission_map={"discover":"UNDERSTANDING","plan":"PLANNING","select_backend":"READY","execute":"EXECUTING","verify":"VERIFYING","repair":"DIAGNOSING","retry":"RETEST","deliver":"COMPLETED"}
+        mission_map={"discover":"UNDERSTANDING","plan":"PLANNING","select_backend":"READY","execute":"EXECUTING","observe":"OBSERVING","verify":"VERIFYING","repair":"DIAGNOSING","recover":"RECOVERING","retry":"RETEST","deliver":"COMPLETED"}
         if mission and phase in mission_map:
             from .mission import MissionState
             target=MissionState[mission_map[phase]]
@@ -67,7 +72,7 @@ class BrainSupervisor:
         if phase=="execute" and enforce_authority:
             self.execution_gateway.authorize("brain-internal-execution"); self.execution_contract(job,"execute")
         row=dict(job); row.update(phase=phase,status=status,updated_at=time.time(),details=details or {})
-        idx={"discover":0,"plan":1,"select_backend":2,"execute":3,"verify":4,"repair":5,"retry":6,"deliver":7}.get(phase,row.get("step_index",0))
+        idx={"discover":0,"plan":1,"select_backend":2,"execute":3,"observe":4,"verify":5,"repair":6,"recover":7,"retry":8,"deliver":9}.get(phase,row.get("step_index",0))
         if idx>=row.get("step_index",0):row=self.control.checkpoint(row,idx,row["details"])
         if status in {"blocked","failed","completed"}:row["status"]=status;self.control._append(self.control.jobs,row)
         if mission:
@@ -105,8 +110,11 @@ class BrainSupervisor:
         action=self.next_action(job,verification)
         if action["action"]=="deliver":return self.transition(job,"deliver",status="completed",details=action,required_evidence_kind=action.get("required_evidence_kind"))
         if action["action"]=="blocked":return self.transition(job,"blocked",status="blocked",details=action)
-        repaired=self.transition(job,"repair",details=action);retried=self.control.start_attempt(repaired)
-        self._event(retried["job_id"],"repair_retry_started",action);return self.transition(retried,"retry",details={"action":action["action"],"completion":action.get("completion")})
+        repaired=self.transition(job,"repair",details=action)
+        recovered=self.transition(repaired,"recover",details={"action":action["action"]})
+        retried=self.control.start_attempt(recovered)
+        self._event(retried["job_id"],"repair_retry_started",action)
+        return self.transition(retried,"retry",details={"action":action["action"],"completion":action.get("completion")})
 
     def decide_repair(self,verification):
         if verification.get("ok"):return {"action":"none","reason":"verified"}
@@ -125,14 +133,19 @@ class BrainSupervisor:
 
     def run_simulation(self,task,verification_ok=True):
         job=self.create(task)
-        for phase in ["discover","plan","select_backend","execute","verify"]:job=self.transition(job,phase,details={"simulated":True},enforce_authority=False)
+        for phase in ["discover","plan","select_backend","execute"]:job=self.transition(job,phase,details={"simulated":True},enforce_authority=False)
         verification={"ok":bool(verification_ok)}
         if verification_ok:
             self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation")
+            job=self.transition(job,"observe",details={"simulated":True},enforce_authority=False)
         else:
             job=self.transition(job,"repair",details=self.decide_repair(verification));job=self.transition(job,"retry",details={"bounded":True})
-            job=self.transition(job,"execute",details={"retry":True},enforce_authority=False);job=self.transition(job,"verify",details={"retry":True})
+            job=self.transition(job,"recover",details={"bounded":True},enforce_authority=False)
+            job=self.transition(job,"retry",details={"bounded":True},enforce_authority=False)
+            job=self.transition(job,"execute",details={"retry":True},enforce_authority=False)
             self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation-repair")
+            job=self.transition(job,"observe",details={"retry":True},enforce_authority=False)
+            job=self.transition(job,"verify",details={"retry":True},enforce_authority=False)
         evidence_result=self.verify_evidence(job["job_id"],required_kind="simulation_runtime_verified")
         final="completed" if evidence_result.verified else "blocked"
         job=self.transition(job,"deliver",status="completed",details={"result":final},required_evidence_kind="simulation_runtime_verified")
