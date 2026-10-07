@@ -20,8 +20,20 @@ class CommerceApiTests(unittest.TestCase):
             s.transition(oid, "PAYMENT_VERIFIED", {"transaction_id": "tx-smoke", "evidence_ref": "provider-receipt:smoke"})
             s.transition(oid, "DELIVERY_PENDING", "delivery-request:smoke")
             s.transition(oid, "DELIVERED", "delivery-proof:smoke")
+            with self.assertRaises(Exception):
+                s.transition(oid, "REVENUE_REALIZED", {"delivery_evidence_ref": "delivery-proof:smoke", "reconciliation_ref": "reconciliation:smoke"})
+
+            data = s._read()
+            data[oid]["revenue_authority"] = {
+                "status": "INDEPENDENTLY_VERIFIED",
+                "order_id": oid,
+                "payment_transaction_id": "tx-smoke",
+                "evidence_ref": "authority-proof:smoke",
+            }
+            s._write(data)
             final = s.transition(oid, "REVENUE_REALIZED", {"delivery_evidence_ref": "delivery-proof:smoke", "reconciliation_ref": "reconciliation:smoke"})
             self.assertEqual(final["state"], "REVENUE_REALIZED")
+            self.assertEqual(final["revenue"]["authority_ref"], "authority-proof:smoke")
 
     def test_revenue_cannot_be_realized_without_verified_payment(self):
         with tempfile.TemporaryDirectory() as d:
