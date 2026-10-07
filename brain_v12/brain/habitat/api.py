@@ -66,3 +66,16 @@ def android_open_app_test(request: Request, package: str = "com.android.settings
     bridge = DeviceBridge()
     result = bridge.enqueue("open_app", {"package": package})
     return result
+
+
+@router.post("/android/project-test")
+def android_project_test(request: Request, name: str = "BrainHabitatTest"):
+    """Create a tiny project through the live Android Executor gate."""
+    require_control_key(request)
+    from ..device_bridge import DeviceBridge
+    files = {
+        "README.md": "# Brain Habitat Android Test\n\nCreated through the controlled Android Executor path.\n",
+        "src/BrainHabitatTest.txt": "BRAIN_HABITAT_ANDROID_EXECUTOR_OK\n",
+    }
+    bridge = DeviceBridge()
+    return bridge.enqueue("create_app_project", {"name": name, "files": files})
