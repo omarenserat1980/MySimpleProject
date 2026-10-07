@@ -6,7 +6,7 @@ from .device_sync_adapter import DeviceTaskSyncAdapter
 AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
+    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
                    "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
     def __init__(self,store,sync_adapter=None):
         self.store=store; self._last_seen=None
