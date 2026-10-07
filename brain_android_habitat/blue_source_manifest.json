@@ -1,0 +1,43 @@
+{
+  "schema": "brain.blue.source-gate.v1",
+  "target": {
+    "manufacturer": "Xiaomi",
+    "model": "23129RN51X",
+    "codename": "blue",
+    "hardware": "mt6765",
+    "device_android": "16"
+  },
+  "verified": {
+    "official_kernel": {
+      "repository": "MiCode/Xiaomi_Kernel_OpenSource",
+      "ref": "blue-u-oss",
+      "device": "POCO C61 / Redmi A3",
+      "android_source": "U",
+      "base_tag": "alps-mp-s0.mp1.tc8sp-cs3-V1_xiaomi.s0mp1.k65v1.64.bsp.k510_P18"
+    },
+    "defconfig": {
+      "path": "arch/arm64/configs/blue_defconfig",
+      "status": "verified_in_blue_u_oss"
+    },
+    "mtk_modules": {
+      "repository": "MiCode/MTK_kernel_modules",
+      "ref": "blue-u-oss",
+      "device": "POCO C61 / Redmi A3"
+    }
+  },
+  "unverified": {
+    "exact_device_tree": true,
+    "exact_vendor_bsp": true,
+    "android_16_source": true,
+    "android_16_build_manifest": true
+  },
+  "policy": {
+    "allow_generic_mt6765_fallback": false,
+    "allow_other_xiaomi_device_tree_fallback": false,
+    "allow_android_u_as_android_16": false,
+    "allow_build_when_unverified": false,
+    "allow_flash": false
+  },
+  "decision": "BLOCK_UNTIL_EXACT_BLUE_DT_VENDOR_AND_ANDROID16_EVIDENCE",
+  "safety": "read_only_until_gate_pass"
+}
