@@ -23,6 +23,7 @@ class ExecutorService : Service() {
         private const val CHANNEL = "electronic_brain_executor"
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
+        private const val MAX_BACKOFF_MS = 30000L
         private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
     }
 
@@ -47,7 +48,7 @@ class ExecutorService : Service() {
 
     private fun loop() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
-        val agentId = prefs.getString("agent_id", "android-executor-01") ?: "android-executor-01"
+        val agentId = prefs.getString("agent_id", "redmi3-01") ?: "redmi3-01"
         val key = prefs.getString("agent_key", "") ?: ""
         val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
         if (key.isBlank()) {
@@ -57,6 +58,7 @@ class ExecutorService : Service() {
         }
 
         updateNotification("READY: $agentId")
+        var backoffMs = POLL_MS
         while (running) {
             try {
                 // Resume one persisted production task on every executor cycle.
@@ -71,11 +73,14 @@ class ExecutorService : Service() {
                         else "FAILED: " + task.optString("task")
                     )
                 } else {
+                    backoffMs = POLL_MS
+                    updateNotification("CONNECTED: $agentId • IDLE")
                     Thread.sleep(POLL_MS)
                 }
             } catch (e: Exception) {
-                updateNotification("CONNECTION ERROR: " + (e.message ?: "unknown").take(80))
-                Thread.sleep(5000)
+                updateNotification("RECONNECTING: " + (e.message ?: "unknown").take(70))
+                Thread.sleep(backoffMs)
+                backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
             }
         }
     }
