@@ -59,8 +59,24 @@ object TermuxBridge {
         timeoutMs: Long = 30 * 60 * 1000L
     ): TermuxResult {
         require(executable == "/data/data/com.termux/files/usr/bin/ffmpeg" ||
-                executable == "/data/data/com.termux/files/usr/bin/ffprobe") {
+                executable == "/data/data/com.termux/files/usr/bin/ffprobe" ||
+                executable == "/data/data/com.termux/files/usr/bin/python3") {
             "TERMUX_EXECUTABLE_NOT_ALLOWED"
+        }
+        if (executable.endsWith("/python3")) {
+            require(arguments.size <= 8 && arguments.firstOrNull() == "-c") {
+                "TERMUX_PYTHON_INVOCATION_NOT_ALLOWED"
+            }
+            val code = arguments.getOrNull(1) ?: ""
+            require(
+                code.length <= 4096 &&
+                code.contains("urllib.request") &&
+                code.contains("127.0.0.1:8012") &&
+                !code.contains("os.system") &&
+                !code.contains("subprocess")
+            ) {
+                "TERMUX_PYTHON_CODE_NOT_ALLOWED"
+            }
         }
         require(arguments.size <= 512) { "TERMUX_ARGUMENT_LIMIT" }
         if (!isInstalled(context)) {
