@@ -8,6 +8,13 @@ AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
                    "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
+    TASK_CAPABILITIES = {
+        "internet_download": "internet_download",
+        "open_url": "open_url",
+        "open_app": "open_app",
+        "create_app_project": "create_app_project",
+    }
+    ANDROID_EXECUTOR_PREFIX = "android-executor-"
     def __init__(self,store,sync_adapter=None):
         self.store=store; self._last_seen=None
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
@@ -66,7 +73,12 @@ class DeviceBridge:
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","task":None}
-        task=self.store.device_task_claim(agent_id)
+        required = self.TASK_CAPABILITIES
+        if agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX):
+            allowed_tasks = set(self.ALLOWED_TASKS)
+        else:
+            allowed_tasks = set(self.ALLOWED_TASKS) - set(required)
+        task=self.store.device_task_claim(agent_id, allowed_tasks=allowed_tasks)
         if self.sync_adapter and task:
             self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))
         return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
