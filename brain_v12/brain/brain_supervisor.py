@@ -28,7 +28,8 @@ class BrainSupervisor:
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
-        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"\n")
+        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"
+")
 
     def create(self,task,steps=None,budget=8):
         steps=steps or ["discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver"]
@@ -58,7 +59,13 @@ class BrainSupervisor:
         allowed={"discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:raise ValueError("unknown_supervisor_phase")
         if phase=="deliver" and status=="completed":
-            mission=self.missions.get(job["job_id"])\n            result=self.verification.assert_success(\n                job["job_id"],\n                required_kind=required_evidence_kind,\n                mission_id=job["job_id"],\n                attempt=mission.attempts if mission else None,\n            )
+            mission=self.missions.get(job["job_id"])
+            result=self.verification.assert_success(
+                job["job_id"],
+                required_kind=required_evidence_kind,
+                mission_id=job["job_id"],
+                attempt=mission.attempts if mission else None,
+            )
             if not result.verified:
                 phase="blocked"; status="blocked"
                 details={"completion_gate":"RUNTIME_EVIDENCE_REQUIRED","reasons":list(result.reasons),"evidence_ids":list(result.evidence_ids)}
@@ -86,7 +93,13 @@ class BrainSupervisor:
 
     def verify_evidence(self,job_id,required_kind=None):
         mission=self.missions.get(job_id)
-        mission=self.missions.get(job_id)\n        result=self.verification.verify(\n            job_id,\n            required_kind=required_kind,\n            mission_id=job_id,\n            attempt=mission.attempts if mission else None,\n        )
+        mission=self.missions.get(job_id)
+        result=self.verification.verify(
+            job_id,
+            required_kind=required_kind,
+            mission_id=job_id,
+            attempt=mission.attempts if mission else None,
+        )
         self._event(job_id,"evidence_verification",{"verified":result.verified,"evidence_ids":list(result.evidence_ids),"reasons":list(result.reasons)})
         return result
 
