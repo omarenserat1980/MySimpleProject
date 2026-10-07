@@ -46,9 +46,14 @@ class BrainSupervisor:
         obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)+(recorded["evidence_id"],)))
         self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence(),"evidence_id":recorded["evidence_id"]}); return obs
 
-    def transition(self,job,phase,status="running",details=None,enforce_authority=True):
+    def transition(self,job,phase,status="running",details=None,enforce_authority=True,required_evidence_kind=None):
         allowed={"discover","plan","select_backend","execute","verify","repair","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:raise ValueError("unknown_supervisor_phase")
+        if phase=="deliver" and status=="completed":
+            result=self.verification.assert_success(job["job_id"],required_kind=required_evidence_kind)
+            if not result.verified:
+                phase="blocked"; status="blocked"
+                details={"completion_gate":"RUNTIME_EVIDENCE_REQUIRED","reasons":list(result.reasons),"evidence_ids":list(result.evidence_ids)}
         if phase in {"execute","retry"} and enforce_authority:
             resource=self.resource_guard.sample()
             if resource.get("emergency"): details={"emergency":"RESOURCE_OVERLOAD","resource":resource,"previous_phase":phase}; phase="blocked"; status="blocked"
@@ -80,13 +85,14 @@ class BrainSupervisor:
             if completion["action"]=="deliver":return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
             if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit_after_reality_check","completion":completion}
             return {"action":"treat","reason":"problem_not_complete","completion":completion}
-        if verification.get("verified") or verification.get("ok"):return {"action":"deliver","reason":"verified"}
+        evidence_result=self.verify_evidence(job["job_id"],required_kind=verification.get("required_evidence_kind"))
+        if evidence_result.verified:return {"action":"deliver","reason":"runtime_evidence_verified","evidence_ids":list(evidence_result.evidence_ids)}
         if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit"}
         return self.decide_repair(verification)
 
     def repair_and_retry(self,job,verification):
         action=self.next_action(job,verification)
-        if action["action"]=="deliver":return self.transition(job,"deliver",status="completed",details=action)
+        if action["action"]=="deliver":return self.transition(job,"deliver",status="completed",details=action,required_evidence_kind=action.get("required_evidence_kind"))
         if action["action"]=="blocked":return self.transition(job,"blocked",status="blocked",details=action)
         repaired=self.transition(job,"repair",details=action);retried=self.control.start_attempt(repaired)
         self._event(retried["job_id"],"repair_retry_started",action);return self.transition(retried,"retry",details={"action":action["action"],"completion":action.get("completion")})
@@ -110,10 +116,15 @@ class BrainSupervisor:
         job=self.create(task)
         for phase in ["discover","plan","select_backend","execute","verify"]:job=self.transition(job,phase,details={"simulated":True},enforce_authority=False)
         verification={"ok":bool(verification_ok)}
-        if not verification["ok"]:
+        if verification_ok:
+            self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation")
+        else:
             job=self.transition(job,"repair",details=self.decide_repair(verification));job=self.transition(job,"retry",details={"bounded":True})
             job=self.transition(job,"execute",details={"retry":True},enforce_authority=False);job=self.transition(job,"verify",details={"retry":True})
-        final="completed" if verification_ok else "completed_after_repair"
-        job=self.transition(job,"deliver",status="completed",details={"result":final});self.snapshot(job,{"verified":verification_ok,"result":final});return job
+            self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation-repair")
+        evidence_result=self.verify_evidence(job["job_id"],required_kind="simulation_runtime_verified")
+        final="completed" if evidence_result.verified else "blocked"
+        job=self.transition(job,"deliver",status="completed",details={"result":final},required_evidence_kind="simulation_runtime_verified")
+        self.snapshot(job,{"verified":evidence_result.verified,"result":job["status"]});return job
 
 if __name__=="__main__":print(json.dumps(BrainSupervisor().run_simulation("supervisor_smoke_test"),indent=2))
