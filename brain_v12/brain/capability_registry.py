@@ -49,3 +49,8 @@ class CapabilityEvidence:
         self.events.append({"executor_id":executor_id,"action":action,"success":bool(success),"evidence":evidence})
     def snapshot(self):
         return list(self.events)
+
+
+ANDROID_INTERNET_APP_CAPABILITIES = frozenset({
+    "internet_download", "open_url", "open_app", "create_app_project",
+})
