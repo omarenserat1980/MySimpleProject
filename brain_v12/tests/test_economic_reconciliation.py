@@ -14,7 +14,7 @@ class EconomicReconciliationTests(unittest.TestCase):
     def test_reconcile_requires_control_key(self):
         r=self.client.post("/api/economic-reconciliation/reconcile",json={"order_id":"BRAIN-ORD-1","payment_transaction_id":"tx:1","payment_evidence_ref":"pay:1","delivery_evidence_ref":"delivery:1","amount_usd":9}); self.assertEqual(r.status_code,401)
     def test_reconcile_is_idempotent_and_evidence_gated(self):
-        payload={"order_id":"BRAIN-ORD-1","payment_transaction_id":"tx:1","payment_evidence_ref":"pay:1","delivery_evidence_ref":"delivery:1","amount_usd":9}
+        payload={"order_id":"BRAIN-ORD-1","payment_transaction_id":"tx:1","payment_evidence_ref":"pay:1","delivery_evidence_ref":"delivery:1","payment_source":"test-provider","payment_status":"VERIFIED","payment_amount_usd":9,"payment_currency":"USD","amount_usd":9}
         r=self.client.post("/api/economic-reconciliation/reconcile",json=payload,headers={"X-Brain-Control-Key":"test-control"}); self.assertEqual(r.status_code,200); self.assertEqual(r.json()["state"],"REVENUE_REALIZED")
         r2=self.client.post("/api/economic-reconciliation/reconcile",json=payload,headers={"X-Brain-Control-Key":"test-control"}); self.assertEqual(r2.status_code,200); self.assertEqual(r2.json()["audit_fingerprint"],r.json()["audit_fingerprint"])
 if __name__=="__main__": unittest.main()
