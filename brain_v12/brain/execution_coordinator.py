@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .control_plane import BrainControlPlane
-from .path_engine import GateDecision, GateResult, PathEngine, PathRun, PathSpec, PathState
+from ..path_engine import GateDecision, GateResult, PathEngine, PathRun, PathSpec
 from .task_engine import TaskEngine
 
 Executor = Callable[[str], dict[str, Any]]
