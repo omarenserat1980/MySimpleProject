@@ -23,7 +23,7 @@ class ExecutorService : Service() {
         private const val CHANNEL = "electronic_brain_executor"
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","termux_gateway_status","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -182,6 +182,26 @@ class ExecutorService : Service() {
                             .put("stderr", result.stderr.take(2000))
                             .put("error", result.errorMessage))
                     }
+                }
+                "termux_gateway_status" -> {
+                    if (!TermuxBridge.isInstalled(this)) {
+                        return ok(JSONObject().put("installed", false).put("ready", false).put("error", "TERMUX_NOT_INSTALLED"))
+                    }
+                    val code = "import urllib.request,json; out={}; " +
+                        "[(lambda p: out.update({p: (lambda r: {'status':r.status,'body':r.read().decode('utf-8')[:8000]})(urllib.request.urlopen('http://127.0.0.1:8012'+p,timeout=3))}))(p) for p in ['/api/agent-gateway/status','/api/agent-gateway/diagnostics']]; print(json.dumps(out))"
+                    val result = TermuxBridge.run(
+                        this,
+                        "/data/data/com.termux/files/usr/bin/python3",
+                        listOf("-c", code),
+                        timeoutMs = 15_000L
+                    )
+                    ok(JSONObject()
+                        .put("installed", true)
+                        .put("ready", result.exitCode == 0 && result.errorCode == 0)
+                        .put("exit_code", result.exitCode)
+                        .put("stdout", result.stdout.take(10000))
+                        .put("stderr", result.stderr.take(4000))
+                        .put("error", result.errorMessage))
                 }
                 "status" -> ok(JSONObject()
                     .put("device", "Android")
