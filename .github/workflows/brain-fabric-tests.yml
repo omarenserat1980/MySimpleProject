@@ -18,6 +18,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install required media test dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg already available: $(command -v ffmpeg)"
+          else
+            echo "FFmpeg missing; use cached package metadata first."
+            if ! apt-cache show ffmpeg >/dev/null 2>&1; then
+              sudo timeout --signal=TERM --kill-after=10s 45s                 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10
+            fi
+            sudo timeout --signal=TERM --kill-after=10s 45s               apt-get install -y --no-install-recommends -o DPkg::Lock::Timeout=10 ffmpeg
+          fi
+          command -v ffmpeg
+          ffmpeg -version | head -n 2
       - name: Install cloud test dependencies
         run: python -m pip install -r cloud/requirements.txt
       - name: Run Brain Fabric tests
