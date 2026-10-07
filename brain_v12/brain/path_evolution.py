@@ -109,3 +109,18 @@ class PathEvolutionRegistry:
 
 def default_registry(root: str | Path = ".") -> PathEvolutionRegistry:
     return PathEvolutionRegistry(Path(root) / ".brain" / "state" / "path_evolution.json")
+
+
+
+def bootstrap_default_paths(registry: PathEvolutionRegistry) -> None:
+    """Install stable baseline paths once; never overwrite observed metrics."""
+    defaults = [
+        ("PATH-BUILD-APK", "build", ["source", "ci-build", "artifact", "checksum", "install", "verify"]),
+        ("PATH-TERMUX-BRAIN", "connectivity", ["api", "enqueue", "redmi3-01", "execute", "report", "verify"]),
+        ("PATH-ANDROID-EXECUTOR", "connectivity", ["apk", "android-executor-redmi3-01", "poll", "task", "result", "verify"]),
+        ("PATH-FAST-SCAN", "scan", ["github", "ci", "runtime", "device", "deep-scan-on-demand"]),
+        ("PATH-FAST-RECOVERY", "recovery", ["evidence", "classify", "best-alternative", "one-repair", "verify", "record"]),
+    ]
+    for path_id, goal, steps in defaults:
+        if path_id not in registry._data["paths"]:
+            registry.upsert(PathRecord(path_id, goal, steps))
