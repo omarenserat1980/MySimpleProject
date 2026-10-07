@@ -120,7 +120,7 @@ def create_app(
     def create_lead(lead: LeadIn) -> LeadOut:
         created = lead_store.create(lead)
         case_id = cases.create_case(created.id)
-        return created.model_copy(update={"case_id": case_id})
+        return created.copy(update={"case_id": case_id})
 
     @app.get("/v1/leads/{lead_id}", response_model=LeadOut)
     def get_lead(lead_id: int) -> LeadOut:
@@ -130,7 +130,7 @@ def create_app(
                 "SELECT id FROM cases WHERE lead_id=? ORDER BY id DESC LIMIT 1",
                 (lead_id,),
             ).fetchone()
-            return result.model_copy(update={"case_id": rows["id"] if rows else None})
+            return result.copy(update={"case_id": rows["id"] if rows else None})
         except KeyError:
             raise HTTPException(status_code=404, detail="lead_not_found")
 
