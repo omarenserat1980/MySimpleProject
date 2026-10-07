@@ -111,6 +111,8 @@ class BrainSupervisor:
         return gate.decision(verification.get("verified_world",{}),verification.get("evidence",verification))
 
     def next_action(self,job,verification):
+        if verification.get("ok"):
+            return {"action":"deliver","reason":"verification_ok"}
         completion=self._completion_decision(verification)
         if completion:
             if completion["action"]=="deliver":return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
@@ -154,7 +156,7 @@ class BrainSupervisor:
             self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation")
             job=self.transition(job,"observe",details={"simulated":True},enforce_authority=False)
         else:
-            job=self.transition(job,"repair",details=self.decide_repair(verification));job=self.transition(job,"retry",details={"bounded":True})
+            job=self.transition(job,"repair",details=self.decide_repair(verification))
             job=self.transition(job,"recover",details={"bounded":True},enforce_authority=False)
             job=self.transition(job,"retry",details={"bounded":True},enforce_authority=False)
             job=self.transition(job,"execute",details={"retry":True},enforce_authority=False)
