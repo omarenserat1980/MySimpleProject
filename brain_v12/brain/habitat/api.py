@@ -56,3 +56,13 @@ def list_sources(limit: int = 200):
 def read_source(path: str, request: Request):
     require_control_key(request)
     return {"ok": True, "path": path, "content": sources.read(path)}
+
+
+@router.post("/android/open-app-test")
+def android_open_app_test(request: Request, package: str = "com.android.settings"):
+    """Queue a least-privilege Android app-open test through the live Executor gate."""
+    require_control_key(request)
+    from ..device_bridge import DeviceBridge
+    bridge = DeviceBridge()
+    result = bridge.enqueue("open_app", {"package": package})
+    return result
