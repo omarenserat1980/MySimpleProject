@@ -50,6 +50,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.chatgpt_device_gateway import ChatGPTDeviceGateway
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -135,6 +136,7 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 device_bridge=DeviceBridge(store)
+chatgpt_device_gateway=ChatGPTDeviceGateway(device_bridge)
 
 sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
 sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
@@ -1892,6 +1894,35 @@ def device_self_test_request(request:Request):
         "status": result.get("status"),
     })
     return result
+
+@app.post("/api/brain/chatgpt/mobile/send")
+def brain_chatgpt_mobile_send(request: Request, body: dict):
+    """Brain-authorized bounded request to the installed ChatGPT Android app."""
+    message = str(body.get("message") or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="MESSAGE_REQUIRED")
+    decision_id = str(body.get("decision_id") or "").strip()
+    if not decision_id:
+        raise HTTPException(status_code=400, detail="BRAIN_DECISION_ID_REQUIRED")
+    required_evidence = body.get("required_evidence") or ["response_text", "ui_clicked", "status"]
+    result = chatgpt_device_gateway.send(
+        message,
+        decision_id=decision_id,
+        required_evidence=list(required_evidence),
+        timeout_ms=int(body.get("timeout_ms") or 120000),
+    )
+    store.event("BRAIN_CHATGPT_MOBILE_QUEUED", {"decision_id": decision_id, "task_id": result.get("task", {}).get("task_id"), "status": result.get("status")})
+    return result
+
+@app.get("/api/brain/chatgpt/mobile/{task_id}/verify")
+def brain_chatgpt_mobile_verify(task_id: str):
+    result = chatgpt_device_gateway.verify(task_id)
+    store.event("BRAIN_CHATGPT_MOBILE_VERIFIED", {"task_id": task_id, "verified": result.get("verified", False), "status": result.get("status")})
+    return result
+
+@app.get("/api/brain/chatgpt/mobile/contract")
+def brain_chatgpt_mobile_contract():
+    return {"ok": True, "contract": chatgpt_device_gateway.contract()}
 
 @app.get("/api/device/result/{task_id}")
 def device_result(task_id:str):
