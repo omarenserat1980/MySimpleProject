@@ -50,6 +50,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.liveness import assess as assess_brain_liveness
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -2824,6 +2825,11 @@ def brain_evidence(evidence_id:str):
 @app.get("/api/brain/evidence/task/{task_id}")
 def brain_task_evidence(task_id:str):
     return {"ok":True,"task_id":task_id,"evidence":evidence_store.for_task(task_id)}
+
+@app.get("/api/brain/liveness")
+def brain_liveness():
+    """Read-only evidence-based Brain liveness assessment."""
+    return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
