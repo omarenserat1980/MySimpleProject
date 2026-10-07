@@ -15,8 +15,8 @@ class VerificationCore:
         self.evidence=evidence_store or EvidenceStore()
         self.constitution=constitution or BrainConstitution()
 
-    def verify(self,task_id,*,required_kind=None):
-        items=self.evidence.for_task(task_id)
+    def verify(self,task_id,*,required_kind=None,mission_id=None,attempt=None):
+        items=self.evidence.for_task(task_id,mission_id=mission_id,attempt=attempt)
         valid=[]; reasons=[]
         for item in items:
             checked=self.evidence.verify_hash(item["evidence_id"])
@@ -27,7 +27,7 @@ class VerificationCore:
             reasons.append("REQUIRED_RUNTIME_EVIDENCE_MISSING")
         return VerificationResult(not reasons,tuple(x["evidence_id"] for x in runtime),tuple(reasons))
 
-    def assert_success(self,task_id,*,required_kind=None):
-        result=self.verify(task_id,required_kind=required_kind)
+    def assert_success(self,task_id,*,required_kind=None,mission_id=None,attempt=None):
+        result=self.verify(task_id,required_kind=required_kind,mission_id=mission_id,attempt=attempt)
         self.constitution.assert_success_claim(verified=result.verified,evidence_ids=list(result.evidence_ids))
         return result
