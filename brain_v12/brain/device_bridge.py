@@ -7,7 +7,7 @@ AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; 
 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
-                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
+                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{},"brain_runtime_launch":{}}
     TASK_CAPABILITIES = {
         "internet_download": "internet_download",
         "open_url": "open_url",
