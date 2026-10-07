@@ -57,12 +57,13 @@ class ExecutorService : Service() {
             return
         }
 
-        updateNotification("READY: $agentId")
+        updateNotification("CONNECTING: $agentId")
         var backoffMs = POLL_MS
         while (running) {
             try {
                 // Keep Brain's device registry fresh even when no task is queued.
                 heartbeat(baseUrl, agentId, key)
+                updateNotification("ONLINE: $agentId • HEARTBEAT OK")
                 // Resume one persisted production task on every executor cycle.
                 queueWorker.resumeOnce()
 
