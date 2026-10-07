@@ -48,6 +48,7 @@ except Exception as exc:
 PY
 }
 health_ok() { "$PYTHON" -c 'import os,urllib.request; urllib.request.urlopen(os.environ["V12_BRAIN_URL"]+"/health",timeout=2).read()' >/dev/null 2>&1; }
+habitat_ok() { "$PYTHON" -c 'import json,os,urllib.request; data=json.loads(urllib.request.urlopen(os.environ["V12_BRAIN_URL"]+"/openapi.json",timeout=3).read().decode()); paths=data.get("paths",{}); required={"/api/habitat/status","/api/habitat/android/project-test"}; raise SystemExit(0 if required.issubset(paths) else 1)' >/dev/null 2>&1; }
 auth_ok() {
   "$PYTHON" -c 'import json,os,urllib.request
 key=open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]),encoding="utf-8").read().strip()
@@ -63,9 +64,9 @@ start_api() {
   echo "JET_BRAIN_API ready pid=$API_PID" >&2
 }
 if health_ok; then
-  if auth_ok; then echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+  if auth_ok && habitat_ok; then echo "JET_BRAIN_API already_ready_authenticated_and_habitat url=$V12_BRAIN_URL" >&2
   else
-    echo "JET_BRAIN_API stale_auth_restart" >&2
+    if auth_ok; then echo "JET_BRAIN_API stale_runtime_restart_missing_habitat" >&2; else echo "JET_BRAIN_API stale_auth_restart" >&2; fi
     pkill -f "uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012" 2>/dev/null || true
     sleep 1
     start_api
