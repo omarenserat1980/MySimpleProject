@@ -18,10 +18,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install system test dependencies
+      - name: Verify system test dependencies
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg is not preinstalled; installing with bounded APT timeouts."
+            sudo timeout 120s apt-get update -o Acquire::Retries=2
+            sudo timeout 120s apt-get install -y --no-install-recommends ffmpeg
+          fi
+          command -v ffmpeg
           ffmpeg -version
       - name: Install cloud test dependencies
         run: python -m pip install -r cloud/requirements.txt
