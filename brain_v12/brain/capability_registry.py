@@ -39,3 +39,13 @@ class CapabilityRegistry:
         return {"count":len(self._items),"online":sum(x.state=="ONLINE" for x in self._items.values()),
                 "executors":[{"executor_id":x.executor_id,"capabilities":sorted(x.capabilities),"state":x.state,
                               "metadata":x.metadata} for x in self._items.values()]}
+
+
+# Evolution metadata is intentionally append-only and JSON-safe.
+class CapabilityEvidence:
+    def __init__(self):
+        self.events=[]
+    def record(self, executor_id, action, success, evidence=None):
+        self.events.append({"executor_id":executor_id,"action":action,"success":bool(success),"evidence":evidence})
+    def snapshot(self):
+        return list(self.events)
