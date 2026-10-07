@@ -25,7 +25,7 @@ class ExecutorService : Service() {
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
         private const val MAX_BACKOFF_MS = 30000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send","internet_download","open_url","open_app","create_app_project",)
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send","internet_download","open_url","open_app","create_app_project","brain_runtime_launch",)
     }
 
     private val executor = Executors.newSingleThreadExecutor()

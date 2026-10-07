@@ -51,6 +51,17 @@ object TermuxBridge {
             false
         }
 
+    fun runBrainRuntimeLauncher(context: Context): TermuxResult {
+        if (!isInstalled(context)) return TermuxResult(-1, "", "", -1, "TERMUX_NOT_INSTALLED")
+        return runFixedCommand(context, "/data/data/com.termux/files/usr/bin/bash", listOf("/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_launcher.sh"), timeoutMs = 120000L)
+    }
+
+    private fun runFixedCommand(context: Context, executable: String, arguments: List<String>, workDir: String = "/data/data/com.termux/files/home", timeoutMs: Long = 30 * 60 * 1000L): TermuxResult {
+        require(executable == "/data/data/com.termux/files/usr/bin/bash") { "TERMUX_EXECUTABLE_NOT_ALLOWED" }
+        require(arguments.size == 1 && arguments[0] == "/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_launcher.sh") { "TERMUX_ARGUMENTS_NOT_ALLOWED" }
+        return runInternal(context, executable, arguments, workDir, timeoutMs)
+    }
+
     fun run(
         context: Context,
         executable: String,
@@ -62,6 +73,10 @@ object TermuxBridge {
                 executable == "/data/data/com.termux/files/usr/bin/ffprobe") {
             "TERMUX_EXECUTABLE_NOT_ALLOWED"
         }
+        return runInternal(context, executable, arguments, workDir, timeoutMs)
+    }
+
+    private fun runInternal(context: Context, executable: String, arguments: List<String>, workDir: String, timeoutMs: Long): TermuxResult {
         require(arguments.size <= 512) { "TERMUX_ARGUMENT_LIMIT" }
         if (!isInstalled(context)) {
             return TermuxResult(-1, "", "", -1, "TERMUX_NOT_INSTALLED")
