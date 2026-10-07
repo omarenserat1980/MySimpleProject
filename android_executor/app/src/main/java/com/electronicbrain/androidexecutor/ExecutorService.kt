@@ -48,7 +48,7 @@ class ExecutorService : Service() {
 
     private fun loop() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
-        val agentId = prefs.getString("agent_id", "redmi3-01") ?: "redmi3-01"
+        val agentId = prefs.getString("agent_id", "android-executor-redmi3-01") ?: "android-executor-redmi3-01"
         val key = prefs.getString("agent_key", "") ?: ""
         val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
         if (key.isBlank()) {
