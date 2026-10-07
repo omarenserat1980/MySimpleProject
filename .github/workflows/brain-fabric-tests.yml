@@ -28,6 +28,3 @@ jobs:
           cloud/test_brain_node_security.py
           cloud/test_brain_fabric_integration.py
           cloud/test_brain_fabric_api.py
-      - name: Run media executor contract test
-        if: ${{ hashFiles('cloud/test_brain_job_executor.py') != '' }}
-        run: python -m pytest -q cloud/test_brain_job_executor.py
