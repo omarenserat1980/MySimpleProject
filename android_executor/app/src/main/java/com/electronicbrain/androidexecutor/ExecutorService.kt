@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
@@ -24,7 +25,7 @@ class ExecutorService : Service() {
         private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
         private const val POLL_MS = 2000L
         private const val MAX_BACKOFF_MS = 30000L
-        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
+        private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send","internet_download","open_url","open_app","create_app_project",)
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -142,6 +143,72 @@ class ExecutorService : Service() {
 
         return try {
             when (name) {
+                "internet_download" -> {
+                    val urlText = params.optString("url", "").trim()
+                    require(urlText.startsWith("https://") || urlText.startsWith("http://")) { "URL_SCHEME_NOT_ALLOWED" }
+                    val name = params.optString("filename", "download.bin").replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val target = safePath("Downloads/" + name)
+                    val maxBytes = params.optLong("max_bytes", 50L * 1024L * 1024L).coerceIn(1L, 100L * 1024L * 1024L)
+                    val conn = URL(urlText).openConnection() as HttpURLConnection
+                    conn.connectTimeout = 15000
+                    conn.readTimeout = 30000
+                    conn.requestMethod = "GET"
+                    conn.connect()
+                    if (conn.responseCode !in 200..299) return fail("DOWNLOAD_HTTP_" + conn.responseCode)
+                    val length = conn.contentLengthLong
+                    if (length > maxBytes) return fail("DOWNLOAD_TOO_LARGE")
+                    target.parentFile?.mkdirs()
+                    var total = 0L
+                    conn.inputStream.use { input ->
+                        target.outputStream().use { output ->
+                            val buf = ByteArray(8192)
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n <= 0) break
+                                total += n
+                                if (total > maxBytes) return fail("DOWNLOAD_TOO_LARGE")
+                                output.write(buf, 0, n)
+                            }
+                        }
+                    }
+                    conn.disconnect()
+                    ok(JSONObject().put("url", urlText).put("path", target.absolutePath).put("bytes", total))
+                }
+                "open_url" -> {
+                    val urlText = params.optString("url", "").trim()
+                    require(urlText.startsWith("https://") || urlText.startsWith("http://")) { "URL_SCHEME_NOT_ALLOWED" }
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlText)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                    ok(JSONObject().put("url", urlText).put("opened", true))
+                }
+                "open_app" -> {
+                    val packageName = params.optString("package", "").trim()
+                    if (packageName.isBlank()) return fail("PACKAGE_REQUIRED")
+                    val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return fail("APP_NOT_INSTALLED")
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launch)
+                    ok(JSONObject().put("package", packageName).put("opened", true))
+                }
+                "create_app_project" -> {
+                    val projectName = params.optString("name", "BrainApp").replace(Regex("[^A-Za-z0-9_-]"), "_")
+                    val files = params.optJSONObject("files") ?: return fail("FILES_REQUIRED")
+                    val root = safePath("Apps/" + projectName)
+                    if (!root.exists()) root.mkdirs()
+                    val keys = files.keys()
+                    var count = 0
+                    while (keys.hasNext()) {
+                        val rel = keys.next()
+                        val body = files.optString(rel, "")
+                        if (rel.contains("..") || rel.startsWith("/")) return fail("PATH_OUTSIDE_PROJECT")
+                        if (body.toByteArray(StandardCharsets.UTF_8).size > 2 * 1024 * 1024) return fail("FILE_TOO_LARGE")
+                        val out = File(root, rel).canonicalFile
+                        require(out.path == root.canonicalPath || out.path.startsWith(root.canonicalPath + File.separator)) { "PATH_OUTSIDE_PROJECT" }
+                        out.parentFile?.mkdirs()
+                        out.writeText(body, StandardCharsets.UTF_8)
+                        count++
+                    }
+                    ok(JSONObject().put("project", projectName).put("path", root.absolutePath).put("files", count).put("status", "CREATED"))
+                }
                 "chatgpt_ui_send" -> {
                     if (!params.optBoolean("approved", false)) return fail("EXPLICIT_APPROVAL_REQUIRED")
                     val message = params.optString("message", "").trim()
