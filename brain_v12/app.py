@@ -1893,6 +1893,21 @@ def device_self_test_request(request:Request):
     })
     return result
 
+@app.post("/api/device/android-open-app-test")
+def device_android_open_app_test(request: Request):
+    """Least-privilege live Android Executor mission: launch Android Settings."""
+    require_device_agent(request)
+    agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
+    result = device_bridge.enqueue("open_app", {"package": "com.android.settings", "requested_by_agent": agent_id, "mission": "android_executor_live_test"})
+    store.event("ANDROID_OPEN_APP_TEST_REQUESTED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "agent_id": agent_id,
+        "status": result.get("status"),
+    })
+    return result
+
 @app.get("/api/device/result/{task_id}")
 def device_result(task_id:str):
     return device_bridge.result(task_id)
