@@ -137,35 +137,6 @@ def temporal_next_action():
     return {"ok": True, "action": "delegated"}
 
 
-    """Project known risks forward, then return the safest present action."""
-    import subprocess, sys, json as _json
-    try:
-        p = subprocess.run(
-            [sys.executable, "-m", "brain_v12.self_healing.temporal_simulator"],
-            cwd=str(ROOT), capture_output=True, text=True, timeout=120,
-        )
-        raw = (p.stdout + "\n" + p.stderr).strip()
-        result = _json.loads(raw) if raw.startswith("{") else {}
-        return {
-            "ok": p.returncode == 0,
-            "action": result.get("recommended_present_action", "observe"),
-            "simulation": result,
-        }
-    except Exception as exc:
-        return {"ok": False, "action": "observe", "error": str(exc)[:1000]}
-
-SUPERVISOR_LOCK = STATE / "continuous_supervisor.lock"
-
-def acquire_supervisor_lock():
-    """Prevent duplicate runtime supervisors from competing for the same queue."""
-    STATE.mkdir(parents=True, exist_ok=True)
-    handle = SUPERVISOR_LOCK.open("w", encoding="utf-8")
-    try:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        handle.close()
-        raise RuntimeError("SUPERVISOR_ALREADY_RUNNING")
-    return handle
 def main():
     lock_handle = acquire_supervisor_lock()
     print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION single_instance=true", flush=True)
