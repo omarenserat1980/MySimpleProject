@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 httpx
-pydantic
+pydantic>=2,<3
 python-multipart
 google-api-python-client
 google-auth-oauthlib
