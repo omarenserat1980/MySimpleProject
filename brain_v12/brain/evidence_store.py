@@ -15,6 +15,11 @@ class EvidenceStore:
           created_at REAL NOT NULL, verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', mission_id TEXT, attempt INTEGER, phase TEXT
         )""")
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence(task_id)")
+        for column, definition in (("mission_id", "TEXT"), ("attempt", "INTEGER"), ("phase", "TEXT")):
+            try:
+                self.db.execute(f"ALTER TABLE evidence ADD COLUMN {column} {definition}")
+            except sqlite3.OperationalError:
+                pass
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_mission_attempt ON evidence(mission_id,attempt)")
         self.db.commit()
 
