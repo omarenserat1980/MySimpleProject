@@ -12,9 +12,10 @@ class EvidenceStore:
         self.db.execute("""CREATE TABLE IF NOT EXISTS evidence(
           evidence_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, kind TEXT NOT NULL,
           payload TEXT NOT NULL, sha256 TEXT NOT NULL, producer TEXT NOT NULL,
-          created_at REAL NOT NULL, verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED'
+          created_at REAL NOT NULL, verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED', mission_id TEXT, attempt INTEGER, phase TEXT
         )""")
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_task ON evidence(task_id)")
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_mission_attempt ON evidence(mission_id,attempt)")
         self.db.commit()
 
     @staticmethod
@@ -22,11 +23,11 @@ class EvidenceStore:
         raw=json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":")).encode()
         return hashlib.sha256(raw).hexdigest()
 
-    def append(self,task_id,kind,payload,producer="brain"):
+    def append(self,task_id,kind,payload,producer="brain",*,mission_id=None,attempt=None,phase=None):
         evidence_id="ev-"+uuid4().hex
         digest=self.digest(payload)
-        self.db.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?,?)",
-          (evidence_id,task_id,kind,json.dumps(payload,ensure_ascii=False),digest,producer,time.time(),"UNVERIFIED"))
+        self.db.execute("INSERT INTO evidence(evidence_id,task_id,kind,payload,sha256,producer,created_at,verification_status,mission_id,attempt,phase) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+          (evidence_id,task_id,kind,json.dumps(payload,ensure_ascii=False),digest,producer,time.time(),"UNVERIFIED",mission_id,attempt,phase))
         self.db.commit()
         return self.get(evidence_id)
 
@@ -35,8 +36,12 @@ class EvidenceStore:
         if not row:return None
         item=dict(row); item["payload"]=json.loads(item["payload"]); return item
 
-    def for_task(self,task_id):
-        rows=self.db.execute("SELECT evidence_id FROM evidence WHERE task_id=? ORDER BY created_at",(task_id,)).fetchall()
+    def for_task(self,task_id,*,mission_id=None,attempt=None,phase=None):
+        clauses=["task_id=?"]; params=[task_id]
+        if mission_id is not None: clauses.append("mission_id=?"); params.append(mission_id)
+        if attempt is not None: clauses.append("attempt=?"); params.append(attempt)
+        if phase is not None: clauses.append("phase=?"); params.append(phase)
+        rows=self.db.execute("SELECT evidence_id FROM evidence WHERE "+" AND ".join(clauses)+" ORDER BY created_at",tuple(params)).fetchall()
         return [self.get(r["evidence_id"]) for r in rows]
 
     def verify_hash(self,evidence_id):
