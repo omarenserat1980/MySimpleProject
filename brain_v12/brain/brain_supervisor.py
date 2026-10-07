@@ -47,7 +47,10 @@ class BrainSupervisor:
             from .mission import MissionState
             if mission.state == MissionState.EXECUTING:
                 mission.transition(MissionState.OBSERVING, reason="observation")
-        recorded=self.evidence.append(job_id,key,{"value":value,"confidence":confidence,"evidence_ids":list(evidence_ids)},producer=source)
+        mission=self.missions.get(job_id)
+        recorded=self.evidence.append(job_id,key,{"value":value,"confidence":confidence,"evidence_ids":list(evidence_ids)},producer=source,mission_id=job_id,attempt=mission.attempts if mission else None,phase=mission.state.value if mission else None)
+        if mission:
+            mission.evidence_ids.append(recorded["evidence_id"])
         obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)+(recorded["evidence_id"],)))
         self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence(),"evidence_id":recorded["evidence_id"]}); return obs
 
@@ -82,6 +85,7 @@ class BrainSupervisor:
         return row
 
     def verify_evidence(self,job_id,required_kind=None):
+        mission=self.missions.get(job_id)
         result=self.verification.verify(job_id,required_kind=required_kind)
         self._event(job_id,"evidence_verification",{"verified":result.verified,"evidence_ids":list(result.evidence_ids),"reasons":list(result.reasons)})
         return result
