@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 import hashlib, json, os, time
 from pathlib import Path
 from typing import Any, Callable, Iterable
+from threading import RLock
 
 from .sync_engine import BrainSyncStore, SyncEvent
 
@@ -34,6 +35,8 @@ class DurableSyncQueue:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._items: dict[str, QueueItem] = {}
+        # Serialize concurrent API/supervisor queue mutations and persistence.
+        self._lock = RLock()
         self._load()
 
     @staticmethod
@@ -53,8 +56,10 @@ class DurableSyncQueue:
 
     def _persist(self) -> None:
         tmp=self.path.with_suffix(self.path.suffix+".tmp")
+        with self._lock:
+            snapshot = list(self._items.values())
         rows=[]
-        for item in self._items.values():
+        for item in snapshot:
             rows.append(json.dumps({"event":asdict(item.event),"state":item.state,
                                     "attempts":item.attempts,"last_error":item.last_error},
                                    sort_keys=True, ensure_ascii=False))
@@ -62,34 +67,41 @@ class DurableSyncQueue:
         os.replace(tmp,self.path)
 
     def enqueue(self,event: SyncEvent) -> bool:
-        if event.event_id in self._items:
-            return False
-        self._items[event.event_id]=QueueItem(event)
-        self._persist()
-        return True
+        with self._lock:
+            if event.event_id in self._items:
+                return False
+            self._items[event.event_id]=QueueItem(event)
+            self._persist()
+            return True
 
     def items(self) -> list[QueueItem]:
         """Return all durable entries for restart recovery."""
-        return list(self._items.values())
+        with self._lock:
+            return list(self._items.values())
 
     def pending(self) -> list[QueueItem]:
-        return [x for x in self._items.values() if x.state in {"PENDING","FAILED"}]
+        with self._lock:
+            return [x for x in self._items.values() if x.state in {"PENDING","FAILED"}]
 
     def ack(self,event_id: str) -> None:
-        item=self._items.get(event_id)
-        if item is None: return
-        self._items[event_id]=QueueItem(item.event,"ACKED",item.attempts,item.last_error)
-        self._persist()
+        with self._lock:
+            item=self._items.get(event_id)
+            if item is None: return
+            self._items[event_id]=QueueItem(item.event,"ACKED",item.attempts,item.last_error)
+            self._persist()
 
     def fail(self,event_id: str,error: str) -> None:
-        item=self._items.get(event_id)
-        if item is None: return
-        self._items[event_id]=QueueItem(item.event,"FAILED",item.attempts+1,error[:1000])
-        self._persist()
+        with self._lock:
+            item=self._items.get(event_id)
+            if item is None: return
+            self._items[event_id]=QueueItem(item.event,"FAILED",item.attempts+1,error[:1000])
+            self._persist()
 
     def replay(self, sender: Callable[[SyncEvent], Any], *, max_items: int | None = None) -> dict[str,int]:
         sent=acked=failed=0
-        for item in self.pending()[:max_items]:
+        with self._lock:
+            items = self.pending()[:max_items]
+        for item in items:
             sent += 1
             try:
                 sender(item.event)
@@ -99,9 +111,10 @@ class DurableSyncQueue:
         return {"sent":sent,"acked":acked,"failed":failed}
 
     def counts(self) -> dict[str,int]:
-        out={k:0 for k in ("PENDING","FAILED","ACKED")}
-        for item in self._items.values(): out[item.state]=out.get(item.state,0)+1
-        return out
+        with self._lock:
+            out={k:0 for k in ("PENDING","FAILED","ACKED")}
+            for item in self._items.values(): out[item.state]=out.get(item.state,0)+1
+            return out
 
 class HeartbeatRegistry:
     def __init__(self, ttl_seconds: float = 30):
