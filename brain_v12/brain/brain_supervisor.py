@@ -58,7 +58,13 @@ class BrainSupervisor:
         allowed={"discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:raise ValueError("unknown_supervisor_phase")
         if phase=="deliver" and status=="completed":
-            result=self.verification.assert_success(job["job_id"],required_kind=required_evidence_kind)
+            mission=self.missions.get(job["job_id"])
+            result=self.verification.assert_success(
+                job["job_id"],
+                required_kind=required_evidence_kind,
+                mission_id=job["job_id"],
+                attempt=mission.attempts if mission else None,
+            )
             if not result.verified:
                 phase="blocked"; status="blocked"
                 details={"completion_gate":"RUNTIME_EVIDENCE_REQUIRED","reasons":list(result.reasons),"evidence_ids":list(result.evidence_ids)}
@@ -86,7 +92,12 @@ class BrainSupervisor:
 
     def verify_evidence(self,job_id,required_kind=None):
         mission=self.missions.get(job_id)
-        result=self.verification.verify(job_id,required_kind=required_kind)
+        result=self.verification.verify(
+            job_id,
+            required_kind=required_kind,
+            mission_id=job_id,
+            attempt=mission.attempts if mission else None,
+        )
         self._event(job_id,"evidence_verification",{"verified":result.verified,"evidence_ids":list(result.evidence_ids),"reasons":list(result.reasons)})
         return result
 

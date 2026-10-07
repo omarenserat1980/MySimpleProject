@@ -34,7 +34,7 @@ _ALLOWED = {
     MissionState.VERIFYING: {MissionState.COMPLETED, MissionState.DIAGNOSING, MissionState.ESCALATED},
     MissionState.DIAGNOSING: {MissionState.RECOVERING, MissionState.ESCALATED},
     MissionState.RECOVERING: {MissionState.RETEST, MissionState.ESCALATED},
-    MissionState.RETEST: {MissionState.VERIFYING, MissionState.DIAGNOSING, MissionState.ESCALATED},
+    MissionState.RETEST: {MissionState.EXECUTING, MissionState.VERIFYING, MissionState.DIAGNOSING, MissionState.ESCALATED},
     MissionState.COMPLETED: set(),
     MissionState.ESCALATED: set(),
 }
@@ -57,7 +57,7 @@ class Mission:
         previous = self.state
         if target not in _ALLOWED[previous]:
             raise ValueError(f"invalid_mission_transition:{previous}->{target}")
-        if target in {MissionState.EXECUTING, MissionState.RETEST}:
+        if target == MissionState.EXECUTING:
             if self.attempts >= self.max_attempts:
                 raise ValueError("mission_attempt_limit_reached")
             self.attempts += 1
