@@ -9,6 +9,8 @@ from .execution_contract import ExecutionContract
 from .reality_core import Observation, RealityCore
 from .brain_constitution import BrainConstitution
 from .mission import Mission
+from .evidence_store import EvidenceStore
+from .verification_core import VerificationCore
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
@@ -22,7 +24,7 @@ class BrainSupervisor:
         self.max_cycles=max(1,min(int(max_cycles),5))
         self.control=ControlPlane(str(self.root/"control_plane")); self.reasoner=AutonomousReasoner()
         self.execution_gateway=execution_gateway or BrainExecutionGateway(); self.resource_guard=EmergencyResourceGuard()
-        self.reality=RealityCore(); self.constitution=BrainConstitution(); self.missions={}
+        self.reality=RealityCore(); self.constitution=BrainConstitution(); self.evidence=EvidenceStore(str(self.root/"evidence.db")); self.verification=VerificationCore(self.evidence,self.constitution); self.missions={}
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
@@ -40,8 +42,9 @@ class BrainSupervisor:
         c.validate(); self._event(job["job_id"],"execution_contract",c.as_dict()); return c
 
     def observe(self,job_id,key,value,source="supervisor",confidence=1.0,evidence_ids=()):
-        obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)))
-        self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence()}); return obs
+        recorded=self.evidence.append(job_id,key,{"value":value,"confidence":confidence,"evidence_ids":list(evidence_ids)},producer=source)
+        obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)+(recorded["evidence_id"],)))
+        self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence(),"evidence_id":recorded["evidence_id"]}); return obs
 
     def transition(self,job,phase,status="running",details=None,enforce_authority=True):
         allowed={"discover","plan","select_backend","execute","verify","repair","retry","deliver","blocked","completed","failed"}
@@ -56,6 +59,11 @@ class BrainSupervisor:
         if idx>=row.get("step_index",0):row=self.control.checkpoint(row,idx,row["details"])
         if status in {"blocked","failed","completed"}:row["status"]=status;self.control._append(self.control.jobs,row)
         self._event(row["job_id"],"phase",{"phase":phase,"status":status,"details":row["details"]});return row
+
+    def verify_evidence(self,job_id,required_kind=None):
+        result=self.verification.verify(job_id,required_kind=required_kind)
+        self._event(job_id,"evidence_verification",{"verified":result.verified,"evidence_ids":list(result.evidence_ids),"reasons":list(result.reasons)})
+        return result
 
     def reason(self,evidence):
         decision=self.reasoner.next(evidence);self._event(evidence.get("job_id","unknown"),"reasoning_decision",self.reasoner.explain(decision));return decision
