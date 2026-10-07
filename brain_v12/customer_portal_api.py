@@ -88,7 +88,7 @@ class LeadStore:
              int(lead.marketing_consent), created, digest, "NEW"),
         )
         self.db.commit()
-        return LeadOut(id=cur.lastrowid, **lead.model_dump(),
+        return LeadOut(id=cur.lastrowid, **lead.dict(),
                        created_at=created, content_hash=digest, status="NEW")
 
     def get(self, lead_id: int) -> LeadOut:
