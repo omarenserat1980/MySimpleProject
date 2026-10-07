@@ -61,6 +61,8 @@ class ExecutorService : Service() {
         var backoffMs = POLL_MS
         while (running) {
             try {
+                // Keep Brain's device registry fresh even when no task is queued.
+                heartbeat(baseUrl, agentId, key)
                 // Resume one persisted production task on every executor cycle.
                 queueWorker.resumeOnce()
 
@@ -85,6 +87,23 @@ class ExecutorService : Service() {
         }
     }
 
+
+    private fun heartbeat(baseUrl: String, agentId: String, key: String) {
+        val c = URL(baseUrl + "/api/device/heartbeat").openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        c.doOutput = true
+        c.connectTimeout = 10000
+        c.readTimeout = 10000
+        c.setRequestProperty("X-V12-Agent-Key", key)
+        c.setRequestProperty("X-V12-Agent-Id", agentId)
+        c.setRequestProperty("Content-Type", "application/json")
+        val metadata = JSONObject().put("client", "ElectronicBrain-AndroidExecutor").put("model", Build.MODEL).put("sdk", Build.VERSION.SDK_INT).put("executor_agent_id", agentId)
+        c.outputStream.use { it.write(JSONObject().put("agent_id", agentId).put("metadata", metadata).toString().toByteArray(StandardCharsets.UTF_8)) }
+        val code = c.responseCode
+        if (code !in 200..299) throw IllegalStateException("HEARTBEAT_HTTP_$code")
+        c.inputStream.close()
+        c.disconnect()
+    }
     private fun poll(baseUrl: String, agentId: String, key: String): JSONObject? {
         val url = URL(baseUrl + "/api/device/poll?agent_id=" + URLEncoder.encode(agentId, "UTF-8"))
         val c = url.openConnection() as HttpURLConnection
