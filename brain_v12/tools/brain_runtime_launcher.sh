@@ -1,19 +1,16 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-cd "$ROOT"
+SOURCE_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$SOURCE_ROOT"
 
-# Source-of-truth sync: refresh the local Brain before booting the runtime.
-# Never overwrite local work; only fast-forward a clean checkout.
-if command -v git >/dev/null 2>&1 && git diff --quiet && git diff --cached --quiet; then
-  if git pull --ff-only >/dev/null 2>&1; then
-    echo "JET_BRAIN_SOURCE_SYNC fast_forwarded" >&2
-  else
-    echo "JET_BRAIN_SOURCE_SYNC skipped_pull_failed" >&2
-  fi
-else
-  echo "JET_BRAIN_SOURCE_SYNC skipped_local_changes" >&2
+# Runtime is isolated from the active development branch. The source manager
+# fetches origin/main into a detached worktree and never rewrites local work.
+if ! source "$SOURCE_ROOT/brain_v12/tools/brain_runtime_source_manager.sh"; then
+  echo "BRAIN_RUNTIME_ERROR: SOURCE_CONVERGENCE_FAILED" >&2
+  exit 49
 fi
+ROOT="${BRAIN_RUNTIME_ROOT}"
+cd "$ROOT"
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
