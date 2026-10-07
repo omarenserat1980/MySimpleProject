@@ -1824,6 +1824,7 @@ def device_status():
 class DeviceTask(BaseModel):
     task:str
     params:dict={}
+    target_agent_id:str=""
 
 
 class DeviceReport(BaseModel):
@@ -1844,7 +1845,11 @@ def require_device_agent(request:Request) -> None:
 @app.post("/api/device/enqueue")
 def device_enqueue(request:Request, body:DeviceTask):
     require_control_key(request)
-    result=device_bridge.enqueue(body.task, body.params)
+    params=dict(body.params or {})
+    target_agent_id=body.target_agent_id.strip()
+    if target_agent_id:
+        params["_target_agent_id"]=target_agent_id
+    result=device_bridge.enqueue(body.task, params)
     store.event("DEVICE_TASK_QUEUED", {"task": body.task, "status": result.get("status"), "task_id": result.get("task",{}).get("task_id")})
     return result
 
