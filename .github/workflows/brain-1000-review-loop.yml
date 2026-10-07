@@ -31,9 +31,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install system media dependencies
+        timeout-minutes: 8
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          set -euo pipefail
+          if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+            echo "ffmpeg/ffprobe already available; skipping apt install"
+            ffmpeg -version | head -n 1
+            ffprobe -version | head -n 1
+          else
+            timeout 300s sudo -n apt-get update -o DPkg::Lock::Timeout=60
+            timeout 300s sudo -n apt-get install -y --no-install-recommends ffmpeg
+            command -v ffmpeg
+            command -v ffprobe
+          fi
 
       - name: Install Brain Python dependencies
         run: |
