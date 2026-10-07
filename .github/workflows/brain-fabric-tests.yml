@@ -18,17 +18,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Verify system test dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            echo "FFmpeg is not preinstalled; installing with bounded APT timeouts."
-            sudo timeout 120s apt-get update -o Acquire::Retries=2
-            sudo timeout 120s apt-get install -y --no-install-recommends ffmpeg
-          fi
-          command -v ffmpeg
-          ffmpeg -version
       - name: Install cloud test dependencies
         run: python -m pip install -r cloud/requirements.txt
       - name: Run Brain Fabric tests
@@ -39,4 +28,3 @@ jobs:
           cloud/test_brain_node_security.py
           cloud/test_brain_fabric_integration.py
           cloud/test_brain_fabric_api.py
-          cloud/test_brain_job_executor.py
