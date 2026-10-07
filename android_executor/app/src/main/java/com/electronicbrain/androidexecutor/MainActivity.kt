@@ -43,6 +43,19 @@ class MainActivity : ComponentActivity() {
         }
 
         val status = label("CORTEX: READY", 17f, true)
+        val profile = cortex.deviceProfile()
+        val deviceProfile = label(
+            "DEVICE DISCOVERY\n" +
+                "Manufacturer: ${profile.manufacturer}\n" +
+                "Brand: ${profile.brand}\n" +
+                "Model: ${profile.model}\n" +
+                "Codename: ${profile.device}\n" +
+                "Android: ${profile.androidRelease} (SDK ${profile.sdk})\n" +
+                "Hardware: ${profile.hardware}\n" +
+                "Primary ABI: ${profile.abi}\n" +
+                "64-bit ABI: ${if (profile.abi64Available) "available" else "not reported"}",
+            14f
+        )
         val capabilities = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         cortex.snapshot().forEach { capability ->
             capabilities.addView(label(capability.name + ": " + capability.state))
@@ -111,6 +124,8 @@ class MainActivity : ComponentActivity() {
             addView(label("Android Habitat v1", 15f))
             addView(label("One Brain -> one orchestrated execution path", 13f))
             addView(status)
+            addView(label("DEVICE DISCOVERY", 18f, true))
+            addView(deviceProfile)
             addView(label("LOCAL CAPABILITIES", 18f, true))
             addView(capabilities)
             addView(label("AGENT CONFIGURATION", 18f, true))
