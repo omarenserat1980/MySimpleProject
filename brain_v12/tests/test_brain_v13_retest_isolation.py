@@ -39,5 +39,21 @@ class RetestEvidenceIsolationTests(unittest.TestCase):
         self.assertEqual(completed["status"],"blocked")
         self.assertEqual(completed["details"]["completion_gate"],"RUNTIME_EVIDENCE_REQUIRED")
 
+    def test_retest_requires_new_execution_attempt(self):
+        s=BrainSupervisor(root=tempfile.mkdtemp(prefix="brain-retest-exec-"),max_cycles=3)
+        job=s.create("retest-execution-boundary")
+        for phase in ("discover","plan","select_backend","execute"):
+            job=s.transition(job,phase,enforce_authority=False)
+        mission=s.missions[job["job_id"]]
+        self.assertEqual(mission.attempts,1)
+        job=s.transition(job,"observe",enforce_authority=False)
+        job=s.transition(job,"verify",enforce_authority=False)
+        job=s.transition(job,"repair",enforce_authority=False)
+        job=s.transition(job,"recover",enforce_authority=False)
+        job=s.transition(job,"retry",enforce_authority=False)
+        self.assertEqual(mission.attempts,1)
+        job=s.transition(job,"execute",enforce_authority=False)
+        self.assertEqual(mission.attempts,2)
+
 if __name__=="__main__":
     unittest.main()
