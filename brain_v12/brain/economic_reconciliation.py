@@ -73,7 +73,7 @@ class ReconciliationStore:
             "delivery_evidence_ref": body.delivery_evidence_ref,
             "money_movement": False,
             "audit_fingerprint": hashlib.sha256(
-                json.dumps(body.model_dump(), sort_keys=True).encode("utf-8")
+                json.dumps(body.dict(), sort_keys=True).encode("utf-8")
             ).hexdigest(),
         }
         data["records"][body.order_id] = record
