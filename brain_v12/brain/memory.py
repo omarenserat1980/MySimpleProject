@@ -493,7 +493,17 @@ class MemoryStore:
         # Serialize claimers so two polling requests cannot claim the same task.
         with self.connect() as con:
             con.execute("BEGIN IMMEDIATE")
-            row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
+            rows=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1000").fetchall()
+            row=None
+            for candidate in rows:
+                try:
+                    params=json.loads(candidate["params"] or "{}")
+                except Exception:
+                    params={}
+                target=str(params.get("_target_agent_id") or "").strip()
+                if not target or target == agent_id:
+                    row=candidate
+                    break
             if not row:
                 con.commit()
                 return None
