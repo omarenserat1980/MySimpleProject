@@ -2,6 +2,19 @@
 
 Use this runbook on the Redmi/Termux node. It does not require root.
 
+## 0. Repair the existing Termux:Boot chain
+
+Before starting the Habitat, repair the older boot entries if they exist. The current Redmi may contain legacy launchers that reference a removed script such as `brain_v12/tools/termux_runtime_bootstrap.sh`.
+
+From Termux:
+
+```sh
+cd ~/MySimpleProject
+bash brain_android_habitat/repair_termux_boot.sh
+```
+
+This safely backs up the existing `~/.termux/boot/00-brain-runtime` and replaces it with the canonical Habitat entrypoint. It does not require root and does not bypass Android security.
+
 ## 1. Enter the Brain repository
 
 ```sh
