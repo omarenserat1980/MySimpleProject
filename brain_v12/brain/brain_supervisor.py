@@ -93,7 +93,6 @@ class BrainSupervisor:
 
     def verify_evidence(self,job_id,required_kind=None):
         mission=self.missions.get(job_id)
-        mission=self.missions.get(job_id)
         result=self.verification.verify(
             job_id,
             required_kind=required_kind,
