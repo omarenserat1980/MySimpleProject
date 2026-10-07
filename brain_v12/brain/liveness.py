@@ -8,6 +8,27 @@ the Brain itself look dead.
 import time
 
 
+
+def run_execution_probe(device_bridge, timeout=8):
+    """Queue a harmless python_version probe and wait briefly for its result."""
+    try:
+        created = device_bridge.enqueue("python_version", {})
+        if not created.get("ok"):
+            return {"ok": False, "status": "PROBE_ENQUEUE_FAILED", "error": created.get("error", "unknown")}
+        task_id = created["task"]["task_id"]
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = device_bridge.result(task_id)
+            if result.get("status") == "COMPLETED":
+                verified = device_bridge.verify_result(task_id)
+                return {"ok": bool(verified.get("verified", True)), "status": "PROBE_COMPLETED", "task_id": task_id, "agent_id": result.get("agent_id"), "verification": verified}
+            if result.get("status") == "FAILED":
+                return {"ok": False, "status": "PROBE_FAILED", "task_id": task_id, "error": result.get("error", "")}
+            time.sleep(0.25)
+        return {"ok": False, "status": "PROBE_TIMEOUT", "task_id": task_id}
+    except Exception as exc:
+        return {"ok": False, "status": "PROBE_ERROR", "error": str(exc)[:300]}
+
 def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
     checked_at = time.time()
     checks = {}
