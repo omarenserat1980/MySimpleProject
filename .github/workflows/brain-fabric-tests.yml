@@ -22,13 +22,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            echo "FFmpeg is not preinstalled; installing with bounded APT timeouts."
-            sudo timeout 120s apt-get update -o Acquire::Retries=2
-            sudo timeout 120s apt-get install -y --no-install-recommends ffmpeg
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "FFmpeg already available: $(command -v ffmpeg)"
+          else
+            echo "FFmpeg missing; attempting bounded noninteractive APT recovery."
+            export DEBIAN_FRONTEND=noninteractive
+            sudo timeout --signal=TERM --kill-after=10s 45s               apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10
+            sudo timeout --signal=TERM --kill-after=10s 45s               apt-get install -y --no-install-recommends                 -o DPkg::Lock::Timeout=10 ffmpeg
           fi
-          command -v ffmpeg
-          ffmpeg -version
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "::error::FFmpeg unavailable after bounded recovery; refusing to hang the runner."
+            exit 1
+          fi
+          ffmpeg -version | head -n 2
       - name: Install cloud test dependencies
         run: python -m pip install -r cloud/requirements.txt
       - name: Run Brain Fabric tests
