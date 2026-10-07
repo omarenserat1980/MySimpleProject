@@ -224,7 +224,7 @@ def router(data_path: str | None = None) -> APIRouter:
     def payment_verified(request: Request, order_id: str, body: PaymentVerificationIn):
         from .control_auth import require_control_key
         require_control_key(request)
-        return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.model_dump())}
+        return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.dict())}
 
     @api.post("/orders/{order_id}/delivery-pending")
     def delivery_pending(request: Request, order_id: str, body: CommerceStateIn):
@@ -242,7 +242,7 @@ def router(data_path: str | None = None) -> APIRouter:
     def revenue_realized(request: Request, order_id: str, body: RevenueRealizationIn):
         from .control_auth import require_control_key
         require_control_key(request)
-        return {"ok": True, "order": store.transition(order_id, "REVENUE_REALIZED", body.model_dump())}
+        return {"ok": True, "order": store.transition(order_id, "REVENUE_REALIZED", body.dict())}
 
     @api.get("/status")
     def status():
