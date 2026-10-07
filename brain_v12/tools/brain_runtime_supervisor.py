@@ -137,6 +137,24 @@ def temporal_next_action():
     return {"ok": True, "action": "delegated"}
 
 
+HEARTBEAT = STATE / "cloud-worker-heartbeat.json"
+
+def write_worker_heartbeat(*, state="RUNNING", verified=True, error=None):
+    """Publish local worker liveness evidence for /health without requiring a cloud filesystem."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "service": "brain-cloud-runtime",
+        "state": state,
+        "timestamp": time.time(),
+        "preflight": {"verified": bool(verified)},
+        "pid": os.getpid(),
+    }
+    if error:
+        payload["error"] = str(error)[:300]
+    tmp = HEARTBEAT.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, HEARTBEAT)
+
 SUPERVISOR_LOCK = STATE / "continuous_supervisor.lock"
 
 def acquire_supervisor_lock():
@@ -152,11 +170,13 @@ def acquire_supervisor_lock():
 def main():
     lock_handle = acquire_supervisor_lock()
     print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION single_instance=true", flush=True)
+    write_worker_heartbeat()
     cycle = 0
     consecutive_failures = 0
     while True:
         try:
             cycle += 1
+            write_worker_heartbeat()
             refresh_predictions()
             kind, priority, goal, fingerprint = choose_goal()
             print(f"JET_BRAIN_CYCLE {cycle} SELECT kind={kind} priority={priority} goal={goal[:180]}", flush=True)
@@ -207,6 +227,7 @@ def main():
             consecutive_failures = 0 if verified else consecutive_failures + 1
             delay = min(INTERVAL * (2 ** min(consecutive_failures, 3)), 900)
             print(f"JET_BRAIN_CYCLE {cycle} NEXT_IN={delay}s", flush=True)
+            write_worker_heartbeat()
             time.sleep(delay)
         except KeyboardInterrupt:
             print("JET_BRAIN_SUPERVISOR stopped=INTERRUPTED", flush=True)
@@ -216,6 +237,7 @@ def main():
             consecutive_failures += 1
             delay = min(INTERVAL * (2 ** min(consecutive_failures, 3)), 900)
             record({"cycle": cycle, "event": "error", "error": str(exc)[:500]})
+            write_worker_heartbeat(state="RUNNING", verified=False, error=exc)
             print(f"JET_BRAIN_SUPERVISOR error={str(exc)[:300]} retry_in={delay}s", flush=True)
             time.sleep(delay)
 
