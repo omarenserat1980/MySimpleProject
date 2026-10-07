@@ -112,6 +112,17 @@ class BrainExecutionCoordinator:
         control_view = self.control_plane._view(control) if control is not None else {}
         status = control_view.get("status")
 
+        # PathEngine is the authoritative outer budget. If the path has
+        # exhausted its attempts, no inner coordinator state may keep it
+        # retryable.
+        if path.state == PathState.STOPPED:
+            status = "FAILED"
+            control_view["status"] = "FAILED"
+            control_view["error"] = control_view.get("error") or "PATH_ATTEMPT_BUDGET_EXHAUSTED"
+            if control is not None:
+                control.status = "FAILED"
+                control.error = control_view["error"]
+
         if status == "COMPLETED":
             evidence = self._evidence_ref(control_view)
             self.task_engine.complete(task_id, evidence_ref=evidence)
