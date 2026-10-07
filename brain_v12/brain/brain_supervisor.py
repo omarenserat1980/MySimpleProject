@@ -57,13 +57,24 @@ class BrainSupervisor:
         if phase in {"execute","retry"} and enforce_authority:
             resource=self.resource_guard.sample()
             if resource.get("emergency"): details={"emergency":"RESOURCE_OVERLOAD","resource":resource,"previous_phase":phase}; phase="blocked"; status="blocked"
+        mission=self.missions.get(job["job_id"])
+        mission_map={"discover":"UNDERSTANDING","plan":"PLANNING","select_backend":"READY","execute":"EXECUTING","verify":"VERIFYING","repair":"DIAGNOSING","retry":"RETEST","deliver":"COMPLETED"}
+        if mission and phase in mission_map:
+            from .mission import MissionState
+            target=MissionState[mission_map[phase]]
+            if mission.state != target:
+                mission.transition(target, reason=phase)
         if phase=="execute" and enforce_authority:
             self.execution_gateway.authorize("brain-internal-execution"); self.execution_contract(job,"execute")
         row=dict(job); row.update(phase=phase,status=status,updated_at=time.time(),details=details or {})
         idx={"discover":0,"plan":1,"select_backend":2,"execute":3,"verify":4,"repair":5,"retry":6,"deliver":7}.get(phase,row.get("step_index",0))
         if idx>=row.get("step_index",0):row=self.control.checkpoint(row,idx,row["details"])
         if status in {"blocked","failed","completed"}:row["status"]=status;self.control._append(self.control.jobs,row)
-        self._event(row["job_id"],"phase",{"phase":phase,"status":status,"details":row["details"]});return row
+        if mission:
+            row["mission_state"]=mission.state.value
+            row["mission_attempts"]=mission.attempts
+        self._event(row["job_id"],"phase",{"phase":phase,"status":status,"details":row["details"],"mission_state":mission.state.value if mission else None})
+        return row
 
     def verify_evidence(self,job_id,required_kind=None):
         result=self.verification.verify(job_id,required_kind=required_kind)
