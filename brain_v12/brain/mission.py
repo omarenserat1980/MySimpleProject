@@ -54,8 +54,9 @@ class Mission:
     updated_at: float = field(default_factory=time.time)
 
     def transition(self, target: MissionState, *, reason: str = "") -> "Mission":
-        if target not in _ALLOWED[self.state]:
-            raise ValueError(f"invalid_mission_transition:{self.state}->{target}")
+        previous = self.state
+        if target not in _ALLOWED[previous]:
+            raise ValueError(f"invalid_mission_transition:{previous}->{target}")
         if target in {MissionState.EXECUTING, MissionState.RETEST}:
             if self.attempts >= self.max_attempts:
                 raise ValueError("mission_attempt_limit_reached")
@@ -64,7 +65,7 @@ class Mission:
         self.updated_at = time.time()
         if reason:
             self.metadata.setdefault("transition_reasons", []).append(
-                {"from": self.state.value, "to": target.value, "reason": reason, "ts": self.updated_at}
+                {"from": previous.value, "to": target.value, "reason": reason, "ts": self.updated_at}
             )
         return self
 
