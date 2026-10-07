@@ -8,7 +8,7 @@ the Brain itself look dead.
 import time
 
 
-def assess(*, store, device_bridge, cognitive) -> dict:
+def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
     checked_at = time.time()
     checks = {}
 
@@ -52,14 +52,18 @@ def assess(*, store, device_bridge, cognitive) -> dict:
     except Exception as exc:
         checks["cognitive"] = {"ok": False, "status": "ERROR", "error": str(exc)[:300]}
 
+    if probe_result is not None:
+        checks["execution_probe"] = dict(probe_result)
     core_ok = all(checks[name]["ok"] for name in ("database", "runtime", "cognitive"))
     worker_ok = checks["device_bridge"]["ok"]
-    overall = "ALIVE" if core_ok and worker_ok else "DEGRADED" if core_ok else "ERROR"
+    probe_ok = checks.get("execution_probe", {}).get("ok", True)
+    overall = "ALIVE" if core_ok and worker_ok and probe_ok else "DEGRADED" if core_ok else "ERROR"
 
     return {
         "ok": core_ok,
         "status": overall,
         "brain_alive": core_ok,
+        "execution_alive": probe_ok,
         "checked_at": checked_at,
         "checks": checks,
         "definition": {
