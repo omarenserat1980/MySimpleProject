@@ -93,3 +93,27 @@ def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
             "ERROR": "A core Brain dependency failed.",
         },
     }
+
+def assess_full(*, store, device_bridge, cognitive, probe_timeout=8):
+    """Run the evidence-based Brain life certificate, including a safe execution probe."""
+    probe = run_execution_probe(device_bridge, timeout=probe_timeout)
+    result = assess(store=store, device_bridge=device_bridge, cognitive=cognitive, probe_result=probe)
+    checks = result["checks"]
+    agent_online = bool(checks.get("device_bridge", {}).get("agents_online"))
+    if not result["brain_alive"]:
+        truth = "RUNTIME_DEAD"
+    elif not checks.get("device_bridge", {}).get("ok"):
+        truth = "EXECUTOR_OFFLINE"
+    elif not agent_online:
+        truth = "AGENT_OFFLINE"
+    elif not probe.get("ok"):
+        truth = "EXECUTION_FAILED"
+    else:
+        truth = "FULLY_ALIVE"
+    result["life_certificate"] = {
+        "status": truth,
+        "verified": truth == "FULLY_ALIVE",
+        "checks": ["process","database","runtime","cognitive","device_bridge","agent","safe_execution_probe","result_verification"],
+    }
+    return result
+

@@ -50,7 +50,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
-from .brain.liveness import assess as assess_brain_liveness
+from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -2825,6 +2825,12 @@ def brain_evidence(evidence_id:str):
 @app.get("/api/brain/evidence/task/{task_id}")
 def brain_task_evidence(task_id:str):
     return {"ok":True,"task_id":task_id,"evidence":evidence_store.for_task(task_id)}
+
+@app.get("/api/brain/life-certificate")
+def brain_life_certificate():
+    """Return an evidence-based Brain life certificate with a safe execution probe."""
+    return assess_brain_liveness_full(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
 
 @app.get("/api/brain/liveness")
 def brain_liveness():
