@@ -6,8 +6,15 @@ from .device_sync_adapter import DeviceTaskSyncAdapter
 AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
+    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
                    "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
+    TASK_CAPABILITIES = {
+        "internet_download": "internet_download",
+        "open_url": "open_url",
+        "open_app": "open_app",
+        "create_app_project": "create_app_project",
+    }
+    ANDROID_EXECUTOR_PREFIX = "android-executor-"
     def __init__(self,store,sync_adapter=None):
         self.store=store; self._last_seen=None
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
@@ -57,16 +64,34 @@ class DeviceBridge:
         if expected and hmac.compare_digest(supplied,expected):return True
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
+    def authorized_executor_for_task(self, task):
+        capability=self.TASK_CAPABILITIES.get(task)
+        if capability is None: return None
+        ttl=max(5,int(os.getenv("TERMUX_AGENT_TTL_SECONDS","15"))); now=time.time()
+        for item in self.store.device_agents():
+            agent_id=item.get("agent_id","")
+            age=max(0.,now-float(item.get("last_seen",0)))
+            if agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX) and age <= ttl:
+                return agent_id
+        return None
+
     def enqueue(self,task,params=None):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED"}
         if task not in self.ALLOWED_TASKS:return {"ok":False,"status":"TASK_NOT_ALLOWED","task":task}
+        if task in self.TASK_CAPABILITIES and not self.authorized_executor_for_task(task):
+            return {"ok":False,"status":"CAPABILITY_WORKER_OFFLINE","task":task,"capability":self.TASK_CAPABILITIES[task],"required_executor":"android-executor-*"}
         task_id="brain-termux-"+uuid4().hex
         self.store.device_task_create(task_id,task,params or {},time.time())
         self.sync_adapter.task_transition(task_id,status="QUEUED",task=task)
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","task":None}
-        task=self.store.device_task_claim(agent_id)
+        required = self.TASK_CAPABILITIES
+        if agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX):
+            allowed_tasks = set(self.ALLOWED_TASKS)
+        else:
+            allowed_tasks = set(self.ALLOWED_TASKS) - set(required)
+        task=self.store.device_task_claim(agent_id, allowed_tasks=allowed_tasks)
         if self.sync_adapter and task:
             self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))
         return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
@@ -97,6 +122,8 @@ class DeviceBridge:
             stdout=str(result.get("stdout","")).strip(); exit_code=result.get("returncode",result.get("exit_code")); verified=bool(stdout) and exit_code in (None,0)
         elif task in ("brain_machine_cinema_60m","brain_machine_cinema_120m"):
             evidence=result.get("result") or result; verified=bool(result.get("ok") and evidence.get("status")=="VERIFIED_COMPLETED" and evidence.get("final"))
+        elif task in self.TASK_CAPABILITIES:
+            verified=bool(item.get("ok") and result.get("opened") is True if task in ("open_app","open_url") else item.get("ok"))
         else: verified=bool(item.get("ok"))
         return {"ok":verified,"verified":verified,"status":"VERIFIED" if verified else "VERIFICATION_FAILED","task_id":item["task_id"],"result":result}
     def wait_result(self,task_id,timeout=20):

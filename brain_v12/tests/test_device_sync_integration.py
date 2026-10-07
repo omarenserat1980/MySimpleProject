@@ -1,14 +1,15 @@
 """Integration tests for DeviceBridge -> DeviceTaskSyncAdapter offline-first flow."""
 from __future__ import annotations
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from brain_v12.brain.device_bridge import DeviceBridge
 from brain_v12.brain.sync_engine import BrainSyncStore
 from brain_v12.brain.memory import MemoryStore
 from brain_v12.brain.device_sync_adapter import DeviceTaskSyncAdapter
-from brain_v12.brain.sync_runtime import DurableSyncQueue
 
 
 class TestDeviceSyncIntegration(unittest.TestCase):
@@ -17,26 +18,31 @@ class TestDeviceSyncIntegration(unittest.TestCase):
             queue_path = Path(td) / "device-sync.jsonl"
             device_store = MemoryStore(Path(td) / "device.db")
             device_store.init()
-            local_store = BrainSyncStore("brain-device")
             adapter = DeviceTaskSyncAdapter(queue_path, replica_id="brain-device")
             bridge = DeviceBridge(device_store, sync_adapter=adapter)
 
-            queued = bridge.enqueue("python_version")
-            self.assertTrue(queued["ok"])
-            task_id = queued["task"]["task_id"]
+            with patch.dict(
+                os.environ,
+                {"BRAIN_AGENT_KEY": "test-device-key", "BRAIN_ENABLE_DEVICE_BRIDGE": "1"},
+                clear=False,
+            ):
+                queued = bridge.enqueue("python_version")
+                self.assertTrue(queued["ok"])
+                task_id = queued["task"]["task_id"]
 
-            claimed = bridge.poll("redmi3-01")
-            self.assertEqual(claimed["status"], "TASK_AVAILABLE")
-            self.assertEqual(claimed["task"]["task_id"], task_id)
+                claimed = bridge.poll("redmi3-01")
+                self.assertEqual(claimed["status"], "TASK_AVAILABLE")
+                self.assertEqual(claimed["task"]["task_id"], task_id)
 
-            reported = bridge.report(
-                task_id, "redmi3-01", True,
-                {"stdout": "Python 3.13.0", "returncode": 0, "evidence_ref": "ev-device-1"},
-            )
-            self.assertEqual(reported["status"], "COMPLETED")
-            self.assertEqual(adapter.pending()[-1].value["evidence_ref"], "ev-device-1")
+                reported = bridge.report(
+                    task_id,
+                    "redmi3-01",
+                    True,
+                    {"stdout": "Python 3.13.0", "returncode": 0, "evidence_ref": "ev-device-1"},
+                )
+                self.assertEqual(reported["status"], "COMPLETED")
+                self.assertEqual(adapter.pending()[-1].value["evidence_ref"], "ev-device-1")
 
-            # Simulate process restart: durable queue rebuilds local state.
             recovered = DeviceTaskSyncAdapter(queue_path, replica_id="brain-device")
             self.assertGreaterEqual(len(recovered.pending()), 3)
 

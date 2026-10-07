@@ -489,11 +489,19 @@ class MemoryStore:
                         (task_id,task,json.dumps(params or {},ensure_ascii=False),"QUEUED",str(created_at)))
             con.commit()
 
-    def device_task_claim(self, agent_id):
+    def device_task_claim(self, agent_id, allowed_tasks=None):
         # Serialize claimers so two polling requests cannot claim the same task.
         with self.connect() as con:
             con.execute("BEGIN IMMEDIATE")
-            row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
+            if allowed_tasks:
+                names=tuple(sorted(set(allowed_tasks)))
+                placeholders=",".join("?" for _ in names)
+                row=con.execute(
+                    f"SELECT * FROM device_tasks WHERE status='QUEUED' AND task IN ({placeholders}) ORDER BY created_at,task_id LIMIT 1",
+                    names,
+                ).fetchone()
+            else:
+                row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
             if not row:
                 con.commit()
                 return None

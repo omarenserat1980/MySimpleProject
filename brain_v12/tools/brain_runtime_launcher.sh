@@ -35,6 +35,18 @@ export PYTHONPATH="$ROOT:${PYTHONPATH:-}"
 PYTHON="${V12_PYTHON_EXECUTABLE:-$(command -v python3 || command -v python)}"
 if [ -z "$PYTHON" ]; then echo "BRAIN_RUNTIME_ERROR: PYTHON_NOT_FOUND" >&2; exit 42; fi
 mkdir -p "$ROOT/.brain/state"
+status_snapshot() {
+  "$PYTHON" - <<'PY'
+import json, os, urllib.request
+base=os.environ["V12_BRAIN_URL"]
+try:
+    with urllib.request.urlopen(base+"/api/device/status", timeout=3) as r:
+        data=json.loads(r.read().decode())
+    print("JET_BRAIN_DEVICE_STATUS "+json.dumps(data, ensure_ascii=False, separators=(",",":")))
+except Exception as exc:
+    print("JET_BRAIN_DEVICE_STATUS_ERROR "+str(exc)[:200])
+PY
+}
 health_ok() { "$PYTHON" -c 'import os,urllib.request; urllib.request.urlopen(os.environ["V12_BRAIN_URL"]+"/health",timeout=2).read()' >/dev/null 2>&1; }
 auth_ok() {
   "$PYTHON" -c 'import json,os,urllib.request
@@ -80,6 +92,7 @@ except Exception as exc:
     print("JET_BRAIN_SUPERVISOR bootstrap_failed="+str(exc)[:200],flush=True)
 PY
 }
+status_snapshot
 seed_bootstrap_task
 # Keep a durable local supervisor alongside the Emulator. It only queues work when idle.
 if [ -n "${BRAIN_CONTROL_KEY:-}" ]; then
