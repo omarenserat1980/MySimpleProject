@@ -168,8 +168,11 @@ def execute(task, params):
         }, "" if p.returncode == 0 else "CINEMATIC_ROOM13_RENDER_FAILED"
 
     if task == "status":
-        return True, {"agent_id": AGENT_ID, "platform": platform.platform(),
-                      "python": platform.python_version(), "status": "READY"}, ""
+        runtime_ok = ROOT.exists() and (ROOT / "brain_v12").is_dir()
+        return runtime_ok, {"agent_id": AGENT_ID, "platform": platform.platform(),
+                      "python": platform.python_version(), "root": str(ROOT),
+                      "runtime_ok": runtime_ok,
+                      "status": "READY" if runtime_ok else "NOT_READY"}, "" if runtime_ok else "RUNTIME_NOT_READY"
 
     return False, {}, "TASK_NOT_ALLOWED"
 
