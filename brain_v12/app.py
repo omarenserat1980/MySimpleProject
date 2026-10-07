@@ -55,6 +55,7 @@ from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
+from .brain.liveness import assess as assess_brain_liveness
 from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
@@ -2138,6 +2139,11 @@ def agent_gateway_verify(task_id:str):
     })
     return verification
 
+
+@app.get("/api/brain/liveness")
+def brain_liveness():
+    """Read-only evidence-based Brain liveness assessment."""
+    return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
 
 @app.get("/api/system/status")
 def system_status():
