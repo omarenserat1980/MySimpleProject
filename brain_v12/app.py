@@ -191,6 +191,7 @@ from .brain.habitat.api import router as habitat_router
 from .economics.router_bundle import router as economics_router
 from .youtube.router_bundle import router as youtube_router
 from .marketing.router_bundle import router as marketing_router
+from .intelligence.router_bundle import router as intelligence_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(ai_fabric_router(fabric))
@@ -208,6 +209,7 @@ app.include_router(habitat_router)
 app.include_router(economics_router)
 app.include_router(youtube_router)
 app.include_router(marketing_router)
+app.include_router(intelligence_router)
 app.include_router(commercial_dashboard_router())
 
 
