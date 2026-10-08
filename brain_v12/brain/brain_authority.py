@@ -10,6 +10,7 @@ from enum import IntEnum
 import hashlib
 import hmac
 import os
+import json
 from typing import Iterable
 
 
@@ -87,3 +88,26 @@ class BrainAuthorityPolicy:
 def require_authorized(decision: AuthorityDecision) -> None:
     if not decision.authorized:
         raise PermissionError(f"AUTHORITY_DENIED:{decision.reason}")
+
+
+def authority_proof(contract: dict) -> str:
+    """Create/verify an HMAC proof using a secret outside Git."""
+    secret = os.environ.get("BRAIN_AUTHORITY_SIGNING_TOKEN", "")
+    if not secret:
+        raise RuntimeError("BRAIN_AUTHORITY_SIGNING_TOKEN_REQUIRED")
+    fields = {
+        "brain_id": contract.get("brain_id"),
+        "generation": contract.get("generation"),
+        "fencing_token": contract.get("fencing_token"),
+        "lease_id": contract.get("lease_id"),
+        "holder_id": contract.get("holder_id"),
+        "task_id": contract.get("task_id"),
+        "attempt_id": contract.get("attempt_id"),
+        "source_commit": contract.get("source_commit"),
+        "capability": contract.get("capability"),
+        "executor": contract.get("executor"),
+        "authority_policy_version": contract.get("authority_policy_version"),
+        "authority_decision": contract.get("authority_decision"),
+    }
+    payload = json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()
+    return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
