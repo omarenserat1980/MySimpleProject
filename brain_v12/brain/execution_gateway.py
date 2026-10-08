@@ -74,7 +74,7 @@ def _native_contract_from_metadata(metadata: dict[str, Any]) -> WindowsNativeExe
     return WindowsNativeExecutorContract(
         executor_id=str(raw.get("executor_id", "")),
         server=server,
-        agent_attestation_verified=bool(raw.get("agent_attestation_verified", False)),
+        attestation=raw.get("attestation"),
         brain_generation=int(raw.get("brain_generation", 0)),
         fencing_token=int(raw.get("fencing_token", 0)),
         authority_policy_version=str(raw.get("authority_policy_version", "authority-policy-v1")),
