@@ -19,7 +19,7 @@ def test_chain_detects_tampering():
     object.__setattr__(r.transition,"reason","tampered")
     assert not t.verify()
 
-def test_chain_links_records():
+def test_chain_rejects_mixed_missions():\n    t=TamperEvidentLedger("a"*64)\n    t.append(event())\n    other=MissionLedger("c"*64).move(MissionState.ANALYZING,"other")\n    import pytest\n    with pytest.raises(ValueError):\n        t.append(other)\n\ndef test_chain_links_records():
     t=TamperEvidentLedger()
     first=event()
     second=MissionLedger("a"*64).move(MissionState.ANALYZING,"next")
