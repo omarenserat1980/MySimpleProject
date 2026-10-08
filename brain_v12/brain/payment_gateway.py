@@ -148,6 +148,15 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             expected_amount = float(order["product"]["price_usd"])
             if abs(payload.amount_usd - expected_amount) > 0.000001:
                 raise HTTPException(409, "AMOUNT_MISMATCH")
+            if order.get("state") == "PAYMENT_VERIFIED":
+                existing_tx = str(order.get("payment", {}).get("transaction_id", "")).strip()
+                existing_provider = str(order.get("revenue_authority", {}).get("provider", "")).strip()
+                if existing_tx == payload.payment_reference and existing_provider == payload.provider:
+                    replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+                    return {"ok": True, "verified": True, "idempotent": True,
+                            "order_id": order["order_id"], "state": order["state"],
+                            "payment_reference": payload.payment_reference}
+                raise HTTPException(409, "PAYMENT_REFERENCE_ORDER_CONFLICT")
             if order.get("state") != "PAYMENT_PENDING":
                 raise HTTPException(409, "INVALID_PAYMENT_STATE")
             order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
