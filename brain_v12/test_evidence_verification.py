@@ -26,7 +26,7 @@ class EvidenceVerificationTests(unittest.TestCase):
             "tool_result": {"ok": True, "data": ["أ"]},
         }
         digest = EvidenceStore.digest(payload)
-        self.assertEqual(digest, EvidenceStore.digest(payload))
+        self.assertEqual(digest, "10022d3de1045513a5b14d453c276d27b4c9145e5e722036afada521a71bb02e")
 
 
     def test_tamper_is_detected(self):
