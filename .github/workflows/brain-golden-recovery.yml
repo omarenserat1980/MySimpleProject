@@ -1,0 +1,88 @@
+name: brain-golden-recovery-bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkpoint_id:
+        description: "Golden checkpoint identifier"
+        required: true
+        default: "BRAIN-GOLDEN-01"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-golden-recovery
+  cancel-in-progress: false
+
+jobs:
+  build-recovery-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact main source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify golden checkpoint metadata
+        env:
+          CHECKPOINT_ID: ${{ inputs.checkpoint_id }}
+        run: |
+          set -euo pipefail
+          test -f recovery/BRAIN_GOLDEN_CHECKPOINT_01.json
+          python - <<'PY'
+          import json, subprocess
+          p=json.load(open("recovery/BRAIN_GOLDEN_CHECKPOINT_01.json", encoding="utf-8"))
+          head=subprocess.check_output(["git","rev-parse","HEAD"], text=True).strip()
+          assert p["checkpoint_id"] == "BRAIN-GOLDEN-01"
+          assert p["source_commit"] == head, (p["source_commit"], head)
+          print("CHECKPOINT_SOURCE=VERIFIED")
+          print("SOURCE_COMMIT="+head)
+          PY
+
+      - name: Build deterministic recovery inventory
+        run: |
+          set -euo pipefail
+          mkdir -p recovery_bundle/source recovery_bundle/state
+          git archive --format=tar HEAD | gzip -n > recovery_bundle/source/brain-source.tar.gz
+          sha256sum recovery_bundle/source/brain-source.tar.gz > recovery_bundle/source/brain-source.tar.gz.sha256
+
+          for f in             brain_v12/brain_v12.db             brain_v12/.brain/state/sync_queue.jsonl             brain6_artifacts/evidence/evidence.db             .brain/state/sync_queue.jsonl             .brain/state/continuous_supervisor.jsonl
+          do
+            if [ -f "$f" ]; then
+              mkdir -p "recovery_bundle/state/$(dirname "$f")"
+              cp -p "$f" "recovery_bundle/state/$f"
+            fi
+          done
+
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          root="recovery_bundle"
+          files=[]
+          for base, _, names in os.walk(root):
+              for name in sorted(names):
+                  p=os.path.join(base,name)
+                  if p.endswith("inventory.json"): continue
+                  h=hashlib.sha256(open(p,"rb").read()).hexdigest()
+                  files.append({"path":p,"sha256":h,"bytes":os.path.getsize(p)})
+          manifest={
+              "checkpoint_id":"BRAIN-GOLDEN-01",
+              "source_commit":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
+              "created_at":__import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+              "state_files_present":[x["path"] for x in files if "/state/" in x["path"]],
+              "files":files,
+              "secrets_included":False,
+              "device_identity_included":False,
+          }
+          json.dump(manifest,open(root+"/inventory.json","w",encoding="utf-8"),ensure_ascii=False,indent=2)
+          PY
+
+      - name: Upload recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-golden-recovery-${{ inputs.checkpoint_id }}
+          path: recovery_bundle/
+          retention-days: 90
+          if-no-files-found: error
