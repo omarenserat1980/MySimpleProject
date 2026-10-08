@@ -95,12 +95,15 @@ jobs:
           from pathlib import Path
 
           rows=json.loads(Path("brain6_artifacts/workflow_watchdog/failures.json").read_text())
+          from brain_v12.brain.workflow_watchdog_policy import select_recovery_candidates
+          eligible=select_recovery_candidates(rows, target_sha, limit=1)
+          selected_ids={r["run_id"] for r in eligible}
           retry=[]
           blocked=[]
           for r in rows:
-              # GitHub permits many re-runs, but Brain deliberately caps automatic
-              # recovery to three attempts for a single run.
-              if r["attempt"] < 3:
+              # The global watchdog is a single orchestrator: at most one
+              # automatic recovery action is allowed per invocation.
+              if r["run_id"] in selected_ids and r["attempt"] < 3:
                   retry.append(r)
               else:
                   blocked.append(r)
