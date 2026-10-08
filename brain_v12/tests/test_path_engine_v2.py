@@ -45,6 +45,29 @@ class MultiStepPathV2Tests(unittest.TestCase):
         self.assertEqual(run.step_index, 0)
         self.assertEqual(run.attempts, 2)
 
+    def test_duplicate_steps_are_rejected(self):
+        engine = PathEngine()
+        with self.assertRaises(ValueError):
+            engine.start(PathSpec("dup", "goal", ["inspect", "inspect"], max_steps=2), "dup-run")
+
+    def test_run_id_collision_is_rejected(self):
+        engine = PathEngine()
+        spec = PathSpec("same", "goal", ["inspect"], max_attempts=1, max_steps=1)
+        engine.start(spec, "same-run")
+        with self.assertRaises(RuntimeError):
+            engine.start(PathSpec("other", "other-goal", ["inspect"], max_attempts=1, max_steps=1), "same-run")
+
+    def test_verifier_exception_is_bounded_failure(self):
+        engine = PathEngine(
+            executor=lambda run, step: {"step": step},
+            verifier=lambda run, result: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        run = engine.start(PathSpec("verify-error", "goal", ["inspect"], max_attempts=1, max_steps=1), "verify-error-run")
+        engine.advance("verify-error-run")
+        self.assertEqual(run.state, PathState.STOPPED)
+        self.assertEqual(run.last_error, "VERIFIER_ERROR:RuntimeError")
+        self.assertTrue(any(e.kind == "failure" for e in run.evidence))
+
     def test_step_budget_cannot_be_smaller_than_plan(self):
         engine = PathEngine()
         with self.assertRaises(ValueError):
