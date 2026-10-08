@@ -66,6 +66,7 @@ from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
+from .brain.resource_fabric import ResourceFabric, ResourceKind, ResourceRequest, ResourceSpec, ResourceState
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
@@ -159,6 +160,7 @@ workload_router=WorkloadRouter(workload_controller)
 worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
+resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
@@ -2857,6 +2859,57 @@ def agent_execute(request:Request, body:Exec):
 @app.post("/api/builder/plan")
 def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
+
+@app.get("/api/brain/fabric")
+def brain_fabric_status():
+    return resource_fabric.inspect()
+
+
+@app.post("/api/brain/fabric/register")
+def brain_fabric_register(request: Request, body: dict):
+    require_control_key(request)
+    spec = ResourceSpec(
+        resource_id=str(body["resource_id"]),
+        kind=ResourceKind(str(body["kind"])),
+        provider_id=str(body.get("provider_id") or "unknown"),
+        capacity=int(body["capacity"]),
+        unit=str(body["unit"]),
+        attributes=dict(body.get("attributes") or {}),
+        state=ResourceState(str(body.get("state") or "AVAILABLE")),
+    )
+    return resource_fabric.register(spec)
+
+
+@app.post("/api/brain/fabric/compose")
+def brain_fabric_compose(request: Request, body: dict):
+    require_control_key(request)
+    intent_id=str(body.get("intent_id") or uuid4().hex)
+    requests=[]
+    for item in body.get("resources") or []:
+        requests.append(ResourceRequest(
+            kind=ResourceKind(str(item["kind"])),
+            amount=int(item["amount"]),
+            unit=str(item["unit"]),
+            attributes=dict(item.get("attributes") or {}),
+            required=bool(item.get("required", True)),
+        ))
+    result=resource_fabric.compose(intent_id, requests, body.get("ttl_seconds"))
+    store.event("BRAIN_RESOURCE_FABRIC_COMPOSE", {
+        "intent_id": intent_id, "status": result.get("status"),
+        "resource_ids": result.get("resource_ids", []),
+    })
+    return result
+
+
+@app.post("/api/brain/fabric/release/{reservation_id}")
+def brain_fabric_release(request: Request, reservation_id: str):
+    require_control_key(request)
+    result=resource_fabric.release(reservation_id)
+    store.event("BRAIN_RESOURCE_FABRIC_RELEASE", {
+        "reservation_id": reservation_id, "status": result.get("status"),
+    })
+    return result
+
 
 @app.get("/api/brain/recovery")
 def brain_recovery():
