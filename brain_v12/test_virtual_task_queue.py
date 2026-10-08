@@ -4,6 +4,7 @@ import tempfile
 from .blade_server import BladeChassis
 from .brain.resource_manager import ResourceManager, ResourceRequirement
 from .brain.virtual_task_queue import VirtualTaskQueue
+from .brain.workload_controller import WorkloadController
 
 class VirtualTaskQueueTests(unittest.TestCase):
     def setUp(self):
@@ -44,3 +45,15 @@ class VirtualTaskQueueTests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+    def test_emergency_backpressure_holds_background_work(self):
+        self.queue.workload_controller = WorkloadController()
+        self.queue.workload_controller.policy = WorkloadController().policy
+        original = self.queue.store.counts
+        self.queue.store.counts = lambda: {"QUEUED": 800, "WAITING": 0, "RUNNING": 0}
+        try:
+            task = self.queue.submit([("HALT",)], required_capabilities={"cpu"}, task_id="backpressure")
+            self.assertEqual(self.queue.get(task.task_id).status, "WAITING")
+        finally:
+            self.queue.store.counts = original
