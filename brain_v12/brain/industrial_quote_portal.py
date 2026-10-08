@@ -25,7 +25,7 @@ class InquiryIn(BaseModel):
     product: str = Field(default="", max_length=160)
     quantity: str = Field(default="", max_length=60)
     message: str = Field(min_length=10, max_length=3000)
-    language: str = Field(default="ar", regex="^(ar|en)$")
+    language: str = Field(default="ar", pattern="^(ar|en)$")
 
     @validator("email")
     @classmethod
