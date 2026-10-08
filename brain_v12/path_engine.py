@@ -106,6 +106,10 @@ class PathEngine:
     def start(self, spec: PathSpec, run_id: str) -> PathRun:
         if not spec.path_id or not spec.goal or not spec.steps:
             raise ValueError("path_id, goal and steps are required")
+        if len(set(spec.steps)) != len(spec.steps):
+            raise ValueError("path steps must be unique")
+        if run_id in self.runs:
+            raise RuntimeError(f"run already exists: {run_id}")
         if spec.max_attempts < 1 or spec.max_steps < 1:
             raise ValueError("budgets must be positive")
         if spec.max_steps < len(spec.steps):
@@ -157,7 +161,13 @@ class PathEngine:
             self._release(run)
             return run
 
-        auth = self._gate(self.authorization_gate, run, "authorization")
+        try:
+            auth = self._gate(self.authorization_gate, run, "authorization")
+        except Exception as exc:
+            run.state = PathState.FAILED
+            run.last_error = f"AUTHORIZATION_GATE_ERROR:{type(exc).__name__}"
+            run.add_evidence("failure", "Authorization gate failed", error=run.last_error)
+            return run
         if auth.decision == GateDecision.DENY:
             run.state = PathState.BLOCKED
             run.last_error = auth.reason or "authorization denied"
@@ -167,7 +177,13 @@ class PathEngine:
             run.state = PathState.WAITING_GATE
             return run
 
-        policy = self._gate(self.policy_gate, run, "policy")
+        try:
+            policy = self._gate(self.policy_gate, run, "policy")
+        except Exception as exc:
+            run.state = PathState.FAILED
+            run.last_error = f"POLICY_GATE_ERROR:{type(exc).__name__}"
+            run.add_evidence("failure", "Policy gate failed", error=run.last_error)
+            return run
         if policy.decision == GateDecision.DENY:
             run.state = PathState.BLOCKED
             run.last_error = policy.reason or "policy denied"
@@ -204,7 +220,12 @@ class PathEngine:
                 return run
 
         run.state = PathState.VERIFYING
-        verified = self.verifier(run, result) if self.verifier else True
+        try:
+            verified = self.verifier(run, result) if self.verifier else True
+        except Exception as exc:
+            verified = False
+            run.last_error = f"VERIFIER_ERROR:{type(exc).__name__}"
+            run.add_evidence("failure", "Verifier failed", step=step, error=run.last_error)
         run.add_evidence("verification", "Step verified" if verified else "Step rejected", step=step)
 
         if not verified:
