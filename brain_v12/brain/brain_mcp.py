@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Callable
 
 from fastapi import APIRouter, Request
@@ -253,7 +254,7 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
                     "error": str(exc)[:500],
                 }
 
-            text = str(result)
+            text = json.dumps(result, ensure_ascii=False, default=str)
             return rpc_result(
                 request_id,
                 {
