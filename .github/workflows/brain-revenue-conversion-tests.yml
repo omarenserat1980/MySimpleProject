@@ -1,0 +1,45 @@
+name: Brain Revenue Conversion Tests
+
+on:
+  push:
+    paths:
+      - "brain_v12/brain/client_revenue_guardian.py"
+      - "brain_v12/brain/income_lifecycle.py"
+      - "brain_v12/brain/live_opportunity_researcher.py"
+      - "brain_v12/tests/test_client_revenue_guardian.py"
+      - "brain_v12/tests/test_income_lifecycle.py"
+      - "brain_v12/tests/test_live_opportunity_researcher.py"
+      - ".github/workflows/brain-revenue-conversion-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: brain-revenue-conversion-tests
+  cancel-in-progress: true
+
+jobs:
+  revenue-conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile revenue path
+        run: python -m compileall -q brain_v12/brain/client_revenue_guardian.py brain_v12/brain/income_lifecycle.py brain_v12/brain/live_opportunity_researcher.py
+
+      - name: Revenue lifecycle tests
+        run: python -m unittest brain_v12.tests.test_income_lifecycle -v
+
+      - name: Revenue guardian tests
+        run: python -m unittest brain_v12.tests.test_client_revenue_guardian -v
+
+      - name: Live opportunity tests
+        run: python -m unittest brain_v12.tests.test_live_opportunity_researcher -v
