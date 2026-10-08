@@ -13,13 +13,19 @@ class PaymentRequestBody(BaseModel):
     order_id: str | None = None
 
 
+class PaymentAuthority(BaseModel):
+    evidence_ref: str
+    independent_verification: str
+    provider: str
+    event_id: str
+
 class PaymentReconcileBody(BaseModel):
     opportunity_id: str
     client_id: str
     amount_jod: float
     currency: str = "JOD"
     transaction_id: str
-    evidence: str
+    evidence: PaymentAuthority
     order_id: str | None = None
 
 
@@ -44,7 +50,7 @@ def router(lifecycle):
         require_control_key(request)
         return lifecycle.reconcile_payment(
             body.opportunity_id, body.amount_jod, body.currency,
-            body.transaction_id, body.evidence,
+            body.transaction_id, body.evidence.model_dump(),
             client_id=body.client_id, order_id=body.order_id,
         )
 
