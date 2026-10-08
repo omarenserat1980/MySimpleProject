@@ -17,11 +17,13 @@ variable "resource_group_name" {
 variable "admin_username" {
   type      = string
   sensitive = true
+  default   = "brainadmin"
 }
 
 variable "admin_password" {
   type      = string
   sensitive = true
+  default   = null
 }
 
 variable "vm_size" {
