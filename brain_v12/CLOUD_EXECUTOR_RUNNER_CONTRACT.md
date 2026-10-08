@@ -46,3 +46,16 @@ brain_v12/brain/cloud_executor_gate.py is the substrate gate. It must return ver
 ## Security rule
 
 Never set BRAIN_CLOUD_EXECUTOR in workflow YAML. Doing so would allow a non-cloud runner to self-identify as a cloud executor.
+
+
+## Executor identity and attestation
+
+A production executor must also provide these host/service environment values:
+
+- BRAIN_CLOUD_EXECUTOR=1
+- BRAIN_CLOUD_EXECUTOR_ID=<stable-or-ephemeral executor identity>
+- BRAIN_CLOUD_EXECUTOR_ATTESTATION=<non-empty host attestation reference>
+
+The workflow must never set these values. Missing identity or attestation fails the
+Cloud Executor Gate. The attestation is evidence of the executor's externally
+managed identity; it is not itself proof that Windows booted.
