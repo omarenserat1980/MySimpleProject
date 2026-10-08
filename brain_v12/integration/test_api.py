@@ -11,7 +11,7 @@ def test_mission_api_is_read_only_planning():
     data=r.json()
     assert data["ok"] is True
     assert "commerce" in data["specialists"]
-    assert data["action"]=="ANALYZE"
+    assert data["action"]=="ANALYZE"\n    assert data["decision_evidence_valid"] is True\n    assert len(data["decision_evidence_fingerprint"])==64
 
 def test_mission_api_blocks_external_side_effect():
     app=FastAPI()
