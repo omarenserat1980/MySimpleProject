@@ -58,6 +58,7 @@ from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
 from .brain.workload_controller import WorkloadController
+from .brain.workload_router import WorkloadRouter, WorkerTarget
 from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
@@ -153,6 +154,7 @@ problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
 workload_controller=WorkloadController()
+workload_router=WorkloadRouter(workload_controller)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
@@ -227,6 +229,17 @@ def brain_workload_status(queued:int=0, active:int=0, oldest_age_seconds:float|N
 def brain_workload_admit(body:dict):
     return workload_controller.evaluate(queued=int(body.get("queued",0)), active=int(body.get("active",0)), key_active=int(body.get("key_active",0)), priority=str(body.get("priority","NORMAL")), retry_count=int(body.get("retry_count",0)), duplicate=bool(body.get("duplicate",False)))
 
+
+@app.post("/api/brain/workload/route")
+def brain_workload_route(body:dict):
+    workers=[WorkerTarget(str(x.get("worker_id","unknown")), str(x.get("kind","unknown")), frozenset(x.get("capabilities",[])), bool(x.get("online",True))) for x in body.get("workers",[])]
+    return workload_router.choose(
+        queued=int(body.get("queued",0)), active=int(body.get("active",0)),
+        priority=str(body.get("priority","NORMAL")),
+        required_capabilities=body.get("required_capabilities",[]),
+        workers=workers, github_available=bool(body.get("github_available",True)),
+        key_active=int(body.get("key_active",0)), retry_count=int(body.get("retry_count",0)),
+        duplicate=bool(body.get("duplicate",False)))
 
 class BrainInternalClientRequest(BaseModel):
     client_id: str
