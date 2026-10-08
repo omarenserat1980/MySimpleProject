@@ -149,6 +149,17 @@ class CommerceStore:
                     "evidence_ref": payment_evidence_ref,
                 }
                 order["payment"] = {"status": "VERIFIED", **payment_record}
+                # Only a cryptographically authenticated provider webhook may
+                # establish independent commercial authority for revenue.
+                if evidence_ref.get("independent_verification") == "SIGNED_PROVIDER_WEBHOOK":
+                    order["revenue_authority"] = {
+                        "status": "INDEPENDENTLY_VERIFIED",
+                        "order_id": order_id,
+                        "payment_transaction_id": transaction_id,
+                        "provider": str(evidence_ref.get("provider", "")).strip(),
+                        "event_id": str(evidence_ref.get("event_id", "")).strip(),
+                        "evidence_ref": payment_evidence_ref,
+                    }
                 order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": payment_evidence_ref, "transaction_id": transaction_id}
             elif target == "REVENUE_REALIZED":
                 if not isinstance(evidence_ref, dict):
