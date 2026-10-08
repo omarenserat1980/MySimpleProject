@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pathlib
 import unittest
@@ -31,7 +32,7 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertTrue({"/health", "/api/system/readiness", "/api/deploy/verify"} <= routes)
 
     def test_health_contract_without_external_services(self):
-        from fastapi.testclient import TestClient
+        import httpx
         from brain_v12.app import app
 
         with patch.dict(
@@ -43,7 +44,12 @@ class RuntimeContractTests(unittest.TestCase):
             },
             clear=False,
         ):
-            response = TestClient(app).get("/health")
+            async def _request_health():
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+                    return await client.get("/health")
+
+            response = asyncio.run(_request_health())
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
