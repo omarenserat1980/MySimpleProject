@@ -29,6 +29,8 @@ jobs:
           python -m pytest -q
           brain_v12/tests/test_secret_broker.py
           brain_v12/tests/test_resource_fabric.py
+          brain_v12/tests/test_hardware_truth.py
+          brain_v12/tests/test_hardware_twin.py
           brain_v12/tests/test_resource_fabric_federation.py
           brain_v12/tests/test_resource_providers.py
           brain_v12/tests/test_vdc_resource_provider.py
