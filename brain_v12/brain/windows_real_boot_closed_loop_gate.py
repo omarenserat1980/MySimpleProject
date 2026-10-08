@@ -46,7 +46,7 @@ def load_and_verify(path: str | Path | None = None, *, now: float | None = None)
     secret = os.environ.get("BRAIN_AUTHORITY_SIGNING_TOKEN", "")
     if not secret or not proof:
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_PROOF_REQUIRED")
-    from .brain_authority import authority_proof
+    from brain_v12.brain.brain_authority import authority_proof
     expected = authority_proof(contract)
     if not hmac.compare_digest(proof, expected):
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_PROOF_INVALID")
