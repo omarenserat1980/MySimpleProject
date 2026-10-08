@@ -16,24 +16,19 @@ permissions:
 jobs:
   provision:
     if: ${{ inputs.approve_apply == true }}
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
       BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
       BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
-      ARM_USE_OIDC: "true"
-      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      TF_VAR_admin_username: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
-      TF_VAR_admin_password: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
-      TF_VAR_allowed_source_ip: ${{ secrets.BRAIN_WINDOWS_ALLOWED_SOURCE_IP }}
-      TF_VAR_resource_group_location: ${{ vars.BRAIN_WINDOWS_REGION }}
-      TF_VAR_vm_name: ${{ vars.BRAIN_WINDOWS_VM_NAME }}
-      TF_VAR_resource_group_name: ${{ vars.BRAIN_WINDOWS_RESOURCE_GROUP }}
-      TF_VAR_vm_size: ${{ vars.BRAIN_WINDOWS_VM_SIZE }}
+      ARM_USE_CLI: "true"
+      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_vm_name: "brain-windows-2025"
+      TF_VAR_resource_group_name: "brain-windows-rg"
+      TF_VAR_vm_size: "Standard_D4s_v5"
     defaults:
       run:
         working-directory: brain_v12/cloud/windows_terraform
@@ -42,29 +37,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate non-secret deployment configuration
-        run: |
-          test -n "${ARM_CLIENT_ID}" || { echo "Missing AZURE_CLIENT_ID"; exit 2; }
-          test -n "${ARM_TENANT_ID}" || { echo "Missing AZURE_TENANT_ID"; exit 2; }
-          test -n "${ARM_SUBSCRIPTION_ID}" || { echo "Missing AZURE_SUBSCRIPTION_ID"; exit 2; }
-          test -n "${TF_VAR_resource_group_location}" || { echo "Missing BRAIN_WINDOWS_REGION"; exit 2; }
-          test -n "${TF_VAR_vm_name}" || { echo "Missing BRAIN_WINDOWS_VM_NAME"; exit 2; }
-          test -n "${TF_VAR_resource_group_name}" || { echo "Missing BRAIN_WINDOWS_RESOURCE_GROUP"; exit 2; }
-          test -n "${TF_VAR_vm_size}" || { echo "Missing BRAIN_WINDOWS_VM_SIZE"; exit 2; }
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
 
-      - name: Validate required secret configuration
-        run: |
-          test -n "${TF_VAR_admin_username}" || { echo "Missing BRAIN_WINDOWS_ADMIN_USERNAME"; exit 2; }
-          test -n "${TF_VAR_admin_password}" || { echo "Missing BRAIN_WINDOWS_ADMIN_PASSWORD"; exit 2; }
-          test -n "${TF_VAR_allowed_source_ip}" || { echo "Missing BRAIN_WINDOWS_ALLOWED_SOURCE_IP"; exit 2; }
-          test "${TF_VAR_allowed_source_ip}" != "0.0.0.0/0" || { echo "Public WinRM is forbidden"; exit 2; }
+      - name: Terraform init
+        run: terraform init -input=false
 
-      - name: Azure login via GitHub OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Terraform plan
+        run: terraform plan -input=false -out=brain.tfplan
+
+      - name: Terraform apply
+        run: terraform apply -input=false brain.tfplan
+
+      - name: Export infrastructure proof
+        shell: pwsh
+        run: |
+          terraform output -json | Out-File -FilePath brain-terraform-outputs.json -Encoding utf8
+          $d = Get-Content brain-terraform-outputs.json -Raw | ConvertFrom-Json
+          $safe = @{}; $d.PSObject.Properties | Where-Object { name: BRAIN Windows Cloud Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Explicitly authorize Terraform apply"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision:
+    if: ${{ inputs.approve_apply == true }}
+    runs-on: [self-hosted, brain-internal]
+    environment: brain-windows-production
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
+      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
+      ARM_USE_CLI: "true"
+      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_vm_name: "brain-windows-2025"
+      TF_VAR_resource_group_name: "brain-windows-rg"
+      TF_VAR_vm_size: "Standard_D4s_v5"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -88,3 +115,133 @@ jobs:
           safe = {k: v.get("value") for k, v in d.items() if k != "brain_public_ip"}
           print(json.dumps(safe, indent=2))
           PY
+
+
+.Name -ne "brain_public_ip" } | ForEach-Object { $safe[name: BRAIN Windows Cloud Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Explicitly authorize Terraform apply"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision:
+    if: ${{ inputs.approve_apply == true }}
+    runs-on: [self-hosted, brain-internal]
+    environment: brain-windows-production
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
+      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
+      ARM_USE_CLI: "true"
+      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_vm_name: "brain-windows-2025"
+      TF_VAR_resource_group_name: "brain-windows-rg"
+      TF_VAR_vm_size: "Standard_D4s_v5"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=brain.tfplan
+
+      - name: Terraform apply
+        run: terraform apply -input=false brain.tfplan
+
+      - name: Export infrastructure proof
+        run: |
+          terraform output -json > brain-terraform-outputs.json
+          python - <<'PY'
+          import json
+          with open("brain-terraform-outputs.json", encoding="utf-8") as f:
+              d = json.load(f)
+          safe = {k: v.get("value") for k, v in d.items() if k != "brain_public_ip"}
+          print(json.dumps(safe, indent=2))
+          PY
+
+
+.Name] = name: BRAIN Windows Cloud Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Explicitly authorize Terraform apply"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision:
+    if: ${{ inputs.approve_apply == true }}
+    runs-on: [self-hosted, brain-internal]
+    environment: brain-windows-production
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
+      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
+      ARM_USE_CLI: "true"
+      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_vm_name: "brain-windows-2025"
+      TF_VAR_resource_group_name: "brain-windows-rg"
+      TF_VAR_vm_size: "Standard_D4s_v5"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=brain.tfplan
+
+      - name: Terraform apply
+        run: terraform apply -input=false brain.tfplan
+
+      - name: Export infrastructure proof
+        run: |
+          terraform output -json > brain-terraform-outputs.json
+          python - <<'PY'
+          import json
+          with open("brain-terraform-outputs.json", encoding="utf-8") as f:
+              d = json.load(f)
+          safe = {k: v.get("value") for k, v in d.items() if k != "brain_public_ip"}
+          print(json.dumps(safe, indent=2))
+          PY
+
+
+.Value.value }
+          $safe | ConvertTo-Json -Depth 10

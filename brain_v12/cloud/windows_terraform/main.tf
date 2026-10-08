@@ -1,3 +1,13 @@
+resource "random_password" "brain_admin" {
+  length           = 32
+  special          = true
+  override_special = "!@#%_+=-"
+}
+
+locals {
+  effective_admin_password = var.admin_password != null && var.admin_password != "" ? var.admin_password : random_password.brain_admin.result
+}
+
 resource "azurerm_resource_group" "brain" {
   name     = var.resource_group_name
   location = var.resource_group_location
@@ -67,7 +77,7 @@ resource "azurerm_windows_virtual_machine" "brain" {
   location              = azurerm_resource_group.brain.location
   size                  = var.vm_size
   admin_username        = var.admin_username
-  admin_password        = var.admin_password
+  admin_password        = local.effective_admin_password
   network_interface_ids = [azurerm_network_interface.brain.id]
 
   os_disk {
