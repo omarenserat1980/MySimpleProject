@@ -58,8 +58,10 @@ class BrainExecutionLock:
             existing = self._read()
             if existing and float(existing.get("expires_at", 0)) > now:
                 raise ExecutionLockError("EXECUTION_LOCK_HELD")
-            # A malformed/expired lease can be recovered, but only because
-            # its lease has ended; this is deliberately not unconditional.
+            # Expired leases may be recovered. A malformed lease is fail-closed:
+            # deleting an unreadable lock could allow two executors to overlap.
+            if existing is None:
+                raise ExecutionLockError("EXECUTION_LOCK_MALFORMED")
             self.path.unlink(missing_ok=True)
 
         lease = LockLease(
