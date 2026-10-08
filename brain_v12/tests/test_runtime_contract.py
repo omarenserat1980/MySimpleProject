@@ -9,7 +9,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class RuntimeContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ.setdefault("BRAIN_DB", "/tmp/brain-v12-test.db")
+        test_db = ROOT / ".brain" / "test" / "brain-v12-test.db"
+        test_db.parent.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("BRAIN_DB", str(test_db))
         os.environ.setdefault("BRAIN_LIVE_INCOME_SEARCH_ENABLED", "false")
         os.environ.setdefault("BRAIN_WORKFORCE_ENABLED", "false")
 
