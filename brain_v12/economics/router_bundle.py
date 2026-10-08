@@ -9,10 +9,12 @@ from fastapi import APIRouter
 from .api import router as economics_router
 from .orchestrator_api import router as orchestrator_router
 from .shortlist_api import router as shortlist_router
+from .control_api import router as control_router
 
 router = APIRouter()
 router.include_router(economics_router)
 router.include_router(orchestrator_router)
 router.include_router(shortlist_router)
+router.include_router(control_router)
 
 __all__ = ["router"]
