@@ -22,6 +22,7 @@ class OrchestrationResult:
 def evaluate(
     opportunity: Opportunity,
     *,
+    opportunity_class: str,
     eligibility: list[str],
     upfront_cost_usd: float,
     source_url: str,
@@ -30,6 +31,9 @@ def evaluate(
     region: str = "Jordan",
 ) -> OrchestrationResult:
     """Run one deterministic economic path from discovery to decision."""
+    if not opportunity_class.strip():
+        raise ValueError("opportunity_class cannot be empty")
+
     unique = deduplicate_opportunities([opportunity])
     if len(unique) != 1:
         raise ValueError("opportunity deduplication failed")
@@ -45,7 +49,7 @@ def evaluate(
         last_verified_at=last_verified_at,
         region=region,
     )
-    memory = learned_estimate(observations, normalized.opportunity_id)
+    memory = learned_estimate(observations, opportunity_class)
     decision = decide(normalized, score_value, verification, memory)
 
     return OrchestrationResult(
