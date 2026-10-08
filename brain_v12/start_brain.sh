@@ -13,4 +13,4 @@ if command -v curl >/dev/null 2>&1 && curl -fsS "http://127.0.0.1:$PORT/health" 
   echo "Brain V12 already running on http://127.0.0.1:$PORT"
   exit 0
 fi
-python3 -m uvicorn brain_v12.app:app --host 0.0.0.0 --port "$PORT"
+python3 -m uvicorn brain_v12.mcp_server:app --host 0.0.0.0 --port "$PORT"
