@@ -30,7 +30,7 @@ def default_executors() -> tuple[Executor, ...]:
     return (
         Executor(
             name=BRAIN_INTERNAL,
-            capabilities=frozenset({"brain-internal-execution", WINDOWS_REAL_BOOT}),
+            capabilities=frozenset({"brain-internal-execution", "qemu"}),
             priority=0,
             external=False,
         ),
