@@ -6,6 +6,8 @@ This directory is durable operational documentation for Brain.
 - BRAIN_RECOVERY_ARCHITECTURE.md — source/state/device recovery.
 - BRAIN_TERMUX_OPERATIONS.md — Termux paths, scripts and runtime contract.
 - DESKTOP_COMMANDER_CONFIGURATION.md — current Desktop Commander profile and execution boundary.
+- BRAIN_RUNTIME_INVENTORY.md — runtime APIs, state stores and semantics.
+- BRAIN_STATE_SNAPSHOT.md — safe live-state snapshot procedure.
 
 ## Canonical references
 - recovery/BRAIN_GOLDEN_CHECKPOINT_01.json
@@ -31,3 +33,6 @@ Golden checkpoints are restoration anchors. Future work uses new branches and do
 
 ## Source versus state
 Git stores source and documentation. Runtime databases, evidence and durable queues are separate state and must be captured by an approved recovery mechanism.
+
+## Current recovery principle
+A missing state file in a GitHub-hosted recovery runner means “state not present on that runner”, not “state does not exist”. Real production state must be captured from the Brain runtime host or a trusted self-hosted runtime runner.
