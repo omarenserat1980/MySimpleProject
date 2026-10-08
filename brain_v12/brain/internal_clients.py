@@ -15,6 +15,7 @@ from .windows_cloud_provider_factory import windows_cloud_provider_readiness
 from ..business.customer_execution_router import CustomerExecutionRouter
 from ..business.two_customer_execution_contract import CUSTOMER_SCOPE, public_scope
 from .client_revenue_guardian import GUARDIAN_CLIENT_ID, TARGET_CLIENT_ID
+from .executor_identity import configured_executor, identity
 
 
 INTERNAL_CLIENTS = {
@@ -22,7 +23,7 @@ INTERNAL_CLIENTS = {
         "customer_id": "CL-000001",
         "tool_role": "INDUSTRIAL_ISO_CLIENT",
         "request": "LOAD_AND_BOOT_BRAIN_ISO",
-        "target": "arkan",
+        "target": configured_executor()["executor_id"],
     },
     "BRAIN-INTERNAL-CL-000002": {
         "customer_id": "CL-000002",
@@ -143,6 +144,7 @@ def public_registry() -> dict[str, Any]:
         "ok": True,
         "mode": "BRAIN_INTERNAL_CLIENTS",
         "customer_scope": public_scope(),
+        "executor_identity": identity(),
         "clients": [
             {
                 "client_id": client_id,
