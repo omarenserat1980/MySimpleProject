@@ -10,14 +10,10 @@ def _vdc_with_two_blades():
     vdc = BrainVirtualDatacenter()
     for index in range(2):
         blade_id = f"blade-test-{index}"
-        blade = BladeServer(
-            blade_id,
-            VirtualComputer(
-                blade_id,
-                ram_size=8 * 1024**3,
-                storage_size=128 * 1024**3,
-            ),
-        )
+        computer = VirtualComputer(blade_id)
+        computer.ram.size = 8 * 1024**3
+        computer.storage.capacity = 128 * 1024**3
+        blade = BladeServer(blade_id, computer)
         blade.power_on()
         vdc.chassis.blades[blade_id] = blade
     return vdc
