@@ -6,6 +6,7 @@ set -euo pipefail
 # Secrets/tokens are never committed or printed.
 
 REPO="${BRAIN_GITHUB_REPOSITORY:-omarenserat1980/MySimpleProject}"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 RUNNER_DIR="${BRAIN_RUNNER_DIR:-$HOME/brain-cloud-executor}"
 RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
 RUNNER_ARCH="linux-x64"
@@ -52,7 +53,7 @@ EOF
 chmod 600 .env
 
 # Prove the substrate before the service is allowed to become available.
-cd "$(dirname "$RUNNER_DIR")"
+cd "$ROOT"
 export BRAIN_CLOUD_EXECUTOR BRAIN_CLOUD_EXECUTOR_ID BRAIN_CLOUD_EXECUTOR_ATTESTATION
 python3 brain_v12/brain/cloud_executor_gate.py --output "$RUNNER_DIR/cloud-executor-gate.json"
 grep -q '"verified": true' "$RUNNER_DIR/cloud-executor-gate.json"
