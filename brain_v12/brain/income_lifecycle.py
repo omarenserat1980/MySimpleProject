@@ -116,6 +116,111 @@ class IncomeLifecycle:
         """Record an externally completed step only when its evidence is supplied."""
         return self._transition(opportunity_id, status, evidence=evidence, actor="external_executor", client_id=client_id)
 
+    def request_payment(self, opportunity_id, amount_jod, currency="JOD", client_id=None, order_id=None):
+        """Create an auditable payment request after verified delivery."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        status = str(row.get("status") or "DISCOVERY")
+        if status != "COMPLETED":
+            return {"ok": False, "status": "DELIVERY_NOT_VERIFIED", "current": status}
+        amount = float(amount_jod)
+        if amount <= 0:
+            return {"ok": False, "status": "INVALID_AMOUNT"}
+        data = dict(row.get("data") or {})
+        existing = data.get("payment_request") or {}
+        if existing:
+            if float(existing.get("amount_jod", 0) or 0) == amount and existing.get("currency") == currency:
+                return {"ok": True, "status": "ALREADY_REQUESTED", "payment_request": existing}
+            return {"ok": False, "status": "PAYMENT_REQUEST_IMMUTABLE"}
+        request_id = "PAY-" + hashlib.sha1(
+            f"{opportunity_id}|{client_id}|{amount:.2f}|{currency}".encode()
+        ).hexdigest()[:12]
+        payment_request = {
+            "request_id": request_id,
+            "opportunity_id": opportunity_id,
+            "order_id": order_id,
+            "client_id": client_id,
+            "amount_jod": round(amount, 2),
+            "currency": currency,
+            "status": "REQUESTED",
+            "created_at": self._now(),
+            "payment_provider": "HUMAN_OR_CONNECTED_PROVIDER",
+        }
+        data = self._save(row, payment_request=payment_request)
+        self.store.event("PAYMENT_REQUEST_CREATED", {
+            "request_id": request_id,
+            "opportunity_id": opportunity_id,
+            "amount_jod": round(amount, 2),
+        })
+        return {"ok": True, "status": "PAYMENT_REQUESTED", "payment_request": payment_request}
+
+    def reconcile_payment(self, opportunity_id, amount_jod, currency, transaction_id, evidence, client_id=None, order_id=None):
+        """Reconcile independent payment evidence before revenue recognition."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        data = dict(row.get("data") or {})
+        request = data.get("payment_request") or {}
+        if not request:
+            return {"ok": False, "status": "PAYMENT_REQUEST_REQUIRED"}
+        if order_id and request.get("order_id") and order_id != request.get("order_id"):
+            return {"ok": False, "status": "ORDER_MISMATCH"}
+        if currency != request.get("currency"):
+            return {"ok": False, "status": "CURRENCY_MISMATCH"}
+        received = float(amount_jod)
+        requested = float(request.get("amount_jod", 0) or 0)
+        if received < requested:
+            return {"ok": False, "status": "AMOUNT_MISMATCH", "requested": requested, "received": received}
+        if not str(transaction_id).strip() or not str(evidence).strip():
+            return {"ok": False, "status": "INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED"}
+        existing = data.get("payment_reconciliation")
+        if existing:
+            if existing.get("transaction_id") == transaction_id and float(existing.get("received_amount_jod", 0) or 0) == received:
+                return {"ok": True, "status": "ALREADY_RECONCILED", "reconciliation": existing}
+            return {"ok": False, "status": "PAYMENT_RECONCILIATION_IMMUTABLE"}
+        reconciliation = {
+            "transaction_id": str(transaction_id)[:300],
+            "received_amount_jod": round(received, 2),
+            "currency": currency,
+            "evidence": str(evidence)[:4000],
+            "reconciled_at": self._now(),
+            "order_id": order_id or request.get("order_id"),
+        }
+        data = self._save(row, payment_reconciliation=reconciliation)
+        self.store.event("PAYMENT_RECONCILED", {
+            "opportunity_id": opportunity_id,
+            "transaction_id": str(transaction_id)[:300],
+            "received_amount_jod": round(received, 2),
+        })
+        return {"ok": True, "status": "RECONCILED", "reconciliation": reconciliation}
+
+    def realize_revenue(self, opportunity_id, client_id=None):
+        """Recognize revenue only after delivery, payment request, and reconciliation."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        data = dict(row.get("data") or {})
+        if str(data.get("status")) not in {"COMPLETED", "PAYMENT_VERIFIED"}:
+            return {"ok": False, "status": "DELIVERY_NOT_VERIFIED"}
+        reconciliation = data.get("payment_reconciliation") or {}
+        if not reconciliation:
+            return {"ok": False, "status": "PAYMENT_NOT_RECONCILED"}
+        if data.get("revenue_realized"):
+            return {"ok": True, "status": "ALREADY_REALIZED", "amount_jod": float(data.get("verified_amount_jod", 0) or 0)}
+        amount = float(reconciliation.get("received_amount_jod", 0) or 0)
+        if amount <= 0:
+            return {"ok": False, "status": "INVALID_RECONCILED_AMOUNT"}
+        data = self._save(row, status="PAYMENT_VERIFIED", verification_status="VERIFIED",
+                          verified_amount_jod=amount, revenue_realized=True,
+                          revenue_realized_at=self._now())
+        self.store.event("REVENUE_REALIZED", {
+            "opportunity_id": opportunity_id,
+            "amount_jod": amount,
+            "transaction_id": reconciliation.get("transaction_id"),
+        })
+        return {"ok": True, "status": "REVENUE_REALIZED", "amount_jod": amount}
+
     def summary(self, client_id=None):
         rows = self.store.income_opportunities(500, client_id=client_id)
         counts = {s: 0 for s in self.ORDER}
@@ -125,7 +230,7 @@ class IncomeLifecycle:
         return {
             "counts": counts,
             "external_execution_ready": False,
-            "reason": "لا توجد قناة تنفيذ خارجية متصلة بالحسابات؛ يمكن تجهيز العروض وتسجيل الأدلة فقط.",
-            "payment_verified_jod": sum(float(x.get("verified_amount_jod") or 0) for x in rows),
+            "reason": "يمكن إنشاء طلب دفع بعد التسليم؛ الاعتراف بالإيراد يتطلب مصالحة مستقلة للدفع.",
+            "payment_verified_jod": sum(float(x.get("verified_amount_jod") or 0) for x in rows if x.get("revenue_realized")),
             "client_id": client_id,
         }
