@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-"""Composable resource fabric for Brain.
-
-This layer models compute, memory, accelerator, storage, network and security
-capacity as addressable resources. It deliberately does not pretend software
-can create physical capacity: a provider must advertise real/virtual capacity.
-"""
+"""Composable resource fabric with strict resource-state normalization."""
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -30,6 +25,15 @@ class ResourceState(str, Enum):
     OFFLINE = "OFFLINE"
 
 
+def normalize_resource_state(value: ResourceState | str) -> ResourceState:
+    if isinstance(value, ResourceState):
+        return value
+    try:
+        return ResourceState(str(value).upper())
+    except ValueError as exc:
+        raise ValueError("INVALID_RESOURCE_STATE") from exc
+
+
 @dataclass(frozen=True)
 class ResourceSpec:
     resource_id: str
@@ -39,6 +43,11 @@ class ResourceSpec:
     unit: str
     attributes: dict[str, object] = field(default_factory=dict)
     state: ResourceState = ResourceState.AVAILABLE
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "state", normalize_resource_state(self.state))
+        if self.capacity < 0:
+            raise ValueError("RESOURCE_CAPACITY_MUST_BE_NONNEGATIVE")
 
     def public(self) -> dict:
         return {"resource_id": self.resource_id, "kind": self.kind.value,
@@ -92,8 +101,8 @@ class ResourceFabric:
         self.intents: dict[str, dict] = {}
 
     def register(self, spec: ResourceSpec) -> dict:
-        if spec.capacity < 0:
-            raise ValueError("RESOURCE_CAPACITY_MUST_BE_NONNEGATIVE")
+        spec = ResourceSpec(spec.resource_id, spec.kind, spec.provider_id, spec.capacity,
+                            spec.unit, dict(spec.attributes), normalize_resource_state(spec.state))
         self.resources[spec.resource_id] = spec
         return {"ok": True, "status": "REGISTERED", "resource": spec.public()}
 
@@ -136,30 +145,24 @@ class ResourceFabric:
 
     def discover(self, request: ResourceRequest) -> list[ResourceSpec]:
         self.reap_expired()
-        return [
-            spec for spec in self.resources.values()
-            if self._matches(spec, request)
-            and spec.capacity - self._reserved_amount(spec.resource_id) >= request.amount
-        ]
+        return [spec for spec in self.resources.values()
+                if self._matches(spec, request)
+                and spec.capacity - self._reserved_amount(spec.resource_id) >= request.amount]
 
     def plan(self, intent_id: str, requests: list[ResourceRequest]) -> dict:
-        """Create a deterministic placement plan with optional co-location."""
         selected: list[dict[str, int]] = []
         used: set[str] = set()
         failures: list[dict] = []
         placements: dict[str, str] = {}
-
         for request in requests:
-            candidates = [spec for spec in self.discover(request)
-                          if spec.resource_id not in used]
+            candidates = [spec for spec in self.discover(request) if spec.resource_id not in used]
             if request.co_locate_key:
                 existing_provider = placements.get(request.co_locate_key)
                 if existing_provider is not None:
                     candidates = [s for s in candidates
                                   if s.attributes.get("blade_id", s.provider_id) == existing_provider]
-            candidates.sort(key=lambda s: (
-                0 if s.state == ResourceState.AVAILABLE else 1,
-                s.capacity - request.amount, s.resource_id))
+            candidates.sort(key=lambda s: (0 if s.state == ResourceState.AVAILABLE else 1,
+                                           s.capacity - request.amount, s.resource_id))
             if not candidates:
                 if request.required:
                     failures.append({"request": request.public(), "status": "NO_MATCH"})
@@ -170,14 +173,10 @@ class ResourceFabric:
             if request.co_locate_key:
                 placements[request.co_locate_key] = chosen.attributes.get(
                     "blade_id", chosen.provider_id)
-
-        return {"ok": not failures,
-                "status": "PLAN_READY" if not failures else "PLAN_BLOCKED",
-                "intent_id": intent_id,
-                "allocations": selected,
+        return {"ok": not failures, "status": "PLAN_READY" if not failures else "PLAN_BLOCKED",
+                "intent_id": intent_id, "allocations": selected,
                 "resource_ids": [x["resource_id"] for x in selected],
-                "placements": placements,
-                "failures": failures}
+                "placements": placements, "failures": failures}
 
     def reserve(self, intent_id: str, resource_ids: list[str] | None = None,
                 ttl_seconds: int | None = None, allocations: list[dict] | None = None) -> dict:
@@ -185,7 +184,7 @@ class ResourceFabric:
         if allocations is None:
             allocations = [{"resource_id": rid, "amount": self.resources[rid].capacity}
                            for rid in (resource_ids or [])]
-        normalized = {}
+        normalized: dict[str, int] = {}
         for item in allocations:
             rid = str(item["resource_id"])
             amount = int(item["amount"])
@@ -201,14 +200,13 @@ class ResourceFabric:
                         "resource_id": rid, "requested": amount, "available": available}
         now = time()
         reservation = ResourceReservation(
-            reservation_id=f"rsv-{uuid4().hex[:12]}",
-            intent_id=intent_id, allocations=normalized,
-            created_at=now, expires_at=now + max(1, int(ttl_seconds or self.lease_seconds)))
+            reservation_id=f"rsv-{uuid4().hex[:12]}", intent_id=intent_id,
+            allocations=normalized, created_at=now,
+            expires_at=now + max(1, int(ttl_seconds or self.lease_seconds)))
         self.reservations[reservation.reservation_id] = reservation
-        self.intents[intent_id] = {"intent_id": intent_id,
-                                   "resource_ids": list(normalized),
-                                   "allocations": dict(normalized),
-                                   "status": "RESERVED", "updated_at": now}
+        self.intents[intent_id] = {"intent_id": intent_id, "resource_ids": list(normalized),
+                                   "allocations": dict(normalized), "status": "RESERVED",
+                                   "updated_at": now}
         return {"ok": True, "status": "RESERVED", "reservation": reservation.public()}
 
     def release(self, reservation_id: str) -> dict:
@@ -216,6 +214,8 @@ class ResourceFabric:
         if reservation is None:
             return {"ok": False, "status": "RESERVATION_NOT_FOUND",
                     "reservation_id": reservation_id}
+        if reservation.status != "RESERVED":
+            return {"ok": True, "status": reservation.status, "reservation_id": reservation_id}
         self.reservations[reservation_id] = ResourceReservation(
             reservation.reservation_id, reservation.intent_id, reservation.allocations,
             reservation.created_at, reservation.expires_at, "RELEASED")
@@ -248,47 +248,33 @@ class ResourceFabric:
             return plan
         reservation = self.reserve(intent_id, ttl_seconds=ttl_seconds, allocations=plan["allocations"])
         if not reservation["ok"]:
-            return {"ok": False, "status": "COMPOSITION_RACE",
-                    "plan": plan, "reservation": reservation}
+            return {"ok": False, "status": "COMPOSITION_RACE", "plan": plan, "reservation": reservation}
         self.intents[intent_id]["status"] = "COMPOSED"
         self.intents[intent_id]["updated_at"] = time()
         return {"ok": True, "status": "COMPOSED", "intent_id": intent_id,
-                "resource_ids": plan["resource_ids"],
-                "allocations": plan["allocations"],
+                "resource_ids": plan["resource_ids"], "allocations": plan["allocations"],
                 "reservation": reservation["reservation"]}
 
     def federated_capacity(self, *, include_degraded: bool = True) -> dict:
-        """Return the real aggregate capacity advertised by all registered nodes.
-
-        This is an accounting view, not synthetic capacity. Reserved amounts are
-        subtracted from allocatable capacity; OFFLINE resources contribute nothing.
-        """
         self.reap_expired()
         totals: dict[str, dict[str, int]] = {}
         providers: dict[str, dict] = {}
         for spec in self.resources.values():
             key = f"{spec.kind.value}:{spec.unit}"
             row = totals.setdefault(key, {"capacity": 0, "reserved": 0, "available": 0})
+            reserved = self._reserved_amount(spec.resource_id)
             row["capacity"] += int(spec.capacity)
-            row["reserved"] += self._reserved_amount(spec.resource_id)
-            if spec.state == ResourceState.AVAILABLE or (
-                include_degraded and spec.state == ResourceState.DEGRADED
-            ):
-                row["available"] += max(0, int(spec.capacity) - self._reserved_amount(spec.resource_id))
+            row["reserved"] += reserved
+            if spec.state == ResourceState.AVAILABLE or (include_degraded and spec.state == ResourceState.DEGRADED):
+                row["available"] += max(0, int(spec.capacity) - reserved)
             provider = providers.setdefault(spec.provider_id, {"resources": 0, "kinds": {}})
             provider["resources"] += 1
             provider["kinds"][spec.kind.value] = provider["kinds"].get(spec.kind.value, 0) + int(spec.capacity)
-        return {
-            "ok": True,
-            "status": "READY",
-            "real_capacity": totals,
-            "providers": providers,
-            "resource_count": len(self.resources),
-            "reserved_resource_count": sum(r.status == "RESERVED" for r in self.reservations.values()),
-        }
+        return {"ok": True, "status": "READY", "real_capacity": totals, "providers": providers,
+                "resource_count": len(self.resources),
+                "reserved_resource_count": sum(r.status == "RESERVED" for r in self.reservations.values())}
 
     def provider_capacity(self, provider_id: str) -> dict:
-        """Inspect one real provider's advertised capacity."""
         rows = [s for s in self.resources.values() if s.provider_id == provider_id]
         if not rows:
             return {"ok": False, "status": "PROVIDER_NOT_FOUND", "provider_id": provider_id}
@@ -305,7 +291,7 @@ class ResourceFabric:
             if spec.state in {ResourceState.AVAILABLE, ResourceState.DEGRADED}:
                 row["available"] += max(0, int(spec.capacity) - reserved)
         return {"ok": True, "status": "READY", "provider_id": provider_id, "real_capacity": totals}
-    
+
     def inspect(self) -> dict:
         self.reap_expired()
         by_kind: dict[str, int] = {}
@@ -315,6 +301,5 @@ class ResourceFabric:
                 "reservation_count": sum(r.status == "RESERVED" for r in self.reservations.values()),
                 "intent_count": len(self.intents), "by_kind": by_kind,
                 "resources": [r.public() for r in self.resources.values()],
-                "reservations": [r.public() for r in self.reservations.values()
-                                 if r.status == "RESERVED"],
+                "reservations": [r.public() for r in self.reservations.values() if r.status == "RESERVED"],
                 "intents": list(self.intents.values())}
