@@ -146,5 +146,18 @@ class BrainLeadershipStore:
                 raise RuntimeError("BRAIN_LEADERSHIP_FENCED")
         return {"verified": True, "fencing_token": lease.fencing_token}
 
+    def assert_contract_fenced(self, contract: dict[str, Any], *, now: float | None = None) -> dict[str, Any]:
+        """Reject contracts without the current fencing token."""
+        token = contract.get("leadership_fencing_token")
+        if not isinstance(token, int) or isinstance(token, bool) or token < 1:
+            raise RuntimeError("BRAIN_LEADERSHIP_FENCING_REQUIRED")
+        now = time.time() if now is None else float(now)
+        row = self.db.execute("SELECT * FROM leadership WHERE singleton=1").fetchone()
+        if row is None or float(row["expires_at"]) <= now:
+            raise RuntimeError("BRAIN_LEADERSHIP_NOT_ACTIVE")
+        if int(row["fencing_token"]) != token:
+            raise RuntimeError("BRAIN_LEADERSHIP_FENCED")
+        return {"verified": True, "fencing_token": token, "brain_id": row["brain_id"], "generation": row["generation"]}
+
     def close(self) -> None:
         self.db.close()
