@@ -20,6 +20,7 @@ from brain_v12.brain.income_engine import IncomeEngine
 from brain_v12.brain.live_opportunity_researcher import LiveOpportunityResearcher
 from brain_v12.brain.memory import MemoryStore
 from brain_v12.brain.economic_ledger import EconomicLedger
+from brain_v12.brain.zero_capital_gate import ZeroCapitalGate
 
 ROOT = Path(".")
 ARTIFACTS = ROOT / "brain6_artifacts"
@@ -45,9 +46,22 @@ def main() -> int:
     store.init()
     engine = IncomeEngine(store)
 
+    financial_opportunities = rank_with_financials()
+    zero_capital_opportunities = ZeroCapitalGate.filter(
+        financial_opportunities,
+        available_capital_jod=float(os.getenv("BRAIN_AVAILABLE_CAPITAL_JOD", "0")),
+    )
     catalog = {
         "generated_at": now(),
-        "financial_opportunities": rank_with_financials(),
+        "financial_opportunities": financial_opportunities,
+        "zero_capital_opportunities": zero_capital_opportunities,
+        "zero_capital_policy": {
+            "available_capital_jod": float(os.getenv("BRAIN_AVAILABLE_CAPITAL_JOD", "0")),
+            "hard_gate": True,
+            "paid_cloud_mining": "REJECT",
+            "deposits": "REJECT",
+            "expected_revenue_is_realized": False,
+        },
         "self_executable": self_catalog(),
         "api_routes": api_catalog(),
         "revenue_paths": [x.__dict__ for x in PATHS],
@@ -151,6 +165,7 @@ def main() -> int:
         "accepted": discovery.get("accepted", 0),
         "stale": lifecycle.get("stale", 0),
         "verified_revenue_jod": snapshot.get("verified_revenue_jod", 0),
+        "zero_capital_candidates": len(zero_capital_opportunities),
     }, ensure_ascii=False))
     return 0
 
