@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Keep one active run and replace stale queued work for this verification family.
+concurrency:
+  group: brain-reflection-e2e
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
