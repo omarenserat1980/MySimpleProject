@@ -73,8 +73,10 @@ class BrainExecutionGateway:
         metadata = metadata or {}
         if capability == WINDOWS_REAL_BOOT:
             executor_type = str(metadata.get("executor", "")).strip().lower()
-            if executor_type != WINDOWS_CLOUD:
-                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_EXPLICIT_WINDOWS_CLOUD")
+            # QEMU real-boot is a distinct capability from a native cloud
+            # Windows VM. A native provider VM cannot satisfy this contract.
+            if executor_type != "windows-real-boot-qemu":
+                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD_EXECUTOR")
             vm_data = metadata.get("vm")
             node = metadata.get("node")
             if not isinstance(vm_data, dict) or not isinstance(node, dict):
