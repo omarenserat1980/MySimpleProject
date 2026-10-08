@@ -64,14 +64,14 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Preflight (no VM changes)
-        shell: pwsh
-        run: ./scripts/windows-cloud/preflight.ps1 -Location northeurope -VmSize Standard_D4s_v5
-
       - name: Bootstrap remote Terraform state and Azure providers
         if: ${{ inputs.approve_apply == true }}
         shell: pwsh
         run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location northeurope -RegisterProviders
+
+      - name: Preflight (no VM changes)
+        shell: pwsh
+        run: ./scripts/windows-cloud/preflight.ps1 -Location northeurope -VmSize Standard_D4s_v5
 
       - name: Deploy and verify Windows Server 2025
         if: ${{ inputs.approve_apply == true }}
