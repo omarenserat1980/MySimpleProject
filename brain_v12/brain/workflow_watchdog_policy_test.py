@@ -24,10 +24,14 @@ class WorkflowWatchdogPolicyTests(unittest.TestCase):
         self.assertEqual(rows, ignored)
 
     def test_recovery_guard_rejects_cross_sha(self):
-        self.assertTrue(recovery_allowed({"head_sha": "target"}, "target"))
+        self.assertTrue(recovery_allowed({"head_sha": "target", "workflow": "Ordinary Workflow"}, "target"))
         self.assertFalse(recovery_allowed({"head_sha": "old"}, "target"))
         self.assertFalse(recovery_allowed({"head_sha": ""}, "target"))
         self.assertFalse(recovery_allowed({"head_sha": "target"}, ""))
+
+    def test_protected_windows_boot_is_never_auto_recovered(self):
+        row = {"head_sha": "target", "workflow": "Brain Windows Real Boot Evidence"}
+        self.assertFalse(recovery_allowed(row, "target"))
 
 
 if __name__ == "__main__":
