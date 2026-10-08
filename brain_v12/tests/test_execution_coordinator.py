@@ -68,6 +68,48 @@ class ExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(result["repair"]["action"], "reset")
         self.assertTrue(any(e["stage"] == "repair" for e in result["control"]["evidence"]))
 
+
+    def test_full_multistep_path_requires_verified_progression(self):
+        c = BrainExecutionCoordinator()
+        created = c.create_multistep(
+            "full build",
+            ["inspect", "design", "implement", "test", "verify"],
+            max_attempts=2,
+        )
+        path_id = created["path"]["run_id"]
+        calls = []
+
+        def executor_for(step):
+            return lambda _: calls.append(step) or {"ok": True, "step": step}
+
+        handlers = {step: executor_for(step) for step in ("inspect", "design", "implement", "test", "verify")}
+        verifiers = {
+            step: (lambda value: {"verified": True, "evidence_ref": f"evidence://{value['step']}"})
+            for step in handlers
+        }
+
+        failed = c.execute_path_step(
+            path_id,
+            handlers,
+            {**verifiers, "inspect": lambda _: {"verified": False}},
+        )
+        self.assertFalse(failed["ok"])
+        self.assertEqual(failed["step"], "inspect")
+        self.assertEqual(failed["path"]["step"], "inspect")
+        self.assertEqual(calls, ["inspect"])
+
+        states = []
+        for expected in ("inspect", "design", "implement", "test", "verify"):
+            result = c.execute_path_step(path_id, handlers, verifiers)
+            states.append(result["path"]["state"])
+            self.assertEqual(result["step"], expected)
+
+        self.assertEqual(calls, ["inspect", "inspect", "design", "implement", "test", "verify"])
+        self.assertEqual(states[-1], "SUCCEEDED")
+        self.assertEqual(states[:-1], ["RUNNING", "RUNNING", "RUNNING", "RUNNING"])
+        self.assertEqual(result["task"]["status"], "COMPLETED")
+        self.assertIsNone(result["path"]["step"])
+
     def test_unknown_task_never_executes(self):
         c = BrainExecutionCoordinator()
         called = []
