@@ -14,7 +14,7 @@ SPECIALISTS={
 }
 
 KEYWORDS={
-    "marketing":("marketing","تسويق","ads","advertising","brand","عملاء","مبيعات"),
+    "marketing":("marketing","تسويق","ads","advertising","brand","fundraising","عملاء","مبيعات"),
     "commerce":("amazon","ebay","temu","alibaba","dropship","دروب","متجر","منتج"),
     "finance":("finance","financial","investment","invest","استثمار","مالي","أسهم"),
     "business":("project","business","service","client","مشروع","خدمة","عميل","ربح"),
