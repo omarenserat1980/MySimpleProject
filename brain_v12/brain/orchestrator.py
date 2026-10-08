@@ -5,6 +5,7 @@ from typing import Any
 from .core import BrainCore
 from .builder import SoftwareBuilder
 from .execution_coordinator import BrainExecutionCoordinator
+from .execution_coordinator import BrainExecutionCoordinator
 
 
 class CognitiveOrchestrator:
