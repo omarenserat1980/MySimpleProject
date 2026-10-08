@@ -56,6 +56,21 @@ class CognitiveOrchestrator:
         })
         return execution
 
+
+    def create_build_path(self, objective: str, max_attempts: int = 3) -> dict[str, Any]:
+        """Create the full bounded build path without executing any step locally."""
+        execution = self.execution_coordinator.create_multistep(
+            objective,
+            ["inspect", "design", "implement", "test", "verify"],
+            max_attempts=max_attempts,
+        )
+        self.store.event("ORCHESTRATOR_BUILD_PATH_CREATED", {
+            "objective": objective,
+            "path_run_id": execution["path"]["run_id"],
+            "steps": ["inspect", "design", "implement", "test", "verify"],
+        })
+        return execution
+
     def execute(self, control_task_id: str, executor, verifier, repair=None) -> dict[str, Any]:
         """Delegate execution to the single execution owner; never execute locally."""
         return self.execution_coordinator.execute(control_task_id, executor, verifier, repair=repair)
