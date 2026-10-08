@@ -6,9 +6,14 @@ on:
       - "brain_v12/brain/client_revenue_guardian.py"
       - "brain_v12/brain/income_lifecycle.py"
       - "brain_v12/brain/live_opportunity_researcher.py"
+      - "brain_v12/brain/payment_gateway.py"
+      - "brain_v12/brain/commerce_api.py"
+      - "brain_v12/brain/economic_reconciliation.py"
       - "brain_v12/tests/test_client_revenue_guardian.py"
       - "brain_v12/tests/test_income_lifecycle.py"
       - "brain_v12/tests/test_live_opportunity_researcher.py"
+      - "brain_v12/tests/test_payment_gateway.py"
+      - "brain_v12/tests/test_commerce_api.py"
       - ".github/workflows/brain-revenue-conversion-tests.yml"
   workflow_dispatch:
 
@@ -34,6 +39,12 @@ jobs:
 
       - name: Compile revenue path
         run: python -m compileall -q brain_v12/brain/client_revenue_guardian.py brain_v12/brain/income_lifecycle.py brain_v12/brain/live_opportunity_researcher.py
+
+      - name: Payment gateway tests
+        run: python -m unittest brain_v12.tests.test_payment_gateway -v
+
+      - name: Commerce financial gate tests
+        run: python -m unittest brain_v12.tests.test_commerce_api -v
 
       - name: Revenue lifecycle tests
         run: python -m unittest brain_v12.tests.test_income_lifecycle -v
