@@ -52,7 +52,7 @@ class ControlInput(BaseModel):
 
     script_fingerprint: str
     asset_fingerprint: str
-    existing_fingerprints: list[dict] = []
+    existing_fingerprints: list[dict] = Field(default_factory=list)
 
 
 @router.post("/evaluate")
