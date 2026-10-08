@@ -73,10 +73,8 @@ class BrainExecutionGateway:
         metadata = metadata or {}
         if capability == WINDOWS_REAL_BOOT:
             executor_type = str(metadata.get("executor", "")).strip().lower()
-            # QEMU real-boot is a distinct capability from a native cloud
-            # Windows VM. A native provider VM cannot satisfy this contract.
-            if executor_type != "windows-real-boot-qemu":
-                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD_EXECUTOR")
+            if executor_type != WINDOWS_CLOUD:
+                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_EXPLICIT_WINDOWS_CLOUD")
             vm_data = metadata.get("vm")
             node = metadata.get("node")
             if not isinstance(vm_data, dict) or not isinstance(node, dict):
@@ -90,7 +88,12 @@ class BrainExecutionGateway:
                 architecture=str(vm_data.get("architecture", "x86_64")),
                 metadata=vm_data.get("metadata", {}),
             )
-            raise RuntimeError("WINDOWS_REAL_BOOT_QEMU_RUNTIME_CONTRACT_REQUIRED")
+            return self.authorize_windows_cloud(
+                vm,
+                node,
+                heartbeat_timeout=float(metadata.get("heartbeat_timeout", 120.0)),
+                now=metadata.get("now"),
+            )
         return self.authorize(capability)
 
     def authorize(self, capability: str) -> ExecutionDecision:
