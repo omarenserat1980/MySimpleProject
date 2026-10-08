@@ -50,3 +50,45 @@ class InternalRuntimeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_high_risk_requires_leadership_fencing(self):
+        import tempfile
+        from brain_v12.brain.brain_leadership import BrainLeadershipStore
+        from brain_v12.brain.brain_identity import IDENTITY_SCHEMA
+        identity = {"schema": IDENTITY_SCHEMA, "brain_id": "brain-primary", "generation": 2,
+                    "source_commit": "a" * 40, "checkpoint_id": "BRAIN-GOLDEN-01"}
+        checkpoint = {"checkpoint_id": "BRAIN-GOLDEN-01", "source_commit": "a" * 40,
+                      "status": "STABLE_BASELINE"}
+        with tempfile.TemporaryDirectory() as d:
+            leadership = BrainLeadershipStore(f"{d}/leadership.db")
+            rt = InternalTaskRuntime(d, leadership_store=leadership)
+            rt.enqueue("high-risk", ["echo", "blocked"], "brain-internal-execution",
+                       {"risk": "HIGH"})
+            result = rt.run_one()
+            self.assertEqual(result["state"], "BLOCKED")
+            self.assertIn("BRAIN_LEADERSHIP_FENCING_REQUIRED", result["error"])
+            leadership.close()
+
+    def test_high_risk_accepts_current_fencing(self):
+        import tempfile
+        from brain_v12.brain.brain_leadership import BrainLeadershipStore
+        from brain_v12.brain.brain_identity import IDENTITY_SCHEMA
+        identity = {"schema": IDENTITY_SCHEMA, "brain_id": "brain-primary", "generation": 2,
+                    "source_commit": "a" * 40, "checkpoint_id": "BRAIN-GOLDEN-01"}
+        checkpoint = {"checkpoint_id": "BRAIN-GOLDEN-01", "source_commit": "a" * 40,
+                      "status": "STABLE_BASELINE"}
+        with tempfile.TemporaryDirectory() as d:
+            leadership = BrainLeadershipStore(f"{d}/leadership.db")
+            lease = leadership.acquire(identity, checkpoint, "runtime-a", now=100)
+            class Runner:
+                def require(self, capability): return None
+                def run(self, argv, cwd=None, timeout=None):
+                    from types import SimpleNamespace
+                    return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+            rt = InternalTaskRuntime(d, BrainExecutionGateway(Runner()), leadership)
+            rt.enqueue("high-risk", ["echo", "ok"], "brain-internal-execution",
+                       {"risk": "HIGH", "leadership_fencing_token": lease.fencing_token})
+            result = rt.run_one()
+            self.assertEqual(result["state"], "COMPLETED")
+            leadership.close()
