@@ -1,0 +1,51 @@
+name: Brain Queue Guard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: brain-queue-guard
+  cancel-in-progress: true
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel stale queued runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          gh run list --repo "$repo" --limit 100 --json databaseId,status,workflowName,headBranch,createdAt             > runs.json
+          python - <<'PY'
+          import json, subprocess
+          rows=json.load(open("runs.json"))
+          latest={}
+          for r in rows:
+              if r["status"] not in {"queued","in_progress"}:
+                  continue
+              key=(r.get("workflowName"), r.get("headBranch"))
+              if key not in latest:
+                  latest[key]=r["databaseId"]
+          cancelled=0
+          for r in rows:
+              if r["status"] not in {"queued","in_progress"}:
+                  continue
+              if r["workflowName"]=="Brain Queue Guard":
+                  continue
+              key=(r.get("workflowName"), r.get("headBranch"))
+              if latest.get(key)!=r["databaseId"]:
+                  subprocess.run(["gh","run","cancel",str(r["databaseId"]),"--repo","${{ github.repository }}"],check=False)
+                  cancelled+=1
+          print(f"STALE_RUNS_CANCEL_REQUESTED={cancelled}")
+          print(f"LATEST_RUNS_RETAINED={len(latest)}")
+          PY
