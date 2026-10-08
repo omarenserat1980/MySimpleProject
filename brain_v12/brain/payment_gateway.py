@@ -151,11 +151,15 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             if order.get("state") == "PAYMENT_VERIFIED":
                 existing_tx = str(order.get("payment", {}).get("transaction_id", "")).strip()
                 existing_provider = str(order.get("revenue_authority", {}).get("provider", "")).strip()
+                existing_event = str(order.get("revenue_authority", {}).get("event_id", "")).strip()
                 if existing_tx == payload.payment_reference and existing_provider == payload.provider:
+                    # Same payment may be retried with a new delivery event id by the
+                    # provider; preserve the original authoritative event identity.
                     replay.record(payload.event_id, payload.payment_reference, payload.order_id)
                     return {"ok": True, "verified": True, "idempotent": True,
                             "order_id": order["order_id"], "state": order["state"],
-                            "payment_reference": payload.payment_reference}
+                            "payment_reference": payload.payment_reference,
+                            "authoritative_event_id": existing_event}
                 raise HTTPException(409, "PAYMENT_REFERENCE_ORDER_CONFLICT")
             if order.get("state") != "PAYMENT_PENDING":
                 raise HTTPException(409, "INVALID_PAYMENT_STATE")
