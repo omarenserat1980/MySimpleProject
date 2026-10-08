@@ -7,8 +7,11 @@ class FakeStore:
         self.rows=[]
         self.events_log=[]
 
-    def income_opportunities(self, limit=500):
-        return list(self.rows)
+    def income_opportunities(self, limit=500, client_id=None):
+        rows=list(self.rows)
+        if client_id is None:
+            return rows
+        return [row for row in rows if row.get("data", {}).get("client_id") == client_id]
 
     def upsert_income_opportunity(self, item):
         oid=item["opportunity_id"]
