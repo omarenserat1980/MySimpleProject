@@ -68,6 +68,7 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
+from .brain.quranic_core.api import build_router as quranic_core_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
@@ -213,6 +214,7 @@ app.include_router(marketing_router)
 app.include_router(intelligence_router)
 app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
+app.include_router(quranic_core_router())
 
 
 class BrainInternalClientRequest(BaseModel):
