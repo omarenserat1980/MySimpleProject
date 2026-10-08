@@ -81,7 +81,12 @@ jobs:
   probe:
     name: Prove Job Execution Capability
     needs: detect
-    if: needs.detect.outputs.runner_online == 'true'
+    # Scheduled runs must remain observation-only; the manual dispatch is the
+    # explicit execution probe and cannot consume the internal runner every 5 minutes.
+    if: github.event_name == 'workflow_dispatch' && needs.detect.outputs.runner_online == 'true'
+    concurrency:
+      group: brain-internal-execution-probe
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 5
     steps:
