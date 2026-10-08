@@ -46,6 +46,9 @@ permissions:
 jobs:
   dispatch_internal_task:
     if: github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: brain-internal-execution
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 60
     permissions:
@@ -74,6 +77,9 @@ jobs:
           python brain_v12/ci/brain_runner.py
 
   health_and_recovery:
+    concurrency:
+      group: brain-internal-execution
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 10
     steps:
@@ -106,6 +112,9 @@ jobs:
 
   self_heal:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success'
+    concurrency:
+      group: brain-internal-execution
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 10
     steps:
@@ -180,6 +189,9 @@ jobs:
           retention-days: 7
 
   verify:
+    concurrency:
+      group: brain-internal-execution
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 10
     steps:
