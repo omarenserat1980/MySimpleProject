@@ -17,6 +17,6 @@ def validate(o:CrossDomainOpportunity)->bool:
 
 def safe_action(o:CrossDomainOpportunity)->str:
     if not validate(o): return "HOLD"
-    if o.external_side_effects and not o.authorized: return "HOLD"
+    if o.external_side_effects and not o.authorized: return "AUTHORIZATION_REQUIRED"
     if o.evidence_confidence<.70: return "RESEARCH"
     return "ANALYZE"
