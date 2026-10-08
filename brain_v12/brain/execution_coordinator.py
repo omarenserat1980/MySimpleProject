@@ -33,6 +33,7 @@ class BrainExecutionCoordinator:
         )
         self._links: dict[str, str] = {}
         self._path_links: dict[str, str] = {}
+        self._path_step_links: dict[str, dict[str, str]] = {}
 
     @staticmethod
     def _authorization_gate(run: PathRun) -> GateResult:
@@ -66,6 +67,91 @@ class BrainExecutionCoordinator:
         task["path_run_id"] = path.run_id
         task["max_attempts"] = control["max_attempts"]
         return {"control": control, "task": task, "path": self._path_view(path)}
+
+    def create_multistep(self, objective: str, steps: list[str], max_attempts: int = 3) -> dict[str, Any]:
+        """Create a path with one non-retrying ControlTask per step.
+
+        PathEngine owns the retry budget; each step ControlTask executes once.
+        """
+        if not steps:
+            raise ValueError("steps are required")
+        task = self.task_engine.create(objective)
+        path_id = f"path:{task['id']}"
+        path = self.path_engine.start(
+            PathSpec(
+                path_id=path_id,
+                goal=objective,
+                steps=list(steps),
+                max_attempts=max_attempts,
+                max_steps=len(steps),
+                require_authorization=True,
+                metadata={"task_id": task["id"], "multistep": True},
+            ),
+            run_id=path_id,
+        )
+        step_links: dict[str, str] = {}
+        step_controls: dict[str, Any] = {}
+        for step in steps:
+            control = self.control_plane.create(f"{step}:{objective}", max_attempts=1)
+            step_links[step] = control["id"]
+            step_controls[step] = control
+        self._path_step_links[path_id] = step_links
+        task["path_run_id"] = path_id
+        task["max_attempts"] = max_attempts
+        return {
+            "task": task,
+            "path": self._path_view(path),
+            "steps": step_controls,
+            "step_control_ids": dict(step_links),
+        }
+
+    def execute_path_step(
+        self,
+        path_run_id: str,
+        executors: dict[str, Executor],
+        verifiers: dict[str, Verifier],
+        repairs: dict[str, Repairer] | None = None,
+    ) -> dict[str, Any]:
+        """Execute only the current path step; PathEngine owns progression."""
+        path = self.path_engine.runs.get(path_run_id)
+        links = self._path_step_links.get(path_run_id)
+        if path is None or links is None:
+            return {"ok": False, "error": "PATH_NOT_FOUND"}
+        step = path.current_step
+        if step is None or step not in links:
+            return {"ok": False, "error": "PATH_STEP_NOT_FOUND"}
+        executor = executors.get(step)
+        verifier = verifiers.get(step)
+        if executor is None or verifier is None:
+            return {"ok": False, "error": "STEP_HANDLER_NOT_FOUND"}
+
+        control_id = links[step]
+        repair = (repairs or {}).get(step)
+        self.path_engine.executor = lambda run, current_step: self.control_plane.execute(
+            links[current_step], executors[current_step], verifiers[current_step]
+        )
+        self.path_engine.verifier = lambda run, value: (
+            isinstance(value, dict) and value.get("status") == "VERIFIED_COMPLETED"
+        )
+        result = self.path_engine.advance(path_run_id)
+
+        control = self.control_plane.tasks.get(control_id)
+        control_view = self.control_plane._view(control) if control is not None else {}
+        if result.state == PathState.STOPPED:
+            control_view["status"] = "FAILED"
+            control_view["error"] = control_view.get("error") or "PATH_ATTEMPT_BUDGET_EXHAUSTED"
+        task_id = path.spec.metadata.get("task_id")
+        if task_id and result.state == PathState.SUCCEEDED:
+            self.task_engine.complete(task_id, evidence_ref=self._evidence_ref(control_view))
+        elif task_id and result.state == PathState.STOPPED:
+            self.task_engine.fail(task_id, error=control_view.get("error", "PATH_FAILED"))
+        return {
+            "ok": result.state == PathState.SUCCEEDED,
+            "status": "VERIFIED_COMPLETED" if result.state == PathState.SUCCEEDED else result.state.value,
+            "step": step,
+            "control": control_view,
+            "path": self._path_view(result),
+        }
 
     def execute(
         self,
