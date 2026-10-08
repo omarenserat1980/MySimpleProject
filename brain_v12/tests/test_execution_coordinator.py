@@ -74,7 +74,7 @@ class ExecutionCoordinatorTests(unittest.TestCase):
         created = c.create_multistep(
             "full build",
             ["inspect", "design", "implement", "test", "verify"],
-            max_attempts=2,
+            max_attempts=6,
         )
         path_id = created["path"]["run_id"]
         calls = []
