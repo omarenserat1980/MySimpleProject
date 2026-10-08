@@ -32,21 +32,28 @@ class HostProbe:
 
     def _linux(self) -> list[ResourceSpec]:
         cpu = os.cpu_count() or 1
-        mem_kb = 0
+        mem_total_kb = 0
+        mem_available_kb = 0
         try:
             with open("/proc/meminfo", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("MemTotal:"):
-                        mem_kb = int(line.split()[1])
-                        break
+                        mem_total_kb = int(line.split()[1])
+                    elif line.startswith("MemAvailable:"):
+                        mem_available_kb = int(line.split()[1])
         except OSError:
             pass
-        memory_gb = max(1, mem_kb // (1024 * 1024))
+        allocatable_kb = mem_available_kb or mem_total_kb
+        memory_gb = allocatable_kb // (1024 * 1024)
         specs = [
             ResourceSpec(f"{self.provider_id}:cpu", ResourceKind.COMPUTE, self.provider_id,
                          cpu, "core", {"architecture": platform.machine()}),
             ResourceSpec(f"{self.provider_id}:ram", ResourceKind.MEMORY, self.provider_id,
-                         memory_gb, "GB", {"tier": "host"}),
+                         memory_gb, "GB", {
+                             "tier": "host",
+                             "total_bytes": mem_total_kb * 1024,
+                             "available_bytes": allocatable_kb * 1024,
+                         }),
         ]
         disk = shutil.disk_usage("/")
         specs.append(ResourceSpec(f"{self.provider_id}:storage", ResourceKind.STORAGE,
@@ -58,7 +65,7 @@ class HostProbe:
         cpu = self._cmd("powershell", "-NoProfile", "-Command",
                         "[Environment]::ProcessorCount")
         mem = self._cmd("powershell", "-NoProfile", "-Command",
-                        "[math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB)")
+                        "[math]::Floor((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1GB)")
         disk = self._cmd("powershell", "-NoProfile", "-Command",
                          "[math]::Floor((Get-PSDrive C).Free/1TB)")
         specs = []
