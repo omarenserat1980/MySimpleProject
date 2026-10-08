@@ -1,6 +1,8 @@
-﻿name: BRAIN Windows Cloud Launch
+name: BRAIN Windows Cloud Launch
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       approve_apply:
@@ -15,7 +17,7 @@ permissions:
 
 jobs:
   provision:
-    if: ${{ inputs.approve_apply == true }}
+    if: ${{ inputs.approve_apply == true || contains(github.event.head_commit.message, '[launch-windows]') }}
     runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
     env:
@@ -57,6 +59,8 @@ jobs:
           $safe = @{}; $d.PSObject.Properties | Where-Object { name: BRAIN Windows Cloud Launch
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       approve_apply:
@@ -71,7 +75,7 @@ permissions:
 
 jobs:
   provision:
-    if: ${{ inputs.approve_apply == true }}
+    if: ${{ inputs.approve_apply == true || contains(github.event.head_commit.message, '[launch-windows]') }}
     runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
     env:
@@ -120,6 +124,8 @@ jobs:
 .Name -ne "brain_public_ip" } | ForEach-Object { $safe[name: BRAIN Windows Cloud Launch
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       approve_apply:
@@ -134,7 +140,7 @@ permissions:
 
 jobs:
   provision:
-    if: ${{ inputs.approve_apply == true }}
+    if: ${{ inputs.approve_apply == true || contains(github.event.head_commit.message, '[launch-windows]') }}
     runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
     env:
@@ -183,6 +189,8 @@ jobs:
 .Name] = name: BRAIN Windows Cloud Launch
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       approve_apply:
@@ -197,7 +205,7 @@ permissions:
 
 jobs:
   provision:
-    if: ${{ inputs.approve_apply == true }}
+    if: ${{ inputs.approve_apply == true || contains(github.event.head_commit.message, '[launch-windows]') }}
     runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
     env:
