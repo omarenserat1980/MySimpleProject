@@ -251,7 +251,7 @@ class BrainInternalClientRequest(BaseModel):
 class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
-    target: str = "arkan"
+    target: str | None = None
 
 
 @app.post("/api/brain/council/convene")
@@ -519,7 +519,7 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
             "status": "ALREADY_RUNNING",
             "client_id": body.client_id,
             "request": body.request,
-            "target": body.target,
+            "target": contract["target"],
             "workflow": workflow,
             "run_id": latest.get("id"),
             "run_url": latest.get("html_url"),
@@ -534,7 +534,7 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
             "status": "ALREADY_RUNNING",
             "client_id": body.client_id,
             "request": body.request,
-            "target": body.target,
+            "target": contract["target"],
             "workflow": workflow,
             "request_id": claim.get("request_id"),
             "execution_policy": "EXISTING_PRIMARY_PIPELINE",
@@ -543,14 +543,15 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         "request_id": request_id,
         "client_id": body.client_id,
         "request": body.request,
-        "target": body.target,
+        "target": contract["target"],
+        "executor_identity": contract.get("executor_identity"),
         "workflow": workflow,
     })
     store.industrial_client_request(
         body.client_id,
         request_id,
         activity_id=contract.get("request", body.request),
-        target=body.target,
+        target=contract["target"],
         backend="INDUSTRIAL_PRIMARY_WORKFLOW",
         workflow=workflow,
         stage="QUEUED",

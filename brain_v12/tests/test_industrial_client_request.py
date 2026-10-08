@@ -27,7 +27,7 @@ class IndustrialClientRequestTests(unittest.TestCase):
         result = industrial_clients.build_request(
             industrial_clients.INDUSTRIAL_CLIENT_ID,
             industrial_clients.ALLOWED_REQUEST,
-            "arkan",
+            "arkan-executor-01",
         )
         self.assertTrue(result["ok"])
         self.assertEqual(
@@ -36,6 +36,16 @@ class IndustrialClientRequestTests(unittest.TestCase):
         self.assertEqual(
             result["execution_policy"], "EXISTING_PRIMARY_PIPELINE"
         )
+
+    def test_host_alias_resolves_to_stable_executor_identity(self):
+        result = industrial_clients.build_request(
+            industrial_clients.INDUSTRIAL_CLIENT_ID,
+            industrial_clients.ALLOWED_REQUEST,
+            "arkan",
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["target"], "arkan-executor-01")
+        self.assertEqual(result["executor_identity"]["host_alias"], "arkan")
 
     def test_arbitrary_target_is_rejected(self):
         result = industrial_clients.build_request(
