@@ -9,6 +9,7 @@ from .benefit import HumanBenefitEngine
 from .orchestrator import QuranicResearchOrchestrator
 from .graph import EvidenceGraph
 from .publication import PublicationGate
+from .research_packet import ResearchPacketBuilder
 
 class EvidenceIn(BaseModel):
     level: EvidenceLevel
@@ -34,6 +35,7 @@ def build_router(engine=None):
     orchestrator=QuranicResearchOrchestrator()
     graph=EvidenceGraph()
     publication=PublicationGate()
+    packets=ResearchPacketBuilder(publication)
     router=APIRouter(prefix="/api/quranic-core",tags=["quranic-core"])
 
     @router.get("/health")
@@ -72,6 +74,12 @@ def build_router(engine=None):
         records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
         finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
         return publication.evaluate(finding)
+
+    @router.post("/research-packet")
+    def research_packet(body:ResearchIn):
+        records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
+        finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
+        return packets.build(finding)
 
     @router.get("/sources/status")
     def sources_status():
