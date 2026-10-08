@@ -164,9 +164,12 @@ class PathEngine:
         try:
             auth = self._gate(self.authorization_gate, run, "authorization")
         except Exception as exc:
-            run.state = PathState.FAILED
+            run.attempts += 1
+            run.state = PathState.STOPPED if run.attempts >= run.spec.max_attempts else PathState.FAILED
             run.last_error = f"AUTHORIZATION_GATE_ERROR:{type(exc).__name__}"
-            run.add_evidence("failure", "Authorization gate failed", error=run.last_error)
+            run.add_evidence("failure", "Authorization gate failed", error=run.last_error, attempts=run.attempts)
+            if run.state == PathState.STOPPED:
+                self._release(run)
             return run
         if auth.decision == GateDecision.DENY:
             run.state = PathState.BLOCKED
@@ -180,9 +183,12 @@ class PathEngine:
         try:
             policy = self._gate(self.policy_gate, run, "policy")
         except Exception as exc:
-            run.state = PathState.FAILED
+            run.attempts += 1
+            run.state = PathState.STOPPED if run.attempts >= run.spec.max_attempts else PathState.FAILED
             run.last_error = f"POLICY_GATE_ERROR:{type(exc).__name__}"
-            run.add_evidence("failure", "Policy gate failed", error=run.last_error)
+            run.add_evidence("failure", "Policy gate failed", error=run.last_error, attempts=run.attempts)
+            if run.state == PathState.STOPPED:
+                self._release(run)
             return run
         if policy.decision == GateDecision.DENY:
             run.state = PathState.BLOCKED
