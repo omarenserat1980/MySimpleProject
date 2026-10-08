@@ -75,6 +75,7 @@ from .brain.execution_kernel import ExecutionKernel
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
+from .virtual_hardware.hardware_twin import HardwareTwin, HardwareComponent, HardwareDomain, HealthState, build_complete_server_twin
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .brain.quranic_core.api import build_router as quranic_core_router
