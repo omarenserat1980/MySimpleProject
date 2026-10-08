@@ -107,6 +107,33 @@ class ApiContractGateTests(unittest.TestCase):
         self.assertEqual(body["next"]["stage"], "agent_status")
         self.assertEqual(body["next"]["path"], "/api/agent-gateway/status")
 
+    def test_failure_identity_ignores_volatile_evidence(self):
+        from brain_v12.brain.api_resilience import failure_identity
+
+        first = failure_identity(
+            "agent_status",
+            "device_unhealthy",
+            "heartbeat_ttl",
+            {"ok": False, "online": False, "heartbeat_age": 2, "ts": 100},
+        )
+        second = failure_identity(
+            "agent_status",
+            "device_unhealthy",
+            "heartbeat_ttl",
+            {"ok": False, "online": False, "heartbeat_age": 14, "ts": 999},
+        )
+
+        self.assertEqual(first["failure_id"], second["failure_id"])
+        self.assertEqual(first["identity_basis"], second["identity_basis"])
+
+    def test_failure_identity_changes_for_different_root_state(self):
+        from brain_v12.brain.api_resilience import failure_identity
+
+        first = failure_identity("runtime", "runtime_unhealthy", "runtime", {"ok": False, "status": "DOWN"})
+        second = failure_identity("runtime", "runtime_unhealthy", "runtime", {"ok": False, "status": "ERROR"})
+
+        self.assertNotEqual(first["failure_id"], second["failure_id"])
+
     def test_payment_webhook_missing_secret_is_explicit_configuration_failure(self):
         old = os.environ.pop("BRAIN_PAYMENT_WEBHOOK_SECRET", None)
         try:
