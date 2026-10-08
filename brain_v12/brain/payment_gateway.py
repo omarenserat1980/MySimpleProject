@@ -49,8 +49,8 @@ class WebhookStore:
             return {}
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("WEBHOOK_REPLAY_STORE_UNREADABLE") from exc
     def seen(self, event_id: str) -> bool:
         with self.lock:
             return event_id in self._read()
