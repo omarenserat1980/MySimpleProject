@@ -6,20 +6,11 @@ from brain_v12.brain.brain_identity import IDENTITY_SCHEMA
 from brain_v12.brain.brain_leadership import BrainLeadershipStore
 
 def identity(generation=2):
-    return {
-        "schema": IDENTITY_SCHEMA,
-        "brain_id": "brain-primary",
-        "generation": generation,
-        "source_commit": "a" * 40,
-        "checkpoint_id": "BRAIN-GOLDEN-01",
-    }
+    return {"schema": IDENTITY_SCHEMA, "brain_id": "brain-primary", "generation": generation,
+            "source_commit": "a" * 40, "checkpoint_id": "BRAIN-GOLDEN-01"}
 
 def checkpoint():
-    return {
-        "checkpoint_id": "BRAIN-GOLDEN-01",
-        "source_commit": "a" * 40,
-        "status": "STABLE_BASELINE",
-    }
+    return {"checkpoint_id": "BRAIN-GOLDEN-01", "source_commit": "a" * 40, "status": "STABLE_BASELINE"}
 
 class BrainLeadershipTests(unittest.TestCase):
     def setUp(self):
@@ -50,7 +41,7 @@ class BrainLeadershipTests(unittest.TestCase):
 
     def test_stale_holder_cannot_renew(self):
         old = self.store.acquire(identity(), checkpoint(), "runtime-a", now=100, lease_seconds=10)
-        new = self.store.acquire(identity(3), checkpoint(), "runtime-b", now=111)
+        self.store.acquire(identity(3), checkpoint(), "runtime-b", now=111)
         with self.assertRaisesRegex(RuntimeError, "BRAIN_LEADERSHIP_RENEW_REJECTED"):
             self.store.renew(old, now=112)
 
@@ -64,6 +55,18 @@ class BrainLeadershipTests(unittest.TestCase):
                              lease.fencing_token, "runtime-b", lease.acquired_at, lease.expires_at)
         self.assertFalse(self.store.release(forged))
         self.assertTrue(self.store.assert_current(lease, now=101)["verified"])
+
+    def test_execution_contract_requires_current_fencing(self):
+        lease = self.store.acquire(identity(), checkpoint(), "runtime-a", now=100)
+        self.assertTrue(self.store.assert_contract_fenced(
+            {"leadership_fencing_token": lease.fencing_token}, now=101)["verified"])
+        with self.assertRaisesRegex(RuntimeError, "BRAIN_LEADERSHIP_FENCED"):
+            self.store.assert_contract_fenced({"leadership_fencing_token": lease.fencing_token - 1}, now=101)
+
+    def test_missing_fencing_is_fail_closed(self):
+        self.store.acquire(identity(), checkpoint(), "runtime-a", now=100)
+        with self.assertRaisesRegex(RuntimeError, "BRAIN_LEADERSHIP_FENCING_REQUIRED"):
+            self.store.assert_contract_fenced({}, now=101)
 
 if __name__ == "__main__":
     unittest.main()
