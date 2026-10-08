@@ -152,12 +152,16 @@ class CommerceStore:
                 # Only a cryptographically authenticated provider webhook may
                 # establish independent commercial authority for revenue.
                 if evidence_ref.get("independent_verification") == "SIGNED_PROVIDER_WEBHOOK":
+                    provider = str(evidence_ref.get("provider", "")).strip()
+                    event_id = str(evidence_ref.get("event_id", "")).strip()
+                    if not provider or not event_id:
+                        raise HTTPException(status_code=400, detail="PROVIDER_AND_EVENT_ID_REQUIRED")
                     order["revenue_authority"] = {
                         "status": "INDEPENDENTLY_VERIFIED",
                         "order_id": order_id,
                         "payment_transaction_id": transaction_id,
-                        "provider": str(evidence_ref.get("provider", "")).strip(),
-                        "event_id": str(evidence_ref.get("event_id", "")).strip(),
+                        "provider": provider,
+                        "event_id": event_id,
                         "evidence_ref": payment_evidence_ref,
                     }
                 order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": payment_evidence_ref, "transaction_id": transaction_id}
