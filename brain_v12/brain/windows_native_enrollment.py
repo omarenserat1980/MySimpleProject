@@ -183,6 +183,7 @@ class WindowsNativeEnrollment:
         signature: str,
         signing_token: str,
         replay_guard: AttestationReplayGuard | None = None,
+        registry: VerifiedAttestationRegistry | None = None,
         *,
         now: float | None = None,
     ) -> dict[str, Any]:
@@ -190,7 +191,7 @@ class WindowsNativeEnrollment:
         verified = verify_attestation(payload=payload, signature=signature, signing_token=signing_token)
         if verified and replay_guard is not None:
             replay_guard.consume(self.challenge, now=now)
-        return {
+        result = {
             "verified": verified,
             "schema": self.attestation_version,
             "enrollment_id": self.enrollment_id,
@@ -202,3 +203,6 @@ class WindowsNativeEnrollment:
             "challenge": self.challenge,
             "replay_protected": replay_guard is not None,
         }
+        if verified and registry is not None:
+            registry.register(result, now=now)
+        return result
