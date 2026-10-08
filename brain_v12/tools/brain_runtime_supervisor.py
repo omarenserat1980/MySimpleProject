@@ -176,7 +176,8 @@ def main():
                 "fingerprint": fingerprint, "verified": verified,
                 "status": "VERIFIED" if verified else verification.get("status", result.get("status", "UNKNOWN")),
             })
-            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={"VERIFIED" if verified else verification.get("status", "UNKNOWN")}", flush=True)
+            verification_status = "VERIFIED" if verified else verification.get("status", "UNKNOWN")
+            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification_status}", flush=True)
 
             # Repair policy is owned by the canonical V12 BrainSupervisor/runtime.
             # This loop only schedules work and records the returned evidence.
