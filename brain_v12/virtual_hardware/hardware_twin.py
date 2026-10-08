@@ -12,6 +12,8 @@ from typing import Any
 import time
 import uuid
 
+from brain_v12.brain.evidence import EvidenceStore
+
 
 class TruthState(str, Enum):
     SIMULATED = "SIMULATED"
@@ -137,6 +139,19 @@ class HardwareTwin:
         component.metadata["evidence"] = dict(evidence)
         component.metadata["bound_at"] = time.time()
         self._event("COMPONENT_ATTACHED", component_id=component_id, backend=backend)
+        return self.inspect(component_id)
+
+    def bind_with_evidence_store(self, component_id: str, evidence_id: str,
+                                evidence_store: EvidenceStore, backend: str) -> dict[str, Any]:
+        component = self._require(component_id)
+        record = evidence_store.get_valid(evidence_id, component_id, component.resource_ids or None)
+        component.backend = backend
+        component.truth = TruthState.ATTACHED
+        component.metadata["evidence_id"] = record.evidence_id
+        component.metadata["evidence_digest"] = record.digest
+        component.metadata["verified_at"] = record.observed_at
+        self._event("COMPONENT_ATTACHED", component_id=component_id, backend=backend,
+                    evidence_id=record.evidence_id)
         return self.inspect(component_id)
 
     def mark_running(self, component_id: str, execution_id: str) -> dict[str, Any]:
