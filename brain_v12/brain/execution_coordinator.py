@@ -127,7 +127,7 @@ class BrainExecutionCoordinator:
 
         control_id = links[step]
         repair = (repairs or {}).get(step)
-        self.path_engine.executor = lambda run, current_step: self.control_plane.execute(
+        self.path_engine.executor = lambda run, current_step: self.control_plane.execute_once(
             links[current_step], executors[current_step], verifiers[current_step]
         )
         self.path_engine.verifier = lambda run, value: (
