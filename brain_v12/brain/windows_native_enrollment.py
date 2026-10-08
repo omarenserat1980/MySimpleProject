@@ -28,6 +28,64 @@ def verify_attestation(*, payload: dict[str, Any], signature: str, signing_token
     return hmac.compare_digest(expected, signature)
 
 
+class VerifiedAttestationRegistry:
+    """Brain-owned registry of attestations that actually passed verification."""
+
+    def __init__(self, path: str = "brain6_artifacts/control_plane/windows_attestation_registry.db"):
+        self.db = sqlite3.connect(path, timeout=10, isolation_level=None)
+        self.db.execute(
+            """CREATE TABLE IF NOT EXISTS attestations(
+               attestation_digest TEXT PRIMARY KEY,
+               enrollment_id TEXT NOT NULL,
+               executor_id TEXT NOT NULL,
+               server_id TEXT NOT NULL,
+               brain_generation INTEGER NOT NULL,
+               network_generation INTEGER NOT NULL,
+               verified_at REAL NOT NULL
+            )"""
+        )
+
+    def register(self, record: dict[str, Any], *, now: float | None = None) -> None:
+        if record.get("verified") is not True:
+            raise PermissionError("WINDOWS_NATIVE_ATTESTATION_NOT_VERIFIED")
+        digest = str(record.get("attestation_digest", "")).strip()
+        if not digest:
+            raise ValueError("WINDOWS_NATIVE_ATTESTATION_DIGEST_REQUIRED")
+        now = time.time() if now is None else float(now)
+        self.db.execute(
+            """INSERT OR REPLACE INTO attestations(
+               attestation_digest,enrollment_id,executor_id,server_id,
+               brain_generation,network_generation,verified_at)
+               VALUES(?,?,?,?,?,?,?)""",
+            (digest, str(record["enrollment_id"]), str(record["executor_id"]),
+             str(record["server_id"]), int(record["brain_generation"]),
+             int(record["network_generation"]), now),
+        )
+
+    def get(self, digest: str) -> dict[str, Any] | None:
+        row = self.db.execute(
+            """SELECT attestation_digest,enrollment_id,executor_id,server_id,
+                      brain_generation,network_generation,verified_at
+               FROM attestations WHERE attestation_digest=?""",
+            (digest,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "verified": True,
+            "attestation_digest": row[0],
+            "enrollment_id": row[1],
+            "executor_id": row[2],
+            "server_id": row[3],
+            "brain_generation": row[4],
+            "network_generation": row[5],
+            "verified_at": row[6],
+        }
+
+    def close(self) -> None:
+        self.db.close()
+
+
 class AttestationReplayGuard:
     """Durable one-time challenge consumption.
 
@@ -141,4 +199,6 @@ class WindowsNativeEnrollment:
             "brain_generation": self.brain_generation,
             "network_generation": self.network_generation,
             "attestation_digest": attestation_digest(payload),
+            "challenge": self.challenge,
+            "replay_protected": replay_guard is not None,
         }
