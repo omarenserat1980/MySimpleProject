@@ -11,7 +11,7 @@ output "brain_region" {
 }
 
 output "brain_state" {
-  value = "RUNNING"
+  value = "PROVISIONED"
 }
 
 output "brain_os" {
