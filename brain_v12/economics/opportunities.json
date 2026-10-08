@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "currency": "USD",
+  "revenue_policy": "opportunity_is_not_revenue",
+  "opportunities": [
+    {
+      "id": "welo-ar-lev-ai-eval",
+      "class": "arabic_ai_evaluation",
+      "priority": 1,
+      "status": "candidate",
+      "eligibility": ["Jordan", "remote"],
+      "advertised_rate_usd_per_hour": 22,
+      "source": "Welo Data / LinkedIn",
+      "verification_required": true,
+      "revenue_confirmed": false
+    },
+    {
+      "id": "opentrain-ar-ai-safety",
+      "class": "ai_safety_evaluation",
+      "priority": 2,
+      "status": "candidate",
+      "eligibility": ["Jordan", "remote"],
+      "advertised_rate_usd_per_hour_min": 28,
+      "advertised_rate_usd_per_hour_max": 32,
+      "source": "OpenTrain",
+      "verification_required": true,
+      "revenue_confirmed": false
+    },
+    {
+      "id": "rws-ar-lev-ai-data",
+      "class": "arabic_ai_data",
+      "priority": 3,
+      "status": "candidate",
+      "eligibility": ["Jordan", "remote"],
+      "advertised_rate_usd_per_hour": 6,
+      "source": "RWS / LinkedIn",
+      "verification_required": true,
+      "revenue_confirmed": false
+    },
+    {
+      "id": "welo-jordan-video-recording",
+      "class": "arabic_video_recording",
+      "priority": 4,
+      "status": "candidate",
+      "eligibility": ["Jordan"],
+      "advertised_rate_usd_per_task_min": 4,
+      "advertised_rate_usd_per_task_max": 15,
+      "source": "Welo Data / Lever",
+      "verification_required": true,
+      "revenue_confirmed": false
+    }
+  ]
+}
