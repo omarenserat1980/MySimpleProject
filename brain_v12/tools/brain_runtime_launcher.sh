@@ -3,13 +3,19 @@ set -euo pipefail
 SOURCE_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$SOURCE_ROOT"
 
-# Runtime is isolated from the active development branch. The source manager
-# fetches origin/main into a detached worktree and never rewrites local work.
-if ! source "$SOURCE_ROOT/brain_v12/tools/brain_runtime_source_manager.sh"; then
-  echo "BRAIN_RUNTIME_ERROR: SOURCE_CONVERGENCE_FAILED" >&2
-  exit 49
+# Prefer the isolated runtime source manager when present. Older/local checkouts
+# may not contain it; in that case run directly from the verified source tree.
+SOURCE_MANAGER="$SOURCE_ROOT/brain_v12/tools/brain_runtime_source_manager.sh"
+if [ -f "$SOURCE_MANAGER" ]; then
+  if ! source "$SOURCE_MANAGER"; then
+    echo "BRAIN_RUNTIME_ERROR: SOURCE_CONVERGENCE_FAILED" >&2
+    exit 49
+  fi
+  ROOT="${BRAIN_RUNTIME_ROOT:-$SOURCE_ROOT}"
+else
+  echo "JET_BRAIN_SOURCE_SYNC fallback_local_root" >&2
+  ROOT="$SOURCE_ROOT"
 fi
-ROOT="${BRAIN_RUNTIME_ROOT}"
 cd "$ROOT"
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
