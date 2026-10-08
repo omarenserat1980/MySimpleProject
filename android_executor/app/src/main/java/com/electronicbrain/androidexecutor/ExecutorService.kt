@@ -62,6 +62,18 @@ class ExecutorService : Service() {
         var backoffMs = POLL_MS
         while (running) {
             try {
+                // Android Executor is the local runtime bootstrap authority. If the
+                // API is down, start the Termux runtime through the supported bridge
+                // instead of requiring the user to open Termux manually.
+                if (!health(baseUrl)) {
+                    updateNotification("BOOTSTRAPPING: Brain Runtime")
+                    val bootstrap = TermuxBridge.runBrainRuntimeBootstrap(this)
+                    if (bootstrap.exitCode != 0 || bootstrap.errorCode != 0) {
+                        throw IllegalStateException("RUNTIME_BOOTSTRAP_FAILED: " + (bootstrap.errorMessage.ifBlank { bootstrap.stderr }).take(160))
+                    }
+                    Thread.sleep(1500L)
+                    if (!health(baseUrl)) throw IllegalStateException("RUNTIME_BOOTSTRAP_NO_HEALTH")
+                }
                 // Keep Brain's device registry fresh even when no task is queued.
                 heartbeat(baseUrl, agentId, key)
                 requestLiveAndroidTestOnce(baseUrl, agentId, key, prefs)
@@ -89,6 +101,20 @@ class ExecutorService : Service() {
         }
     }
 
+
+    private fun health(baseUrl: String): Boolean {
+        return try {
+            val c = URL(baseUrl + "/health").openConnection() as HttpURLConnection
+            c.requestMethod = "GET"
+            c.connectTimeout = 2500
+            c.readTimeout = 2500
+            val code = c.responseCode
+            c.disconnect()
+            code in 200..299
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     private fun heartbeat(baseUrl: String, agentId: String, key: String) {
         val c = URL(baseUrl + "/api/device/heartbeat").openConnection() as HttpURLConnection
