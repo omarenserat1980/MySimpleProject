@@ -26,8 +26,39 @@ def _run(cmd: list[str], timeout: int = 10) -> tuple[bool, str]:
     return p.returncode == 0, out
 
 
+def _probe_kvm(qemu: str) -> tuple[bool, str]:
+    """Actually initialize KVM in QEMU; timeout means QEMU reached its paused state."""
+    try:
+        p = subprocess.Popen(
+            [qemu, "-accel", "kvm", "-machine", "q35", "-nodefaults", "-display", "none", "-S"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            p.wait(timeout=2)
+            err = (p.stderr.read() if p.stderr else "").strip()
+            return False, f"qemu-exited:{p.returncode}:{err[:500]}"
+        except subprocess.TimeoutExpired:
+            p.terminate()
+            try:
+                p.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait(timeout=2)
+            return True, "qemu-initialized-kvm-and-paused"
+    except Exception as exc:
+        return False, f"{type(exc).__name__}:{exc}"
+
+
 def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
     checks: dict[str, Any] = {}
+
+    cloud_flag = os.environ.get("BRAIN_CLOUD_EXECUTOR", "")
+    checks["cloud_executor_identity"] = {
+        "ok": cloud_flag == "1",
+        "value": "1" if cloud_flag == "1" else "missing",
+    }
 
     arch = platform.machine().lower()
     checks["x86_64"] = {"ok": arch in {"x86_64", "amd64"}, "value": arch}
@@ -43,9 +74,12 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
         checks["qemu_version"] = {"ok": ok, "value": version.splitlines()[0] if version else ""}
         ok, accel = _run([qemu, "-accel", "help"])
         checks["qemu_accel"] = {"ok": ok and "kvm" in accel.lower(), "value": accel[:1000]}
+        ok, probe = _probe_kvm(qemu)
+        checks["kvm_runtime"] = {"ok": ok, "value": probe}
     else:
         checks["qemu_version"] = {"ok": False, "value": ""}
         checks["qemu_accel"] = {"ok": False, "value": ""}
+        checks["kvm_runtime"] = {"ok": False, "value": "qemu-missing"}
 
     checks["python"] = {"ok": bool(shutil.which("python") or shutil.which("python3")), "value": platform.python_version()}
     checks["hostname"] = {"ok": bool(socket.gethostname()), "value": socket.gethostname()}
@@ -58,7 +92,7 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
         "evidence_ref": f"cloud-executor-gate:{int(time.time())}",
         "executor": "cloud-ephemeral-or-equivalent",
         "checks": checks,
-        "rule": "x86_64 + KVM + QEMU/KVM acceleration + writable execution surface",
+        "rule": "cloud identity + x86_64 + KVM device + QEMU + actual KVM initialization + writable execution surface",
     }
     Path(output).write_text(json.dumps(evidence, indent=2, sort_keys=True), encoding="utf-8")
     return evidence
