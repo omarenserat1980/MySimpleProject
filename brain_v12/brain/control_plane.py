@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 from uuid import uuid4
 
+from .execution_lock import BrainExecutionLock, ExecutionLockError
+
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 
 @dataclass
@@ -23,8 +25,9 @@ class ControlTask:
 
 class BrainControlPlane:
     """Bounded execution lifecycle: plan -> execute -> verify -> retry/escalate."""
-    def __init__(self) -> None:
+    def __init__(self, execution_lock: BrainExecutionLock | None = None) -> None:
         self.tasks: dict[str, ControlTask] = {}
+        self.execution_lock = execution_lock or BrainExecutionLock()
 
     def create(self, objective: str, max_attempts: int = 3) -> dict[str, Any]:
         task = ControlTask(id=str(uuid4()), objective=objective, max_attempts=max(1, int(max_attempts)))
@@ -54,12 +57,19 @@ class BrainControlPlane:
         if task.attempts >= task.max_attempts:
             task.status = "FAILED"; task.error = "RETRY_LIMIT_REACHED"
             return {"ok": False, "error": task.error, "task": self._view(task)}
+        try:
+            lease = self.execution_lock.acquire(task.id)
+        except ExecutionLockError as exc:
+            task.error = str(exc)
+            return {"ok": False, "status": task.status, "error": task.error, "task": self._view(task)}
+
         task.status = "RUNNING"; task.attempts += 1
         try:
             result = executor(task.objective)
             if not isinstance(result, dict): raise TypeError("executor must return a mapping")
         except Exception as exc:
             task.status = "FAILED"; task.error = f"EXECUTOR_ERROR:{type(exc).__name__}"
+            self.execution_lock.release(lease)
             return {"ok": False, "error": task.error, "task": self._view(task)}
         task.evidence.append({"stage": "execution", "result": result})
         try: verification = verifier(result)
@@ -67,6 +77,7 @@ class BrainControlPlane:
         verified = verification is True or (isinstance(verification, dict) and verification.get("verified") is True)
         evidence_ref = verification.get("evidence_ref") if isinstance(verification, dict) else None
         task.evidence.append({"stage": "verification", "result": verification})
+        self.execution_lock.release(lease)
         if verified and evidence_ref:
             task.status = "COMPLETED"; task.error = None
             return {"ok": True, "status": "VERIFIED_COMPLETED", "task": self._view(task)}
