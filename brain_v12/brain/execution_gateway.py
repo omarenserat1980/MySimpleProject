@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .execution_policy import BRAIN_INTERNAL, WINDOWS_REAL_BOOT, Executor, choose_executor
+from .execution_policy import BRAIN_INTERNAL, WINDOWS_CLOUD_NATIVE, WINDOWS_REAL_BOOT, Executor, choose_executor
 from .internal_runner import InternalRunner
 from .windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
 
@@ -55,9 +55,9 @@ class BrainExecutionGateway:
             )
         return ExecutionDecision(
             executor="windows-server-2025-cloud",
-            capability=WINDOWS_REAL_BOOT,
+            capability=WINDOWS_CLOUD_NATIVE,
             verified=True,
-            reason="WINDOWS_CLOUD_RUNTIME_VERIFIED",
+            reason="WINDOWS_CLOUD_NATIVE_RUNTIME_VERIFIED",
         )
 
     def authorize_task(
@@ -73,8 +73,8 @@ class BrainExecutionGateway:
         metadata = metadata or {}
         if capability == WINDOWS_REAL_BOOT:
             executor_type = str(metadata.get("executor", "")).strip().lower()
-            if executor_type != WINDOWS_CLOUD:
-                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_EXPLICIT_WINDOWS_CLOUD")
+            if executor_type != "windows-real-boot-qemu":
+                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD_EXECUTOR")
             vm_data = metadata.get("vm")
             node = metadata.get("node")
             if not isinstance(vm_data, dict) or not isinstance(node, dict):
