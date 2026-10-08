@@ -3,7 +3,9 @@ import pytest
 from economics.economic_memory import (
     EconomicObservation,
     Outcome,
+    conservative_update,
     estimate,
+    learned_estimate,
     verified_payment_total,
 )
 
@@ -53,3 +55,18 @@ def test_only_verified_payments_count_as_revenue_evidence():
         ),
     ]
     assert verified_payment_total(observations) == 15
+
+
+def test_conservative_update_shrinks_small_sample_toward_prior():
+    result = conservative_update(0.5, 1, 1, prior_strength=4)
+    assert result == 0.6
+
+
+def test_learned_estimate_is_conservative():
+    observations = [
+        EconomicObservation("video", Outcome.ACCEPTED, 1, 20),
+    ]
+    result = learned_estimate(observations, "video")
+    assert result.observations == 1
+    assert result.acceptance_probability == 0.6
+    assert result.risk == 0.4
