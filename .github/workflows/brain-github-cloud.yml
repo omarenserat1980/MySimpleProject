@@ -30,6 +30,7 @@ jobs:
     uses: ./.github/workflows/brain-revenue-conversion-tests.yml
 
   brain-internal:
+    if: ${{ inputs.task != 'revenue-tests' }}
     name: Brain Internal Runtime
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 60
