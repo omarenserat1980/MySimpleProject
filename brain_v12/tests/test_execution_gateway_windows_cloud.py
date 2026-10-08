@@ -29,6 +29,24 @@ class WindowsCloudExecutionGatewayTests(unittest.TestCase):
             ],
         }
 
+    def test_real_boot_wrong_executor_is_rejected_by_router(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "NO_WINDOWS_ROUTE_FOR|WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD"
+        ):
+            self.gateway.authorize_task(
+                "windows-server-2025-real-boot",
+                {"executor": "windows-server-2025-cloud"},
+            )
+
+    def test_real_boot_qemu_reaches_runtime_adapter_gate(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_BOOT_QEMU_RUNTIME_ADAPTER_NOT_CONFIGURED"
+        ):
+            self.gateway.authorize_task(
+                "windows-server-2025-real-boot",
+                {"executor": "windows-real-boot-qemu"},
+            )
+
     def test_fresh_guest_heartbeat_authorizes_windows_cloud(self):
         decision = self.gateway.authorize_windows_cloud(
             self.vm,

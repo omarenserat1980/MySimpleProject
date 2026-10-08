@@ -1,0 +1,38 @@
+name: Brain Executor Router Validation
+
+on:
+  push:
+    branches:
+      - "brain/executor-router-v1"
+    paths:
+      - "brain_v12/brain/executor_router.py"
+      - "brain_v12/tests/test_executor_router.py"
+      - "brain_v12/brain/execution_gateway.py"
+      - "brain_v12/tests/test_execution_gateway_windows_cloud.py"
+      - ".github/workflows/brain-executor-router-validation.yml"
+  pull_request:
+    paths:
+      - "brain_v12/brain/executor_router.py"
+      - "brain_v12/tests/test_executor_router.py"
+      - ".github/workflows/brain-executor-router-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-executor-router-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Router tests
+        run: python -m unittest brain_v12.tests.test_executor_router brain_v12.tests.test_execution_gateway_windows_cloud -v
+      - name: Import smoke
+        run: python -c "from brain_v12.brain.executor_router import route_windows; print(route_windows('windows-server-2025-real-boot', {'executor':'windows-real-boot-qemu'}))"
