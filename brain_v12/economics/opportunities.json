@@ -1,7 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "currency": "USD",
   "revenue_policy": "opportunity_is_not_revenue",
+  "revenue_confirmed_policy": "payment_evidence_required",
   "opportunities": [
     {
       "id": "welo-ar-lev-ai-eval",
@@ -12,7 +13,9 @@
       "advertised_rate_usd_per_hour": 22,
       "source": "Welo Data / LinkedIn",
       "verification_required": true,
-      "revenue_confirmed": false
+      "revenue_confirmed": false,
+      "upfront_cost_usd": 0,
+      "evidence_refs": []
     },
     {
       "id": "opentrain-ar-ai-safety",
@@ -24,7 +27,9 @@
       "advertised_rate_usd_per_hour_max": 32,
       "source": "OpenTrain",
       "verification_required": true,
-      "revenue_confirmed": false
+      "revenue_confirmed": false,
+      "upfront_cost_usd": 0,
+      "evidence_refs": []
     },
     {
       "id": "rws-ar-lev-ai-data",
@@ -35,7 +40,9 @@
       "advertised_rate_usd_per_hour": 6,
       "source": "RWS / LinkedIn",
       "verification_required": true,
-      "revenue_confirmed": false
+      "revenue_confirmed": false,
+      "upfront_cost_usd": 0,
+      "evidence_refs": []
     },
     {
       "id": "welo-jordan-video-recording",
@@ -47,7 +54,9 @@
       "advertised_rate_usd_per_task_max": 15,
       "source": "Welo Data / Lever",
       "verification_required": true,
-      "revenue_confirmed": false
+      "revenue_confirmed": false,
+      "upfront_cost_usd": 0,
+      "evidence_refs": []
     }
   ]
 }
