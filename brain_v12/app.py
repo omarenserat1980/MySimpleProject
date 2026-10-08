@@ -251,7 +251,7 @@ class BrainInternalClientRequest(BaseModel):
 class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
-    target: str = "arkan"
+    target: str | None = None
 
 
 @app.post("/api/brain/council/convene")
