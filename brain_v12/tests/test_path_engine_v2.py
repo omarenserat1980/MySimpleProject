@@ -68,6 +68,21 @@ class MultiStepPathV2Tests(unittest.TestCase):
         self.assertEqual(run.last_error, "VERIFIER_ERROR:RuntimeError")
         self.assertTrue(any(e.kind == "failure" for e in run.evidence))
 
+    def test_gate_exception_consumes_budget_and_stops(self):
+        engine = PathEngine(
+            authorization_gate=lambda _: (_ for _ in ()).throw(RuntimeError("auth boom")),
+            executor=lambda run, step: {"ok": True},
+            verifier=lambda run, result: True,
+        )
+        run = engine.start(PathSpec("gate-error", "goal", ["inspect"], max_attempts=2, max_steps=1), "gate-error-run")
+        engine.advance("gate-error-run")
+        self.assertEqual(run.state, PathState.FAILED)
+        self.assertEqual(run.attempts, 1)
+        engine.advance("gate-error-run")
+        self.assertEqual(run.state, PathState.STOPPED)
+        self.assertEqual(run.attempts, 2)
+        self.assertNotIn("goal", engine.active_by_goal)
+
     def test_step_budget_cannot_be_smaller_than_plan(self):
         engine = PathEngine()
         with self.assertRaises(ValueError):
