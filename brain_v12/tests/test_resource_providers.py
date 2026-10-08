@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 from brain_v12.brain.resource_fabric import ResourceFabric
 from brain_v12.brain.resource_providers import HostProbe, HostResourceProvider
 
@@ -11,7 +11,7 @@ class ResourceProviderTests(unittest.TestCase):
     @patch("brain_v12.brain.resource_providers.shutil.disk_usage")
     def test_linux_probe(self, disk_usage, *_):
         disk_usage.return_value.free = 2 * 1024**4
-        with patch("builtins.open", return_value=iter(["MemTotal:       524288000 kB\n"])):
+        with patch("builtins.open", mock_open(read_data="MemTotal:       524288000 kB\n")):
             specs = HostProbe("arkan").probe()
         self.assertEqual(specs[0].capacity, 96)
         self.assertEqual(specs[0].unit, "core")
