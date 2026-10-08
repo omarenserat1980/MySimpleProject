@@ -6,7 +6,7 @@ future-evolution predictions. Safety gates remain authoritative; continuity is n
 permission to bypass them.
 """
 from __future__ import annotations
-import json, os, time, urllib.parse, urllib.request, fcntl, fcntl
+import json, os, time, urllib.parse, urllib.request, fcntl
 from pathlib import Path
 
 BASE = os.environ.get("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
@@ -174,9 +174,9 @@ def main():
             record({
                 "cycle": cycle, "event": "completed", "goal": goal,
                 "fingerprint": fingerprint, "verified": verified,
-                "status": verification.get("status", result.get("status", "UNKNOWN")),
+                "status": "VERIFIED" if verified else verification.get("status", result.get("status", "UNKNOWN")),
             })
-            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
+            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={"VERIFIED" if verified else verification.get("status", "UNKNOWN")}", flush=True)
 
             # Repair policy is owned by the canonical V12 BrainSupervisor/runtime.
             # This loop only schedules work and records the returned evidence.
