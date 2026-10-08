@@ -34,6 +34,8 @@ jobs:
           brain_v12/tests/test_resource_fabric_federation.py
           brain_v12/tests/test_resource_providers.py
           brain_v12/tests/test_vdc_resource_provider.py
+          brain_v12/tests/test_piece_graph.py
+          brain_v12/tests/test_graph_composer.py
           brain_v12/tests/test_execution_authority.py
           brain_v12/tests/test_execution_kernel.py
           brain_v12/tests/test_mission_execution_kernel_integration.py
