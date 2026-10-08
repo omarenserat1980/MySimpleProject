@@ -14,7 +14,7 @@ def metadata(attested=True, fencing=19, state="READY"):
     return {
         "native_contract": {
             "executor_id": "windows-native-vivobook-01",
-            "agent_attestation_verified": attested,
+            "attestation": {\n                "verified": attested,\n                "replay_protected": True,\n                "attestation_digest": "digest-v1",\n                "challenge": "challenge-123",\n                "executor_id": "windows-native-vivobook-01",\n                "server_id": "vivobook-01",\n                "brain_generation": 8,\n                "network_generation": 7,\n            },
             "brain_generation": 8,
             "fencing_token": fencing,
             "authority_policy_version": "authority-policy-v1",
@@ -50,7 +50,7 @@ class WindowsNativeGatewayTests(unittest.TestCase):
         self.assertEqual(WINDOWS_NATIVE_EXECUTOR, decision.executor)
 
     def test_gateway_rejects_missing_agent_attestation(self):
-        with self.assertRaisesRegex(ValueError, "agent_attestation"):
+        with self.assertRaisesRegex(ValueError, "attestation_not_verified"):
             BrainExecutionGateway().authorize_task(
                 WINDOWS_NATIVE_EXECUTOR, metadata(attested=False)
             )
