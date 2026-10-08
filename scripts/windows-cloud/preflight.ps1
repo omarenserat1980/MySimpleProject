@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([string]$Location = "northeurope", [string]$VmSize = "Standard_D4s_v5")
 $ErrorActionPreference = "Stop"
-function Fail([string]$Message) { Write-Error $Message; exit 1 }
+function Fail([string]$Message) { throw $Message }
 foreach ($tool in @("az","terraform")) {
     if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { Fail "Missing prerequisite: $tool" }
 }
