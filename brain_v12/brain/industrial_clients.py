@@ -11,6 +11,8 @@ import hmac
 import os
 from typing import Any
 
+from .executor_identity import configured_executor, identity
+
 
 INDUSTRIAL_CLIENT_ID = "BRAIN-CLIENT-ARKAN-ISO-01"
 PRIMARY_WORKFLOW = "372137841"  # Existing Brain Windows Real Boot Evidence workflow ID
@@ -32,19 +34,21 @@ def authenticate(client_id: str, supplied_key: str) -> bool:
     )
 
 
-def build_request(client_id: str, request: str, target: str = "arkan") -> dict[str, Any]:
+def build_request(client_id: str, request: str, target: str | None = None) -> dict[str, Any]:
     if client_id != INDUSTRIAL_CLIENT_ID:
         return {"ok": False, "status": "UNKNOWN_CLIENT"}
     if request != ALLOWED_REQUEST:
         return {"ok": False, "status": "REQUEST_NOT_ALLOWED"}
-    if target != "arkan":
+    cfg = configured_executor()
+    if target is not None and str(target).strip().lower() not in {cfg["executor_id"].lower(), cfg["host_alias"].lower()}:
         return {"ok": False, "status": "TARGET_NOT_ALLOWED"}
     return {
         "ok": True,
         "status": "REQUEST_ACCEPTED",
         "client_id": client_id,
         "request": request,
-        "target": target,
+        "target": cfg["executor_id"],
+        "executor_identity": identity(),
         "workflow": PRIMARY_WORKFLOW,
         "execution_policy": "EXISTING_PRIMARY_PIPELINE",
         "verification": "WORKFLOW_SUCCESS_AND_WINDOWS_BOOT_EVIDENCE",
