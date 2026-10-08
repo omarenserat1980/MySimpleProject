@@ -9,7 +9,9 @@ from .revenue_gate import PaymentEvidence, ConfirmedRevenue
 def run_smoke() -> dict:
     root = Path(__file__).parent
     data = json.loads((root / "opportunities.json").read_text(encoding="utf-8"))
-    assert data["revenue_confirmed_policy"] if "revenue_confirmed_policy" in data else True
+
+    assert data["revenue_policy"] == "opportunity_is_not_revenue"
+    assert data["revenue_confirmed_policy"] == "payment_evidence_required"
     assert data["opportunities"]
 
     sample = Opportunity("smoke", 100, 0.5, 0.8, 2, 0.1, 0.1)
