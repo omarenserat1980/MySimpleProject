@@ -16,7 +16,7 @@ concurrency:
 jobs:
   drain:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Cancel stale queued runs
         env:
@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           repo="${{ github.repository }}"
-          gh run list --repo "$repo" --limit 100 --json databaseId,status,workflowName,headBranch,createdAt             > runs.json
+          gh run list --repo "$repo" --limit 1000 --json databaseId,status,workflowName,headBranch,createdAt             > runs.json
           python - <<'PY'
           import json, subprocess
           rows=json.load(open("runs.json"))
