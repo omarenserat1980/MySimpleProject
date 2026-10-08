@@ -28,6 +28,19 @@ class PaymentGatewayTests(unittest.TestCase):
 
     def test_replay_rejected(self):
         p={"event_id":"evt_replay1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_456","amount_usd":9,"currency":"USD","timestamp":int(time.time())}; raw,h=self.signed(p); self.assertEqual(self.client.post("/api/payments/webhook",content=raw,headers=h).status_code,200); self.assertEqual(self.client.post("/api/payments/webhook",content=raw,headers=h).status_code,409)
+    def test_verified_webhook_is_idempotent_after_replay_record_loss(self):
+        p={"event_id":"evt_recover1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_recover","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
+        raw,h=self.signed(p)
+        first=self.client.post("/api/payments/webhook",content=raw,headers=h)
+        self.assertEqual(first.status_code,200)
+        replay_file=self.db + ".webhooks.json"
+        os.remove(replay_file)
+        second_payload=dict(p); second_payload["event_id"]="evt_recover2"
+        raw2,h2=self.signed(second_payload)
+        second=self.client.post("/api/payments/webhook",content=raw2,headers=h2)
+        self.assertEqual(second.status_code,200)
+        self.assertTrue(second.json().get("idempotent"))
+
     def test_payment_reference_replay_rejected_across_event_ids(self):
         second = self.store.create(CommerceOrderIn(customer_name="Test2",contact="test2@example.com",product_id="ai-starter-kit"))
         self.store.transition(second["order_id"],"PAYMENT_PENDING","test-pending-2")
