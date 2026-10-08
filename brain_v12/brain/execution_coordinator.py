@@ -44,7 +44,7 @@ class BrainExecutionCoordinator:
     def _policy_gate(run: PathRun) -> GateResult:
         return GateResult(GateDecision.ALLOW, "coordinator policy")
 
-    def create(self, objective: str, max_attempts: int = 3) -> dict[str, Any]:
+    def create(self, objective: str, max_attempts: int = 3, steps: list[str] | None = None) -> dict[str, Any]:
         control = self.control_plane.create(objective, max_attempts=max_attempts)
         task = self.task_engine.create(objective)
         path_id = f"execution:{control['id']}"
@@ -52,9 +52,9 @@ class BrainExecutionCoordinator:
             PathSpec(
                 path_id=path_id,
                 goal=objective,
-                steps=["execute"],
+                steps=steps or ["execute"],
                 max_attempts=control["max_attempts"],
-                max_steps=1,
+                max_steps=len(steps or ["execute"]),
                 require_authorization=True,
                 metadata={"control_task_id": control["id"]},
             ),
