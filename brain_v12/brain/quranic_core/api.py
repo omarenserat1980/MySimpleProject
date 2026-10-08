@@ -49,6 +49,14 @@ def build_router(engine=None):
         except ValueError as exc:
             raise HTTPException(status_code=422,detail=str(exc)) from exc
 
+    @router.post("/decision")
+    def decision(body:ResearchIn):
+        try:
+            result=orchestrator.evaluate(body.question,body.finding,[x.model_dump() for x in body.evidence])
+            return orchestrator.decision(result)
+        except ValueError as exc:
+            raise HTTPException(status_code=422,detail=str(exc)) from exc
+
     @router.get("/sources/status")
     def sources_status():
         return {"ok":True,"canonical":canonical.configured(),
