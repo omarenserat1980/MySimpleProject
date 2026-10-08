@@ -59,6 +59,7 @@ from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
 from .brain.workload_controller import WorkloadController
 from .brain.workload_router import WorkloadRouter, WorkerTarget
+from .brain.worker_registry import WorkerRegistry
 from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
@@ -155,6 +156,7 @@ brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
 workload_controller=WorkloadController()
 workload_router=WorkloadRouter(workload_controller)
+worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
@@ -1825,6 +1827,19 @@ def system_connection():
         "version": APP_VERSION,
         "checks": checks,
     }
+
+@app.get("/api/brain/workers")
+def brain_workers():
+    return worker_registry.snapshot()
+
+@app.post("/api/brain/workers/register")
+def brain_worker_register(body:dict):
+    return worker_registry.register(
+        body.get("worker_id",""),
+        body.get("kind","local"),
+        body.get("capabilities",[]),
+        body.get("lease_seconds",30),
+    )
 
 @app.get("/api/device/agent-status/{agent_id}")
 def device_agent_status_by_id(agent_id: str, request: Request):
