@@ -113,7 +113,10 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = WebhookEnvelope.model_validate_json(raw)
+            if hasattr(WebhookEnvelope, "model_validate_json"):
+                payload = WebhookEnvelope.model_validate_json(raw)
+            else:
+                payload = WebhookEnvelope.parse_raw(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         if replay.seen(payload.event_id):
