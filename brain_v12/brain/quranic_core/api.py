@@ -9,6 +9,7 @@ from .benefit import HumanBenefitEngine
 from .orchestrator import QuranicResearchOrchestrator
 from .graph import EvidenceGraph
 from .publication import PublicationGate
+from .knowledge import KnowledgeOpportunityEngine
 from .research_packet import ResearchPacketBuilder
 
 class EvidenceIn(BaseModel):
@@ -35,6 +36,7 @@ def build_router(engine=None):
     orchestrator=QuranicResearchOrchestrator()
     graph=EvidenceGraph()
     publication=PublicationGate()
+    knowledge=KnowledgeOpportunityEngine()
     packets=ResearchPacketBuilder(publication)
     router=APIRouter(prefix="/api/quranic-core",tags=["quranic-core"])
 
@@ -80,6 +82,12 @@ def build_router(engine=None):
         records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
         finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
         return packets.build(finding)
+
+    @router.post("/knowledge-opportunities")
+    def knowledge_opportunities(body:ResearchIn):
+        records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
+        finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
+        return knowledge.generate(finding)
 
     @router.get("/sources/status")
     def sources_status():
