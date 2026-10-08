@@ -20,36 +20,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout exact main source
+      - name: Checkout repository metadata
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Verify golden checkpoint metadata
+      - name: Resolve immutable checkpoint commit
         env:
           CHECKPOINT_ID: ${{ inputs.checkpoint_id }}
         run: |
           set -euo pipefail
           test -f recovery/BRAIN_GOLDEN_CHECKPOINT_01.json
           python - <<'PY'
-          import json, subprocess
+          import json, os
           p=json.load(open("recovery/BRAIN_GOLDEN_CHECKPOINT_01.json", encoding="utf-8"))
-          head=subprocess.check_output(["git","rev-parse","HEAD"], text=True).strip()
-          assert p["checkpoint_id"] == "BRAIN-GOLDEN-01"
-          assert p["source_commit"] == head, (p["source_commit"], head)
-          print("CHECKPOINT_SOURCE=VERIFIED")
-          print("SOURCE_COMMIT="+head)
+          expected=os.environ["CHECKPOINT_ID"]
+          assert p["checkpoint_id"] == expected, (p["checkpoint_id"], expected)
+          commit=p["source_commit"]
+          assert len(commit)==40 and all(c in "0123456789abcdef" for c in commit), commit
+          print("CHECKPOINT_ID="+p["checkpoint_id"])
+          print("SOURCE_COMMIT="+commit)
+          with open(os.environ["GITHUB_ENV"],"a") as f:
+              f.write("CHECKPOINT_SOURCE_COMMIT="+commit+"\n")
           PY
+          git cat-file -e "$CHECKPOINT_SOURCE_COMMIT^{commit}"
+
+      - name: Checkout immutable checkpoint source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKPOINT_SOURCE_COMMIT }}
+          fetch-depth: 0
+
+      - name: Verify checkpoint source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CHECKPOINT_SOURCE_COMMIT"
+          git cat-file -e "$CHECKPOINT_SOURCE_COMMIT^{commit}"
 
       - name: Build deterministic recovery inventory
         run: |
           set -euo pipefail
           mkdir -p recovery_bundle/source recovery_bundle/state
-          git archive --format=tar HEAD | gzip -n > recovery_bundle/source/brain-source.tar.gz
+          git archive --format=tar "$CHECKPOINT_SOURCE_COMMIT" | gzip -n > recovery_bundle/source/brain-source.tar.gz
           sha256sum recovery_bundle/source/brain-source.tar.gz > recovery_bundle/source/brain-source.tar.gz.sha256
 
-          for f in             brain_v12/brain_v12.db             brain_v12/.brain/state/sync_queue.jsonl             brain6_artifacts/evidence/evidence.db             .brain/state/sync_queue.jsonl             .brain/state/continuous_supervisor.jsonl
+          for f in \
+            brain_v12/brain_v12.db \
+            brain_v12/.brain/state/sync_queue.jsonl \
+            brain6_artifacts/evidence/evidence.db \
+            .brain/state/sync_queue.jsonl \
+            .brain/state/continuous_supervisor.jsonl
           do
             if [ -f "$f" ]; then
               mkdir -p "recovery_bundle/state/$(dirname "$f")"
@@ -64,9 +85,11 @@ jobs:
           for base, _, names in os.walk(root):
               for name in sorted(names):
                   p=os.path.join(base,name)
-                  if p.endswith("inventory.json"): continue
-                  h=hashlib.sha256(open(p,"rb").read()).hexdigest()
-                  files.append({"path":p,"sha256":h,"bytes":os.path.getsize(p)})
+                  if p.endswith("inventory.json"):
+                      continue
+                  with open(p,"rb") as fh:
+                      digest=hashlib.sha256(fh.read()).hexdigest()
+                  files.append({"path":p,"sha256":digest,"bytes":os.path.getsize(p)})
           manifest={
               "checkpoint_id":"BRAIN-GOLDEN-01",
               "source_commit":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
@@ -75,6 +98,7 @@ jobs:
               "files":files,
               "secrets_included":False,
               "device_identity_included":False,
+              "live_runtime_touched":False,
           }
           json.dump(manifest,open(root+"/inventory.json","w",encoding="utf-8"),ensure_ascii=False,indent=2)
           PY
