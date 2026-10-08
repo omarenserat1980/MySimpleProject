@@ -23,7 +23,7 @@ class EvidenceStore:
         self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_mission_attempt ON evidence(mission_id,attempt)")
         self.db.execute("""CREATE TABLE IF NOT EXISTS execution_idempotency(
           execution_key TEXT PRIMARY KEY, mission_fingerprint TEXT NOT NULL, action TEXT NOT NULL,
-          parameters_fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, completed_at REAL
+          parameters_fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, completed_at REAL, lease_until REAL
         )""")
         self.db.commit()
 
