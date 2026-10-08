@@ -1,6 +1,7 @@
 from economics.opportunity_engine import (
     Opportunity, OpportunityState, can_record_confirmed_revenue,
-    create_transition, rank_opportunities, score, transition_allowed,
+    create_transition, deduplicate_opportunities, rank_opportunities,
+    score, transition_allowed,
 )
 
 
@@ -46,3 +47,11 @@ def test_ranking_is_deterministic():
     ranked = rank_opportunities([b, a])
     assert ranked[0][0].opportunity_id == "a"
     assert ranked[0][1] > ranked[1][1]
+
+
+def test_duplicate_opportunities_are_collapsed():
+    a = Opportunity("same", 100, .8, .8, 2, .1, .1)
+    b = Opportunity("same", 200, .8, .8, 2, .1, .1)
+    result = deduplicate_opportunities([a, b])
+    assert len(result) == 1
+    assert result[0] == a
