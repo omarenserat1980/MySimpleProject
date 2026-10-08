@@ -80,5 +80,7 @@ def test_fabric_sync_excludes_vdc_reserved_capacity():
     vdc.sync_resource_fabric(fabric2)
     ram = fabric2.resources[f"vdc:{blade_id}:ram"]
     storage = fabric2.resources[f"vdc:{blade_id}:storage"]
-    assert ram.capacity == 6
-    assert storage.capacity == 112
+    assert ram.capacity == 6 * 1024**3
+    assert storage.capacity == 112 * 1024**3
+    assert ram.unit == "bytes"
+    assert storage.unit == "bytes"
