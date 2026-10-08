@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Iterable
 
 
 class OpportunityState(str, Enum):
@@ -51,6 +52,12 @@ def score(opportunity: Opportunity) -> float:
         * opportunity.acceptance_probability
         * opportunity.brain_assistance
     ) / denominator
+
+
+def rank_opportunities(opportunities: Iterable[Opportunity]) -> list[tuple[Opportunity, float]]:
+    """Rank opportunities by descending deterministic score, then stable ID."""
+    ranked = [(item, score(item)) for item in opportunities]
+    return sorted(ranked, key=lambda pair: (-pair[1], pair[0].opportunity_id))
 
 
 def can_record_confirmed_revenue(state: OpportunityState, payment_evidence: bool) -> bool:
