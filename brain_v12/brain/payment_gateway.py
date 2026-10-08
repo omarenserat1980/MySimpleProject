@@ -137,6 +137,7 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             "provider": payload.provider,
             "event_id": payload.event_id,
             "verified_at": int(time.time()),
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
         })
         replay.record(payload.event_id)
         return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
