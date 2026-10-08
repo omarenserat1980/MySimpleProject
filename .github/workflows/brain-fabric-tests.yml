@@ -37,6 +37,7 @@ jobs:
           brain_v12/tests/test_piece_graph.py
           brain_v12/tests/test_graph_composer.py
           brain_v12/tests/test_hardware_truth_kernel.py
+          brain_v12/tests/test_hardware_reconciler_deep.py
           brain_v12/tests/test_execution_authority.py
           brain_v12/tests/test_execution_kernel.py
           brain_v12/tests/test_mission_execution_kernel_integration.py
