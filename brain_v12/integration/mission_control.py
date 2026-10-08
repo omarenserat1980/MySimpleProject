@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import hashlib
 from .mission_router import MissionRoute, route
 from .cross_domain_contract import CrossDomainOpportunity, safe_action
-from .decision_evidence import DecisionEvidence
+from .decision_evidence import DecisionEvidence\nfrom .mission_lifecycle import MissionState
 
 @dataclass(frozen=True)
 class MissionPlan:
