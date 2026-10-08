@@ -26,6 +26,7 @@ class VirtualTask:
     result:dict|None=None
     attempt:int=0
     idempotency_key:str|None=None
+    priority:str="NORMAL"
 
 class VirtualTaskQueue:
     """Durable queue with startup recovery and explicit verification boundary."""
@@ -42,7 +43,7 @@ class VirtualTaskQueue:
         req=ResourceRequirement(**spec.get("requirement",{}))
         return VirtualTask(row["task_id"],spec.get("program",[]),set(spec.get("required_capabilities",[])),req,
           row["status"],row["blade_id"],row["lease_id"],row["lease_expires_at"],row["created_at"],None,None,result,
-          int(row.get("attempt") or 0),row.get("idempotency_key"))
+          int(row.get("attempt") or 0),row.get("idempotency_key"),spec.get("priority","NORMAL"))
 
     def _recover_on_start(self):
         # A new process cannot trust old in-memory resource reservations. Requeue stale RUNNING work first.
@@ -56,10 +57,10 @@ class VirtualTaskQueue:
             self.tasks[task.task_id]=task
         self.pump()
 
-    def submit(self,program,required_capabilities=None,requirement=None,task_id=None,idempotency_key=None):
+    def submit(self,program,required_capabilities=None,requirement=None,task_id=None,idempotency_key=None,priority="NORMAL"):
         task_id=task_id or f"vtask-{uuid4().hex[:12]}"
         existing=self.store.submit(task_id,{"program":list(program),"required_capabilities":sorted(required_capabilities or {"cpu"}),
-          "requirement":(requirement or ResourceRequirement()).__dict__},idempotency_key)
+          "requirement":(requirement or ResourceRequirement()).__dict__,"priority":str(priority).upper()},idempotency_key)
         task=self._row_to_task(existing)
         with self.lock: self.tasks[task.task_id]=task
         self._schedule(task.task_id)
