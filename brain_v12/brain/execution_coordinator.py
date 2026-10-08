@@ -150,6 +150,7 @@ class BrainExecutionCoordinator:
             "status": "VERIFIED_COMPLETED" if result.state == PathState.SUCCEEDED else result.state.value,
             "step": step,
             "control": control_view,
+            "task": self.task_engine.tasks.get(task_id) if task_id else None,
             "path": self._path_view(result),
         }
 
