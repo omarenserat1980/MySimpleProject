@@ -54,13 +54,24 @@ class WebhookStore:
     def seen(self, event_id: str) -> bool:
         with self.lock:
             return event_id in self._read()
-    def record(self, event_id: str) -> None:
+    def record(self, event_id: str, payment_reference: str | None = None, order_id: str | None = None) -> None:
         with self.lock:
             data = self._read()
-            data[event_id] = {"seen_at": int(time.time())}
+            data[event_id] = {
+                "seen_at": int(time.time()),
+                "payment_reference": payment_reference,
+                "order_id": order_id,
+            }
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
             tmp.replace(self.path)
+
+    def payment_seen(self, payment_reference: str) -> bool:
+        with self.lock:
+            return any(
+                isinstance(v, dict) and v.get("payment_reference") == payment_reference
+                for v in self._read().values()
+            )
 
 
 class WebhookEnvelope(BaseModel):
@@ -118,8 +129,15 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         if replay.seen(payload.event_id):
             raise HTTPException(409, "WEBHOOK_REPLAY")
+        if replay.payment_seen(payload.payment_reference):
+            raise HTTPException(409, "PAYMENT_REFERENCE_REPLAY")
+        configured_provider = os.getenv("BRAIN_PAYMENT_PROVIDER", "").strip()
+        if not configured_provider:
+            raise HTTPException(503, "PAYMENT_PROVIDER_NOT_CONFIGURED")
+        if payload.provider != configured_provider:
+            raise HTTPException(409, "PAYMENT_PROVIDER_MISMATCH")
         if payload.event_type != "payment.verified":
-            replay.record(payload.event_id)
+            replay.record(payload.event_id, payload.payment_reference, payload.order_id)
             return {"ok": True, "ignored": True, "event_id": payload.event_id}
         order = store.get(payload.order_id)
         if not order:
@@ -139,7 +157,7 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             "verified_at": int(time.time()),
             "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
         })
-        replay.record(payload.event_id)
+        replay.record(payload.event_id, payload.payment_reference, payload.order_id)
         return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
 
     return api
