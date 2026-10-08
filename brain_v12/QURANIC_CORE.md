@@ -37,3 +37,14 @@ Live content such as tafsir and search can be connected through Quran Foundation
 
 ## Next expansion
 Add pinned canonical-text manifests, tafsir adapters, provenance records, counter-evidence workers, and human-benefit project generation. These adapters must remain behind the integrity gate.
+
+
+## Implemented adapters
+- Canonical Quran adapter: read-only Quran Foundation Content API integration; credentials remain server-side.
+- Tafsir adapter: lists tafsir resources and retrieves ayah tafsir while preserving the tafsir evidence level.
+- Scientific evidence adapter: records externally supplied scientific evidence without inventing citations.
+- Counter-evidence engine: requires explicit counter/opposing records and warns that absence of recorded counter-evidence is not proof.
+- Human-benefit engine: generates project directions rather than religious rulings.
+
+## Runtime configuration
+Set `QF_CLIENT_ID`, `QF_ACCESS_TOKEN`, and optionally `QF_ENV=production` on the backend. If credentials are absent, the core remains operational but live source retrieval returns `NOT_CONFIGURED` rather than fabricating content.
