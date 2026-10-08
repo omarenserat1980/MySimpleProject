@@ -85,10 +85,10 @@ class WindowsCloudExecutor:
         Use verify_runtime() for the stronger operational proof.
         """
         self._validate(vm)
-        running = vm.state == "RUNNING"
+        provisioned = str(vm.state).upper() in {"PROVISIONED", "READY", "RUNNING"}
         return {
-            "status": "CLOUD_WINDOWS_VM_READY" if running else "CLOUD_WINDOWS_VM_NOT_READY",
-            "verified": running,
+            "status": "CLOUD_WINDOWS_VM_PROVISIONED" if provisioned else "CLOUD_WINDOWS_VM_NOT_READY",
+            "verified": provisioned,
             "runtime_verified": False,
             "verification_scope": "infrastructure_only",
             "executor": self.capability,
@@ -114,7 +114,7 @@ class WindowsCloudExecutor:
                 **infrastructure,
                 "status": "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED",
                 "runtime_verified": False,
-                "reason": "CLOUD_WINDOWS_VM_NOT_RUNNING",
+                "reason": "CLOUD_WINDOWS_VM_NOT_PROVISIONED",
             }
 
         if str(node.get("provider", "")).strip().lower() != vm.provider.strip().lower():
