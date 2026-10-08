@@ -58,3 +58,9 @@ The Windows real-boot path must remain single-flight. Do not create parallel Win
 ## Source of truth
 
 Repository state, workflow logs, immutable artifacts, and independent completion gates are evidence. Human-readable status messages are not evidence by themselves.
+
+## Cloud executor capability gate
+
+Windows Real Boot must not start until cloud_executor_gate.py independently verifies the execution substrate: x86_64, usable /dev/kvm, QEMU x86_64, KVM acceleration, and a writable execution surface. The gate is evidence-only and never declares Windows success. The Windows workflow requires this gate as a prerequisite job.
+
+Cloud execution is intended to be ephemeral/JIT. The executor must run one consequential job, preserve required evidence externally, and then be destroyed/cleaned. Provider availability or VM creation alone is not capability evidence.
