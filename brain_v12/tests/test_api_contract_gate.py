@@ -66,6 +66,7 @@ class ApiContractGateTests(unittest.TestCase):
         self.assertFalse(body["healthy"])
         self.assertEqual(body["next"]["stage"], "runtime")
         self.assertEqual(body["next"]["path"], "/api/system/readiness")
+        self.assertRegex(body["next"]["failure"]["failure_id"], r"^API-[A-F0-9]{16}$")
 
     def test_resilience_health_detects_offline_agent_status(self):
         app = FastAPI()
@@ -85,6 +86,7 @@ class ApiContractGateTests(unittest.TestCase):
         self.assertFalse(body["healthy"])
         self.assertEqual(body["next"]["stage"], "agent_status")
         self.assertEqual(body["next"]["path"], "/api/agent-gateway/status")
+        self.assertRegex(body["next"]["failure"]["failure_id"], r"^API-[A-F0-9]{16}$")
 
     def test_resilience_health_cannot_report_healthy_on_failed_device(self):
         app = FastAPI()
