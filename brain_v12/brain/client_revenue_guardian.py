@@ -389,6 +389,14 @@ class ClientRevenueGuardian:
                 "verification_required": True,
             }
 
+        snapshot = income_engine.snapshot(client_id=client_id)
+        opportunities = list(snapshot.get("opportunities") or [])
+        ready = [x for x in opportunities if str(x.get("status") or "").upper() == "READY_TO_APPLY"]
+        active = [x for x in opportunities if str(x.get("status") or "").upper() not in {"STALE", "COMPLETED", "PAYMENT_VERIFIED"}]
+        candidate = ready[0] if ready else (active[0] if active else None)
+        candidate_data = dict((candidate or {}).get("data") or {})
+        candidate_id = str((candidate or {}).get("opportunity_id") or "")
+        candidate_title = str(candidate_data.get("title") or (candidate or {}).get("title") or "")
         mission = {
             "client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -399,6 +407,19 @@ class ClientRevenueGuardian:
             "payment_verification_required": True,
             "constraint": "ONE_OPPORTUNITY_ONE_EXTERNAL_ACTION",
             "no_fabricated_buyer_or_payment": True,
+            "selected_opportunity_id": candidate_id or None,
+            "selected_opportunity_title": candidate_title or None,
+            "recommended_offer_jod": 10.0,
+            "delivery_contract": {
+                "acceptance": "CLIENT_ACCEPTED",
+                "delivery_evidence_required": True,
+                "payment_request_after": "COMPLETED",
+                "payment_reconciliation_before_revenue": True,
+            },
+            "conversion_path": (
+                "SELECT_ONE_OPPORTUNITY -> HUMAN_APPROVAL -> EXTERNAL_SUBMISSION -> "
+                "CLIENT_ACCEPTED -> DELIVER -> PAYMENT_REQUEST -> PAYMENT_RECONCILIATION -> REVENUE_REALIZED"
+            ),
         }
         record = {
             **previous,
