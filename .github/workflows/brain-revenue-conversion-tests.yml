@@ -15,6 +15,7 @@ on:
       - "brain_v12/tests/test_live_opportunity_researcher.py"
       - "brain_v12/tests/test_payment_gateway.py"
       - "brain_v12/tests/test_commerce_api.py"
+      - "brain_v12/tests/test_economic_reconciliation.py"
       - ".github/workflows/brain-revenue-conversion-tests.yml"
       - "brain_v12/ci/dispatch_workflow.py"
   workflow_dispatch:
@@ -50,6 +51,9 @@ jobs:
 
       - name: Revenue lifecycle tests
         run: python -m unittest brain_v12.tests.test_income_lifecycle -v
+
+      - name: Economic reconciliation tests
+        run: python -m unittest brain_v12.tests.test_economic_reconciliation -v
 
       - name: Revenue guardian tests
         run: python -m unittest brain_v12.tests.test_client_revenue_guardian -v
