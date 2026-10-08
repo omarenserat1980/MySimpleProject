@@ -74,6 +74,14 @@ jobs:
           PY
           echo "BRAIN_INTERNAL_RUNNER=VERIFIED"
 
+      - name: Verify pre-issued Brain closed-loop execution contract
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/windows_real_boot_closed_loop_gate.py \
+            --output windows-execution-contract-gate.json
+          grep -q '"verified": true' windows-execution-contract-gate.json
+          echo "WINDOWS_EXECUTION_CONTRACT=VERIFIED"
+
       - name: Install real VM tooling
         run: |
           # Brain-owned hosts are provisioned before registration.
@@ -314,6 +322,9 @@ jobs:
           python3 - <<'PY'
           import json,pathlib
           e=json.loads(pathlib.Path("windows-boot-evidence.json").read_text(encoding="utf-8-sig"))
+          contract_gate=json.loads(pathlib.Path("windows-execution-contract-gate.json").read_text(encoding="utf-8"))
+          assert contract_gate["verified"] is True, contract_gate
+          e["control"]=contract_gate["contract"]
           assert e["status"]=="WINDOWS_BOOT_VERIFIED", e
           assert e["guest"]["os"]=="Windows Server 2025", e
           assert e["guest"]["architecture"]=="AMD64", e
@@ -360,12 +371,16 @@ jobs:
             proof-iso-setupcomplete.txt
             qemu-accel.txt
             windows-boot-phase.txt
+            windows-execution-contract-gate.json
             qemu-console.log
             qemu-serial.log
 
       - name: Final Windows evidence gate
         run: |
           set -euo pipefail
+          test -f windows-execution-contract-gate.json
+          grep -q '"verified": true' windows-execution-contract-gate.json
           test -f windows-completion-gate.json
           grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          echo "BRAIN_WINDOWS_REAL_BOOT_CLOSED_LOOP=VERIFIED"
           echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
