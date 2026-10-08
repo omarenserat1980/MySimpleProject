@@ -14,6 +14,8 @@ WINDOWS_REAL_BOOT = "windows-server-2025-real-boot"
 BRAIN_INTERNAL = "brain-internal"
 GITHUB_CI = "github-ci"
 WINDOWS_CLOUD = "windows-server-2025-cloud"
+WINDOWS_CLOUD_NATIVE = "windows-server-2025-cloud-native"
+WINDOWS_REAL_BOOT_QEMU = "windows-server-2025-real-boot-qemu"
 
 
 @dataclass(frozen=True)
@@ -34,7 +36,7 @@ def default_executors() -> tuple[Executor, ...]:
         ),
         Executor(
             name=WINDOWS_CLOUD,
-            capabilities=frozenset({WINDOWS_CLOUD, WINDOWS_REAL_BOOT}),
+            capabilities=frozenset({WINDOWS_CLOUD, WINDOWS_CLOUD_NATIVE}),
             priority=50,
             external=True,
         ),
