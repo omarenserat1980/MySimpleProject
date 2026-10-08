@@ -2924,6 +2924,55 @@ def brain_fabric_release(request: Request, reservation_id: str):
     return result
 
 
+@app.post("/api/brain/fabric/sync-vdc")
+def brain_fabric_sync_vdc(request: Request):
+    require_control_key(request)
+    result=brain_datacenter.sync_resource_fabric(resource_fabric)
+    store.event("BRAIN_VDC_RESOURCE_PROVIDER_SYNC", result)
+    return result
+
+
+@app.post("/api/brain/fabric/compose-server")
+def brain_fabric_compose_server(request: Request, body: dict):
+    require_control_key(request)
+    intent_id=str(body.get("intent_id") or uuid4().hex)
+    result=vdc_resource_provider.compose_server(
+        intent_id=intent_id,
+        cpu_cores=int(body.get("cpu_cores", 1)),
+        ram_bytes=int(body.get("ram_bytes", 4*1024*1024*1024)),
+        storage_bytes=int(body.get("storage_bytes", 64*1024*1024*1024)),
+        network=bool(body.get("network", False)),
+        gpu=bool(body.get("gpu", False)),
+        ttl_seconds=body.get("ttl_seconds"),
+    )
+    store.event("BRAIN_VDC_SERVER_COMPOSE", {
+        "intent_id": intent_id,
+        "status": result.get("status"),
+        "blade_id": result.get("blade_id"),
+        "reservation_id": result.get("reservation_id"),
+    })
+    return result
+
+
+@app.post("/api/brain/fabric/reap")
+def brain_fabric_reap(request: Request):
+    require_control_key(request)
+    result=vdc_resource_provider.reap_expired()
+    store.event("BRAIN_RESOURCE_FABRIC_REAP", result)
+    return result
+
+
+@app.post("/api/brain/fabric/release-vdc/{reservation_id}")
+def brain_fabric_release_vdc(request: Request, reservation_id: str):
+    require_control_key(request)
+    result=vdc_resource_provider.release(reservation_id)
+    store.event("BRAIN_VDC_SERVER_RELEASE", {
+        "reservation_id": reservation_id,
+        "status": result.get("status"),
+    })
+    return result
+
+
 @app.get("/api/brain/recovery")
 def brain_recovery():
     recovered=brain_datacenter.task_queue.recover_expired()
