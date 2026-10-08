@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from .engine import QuranicResearchEngine
 from .counter_evidence import CounterEvidenceEngine
 from .benefit import HumanBenefitEngine
+from .models import EvidenceLevel
 
 @dataclass
 class QuranicResearchOrchestrator:
@@ -27,7 +28,7 @@ class QuranicResearchOrchestrator:
         records=[]
         for item in evidence:
             records.append(self.engine.make_evidence(
-                item["level"],item["source"],item["claim"],
+                EvidenceLevel(item["level"]),item["source"],item["claim"],
                 item.get("citation"),item.get("confidence",0.0),item.get("metadata")))
         integrity=self.engine.gate.validate(records)
         if not integrity.allowed:
