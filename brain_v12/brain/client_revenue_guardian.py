@@ -393,10 +393,19 @@ class ClientRevenueGuardian:
         opportunities = list(snapshot.get("opportunities") or [])
         ready = [x for x in opportunities if str(x.get("status") or "").upper() == "READY_TO_APPLY"]
         active = [x for x in opportunities if str(x.get("status") or "").upper() not in {"STALE", "COMPLETED", "PAYMENT_VERIFIED"}]
-        candidate = ready[0] if ready else (active[0] if active else None)
+        ranked = sorted(
+            (ready or active),
+            key=lambda x: float(x.get("score") or x.get("fit_score") or (x.get("data") or {}).get("score") or 0),
+            reverse=True,
+        )
+        candidate = ranked[0] if ranked else None
         candidate_data = dict((candidate or {}).get("data") or {})
         candidate_id = str((candidate or {}).get("opportunity_id") or "")
         candidate_title = str(candidate_data.get("title") or (candidate or {}).get("title") or "")
+        candidate_url = str(candidate_data.get("source_url") or (candidate or {}).get("source_url") or "")
+        candidate_evidence = str(candidate_data.get("evidence") or (candidate or {}).get("evidence") or "")
+        candidate_requirements = str(candidate_data.get("requirements") or "")
+        candidate_quality = bool(candidate_id and candidate_title and candidate_url.startswith(("http://", "https://")) and candidate_evidence.strip() and len(candidate_requirements.strip()) >= 8)
         mission = {
             "client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -409,6 +418,8 @@ class ClientRevenueGuardian:
             "no_fabricated_buyer_or_payment": True,
             "selected_opportunity_id": candidate_id or None,
             "selected_opportunity_title": candidate_title or None,
+            "selected_opportunity_url": candidate_url or None,
+            "selected_opportunity_quality": candidate_quality,
             "recommended_offer_jod": 10.0,
             "delivery_contract": {
                 "acceptance": "CLIENT_ACCEPTED",
