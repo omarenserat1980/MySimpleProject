@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from time import time
 from uuid import uuid4
+from threading import RLock
 
 
 class ResourceKind(str, Enum):
@@ -99,6 +100,7 @@ class ResourceFabric:
         self.resources: dict[str, ResourceSpec] = {}
         self.reservations: dict[str, ResourceReservation] = {}
         self.intents: dict[str, dict] = {}
+        self._lock = RLock()
 
     def register(self, spec: ResourceSpec) -> dict:
         spec = ResourceSpec(spec.resource_id, spec.kind, spec.provider_id, spec.capacity,
@@ -180,7 +182,8 @@ class ResourceFabric:
 
     def reserve(self, intent_id: str, resource_ids: list[str] | None = None,
                 ttl_seconds: int | None = None, allocations: list[dict] | None = None) -> dict:
-        self.reap_expired()
+        with self._lock:
+            self.reap_expired()
         if allocations is None:
             allocations = [{"resource_id": rid, "amount": self.resources[rid].capacity}
                            for rid in (resource_ids or [])]
