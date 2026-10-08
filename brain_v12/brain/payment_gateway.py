@@ -188,6 +188,7 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:
+            journal_entry = journal.get(payload.event_id)
             if replay.seen(payload.event_id):
                 raise HTTPException(409, "WEBHOOK_REPLAY")
             if replay.payment_seen(payload.payment_reference):
@@ -208,6 +209,14 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             expected_amount = float(order["product"]["price_usd"])
             if abs(payload.amount_usd - expected_amount) > 0.000001:
                 raise HTTPException(409, "AMOUNT_MISMATCH")
+            journal_entry = journal.begin(payload)
+            if journal_entry.get("state") == "COMMERCE_COMMITTED":
+                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+                journal.mark(payload.event_id, "COMPLETED")
+                return {"ok": True, "verified": True, "idempotent": True,
+                        "order_id": payload.order_id, "state": "PAYMENT_VERIFIED",
+                        "payment_reference": payload.payment_reference}
+
             if order.get("state") == "PAYMENT_VERIFIED":
                 existing_tx = str(order.get("payment", {}).get("transaction_id", "")).strip()
                 existing_provider = str(order.get("revenue_authority", {}).get("provider", "")).strip()
@@ -231,7 +240,9 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             "verified_at": int(time.time()),
             "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
             })
+            journal.mark(payload.event_id, "COMMERCE_COMMITTED")
             replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+            journal.mark(payload.event_id, "COMPLETED")
             return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
 
     return api
