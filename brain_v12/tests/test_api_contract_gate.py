@@ -37,6 +37,8 @@ class ApiContractGateTests(unittest.TestCase):
 
         self.assertTrue(body["ok"])
         self.assertEqual(body["mode"], "CANONICAL_API_PATHS")
+        self.assertIn("agent_status", body["dependencies"])
+        self.assertIn("heartbeat_ttl", body["dependencies"]["agent_status"]["depends_on"])
         self.assertEqual(
             body["order"],
             [
@@ -64,6 +66,25 @@ class ApiContractGateTests(unittest.TestCase):
         self.assertFalse(body["healthy"])
         self.assertEqual(body["next"]["stage"], "runtime")
         self.assertEqual(body["next"]["path"], "/api/system/readiness")
+
+    def test_resilience_health_detects_offline_agent_status(self):
+        app = FastAPI()
+        app.include_router(
+            router_factory(
+                _Device({"online": False, "agents": []}),
+                lambda: {"ok": True},
+            )
+        )
+        client = TestClient(app)
+
+        response = client.get("/api/resilience/status")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+
+        self.assertFalse(body["ok"])
+        self.assertFalse(body["healthy"])
+        self.assertEqual(body["next"]["stage"], "agent_status")
+        self.assertEqual(body["next"]["path"], "/api/agent-gateway/status")
 
     def test_resilience_health_cannot_report_healthy_on_failed_device(self):
         app = FastAPI()
