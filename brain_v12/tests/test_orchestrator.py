@@ -15,5 +15,15 @@ class OrchestratorTests(unittest.TestCase):
         self.assertTrue(result["plan"]["steps"])
         self.assertEqual(store.state()["status"],"PLANNED")
 
+    def test_create_inspect_path_is_not_executed_locally(self):
+        path=tempfile.NamedTemporaryFile(suffix=".db",delete=False).name
+        store=MemoryStore(path); store.init()
+        brain=BrainCore(store)
+        orchestrator=CognitiveOrchestrator(store,brain,SoftwareBuilder())
+        result=orchestrator.create_inspect_path("فحص المشروع")
+        self.assertEqual(result["plan_step"], "inspect")
+        self.assertEqual(result["path"]["state"], "CREATED")
+        self.assertEqual(result["path"]["step"], "execute")
+
 if __name__=="__main__":
     unittest.main()
