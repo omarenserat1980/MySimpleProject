@@ -44,14 +44,13 @@ class BrainExecutionLockTests(unittest.TestCase):
             self.assertEqual(lock.status()["lease"]["task_id"], "recovery-task")
             lock.release(second)
 
-    def test_malformed_lock_is_recovered_only_as_non_active_lease(self):
+    def test_malformed_lock_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "execution.lock"
             path.write_text("{broken", encoding="utf-8")
             lock = BrainExecutionLock(path, lease_seconds=30)
-            lease = lock.acquire("recovery")
-            self.assertTrue(lock.status()["locked"])
-            lock.release(lease)
+            with self.assertRaisesRegex(ExecutionLockError, "EXECUTION_LOCK_MALFORMED"):
+                lock.acquire("recovery")
 
 
 if __name__ == "__main__":
