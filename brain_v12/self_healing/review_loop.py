@@ -313,6 +313,8 @@ def main() -> int:
                 entry["post_repair_verification"] = details2
                 final_ok = ok2
                 entry["status"] = "REPAIRED_AND_VERIFIED" if ok2 else "REPAIR_FAILED"
+                if not ok2:
+                    record_repair_failure(recurrence_id)
             else:
                 entry["post_repair_verification"] = {
                     "status": "NOT_RUN",
