@@ -37,6 +37,10 @@ def load_and_verify(path: str | Path | None = None, *, now: float | None = None)
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_CAPABILITY_INVALID")
     if contract.get("executor") != "windows-real-boot-qemu":
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_EXECUTOR_INVALID")
+    if contract.get("authority_policy_version") != "authority-policy-v1":
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_POLICY_INVALID")
+    if contract.get("authority_decision") != "AUTHORIZED":
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_NOT_AUTHORIZED")
 
     brain_id = str(contract.get("brain_id", "")).strip()
     if not brain_id:
