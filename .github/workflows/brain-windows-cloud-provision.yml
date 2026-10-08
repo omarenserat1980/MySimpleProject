@@ -1,0 +1,64 @@
+name: BRAIN Windows Cloud Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Explicitly authorize Terraform apply"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  provision:
+    if: ${{ inputs.approve_apply == true }}
+    runs-on: ubuntu-24.04
+    environment: brain-windows-production
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
+      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Azure OIDC configuration
+        run: |
+          test -n "${ARM_CLIENT_ID}" || { echo "Missing AZURE_CLIENT_ID repository/environment variable"; exit 2; }
+          test -n "${ARM_TENANT_ID}" || { echo "Missing AZURE_TENANT_ID repository/environment variable"; exit 2; }
+          test -n "${ARM_SUBSCRIPTION_ID}" || { echo "Missing AZURE_SUBSCRIPTION_ID repository/environment variable"; exit 2; }
+
+      - name: Azure login via GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        run: terraform plan -input=false -out=brain.tfplan
+
+      - name: Terraform apply
+        run: terraform apply -input=false brain.tfplan
+
+      - name: Show non-secret outputs
+        run: terraform output -json | python -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({k:v.get("value") for k,v in d.items() if k != "brain_public_ip"}, indent=2))'
