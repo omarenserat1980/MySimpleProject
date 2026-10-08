@@ -189,7 +189,8 @@ class ResourceFabric:
             created_at=now, expires_at=now + max(1, int(ttl_seconds or self.lease_seconds)))
         self.reservations[reservation.reservation_id] = reservation
         self.intents[intent_id] = {"intent_id": intent_id,
-                                   "resource_ids": list(resource_ids),
+                                   "resource_ids": list(normalized),
+                                   "allocations": dict(normalized),
                                    "status": "RESERVED", "updated_at": now}
         return {"ok": True, "status": "RESERVED", "reservation": reservation.public()}
 
@@ -212,7 +213,7 @@ class ResourceFabric:
         for rid, reservation in list(self.reservations.items()):
             if reservation.status == "RESERVED" and reservation.expires_at <= now:
                 self.reservations[rid] = ResourceReservation(
-                    reservation.reservation_id, reservation.intent_id, reservation.resource_ids,
+                    reservation.reservation_id, reservation.intent_id, reservation.allocations,
                     reservation.created_at, reservation.expires_at, "EXPIRED")
                 if reservation.intent_id in self.intents:
                     self.intents[reservation.intent_id]["status"] = "EXPIRED"
