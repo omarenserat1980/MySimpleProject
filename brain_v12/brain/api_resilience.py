@@ -6,6 +6,8 @@ correct existing path and prevents ad-hoc endpoint guessing.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from fastapi import APIRouter, Request
 
@@ -115,20 +117,35 @@ def router_factory(device_bridge, liveness_reader):
 
     return router
 
+def failure_identity(stage, reason, dependency=None, evidence=None):
+    raw = json.dumps(
+        {"stage": stage, "reason": reason, "dependency": dependency or "", "evidence": evidence or {}},
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode()
+    return {
+        "failure_id": "API-" + hashlib.sha256(raw).hexdigest()[:16].upper(),
+        "stage": stage,
+        "reason": reason,
+        "dependency": dependency,
+        "evidence": evidence or {},
+    }
+
 def _next_path(checks, errors=None):
     errors = errors or {}
     if "runtime" in errors or not _looks_ok(checks.get("runtime")):
-        return {"stage": "runtime", "path": "/api/system/readiness"}
+        return {"stage": "runtime", "path": "/api/system/readiness", "failure": failure_identity("runtime", "runtime_unhealthy", "runtime", checks.get("runtime"))}
     if "device" in errors:
-        return {"stage": "agent_status", "path": "/api/agent-gateway/status"}
+        return {"stage": "agent_status", "path": "/api/agent-gateway/status", "failure": failure_identity("agent_status", "agent_status_error", "agent_status", errors.get("device"))}
     device = checks.get("device") or {}
     if not _looks_ok(device):
-        return {"stage": "agent_status", "path": "/api/agent-gateway/status", "reason": "device_unhealthy"}
+        return {"stage": "agent_status", "path": "/api/agent-gateway/status", "reason": "device_unhealthy", "failure": failure_identity("agent_status", "device_unhealthy", "heartbeat_ttl", device)}
     if isinstance(device, dict):
         failed = int(device.get("failed", 0) or 0)
         queued = int(device.get("queued", 0) or 0)
         if failed > 0:
-            return {"stage": "result", "path": "/api/agent-gateway/result/{task_id}", "reason": "failed_tasks_present"}
+            return {"stage": "result", "path": "/api/agent-gateway/result/{task_id}", "reason": "failed_tasks_present", "failure": failure_identity("result", "failed_tasks_present", "device_store", {"failed": failed})}
         if queued > 0:
             return {"stage": "poll", "path": "/api/device/poll", "reason": "queue_pending"}
     return {"stage": "verify", "path": "/api/agent-gateway/verify/{task_id}", "reason": "runtime_and_agent_healthy"}
