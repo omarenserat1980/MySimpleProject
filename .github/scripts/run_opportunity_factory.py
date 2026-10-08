@@ -41,6 +41,7 @@ def write_json(name: str, payload: dict) -> None:
 def main() -> int:
     live = os.getenv("LIVE_SEARCH", "true").lower() in {"1", "true", "yes", "on"}
     db_path = os.getenv("BRAIN6_DB", str(ARTIFACTS / "opportunities.db"))
+    available_capital = float(os.getenv("BRAIN_AVAILABLE_CAPITAL_JOD", "0"))
 
     store = MemoryStore(db_path)
     store.init()
@@ -49,14 +50,14 @@ def main() -> int:
     financial_opportunities = rank_with_financials()
     zero_capital_opportunities = ZeroCapitalGate.filter(
         financial_opportunities,
-        available_capital_jod=float(os.getenv("BRAIN_AVAILABLE_CAPITAL_JOD", "0")),
+        available_capital_jod=available_capital,
     )
     catalog = {
         "generated_at": now(),
         "financial_opportunities": financial_opportunities,
         "zero_capital_opportunities": zero_capital_opportunities,
         "zero_capital_policy": {
-            "available_capital_jod": float(os.getenv("BRAIN_AVAILABLE_CAPITAL_JOD", "0")),
+            "available_capital_jod": available_capital,
             "hard_gate": True,
             "paid_cloud_mining": "REJECT",
             "deposits": "REJECT",
@@ -86,16 +87,20 @@ def main() -> int:
     discovery["finished_at"] = now()
     write_json("live_discovery.json", discovery)
 
-    # Autonomous freelance preparation: discovery -> technical fit -> proposal draft.
-    # External submission, login, contracts and money movement remain explicitly gated.
+    # Autonomous freelance preparation: discovery -> zero-capital gate ->
+    # technical fit -> proposal draft. External submission, login, contracts
+    # and money movement remain explicitly gated.
     from brain_v12.brain.freelance_agent import FreelanceAgent
     freelance = FreelanceAgent(store)
     live_rows = engine.prioritize(100)
     prepared = []
+    rejected_zero_capital = 0
+
     for opportunity in live_rows:
         data = dict(opportunity.get("data") or {})
         if data.get("source_kind") != "LIVE_OPPORTUNITY":
             continue
+
         candidate = {
             "title": data.get("title") or opportunity.get("title"),
             "url": data.get("source_url") or opportunity.get("source_url"),
@@ -105,7 +110,17 @@ def main() -> int:
             "category": data.get("category", "FREELANCE_JOB"),
             "budget": data.get("budget"),
             "evidence": data.get("evidence", ""),
+            "terms": data.get("terms", ""),
+            "action": data.get("action", ""),
+            "direct_cost_jod": data.get("direct_cost_jod", data.get("cost_jod", 0)),
+            "capital_required_jod": data.get("capital_required_jod", 0),
         }
+
+        gate = ZeroCapitalGate.evaluate(candidate, available_capital)
+        if not gate.eligible:
+            rejected_zero_capital += 1
+            continue
+
         analysis = freelance.analyze(candidate)
         if analysis.get("recommendation") != "PREPARE_OFFER":
             continue
@@ -117,18 +132,22 @@ def main() -> int:
             "fit_score": analysis["fit_score"],
             "categories": analysis["categories"],
             "matched_skills": analysis["matched_skills"],
+            "zero_capital_gate": gate.to_dict(),
             "proposal": offer["proposal"],
             "submission_status": "NOT_SUBMITTED",
             "human_gate": "REVIEW_AND_SUBMIT",
         })
         if len(prepared) >= 10:
             break
+
     prepared.sort(key=lambda x: x["fit_score"], reverse=True)
     write_json("freelance_ready_offers.json", {
         "generated_at": now(),
         "count": len(prepared),
+        "zero_capital_rejected": rejected_zero_capital,
         "offers": prepared,
         "policy": {
+            "zero_capital_gate": "HARD",
             "discovery": "AUTOMATED",
             "technical_fit": "AUTOMATED",
             "proposal_generation": "AUTOMATED",
@@ -148,13 +167,19 @@ def main() -> int:
     ledger = EconomicLedger(str(ARTIFACTS / "economy" / "ledger.jsonl"))
     write_json("economic_ledger_snapshot.json", ledger.snapshot())
 
-    report = engine.lifecycle_report(limit=100)
     snapshot = engine.snapshot()
     write_json("opportunity_report.json", {
         "generated_at": now(),
         "discovery": discovery,
         "lifecycle": lifecycle,
         "snapshot": snapshot,
+        "zero_capital": {
+            "available_capital_jod": available_capital,
+            "catalog_candidates": len(zero_capital_opportunities),
+            "live_rejected": rejected_zero_capital,
+            "prepared_offers": len(prepared),
+            "hard_gate": True,
+        },
         "policy": "Opportunity evidence is not revenue; revenue requires verified payment evidence.",
     })
 
@@ -166,6 +191,8 @@ def main() -> int:
         "stale": lifecycle.get("stale", 0),
         "verified_revenue_jod": snapshot.get("verified_revenue_jod", 0),
         "zero_capital_candidates": len(zero_capital_opportunities),
+        "zero_capital_live_rejected": rejected_zero_capital,
+        "prepared_offers": len(prepared),
     }, ensure_ascii=False))
     return 0
 
