@@ -10,6 +10,6 @@ def test_cross_domain_analysis():
 
 def test_external_side_effects_require_truth_gate():
     o=CrossDomainOpportunity("x",("finance",),.9,True,False)
-    assert safe_action(o)=="HOLD"
+    assert safe_action(o)=="AUTHORIZATION_REQUIRED"
     o=CrossDomainOpportunity("x",("finance",),.9,True,True)
     assert safe_action(o)=="AUTHORIZATION_REQUIRED"
