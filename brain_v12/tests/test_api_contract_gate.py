@@ -81,7 +81,8 @@ class ApiContractGateTests(unittest.TestCase):
 
         self.assertFalse(body["ok"])
         self.assertFalse(body["healthy"])
-        self.assertEqual(body["next"]["stage"], "verify")
+        self.assertEqual(body["next"]["stage"], "agent_status")
+        self.assertEqual(body["next"]["path"], "/api/agent-gateway/status")
 
     def test_payment_webhook_missing_secret_is_explicit_configuration_failure(self):
         old = os.environ.pop("BRAIN_PAYMENT_WEBHOOK_SECRET", None)
