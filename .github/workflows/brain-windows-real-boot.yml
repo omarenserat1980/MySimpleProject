@@ -24,7 +24,7 @@ concurrency:
 jobs:
   cloud_executor_gate:
     name: Cloud Executor Capability Gate
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +49,7 @@ jobs:
 
   real_windows_boot:
     needs: cloud_executor_gate
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
