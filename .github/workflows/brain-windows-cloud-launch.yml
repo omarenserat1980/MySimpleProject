@@ -27,7 +27,7 @@ jobs:
       BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
       ARM_USE_CLI: "true"
       TF_VAR_allowed_source_ip: "212.34.20.123/32"
-      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_resource_group_location: "northeurope"
       TF_VAR_vm_name: "brain-windows-2025"
       TF_VAR_resource_group_name: "brain-windows-rg"
       TF_VAR_vm_size: "Standard_D4s_v5"
@@ -59,3 +59,4 @@ jobs:
         run: terraform apply -input=false brain.tfplan
 # launch trigger armed
 # launch trigger retry after runner fix
+# launch north europe
