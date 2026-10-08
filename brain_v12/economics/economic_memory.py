@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from statistics import mean
 
 
 class Outcome(str, Enum):
@@ -42,22 +41,28 @@ class EconomicEstimate:
     observations: int
 
 
-def estimate(observations: list[EconomicObservation], opportunity_class: str) -> EconomicEstimate:
+def estimate(
+    observations: list[EconomicObservation], opportunity_class: str
+) -> EconomicEstimate:
     """Estimate only from observed outcomes; no observation means neutral priors."""
     items = [o for o in observations if o.opportunity_class == opportunity_class]
     if not items:
         return EconomicEstimate(opportunity_class, 0.5, 0.5, 0)
 
-    accepted = sum(o.outcome in {Outcome.ACCEPTED, Outcome.DELIVERED, Outcome.PAYMENT_VERIFIED} for o in items)
-    acceptance_probability = accepted / len(items)
-
-    risky = sum(o.outcome is Outcome.REJECTED for o in items)
-    risk = risky / len(items)
+    accepted = sum(
+        o.outcome in {
+            Outcome.ACCEPTED,
+            Outcome.DELIVERED,
+            Outcome.PAYMENT_VERIFIED,
+        }
+        for o in items
+    )
+    rejected = sum(o.outcome is Outcome.REJECTED for o in items)
 
     return EconomicEstimate(
         opportunity_class=opportunity_class,
-        acceptance_probability=acceptance_probability,
-        risk=risk,
+        acceptance_probability=accepted / len(items),
+        risk=rejected / len(items),
         observations=len(items),
     )
 
