@@ -6,7 +6,7 @@ param(
     [switch]$SkipAuthenticatedWinRM
 )
 $ErrorActionPreference = "Stop"
-function Fail([string]$Message) { Write-Error $Message; exit 1 }
+function Fail([string]$Message) { throw $Message }
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $vm = $null
 do {
