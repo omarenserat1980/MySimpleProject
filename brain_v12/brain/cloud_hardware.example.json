@@ -1,0 +1,19 @@
+{
+  "schema": "brain-cloud-max/hardware-manifest/v1",
+  "machine_id": "brain-cloud-max-reference-01",
+  "source": "declared",
+  "note": "Reference architecture only; not provisioned hardware.",
+  "state": "offline",
+  "executor_class": "gpu",
+  "components": {
+    "motherboard": "virtual",
+    "cpu": {"sockets": 2, "logical_threads": 768, "numa_nodes": 8},
+    "memory": {"bytes": 6597069766656, "ecc": true},
+    "gpu": {"count": 8, "vram_bytes": 1649267441664, "interconnect": "fabric"},
+    "storage": {"fast_bytes": 109951162777600, "object_bytes": 1125899906842624},
+    "network": {"bandwidth_bps": 400000000000, "rdma": true},
+    "firmware": {"uefi": true, "secure_boot": true, "vtpm": true},
+    "management": {"virtual_bmc": true, "power_telemetry": true, "thermal_telemetry": true},
+    "availability": {"zones": 3, "snapshots": true, "cross_region": true}
+  }
+}
