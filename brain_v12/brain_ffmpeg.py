@@ -19,6 +19,11 @@ def _resolve(env_name: str, filename: str) -> str:
     if configured:
         candidates.append(pathlib.Path(configured))
     candidates.append(BIN_ROOT / filename)
+    # Termux/Android native toolchain: keep media execution on-device without
+    # leaking the Termux PATH into Android-shell processes.
+    termux_tool = pathlib.Path("/data/data/com.termux/files/usr/bin") / filename
+    if termux_tool.is_file():
+        candidates.append(termux_tool)
     if os.getenv("CI", "").lower() == "true":
         system_path = shutil.which(filename)
         if system_path:
