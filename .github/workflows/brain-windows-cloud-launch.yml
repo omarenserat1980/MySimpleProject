@@ -1,12 +1,10 @@
 name: BRAIN Windows Cloud Launch
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       approve_apply:
-        description: "Explicitly authorize Terraform apply"
+        description: "Authorize creating/updating Azure resources after preflight"
         required: true
         type: boolean
         default: false
@@ -15,52 +13,74 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: brain-windows-cloud-launch
+  cancel-in-progress: false
+
 jobs:
   provision:
-    if: ${{ inputs.approve_apply == true || contains(github.event.head_commit.message, '[launch-windows]') }}
     runs-on: [self-hosted, brain-internal]
     environment: brain-windows-production
+    timeout-minutes: 90
     env:
-      TF_IN_AUTOMATION: "true"
-      TF_INPUT: "false"
-      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
-      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: "true"
       ARM_USE_OIDC: "true"
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_admin_username: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+      TF_VAR_admin_password: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
       TF_VAR_allowed_source_ip: "212.34.20.123/32"
-      TF_VAR_resource_group_location: "northeurope"
-      TF_VAR_vm_name: "brain-windows-2025"
-      TF_VAR_resource_group_name: "brain-windows-rg"
-      TF_VAR_vm_size: "Standard_D4s_v5"
-    defaults:
-      run:
-        working-directory: brain_v12/cloud/windows_terraform
-
+      BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
+      APPROVE_APPLY: ${{ inputs.approve_apply }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Terraform prerequisites
+      - name: Install PowerShell on Ubuntu runner
         shell: bash
         run: |
+          set -euo pipefail
+          . /etc/os-release
+          if [ "${ID}" != "ubuntu" ]; then
+            echo "This runner job requires Ubuntu for PowerShell installation; detected ${ID}."
+            exit 1
+          fi
           sudo apt-get update
-          sudo apt-get install -y unzip
+          sudo apt-get install -y wget apt-transport-https
+          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O /tmp/packages-microsoft-prod.deb
+          sudo dpkg -i /tmp/packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_wrapper: false
 
-      - name: Terraform init
-        run: terraform init -input=false
+      - name: Azure OIDC login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Terraform plan
-        run: terraform plan -input=false -out=brain.tfplan
+      - name: Preflight (no VM changes)
+        shell: pwsh
+        run: ./scripts/windows-cloud/preflight.ps1 -Location northeurope -VmSize Standard_D4s_v5
 
-      - name: Terraform apply
-        run: terraform apply -input=false brain.tfplan
-# launch trigger armed
-# launch trigger retry after runner fix
-# launch north europe
-# launch oidc
+      - name: Bootstrap remote Terraform state and Azure providers
+        if: ${{ inputs.approve_apply == true }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location northeurope -RegisterProviders
+
+      - name: Deploy and verify Windows Server 2025
+        if: ${{ inputs.approve_apply == true }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location northeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_D4s_v5 -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
+
+      - name: Explain preflight-only run
+        if: ${{ inputs.approve_apply != true }}
+        shell: bash
+        run: |
+          echo "Preflight only. No state storage or VM resources were created."
+          echo "Set approve_apply=true only when authorized to create the state store and deploy the VM."
