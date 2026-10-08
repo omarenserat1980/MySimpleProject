@@ -21,6 +21,6 @@ def build_router():
             "route_reason":p.route.reason,
             "action":p.action,
             "external_side_effects":p.external_side_effects,
-            "requires_authorization":p.requires_authorization,
+            "requires_authorization":p.requires_authorization,\n            "decision_evidence":p.decision_evidence.canonical(),\n            "decision_evidence_fingerprint":p.decision_evidence.fingerprint(),\n            "decision_evidence_valid":p.decision_evidence.valid(),
         }
     return router
