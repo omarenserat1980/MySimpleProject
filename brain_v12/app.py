@@ -68,6 +68,7 @@ from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
 from .brain.resource_fabric import ResourceFabric, ResourceKind, ResourceRequest, ResourceSpec, ResourceState
 from .brain.resource_providers import HostResourceProvider
+from .brain.vdc_resource_provider import VirtualDatacenterResourceProvider
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
@@ -163,6 +164,7 @@ brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_
 brain_datacenter=BrainVirtualDatacenter()
 resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
 host_resource_provider=HostResourceProvider(resource_fabric)
+vdc_resource_provider=VirtualDatacenterResourceProvider(brain_datacenter, resource_fabric)
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
@@ -2902,6 +2904,7 @@ def brain_fabric_compose(request: Request, body: dict):
             unit=str(item["unit"]),
             attributes=dict(item.get("attributes") or {}),
             required=bool(item.get("required", True)),
+            co_locate_key=item.get("co_locate_key"),
         ))
     result=resource_fabric.compose(intent_id, requests, body.get("ttl_seconds"))
     store.event("BRAIN_RESOURCE_FABRIC_COMPOSE", {
