@@ -48,9 +48,6 @@ class InternalRuntimeTests(unittest.TestCase):
             self.assertIn("BRAIN_INTERNAL_RUNNER_NOT_VERIFIED", result["error"])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
     def test_high_risk_requires_leadership_fencing(self):
         import tempfile
@@ -92,3 +89,7 @@ if __name__ == "__main__":
             result = rt.run_one()
             self.assertEqual(result["state"], "COMPLETED")
             leadership.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
