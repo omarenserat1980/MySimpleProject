@@ -62,10 +62,10 @@ class BrainVirtualDatacenter:
                              cpu_free,"core",{"blade_id":blade.blade_id},
                              state=state),
                 ResourceSpec(prefix+":ram",ResourceKind.MEMORY,self.name,
-                             ram_free//(1024**3),"GB",{"blade_id":blade.blade_id},
+                             ram_free,"bytes",{"blade_id":blade.blade_id},
                              state=state),
                 ResourceSpec(prefix+":storage",ResourceKind.STORAGE,self.name,
-                             storage_free//(1024**3),"GB",{"blade_id":blade.blade_id},
+                             storage_free,"bytes",{"blade_id":blade.blade_id},
                              state=state),
             ])
             if snap["network"]["available"]:
