@@ -18,3 +18,10 @@ def test_orchestrator_reaches_human_review_after_counter():
     ])
     assert r["status"]=="READY_FOR_HUMAN_REVIEW"
     assert r["next"]=="human_review_before_publication"
+
+
+def test_decision_gate_fails_closed():
+    o=QuranicResearchOrchestrator()
+    assert o.decision({"status":"HOLD"})["publish"] is False
+    assert o.decision({"status":"READY_FOR_HUMAN_REVIEW"})["decision"]=="HUMAN_REVIEW"
+    assert o.decision({"status":"unexpected"})["decision"]=="HOLD"
