@@ -22,8 +22,8 @@ if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_confi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
 export V12_BRAIN_URL="${BRAIN_URL:-http://127.0.0.1:8012}"
-# Local Termux runtime must use the single on-device key. Prevent stale cloud/auth env vars from winning over it.
-unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256
+# Local Termux runtime must use exactly one on-device key. Clear stale values, then seed the direct-key variable from the canonical local key file.
+unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
 export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
@@ -36,6 +36,8 @@ if [ ! -s "$V12_AGENT_KEY_FILE" ]; then
 fi
 if [ ! -s "$V12_AGENT_KEY_FILE" ]; then echo "BRAIN_RUNTIME_ERROR: AGENT_KEY_CREATE_FAILED" >&2; exit 41; fi
 export BRAIN_EMULATOR_KEY="$(cat "$V12_AGENT_KEY_FILE")"
+# DeviceBridge checks BRAIN_AGENT_KEY first; explicitly bind it to the same local key.
+export BRAIN_AGENT_KEY="$BRAIN_EMULATOR_KEY"
 export PYTHONPATH="$ROOT:${PYTHONPATH:-}"
 PYTHON="${V12_PYTHON_EXECUTABLE:-$(command -v python3 || command -v python)}"
 if [ -z "$PYTHON" ]; then echo "BRAIN_RUNTIME_ERROR: PYTHON_NOT_FOUND" >&2; exit 42; fi
@@ -112,11 +114,20 @@ PY
 }
 status_snapshot
 seed_bootstrap_task
-# Keep a durable local supervisor alongside the Emulator. It only queues work when idle.
+# Keep exactly one durable local supervisor alongside the Emulator.
 if [ -n "${BRAIN_CONTROL_KEY:-}" ]; then
-  "$PYTHON" "$ROOT/brain_v12/tools/brain_runtime_supervisor.py" >> "$ROOT/.brain/state/supervisor.log" 2>&1 &
-  SUPERVISOR_PID=$!
-  echo "JET_BRAIN_SUPERVISOR pid=$SUPERVISOR_PID" >&2
+  SUP_PID_FILE="$ROOT/.brain/state/supervisor.pid"
+  SUP_PID=""
+  if [ -s "$SUP_PID_FILE" ]; then SUP_PID="$(cat "$SUP_PID_FILE" 2>/dev/null || true)"; fi
+  if [ -n "$SUP_PID" ] && kill -0 "$SUP_PID" 2>/dev/null; then
+    echo "JET_BRAIN_SUPERVISOR already_running pid=$SUP_PID" >&2
+  else
+    rm -f "$SUP_PID_FILE"
+    "$PYTHON" "$ROOT/brain_v12/tools/brain_runtime_supervisor.py" >> "$ROOT/.brain/state/supervisor.log" 2>&1 &
+    SUPERVISOR_PID=$!
+    echo "$SUPERVISOR_PID" > "$SUP_PID_FILE"
+    echo "JET_BRAIN_SUPERVISOR pid=$SUPERVISOR_PID" >&2
+  fi
 fi
 echo "JET_BRAIN_RUNTIME url=$V12_BRAIN_URL agent=$V12_AGENT_ID" >&2
 exec "$PYTHON" "$ROOT/brain_v12/tools/brain_emulator_agent.py"
