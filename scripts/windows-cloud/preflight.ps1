@@ -37,7 +37,7 @@ if ($LASTEXITCODE -eq 0 -and $quotaRaw) {
         if ($quota.Count -gt 0 -and $null -ne $quota[0].limit -and $null -ne $quota[0].currentValue) {
             $available = [int]$quota[0].limit - [int]$quota[0].currentValue
             if ($requiredCores -gt 0 -and $available -lt $requiredCores) {
-                Fail "Insufficient Azure quota in $Location for $VmSize: available=$available, required=$requiredCores, quota=$($quota[0].name.localizedValue). Request quota or select an eligible smaller SKU before applying."
+                Fail "Insufficient Azure quota in $Location for ${VmSize}: available=$available, required=$requiredCores, quota=$($quota[0].name.localizedValue). Request quota or select an eligible smaller SKU before applying."
             }
             Write-Host "Quota $($quota[0].name.localizedValue): current=$($quota[0].currentValue), limit=$($quota[0].limit), needed=$requiredCores."
         }
