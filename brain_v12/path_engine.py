@@ -139,7 +139,6 @@ class PathEngine:
         run = self.runs[run_id]
         if run.state in {
             PathState.SUCCEEDED,
-            PathState.FAILED,
             PathState.BLOCKED,
             PathState.STOPPED,
         }:
