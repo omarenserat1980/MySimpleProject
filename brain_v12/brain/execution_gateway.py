@@ -9,9 +9,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .execution_policy import BRAIN_INTERNAL, WINDOWS_CLOUD, WINDOWS_CLOUD_NATIVE, WINDOWS_REAL_BOOT, Executor, choose_executor
+from .execution_policy import (
+    BRAIN_INTERNAL,
+    WINDOWS_CLOUD,
+    WINDOWS_CLOUD_NATIVE,
+    WINDOWS_REAL_BOOT,
+    WINDOWS_NATIVE_EXECUTOR,
+    Executor,
+    choose_executor,
+)
 from .internal_runner import InternalRunner
 from .windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
+from .windows_native_executor import WindowsNativeExecutorContract
+from .windows_server_network_contract import (
+    NetworkZone,
+    NodeTrustState,
+    WindowsServerNetworkContract,
+)
 
 
 @dataclass(frozen=True)
@@ -20,6 +34,52 @@ class ExecutionDecision:
     capability: str
     verified: bool
     reason: str
+
+
+def _native_contract_from_metadata(metadata: dict[str, Any]) -> WindowsNativeExecutorContract:
+    raw = metadata.get("native_contract")
+    if not isinstance(raw, dict):
+        raise RuntimeError("WINDOWS_NATIVE_EXECUTION_CONTRACT_REQUIRED")
+    server_raw = raw.get("server")
+    if not isinstance(server_raw, dict):
+        raise RuntimeError("WINDOWS_NATIVE_SERVER_CONTRACT_REQUIRED")
+
+    def zone(value: Any, default: NetworkZone) -> NetworkZone:
+        try:
+            return NetworkZone(str(value))
+        except ValueError:
+            return default
+
+    try:
+        state = NodeTrustState(str(server_raw.get("state", "")))
+    except ValueError as exc:
+        raise RuntimeError("WINDOWS_NATIVE_SERVER_STATE_INVALID") from exc
+
+    server = WindowsServerNetworkContract(
+        server_id=str(server_raw.get("server_id", "")),
+        brain_id=str(server_raw.get("brain_id", "")),
+        network_generation=int(server_raw.get("network_generation", 0)),
+        management_zone=zone(server_raw.get("management_zone"), NetworkZone.MANAGEMENT),
+        client_zone=zone(server_raw.get("client_zone"), NetworkZone.CLIENT),
+        service_zone=zone(server_raw.get("service_zone"), NetworkZone.SERVICE),
+        internet_zone=zone(server_raw.get("internet_zone"), NetworkZone.INTERNET),
+        state=state,
+        capabilities=frozenset(server_raw.get("capabilities", [])),
+        client_ids=frozenset(server_raw.get("client_ids", [])),
+        fencing_token=server_raw.get("fencing_token"),
+        attestation_verified=bool(server_raw.get("attestation_verified", False)),
+        firewall_policy_version=str(server_raw.get("firewall_policy_version", "")),
+        metadata=server_raw.get("metadata", {}),
+    )
+    return WindowsNativeExecutorContract(
+        executor_id=str(raw.get("executor_id", "")),
+        server=server,
+        agent_attestation_verified=bool(raw.get("agent_attestation_verified", False)),
+        brain_generation=int(raw.get("brain_generation", 0)),
+        fencing_token=int(raw.get("fencing_token", 0)),
+        authority_policy_version=str(raw.get("authority_policy_version", "authority-policy-v1")),
+        state=str(raw.get("state", "VERIFIED")),
+    )
 
 
 class BrainExecutionGateway:
@@ -36,12 +96,6 @@ class BrainExecutionGateway:
         heartbeat_timeout: float = 120.0,
         now: float | None = None,
     ) -> ExecutionDecision:
-        """Authorize Windows Cloud only after fresh guest-runtime proof.
-
-        Infrastructure RUNNING state alone is insufficient. This path is the
-        explicit runtime exception to the internal-only default and never
-        falls back to GitHub CI or another external executor.
-        """
         verification = WindowsCloudExecutor().verify_runtime(
             vm,
             node,
@@ -65,12 +119,16 @@ class BrainExecutionGateway:
         capability: str,
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionDecision:
-        """Authorize a task using its explicit runtime contract.
-
-        Windows real-boot tasks must carry a verified Windows Cloud VM/node
-        contract. They are never silently executed by the local runner.
-        """
         metadata = metadata or {}
+        if capability == WINDOWS_NATIVE_EXECUTOR:
+            contract = _native_contract_from_metadata(metadata)
+            contract.validate()
+            return ExecutionDecision(
+                executor=WINDOWS_NATIVE_EXECUTOR,
+                capability=WINDOWS_NATIVE_EXECUTOR,
+                verified=True,
+                reason="WINDOWS_NATIVE_EXECUTOR_CONTRACT_VERIFIED",
+            )
         if capability == WINDOWS_REAL_BOOT:
             executor_type = str(metadata.get("executor", "")).strip().lower()
             if executor_type != "windows-real-boot-qemu":
@@ -102,14 +160,9 @@ class BrainExecutionGateway:
         return self.authorize(capability)
 
     def authorize(self, capability: str) -> ExecutionDecision:
-        # Production execution is Brain-owned. External executors are not
-        # considered candidates for runtime work.
         internal = Executor(
             name=BRAIN_INTERNAL,
-            capabilities=frozenset({
-                "brain-internal-execution",
-                "qemu",
-            }),
+            capabilities=frozenset({"brain-internal-execution", "qemu"}),
             priority=0,
             external=False,
         )
