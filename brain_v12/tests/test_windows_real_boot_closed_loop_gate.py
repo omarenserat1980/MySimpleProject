@@ -21,6 +21,8 @@ def contract():
         "task_id": "windows-real-boot",
         "attempt_id": "attempt-abc",
         "source_commit": "a" * 40,
+        "authority_policy_version": "authority-policy-v1",
+        "authority_decision": "AUTHORIZED",
         "expires_at": time.time() + 300,
     }
 
