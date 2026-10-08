@@ -25,12 +25,17 @@ def hash_record(sequence:int, transition:MissionTransition, previous_hash:str)->
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 class TamperEvidentLedger:
-    def __init__(self):
+    def __init__(self, mission_fingerprint: str | None = None):
+        self.mission_fingerprint = mission_fingerprint
         self._records=[]
 
     def append(self, transition:MissionTransition)->LedgerRecord:
         if not transition.valid():
             raise ValueError("invalid transition")
+        if self.mission_fingerprint is None:
+            self.mission_fingerprint = transition.mission_fingerprint
+        elif transition.mission_fingerprint != self.mission_fingerprint:
+            raise ValueError("mixed mission fingerprints")
         previous=self._records[-1].record_hash if self._records else "GENESIS"
         sequence=len(self._records)+1
         record_hash=hash_record(sequence,transition,previous)
