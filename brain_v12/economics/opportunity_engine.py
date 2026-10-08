@@ -1,4 +1,4 @@
-"""Deterministic opportunity lifecycle, ranking, and revenue guardrails."""
+"""Deterministic opportunity lifecycle, deduplication, ranking, and revenue guardrails."""
 
 from __future__ import annotations
 
@@ -66,6 +66,20 @@ def rank_opportunities(opportunities: Iterable[Opportunity]) -> list[tuple[Oppor
     """Rank opportunities by descending score, then stable ID."""
     ranked = [(item, score(item)) for item in opportunities]
     return sorted(ranked, key=lambda pair: (-pair[1], pair[0].opportunity_id))
+
+
+def deduplicate_opportunities(opportunities: Iterable[Opportunity]) -> list[Opportunity]:
+    """Keep one opportunity per stable ID; first occurrence wins."""
+    seen: set[str] = set()
+    result: list[Opportunity] = []
+    for opportunity in opportunities:
+        if not opportunity.opportunity_id:
+            raise ValueError("opportunity_id cannot be empty")
+        if opportunity.opportunity_id in seen:
+            continue
+        seen.add(opportunity.opportunity_id)
+        result.append(opportunity)
+    return result
 
 
 def transition_allowed(current: OpportunityState, target: OpportunityState) -> bool:
