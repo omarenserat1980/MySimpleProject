@@ -190,6 +190,21 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         with replay.lock:
             journal_entry = journal.get(payload.event_id)
             if journal_entry and journal_entry.get("state") == "COMMERCE_COMMITTED":
+                # Recovery is valid only when the durable commerce commit matches
+                # this authenticated payment. The journal state alone is insufficient.
+                recovered_order = store.get(payload.order_id)
+                if not recovered_order:
+                    raise HTTPException(404, "ORDER_NOT_FOUND")
+                recovered_payment = recovered_order.get("payment", {})
+                recovered_authority = recovered_order.get("revenue_authority", {})
+                if recovered_order.get("state") != "PAYMENT_VERIFIED":
+                    raise HTTPException(409, "JOURNAL_COMMERCE_STATE_MISMATCH")
+                if recovered_payment.get("transaction_id") != payload.payment_reference:
+                    raise HTTPException(409, "JOURNAL_PAYMENT_REFERENCE_MISMATCH")
+                if recovered_authority.get("provider") != payload.provider:
+                    raise HTTPException(409, "JOURNAL_PROVIDER_MISMATCH")
+                if recovered_authority.get("event_id") != payload.event_id:
+                    raise HTTPException(409, "JOURNAL_EVENT_ID_MISMATCH")
                 replay.record(payload.event_id, payload.payment_reference, payload.order_id)
                 journal.mark(payload.event_id, "COMPLETED")
                 return {"ok": True, "verified": True, "idempotent": True,
