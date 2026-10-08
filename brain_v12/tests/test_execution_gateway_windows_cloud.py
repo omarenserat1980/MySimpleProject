@@ -1,7 +1,7 @@
 import unittest
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
-from brain_v12.brain.execution_policy import WINDOWS_REAL_BOOT
+from brain_v12.brain.execution_policy import WINDOWS_CLOUD_NATIVE
 from brain_v12.brain.windows_cloud_executor import CloudWindowsVM
 
 
@@ -37,9 +37,9 @@ class WindowsCloudExecutionGatewayTests(unittest.TestCase):
             now=1000.0,
         )
         self.assertEqual(decision.executor, "windows-server-2025-cloud")
-        self.assertEqual(decision.capability, WINDOWS_REAL_BOOT)
+        self.assertEqual(decision.capability, WINDOWS_CLOUD_NATIVE)
         self.assertTrue(decision.verified)
-        self.assertEqual(decision.reason, "WINDOWS_CLOUD_RUNTIME_VERIFIED")
+        self.assertEqual(decision.reason, "WINDOWS_CLOUD_NATIVE_RUNTIME_VERIFIED")
 
     def test_stale_guest_heartbeat_is_blocked(self):
         with self.assertRaisesRegex(
