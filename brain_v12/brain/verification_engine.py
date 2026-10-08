@@ -19,5 +19,5 @@ class VerificationEngine:
         return {"ok":True,"status":"VERIFIED","task_id":task.task_id,"evidence_id":ev["evidence_id"],"evidence_sha256":ev["sha256"]}
 
     def verify_payload_hash(self,payload,expected_sha256):
-        actual=hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":")).encode()).hexdigest()
+        actual=hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":"),default=str).encode()).hexdigest()
         return {"ok":actual==expected_sha256,"status":"VERIFIED" if actual==expected_sha256 else "HASH_MISMATCH","sha256":actual}
