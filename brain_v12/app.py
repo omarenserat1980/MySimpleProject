@@ -48,6 +48,7 @@ from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
+from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
@@ -193,6 +194,7 @@ app.include_router(ai_fabric_router(fabric))
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(revenue_conversion_router(income_lifecycle))
 app.include_router(games_store_router)
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
