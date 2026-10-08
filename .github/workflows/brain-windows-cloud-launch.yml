@@ -50,3 +50,4 @@ jobs:
 
       - name: Terraform apply
         run: terraform apply -input=false brain.tfplan
+# launch trigger armed
