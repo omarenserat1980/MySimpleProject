@@ -18,7 +18,7 @@ KEYWORDS={
     "commerce":("amazon","ebay","temu","alibaba","dropship","دروب","متجر","منتج"),
     "finance":("finance","financial","investment","invest","استثمار","مالي","أسهم"),
     "business":("project","business","service","client","مشروع","خدمة","عميل","ربح"),
-    "social":("charity","ngo","nonprofit","donation","جمعية","خيري","تبرع","منظمة"),
+    "social":("charity","ngo","nonprofit","donation","fundraising","جمعية","خيري","تبرع","منظمة"),
     "political":("politics","policy","government","election","سياسة","حكومة","قانون"),
     "economic":("economy","inflation","trade","market","اقتصاد","تضخم","تجارة"),
     "defense":("defense","security","military","أمني","دفاع","عسكري"),
