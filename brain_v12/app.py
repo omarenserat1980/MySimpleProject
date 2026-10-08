@@ -202,7 +202,7 @@ app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(habitat_router)
 app.include_router(commercial_dashboard_router())
-app.include_router(api_resilience_router_factory(device_bridge, lambda: assess_brain_liveness()))
+app.include_router(api_resilience_router_factory(device_bridge, lambda: assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)))
 
 
 class BrainInternalClientRequest(BaseModel):
