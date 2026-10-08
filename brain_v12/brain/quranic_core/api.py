@@ -7,6 +7,8 @@ from .tafsir import TafsirAdapter
 from .counter_evidence import CounterEvidenceEngine
 from .benefit import HumanBenefitEngine
 from .orchestrator import QuranicResearchOrchestrator
+from .graph import EvidenceGraph
+from .publication import PublicationGate
 
 class EvidenceIn(BaseModel):
     level: EvidenceLevel
@@ -30,6 +32,8 @@ def build_router(engine=None):
     counter_engine=CounterEvidenceEngine()
     benefit_engine=HumanBenefitEngine()
     orchestrator=QuranicResearchOrchestrator()
+    graph=EvidenceGraph()
+    publication=PublicationGate()
     router=APIRouter(prefix="/api/quranic-core",tags=["quranic-core"])
 
     @router.get("/health")
@@ -56,6 +60,18 @@ def build_router(engine=None):
             return orchestrator.decision(result)
         except ValueError as exc:
             raise HTTPException(status_code=422,detail=str(exc)) from exc
+
+    @router.post("/evidence-graph")
+    def evidence_graph(body:ResearchIn):
+        records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
+        finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
+        return graph.build(finding)
+
+    @router.post("/publication-gate")
+    def publication_gate(body:ResearchIn):
+        records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
+        finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
+        return publication.evaluate(finding)
 
     @router.get("/sources/status")
     def sources_status():
