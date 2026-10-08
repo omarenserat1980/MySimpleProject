@@ -303,6 +303,15 @@ class ExecutorService : Service() {
                     val file = safePath(params.optString("path", ""))
                     ok(JSONObject(FFmpegEngine(this).probeMedia(file)))
                 }
+                "brain_runtime_launch" -> {
+                    val result = TermuxBridge.runBrainRuntimeBootstrap(this)
+                    ok(JSONObject()
+                        .put("exit_code", result.exitCode)
+                        .put("error_code", result.errorCode)
+                        .put("stdout", result.stdout.take(4000))
+                        .put("stderr", result.stderr.take(4000))
+                        .put("error", result.errorMessage))
+                }
                 "termux_probe" -> {
                     val installed = TermuxBridge.isInstalled(this)
                     if (!installed) {
