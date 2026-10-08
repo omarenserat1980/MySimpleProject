@@ -13,12 +13,12 @@ Native Android executor for Electronic Brain. This module is designed to remove 
 - Safe path traversal protection.
 - Basic Toybox command adapter with an explicit allowlist.
 - GitHub Actions workflow that builds a debug APK.
+- Automatic Brain Runtime bootstrap when the local Brain health endpoint is unavailable.
+- Explicit `brain_runtime_launch` execution task backed by the Termux bootstrap bridge.
 
 ## Important
 
 This is the first native executor layer, not a full Linux distribution. FFmpeg, Python and local AI runtimes are separate adapters to be integrated next.
-
-For shared-storage access on Android 11+, the app includes the All Files Access flow because the factory needs a stable shared output directory. Android documents this permission as a special access for apps whose core functionality requires broad file management. See the Android storage documentation.
 
 ## Brain protocol
 
@@ -41,4 +41,4 @@ Open `android_executor/` in Android Studio, or use the included GitHub Actions w
 
 The Android Executor CI workflow is the authoritative build path for the debug APK. A successful workflow without the uploaded APK artifact is not treated as a completed build.
 
-The Kotlin compile fixes are now present on `main`; this change triggers CI against the current branch head so the fixes are actually compiled and verified.
+**CI release trigger:** this revision intentionally updates the Android Executor module so the path-filtered CI workflow executes against the current `main` head, including the runtime-bootstrap fixes. Do not reuse pre-fix APK artifacts for runtime verification.
