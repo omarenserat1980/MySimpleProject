@@ -20,7 +20,11 @@ class EvidenceStore:
                 self.db.execute(f"ALTER TABLE evidence ADD COLUMN {column} {definition}")
             except sqlite3.OperationalError:
                 pass
-        self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_mission_attempt ON evidence(mission_id,attempt)")\n        self.db.execute("""CREATE TABLE IF NOT EXISTS execution_idempotency(\n          execution_key TEXT PRIMARY KEY, mission_fingerprint TEXT NOT NULL, action TEXT NOT NULL,\n          parameters_fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, completed_at REAL\n        )""")
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_evidence_mission_attempt ON evidence(mission_id,attempt)")
+        self.db.execute("""CREATE TABLE IF NOT EXISTS execution_idempotency(
+          execution_key TEXT PRIMARY KEY, mission_fingerprint TEXT NOT NULL, action TEXT NOT NULL,
+          parameters_fingerprint TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, completed_at REAL
+        )""")
         self.db.commit()
 
     @staticmethod
@@ -58,7 +62,27 @@ class EvidenceStore:
         self.db.commit()
         return {"ok":valid,"status":status,"evidence_id":evidence_id,"sha256":item["sha256"]}
 
-    def claim_execution(self,execution_key,mission_fingerprint,action,parameters_fingerprint):\n        try:\n            self.db.execute("BEGIN IMMEDIATE")\n            self.db.execute("INSERT INTO execution_idempotency(execution_key,mission_fingerprint,action,parameters_fingerprint,status,created_at) VALUES(?,?,?,?,?,?)",(execution_key,mission_fingerprint,action,parameters_fingerprint,"CLAIMED",time.time()))\n            self.db.commit()\n            return {"ok":True,"status":"CLAIMED","execution_key":execution_key}\n        except sqlite3.IntegrityError:\n            self.db.rollback()\n            row=self.db.execute("SELECT status FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()\n            return {"ok":False,"status":row["status"] if row else "UNKNOWN","execution_key":execution_key}\n\n    def complete_execution(self,execution_key):\n        self.db.execute("UPDATE execution_idempotency SET status=?,completed_at=?,lease_until=NULL WHERE execution_key=? AND status=?",("COMPLETED",time.time(),execution_key,"CLAIMED"))\n        self.db.commit()\n        return self.db.execute("SELECT status FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()["status"]\n\n    def execution_status(self,execution_key):\n        row=self.db.execute("SELECT * FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()\n        return dict(row) if row else None\n\n    def close(self): self.db.close()
+    def claim_execution(self,execution_key,mission_fingerprint,action,parameters_fingerprint):
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute("INSERT INTO execution_idempotency(execution_key,mission_fingerprint,action,parameters_fingerprint,status,created_at) VALUES(?,?,?,?,?,?)",(execution_key,mission_fingerprint,action,parameters_fingerprint,"CLAIMED",time.time()))
+            self.db.commit()
+            return {"ok":True,"status":"CLAIMED","execution_key":execution_key}
+        except sqlite3.IntegrityError:
+            self.db.rollback()
+            row=self.db.execute("SELECT status FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()
+            return {"ok":False,"status":row["status"] if row else "UNKNOWN","execution_key":execution_key}
+
+    def complete_execution(self,execution_key):
+        self.db.execute("UPDATE execution_idempotency SET status=?,completed_at=?,lease_until=NULL WHERE execution_key=? AND status=?",("COMPLETED",time.time(),execution_key,"CLAIMED"))
+        self.db.commit()
+        return self.db.execute("SELECT status FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()["status"]
+
+    def execution_status(self,execution_key):
+        row=self.db.execute("SELECT * FROM execution_idempotency WHERE execution_key=?",(execution_key,)).fetchone()
+        return dict(row) if row else None
+
+    def close(self): self.db.close()
 
 
     def renew_execution(self,execution_key,lease_seconds=300):
