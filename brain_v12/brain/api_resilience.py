@@ -117,9 +117,19 @@ def router_factory(device_bridge, liveness_reader):
 
     return router
 
+def _stable_failure_state(evidence):
+    evidence = evidence if isinstance(evidence, dict) else {}
+    stable = {}
+    for key in ("ok", "online", "status", "error", "reason", "code", "configured"):
+        if key in evidence:
+            stable[key] = evidence[key]
+    return stable
+
+
 def failure_identity(stage, reason, dependency=None, evidence=None):
+    stable = _stable_failure_state(evidence)
     raw = json.dumps(
-        {"stage": stage, "reason": reason, "dependency": dependency or "", "evidence": evidence or {}},
+        {"stage": stage, "reason": reason, "dependency": dependency or "", "state": stable},
         sort_keys=True,
         separators=(",", ":"),
         default=str,
@@ -130,6 +140,7 @@ def failure_identity(stage, reason, dependency=None, evidence=None):
         "reason": reason,
         "dependency": dependency,
         "evidence": evidence or {},
+        "identity_basis": stable,
     }
 
 def _next_path(checks, errors=None):
