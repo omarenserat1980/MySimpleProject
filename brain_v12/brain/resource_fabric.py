@@ -54,10 +54,12 @@ class ResourceRequest:
     unit: str
     attributes: dict[str, object] = field(default_factory=dict)
     required: bool = True
+    co_locate_key: str | None = None
 
     def public(self) -> dict:
         return {"kind": self.kind.value, "amount": self.amount, "unit": self.unit,
-                "attributes": dict(self.attributes), "required": self.required}
+                "attributes": dict(self.attributes), "required": self.required,
+                "co_locate_key": self.co_locate_key}
 
 
 @dataclass(frozen=True)
@@ -141,11 +143,20 @@ class ResourceFabric:
         ]
 
     def plan(self, intent_id: str, requests: list[ResourceRequest]) -> dict:
+        """Create a deterministic placement plan with optional co-location."""
         selected: list[dict[str, int]] = []
         used: set[str] = set()
         failures: list[dict] = []
+        placements: dict[str, str] = {}
+
         for request in requests:
-            candidates = [spec for spec in self.discover(request) if spec.resource_id not in used]
+            candidates = [spec for spec in self.discover(request)
+                          if spec.resource_id not in used]
+            if request.co_locate_key:
+                existing_provider = placements.get(request.co_locate_key)
+                if existing_provider is not None:
+                    candidates = [s for s in candidates
+                                  if s.attributes.get("blade_id", s.provider_id) == existing_provider]
             candidates.sort(key=lambda s: (
                 0 if s.state == ResourceState.AVAILABLE else 1,
                 s.capacity - request.amount, s.resource_id))
@@ -153,13 +164,19 @@ class ResourceFabric:
                 if request.required:
                     failures.append({"request": request.public(), "status": "NO_MATCH"})
                 continue
-            selected.append({"resource_id": candidates[0].resource_id, "amount": request.amount})
-            used.add(candidates[0].resource_id)
+            chosen = candidates[0]
+            selected.append({"resource_id": chosen.resource_id, "amount": request.amount})
+            used.add(chosen.resource_id)
+            if request.co_locate_key:
+                placements[request.co_locate_key] = chosen.attributes.get(
+                    "blade_id", chosen.provider_id)
+
         return {"ok": not failures,
                 "status": "PLAN_READY" if not failures else "PLAN_BLOCKED",
                 "intent_id": intent_id,
                 "allocations": selected,
                 "resource_ids": [x["resource_id"] for x in selected],
+                "placements": placements,
                 "failures": failures}
 
     def reserve(self, intent_id: str, resource_ids: list[str] | None = None,
