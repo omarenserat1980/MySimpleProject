@@ -5,7 +5,6 @@ from typing import Any
 from .core import BrainCore
 from .builder import SoftwareBuilder
 from .execution_coordinator import BrainExecutionCoordinator
-from .execution_coordinator import BrainExecutionCoordinator
 
 
 class CognitiveOrchestrator:
@@ -44,6 +43,19 @@ class CognitiveOrchestrator:
         state.update({"execution": execution})
         self.store.set_state(state)
         return {"status": "PLANNED", "decision": decision, "plan": plan, "execution": execution}
+
+    def create_inspect_path(self, objective: str, max_attempts: int = 1) -> dict[str, Any]:
+        """Create the first production plan step without executing it locally."""
+        execution = self.execution_coordinator.create(f"inspect:{objective}", max_attempts=max_attempts)
+        execution["path"]["step"] = "execute"
+        execution["plan_step"] = "inspect"
+        self.store.event("ORCHESTRATOR_INSPECT_PATH_CREATED", {
+            "objective": objective,
+            "control_task_id": execution["control"]["id"],
+            "path_run_id": execution["path"]["run_id"],
+            "plan_step": "inspect",
+        })
+        return execution
 
     def execute(self, control_task_id: str, executor, verifier, repair=None) -> dict[str, Any]:
         """Delegate execution to the single execution owner; never execute locally."""
