@@ -23,10 +23,6 @@ class VirtualDatacenterResourceProvider:
         self.fabric = fabric
         self.bindings: dict[str, FabricVDCBinding] = {}
 
-    @staticmethod
-    def _gb(value_bytes: int) -> int:
-        return max(0, int(value_bytes) // (1024 ** 3))
-
     def compose_server(
         self,
         intent_id: str,
@@ -47,11 +43,11 @@ class VirtualDatacenterResourceProvider:
                 co_locate_key=intent_id,
             ),
             ResourceRequest(
-                ResourceKind.MEMORY, self._gb(ram_bytes), "GB",
+                ResourceKind.MEMORY, ram_bytes, "bytes",
                 co_locate_key=intent_id,
             ),
             ResourceRequest(
-                ResourceKind.STORAGE, self._gb(storage_bytes), "GB",
+                ResourceKind.STORAGE, storage_bytes, "bytes",
                 co_locate_key=intent_id,
             ),
         ]
