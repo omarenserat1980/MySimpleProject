@@ -237,6 +237,57 @@ app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
 
 
+@app.get("/api/brain/hardware-twin")
+def hardware_twin_status():
+    return {
+        "twin_id": hardware_twin.twin_id,
+        "name": hardware_twin.name,
+        "health": hardware_twin.health_summary(),
+        "capacity": hardware_twin.capacity_summary(),
+        "topology": hardware_twin.topology(),
+    }
+
+
+@app.get("/api/brain/hardware-twin/{component_id}")
+def hardware_twin_component(component_id: str):
+    return hardware_twin.inspect(component_id)
+
+
+@app.post("/api/brain/hardware-twin/sensor")
+def hardware_twin_sensor(request: Request, body: dict):
+    require_control_key(request)
+    return hardware_twin.record_sensor(
+        component_id=str(body["component_id"]),
+        sensor_id=str(body["sensor_id"]),
+        kind=str(body["kind"]),
+        value=body.get("value"),
+        unit=body.get("unit"),
+        health=HealthState(str(body.get("health", "UNKNOWN"))),
+    ).__dict__
+
+
+@app.post("/api/brain/hardware-twin/health")
+def hardware_twin_health(request: Request, body: dict):
+    require_control_key(request)
+    hardware_twin.mark_health(
+        str(body["component_id"]),
+        HealthState(str(body["health"])),
+        str(body.get("reason")) if body.get("reason") else None,
+    )
+    return hardware_twin.inspect(str(body["component_id"]))
+
+
+@app.post("/api/brain/hardware-twin/bind")
+def hardware_twin_bind(request: Request, body: dict):
+    require_control_key(request)
+    return hardware_twin.bind_verified(
+        component_id=str(body["component_id"]),
+        resource_ids=[str(x) for x in body.get("resource_ids", [])],
+        evidence=dict(body.get("evidence") or {}),
+        backend=str(body["backend"]),
+    )
+
+
 @app.get("/api/brain/workload")
 def brain_workload_status(queued:int=0, active:int=0, oldest_age_seconds:float|None=None):
     return workload_controller.status(queued=queued, active=active, oldest_age_seconds=oldest_age_seconds)
