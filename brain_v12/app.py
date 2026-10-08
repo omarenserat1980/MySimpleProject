@@ -76,6 +76,7 @@ from .cloud_bootstrap import bootstrap_status
 from .brain.windows_cloud_discovery import discover_windows_cloud_nodes
 from .brain.windows_cloud_secret_gate import check_windows_cloud_secret_readiness
 from .brain import internal_clients
+from .brain.api_resilience import router_factory as api_resilience_router_factory
 from cloud.brain_fabric import list_nodes as list_fabric_nodes
 
 from .brain.security_middleware import apply_security_headers
@@ -201,6 +202,7 @@ app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(habitat_router)
 app.include_router(commercial_dashboard_router())
+app.include_router(api_resilience_router_factory(device_bridge, lambda: assess_brain_liveness()))
 
 
 class BrainInternalClientRequest(BaseModel):
