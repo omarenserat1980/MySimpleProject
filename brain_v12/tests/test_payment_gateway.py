@@ -14,6 +14,18 @@ class PaymentGatewayTests(unittest.TestCase):
     def test_verified_webhook(self):
         p={"event_id":"evt_12345678","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_123","amount_usd":9,"currency":"USD","timestamp":int(time.time())}; raw,h=self.signed(p); r=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(r.status_code,200); self.assertEqual(r.json()["state"],"PAYMENT_VERIFIED"); self.assertEqual(r.json()["order_id"],self.order["order_id"]); self.assertEqual(r.json()["payment_reference"],"pay_123")
+
+    def test_signed_webhook_establishes_independent_revenue_authority(self):
+        order = self.store.get(self.order["order_id"])
+        self.assertNotEqual(order.get("revenue_authority", {}).get("status"), "INDEPENDENTLY_VERIFIED")
+        p={"event_id":"evt_authority1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_authority","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
+        raw,h=self.signed(p)
+        r=self.client.post("/api/payments/webhook",content=raw,headers=h)
+        self.assertEqual(r.status_code,200)
+        order = self.store.get(self.order["order_id"])
+        self.assertEqual(order["revenue_authority"]["status"], "INDEPENDENTLY_VERIFIED")
+        self.assertEqual(order["revenue_authority"]["payment_transaction_id"], "pay_authority")
+
     def test_replay_rejected(self):
         p={"event_id":"evt_replay1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_456","amount_usd":9,"currency":"USD","timestamp":int(time.time())}; raw,h=self.signed(p); self.assertEqual(self.client.post("/api/payments/webhook",content=raw,headers=h).status_code,200); self.assertEqual(self.client.post("/api/payments/webhook",content=raw,headers=h).status_code,409)
     def test_bad_signature_rejected(self):
