@@ -43,7 +43,7 @@ class DisabledPaymentProvider:
 class WebhookStore:
     def __init__(self, path: str):
         self.path = Path(path)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
     def _read(self) -> dict:
         if not self.path.exists():
             return {}
@@ -127,10 +127,11 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             payload = WebhookEnvelope.model_validate_json(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
-        if replay.seen(payload.event_id):
-            raise HTTPException(409, "WEBHOOK_REPLAY")
-        if replay.payment_seen(payload.payment_reference):
-            raise HTTPException(409, "PAYMENT_REFERENCE_REPLAY")
+        with replay.lock:
+            if replay.seen(payload.event_id):
+                raise HTTPException(409, "WEBHOOK_REPLAY")
+            if replay.payment_seen(payload.payment_reference):
+                raise HTTPException(409, "PAYMENT_REFERENCE_REPLAY")
         configured_provider = os.getenv("BRAIN_PAYMENT_PROVIDER", "").strip()
         if not configured_provider:
             raise HTTPException(503, "PAYMENT_PROVIDER_NOT_CONFIGURED")
