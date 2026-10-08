@@ -33,7 +33,7 @@ if ($LASTEXITCODE -ne 0) { throw "Preflight failed." }
 $stateAccount = if ($env:BRAIN_TFSTATE_ACCOUNT) { $env:BRAIN_TFSTATE_ACCOUNT } else { "brainstate" + ($env:ARM_SUBSCRIPTION_ID.Replace("-","").Substring(0,14)).ToLowerInvariant() }
 Push-Location $tfDir
 try {
-    & terraform init -input=false -reconfigure "-backend-config=resource_group_name=$StateResourceGroup" "-backend-config=storage_account_name=$stateAccount" "-backend-config=container_name=$StateContainer" "-backend-config=key=$VmName.tfstate" "-backend-config=use_oidc=true" "-backend-config=subscription_id=$env:ARM_SUBSCRIPTION_ID" "-backend-config=tenant_id=$env:ARM_TENANT_ID" "-backend-config=client_id=$env:ARM_CLIENT_ID"
+    & terraform init -input=false -reconfigure "-backend-config=resource_group_name=$StateResourceGroup" "-backend-config=storage_account_name=$stateAccount" "-backend-config=container_name=$StateContainer" "-backend-config=key=$VmName.tfstate" "-backend-config=use_oidc=true" "-backend-config=use_azuread_auth=true" "-backend-config=subscription_id=$env:ARM_SUBSCRIPTION_ID" "-backend-config=tenant_id=$env:ARM_TENANT_ID" "-backend-config=client_id=$env:ARM_CLIENT_ID"
     if ($LASTEXITCODE -ne 0) { throw "Terraform init/backend failed. Bootstrap state and grant Storage Blob Data Contributor." }
     & terraform validate
     if ($LASTEXITCODE -ne 0) { throw "Terraform validation failed." }
