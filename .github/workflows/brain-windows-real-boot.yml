@@ -29,6 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run independent cloud executor gate
+        env:
+          BRAIN_CLOUD_EXECUTOR: "1"
         run: |
           set -euo pipefail
           python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
