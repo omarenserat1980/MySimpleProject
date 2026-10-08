@@ -13,3 +13,11 @@ class ScientificEvidenceAdapter:
             EvidenceLevel.SCIENTIFIC, source, claim, citation,
             confidence, metadata or {"present_as": "scientific_evidence"}
         )
+
+
+class ScientificEvidenceAdapterV2:
+    """Validated scientific intake facade; citations are mandatory."""
+    def __init__(self,engine=None): self.engine=engine or QuranicResearchEngine()
+    def record(self,source,claim,citation,confidence=0.0,metadata=None):
+        if not citation: raise ValueError("SCIENTIFIC_CITATION_REQUIRED")
+        return self.engine.make_evidence(EvidenceLevel.SCIENTIFIC,source,claim,citation,confidence,metadata)
