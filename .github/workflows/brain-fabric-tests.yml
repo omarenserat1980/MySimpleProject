@@ -27,6 +27,7 @@ jobs:
           brain_v12/tests/test_resource_fabric.py
           brain_v12/tests/test_resource_providers.py
           brain_v12/tests/test_vdc_resource_provider.py
+          brain_v12/tests/test_execution_authority.py
           cloud/test_brain_fabric.py
           cloud/test_brain_node_security.py
           cloud/test_brain_fabric_integration.py
