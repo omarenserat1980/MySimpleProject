@@ -95,6 +95,7 @@ jobs:
           from pathlib import Path
 
           rows=json.loads(Path("brain6_artifacts/workflow_watchdog/failures.json").read_text())
+          target_sha=Path("brain6_artifacts/workflow_watchdog/target_sha.txt").read_text().strip()
           from brain_v12.brain.workflow_watchdog_policy import select_recovery_candidates
           eligible=select_recovery_candidates(rows, target_sha, limit=1)
           selected_ids={r["run_id"] for r in eligible}
