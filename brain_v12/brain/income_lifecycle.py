@@ -174,6 +174,11 @@ class IncomeLifecycle:
             return {"ok": False, "status": "AMOUNT_MISMATCH", "requested": requested, "received": received}
         if not str(transaction_id).strip() or not str(evidence).strip():
             return {"ok": False, "status": "INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED"}
+        # Revenue conversion is fail-closed: free-form evidence is not enough.
+        # A connected payment authority must explicitly mark the reconciliation
+        # as independently verified (normally from a signed provider webhook).
+        if not isinstance(evidence, dict) or evidence.get("independent_verification") != "SIGNED_PROVIDER_WEBHOOK":
+            return {"ok": False, "status": "SIGNED_PROVIDER_AUTHORITY_REQUIRED"}
         existing = data.get("payment_reconciliation")
         if existing:
             if existing.get("transaction_id") == transaction_id and float(existing.get("received_amount_jod", 0) or 0) == received:
@@ -183,7 +188,10 @@ class IncomeLifecycle:
             "transaction_id": str(transaction_id)[:300],
             "received_amount_jod": round(received, 2),
             "currency": currency,
-            "evidence": str(evidence)[:4000],
+            "evidence": str(evidence.get("evidence_ref") or "")[:4000],
+            "independent_verification": evidence.get("independent_verification"),
+            "provider": str(evidence.get("provider") or "")[:100],
+            "event_id": str(evidence.get("event_id") or "")[:200],
             "reconciled_at": self._now(),
             "order_id": order_id or request.get("order_id"),
         }
