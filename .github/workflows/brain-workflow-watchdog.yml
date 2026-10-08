@@ -131,6 +131,18 @@ jobs:
               continue
             fi
 
+            if ! python - <<'PY' "$workflow" "$row_sha" "$target_sha"
+          import sys
+          from brain_v12.brain.workflow_watchdog_policy import recovery_allowed
+          row={"workflow":sys.argv[1],"head_sha":sys.argv[2]}
+          raise SystemExit(0 if recovery_allowed(row, sys.argv[3]) else 41)
+          PY
+            then
+              echo "RECOVERY=POLICY_BLOCKED"
+              printf '%s\n' "RUN_ID=$run_id" "REASON=POLICY_BLOCKED" >> brain6_artifacts/workflow_watchdog/actions.log
+              continue
+            fi
+
             if gh run view "$run_id" --json status,conclusion,jobs,headSha > "brain6_artifacts/workflow_watchdog/run-$run_id.json"; then
               actual_sha="$(python -c 'import json,sys; print(json.load(sys.stdin)["headSha"])' < "brain6_artifacts/workflow_watchdog/run-$run_id.json")"
               if [ "$actual_sha" != "$target_sha" ]; then
