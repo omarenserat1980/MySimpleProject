@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "policy": "competency_not_completion",
+  "principle": "A course does not create expertise; demonstrated competency does.",
+  "tracks": [
+    {"id":"foundation","domains":["strategy","consumer"]},
+    {"id":"growth","domains":["brand","content","seo","growth"]},
+    {"id":"performance","domains":["paid","sales","analytics"]},
+    {"id":"advanced","domains":["ai_marketing","leadership"]}
+  ]
+}
