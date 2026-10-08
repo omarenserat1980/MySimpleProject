@@ -51,6 +51,15 @@ class PaymentGatewayTests(unittest.TestCase):
         raw2,h2=self.signed(p2)
         self.assertEqual(self.client.post("/api/payments/webhook",content=raw2,headers=h2).status_code,409)
 
+    def test_provider_event_identity_is_persisted_in_authority(self):
+        p={"event_id":"evt_identity1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_identity","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
+        raw,h=self.signed(p)
+        r=self.client.post("/api/payments/webhook",content=raw,headers=h)
+        self.assertEqual(r.status_code,200)
+        order=self.store.get(self.order["order_id"])
+        self.assertEqual(order["revenue_authority"]["provider"],"test")
+        self.assertEqual(order["revenue_authority"]["event_id"],"evt_identity1")
+
     def test_bad_signature_rejected(self):
         p={"event_id":"evt_bad123","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_789","amount_usd":9,"currency":"USD","timestamp":int(time.time())}; raw,_=self.signed(p); r=self.client.post("/api/payments/webhook",content=raw,headers={"X-Brain-Payment-Timestamp":str(int(time.time())),"X-Brain-Payment-Signature":"bad"}); self.assertEqual(r.status_code,401)
 if __name__=="__main__": unittest.main()
