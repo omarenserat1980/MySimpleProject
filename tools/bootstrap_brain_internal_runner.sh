@@ -61,7 +61,7 @@ unset TOKEN
 
 cat > .env <<'EOF'
 BRAIN_INTERNAL_RUNNER_FLAG=1
-BRAIN_INTERNAL_RUNNER_LABELS=self-hosted,linux,x64,brain-internal,qemu,windows-real-boot
+BRAIN_INTERNAL_RUNNER_LABELS=self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor
 EOF
 chmod 600 .env
 
