@@ -132,33 +132,33 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
                 raise HTTPException(409, "WEBHOOK_REPLAY")
             if replay.payment_seen(payload.payment_reference):
                 raise HTTPException(409, "PAYMENT_REFERENCE_REPLAY")
-        configured_provider = os.getenv("BRAIN_PAYMENT_PROVIDER", "").strip()
-        if not configured_provider:
-            raise HTTPException(503, "PAYMENT_PROVIDER_NOT_CONFIGURED")
-        if payload.provider != configured_provider:
-            raise HTTPException(409, "PAYMENT_PROVIDER_MISMATCH")
-        if payload.event_type != "payment.verified":
-            replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-            return {"ok": True, "ignored": True, "event_id": payload.event_id}
-        order = store.get(payload.order_id)
-        if not order:
-            raise HTTPException(404, "ORDER_NOT_FOUND")
-        if payload.currency.upper() != "USD":
-            raise HTTPException(409, "CURRENCY_MISMATCH")
-        expected_amount = float(order["product"]["price_usd"])
-        if abs(payload.amount_usd - expected_amount) > 0.000001:
-            raise HTTPException(409, "AMOUNT_MISMATCH")
-        if order.get("state") != "PAYMENT_PENDING":
-            raise HTTPException(409, "INVALID_PAYMENT_STATE")
-        order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
+            configured_provider = os.getenv("BRAIN_PAYMENT_PROVIDER", "").strip()
+            if not configured_provider:
+                raise HTTPException(503, "PAYMENT_PROVIDER_NOT_CONFIGURED")
+            if payload.provider != configured_provider:
+                raise HTTPException(409, "PAYMENT_PROVIDER_MISMATCH")
+            if payload.event_type != "payment.verified":
+                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+                return {"ok": True, "ignored": True, "event_id": payload.event_id}
+            order = store.get(payload.order_id)
+            if not order:
+                raise HTTPException(404, "ORDER_NOT_FOUND")
+            if payload.currency.upper() != "USD":
+                raise HTTPException(409, "CURRENCY_MISMATCH")
+            expected_amount = float(order["product"]["price_usd"])
+            if abs(payload.amount_usd - expected_amount) > 0.000001:
+                raise HTTPException(409, "AMOUNT_MISMATCH")
+            if order.get("state") != "PAYMENT_PENDING":
+                raise HTTPException(409, "INVALID_PAYMENT_STATE")
+            order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
             "transaction_id": payload.payment_reference,
             "evidence_ref": f"payment-webhook:{payload.provider}:{payload.event_id}",
             "provider": payload.provider,
             "event_id": payload.event_id,
             "verified_at": int(time.time()),
             "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
-        })
-        replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-        return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
+            })
+            replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+            return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
 
     return api
