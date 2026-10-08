@@ -6,5 +6,6 @@ from .tafsir import TafsirAdapter
 from .science import ScientificEvidenceAdapter
 from .counter_evidence import CounterEvidenceEngine
 from .benefit import HumanBenefitEngine
+from .orchestrator import QuranicResearchOrchestrator
 
-__all__ = ["EvidenceLevel", "EvidenceRecord", "QuranicFinding", "QuranIntegrityGate", "QuranicResearchEngine", "CanonicalQuranAdapter", "TafsirAdapter", "ScientificEvidenceAdapter", "CounterEvidenceEngine", "HumanBenefitEngine"]
+__all__ = ["EvidenceLevel", "EvidenceRecord", "QuranicFinding", "QuranIntegrityGate", "QuranicResearchEngine", "CanonicalQuranAdapter", "TafsirAdapter", "ScientificEvidenceAdapter", "CounterEvidenceEngine", "HumanBenefitEngine", "QuranicResearchOrchestrator"]
