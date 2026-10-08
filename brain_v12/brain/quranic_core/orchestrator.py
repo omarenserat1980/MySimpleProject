@@ -45,3 +45,15 @@ class QuranicResearchOrchestrator:
                 "evidence_count":len(records),"counter_evidence":counter,
                 "human_benefit":benefit,
                 "next":"human_review_before_publication"}
+
+
+    def decision(self, research_result:dict) -> dict:
+        status=research_result.get("status")
+        if status=="HOLD":
+            return {"decision":"HOLD","publish":False,"escalate":True,
+                    "reason":research_result.get("message","research gate blocked")}
+        if status=="READY_FOR_HUMAN_REVIEW":
+            return {"decision":"HUMAN_REVIEW","publish":False,"escalate":True,
+                    "reason":"research is structured but consequential publication requires human review"}
+        return {"decision":"HOLD","publish":False,"escalate":True,
+                "reason":"unknown research state; fail closed"}
