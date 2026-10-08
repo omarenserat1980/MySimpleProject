@@ -8,6 +8,10 @@ on:
       - ".github/workflows/**"
       - "*.md"
   workflow_dispatch:
+concurrency:
+  group: brain-brain-master-audit-main
+  cancel-in-progress: true
+
 jobs:
   master-audit:
     runs-on: ubuntu-latest

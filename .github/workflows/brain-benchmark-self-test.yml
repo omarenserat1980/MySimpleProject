@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: brain-brain-benchmark-self-test-main
+  cancel-in-progress: true
+
 jobs:
   benchmark-self-test:
     runs-on: ubuntu-latest

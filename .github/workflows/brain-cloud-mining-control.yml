@@ -11,6 +11,10 @@ on:
   schedule:
     - cron: "31 */6 * * *"
 
+concurrency:
+  group: brain-brain-cloud-mining-control-main
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest

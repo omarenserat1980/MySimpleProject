@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: brain-reflection-e2e-main
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
