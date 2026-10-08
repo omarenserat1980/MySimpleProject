@@ -55,9 +55,13 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
     checks: dict[str, Any] = {}
 
     cloud_flag = os.environ.get("BRAIN_CLOUD_EXECUTOR", "")
+    executor_id = os.environ.get("BRAIN_CLOUD_EXECUTOR_ID", "").strip()
+    executor_attestation = os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION", "").strip()
+    checks["cloud_executor_attestation"] = {"ok": bool(executor_attestation), "value": "present" if executor_attestation else "missing"}
+
     checks["cloud_executor_identity"] = {
-        "ok": cloud_flag == "1",
-        "value": "1" if cloud_flag == "1" else "missing",
+        "ok": cloud_flag == "1" and bool(executor_id),
+        "value": executor_id if executor_id else "missing",
     }
 
     arch = platform.machine().lower()
@@ -91,6 +95,7 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
         "verified": verified,
         "evidence_ref": f"cloud-executor-gate:{int(time.time())}",
         "executor": "cloud-ephemeral-or-equivalent",
+        "executor_id": executor_id,
         "checks": checks,
         "rule": "cloud identity + x86_64 + KVM device + QEMU + actual KVM initialization + writable execution surface",
     }
