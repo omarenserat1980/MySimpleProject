@@ -12,15 +12,15 @@ It provides confidentiality/integrity for the backup transport; production-grade
 secret storage should still be preferred for the passphrase.
 """
 from __future__ import annotations
-import argparse, getpass, hashlib, hmac, json, os, secrets, struct
+import argparse, getpass, hashlib, json, os, secrets, struct
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pathlib import Path
 
-MAGIC=b"EBREC1\0"
+MAGIC=b"EBREC2\\0"
 SALT_LEN=32
-NONCE_LEN=32
+NONCE_LEN=12
 KEY_LEN=32
 ITERATIONS=600_000
-BLOCK=64
 
 def derive(password: bytes, salt: bytes) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", password, salt, ITERATIONS, dklen=KEY_LEN)
@@ -57,6 +57,7 @@ def main():
     args.output.parent.mkdir(parents=True,exist_ok=True)
     args.output.write_bytes(header+cipher+tag)
     result={
+      "kdf":"PBKDF2-HMAC-SHA256"
       "format":"brain-email-recovery-v1",
       "cipher":"PBKDF2-HMAC-SHA256 + HMAC-authenticated stream",
       "iterations":ITERATIONS,
