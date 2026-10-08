@@ -1,6 +1,6 @@
 from economics.opportunity_engine import (
     Opportunity, OpportunityState, can_record_confirmed_revenue,
-    score, transition_allowed,
+    create_transition, rank_opportunities, score, transition_allowed,
 )
 
 
@@ -18,3 +18,31 @@ def test_revenue_requires_payment_verification():
 def test_state_transitions_are_linear():
     assert transition_allowed(OpportunityState.DELIVERED, OpportunityState.PAYMENT_PENDING)
     assert not transition_allowed(OpportunityState.DELIVERED, OpportunityState.PAYMENT_VERIFIED)
+
+
+def test_transition_emits_audit_event():
+    current = Opportunity("x", 100, .5, .8, 2, .1, .1, OpportunityState.DELIVERED)
+    updated, event = create_transition(
+        current, OpportunityState.PAYMENT_PENDING, "delivery-proof-1"
+    )
+    assert updated.state is OpportunityState.PAYMENT_PENDING
+    assert event.from_state is OpportunityState.DELIVERED
+    assert event.to_state is OpportunityState.PAYMENT_PENDING
+    assert event.evidence_ref == "delivery-proof-1"
+
+
+def test_invalid_transition_fails_closed():
+    current = Opportunity("x", 100, .5, .8, 2, .1, .1, OpportunityState.DELIVERED)
+    try:
+        create_transition(current, OpportunityState.PAYMENT_VERIFIED)
+        assert False
+    except ValueError:
+        assert True
+
+
+def test_ranking_is_deterministic():
+    a = Opportunity("a", 100, .8, .8, 2, .1, .1)
+    b = Opportunity("b", 50, .8, .8, 2, .1, .1)
+    ranked = rank_opportunities([b, a])
+    assert ranked[0][0].opportunity_id == "a"
+    assert ranked[0][1] > ranked[1][1]
