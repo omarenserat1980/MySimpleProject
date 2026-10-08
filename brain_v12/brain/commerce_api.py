@@ -68,7 +68,7 @@ class CommerceStore:
     def __init__(self, path: str):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def _read(self) -> dict:
         if not self.path.exists():
