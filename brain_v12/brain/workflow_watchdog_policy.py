@@ -10,6 +10,13 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 
+# High-consequence workflows are never auto-rerun by the global watchdog.
+# They require an explicit operator launch and their own evidence gate.
+PROTECTED_WORKFLOWS = frozenset({
+    "Brain Windows Real Boot Evidence",
+})
+
+
 def partition_failures(
     rows: Iterable[dict[str, Any]], target_sha: str
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -30,4 +37,9 @@ def partition_failures(
 
 def recovery_allowed(row: dict[str, Any], target_sha: str) -> bool:
     """Defence-in-depth guard for any individual recovery action."""
-    return bool(target_sha) and (row.get("head_sha") or "").strip() == target_sha
+    workflow = str(row.get("workflow") or "").strip()
+    return (
+        bool(target_sha)
+        and (row.get("head_sha") or "").strip() == target_sha
+        and workflow not in PROTECTED_WORKFLOWS
+    )
