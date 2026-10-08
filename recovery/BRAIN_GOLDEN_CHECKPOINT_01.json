@@ -1,0 +1,26 @@
+{
+  "checkpoint_id": "BRAIN-GOLDEN-01",
+  "created_at": "2026-10-08",
+  "status": "STABLE_BASELINE",
+  "repository": "omarenserat1980/MySimpleProject",
+  "source_branch": "main",
+  "source_commit": "343280f2884079655f33f2264f27f5c283cf74b0",
+  "merged_prs": [153, 154],
+  "runtime_policy": {
+    "do_not_restart_live_runtime_automatically": true,
+    "phone_is_executor_not_source_of_truth": true,
+    "github_is_source_of_truth": true
+  },
+  "recovery_principles": [
+    "rebuild from source_commit",
+    "restore state separately from source",
+    "never store secrets in git",
+    "re-register replacement devices as executors",
+    "verify tests before declaring recovery complete"
+  ],
+  "integrity": {
+    "checkpoint_branch": "checkpoint/brain-golden-01-2026-10-08",
+    "code_changes_after_source_commit": false,
+    "metadata_only_on_checkpoint_branch": true
+  }
+}
