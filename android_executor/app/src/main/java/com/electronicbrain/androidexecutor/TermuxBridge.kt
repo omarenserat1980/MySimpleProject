@@ -51,9 +51,9 @@ object TermuxBridge {
             false
         }
 
-    fun runBrainRuntimeLauncher(context: Context): TermuxResult {
+    fun runBrainRuntimeBootstrap(context: Context): TermuxResult {
         if (!isInstalled(context)) return TermuxResult(-1, "", "", -1, "TERMUX_NOT_INSTALLED")
-        return runFixedCommand(context, "/data/data/com.termux/files/usr/bin/bash", listOf("/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_launcher.sh"), timeoutMs = 120000L)
+        return runFixedCommand(context, "/data/data/com.termux/files/usr/bin/bash", listOf("/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_bootstrap.sh"), timeoutMs = 15000L)
     }
 
     private fun runFixedCommand(context: Context, executable: String, arguments: List<String>, workDir: String = "/data/data/com.termux/files/home", timeoutMs: Long = 30 * 60 * 1000L): TermuxResult {
@@ -105,8 +105,8 @@ object TermuxBridge {
                 putExtra(EXTRA_WORKDIR, workDir)
                 putExtra(EXTRA_BACKGROUND, true)
                 putExtra(EXTRA_PENDING_INTENT, pendingIntent)
-                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Electronic Brain FFmpeg")
-                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Electronic Brain media execution requested by the authorized Brain Executor.")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Electronic Brain Runtime")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Electronic Brain runtime bootstrap requested by the authorized Brain Executor.")
             }
 
             context.startService(intent)
