@@ -402,7 +402,7 @@ class ClientRevenueGuardian:
         candidate_data = dict((candidate or {}).get("data") or {})
         candidate_id = str((candidate or {}).get("opportunity_id") or "")
         candidate_title = str(candidate_data.get("title") or (candidate or {}).get("title") or "")
-        candidate_url = str(candidate_data.get("source_url") or (candidate or {}).get("source_url") or "")
+        candidate_url = str(candidate_data.get("source_url") or candidate_data.get("url") or (candidate or {}).get("source_url") or (candidate or {}).get("url") or "")
         candidate_evidence = str(candidate_data.get("evidence") or (candidate or {}).get("evidence") or "")
         candidate_requirements = str(candidate_data.get("requirements") or "")
         candidate_quality = bool(candidate_id and candidate_title and candidate_url.startswith(("http://", "https://")) and candidate_evidence.strip() and len(candidate_requirements.strip()) >= 8)
