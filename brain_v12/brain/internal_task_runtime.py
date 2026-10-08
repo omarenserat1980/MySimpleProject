@@ -63,7 +63,7 @@ class InternalTaskRuntime:
         item = items[0]
         started = time.time()
         try:
-            if item["capability"] == "windows-server-2025-real-boot":
+            if item["capability"] in {"windows-server-2025-cloud-native", "windows-server-2025-real-boot"}:
                 metadata = item.get("metadata") or {}
                 vm_data = metadata.get("vm")
                 node = metadata.get("node")
@@ -89,6 +89,7 @@ class InternalTaskRuntime:
                 state = "COMPLETED" if remote["ok"] else "FAILED"
                 evidence = {
                     "task_id": item["id"], "task": item["task"], "state": state,
+                    "capability": item["capability"],
                     "executor": remote["executor"], "authority": "brain-cloud-fabric",
                     "verified_executor": decision.verified, "job_id": remote["job_id"],
                     "remote_evidence": remote.get("evidence", []),
