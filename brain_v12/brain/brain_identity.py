@@ -30,6 +30,23 @@ def validate_identity(data: dict[str, Any]) -> dict[str, Any]:
             "generation": generation, "source_commit": source_commit,
             "checkpoint_id": checkpoint_id}
 
+def require_checkpoint_identity(
+    identity: dict[str, Any],
+    checkpoint: dict[str, Any],
+) -> dict[str, Any]:
+    verified = validate_identity(identity)
+    if not isinstance(checkpoint, dict):
+        raise ValueError("BRAIN_CHECKPOINT_INVALID")
+    if verified["checkpoint_id"] != str(checkpoint.get("checkpoint_id", "")).strip():
+        raise RuntimeError("BRAIN_IDENTITY_CHECKPOINT_MISMATCH")
+    source_commit = str(checkpoint.get("source_commit", "")).strip().lower()
+    if verified["source_commit"] != source_commit:
+        raise RuntimeError("BRAIN_IDENTITY_SOURCE_COMMIT_MISMATCH")
+    if str(checkpoint.get("status", "")).strip() != "STABLE_BASELINE":
+        raise RuntimeError("BRAIN_CHECKPOINT_NOT_STABLE")
+    return verified
+
+
 def require_newer_generation(identity: dict[str, Any], previous_generation: int) -> dict[str, Any]:
     verified = validate_identity(identity)
     if verified["generation"] <= int(previous_generation):
