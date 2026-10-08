@@ -26,4 +26,27 @@ if ($LASTEXITCODE -eq 0 -and $rawSkus) {
 } else { Write-Warning "Could not read SKU metadata; Azure quota and live capacity remain unverified." }
 Write-Host "Preflight passed identity, secret presence, provider and image checks."
 Write-Host "Subscription: $($account.name) ($($account.id)); region: $Location; requested size: $VmSize"
-Write-Host "A SKU listing does not guarantee quota or live capacity; Azure may still reject the plan/apply."
+$match = [regex]::Match($VmSize, '^Standard_[A-Za-z]+(\d+)')
+$requiredCores = if ($match.Success) { [int]$match.Groups[1].Value } else { 0 }
+$quotaRaw = az vm list-usage --location $Location --output json --only-show-errors 2>$null
+if ($LASTEXITCODE -eq 0 -and $quotaRaw) {
+    try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { $quotas = @() }
+    $totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "Total Regional vCPUs" } | Select-Object -First 1)
+    $familyQuota = @($quotas | Where-Object { $_.name.value -match "standardDSv5Family" -or $_.name.localizedValue -match "DSv5 Family" } | Select-Object -First 1)
+    foreach ($quota in @($totalQuota + $familyQuota)) {
+        if ($quota.Count -gt 0 -and $null -ne $quota[0].limit -and $null -ne $quota[0].currentValue) {
+            $available = [int]$quota[0].limit - [int]$quota[0].currentValue
+            if ($requiredCores -gt 0 -and $available -lt $requiredCores) {
+                Fail "Insufficient Azure quota in $Location for $VmSize: available=$available, required=$requiredCores, quota=$($quota[0].name.localizedValue). Request quota or select an eligible smaller SKU before applying."
+            }
+            Write-Host "Quota $($quota[0].name.localizedValue): current=$($quota[0].currentValue), limit=$($quota[0].limit), needed=$requiredCores."
+        }
+    }
+    if ($totalQuota.Count -eq 0 -or $familyQuota.Count -eq 0) {
+        Write-Warning "Azure returned quota data but one or more relevant regional/family quotas were not identifiable; review portal quotas before apply."
+    }
+} else {
+    Write-Warning "Azure quota query returned no usable data. Quota remains unverified; review portal quotas before authorizing apply."
+}
+Write-Host "A SKU listing does not guarantee live capacity; Azure may still reject a deployment."
+
