@@ -76,6 +76,7 @@ from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .virtual_hardware.hardware_twin import HardwareTwin, HardwareComponent, HardwareDomain, HealthState, build_complete_server_twin
+from .brain.evidence import EvidenceRecord, EvidenceStore
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .brain.quranic_core.api import build_router as quranic_core_router
@@ -168,6 +169,7 @@ brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_
 brain_datacenter=BrainVirtualDatacenter()
 resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
 hardware_twin=build_complete_server_twin(name=os.getenv("BRAIN_HARDWARE_TWIN_NAME","BRAIN-CLOUD-SERVER"))
+evidence_store=EvidenceStore()
 host_resource_provider=HostResourceProvider(resource_fabric)
 vdc_resource_provider=VirtualDatacenterResourceProvider(brain_datacenter, resource_fabric)
 execution_authority=ExecutionAuthority()
@@ -275,6 +277,41 @@ def hardware_twin_health(request: Request, body: dict):
         str(body.get("reason")) if body.get("reason") else None,
     )
     return hardware_twin.inspect(str(body["component_id"]))
+
+
+@app.post("/api/brain/hardware-evidence")
+def hardware_evidence(request: Request, body: dict):
+    require_control_key(request)
+    record = EvidenceRecord.create(
+        issuer=str(body["issuer"]),
+        actor=str(body["actor"]),
+        provider_id=str(body["provider_id"]),
+        component_id=str(body["component_id"]),
+        resource_ids=[str(x) for x in body.get("resource_ids", [])],
+        method=str(body["method"]),
+        source=str(body["source"]),
+        measurement=dict(body.get("measurement") or {}),
+        confidence=float(body.get("confidence", 1.0)),
+        ttl_seconds=int(body["ttl_seconds"]) if body.get("ttl_seconds") is not None else None,
+    )
+    evidence_store.put(record)
+    return record.public()
+
+
+@app.get("/api/brain/hardware-evidence")
+def hardware_evidence_status():
+    return evidence_store.inspect()
+
+
+@app.post("/api/brain/hardware-twin/bind-evidence")
+def hardware_twin_bind_evidence(request: Request, body: dict):
+    require_control_key(request)
+    return hardware_twin.bind_with_evidence_store(
+        str(body["component_id"]),
+        str(body["evidence_id"]),
+        evidence_store,
+        str(body["backend"]),
+    )
 
 
 @app.post("/api/brain/hardware-twin/bind")
