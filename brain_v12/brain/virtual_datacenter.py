@@ -7,7 +7,7 @@ from .capability_registry import CapabilityRegistry
 from .executor_adapter import BladeExecutorAdapter
 from .supervisor_executor import SupervisorExecutor
 from .brain_supervisor import BrainSupervisor
-from .resource_fabric import ResourceFabric, ResourceKind, ResourceSpec
+from .resource_fabric import ResourceFabric, ResourceKind, ResourceSpec, ResourceState
 
 class BrainVirtualDatacenter:
     """Brain-owned datacenter with durable queue and supervisor-controlled execution."""
@@ -51,7 +51,7 @@ class BrainVirtualDatacenter:
         specs=[]
         for blade in self.chassis.blades.values():
             snap=self.resource_manager.snapshot(blade)
-            state="AVAILABLE" if snap["state"]=="ONLINE" else "OFFLINE"
+            state=ResourceState.AVAILABLE if snap["state"]=="ONLINE" else ResourceState.OFFLINE
             prefix=f"{provider_prefix}:{blade.blade_id}"
             specs.extend([
                 ResourceSpec(prefix+":cpu",ResourceKind.COMPUTE,self.name,
