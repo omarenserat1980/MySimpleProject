@@ -51,17 +51,21 @@ class BrainVirtualDatacenter:
         specs=[]
         for blade in self.chassis.blades.values():
             snap=self.resource_manager.snapshot(blade)
+            reserved=self.resource_manager.reserved_for_blade(blade.blade_id)
             state=ResourceState.AVAILABLE if snap["state"]=="ONLINE" else ResourceState.OFFLINE
             prefix=f"{provider_prefix}:{blade.blade_id}"
+            cpu_free=max(0, snap["cpu"]["cores"]-reserved.cpu_cores)
+            ram_free=max(0, snap["ram"]["free_bytes"]-reserved.ram_bytes)
+            storage_free=max(0, snap["storage"]["free_bytes"]-reserved.storage_bytes)
             specs.extend([
                 ResourceSpec(prefix+":cpu",ResourceKind.COMPUTE,self.name,
-                             snap["cpu"]["cores"],"core",{"blade_id":blade.blade_id},
+                             cpu_free,"core",{"blade_id":blade.blade_id},
                              state=state),
                 ResourceSpec(prefix+":ram",ResourceKind.MEMORY,self.name,
-                             snap["ram"]["free_bytes"]//(1024**3),"GB",{"blade_id":blade.blade_id},
+                             ram_free//(1024**3),"GB",{"blade_id":blade.blade_id},
                              state=state),
                 ResourceSpec(prefix+":storage",ResourceKind.STORAGE,self.name,
-                             snap["storage"]["free_bytes"]//(1024**4),"GB",{"blade_id":blade.blade_id},
+                             storage_free//(1024**3),"GB",{"blade_id":blade.blade_id},
                              state=state),
             ])
             if snap["network"]["available"]:
