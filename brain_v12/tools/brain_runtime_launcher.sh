@@ -57,7 +57,20 @@ start_api() {
   echo "JET_BRAIN_API starting url=$V12_BRAIN_URL" >&2
   "$PYTHON" -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 --workers 1 --log-level warning >> "$ROOT/.brain/state/api.log" 2>&1 &
   API_PID=$!
-  for i in $(seq 1 20); do if health_ok; then break; fi; sleep 1; done
+  for i in $(seq 1 20); do
+    if ! kill -0 "$API_PID" 2>/dev/null; then
+      echo "BRAIN_RUNTIME_ERROR: API_PROCESS_EXITED pid=$API_PID" >&2
+      tail -n 40 "$ROOT/.brain/state/api.log" >&2 || true
+      exit 43
+    fi
+    if health_ok; then break; fi
+    sleep 1
+  done
+  if ! kill -0 "$API_PID" 2>/dev/null; then
+    echo "BRAIN_RUNTIME_ERROR: API_PROCESS_EXITED pid=$API_PID" >&2
+    tail -n 40 "$ROOT/.brain/state/api.log" >&2 || true
+    exit 43
+  fi
   if ! health_ok; then echo "BRAIN_RUNTIME_ERROR: API_START_FAILED pid=$API_PID" >&2; exit 43; fi
   echo "JET_BRAIN_API ready pid=$API_PID" >&2
 }
@@ -65,7 +78,7 @@ if health_ok; then
   if auth_ok; then echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
   else
     echo "JET_BRAIN_API stale_auth_restart" >&2
-    pkill -f "uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012" 2>/dev/null || true
+    pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
     sleep 1
     start_api
   fi
