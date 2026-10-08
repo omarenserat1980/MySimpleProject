@@ -32,6 +32,38 @@ jobs:
           printf '%s\n' "$target_sha" > brain6_artifacts_target_sha.txt
           echo "WATCHDOG_TARGET_SHA=$target_sha"
 
+      - name: Check email watchdog freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p brain6_artifacts/workflow_watchdog
+          gh run list --workflow brain-email-watchdog.yml --limit 1 --json databaseId,status,conclusion,createdAt,updatedAt,headSha > brain6_artifacts/workflow_watchdog/email-watchdog-latest.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          rows=json.loads(Path("brain6_artifacts/workflow_watchdog/email-watchdog-latest.json").read_text())
+          now=datetime.now(timezone.utc)
+          evidence={"schema":"brain.email_watchdog.freshness.v1","state":"WATCHDOG_STALE","latest_run":None}
+          if rows:
+              r=rows[0]
+              evidence["latest_run"]={k:r.get(k) for k in ("databaseId","status","conclusion","createdAt","updatedAt","headSha")}
+              stamp=r.get("updatedAt") or r.get("createdAt")
+              if stamp:
+                  age=(now-datetime.fromisoformat(stamp.replace("Z","+00:00"))).total_seconds()
+                  evidence["age_seconds"]=round(age)
+                  if age <= 4500 and r.get("status") == "completed":
+                      evidence["state"]="FRESH"
+          Path("brain6_artifacts/workflow_watchdog/email-watchdog-freshness.json").write_text(json.dumps(evidence,indent=2),encoding="utf-8")
+          print("EMAIL_WATCHDOG_STATE="+evidence["state"])
+          print("EMAIL_WATCHDOG_AGE_SECONDS="+str(evidence.get("age_seconds","unknown")))
+          if evidence["state"] == "WATCHDOG_STALE":
+              print("EMAIL_WATCHDOG_RECOVERY=FRESHNESS_ALERT_ONLY")
+          PY
+
       - name: Inspect recent workflow failures
         id: inspect
         env:
