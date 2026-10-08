@@ -25,6 +25,10 @@ permissions:
   actions: read
 
 jobs:
+  revenue-conversion:
+    if: ${{ inputs.task == 'revenue-tests' }}
+    uses: ./.github/workflows/brain-revenue-conversion-tests.yml
+
   brain-internal:
     name: Brain Internal Runtime
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
