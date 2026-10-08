@@ -15,6 +15,7 @@ on:
       - "brain_v12/tests/test_payment_gateway.py"
       - "brain_v12/tests/test_commerce_api.py"
       - ".github/workflows/brain-revenue-conversion-tests.yml"
+      - "brain_v12/ci/dispatch_workflow.py"
   workflow_dispatch:
 
 concurrency:
