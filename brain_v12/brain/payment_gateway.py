@@ -12,6 +12,7 @@ import hmac
 import json
 import os
 import threading
+import tempfile
 import time
 from pathlib import Path
 from typing import Protocol
@@ -56,9 +57,32 @@ class PaymentEventJournal:
             raise RuntimeError("PAYMENT_EVENT_JOURNAL_UNREADABLE") from exc
 
     def _write(self, data: dict) -> None:
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        tmp.replace(self.path)
+        payload = json.dumps(data, indent=2)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=self.path.name + ".",
+            suffix=".tmp",
+            dir=str(self.path.parent),
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, self.path)
+            try:
+                dir_fd = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except OSError:
+                pass
+        except OSError as exc:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise RuntimeError("PAYMENT_EVENT_JOURNAL_WRITE_FAILED") from exc
 
     def get(self, event_id: str) -> dict | None:
         with self.lock:
@@ -121,9 +145,32 @@ class WebhookStore:
                 "payment_reference": payment_reference,
                 "order_id": order_id,
             }
-            tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            tmp.replace(self.path)
+            payload = json.dumps(data, indent=2)
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=self.path.name + ".",
+                suffix=".tmp",
+                dir=str(self.path.parent),
+            )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(tmp_name, self.path)
+                try:
+                    dir_fd = os.open(self.path.parent, os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+                except OSError:
+                    pass
+            except OSError as exc:
+                try:
+                    os.unlink(tmp_name)
+                except OSError:
+                    pass
+                raise RuntimeError("WEBHOOK_REPLAY_STORE_WRITE_FAILED") from exc
 
     def payment_seen(self, payment_reference: str) -> bool:
         with self.lock:
