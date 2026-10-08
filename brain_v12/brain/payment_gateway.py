@@ -40,6 +40,65 @@ class DisabledPaymentProvider:
         raise RuntimeError("PAYMENT_PROVIDER_NOT_CONFIGURED")
 
 
+class PaymentEventJournal:
+    """Durable payment-event state machine for crash recovery."""
+    def __init__(self, path: str):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.lock = threading.RLock()
+
+    def _read(self) -> dict:
+        if not self.path.exists():
+            return {}
+        try:
+            return json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("PAYMENT_EVENT_JOURNAL_UNREADABLE") from exc
+
+    def _write(self, data: dict) -> None:
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
+
+    def get(self, event_id: str) -> dict | None:
+        with self.lock:
+            return self._read().get(event_id)
+
+    def begin(self, payload: "WebhookEnvelope") -> dict:
+        fingerprint = hashlib.sha256(
+            json.dumps(payload.model_dump(), sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        with self.lock:
+            data = self._read()
+            existing = data.get(payload.event_id)
+            if existing:
+                if existing.get("fingerprint") != fingerprint:
+                    raise RuntimeError("PAYMENT_EVENT_ID_CONFLICT")
+                return existing
+            record = {
+                "state": "AUTHENTICATED",
+                "fingerprint": fingerprint,
+                "order_id": payload.order_id,
+                "provider": payload.provider,
+                "payment_reference": payload.payment_reference,
+                "created_at": int(time.time()),
+            }
+            data[payload.event_id] = record
+            self._write(data)
+            return record
+
+    def mark(self, event_id: str, state: str) -> None:
+        with self.lock:
+            data = self._read()
+            record = data.get(event_id)
+            if not record:
+                raise RuntimeError("PAYMENT_EVENT_JOURNAL_ENTRY_MISSING")
+            record["state"] = state
+            record["updated_at"] = int(time.time())
+            data[event_id] = record
+            self._write(data)
+
+
 class WebhookStore:
     def __init__(self, path: str):
         self.path = Path(path)
@@ -93,6 +152,7 @@ def signature(secret: str, timestamp: int, raw_body: bytes) -> str:
 def router(data_path: str, replay_path: str | None = None) -> APIRouter:
     store = CommerceStore(data_path)
     replay = WebhookStore(replay_path or data_path + ".webhooks.json")
+    journal = PaymentEventJournal(data_path + ".payment-events.json")
     api = APIRouter(prefix="/api/payments", tags=["payments"])
 
     @api.post("/intent")
