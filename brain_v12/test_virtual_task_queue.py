@@ -57,3 +57,8 @@ if __name__=="__main__":
             self.assertEqual(self.queue.get(task.task_id).status, "WAITING")
         finally:
             self.queue.store.counts = original
+
+
+    def test_priority_is_persisted(self):
+        task=self.queue.submit([("HALT",)], task_id="high-priority", priority="HIGH")
+        self.assertEqual(task.priority, "HIGH")
