@@ -12,7 +12,6 @@ from enum import Enum
 from typing import Any
 import hashlib
 import time
-import uuid
 
 
 class DeviceState(str, Enum):
@@ -42,11 +41,7 @@ class VirtualDeviceSpec:
 
 @dataclass
 class VirtualHardwareMachine:
-    """A motherboard-level virtual machine model.
-
-    It provides deterministic topology, device state, MMIO/IRQ bookkeeping,
-    firmware state, snapshots and a strict physical-capacity boundary.
-    """
+    """Motherboard-level virtual machine model."""
 
     name: str
     architecture: str = "x86_64"
@@ -115,11 +110,7 @@ class VirtualHardwareMachine:
         resource_ids: list[str],
         evidence: dict[str, Any],
     ) -> dict[str, Any]:
-        """Bind a virtual device to already-admitted real resources.
-
-        Binding never creates capacity. The caller must supply evidence from
-        Resource Fabric / Execution Kernel admission.
-        """
+        """Bind a virtual device to already-admitted real resources."""
         self._require_device(device_id)
         if not resource_ids:
             raise ValueError("VHW_EMPTY_PHYSICAL_BINDING")
@@ -263,7 +254,7 @@ def build_brain_server(
         {"cores": vcpu}, ("compute", "x86_64")
     ))
     m.add_device(VirtualDeviceSpec(
-        "ram0", "VRAM_MEMORY", "memory:0",
+        "ram0", "VMEMORY", "memory:0",
         {"gb": memory_gb}, ("memory",)
     ))
     m.add_device(VirtualDeviceSpec(
