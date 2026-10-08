@@ -49,12 +49,15 @@ def router_factory(device_bridge, liveness_reader):
             checks["device"] = device_bridge.agent_status()
         except Exception as exc:
             checks["device"] = {"ok": False, "error": str(exc)[:300]}
+        next_path = _next_path(checks)
+        healthy = next_path["stage"] == "verify"
         return {
-            "ok": True,
+            "ok": healthy,
+            "healthy": healthy,
             "controller": "API_RELIABILITY_CONTROL_PLANE",
             "ts": time.time(),
             "checks": checks,
-            "next": _next_path(checks),
+            "next": next_path,
         }
 
     @router.post("/diagnose")
@@ -71,11 +74,14 @@ def router_factory(device_bridge, liveness_reader):
         except Exception as exc:
             errors["device"] = str(exc)[:500]
 
+        next_path = _next_path(checks, errors)
+        healthy = not errors and next_path["stage"] == "verify"
         return {
-            "ok": not errors,
+            "ok": healthy,
+            "healthy": healthy,
             "controller": "API_RELIABILITY_CONTROL_PLANE",
             "failed": list(errors),
-            "next": _next_path(checks, errors),
+            "next": next_path,
             "checks": checks,
             "errors": errors,
             "recovery_order": [
