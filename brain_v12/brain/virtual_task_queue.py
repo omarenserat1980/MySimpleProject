@@ -7,6 +7,8 @@ from uuid import uuid4
 import json
 from .resource_manager import ResourceManager,ResourceRequirement
 from .durable_task_store import DurableTaskStore
+from .workload_controller import WorkloadController
+from .workload_router import WorkloadRouter, WorkerTarget
 
 @dataclass
 class VirtualTask:
@@ -27,8 +29,11 @@ class VirtualTask:
 
 class VirtualTaskQueue:
     """Durable queue with startup recovery and explicit verification boundary."""
-    def __init__(self,chassis,resource_manager,max_workers=8,store_path="brain6_artifacts/virtual_tasks/tasks.db"):
+    def __init__(self,chassis,resource_manager,max_workers=8,store_path="brain6_artifacts/virtual_tasks/tasks.db",workload_controller=None,workload_router=None):
         self.chassis=chassis; self.resources=resource_manager; self.tasks={}; self.lock=RLock()
+        self.workload_controller=workload_controller or WorkloadController()
+        self.workload_router=workload_router or WorkloadRouter(self.workload_controller)
+        self.max_workers=max(1,int(max_workers))
         self.pool=ThreadPoolExecutor(max_workers=max(1,int(max_workers))); self.store=DurableTaskStore(store_path)
         self._recover_on_start()
 
@@ -69,6 +74,21 @@ class VirtualTaskQueue:
         with self.lock:
             task=self.tasks.get(task_id)
             if not task or task.status not in {"QUEUED","WAITING"}: return
+            counts=self.store.counts()
+            queued=int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))
+            active=int(counts.get("RUNNING",0))
+            decision=self.workload_router.choose(
+                queued=queued, active=active,
+                priority=getattr(task,"priority","NORMAL"),
+                required_capabilities=task.required_capabilities,
+                workers=[WorkerTarget(b.blade_id,"local",frozenset(b.capabilities),b.state=="ONLINE") for b in self.chassis.blades.values()],
+                github_available=False,
+                key_active=sum(1 for x in self.tasks.values() if x.status=="RUNNING" and x.required_capabilities==task.required_capabilities),
+                retry_count=max(0,task.attempt-1),
+                duplicate=False)
+            if not decision["admit"]:
+                task.status="WAITING"
+                return
             blade=self._find_blade(task)
             if blade is None: task.status="WAITING"; return
             reservation=self.resources.reserve(blade,task.task_id,task.requirement)
