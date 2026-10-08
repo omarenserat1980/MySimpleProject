@@ -107,6 +107,8 @@ def _next_path(checks, errors=None):
     if "device" in errors:
         return {"stage": "agent_status", "path": "/api/agent-gateway/status"}
     device = checks.get("device") or {}
+    if not _looks_ok(device):
+        return {"stage": "agent_status", "path": "/api/agent-gateway/status", "reason": "device_unhealthy"}
     if isinstance(device, dict):
         failed = int(device.get("failed", 0) or 0)
         queued = int(device.get("queued", 0) or 0)
