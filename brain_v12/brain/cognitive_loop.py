@@ -4,6 +4,7 @@ from .permissions import PermissionGate
 from .task_engine import TaskEngine
 from .world_model import WorldModel
 from uuid import uuid4
+from .evidence_store import EvidenceStore
 
 class CognitiveLoop:
     """Traceable V12 cognitive pipeline. Exposes high-level state, never private chain-of-thought."""
@@ -142,23 +143,7 @@ class CognitiveLoop:
         tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
         device_success = bool(action == "device" and tool_result and tool_result.get("ok") and tool_result.get("status") == "COMPLETED" and isinstance(tool_result.get("result"), dict))
         if (action in {"observe","plan"} and tool_result and tool_result.get("ok")) or device_success:
-            import hashlib
-            import json
-            evidence_payload = {
-                "run_id": run_id,
-                "task_id": task["id"],
-                "action": action,
-                "tool": tool_id,
-                "tool_result": tool_result,
-            }
-            evidence_sha256 = hashlib.sha256(
-                json.dumps(
-                    evidence_payload,
-                    sort_keys=True,
-                    ensure_ascii=False,
-                    default=str,
-                ).encode("utf-8")
-            ).hexdigest()
+            evidence_sha256 = EvidenceStore.digest(evidence_payload)
             evidence_ref = f"cognitive://{run_id}/{task['id']}/{evidence_sha256}"
             completion = self.tasks.complete(task["id"], evidence_ref=evidence_ref)
             if not isinstance(completion, dict) or completion.get("ok") is False:
