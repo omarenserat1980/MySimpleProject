@@ -1,7 +1,6 @@
 """Deterministic local opportunity factory.
 
-This module only computes a shortlist from supplied/local opportunity records.
-It never applies, contacts platforms, moves money, or claims revenue.
+No applications, external writes, money movement, or revenue claims.
 """
 
 from __future__ import annotations
@@ -10,8 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable
 
-from .economic_decision import EconomicDecision, decide
-from .economic_memory import EconomicObservation, learned_estimate
+from .economic_decision import EconomicDecision
+from .economic_memory import EconomicObservation
 from .economic_orchestrator import evaluate
 from .opportunity_engine import Opportunity
 from .opportunity_verifier import VerificationResult, verify_opportunity
@@ -39,7 +38,7 @@ def is_stale(last_verified_at: str, *, max_age_days: int, now: datetime | None =
         raise ValueError("max_age_days cannot be negative")
     verified = _parse_timestamp(last_verified_at)
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    return current - verified > __import__("datetime").timedelta(days=max_age_days)
+    return (current - verified).total_seconds() > max_age_days * 86400
 
 
 def deduplicate_records(records: Iterable[dict]) -> list[dict]:
@@ -61,7 +60,6 @@ def deduplicate_records(records: Iterable[dict]) -> list[dict]:
         seen_ids.add(opportunity_id)
         seen_sources.add(fingerprint)
         result.append(record)
-
     return result
 
 
@@ -69,72 +67,61 @@ def build_shortlist(
     records: Iterable[dict],
     *,
     observations: Iterable[EconomicObservation] = (),
-    max_age_days: int = 7,
+    max_age_days: int = 30,
     now: datetime | None = None,
 ) -> list[ShortlistItem]:
-    """Return only verified, decision-ready candidates, sorted by score.
-
-    HOLD candidates remain visible only when verification passed; REJECT is
-    excluded from the executable shortlist. No external side effects occur.
-    """
-    unique = deduplicate_records(records)
+    """Build a verified, explainable shortlist through one orchestration path."""
     history = list(observations)
     candidates: list[ShortlistItem] = []
 
-    for record in unique:
+    for record in deduplicate_records(records):
         last_verified_at = record.get("last_verified_at")
         if not isinstance(last_verified_at, str):
             continue
         try:
-            stale = is_stale(last_verified_at, max_age_days=max_age_days, now=now)
-        except ValueError:
+            if is_stale(last_verified_at, max_age_days=max_age_days, now=now):
+                continue
+
+            opportunity = Opportunity(
+                opportunity_id=str(record["opportunity_id"]),
+                expected_pay=float(record.get("expected_pay", 0)),
+                acceptance_probability=float(record.get("acceptance_probability", 0)),
+                brain_assistance=float(record.get("brain_assistance", 0)),
+                time_hours=float(record.get("time_hours", 0)),
+                entry_friction=float(record.get("entry_friction", 0)),
+                risk=float(record.get("risk", 0)),
+            )
+
+            eligibility = list(record.get("eligibility", []))
+            if not eligibility:
+                if record.get("eligible_region"):
+                    eligibility.append("Jordan")
+                if record.get("remote"):
+                    eligibility.append("remote")
+
+            result = evaluate(
+                opportunity,
+                opportunity_class=str(record.get("opportunity_class", "unknown")),
+                eligibility=eligibility,
+                upfront_cost_usd=float(record.get("upfront_cost_usd", 0)),
+                source_url=str(record["source_url"]),
+                last_verified_at=last_verified_at,
+                observations=history,
+            )
+        except (KeyError, TypeError, ValueError):
             continue
-        if stale:
-            continue
-
-        opportunity = Opportunity(
-            opportunity_id=record["opportunity_id"],
-            expected_pay=float(record.get("expected_pay", 0)),
-            acceptance_probability=float(record.get("acceptance_probability", 0)),
-            brain_assistance=float(record.get("brain_assistance", 0)),
-            time_hours=float(record.get("time_hours", 0)),
-            entry_friction=float(record.get("entry_friction", 0)),
-            risk=float(record.get("risk", 0)),
-        )
-
-        verification = verify_opportunity(
-            opportunity_id=record["opportunity_id"],
-            eligible_region=bool(record.get("eligible_region", False)),
-            remote=bool(record.get("remote", False)),
-            upfront_cost_usd=float(record.get("upfront_cost_usd", 0)),
-            source_url=record["source_url"],
-            last_verified_at=last_verified_at,
-            max_age_days=max_age_days,
-            now=now,
-        )
-
-        result = evaluate(
-            [opportunity],
-            opportunity_class=str(record.get("opportunity_class", "unknown")),
-            eligible=verification.eligible,
-            upfront_cost_usd=float(record.get("upfront_cost_usd", 0)),
-            source_url=record["source_url"],
-            last_verified_at=last_verified_at,
-            observations=history,
-            max_age_days=max_age_days,
-        )
 
         candidates.append(
             ShortlistItem(
                 opportunity_id=opportunity.opportunity_id,
                 opportunity_class=str(record.get("opportunity_class", "unknown")),
-                source_fingerprint=source_fingerprint(record["source_url"]),
-                verification=verification,
+                source_fingerprint=source_fingerprint(str(record["source_url"])),
+                verification=result.verification,
                 decision=result.decision,
             )
         )
 
     return sorted(
-        (item for item in candidates if item.verification.eligible and item.decision.decision.value != "REJECT"),
+        (item for item in candidates if item.verification.eligible),
         key=lambda item: (-item.decision.score, item.opportunity_id),
     )
