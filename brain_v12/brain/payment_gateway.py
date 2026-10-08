@@ -189,6 +189,14 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:
             journal_entry = journal.get(payload.event_id)
+            if journal_entry and journal_entry.get("state") == "COMMERCE_COMMITTED":
+                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
+                journal.mark(payload.event_id, "COMPLETED")
+                return {"ok": True, "verified": True, "idempotent": True,
+                        "order_id": payload.order_id, "state": "PAYMENT_VERIFIED",
+                        "payment_reference": payload.payment_reference}
+            if journal_entry and journal_entry.get("state") == "COMPLETED":
+                raise HTTPException(409, "WEBHOOK_REPLAY")
             if replay.seen(payload.event_id):
                 raise HTTPException(409, "WEBHOOK_REPLAY")
             if replay.payment_seen(payload.payment_reference):
