@@ -28,6 +28,23 @@ class ResourceFabricTests(unittest.TestCase):
         self.assertEqual(len(result["resource_ids"]), 5)
         self.assertEqual(self.fabric.inspect()["reservation_count"], 1)
 
+    def test_partial_capacity_can_be_composed_twice(self):
+        first = self.fabric.compose("slice-a", [
+            ResourceRequest(ResourceKind.COMPUTE, 32, "core"),
+        ])
+        second = self.fabric.compose("slice-b", [
+            ResourceRequest(ResourceKind.COMPUTE, 48, "core"),
+        ])
+        blocked = self.fabric.compose("slice-c", [
+            ResourceRequest(ResourceKind.COMPUTE, 17, "core"),
+        ])
+        self.assertTrue(first["ok"])
+        self.assertTrue(second["ok"])
+        self.assertFalse(blocked["ok"])
+        self.assertEqual(blocked["status"], "PLAN_BLOCKED")
+        self.assertEqual(first["reservation"]["allocations"]["cpu-01"], 32)
+        self.assertEqual(second["reservation"]["allocations"]["cpu-01"], 48)
+
     def test_required_capacity_blocks_without_fake_capacity(self):
         result = self.fabric.compose("too-big", [
             ResourceRequest(ResourceKind.MEMORY, 2048, "GB"),
