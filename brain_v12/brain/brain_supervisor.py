@@ -155,6 +155,7 @@ class BrainSupervisor:
         if verification_ok:
             self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation")
             job=self.transition(job,"observe",details={"simulated":True},enforce_authority=False)
+            job=self.transition(job,"verify",details={"simulated":True},enforce_authority=False)
         else:
             job=self.transition(job,"repair",details=self.decide_repair(verification))
             job=self.transition(job,"recover",details={"bounded":True},enforce_authority=False)
