@@ -22,7 +22,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  cloud_executor_gate:
+    name: Cloud Executor Capability Gate
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent cloud executor gate
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open("cloud-executor-gate.json", encoding="utf-8"))
+          assert e["verified"] is True, e
+          assert e["evidence_ref"], e
+          print("CLOUD_EXECUTOR_GATE=VERIFIED")
+          print("CLOUD_EXECUTOR_EVIDENCE_REF="+e["evidence_ref"])
+          PY
+      - name: Upload executor gate evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-executor-gate-${{ github.run_id }}
+          path: cloud-executor-gate.json
+          retention-days: 14
+
   real_windows_boot:
+    needs: cloud_executor_gate
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 70
     steps:
