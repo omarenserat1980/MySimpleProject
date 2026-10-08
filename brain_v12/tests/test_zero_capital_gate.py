@@ -31,6 +31,21 @@ class ZeroCapitalGateTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["title"], "Free service")
 
+    def test_live_opportunity_with_paid_requirement_is_blocked_before_offer(self):
+        candidate = {
+            "title": "Build automation dashboard",
+            "requirements": "API integration; paid cloud subscription required",
+            "description": "Build a dashboard and deploy it on paid cloud",
+            "source_url": "https://example.invalid/job/1",
+            "evidence": "public listing evidence",
+            "direct_cost_jod": 0,
+            "capital_required_jod": 0,
+        }
+        result = ZeroCapitalGate.evaluate(candidate, available_capital_jod=0)
+        self.assertFalse(result.eligible)
+        self.assertEqual(result.status, "REJECTED")
+        self.assertIn("paid cloud", result.flags)
+
 
 if __name__ == "__main__":
     unittest.main()
