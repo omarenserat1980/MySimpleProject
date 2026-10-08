@@ -75,8 +75,8 @@ class CommerceStore:
             return {}
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("COMMERCE_STORE_UNREADABLE") from exc
 
     def _write(self, data: dict) -> None:
         tmp = self.path.with_suffix(".tmp")
