@@ -16,6 +16,8 @@ if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_confi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
 export V12_BRAIN_URL="${BRAIN_URL:-http://127.0.0.1:8012}"
+# Local Termux runtime must use the single on-device key. Prevent stale cloud/auth env vars from winning over it.
+unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256
 export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
