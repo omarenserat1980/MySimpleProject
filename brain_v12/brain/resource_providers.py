@@ -65,7 +65,7 @@ class HostProbe:
         cpu = self._cmd("powershell", "-NoProfile", "-Command",
                         "[Environment]::ProcessorCount")
         mem = self._cmd("powershell", "-NoProfile", "-Command",
-                        "[math]::Floor((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1GB)")
+                        "[math]::Floor((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory/1024/1024)")
         disk = self._cmd("powershell", "-NoProfile", "-Command",
                          "[math]::Floor((Get-PSDrive C).Free/1TB)")
         specs = []
