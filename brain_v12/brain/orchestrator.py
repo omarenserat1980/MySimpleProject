@@ -46,8 +46,7 @@ class CognitiveOrchestrator:
 
     def create_inspect_path(self, objective: str, max_attempts: int = 1) -> dict[str, Any]:
         """Create the first production plan step without executing it locally."""
-        execution = self.execution_coordinator.create(f"inspect:{objective}", max_attempts=max_attempts)
-        execution["path"]["step"] = "execute"
+        execution = self.execution_coordinator.create(f"inspect:{objective}", max_attempts=max_attempts, steps=["inspect"] )
         execution["plan_step"] = "inspect"
         self.store.event("ORCHESTRATOR_INSPECT_PATH_CREATED", {
             "objective": objective,
