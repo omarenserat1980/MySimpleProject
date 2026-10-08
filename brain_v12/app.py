@@ -77,6 +77,9 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .virtual_hardware.hardware_twin import HardwareTwin, HardwareComponent, HardwareDomain, HealthState, build_complete_server_twin
 from .brain.evidence import EvidenceRecord, EvidenceStore
+from .brain.graph_composer import GraphComposer
+from .brain.piece_graph import HardwareGraph
+from .brain.piece_graph_api import build_piece_graph_router
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .brain.quranic_core.api import build_router as quranic_core_router
@@ -176,6 +179,8 @@ execution_authority=ExecutionAuthority()
 execution_kernel=ExecutionKernel(os.getenv("BRAIN_EXECUTION_KERNEL_STATE", os.path.join(ROOT, ".brain", "state", "execution_kernel.json")))
 mission_execution=MissionExecutionCoordinator(resource_fabric, execution_kernel)
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
+piece_graph=HardwareGraph()
+piece_graph_composer=GraphComposer(piece_graph, evidence_store)
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
@@ -235,6 +240,7 @@ app.include_router(youtube_router)
 app.include_router(marketing_router)
 app.include_router(intelligence_router)
 app.include_router(mission_router_builder())
+app.include_router(build_piece_graph_router(piece_graph, piece_graph_composer))
 app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
 
