@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
+import hashlib
+import hmac
+import os
 from typing import Iterable
 
 
@@ -53,15 +56,16 @@ class BrainAuthorityPolicy:
         action: str,
         risk: str,
         capability: bool,
-        human_approval: bool = False,
-        root_authority: bool = False,
+        human_approval_token: str | None = None,
+        root_authority_token: str | None = None,
     ) -> AuthorityDecision:
         risk = str(risk).upper()
         if risk not in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}:
             return AuthorityDecision(subject, action, AuthorityLevel.OBSERVE, False, "INVALID_RISK")
 
-        if root_authority:
-            return AuthorityDecision(subject, action, AuthorityLevel.ROOT, True, "ROOT_AUTHORITY")
+        root_secret = os.environ.get("BRAIN_ROOT_AUTHORITY_TOKEN", "")
+        if root_authority_token and root_secret and hmac.compare_digest(root_authority_token, root_secret):
+            return AuthorityDecision(subject, action, AuthorityLevel.ROOT, True, "ROOT_AUTHORITY_TOKEN_VERIFIED")
 
         if subject in self.MODEL_SUBJECTS:
             return AuthorityDecision(subject, action, AuthorityLevel.PROPOSE, False, "MODEL_MAY_PROPOSE_NOT_EXECUTE")
@@ -73,9 +77,11 @@ class BrainAuthorityPolicy:
             return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_LOW, capability, "LOW_RISK_CAPABILITY")
         if risk == "MEDIUM":
             return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_MEDIUM, capability, "MEDIUM_RISK_CAPABILITY")
+        approval_secret = os.environ.get("BRAIN_HUMAN_APPROVAL_TOKEN", "")
+        approval_ok = bool(human_approval_token and approval_secret and hmac.compare_digest(human_approval_token, approval_secret))
         if risk == "HIGH":
-            return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_HIGH, capability and human_approval, "HIGH_RISK_REQUIRES_HUMAN_APPROVAL")
-        return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_CRITICAL, capability and human_approval, "CRITICAL_REQUIRES_HUMAN_APPROVAL")
+            return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_HIGH, capability and approval_ok, "HIGH_RISK_REQUIRES_VERIFIED_HUMAN_APPROVAL")
+        return AuthorityDecision(subject, action, AuthorityLevel.EXECUTE_CRITICAL, capability and approval_ok, "CRITICAL_REQUIRES_VERIFIED_HUMAN_APPROVAL")
 
 
 def require_authorized(decision: AuthorityDecision) -> None:
