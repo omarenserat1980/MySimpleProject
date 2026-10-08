@@ -69,6 +69,7 @@ from .brain.virtual_datacenter import BrainVirtualDatacenter
 from .brain.resource_fabric import ResourceFabric, ResourceKind, ResourceRequest, ResourceSpec, ResourceState
 from .brain.resource_providers import HostResourceProvider
 from .brain.vdc_resource_provider import VirtualDatacenterResourceProvider
+from .brain.execution_authority import ExecutionAuthority
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
@@ -165,6 +166,7 @@ brain_datacenter=BrainVirtualDatacenter()
 resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
 host_resource_provider=HostResourceProvider(resource_fabric)
 vdc_resource_provider=VirtualDatacenterResourceProvider(brain_datacenter, resource_fabric)
+execution_authority=ExecutionAuthority()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
@@ -2922,6 +2924,12 @@ def brain_fabric_release(request: Request, reservation_id: str):
         "reservation_id": reservation_id, "status": result.get("status"),
     })
     return result
+
+
+@app.get("/api/brain/execution/status")
+def brain_execution_status(request: Request):
+    require_control_key(request)
+    return execution_authority.status()
 
 
 @app.post("/api/brain/fabric/sync-vdc")
