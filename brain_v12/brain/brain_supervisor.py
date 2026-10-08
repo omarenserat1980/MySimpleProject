@@ -116,6 +116,8 @@ class BrainSupervisor:
             if completion["action"]=="deliver":return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
             if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit_after_reality_check","completion":completion}
             return {"action":"treat","reason":"problem_not_complete","completion":completion}
+        if verification.get("ok"):
+            return {"action":"deliver","reason":"verification_contract_ok"}
         evidence_result=self.verify_evidence(job["job_id"],required_kind=verification.get("required_evidence_kind"))
         if evidence_result.verified:return {"action":"deliver","reason":"runtime_evidence_verified","evidence_ids":list(evidence_result.evidence_ids)}
         if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit"}
@@ -154,7 +156,7 @@ class BrainSupervisor:
             self.observe(job["job_id"],"simulation_runtime_verified",True,source="simulation")
             job=self.transition(job,"observe",details={"simulated":True},enforce_authority=False)
         else:
-            job=self.transition(job,"repair",details=self.decide_repair(verification));job=self.transition(job,"retry",details={"bounded":True})
+            job=self.transition(job,"repair",details=self.decide_repair(verification))
             job=self.transition(job,"recover",details={"bounded":True},enforce_authority=False)
             job=self.transition(job,"retry",details={"bounded":True},enforce_authority=False)
             job=self.transition(job,"execute",details={"retry":True},enforce_authority=False)
