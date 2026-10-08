@@ -33,15 +33,17 @@ class PaymentGatewayTests(unittest.TestCase):
         raw,h=self.signed(p)
         from brain_v12.brain.payment_gateway import PaymentEventJournal
         journal_path=self.db + ".payment-events.json"
-        first=self.client.post("/api/payments/webhook",content=raw,headers=h)
-        self.assertEqual(first.status_code,200)
         journal=PaymentEventJournal(journal_path)
+        journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.model_validate(p))
         journal.mark(p["event_id"], "COMMERCE_COMMITTED")
-        replay_file=self.db + ".webhooks.json"
-        os.remove(replay_file)
         second=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(second.status_code,200)
         self.assertTrue(second.json().get("idempotent"))
+        self.assertEqual(second.json()["state"], "PAYMENT_VERIFIED")
+        replay_file=self.db + ".webhooks.json"
+        with open(replay_file, "r", encoding="utf-8") as f:
+            replay_data=json.load(f)
+        self.assertIn(p["event_id"], replay_data)
 
     def test_verified_webhook_is_idempotent_after_replay_record_loss(self):
         p={"event_id":"evt_recover1","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_recover","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
