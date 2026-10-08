@@ -62,6 +62,32 @@ class IncomeLifecycleTests(unittest.TestCase):
         accepted=self.life.record_external("LIVE-test","ACCEPTED","client accepted proposal")
         self.assertTrue(accepted["ok"])
 
+
+    def test_payment_request_requires_completed_delivery(self):
+        denied=self.life.request_payment("LIVE-test", 25)
+        self.assertEqual(denied["status"], "DELIVERY_NOT_VERIFIED")
+
+    def test_payment_request_reconcile_and_realize_are_idempotent(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        req=self.life.request_payment("LIVE-test", 25, currency="JOD")
+        self.assertEqual(req["status"], "PAYMENT_REQUESTED")
+        self.assertEqual(self.life.request_payment("LIVE-test",25,currency="JOD")["status"], "ALREADY_REQUESTED")
+        recon=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-001","provider-reference-001")
+        self.assertEqual(recon["status"], "RECONCILED")
+        self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "REVENUE_REALIZED")
+        self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "ALREADY_REALIZED")
+
+    def test_reconciliation_rejects_amount_or_currency_mismatch(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        self.life.request_payment("LIVE-test",25,currency="JOD")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",20,"JOD","TX-002","evidence")["status"],"AMOUNT_MISMATCH")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",25,"USD","TX-003","evidence")["status"],"CURRENCY_MISMATCH")
     def test_payment_cannot_skip_delivery(self):
         self.life.qualify("LIVE-test")
         self.life.prepare("LIVE-test")
