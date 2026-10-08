@@ -23,7 +23,7 @@ class OrchestratorTests(unittest.TestCase):
         result=orchestrator.create_inspect_path("فحص المشروع")
         self.assertEqual(result["plan_step"], "inspect")
         self.assertEqual(result["path"]["state"], "CREATED")
-        self.assertEqual(result["path"]["step"], "execute")
+        self.assertEqual(result["path"]["step"], "inspect")
 
 if __name__=="__main__":
     unittest.main()
