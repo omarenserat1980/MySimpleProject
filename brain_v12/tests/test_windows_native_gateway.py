@@ -1,7 +1,10 @@
+import os
+import tempfile
 import unittest
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
 from brain_v12.brain.execution_policy import WINDOWS_NATIVE_EXECUTOR
+from brain_v12.brain.windows_native_enrollment import VerifiedAttestationRegistry
 from brain_v12.brain.windows_server_network_contract import (
     WINDOWS_SERVER_NATIVE,
     WINDOWS_SERVER_CLIENT_GATEWAY,
@@ -42,8 +45,18 @@ def metadata(attested=True, fencing=19, state="READY"):
 
 
 class WindowsNativeGatewayTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp.close()
+        self.registry = VerifiedAttestationRegistry(self.tmp.name)
+        self.registry.register({"verified": True, "attestation_digest": "digest-v1", "enrollment_id": "enroll-01", "executor_id": "windows-native-vivobook-01", "server_id": "vivobook-01", "brain_generation": 8, "network_generation": 7})
+
+    def tearDown(self):
+        self.registry.close()
+        os.unlink(self.tmp.name)
+
     def test_gateway_requires_verified_native_contract(self):
-        decision = BrainExecutionGateway().authorize_task(
+        decision = BrainExecutionGateway(attestation_registry=self.registry).authorize_task(
             WINDOWS_NATIVE_EXECUTOR, metadata()
         )
         self.assertTrue(decision.verified)
