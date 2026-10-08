@@ -25,6 +25,20 @@ STAGES = (
     ("verify", "/api/agent-gateway/verify/{task_id}"),
 )
 
+DEPENDENCY_CONTRACTS = {
+    "runtime": {"owner": "brain_runtime", "depends_on": ["python_runtime", "configuration", "core_stores"]},
+    "media": {"owner": "brain_media", "depends_on": ["ffmpeg", "ffprobe", "media_storage"]},
+    "agent_status": {"owner": "device_bridge", "depends_on": ["agent_key", "device_store", "heartbeat_ttl"]},
+    "agent_diagnostics": {"owner": "device_bridge", "depends_on": ["agent_status", "diagnostic_runtime"]},
+    "queue": {"owner": "device_bridge", "depends_on": ["device_store", "sync_adapter"]},
+    "device_status": {"owner": "device_bridge", "depends_on": ["device_store", "heartbeat_ttl"]},
+    "heartbeat": {"owner": "device_bridge", "depends_on": ["agent_auth", "device_store"]},
+    "poll": {"owner": "device_bridge", "depends_on": ["agent_auth", "queue", "task_allowlist"]},
+    "report": {"owner": "device_bridge", "depends_on": ["agent_auth", "device_store", "sync_adapter"]},
+    "result": {"owner": "device_bridge", "depends_on": ["device_store"]},
+    "verify": {"owner": "device_bridge", "depends_on": ["result", "verification_contract"]},
+}
+
 def router_factory(device_bridge, liveness_reader):
     router = APIRouter(prefix="/api/resilience", tags=["api-resilience"])
 
@@ -35,6 +49,7 @@ def router_factory(device_bridge, liveness_reader):
             "mode": "CANONICAL_API_PATHS",
             "order": [name for name, _ in STAGES],
             "paths": {name: path for name, path in STAGES},
+            "dependencies": DEPENDENCY_CONTRACTS,
             "rule": "diagnose_stage_first; repair_only_the_failed_stage; verify_before_next_stage",
         }
 
@@ -124,6 +139,8 @@ def _looks_ok(value):
     if isinstance(value, dict):
         if value.get("ok") is False:
             return False
-        if str(value.get("status", "")).upper() in {"DOWN", "ERROR", "NOT_READY", "UNAVAILABLE"}:
+        if value.get("online") is False:
+            return False
+        if str(value.get("status", "")).upper() in {"DOWN", "ERROR", "NOT_READY", "UNAVAILABLE", "BRIDGE_DISABLED", "NOT_CONFIGURED"}:
             return False
     return True
