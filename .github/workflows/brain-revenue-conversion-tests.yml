@@ -1,6 +1,7 @@
 name: Brain Revenue Conversion Tests
 
 on:
+  workflow_call:
   push:
     paths:
       - "brain_v12/brain/client_revenue_guardian.py"
