@@ -90,12 +90,7 @@ class BrainExecutionGateway:
                 architecture=str(vm_data.get("architecture", "x86_64")),
                 metadata=vm_data.get("metadata", {}),
             )
-            return self.authorize_windows_cloud(
-                vm,
-                node,
-                heartbeat_timeout=float(metadata.get("heartbeat_timeout", 120.0)),
-                now=metadata.get("now"),
-            )
+            raise RuntimeError("WINDOWS_REAL_BOOT_QEMU_RUNTIME_CONTRACT_REQUIRED")
         return self.authorize(capability)
 
     def authorize(self, capability: str) -> ExecutionDecision:
