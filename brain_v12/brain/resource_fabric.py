@@ -257,6 +257,55 @@ class ResourceFabric:
                 "allocations": plan["allocations"],
                 "reservation": reservation["reservation"]}
 
+    def federated_capacity(self, *, include_degraded: bool = True) -> dict:
+        """Return the real aggregate capacity advertised by all registered nodes.
+
+        This is an accounting view, not synthetic capacity. Reserved amounts are
+        subtracted from allocatable capacity; OFFLINE resources contribute nothing.
+        """
+        self.reap_expired()
+        totals: dict[str, dict[str, int]] = {}
+        providers: dict[str, dict] = {}
+        for spec in self.resources.values():
+            key = f"{spec.kind.value}:{spec.unit}"
+            row = totals.setdefault(key, {"capacity": 0, "reserved": 0, "available": 0})
+            row["capacity"] += int(spec.capacity)
+            row["reserved"] += self._reserved_amount(spec.resource_id)
+            if spec.state == ResourceState.AVAILABLE or (
+                include_degraded and spec.state == ResourceState.DEGRADED
+            ):
+                row["available"] += max(0, int(spec.capacity) - self._reserved_amount(spec.resource_id))
+            provider = providers.setdefault(spec.provider_id, {"resources": 0, "kinds": {}})
+            provider["resources"] += 1
+            provider["kinds"][spec.kind.value] = provider["kinds"].get(spec.kind.value, 0) + int(spec.capacity)
+        return {
+            "ok": True,
+            "status": "READY",
+            "real_capacity": totals,
+            "providers": providers,
+            "resource_count": len(self.resources),
+            "reserved_resource_count": sum(r.status == "RESERVED" for r in self.reservations.values()),
+        }
+
+    def provider_capacity(self, provider_id: str) -> dict:
+        """Inspect one real provider's advertised capacity."""
+        rows = [s for s in self.resources.values() if s.provider_id == provider_id]
+        if not rows:
+            return {"ok": False, "status": "PROVIDER_NOT_FOUND", "provider_id": provider_id}
+        return self._capacity_for_specs(rows, provider_id)
+
+    def _capacity_for_specs(self, specs: list[ResourceSpec], provider_id: str) -> dict:
+        totals: dict[str, dict[str, int]] = {}
+        for spec in specs:
+            key = f"{spec.kind.value}:{spec.unit}"
+            reserved = self._reserved_amount(spec.resource_id)
+            row = totals.setdefault(key, {"capacity": 0, "reserved": 0, "available": 0})
+            row["capacity"] += int(spec.capacity)
+            row["reserved"] += reserved
+            if spec.state in {ResourceState.AVAILABLE, ResourceState.DEGRADED}:
+                row["available"] += max(0, int(spec.capacity) - reserved)
+        return {"ok": True, "status": "READY", "provider_id": provider_id, "real_capacity": totals}
+    
     def inspect(self) -> dict:
         self.reap_expired()
         by_kind: dict[str, int] = {}
