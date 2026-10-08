@@ -2930,6 +2930,18 @@ def brain_fabric_release(request: Request, reservation_id: str):
     return result
 
 
+@app.get("/api/brain/fabric/capacity")
+def brain_fabric_capacity(request: Request):
+    require_control_key(request)
+    return resource_fabric.federated_capacity()
+
+
+@app.get("/api/brain/fabric/provider/{provider_id}/capacity")
+def brain_fabric_provider_capacity(request: Request, provider_id: str):
+    require_control_key(request)
+    return resource_fabric.provider_capacity(provider_id)
+
+
 @app.get("/api/brain/execution/kernel")
 def brain_execution_kernel_status(request: Request):
     require_control_key(request)
