@@ -18,7 +18,7 @@ class QemuWindowsBackend:
     def command(self, install: bool = True) -> list[str]:
         if not self.disk_path: raise ValueError("DISK_PATH_REQUIRED")
         cmd=[self.qemu_binary,"-machine",self.machine,"-m",self.memory,
-             "-smp",str(self.cpus),"-drive",f"file={self.disk_path},format=raw,if=virtio",
+             "-smp",str(self.cpus),"-drive",f"file={self.disk_path},format=qcow2,if=virtio",
              "-netdev","user,id=net0","-device","virtio-net-pci,netdev=net0",
              "-display","none","-serial","stdio"]
         if install:
