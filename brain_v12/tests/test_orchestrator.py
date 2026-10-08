@@ -25,5 +25,15 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(result["path"]["state"], "CREATED")
         self.assertEqual(result["path"]["step"], "inspect")
 
+    def test_inspect_path_contains_design_before_implementation(self):
+        path=tempfile.NamedTemporaryFile(suffix=".db",delete=False).name
+        store=MemoryStore(path); store.init()
+        brain=BrainCore(store)
+        orchestrator=CognitiveOrchestrator(store,brain,SoftwareBuilder())
+        result=orchestrator.create_inspect_path("فحص ثم تصميم")
+        self.assertEqual(result["path"]["step"], "inspect")
+        self.assertEqual(result["path"]["step_index"], 0)
+        self.assertEqual(result["path"]["max_attempts"], 1)
+
 if __name__=="__main__":
     unittest.main()
