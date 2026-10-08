@@ -13,6 +13,21 @@ from brain_v12.brain.windows_server_network_contract import (
 )
 
 
+def attestation(**overrides):
+    values = dict(
+        verified=True,
+        replay_protected=True,
+        attestation_digest="digest-v1",
+        challenge="challenge-123",
+        executor_id="windows-native-vivobook-01",
+        server_id="vivobook-01",
+        brain_generation=8,
+        network_generation=7,
+    )
+    values.update(overrides)
+    return values
+
+
 def ready_server(**overrides):
     values = dict(
         server_id="vivobook-01",
@@ -35,34 +50,56 @@ def ready_server(**overrides):
 
 class WindowsNativeExecutorContractTests(unittest.TestCase):
     def test_ready_attested_vivobook_contract_is_verified(self):
-        server = ready_server()
         contract = WindowsNativeExecutorContract(
             executor_id="windows-native-vivobook-01",
-            server=server,
-            agent_attestation_verified=True,
+            server=ready_server(),
+            attestation=attestation(),
             brain_generation=8,
             fencing_token=19,
         )
         metadata = contract.execution_metadata()
         self.assertEqual(WINDOWS_NATIVE_EXECUTOR, metadata["executor"])
         self.assertEqual(7, metadata["network_generation"])
+        self.assertEqual("digest-v1", metadata["attestation_digest"])
 
     def test_missing_agent_attestation_fails_closed(self):
         contract = WindowsNativeExecutorContract(
             executor_id="windows-native-vivobook-01",
             server=ready_server(),
-            agent_attestation_verified=False,
+            attestation={"verified": False},
             brain_generation=8,
             fencing_token=19,
         )
-        with self.assertRaisesRegex(ValueError, "agent_attestation"):
+        with self.assertRaisesRegex(ValueError, "attestation_not_verified"):
+            contract.validate()
+
+    def test_missing_replay_protection_fails_closed(self):
+        contract = WindowsNativeExecutorContract(
+            executor_id="windows-native-vivobook-01",
+            server=ready_server(),
+            attestation=attestation(replay_protected=False),
+            brain_generation=8,
+            fencing_token=19,
+        )
+        with self.assertRaisesRegex(ValueError, "replay_protection"):
+            contract.validate()
+
+    def test_attestation_identity_mismatch_fails_closed(self):
+        contract = WindowsNativeExecutorContract(
+            executor_id="windows-native-vivobook-01",
+            server=ready_server(),
+            attestation=attestation(executor_id="other-executor"),
+            brain_generation=8,
+            fencing_token=19,
+        )
+        with self.assertRaisesRegex(ValueError, "executor_mismatch"):
             contract.validate()
 
     def test_fencing_mismatch_fails_closed(self):
         contract = WindowsNativeExecutorContract(
             executor_id="windows-native-vivobook-01",
             server=ready_server(),
-            agent_attestation_verified=True,
+            attestation=attestation(),
             brain_generation=8,
             fencing_token=18,
         )
@@ -73,7 +110,7 @@ class WindowsNativeExecutorContractTests(unittest.TestCase):
         contract = WindowsNativeExecutorContract(
             executor_id="windows-native-vivobook-01",
             server=ready_server(state=NodeTrustState.ATTESTED),
-            agent_attestation_verified=True,
+            attestation=attestation(),
             brain_generation=8,
             fencing_token=19,
         )
