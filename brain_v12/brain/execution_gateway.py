@@ -108,7 +108,6 @@ class BrainExecutionGateway:
             name=BRAIN_INTERNAL,
             capabilities=frozenset({
                 "brain-internal-execution",
-                WINDOWS_REAL_BOOT,
                 "qemu",
             }),
             priority=0,
