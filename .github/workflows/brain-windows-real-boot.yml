@@ -1,15 +1,6 @@
-# BRAIN_REAL_BOOT_MANUAL_LAUNCH_2026-10-08
 name: Brain Windows Real Boot Evidence
 
 on:
-  push:
-    paths:
-      - ".github/workflows/brain-windows-real-boot.yml"
-      - "brain_v12/windows_boot_evidence.ps1"
-      - "brain_v12/windows_setupcomplete.cmd"
-      - "brain_v12/brain/windows_completion_gate.py"
-      - "brain_v12/brain/windows_runtime_contract.py"
-      - "brain_v12/WINDOWS_RUNTIME.md"
   workflow_dispatch:
     inputs:
       iso_url:
@@ -25,6 +16,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: brain-windows-real-boot-single-flight
+  cancel-in-progress: false
 
 jobs:
   real_windows_boot:
