@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Decrypt and verify a Brain email recovery package."""
 from __future__ import annotations
-import argparse, getpass, hashlib, hmac, os, struct
+import argparse, getpass, hashlib, os, struct
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pathlib import Path
 
-MAGIC=b"EBREC1\0"; SALT_LEN=32; NONCE_LEN=32; KEY_LEN=32; BLOCK=64
+MAGIC=b"EBREC2\\0"; SALT_LEN=32; NONCE_LEN=12; KEY_LEN=32; ITERATIONS=600_000
 
 def derive(password: bytes, salt: bytes) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", password, salt, 600_000, dklen=KEY_LEN)
