@@ -11,6 +11,7 @@ because a patch was generated: verification must pass.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -138,6 +139,40 @@ def append_cycle_history(entry: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def repair_failure_identity(details: dict, baseline: str = "") -> str:
+    gates = []
+    for item in details.get("checks", []):
+        gates.append({
+            "command": item.get("command", ""),
+            "exit_code": item.get("exit_code"),
+        })
+    raw = json.dumps(
+        {"baseline": baseline, "gates": gates},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return "REPAIR-" + hashlib.sha256(raw).hexdigest()[:16].upper()
+
+
+def repair_recurrence_blocked(failure_id: str) -> bool:
+    path = STATE / "repair_failure_history.json"
+    try:
+        history = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        history = {}
+    return int(history.get(failure_id, 0) or 0) >= 1
+
+
+def record_repair_failure(failure_id: str) -> None:
+    path = STATE / "repair_failure_history.json"
+    try:
+        history = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        history = {}
+    history[failure_id] = int(history.get(failure_id, 0) or 0) + 1
+    path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def repair(timeout: int) -> tuple[bool, dict]:
     env = os.environ.copy()
     failure = STATE / "current_failure.json"
@@ -240,8 +275,21 @@ def main() -> int:
                 "failure, and what is the smallest safe corrective action?"
             )
             entry["failure_evidence"] = details
+            try:
+                baseline = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+            except Exception:
+                baseline = ""
+            recurrence_id = repair_failure_identity(details, baseline)
+            entry["repair_failure_id"] = recurrence_id
 
-            if not proposal_details.get("proposal_exists") or not proposal.get("candidates"):
+            if repair_recurrence_blocked(recurrence_id):
+                repaired = False
+                repair_details = {
+                    "status": "REPAIR_BLOCKED_RECURRING_FAILURE",
+                    "reason": "same_failure_on_same_baseline_already_attempted",
+                    "failure_id": recurrence_id,
+                }
+            elif not proposal_details.get("proposal_exists") or not proposal.get("candidates"):
                 repaired = False
                 repair_details = {
                     "status": "NO_SAFE_REPAIR_PROPOSAL",
@@ -253,6 +301,11 @@ def main() -> int:
 
             entry["repair_ok"] = repaired
             entry["repair_exit_code"] = repair_details.get("exit_code")
+            if not repaired and repair_details.get("status") not in {
+                "NO_SAFE_REPAIR_PROPOSAL",
+                "REPAIR_BLOCKED_RECURRING_FAILURE",
+            }:
+                record_repair_failure(recurrence_id)
             entry["repair"] = repair_details
 
             if repaired:
@@ -260,6 +313,8 @@ def main() -> int:
                 entry["post_repair_verification"] = details2
                 final_ok = ok2
                 entry["status"] = "REPAIRED_AND_VERIFIED" if ok2 else "REPAIR_FAILED"
+                if not ok2:
+                    record_repair_failure(recurrence_id)
             else:
                 entry["post_repair_verification"] = {
                     "status": "NOT_RUN",

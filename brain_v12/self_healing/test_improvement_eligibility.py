@@ -19,6 +19,18 @@ class ImprovementEligibilityContractTests(unittest.TestCase):
         self.assertTrue(matches)
         self.assertTrue(any(c.get("file") == "brain_v12/self_healing/verification_gate.py" for c in matches))
 
+    def test_repair_recurrence_guard_is_present(self):
+        source = Path("brain_v12/self_healing/review_loop.py").read_text(encoding="utf-8")
+        self.assertIn("repair_failure_identity", source)
+        self.assertIn("repair_recurrence_blocked", source)
+        self.assertIn("REPAIR_BLOCKED_RECURRING_FAILURE", source)
+        self.assertIn("same_failure_on_same_baseline_already_attempted", source)
+
+    def test_failed_post_repair_verification_is_recorded(self):
+        source = Path("brain_v12/self_healing/review_loop.py").read_text(encoding="utf-8")
+        self.assertIn("if not ok2:", source)
+        self.assertIn("record_repair_failure(recurrence_id)", source)
+
     def test_generator_is_not_called_inside_ineligible_branch(self):
         source = Path("brain_v12/self_healing/review_loop.py").read_text(encoding="utf-8")
         not_applied = source.index('entry["proactive_improvement"] = {')
