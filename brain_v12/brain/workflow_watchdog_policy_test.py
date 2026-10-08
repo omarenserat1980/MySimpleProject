@@ -3,6 +3,7 @@ import unittest
 from brain_v12.brain.workflow_watchdog_policy import (
     partition_failures,
     recovery_allowed,
+    select_recovery_candidates,
 )
 
 
@@ -22,6 +23,16 @@ class WorkflowWatchdogPolicyTests(unittest.TestCase):
         eligible, ignored = partition_failures(rows, "")
         self.assertEqual([], eligible)
         self.assertEqual(rows, ignored)
+
+    def test_global_recovery_selection_is_bounded(self):
+        rows = [
+            {"run_id": 1, "head_sha": "target", "attempt": 1, "created_at": "2026-10-08T00:00:00Z"},
+            {"run_id": 2, "head_sha": "target", "attempt": 1, "created_at": "2026-10-08T00:01:00Z"},
+            {"run_id": 3, "head_sha": "old", "attempt": 1, "created_at": "2026-10-08T00:02:00Z"},
+        ]
+        selected = select_recovery_candidates(rows, "target")
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0]["run_id"], 1)
 
     def test_recovery_guard_rejects_cross_sha(self):
         self.assertTrue(recovery_allowed({"head_sha": "target"}, "target"))
