@@ -14,8 +14,39 @@ if [ ! -x "$LAUNCHER" ]; then
   exit 41
 fi
 
+ensure_supervisor() {
+  local root="$ROOT"
+  local state="$STATE"
+  local pid_file="$state/supervisor.pid"
+  local pid=""
+  if [ -s "$pid_file" ]; then
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+  fi
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    echo "BRAIN_RUNTIME_SUPERVISOR_ALIVE=1"
+    return 0
+  fi
+  rm -f "$pid_file"
+  local python="$(command -v python3 || command -v python || true)"
+  if [ -z "$python" ]; then
+    echo "BRAIN_RUNTIME_SUPERVISOR_CHECK=PYTHON_NOT_FOUND" >&2
+    return 0
+  fi
+  mkdir -p "$state"
+  "$python" "$root/brain_v12/tools/brain_runtime_supervisor.py" >>"$state/supervisor.log" 2>&1 &
+  pid=$!
+  echo "$pid" > "$pid_file"
+  sleep 1
+  if kill -0 "$pid" 2>/dev/null; then
+    echo "BRAIN_RUNTIME_SUPERVISOR_RECOVERED=1"
+  else
+    echo "BRAIN_RUNTIME_SUPERVISOR_RECOVERY_FAILED=1" >&2
+  fi
+}
+
 if /system/bin/toybox nc -z 127.0.0.1 8012 >/dev/null 2>&1; then
   echo "BRAIN_RUNTIME_ALREADY_LISTENING=1"
+  ensure_supervisor
   exit 0
 fi
 

@@ -142,9 +142,31 @@ class CognitiveLoop:
         tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
         device_success = bool(action == "device" and tool_result and tool_result.get("ok") and tool_result.get("status") == "COMPLETED" and isinstance(tool_result.get("result"), dict))
         if (action in {"observe","plan"} and tool_result and tool_result.get("ok")) or device_success:
-            self.tasks.update(task["id"],"COMPLETED")
-            execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"تم تنفيذ الخطوة الآمنة واستلام النتيجة.","run_id":run_id}
-            self.events.publish("EXECUTION_COMPLETED",execution)
+            import hashlib
+            import json
+            evidence_payload = {
+                "run_id": run_id,
+                "task_id": task["id"],
+                "action": action,
+                "tool": tool_id,
+                "tool_result": tool_result,
+            }
+            evidence_sha256 = hashlib.sha256(
+                json.dumps(
+                    evidence_payload,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                ).encode("utf-8")
+            ).hexdigest()
+            evidence_ref = f"cognitive://{run_id}/{task['id']}/{evidence_sha256}"
+            completion = self.tasks.complete(task["id"], evidence_ref=evidence_ref)
+            if not isinstance(completion, dict) or completion.get("ok") is False:
+                execution={"status":"FAILED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"completion":completion,"result":"فشل تثبيت إكمال المهمة بسبب بوابة الدليل.","run_id":run_id}
+                self.events.publish("EXECUTION_FAILED",execution)
+            else:
+                execution={"status":"COMPLETED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"evidence_ref":evidence_ref,"evidence_sha256":evidence_sha256,"result":"تم تنفيذ الخطوة الآمنة واستلام النتيجة.","run_id":run_id}
+                self.events.publish("EXECUTION_COMPLETED",execution)
         else:
             self.tasks.update(task["id"],"PENDING")
             execution={"status":"WAITING_PERMISSION" if tool_result and tool_result.get("status")=="WAITING_PERMISSION" else "FAILED","action":action,"task_id":task["id"],"tool":tool_id,"tool_result":tool_result,"result":"لم تكتمل الخطوة.","run_id":run_id}

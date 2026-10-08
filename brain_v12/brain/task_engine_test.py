@@ -23,6 +23,18 @@ def test_verify_and_complete_requires_pass_and_evidence():
     assert done["evidence_ref"] == "test://verified"
 
 
+def test_verify_and_complete_rejects_truthy_failed_mapping():
+    engine = TaskEngine()
+    task = engine.create("failed verification")
+    result = engine.verify_and_complete(
+        task["id"],
+        {"ok": False, "verified": False, "status": "FAILED"},
+        "test://failed",
+    )
+    assert result["error"] == "VERIFICATION_FAILED"
+    assert task["status"] == "PENDING"
+
+
 def test_failed_task_preserves_evidence_and_retry_lineage():
     engine = TaskEngine()
     task = engine.create("retryable repair")
