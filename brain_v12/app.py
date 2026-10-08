@@ -67,6 +67,7 @@ from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
 from .brain.resource_fabric import ResourceFabric, ResourceKind, ResourceRequest, ResourceSpec, ResourceState
+from .brain.resource_providers import HostResourceProvider
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
@@ -161,6 +162,7 @@ worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
+host_resource_provider=HostResourceProvider(resource_fabric)
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
@@ -2859,6 +2861,14 @@ def agent_execute(request:Request, body:Exec):
 @app.post("/api/builder/plan")
 def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
+
+@app.post("/api/brain/fabric/sync-host")
+def brain_fabric_sync_host(request: Request):
+    require_control_key(request)
+    result=host_resource_provider.sync()
+    store.event("BRAIN_RESOURCE_PROVIDER_SYNC", result)
+    return result
+
 
 @app.get("/api/brain/fabric")
 def brain_fabric_status():
