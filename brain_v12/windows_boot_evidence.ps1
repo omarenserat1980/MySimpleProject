@@ -4,10 +4,19 @@ $vol = $null
 while ((Get-Date) -lt $deadline -and -not $vol) {
   $vol = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'BRAIN_EVIDENCE' } | Select-Object -First 1
   if ($vol -and -not $vol.DriveLetter) {
-    try {
-      $part = Get-Partition | Where-Object { -not $_.DriveLetter -and $_.Size -gt 0 } | Select-Object -First 1
-      if ($part) { $part | Set-Partition -NewDriveLetter 'B' -ErrorAction SilentlyContinue }
-    } catch {}
+    # Fail closed: map the evidence volume to its exact partition by volume path.
+    # Never select an arbitrary unlettered partition; that can be the EFI System
+    # Partition and would leave the evidence disk inaccessible.
+    $volumePath = [string]$vol.Path
+    $part = $null
+    if ($volumePath) {
+      $part = Get-Partition | Where-Object {
+        @($_.AccessPaths) -contains $volumePath
+      } | Select-Object -First 1
+    }
+    if ($part) {
+      try { $part | Set-Partition -NewDriveLetter 'B' -ErrorAction Stop } catch {}
+    }
     $vol = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'BRAIN_EVIDENCE' -and $_.DriveLetter } | Select-Object -First 1
   }
   if (-not $vol) { Start-Sleep -Seconds 5 }
