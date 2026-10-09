@@ -29,9 +29,8 @@ services:
       BRAIN_STATE_DIR: "/app/.brain_state"
     ports:
       - "127.0.0.1:8000:8000"
-    command: >
-      sh -c "uvicorn cloud.api_server:app --host 0.0.0.0 --port 8000 &
-             exec python cloud/brain_cloud.py"
+    # brain_cloud.py starts the API subprocess itself; do not launch a second uvicorn on the same port.
+    command: ["python", "cloud/brain_cloud.py"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
       interval: 30s
