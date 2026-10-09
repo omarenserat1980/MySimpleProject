@@ -170,5 +170,35 @@ class HomeServerAgentRoundTripTests(unittest.TestCase):
         self.assertIn("python", calls[1][2]["result"])
 
 
+    def test_status_requires_control_auth_and_hides_database_path(self):
+        previous_store = home_server.store
+        home_server.store = self.store
+        try:
+            with patch.dict(os.environ, {"BRAIN_CONTROL_KEY": "control-test-key"}, clear=True):
+                client = TestClient(home_server.app)
+                denied = client.get("/api/home-server/status")
+                self.assertEqual(denied.status_code, 401)
+
+                allowed = client.get(
+                    "/api/home-server/status",
+                    headers={"Authorization": "Bearer control-test-key"},
+                )
+                self.assertEqual(allowed.status_code, 200, allowed.text)
+                payload = allowed.json()
+                self.assertTrue(payload["ok"])
+                self.assertNotIn("database_path", payload)
+                self.assertTrue(payload["control_auth_configured"])
+
+            with patch.dict(os.environ, {}, clear=True):
+                unconfigured = client.get("/api/home-server/status")
+                self.assertEqual(unconfigured.status_code, 503)
+                self.assertEqual(
+                    unconfigured.json()["detail"],
+                    "HOME_SERVER_CONTROL_NOT_CONFIGURED",
+                )
+        finally:
+            home_server.store = previous_store
+
+
 if __name__ == "__main__":
     unittest.main()
