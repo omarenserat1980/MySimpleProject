@@ -2294,6 +2294,9 @@ app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-a
 from .brain.brain_mcp import build_mcp_router
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 
+# Register API routes before the catch-all static UI mount.
+app.include_router(home_server_router)
+
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
@@ -2326,5 +2329,3 @@ async def brain_mcp_auth(request: Request, call_next):
             )
     return await call_next(request)
 
-# Register Home Server endpoints after the main application routes are defined.
-app.include_router(home_server_router)
