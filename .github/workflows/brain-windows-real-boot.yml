@@ -258,62 +258,96 @@ jobs:
             echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
           fi
 
-      - name: Boot and install Windows Server 2025
+      - name: Boot and install Windows Server 2025 through Brain Gateway
         env:
           BOOT_TIMEOUT: ${{ inputs.timeout_minutes || '55' }}
         shell: bash
         run: |
           set -euo pipefail
-          timeout "$BOOT_TIMEOUT"m qemu-system-x86_64 \
-            -machine q35,accel=kvm:tcg -cpu max -m 4G -smp 2 \
-            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
-            -device ich9-ahci,id=sata \
-            -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk \
-            -device ide-hd,bus=sata.2,drive=osdisk \
-            -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
-            -device ide-hd,bus=sata.3,drive=evidence \
-            -nic user,model=e1000 \
-            -drive file=brain-windows-server-2025-proof.iso,media=cdrom,if=none,id=installmedia,readonly=on \
-            -device ide-cd,bus=sata.1,drive=installmedia \
-            -boot once=d,menu=off \
-            -display none -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
-            > qemu-console.log 2>&1 &
-          QPID=$!
-          deadline=$((SECONDS + BOOT_TIMEOUT*60))
-          found=0
-          boot_source="unknown"
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
-              found=1
-              boot_source="windows-installed-disk"
-              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
-              echo "WINDOWS_BOOT_SOURCE=$boot_source"
-              break
-            fi
-            if ! kill -0 "$QPID" 2>/dev/null; then
-              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
-              break
-            fi
-            sleep 5
-          done
-          if [ "$found" -ne 1 ]; then
-            tail -200 qemu-console.log || true
-            tail -200 qemu-serial.log || true
-            exit 1
-          fi
           python3 - <<'PY'
-          import json,socket,time
+          import json, os, pathlib, socket, subprocess, time
+          from brain_v12.brain.execution_gateway import BrainExecutionGateway
+          from brain_v12.brain.windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
+
+          timeout_minutes=int(os.environ.get("BOOT_TIMEOUT","55"))
+          contract_path=os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE") or "/etc/brain/windows-execution-contract.json"
+
+          decision=BrainExecutionGateway().authorize_task(
+              "windows-server-2025-real-boot",
+              {"executor":"windows-real-boot-qemu","contract_path":contract_path},
+          )
+          assert decision.verified is True, decision
+          print("BRAIN_EXECUTION_GATEWAY=VERIFIED")
+          print("BRAIN_EXECUTION_EXECUTOR="+decision.executor)
+
+          adapter=WindowsRealBootQemuAdapter()
+          proc,meta=adapter.start(
+              os_disk="windows-server-2025.qcow2",
+              evidence_disk="windows-evidence.img",
+              proof_iso="brain-windows-server-2025-proof.iso",
+              ovmf_vars="OVMF_VARS.fd",
+              contract_path=contract_path,
+              qmp_socket="qmp.sock",
+              serial_log="qemu-serial.log",
+              cwd=".",
+          )
+          print("BRAIN_QEMU_ADAPTER=STARTED")
+          print("BRAIN_QEMU_PID="+str(proc.pid))
+          print("BRAIN_CONTRACT_SHA256="+meta["contract_sha256"])
+
+          deadline=time.time()+timeout_minutes*60
+          found=False
+          while time.time()<deadline:
+              marker=subprocess.run(
+                  ["mcopy","-i","windows-evidence.img","::WINDOWS_BOOT_VERIFIED","/tmp/windows-boot-marker"],
+                  stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False,
+              )
+              if marker.returncode==0:
+                  found=True
+                  break
+              if proc.poll() is not None:
+                  print("QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE")
+                  break
+              time.sleep(5)
+
+          if not found:
+              for name in ("qemu-console.log","qemu-serial.log"):
+                  p=pathlib.Path(name)
+                  if p.exists():
+                      print("===== "+name+" =====")
+                      print(p.read_text(errors="replace")[-12000:])
+              proc.kill(); proc.wait()
+              raise SystemExit("WINDOWS_BOOT_EVIDENCE_NOT_FOUND")
+
+          print("WINDOWS_BOOT_EVIDENCE_MARKER=FOUND")
+          print("WINDOWS_BOOT_SOURCE=windows-installed-disk")
+
           s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-          s.connect("qmp.sock")
-          for o in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
-              s.sendall((json.dumps(o)+"\r\n").encode()); time.sleep(.5)
-          s.close()
+          try:
+              s.connect("qmp.sock")
+              for command in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
+                  s.sendall((json.dumps(command)+"\r\n").encode())
+                  time.sleep(.5)
+          finally:
+              s.close()
+
+          time.sleep(15)
+          pathlib.Path("windows-boot-phase.txt").write_text(
+              "BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\n"
+              "BOOT_SOURCE=windows-installed-disk\n"
+              "QEMU_PID="+str(proc.pid)+"\n"
+              "CONTRACT_SHA256="+meta["contract_sha256"]+"\n",
+              encoding="utf-8",
+          )
+          if proc.poll() is None:
+              proc.terminate()
+              try: proc.wait(timeout=15)
+              except subprocess.TimeoutExpired:
+                  proc.kill(); proc.wait()
+          elif proc.returncode not in (0,None):
+              raise SystemExit("QEMU_FAILED_AFTER_VERIFIED_BOOT:"+str(proc.returncode))
+          print("BRAIN_QEMU_SUPERVISED_BOOT=VERIFIED")
           PY
-          sleep 15
-          printf 'BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\nBOOT_SOURCE=%s\n' "$boot_source" | tee windows-boot-phase.txt
-          kill "$QPID" 2>/dev/null || true
-          wait "$QPID" 2>/dev/null || true
 
       - name: Read guest evidence and apply independent completion gate
         run: |
