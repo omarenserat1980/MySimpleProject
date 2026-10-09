@@ -231,7 +231,13 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = WebhookEnvelope.model_validate_json(raw)
+            # Support both Pydantic v1 (parse_raw) and v2 (model_validate_json).
+            # Some supported self-hosted runners still resolve Pydantic v1.
+            validate_json = getattr(WebhookEnvelope, "model_validate_json", None)
+            if callable(validate_json):
+                payload = validate_json(raw)
+            else:
+                payload = WebhookEnvelope.parse_raw(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:
