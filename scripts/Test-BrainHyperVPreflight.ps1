@@ -49,7 +49,7 @@ try {
     $observations.cpu = [ordered]@{
         physical_socket_count = $processors.Count
         logical_processor_count = [int]$computer.NumberOfLogicalProcessors
-        cores = [int]$computer.NumberOfLogicalProcessors
+        cores = [int](($processors | Measure-Object -Property NumberOfCores -Sum).Sum)
         virtualization_firmware_enabled = [bool]($processors | Where-Object { $_.VirtualizationFirmwareEnabled -eq $true } | Select-Object -First 1)
     }
     $observations.storage = $drives
@@ -62,6 +62,12 @@ try {
         vmms_status = if ($vmms) { [string]$vmms.Status } else { "NOT_FOUND" }
         vm_inventory = @()
         inventory_read_succeeded = $false
+    }
+
+    if (-not $vmms) {
+        $issues.Add("Hyper-V Virtual Machine Management service (vmms) is not installed or cannot be queried.")
+    } elseif ($vmms.Status -ne "Running") {
+        $issues.Add("Hyper-V Virtual Machine Management service is not running; no service start was attempted.")
     }
 
     if (-not $getVm) {
