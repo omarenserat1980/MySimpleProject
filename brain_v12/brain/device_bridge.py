@@ -13,7 +13,22 @@ class DeviceBridge:
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
-    def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"))
+    def _local_key_file(self):
+        return os.path.expanduser(
+            os.getenv("BRAIN_AGENT_KEY_FILE")
+            or os.getenv("V12_AGENT_KEY_FILE")
+            or "~/v12-agent/agent.key"
+        )
+
+    def configured(self):
+        # Match authenticate(): a supported local key file is also a configuration.
+        return bool(
+            os.getenv(AGENT_KEY_ENV)
+            or os.getenv(AGENT_KEY_SHA256_ENV)
+            or os.getenv("BRAIN_EMULATOR_KEY")
+            or os.getenv("BRAIN_EMULATOR_AGENT_KEY")
+            or os.path.isfile(self._local_key_file())
+        )
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
@@ -24,7 +39,7 @@ class DeviceBridge:
         if not supplied:return False
         expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
         if not expected:
-            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
+            key_file=self._local_key_file()
             if key_file and os.path.isfile(key_file):
                 try:
                     with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
