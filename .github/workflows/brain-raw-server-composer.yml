@@ -11,6 +11,7 @@ on:
       - "scripts/Test-BrainHyperVCapacity.ps1"
       - "brain_v12/raw_server/CONTRACTS.md"
       - ".github/workflows/brain-raw-server-composer.yml"
+      - ".github/workflows/brain-arkan-readonly-preflight.yml"
   push:
     branches: [main]
     paths:
@@ -67,3 +68,6 @@ jobs:
           done
           grep -Eiq 'Get-VM' scripts/Test-BrainHyperVPreflight.ps1
           grep -Eiq 'Get-VM' scripts/Test-BrainHyperVCapacity.ps1
+          grep -Eiq 'workflow_dispatch:' .github/workflows/brain-arkan-readonly-preflight.yml
+          grep -Eiq 'windows-real-boot' .github/workflows/brain-arkan-readonly-preflight.yml
+          ! grep -Eiq '^[[:space:]]*(Start-VM|New-VM|Remove-VM|Set-VM|New-VHD|Set-VMProcessor|Set-VMMemory|Stop-VM|Restart-VM)([[:space:]]|$)' .github/workflows/brain-arkan-readonly-preflight.yml
