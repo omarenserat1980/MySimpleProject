@@ -1,7 +1,7 @@
 """Self-hosted device credentials for Brain Chat.
 
 Provision credentials only from a trusted local operator shell:
-python -m brain_v12.brain.chat_identity issue --db brain_v12.db --account ACCOUNT --device-label DEVICE
+python -m brain_v12.brain.chat_identity --db brain_v12.db issue --account ACCOUNT --device-label DEVICE
 The raw token is printed once; only its SHA-256 digest is persisted.
 """
 from __future__ import annotations
