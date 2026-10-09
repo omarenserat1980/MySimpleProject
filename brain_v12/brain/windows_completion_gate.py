@@ -3,7 +3,7 @@ import hashlib, json, time
 
 class WindowsCompletionGate:
     """Independent evidence gate; never treats process exit as Windows boot."""
-    REQUIRED={"media","uefi","cpu","guest","network","storage","control"}
+    REQUIRED={"media","uefi","cpu","guest","network","storage","control","executor"}
     def verify(self, evidence:dict) -> dict:
         reasons=[]
         for key in self.REQUIRED:
@@ -16,6 +16,13 @@ class WindowsCompletionGate:
         network=evidence.get("network") or {}
         storage=evidence.get("storage") or {}
         control=evidence.get("control") or {}
+        executor=evidence.get("executor") or {}
+        if executor.get("verified") is not True: reasons.append("EXECUTOR_NOT_VERIFIED")
+        if not executor.get("executor_id"): reasons.append("EXECUTOR_ID_MISSING")
+        if not executor.get("hostname"): reasons.append("EXECUTOR_HOSTNAME_MISSING")
+        if not executor.get("evidence_ref"): reasons.append("EXECUTOR_EVIDENCE_REF_MISSING")
+        if not executor.get("runner_name"): reasons.append("EXECUTOR_RUNNER_NAME_MISSING")
+        if not executor.get("workflow_run_id"): reasons.append("EXECUTOR_WORKFLOW_RUN_ID_MISSING")
         if guest.get("os")!="Windows Server 2025": reasons.append("GUEST_OS_NOT_VERIFIED")
         if guest.get("architecture")!="x86_64": reasons.append("GUEST_ARCH_NOT_VERIFIED")
         if not guest.get("boot_verified"): reasons.append("GUEST_BOOT_NOT_VERIFIED")
