@@ -5,6 +5,8 @@ on:
     paths:
       - "brain_v12/app.py"
       - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - "brain_v12/brain/windows_contract_service.py"
+      - "brain_v12/tests/test_windows_contract_service.py"
       - ".github/workflows/brain-windows-real-boot.yml"
       - "brain_v12/brain/brain_leadership.py"
       - "brain_v12/brain/windows_execution_contract_issuer.py"
@@ -37,6 +39,8 @@ jobs:
         run: python -m pip install --disable-pip-version-check cryptography
       - name: Compile authenticated contract API route
         run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
+      - name: Test Control Plane and executor capability separation
+        run: python -m unittest brain_v12.tests.test_windows_contract_service -v
       - name: Test contract fetch client compilation
         run: python -m py_compile brain_v12/brain/fetch_windows_execution_contract.py
       - name: Test contract fetch client behavior
