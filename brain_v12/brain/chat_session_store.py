@@ -246,12 +246,20 @@ class ChatSessionStore:
             message_metadata["client_message_id"] = str(client_message_id)
         with self.connect() as con:
             if client_message_id:
-                existing = con.execute(
-                    "SELECT id FROM chat_session_messages WHERE session_id=? AND metadata LIKE ? LIMIT 1",
-                    (session_id, '%"client_message_id": "' + str(client_message_id).replace('"', '""') + '"%'),
-                ).fetchone()
-                if existing:
-                    return self.get(session_id)
+                # Compare decoded metadata instead of SQL LIKE: client IDs may
+                # contain LIKE wildcards (% and _) or JSON-escaped characters.
+                rows = con.execute(
+                    "SELECT metadata FROM chat_session_messages WHERE session_id=?",
+                    (session_id,),
+                ).fetchall()
+                client_key = str(client_message_id)
+                for row in rows:
+                    try:
+                        existing_metadata = json.loads(row["metadata"])
+                    except (TypeError, json.JSONDecodeError):
+                        continue
+                    if existing_metadata.get("client_message_id") == client_key:
+                        return self.get(session_id)
 
             exists = con.execute(
                 "SELECT 1 FROM chat_sessions WHERE id=?", (session_id,)
