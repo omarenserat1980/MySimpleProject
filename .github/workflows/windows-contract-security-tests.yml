@@ -8,6 +8,8 @@ on:
       - "brain_v12/brain/windows_contract_service.py"
       - "brain_v12/tests/test_windows_contract_service.py"
       - ".github/workflows/brain-windows-real-boot.yml"
+      - "brain_v12/brain/cloud_executor_gate.py"
+      - "brain_v12/tests/test_cloud_executor_gate.py"
       - "brain_v12/brain/brain_leadership.py"
       - "brain_v12/brain/windows_execution_contract_issuer.py"
       - "brain_v12/brain/owner_cryptographic_approval.py"
@@ -37,6 +39,8 @@ jobs:
           python-version: "3.12"
       - name: Install minimal crypto dependency
         run: python -m pip install --disable-pip-version-check cryptography
+      - name: Test signed cloud executor attestation
+        run: python -m unittest brain_v12.tests.test_cloud_executor_gate -v
       - name: Compile authenticated contract API route
         run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
       - name: Test Control Plane and executor capability separation
