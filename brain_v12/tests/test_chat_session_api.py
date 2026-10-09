@@ -184,7 +184,7 @@ class ChatSessionApiTests(unittest.TestCase):
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
             body = MessageIn(message="hello", client_message_id="retry-1", device_id="phone")
             first = endpoint(session["id"], body, authorization=authorization)
-            second = endpoint(session["id"], body)
+            second = endpoint(session["id"], body, authorization=authorization)
             self.assertEqual(len(brain.calls), 1)
             self.assertFalse(first["idempotent_replay"])
             self.assertTrue(second["idempotent_replay"])
