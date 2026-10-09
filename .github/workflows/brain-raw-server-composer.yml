@@ -49,7 +49,7 @@ jobs:
       - name: Parse PowerShell syntax
         shell: pwsh
         run: |
-          foreach ($file in @("scripts/Test-BrainHyperVPreflight.ps1", "scripts/Test-BrainHyperVCapacity.ps1")) {
+          foreach ($file in @("scripts/Install-BrainRawServer.ps1", "scripts/Test-BrainHyperVPreflight.ps1", "scripts/Test-BrainHyperVCapacity.ps1")) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
@@ -71,3 +71,10 @@ jobs:
           grep -Eiq 'workflow_dispatch:' .github/workflows/brain-arkan-readonly-preflight.yml
           grep -Eiq 'windows-real-boot' .github/workflows/brain-arkan-readonly-preflight.yml
           ! grep -Eiq '^[[:space:]]*(Start-VM|New-VM|Remove-VM|Set-VM|New-VHD|Set-VMProcessor|Set-VMMemory|Stop-VM|Restart-VM)([[:space:]]|$)' .github/workflows/brain-arkan-readonly-preflight.yml
+      - name: Guard bootstrap against mutable source references
+        shell: bash
+        run: |
+          grep -Eq '\$PinnedCommit = "[0-9a-f]{40}"' scripts/Install-BrainRawServer.ps1
+          grep -Fq 'raw.githubusercontent.com/omarenserat1980/MySimpleProject/$PinnedCommit/brain_v12/raw_server/composer.py' scripts/Install-BrainRawServer.ps1
+          grep -Fq 'Always refresh the fallback copy from the immutable source.' scripts/Install-BrainRawServer.ps1
+          ! grep -Eq 'raw.githubusercontent.com/omarenserat1980/MySimpleProject/brain-raw-server-composer-20261009/' scripts/Install-BrainRawServer.ps1
