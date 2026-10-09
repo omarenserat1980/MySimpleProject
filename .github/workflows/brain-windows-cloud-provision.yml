@@ -53,19 +53,24 @@ jobs:
         run: |
           az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Terraform version
+        shell: cmd
+        run: terraform version
 
       - name: Terraform init
+        shell: cmd
         run: terraform init -input=false
 
       - name: Terraform fmt check
+        shell: cmd
         run: terraform fmt -check -recursive
 
       - name: Terraform validate
+        shell: cmd
         run: terraform validate
 
       - name: Terraform plan (safe preflight)
+        shell: cmd
         run: terraform plan -input=false -out=brain.tfplan
 
       - name: Terraform apply (explicit approval only)
