@@ -11,10 +11,12 @@ class WindowsExecutionContractIssuerTests(unittest.TestCase):
   self.k=Ed25519PrivateKey.generate()
   self.pub=base64.b64encode(self.k.public_key().public_bytes_raw()).decode()
   self.approval={"schema":SCHEMA,"owner_id":"owner-1","challenge_id":"contract-test-1",
-                 "scope":"windows-server-2025-real-boot","expires_at":2000.0,\n                 "source_commit":"a"*40,"task_id":"windows-real-boot","attempt_id":"attempt-1"}
+                 "scope":"windows-server-2025-real-boot","expires_at":2000.0,
+                 "source_commit":"a"*40,"task_id":"windows-real-boot","attempt_id":"attempt-1"}
   self.approval["signature"]=base64.b64encode(self.k.sign(
    approval_payload(self.approval["owner_id"],self.approval["challenge_id"],
-                    self.approval["scope"],self.approval["expires_at"],self.approval["source_commit"],\n                    self.approval["task_id"],self.approval["attempt_id"]))).decode()
+                    self.approval["scope"],self.approval["expires_at"],self.approval["source_commit"],
+                    self.approval["task_id"],self.approval["attempt_id"]))).decode()
  def identity(self):
   return {"schema":IDENTITY_SCHEMA,"brain_id":"brain-primary","generation":2,
           "source_commit":"a"*40,"checkpoint_id":"BRAIN-GOLDEN-01"}
