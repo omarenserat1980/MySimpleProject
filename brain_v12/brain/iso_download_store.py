@@ -57,7 +57,11 @@ class DownloadError(ValueError):
 class DownloadStore:
     """SQLite-backed lifecycle store; callers must supply a durable root explicitly."""
 
-    def __init__(self, root: str | os.PathLike[str], *, persistent: bool):
+    def __init__(self, root: str | os.PathLike[str], *, persistent: bool,
+                 lease_ttl_seconds: int = 120):
+        if isinstance(lease_ttl_seconds, bool) or lease_ttl_seconds < 1:
+            raise ValueError("lease_ttl_seconds must be a positive integer")
+        self.lease_ttl_seconds = int(lease_ttl_seconds)
         self.root = Path(root).expanduser().resolve()
         self.persistent = bool(persistent)
         self.metadata = self.root / "metadata"
@@ -191,9 +195,13 @@ class DownloadStore:
         return self.get(download_id, owner_id=owner_id)
 
     def acquire_worker(self, download_id: str, *, worker_id: str) -> bool:
-        """Atomically allow one writer lease per task."""
+        """Acquire one writer lease, reclaiming leases whose heartbeat expired.
+
+        A worker must call renew_worker more frequently than lease_ttl_seconds.
+        """
         if not worker_id:
             raise DownloadError("INVALID_REQUEST")
+        now = time.time()
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             exists = db.execute(
@@ -201,14 +209,30 @@ class DownloadStore:
             if not exists:
                 db.execute("ROLLBACK")
                 raise DownloadError("TASK_NOT_FOUND")
+            db.execute("DELETE FROM worker_leases WHERE download_id=? AND acquired_at<=?",
+                       (download_id, now - self.lease_ttl_seconds))
             try:
                 db.execute("INSERT INTO worker_leases VALUES(?,?,?)",
-                           (download_id, worker_id, time.time()))
+                           (download_id, worker_id, now))
             except sqlite3.IntegrityError:
                 db.execute("ROLLBACK")
                 return False
             db.execute("COMMIT")
             return True
+
+    def renew_worker(self, download_id: str, *, worker_id: str) -> bool:
+        """Refresh only the caller's lease; return False if it expired or was replaced."""
+        if not worker_id:
+            raise DownloadError("INVALID_REQUEST")
+        now = time.time()
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("""UPDATE worker_leases SET acquired_at=?
+                WHERE download_id=? AND worker_id=? AND acquired_at>?""",
+                (now, download_id, worker_id, now - self.lease_ttl_seconds))
+            changed = db.execute("SELECT changes()").fetchone()[0] == 1
+            db.execute("COMMIT")
+            return changed
 
     def release_worker(self, download_id: str, *, worker_id: str) -> bool:
         with self._db() as db:

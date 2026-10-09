@@ -66,6 +66,31 @@ class IsoDownloadStoreTests(unittest.TestCase):
         self.assertTrue(self.store.release_worker(task_id, worker_id="worker-a"))
         self.assertTrue(self.store.acquire_worker(task_id, worker_id="worker-b"))
 
+    def test_expired_worker_lease_can_be_reclaimed_after_crash(self):
+        task_id = self.task["download_id"]
+        store = DownloadStore(Path(self.tmp.name) / "lease-ttl", persistent=True,
+                              lease_ttl_seconds=5)
+        task = store.create(owner_id="alice", source="https://downloads.example.test/file.iso")
+        task_id = task["download_id"]
+        self.assertTrue(store.acquire_worker(task_id, worker_id="worker-crashed"))
+        with store._db() as db:
+            db.execute("UPDATE worker_leases SET acquired_at=0 WHERE download_id=?", (task_id,))
+        self.assertTrue(store.acquire_worker(task_id, worker_id="worker-recovery"))
+        self.assertFalse(store.renew_worker(task_id, worker_id="worker-crashed"))
+        self.assertTrue(store.renew_worker(task_id, worker_id="worker-recovery"))
+
+    def test_active_worker_lease_cannot_be_stolen_and_wrong_worker_cannot_renew(self):
+        task_id = self.task["download_id"]
+        self.assertTrue(self.store.acquire_worker(task_id, worker_id="worker-a"))
+        self.assertFalse(self.store.acquire_worker(task_id, worker_id="worker-b"))
+        self.assertFalse(self.store.renew_worker(task_id, worker_id="worker-b"))
+        self.assertTrue(self.store.renew_worker(task_id, worker_id="worker-a"))
+
+    def test_invalid_lease_ttl_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "lease_ttl_seconds"):
+            DownloadStore(Path(self.tmp.name) / "invalid-ttl", persistent=True,
+                          lease_ttl_seconds=0)
+
     def test_resumable_task_requires_declared_persistent_storage(self):
         ephemeral = DownloadStore(Path(self.tmp.name) / "ephemeral", persistent=False)
         with self.assertRaisesRegex(DownloadError, "PERSISTENT_STORAGE_REQUIRED"):
