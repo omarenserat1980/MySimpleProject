@@ -3,6 +3,8 @@ import os
 import tempfile
 import time
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from brain_v12.brain.windows_real_boot_closed_loop_gate import load_and_verify
 
@@ -34,6 +36,21 @@ class WindowsClosedLoopGateTests(unittest.TestCase):
         f.close()
         self.addCleanup(lambda: os.unlink(f.name))
         return f.name
+
+    def test_default_contract_path_matches_issuer_output(self):
+        old = os.environ.pop("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE", None)
+        seen = []
+        try:
+            def record_missing(path):
+                seen.append(str(path))
+                return False
+            with patch.object(Path, "is_file", record_missing):
+                with self.assertRaisesRegex(RuntimeError, "WINDOWS_EXECUTION_CONTRACT_FILE_REQUIRED"):
+                    load_and_verify()
+            self.assertEqual(seen, ["/run/brain/windows-execution-contract.json"])
+        finally:
+            if old is not None:
+                os.environ["BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"] = old
 
     def test_accepts_current_contract(self):
         old = os.environ.get("GITHUB_SHA")
