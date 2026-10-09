@@ -27,7 +27,7 @@ function Invoke-AzJson([string[]]$Arguments) {
     $allArgs = @($Arguments) + @("--output", "json", "--only-show-errors")
     $raw = & az @allArgs 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($raw -join [Environment]::NewLine))) { return $null }
-    try { return (($raw -join [Environment]::NewLine) | ConvertFrom-Json -Depth 30) } catch { return $null }
+    try { return (($raw -join [Environment]::NewLine) | ConvertFrom-Json) } catch { return $null }
 }
 
 if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
@@ -93,12 +93,19 @@ if ($LASTEXITCODE -eq 0 -and $power) {
     }
 } else { Add-Check "power_state" "UNKNOWN" "Azure did not return an instance power state." }
 
-$nicArgs = @("network","nic","list","--resource-group",$ResourceGroup,"--query","[].{name:name,privateIp:ipConfigurations[0].privateIPAddress,publicIpId:ipConfigurations[0].publicIPAddress.id,nsgId:networkSecurityGroup.id}")
-if ($SubscriptionId) { $nicArgs += @("--subscription",$SubscriptionId) }
-$nics = Invoke-AzJson $nicArgs
+# Resolve the exact NIC resource IDs attached to the VM; do not assume NICs share the VM's resource group.
+$nics = [System.Collections.Generic.List[object]]::new()
+foreach ($nicId in @($vm.networkInterfaceIds)) {
+    if (-not $nicId) { continue }
+    $nicQuery = "{id:id,name:name,resourceGroup:resourceGroup,privateIp:ipConfigurations[0].privateIPAddress,publicIpId:ipConfigurations[0].publicIPAddress.id,nsgId:networkSecurityGroup.id}"
+    $nicArgs = @("network","nic","show","--ids",$nicId,"--query",$nicQuery)
+    if ($SubscriptionId) { $nicArgs += @("--subscription",$SubscriptionId) }
+    $nic = Invoke-AzJson $nicArgs
+    if ($nic) { $nics.Add($nic) }
+}
 $report.networkInterfaces = @($nics)
-if ($nics) { Add-Check "network_interfaces" "PASS" "Read network interface metadata." }
-else { Add-Check "network_interfaces" "WARN" "No NIC metadata returned; check permissions and VM network attachment." }
+if ($nics.Count -gt 0) { Add-Check "network_interfaces" "PASS" "Read metadata for $($nics.Count) VM-attached network interface(s)." }
+else { Add-Check "network_interfaces" "WARN" "No VM-attached NIC metadata returned; check permissions and VM network attachment." }
 
 $publicIps = [System.Collections.Generic.List[object]]::new()
 foreach ($nic in @($nics)) {
