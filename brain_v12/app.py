@@ -2011,6 +2011,19 @@ def brain_windows_boot(request:Request, vm_name:str):
     require_control_key(request)
     return brain_datacenter.boot_windows_server_2025(vm_name)
 
+@app.post("/api/brain/windows/contract/issue")
+def brain_windows_contract_issue(request:Request, body:dict):
+    """Issue a short-lived real-boot contract through the protected Brain control plane."""
+    require_control_key(request)
+    from .brain.windows_contract_service import issue as issue_windows_contract
+
+    try:
+        result = issue_windows_contract(body)
+    except (RuntimeError, PermissionError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"ok": True, "contract": result}
+
+
 @app.get("/api/brain/windows/cloud/readiness")
 def brain_windows_cloud_readiness():
     from .brain.windows_cloud_executor import WindowsCloudExecutor
