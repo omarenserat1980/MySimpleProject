@@ -15,7 +15,7 @@ class RawServerComposerTests(unittest.TestCase):
                 "brain_v12.raw_server.composer._available_memory_bytes", return_value=4 * 1024**3
             ):
                 manifest = composer.build()
-            self.assertEqual(manifest["server"]["status"], "READY_FOR_REVIEW")
+            self.assertEqual(manifest["server"]["readiness"], "READY_FOR_REVIEW")
             self.assertFalse(manifest["server"]["provisioned"])
             self.assertEqual(list(manifest["stages"]), composer.ORDER)
             for stage in composer.ORDER:
