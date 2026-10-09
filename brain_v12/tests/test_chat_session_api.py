@@ -200,6 +200,37 @@ class ChatSessionApiTests(unittest.TestCase):
             messages = recovered["session"]["messages"]
             self.assertEqual(sum(1 for m in messages if m["role"] == "assistant"), 1)
 
+    def test_message_endpoint_recovers_reply_after_ledger_was_marked_failed(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("Failed ledger recovery")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+            body = MessageIn(message="hello", client_message_id="failed-ledger-1")
+            first = endpoint(session["id"], body)
+            self.assertTrue(first["ok"])
+            self.assertEqual(len(brain.calls), 1)
+
+            # Simulate recovery after an exception marked the ledger FAILED
+            # even though the assistant response had already been persisted.
+            with store.connect() as con:
+                con.execute(
+                    "UPDATE chat_request_idempotency SET status='FAILED',response_json=NULL "
+                    "WHERE session_id=? AND client_message_id=?",
+                    (session["id"], "failed-ledger-1"),
+                )
+                con.commit()
+
+            recovered = endpoint(session["id"], body)
+            self.assertTrue(recovered["idempotent_replay"])
+            self.assertEqual(recovered["response"]["content"], "Brain verified reply")
+            self.assertEqual(len(brain.calls), 1)
+            self.assertEqual(
+                sum(1 for m in recovered["session"]["messages"] if m["role"] == "assistant"), 1
+            )
+
     def test_message_endpoint_rejects_reused_id_with_changed_payload(self):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
