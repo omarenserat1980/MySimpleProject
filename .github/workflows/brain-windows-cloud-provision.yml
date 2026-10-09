@@ -86,13 +86,16 @@ jobs:
         if: ${{ inputs.bootstrap_state == true }}
         shell: powershell
         run: |
-          terraform init -upgrade -input=false \\
-            -backend-config="resource_group_name=$env:TF_STATE_RESOURCE_GROUP" \\
-            -backend-config="storage_account_name=$env:TF_STATE_STORAGE_ACCOUNT" \\
-            -backend-config="container_name=$env:TF_STATE_CONTAINER" \\
-            -backend-config="key=$env:TF_STATE_KEY" \\
-            -backend-config="use_azuread_auth=true" \\
-            -backend-config="use_cli=true"
+          $backendArgs = @(
+            "-input=false",
+            "-backend-config=resource_group_name=$env:TF_STATE_RESOURCE_GROUP",
+            "-backend-config=storage_account_name=$env:TF_STATE_STORAGE_ACCOUNT",
+            "-backend-config=container_name=$env:TF_STATE_CONTAINER",
+            "-backend-config=key=$env:TF_STATE_KEY",
+            "-backend-config=use_azuread_auth=true",
+            "-backend-config=use_cli=true"
+          )
+          terraform init -upgrade @backendArgs
 
       - name: Terraform fmt check
         shell: cmd
