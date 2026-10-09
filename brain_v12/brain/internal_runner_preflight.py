@@ -9,6 +9,8 @@ import platform
 import os
 from pathlib import Path
 
+from .performance import ShortTTLCache, performance_cache_ttl
+
 
 REQUIRED_BINARIES = (
     "qemu-system-x86_64",
@@ -45,7 +47,17 @@ class RunnerPreflight:
         }
 
 
-def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
+_PREFLIGHT_CACHE: ShortTTLCache[RunnerPreflight] | None = None
+
+
+def _cache() -> ShortTTLCache[RunnerPreflight]:
+    global _PREFLIGHT_CACHE
+    if _PREFLIGHT_CACHE is None:
+        _PREFLIGHT_CACHE = ShortTTLCache(performance_cache_ttl())
+    return _PREFLIGHT_CACHE
+
+
+def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
     binaries = {name: which(name) is not None for name in REQUIRED_BINARIES}
     reasons: list[str] = []
 
@@ -66,6 +78,23 @@ def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
         binaries=binaries,
         reasons=tuple(reasons),
     )
+
+
+def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
+    # Cache only verified substrate results. Failed probes always execute fresh,
+    # so a transient failure cannot be hidden. Authority/contracts/evidence are
+    # deliberately outside this cache and remain live on every execution.
+    key = f"{runner_id}:{os.environ.get('BRAIN_INTERNAL_RUNNER_FLAG', '')}"
+    return _cache().get_or_compute(
+        key,
+        lambda: _inspect_runner_uncached(runner_id),
+        cacheable=lambda result: result.verified,
+    )
+
+
+def invalidate_preflight_cache() -> None:
+    if _PREFLIGHT_CACHE is not None:
+        _PREFLIGHT_CACHE.invalidate()
 
 
 def verify_and_write(path: str | Path) -> dict:
