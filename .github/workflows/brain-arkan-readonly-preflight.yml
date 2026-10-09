@@ -26,7 +26,7 @@ jobs:
         run: |
           $out = Join-Path $env:RUNNER_TEMP "brain-hyperv-preflight"
           New-Item -ItemType Directory -Path $out -Force | Out-Null
-          & "$env:GITHUB_WORKSPACE\scripts\Test-BrainHyperVPreflight.ps1" -OutputDirectory $out
+          pwsh -NoProfile -File "$env:GITHUB_WORKSPACE\scripts\Test-BrainHyperVPreflight.ps1" -OutputDirectory $out
           $code = $LASTEXITCODE
           "preflight_exit_code=$code" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           if ($code -ne 0) { Write-Error "Preflight did not PASS; inspect uploaded evidence." }
