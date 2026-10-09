@@ -7,6 +7,17 @@ on:
       - "brain_v12/tests/test_home_server.py"
       - "brain_v12/requirements.txt"
       - ".github/workflows/brain-home-server-tests.yml"
+      - "brain_v12/brain/windows_cloud_executor.py"
+      - "brain_v12/brain/windows_cloud_gate.py"
+      - "brain_v12/brain/terraform_windows_cloud_provider.py"
+      - "brain_v12/brain/opennebula_windows_cloud_provider.py"
+      - "brain_v12/brain/windows_cloud_provider_factory.py"
+      - "brain_v12/brain/windows_terraform_safety.py"
+      - "brain_v12/tests/test_windows_cloud_executor.py"
+      - "brain_v12/tests/test_terraform_windows_cloud_provider.py"
+      - "brain_v12/tests/test_windows_terraform_safety.py"
+      - "brain_v12/tests/test_windows_cloud_provider_factory.py"
+      - "brain_v12/tests/test_opennebula_windows_cloud_provider.py"
   push:
     branches:
       - "integration/brain-home-azure-clean"
