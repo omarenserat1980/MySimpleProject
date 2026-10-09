@@ -7,10 +7,13 @@ class AuthoritySignatureTests(unittest.TestCase):
         private=Ed25519PrivateKey.generate()
         raw=private.private_bytes_raw()
         pub=private.public_key().public_bytes_raw()
-        contract={"brain_id":"b","generation":1,"fencing_token":2,"lease_id":"l","holder_id":"h","task_id":"t","attempt_id":"a","source_commit":"0"*40,"capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","authority_policy_version":"authority-policy-v1","authority_decision":"AUTHORIZED","authority_signature_algorithm":ALGORITHM}
+        contract={"brain_id":"b","generation":1,"fencing_token":2,"lease_id":"l","holder_id":"h","task_id":"t","attempt_id":"a","source_commit":"0"*40,"capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","authority_policy_version":"authority-policy-v1","authority_decision":"AUTHORIZED","owner_id":"owner-1","owner_challenge_id":"c-1","owner_scope":"windows-server-2025-real-boot","authority_signature_algorithm":ALGORITHM}
         sig=sign_contract(contract,base64.b64encode(raw).decode())
         self.assertTrue(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
         contract["task_id"]="tampered"
+        self.assertFalse(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
+        contract["task_id"]="t"
+        contract["owner_scope"]="tampered"
         self.assertFalse(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
 
 if __name__=="__main__": unittest.main()
