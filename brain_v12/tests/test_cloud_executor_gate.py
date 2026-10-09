@@ -48,7 +48,7 @@ class CloudExecutorAttestationTests(unittest.TestCase):
             "now": self.now,
         }
         values.update(expected)
-        return _verify_attestation(raw, key or self.public_b64, **values)
+        return _verify_attestation(raw, self.public_b64 if key is None else key, **values)
 
     def test_accepts_valid_short_lived_signed_attestation(self):
         ok, reason = self.verify(self.signed())
