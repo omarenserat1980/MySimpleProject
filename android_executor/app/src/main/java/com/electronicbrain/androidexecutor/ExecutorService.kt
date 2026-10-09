@@ -21,7 +21,8 @@ class ExecutorService : Service() {
     companion object {
         const val ACTION_START = "START"
         private const val CHANNEL = "electronic_brain_executor"
-        private const val DEFAULT_BASE_URL = "http://127.0.0.1:8012"
+        private const val DEFAULT_BASE_URL = "https://mysimpleproject.onrender.com"
+        private const val HEARTBEAT_INTERVAL_MS = 5000L
         private const val POLL_MS = 2000L
         private val ALLOWED = setOf("status","device_info","platform","list_files","mkdir","read_file","write_text","run_toybox","ffmpeg_probe","ffmpeg_run","verify_file","verify_media","termux_probe","queue_status","queue_enqueue","film_create","chatgpt_ui_send",)
     }
@@ -49,7 +50,17 @@ class ExecutorService : Service() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
         val agentId = prefs.getString("agent_id", "android-executor-01") ?: "android-executor-01"
         val key = prefs.getString("agent_key", "") ?: ""
-        val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
+        val savedBaseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trim()?.trimEnd('/').orEmpty()
+        val baseUrl = if (savedBaseUrl.isBlank() ||
+            savedBaseUrl.equals("http://127.0.0.1:8012", ignoreCase = true) ||
+            savedBaseUrl.equals("http://localhost:8012", ignoreCase = true)) {
+            DEFAULT_BASE_URL
+        } else {
+            savedBaseUrl
+        }
+        if (baseUrl != savedBaseUrl) {
+            prefs.edit().putString("brain_base_url", baseUrl).apply()
+        }
         if (key.isBlank()) {
             updateNotification("ERROR: agent key missing")
             running = false
@@ -57,8 +68,15 @@ class ExecutorService : Service() {
         }
 
         updateNotification("READY: $agentId")
+        var nextHeartbeatAt = 0L
         while (running) {
             try {
+                val now = System.currentTimeMillis()
+                if (now >= nextHeartbeatAt) {
+                    heartbeat(baseUrl, agentId, key)
+                    nextHeartbeatAt = now + HEARTBEAT_INTERVAL_MS
+                }
+
                 // Resume one persisted production task on every executor cycle.
                 queueWorker.resumeOnce()
 
@@ -87,10 +105,45 @@ class ExecutorService : Service() {
         c.setRequestProperty("X-V12-Agent-Key", key)
         c.connectTimeout = 15000
         c.readTimeout = 20000
-        val body = c.inputStream.bufferedReader().use { it.readText() }
-        c.disconnect()
-        val root = JSONObject(body)
-        return if (root.has("task") && !root.isNull("task")) root.getJSONObject("task") else null
+        return try {
+            val root = JSONObject(readResponse(c))
+            if (root.has("task") && !root.isNull("task")) root.getJSONObject("task") else null
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    private fun heartbeat(baseUrl: String, agentId: String, key: String) {
+        val payload = JSONObject()
+            .put("agent_id", agentId)
+            .put("metadata", JSONObject()
+                .put("platform", "android")
+                .put("client", "android_executor")
+                .put("app_version", "1.1.0"))
+        val c = URL(baseUrl + "/api/device/heartbeat").openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        c.doOutput = true
+        c.connectTimeout = 10000
+        c.readTimeout = 10000
+        c.setRequestProperty("X-V12-Agent-Key", key)
+        c.setRequestProperty("X-V12-Agent-Id", agentId)
+        c.setRequestProperty("Content-Type", "application/json")
+        try {
+            c.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
+            JSONObject(readResponse(c))
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    private fun readResponse(c: HttpURLConnection): String {
+        val code = c.responseCode
+        val stream = if (code in 200..299) c.inputStream else c.errorStream
+        val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+        if (code !in 200..299) {
+            throw IllegalStateException("HTTP $code: " + body.take(160))
+        }
+        return body
     }
 
     private fun report(baseUrl: String, agentId: String, key: String, taskId: String, result: JSONObject) {
@@ -106,9 +159,12 @@ class ExecutorService : Service() {
         c.doOutput = true
         c.setRequestProperty("X-V12-Agent-Key", key)
         c.setRequestProperty("Content-Type", "application/json")
-        c.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
-        c.inputStream.close()
-        c.disconnect()
+        try {
+            c.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
+            readResponse(c)
+        } finally {
+            c.disconnect()
+        }
     }
 
     private fun execute(task: JSONObject): JSONObject {
