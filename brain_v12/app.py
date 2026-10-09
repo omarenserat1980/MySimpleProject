@@ -146,7 +146,6 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
-app.include_router(home_server_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
 from .brain_git.api import router as brain_git_router
@@ -2326,3 +2325,6 @@ async def brain_mcp_auth(request: Request, call_next):
                 status_code=401,
             )
     return await call_next(request)
+
+# Register Home Server endpoints after the main application routes are defined.
+app.include_router(home_server_router)
