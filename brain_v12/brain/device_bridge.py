@@ -43,8 +43,14 @@ class DeviceBridge:
             return "BRAIN_EMULATOR_KEY"
         if os.getenv("BRAIN_EMULATOR_AGENT_KEY", ""):
             return "BRAIN_EMULATOR_AGENT_KEY"
-        if os.path.isfile(self._local_key_file()):
-            return "LOCAL_KEY_FILE"
+        key_file = self._local_key_file()
+        if key_file and os.path.isfile(key_file) and os.access(key_file, os.R_OK):
+            try:
+                with open(key_file, encoding="utf-8") as f:
+                    if f.read().strip():
+                        return "LOCAL_KEY_FILE"
+            except (OSError, UnicodeError):
+                pass
         if os.getenv(AGENT_KEY_SHA256_ENV, "").strip():
             return "SHA256_KEY"
         return "NOT_CONFIGURED"
