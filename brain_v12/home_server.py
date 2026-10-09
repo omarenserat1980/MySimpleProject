@@ -190,7 +190,16 @@ class HomeServerStore:
             return {"ok": True, "task": self._item(updated)}
 
 
-store = HomeServerStore()
+store: HomeServerStore | None = None
+
+
+def get_store() -> HomeServerStore:
+    global store
+    if store is None:
+        store = HomeServerStore()
+    return store
+
+
 app = FastAPI(title="Brain Home Server", version=APP_VERSION)
 
 
@@ -210,7 +219,7 @@ def health():
 
 @app.get("/api/home-server/status")
 def home_server_status():
-    result = store.status()
+    result = get_store().status()
     result["control_auth_configured"] = bool(os.getenv("BRAIN_CONTROL_KEY", "").strip())
     return result
 
@@ -218,14 +227,14 @@ def home_server_status():
 @app.get("/api/home-server/tasks")
 def list_tasks(limit: int = 50, authorization: str | None = Header(default=None)):
     _authorize(authorization)
-    return {"ok": True, "tasks": store.list_tasks(max(1, min(limit, 200)))}
+    return {"ok": True, "tasks": get_store().list_tasks(max(1, min(limit, 200)))}
 
 
 @app.post("/api/home-server/tasks")
 def create_task(body: TaskInput, authorization: str | None = Header(default=None)):
     _authorize(authorization)
     try:
-        return {"ok": True, "task": store.enqueue(body.task, body.params, body.idempotency_key)}
+        return {"ok": True, "task": get_store().enqueue(body.task, body.params, body.idempotency_key)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -233,14 +242,14 @@ def create_task(body: TaskInput, authorization: str | None = Header(default=None
 @app.post("/api/home-server/claim")
 def claim_task(body: ClaimInput, authorization: str | None = Header(default=None)):
     _authorize(authorization)
-    return store.claim(body.worker_id, body.lease_seconds)
+    return get_store().claim(body.worker_id, body.lease_seconds)
 
 
 @app.post("/api/home-server/tasks/{task_id}/report")
 def report_task(task_id: str, body: ReportInput, authorization: str | None = Header(default=None)):
     _authorize(authorization)
     try:
-        return store.report(task_id, body.worker_id, body.ok, body.result, body.error)
+        return get_store().report(task_id, body.worker_id, body.ok, body.result, body.error)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
