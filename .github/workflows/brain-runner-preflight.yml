@@ -1,0 +1,45 @@
+name: BRAIN Arkan Runner Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-arkan-runner-preflight
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: [self-hosted, brain-internal]
+    timeout-minutes: 10
+    steps:
+      - name: Runner identity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Host "RUNNER_OK"
+          Write-Host "HOST=$env:COMPUTERNAME"
+          Write-Host "USER=$env:USERNAME"
+          Write-Host "POWERSHELL=$($PSVersionTable.PSVersion)"
+          Get-Date -Format o
+
+      - name: Workspace health
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = "C:\actions-runner\actions-runner"
+          if (!(Test-Path $root)) { throw "Runner root missing" }
+          $drive = Get-PSDrive C
+          Write-Host "RUNNER_ROOT_OK"
+          Write-Host "C_FREE_BYTES=$($drive.Free)"
+          Write-Host "WORKDIR_EXISTS=$(Test-Path "$root\_work")"
+
+      - name: Azure CLI session check
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
+          if ($LASTEXITCODE -ne 0) { throw "Azure CLI session unavailable" }
+          Write-Host "AZURE_SESSION_OK"
