@@ -23,6 +23,7 @@ on:
   push:
     branches:
       - "integration/brain-home-azure-clean"
+      - "brain-proof-of-execution"
     paths:
       - "brain_v12/home_server.py"
       - "brain_v12/tests/test_home_server.py"
