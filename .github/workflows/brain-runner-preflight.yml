@@ -16,37 +16,29 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        shell: powershell
+        shell: cmd
     steps:
       - name: Runner identity
         run: |
-          $ErrorActionPreference = "Stop"
-          Write-Host "RUNNER_OK"
-          Write-Host "HOST=$env:COMPUTERNAME"
-          Write-Host "USER=$env:USERNAME"
-          Write-Host "POWERSHELL=$($PSVersionTable.PSVersion)"
-          Get-Date -Format o
+          echo RUNNER_OK
+          echo HOST=%COMPUTERNAME%
+          echo USER=%USERNAME%
+          ver
 
       - name: Workspace health
         run: |
-          $ErrorActionPreference = "Stop"
-          $root = "C:\actions-runner\actions-runner"
-          if (!(Test-Path $root)) { throw "Runner root missing" }
-          $drive = Get-PSDrive C
-          Write-Host "RUNNER_ROOT_OK"
-          Write-Host "C_FREE_BYTES=$($drive.Free)"
-          Write-Host "WORKDIR_EXISTS=$(Test-Path "$root\_work")"
+          if not exist "C:\actions-runner\actions-runner\_work" exit /b 1
+          echo RUNNER_ROOT_OK
+          echo WORKDIR_OK
 
       - name: Azure CLI session check
         run: |
-          $ErrorActionPreference = "Stop"
           az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
-          if ($LASTEXITCODE -ne 0) { throw "Azure CLI session unavailable" }
-          Write-Host "AZURE_SESSION_OK"
+          if errorlevel 1 exit /b 1
+          echo AZURE_SESSION_OK
 
       - name: Terraform availability
         run: |
-          $ErrorActionPreference = "Stop"
           terraform version
-          if ($LASTEXITCODE -ne 0) { throw "Terraform unavailable" }
-          Write-Host "TERRAFORM_OK"
+          if errorlevel 1 exit /b 1
+          echo TERRAFORM_OK
