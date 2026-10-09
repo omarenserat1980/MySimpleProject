@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 APP_VERSION = "0.1.0"
@@ -223,6 +223,7 @@ def get_store() -> HomeServerStore:
 
 
 app = FastAPI(title="Brain Home Server", version=APP_VERSION)
+router = APIRouter()
 
 
 def _authorize(authorization: str | None, *, worker: bool = False) -> None:
@@ -252,20 +253,20 @@ def health():
     return {"ok": True, "service": "brain-home-server", "version": APP_VERSION}
 
 
-@app.get("/api/home-server/status")
+@router.get("/api/home-server/status")
 def home_server_status():
     result = get_store().status()
     result["control_auth_configured"] = bool(os.getenv("BRAIN_CONTROL_KEY", "").strip())
     return result
 
 
-@app.get("/api/home-server/tasks")
+@router.get("/api/home-server/tasks")
 def list_tasks(limit: int = 50, authorization: str | None = Header(default=None)):
     _authorize(authorization)
     return {"ok": True, "tasks": get_store().list_tasks(max(1, min(limit, 200)))}
 
 
-@app.post("/api/home-server/tasks")
+@router.post("/api/home-server/tasks")
 def create_task(body: TaskInput, authorization: str | None = Header(default=None)):
     _authorize(authorization)
     try:
@@ -274,13 +275,13 @@ def create_task(body: TaskInput, authorization: str | None = Header(default=None
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@app.post("/api/home-server/claim")
+@router.post("/api/home-server/claim")
 def claim_task(body: ClaimInput, authorization: str | None = Header(default=None)):
     _authorize(authorization, worker=True)
     return get_store().claim(body.worker_id, body.lease_seconds, body.capabilities)
 
 
-@app.post("/api/home-server/tasks/{task_id}/report")
+@router.post("/api/home-server/tasks/{task_id}/report")
 def report_task(task_id: str, body: ReportInput, authorization: str | None = Header(default=None)):
     _authorize(authorization, worker=True)
     try:
@@ -289,3 +290,7 @@ def report_task(task_id: str, body: ReportInput, authorization: str | None = Hea
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+# Keep the standalone local service working while allowing the main Brain app to reuse these routes.
+app.include_router(router)
