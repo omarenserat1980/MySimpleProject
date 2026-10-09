@@ -15,6 +15,8 @@ on:
       - "brain_v12/raw_server/**"
       - "brain_v12/tests/test_raw_server_composer.py"
       - "scripts/Install-BrainRawServer.ps1"
+      - "scripts/Test-BrainHyperVPreflight.ps1"
+      - "brain_v12/raw_server/CONTRACTS.md"
       - ".github/workflows/brain-raw-server-composer.yml"
   workflow_dispatch:
 
@@ -38,6 +40,13 @@ jobs:
           test -s scripts/Install-BrainRawServer.ps1
           test -s scripts/Test-BrainHyperVPreflight.ps1
           test -s brain_v12/raw_server/CONTRACTS.md
+      - name: Parse PowerShell preflight syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "scripts/Test-BrainHyperVPreflight.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Out-String | Write-Error }
       - name: Guard read-only Hyper-V preflight against VM mutations
         shell: bash
         run: |
