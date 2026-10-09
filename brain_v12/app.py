@@ -47,6 +47,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .home_server import router as home_server_router
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -145,6 +146,7 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+app.include_router(home_server_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
 from .brain_git.api import router as brain_git_router
