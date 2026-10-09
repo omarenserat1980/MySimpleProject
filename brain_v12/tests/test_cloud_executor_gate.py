@@ -9,28 +9,48 @@ from brain_v12.brain.cloud_executor_gate import check
 
 class CloudExecutorGateTests(unittest.TestCase):
     def test_gate_requires_x86_kvm_and_qemu(self):
+        env = {
+            "BRAIN_CLOUD_EXECUTOR": "1",
+            "BRAIN_CLOUD_EXECUTOR_ID": "test-executor",
+            "BRAIN_CLOUD_EXECUTOR_ATTESTATION": "test-attestation-reference",
+        }
         with tempfile.TemporaryDirectory() as td:
             out = str(Path(td) / "gate.json")
-            with patch.dict("os.environ", {"BRAIN_CLOUD_EXECUTOR": "1"}), \
-                 patch("brain_v12.brain.cloud_executor_gate.platform.machine", return_value="x86_64"),                  patch("brain_v12.brain.cloud_executor_gate.Path.exists", return_value=True),                  patch("brain_v12.brain.cloud_executor_gate.os.access", return_value=True),                  patch("brain_v12.brain.cloud_executor_gate.shutil.which", side_effect=lambda x: "/usr/bin/qemu-system-x86_64" if x == "qemu-system-x86_64" else "/usr/bin/python"),                  patch("brain_v12.brain.cloud_executor_gate._run", side_effect=[
+            with patch.dict("os.environ", env), \
+                 patch("brain_v12.brain.cloud_executor_gate.platform.machine", return_value="x86_64"), \
+                 patch("brain_v12.brain.cloud_executor_gate.Path.exists", return_value=True), \
+                 patch("brain_v12.brain.cloud_executor_gate.os.access", return_value=True), \
+                 patch("brain_v12.brain.cloud_executor_gate.shutil.which",
+                       side_effect=lambda x: "/usr/bin/qemu-system-x86_64" if x == "qemu-system-x86_64" else "/usr/bin/python"), \
+                 patch("brain_v12.brain.cloud_executor_gate._run", side_effect=[
                      (True, "QEMU emulator version 9"),
-                     (True, "kvm tcg")
+                     (True, "kvm tcg"),
                  ]), \
-                 patch("brain_v12.brain.cloud_executor_gate._probe_kvm", return_value=(True, "qemu-initialized-kvm-and-paused")):
-                e = check(out)
-            self.assertTrue(e["verified"])
+                 patch("brain_v12.brain.cloud_executor_gate._probe_kvm",
+                       return_value=(True, "qemu-initialized-kvm-and-paused")):
+                evidence = check(out)
+            self.assertTrue(evidence["verified"], evidence)
             self.assertTrue(Path(out).exists())
             self.assertTrue(json.loads(Path(out).read_text())["verified"])
 
     def test_gate_fails_without_kvm(self):
+        env = {
+            "BRAIN_CLOUD_EXECUTOR": "1",
+            "BRAIN_CLOUD_EXECUTOR_ID": "test-executor",
+            "BRAIN_CLOUD_EXECUTOR_ATTESTATION": "test-attestation-reference",
+        }
         with tempfile.TemporaryDirectory() as td:
-            with patch.dict("os.environ", {"BRAIN_CLOUD_EXECUTOR": "1"}), \
-                 patch("brain_v12.brain.cloud_executor_gate.platform.machine", return_value="x86_64"),                  patch("brain_v12.brain.cloud_executor_gate.Path.exists", return_value=False),                  patch("brain_v12.brain.cloud_executor_gate.os.access", return_value=False),                  patch("brain_v12.brain.cloud_executor_gate.shutil.which", return_value="/usr/bin/qemu-system-x86_64"),                  patch("brain_v12.brain.cloud_executor_gate._run", side_effect=[
+            with patch.dict("os.environ", env), \
+                 patch("brain_v12.brain.cloud_executor_gate.platform.machine", return_value="x86_64"), \
+                 patch("brain_v12.brain.cloud_executor_gate.Path.exists", return_value=False), \
+                 patch("brain_v12.brain.cloud_executor_gate.os.access", return_value=False), \
+                 patch("brain_v12.brain.cloud_executor_gate.shutil.which", return_value="/usr/bin/qemu-system-x86_64"), \
+                 patch("brain_v12.brain.cloud_executor_gate._run", side_effect=[
                      (True, "QEMU emulator version 9"),
-                     (True, "kvm")
+                     (True, "kvm"),
                  ]):
-                e = check(str(Path(td) / "gate.json"))
-            self.assertFalse(e["verified"])
+                evidence = check(str(Path(td) / "gate.json"))
+            self.assertFalse(evidence["verified"])
 
 
 if __name__ == "__main__":
