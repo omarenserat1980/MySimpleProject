@@ -10,7 +10,6 @@ import json
 import os
 import re
 import time
-import hmac
 from pathlib import Path
 from typing import Any
 
@@ -42,14 +41,12 @@ def load_and_verify(path: str | Path | None = None, *, now: float | None = None)
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_POLICY_INVALID")
     if contract.get("authority_decision") != "AUTHORIZED":
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_NOT_AUTHORIZED")
-    proof = str(contract.get("authority_proof", "")).strip()
-    secret = os.environ.get("BRAIN_AUTHORITY_SIGNING_TOKEN", "")
-    if not secret or not proof:
-        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_PROOF_REQUIRED")
-    from brain_v12.brain.brain_authority import authority_proof
-    expected = authority_proof(contract)
-    if not hmac.compare_digest(proof, expected):
-        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_PROOF_INVALID")
+    signature = str(contract.get("authority_signature", "")).strip()
+    if not signature:
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_REQUIRED")
+    from brain_v12.brain.authority_signature import verify_contract_signature
+    if not verify_contract_signature(contract, signature):
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
 
     brain_id = str(contract.get("brain_id", "")).strip()
     if not brain_id:
