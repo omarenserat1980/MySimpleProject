@@ -71,7 +71,7 @@ class BrainTaskContinuityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "continuous_tasks.jsonl").write_text(json.dumps({
-                "task_id": "blocked", "fingerprint": "goal:needs-approval",
+                "task_id": "blocked", "fingerprint": "goal:needs approval",
                 "goal": "needs approval", "kind": "goal",
                 "priority": 1.0, "status": "BLOCKED",
             }) + "\n", encoding="utf-8")
