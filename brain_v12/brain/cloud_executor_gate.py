@@ -118,6 +118,13 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
     cloud_flag = os.environ.get("BRAIN_CLOUD_EXECUTOR", "")
     executor_id = os.environ.get("BRAIN_CLOUD_EXECUTOR_ID", "").strip()
     raw_attestation = os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION", "").strip()
+    encoded_attestation = os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64", "").strip()
+    if encoded_attestation:
+        try:
+            decoded = base64.b64decode(encoded_attestation.encode("ascii"), validate=True)
+            raw_attestation = decoded.decode("utf-8")
+        except Exception:
+            raw_attestation = ""
     trusted_key = os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64", "").strip()
 
     arch = platform.machine().lower()
