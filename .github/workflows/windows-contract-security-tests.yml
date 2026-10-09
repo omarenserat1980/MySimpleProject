@@ -41,6 +41,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check cryptography
       - name: Test signed cloud executor attestation
         run: python -m unittest brain_v12.tests.test_cloud_executor_gate -v
+      - name: Compile executor gate and validate bootstrap shell syntax
+        run: |
+          python -m py_compile brain_v12/brain/cloud_executor_gate.py
+          bash -n tools/bootstrap_brain_cloud_executor.sh
       - name: Compile authenticated contract API route
         run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
       - name: Test Control Plane and executor capability separation
