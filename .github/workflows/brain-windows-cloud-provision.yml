@@ -49,7 +49,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Verify Azure CLI session
-        shell: powershell
+        shell: cmd
         run: |
           az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
 
@@ -74,12 +74,5 @@ jobs:
 
       - name: Export infrastructure proof
         if: ${{ inputs.approve_apply == true }}
-        shell: powershell
-        run: |
-          terraform output -json | Out-File -FilePath brain-terraform-outputs.json -Encoding utf8
-          $d = Get-Content brain-terraform-outputs.json -Raw | ConvertFrom-Json
-          $safe = @{}
-          $d.PSObject.Properties | Where-Object { $_.Name -ne "brain_public_ip" } | ForEach-Object {
-            $safe[$_.Name] = $_.Value.value
-          }
-          $safe | ConvertTo-Json -Depth 10
+        shell: cmd
+        run: terraform output -json > brain-terraform-outputs.json
