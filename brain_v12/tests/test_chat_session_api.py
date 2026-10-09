@@ -313,7 +313,7 @@ class ChatSessionApiTests(unittest.TestCase):
             get_endpoint = next(route.endpoint for route in routes
                                 if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}")
             list_endpoint = next(route.endpoint for route in routes
-                                 if getattr(route, "path", "") == "/api/brain-chat/sessions")
+                                 if getattr(route, "path", "") == "/api/brain-chat/sessions" and "GET" in route.methods)
             self.assertEqual(get_endpoint(owner_session["id"], authorization=authorization)["session"]["id"],
                              owner_session["id"])
             with self.assertRaises(HTTPException) as cross_account:
