@@ -17,5 +17,6 @@ class ArkanTwinGoldenLoopTests(unittest.TestCase):
    loop.arkan.set_network(kvm=True)
    loop.arkan.set_resources(free_ram_gib=1.0)
    r=loop.run("Write-Output SHOULD_NOT_RUN",task_id="blocked-01",max_attempts=1)
-   self.assertFalse(r["ok"]); self.assertEqual(r["status"],"GOLDEN_CLOSED_LOOP_FAILED")\n   loop.close()
+   self.assertFalse(r["ok"]); self.assertEqual(r["status"],"GOLDEN_CLOSED_LOOP_FAILED")
+   loop.close()
 if __name__=="__main__":unittest.main()
