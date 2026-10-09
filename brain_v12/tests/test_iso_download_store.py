@@ -103,6 +103,26 @@ class IsoDownloadStoreTests(unittest.TestCase):
         self.assertTrue(self.store.renew_worker_lease(
             task_id, worker_id="worker-b", generation=second))
 
+    def test_stale_worker_cannot_commit_completed_state(self):
+        task_id = self.task["download_id"]
+        for state in ("VALIDATING", "QUEUED", "CONNECTING", "DOWNLOADING", "VERIFYING"):
+            self.store.transition(task_id, owner_id="alice", new_state=state, reason="test")
+        first = self.store.acquire_worker_token(task_id, worker_id="worker-a")
+        # Expire and reclaim the lease to simulate recovery after worker-a stalled.
+        with self.store._db() as db:
+            db.execute("UPDATE worker_leases SET acquired_at=0 WHERE download_id=?", (task_id,))
+        second = self.store.acquire_worker_token(task_id, worker_id="worker-b")
+        with self.assertRaisesRegex(DownloadError, "WORKER_LEASE_LOST"):
+            self.store.complete_with_worker_lease(
+                task_id, owner_id="alice", worker_id="worker-a", generation=first)
+        self.assertEqual(self.store.get(task_id, owner_id="alice")["state"], "VERIFYING")
+        completed = self.store.complete_with_worker_lease(
+            task_id, owner_id="alice", worker_id="worker-b", generation=second,
+            request_id="req-complete")
+        self.assertEqual(completed["state"], "COMPLETED")
+        history = self.store.transition_history(task_id, owner_id="alice")
+        self.assertEqual(history[-1]["new_state"], "COMPLETED")
+
     def test_existing_worker_lease_schema_is_migrated(self):
         root = Path(self.tmp.name) / "legacy-db"
         legacy = DownloadStore(root, persistent=True)

@@ -266,6 +266,47 @@ class DownloadStore:
                 (download_id, worker_id, generation, now - self.lease_ttl_seconds)).fetchone()
         return row is not None
 
+    def complete_with_worker_lease(self, download_id: str, *, owner_id: str,
+                                    worker_id: str, generation: int,
+                                    request_id: str | None = None) -> dict:
+        """Atomically fence the worker and record VERIFYING -> COMPLETED.
+
+        This protects the database commit only. Callers must separately ensure that
+        filesystem promotion is safe and cannot be performed by a stale worker.
+        """
+        if not worker_id or isinstance(generation, bool) or generation < 1:
+            raise DownloadError("INVALID_REQUEST")
+        now = time.time()
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("""SELECT * FROM downloads
+                WHERE download_id=? AND owner_id=?""", (download_id, owner_id)).fetchone()
+            if row is None:
+                db.execute("ROLLBACK")
+                raise DownloadError("TASK_NOT_FOUND")
+            lease = db.execute("""SELECT 1 FROM worker_leases
+                WHERE download_id=? AND worker_id=? AND generation=? AND acquired_at>?""",
+                (download_id, worker_id, generation, now - self.lease_ttl_seconds)).fetchone()
+            if lease is None or row["lease_generation"] != generation:
+                db.execute("ROLLBACK")
+                raise DownloadError("WORKER_LEASE_LOST")
+            if row["state"] != "VERIFYING":
+                db.execute("ROLLBACK")
+                raise DownloadError("INVALID_STATE_TRANSITION")
+            db.execute("""UPDATE downloads SET state='COMPLETED',updated_at=?,last_request_id=?
+                WHERE download_id=? AND owner_id=? AND state='VERIFYING' AND lease_generation=?""",
+                (now, request_id, download_id, owner_id, generation))
+            if db.execute("SELECT changes()").fetchone()[0] != 1:
+                db.execute("ROLLBACK")
+                raise DownloadError("TASK_CONFLICT")
+            db.execute("""INSERT INTO transitions
+                (download_id,previous_state,new_state,occurred_at,reason,request_id)
+                VALUES(?,?,?,?,?,?)""",
+                (download_id, "VERIFYING", "COMPLETED", now,
+                 "verified by current fenced worker", request_id))
+            db.execute("COMMIT")
+        return self.get(download_id, owner_id=owner_id)
+
     def renew_worker(self, download_id: str, *, worker_id: str) -> bool:
         """Legacy renewal API; prefer renew_worker_lease with a fencing token."""
         if not worker_id:
