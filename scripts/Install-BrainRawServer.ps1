@@ -9,14 +9,17 @@ $ErrorActionPreference = "Stop"
 $Composer = Join-Path $PSScriptRoot "..\brain_v12\raw_server\composer.py"
 $Composer = [System.IO.Path]::GetFullPath($Composer)
 if (-not (Test-Path -LiteralPath $Composer -PathType Leaf)) {
-    # This makes the installer usable when only this .ps1 file was downloaded.
+    # Bootstrap from a reviewed immutable commit, never from a mutable branch name.
     $Composer = Join-Path $env:ProgramData "ElectronicBrain\RawServer\composer.py"
     $ComposerDirectory = Split-Path -Parent $Composer
     New-Item -ItemType Directory -Force -Path $ComposerDirectory | Out-Null
-    $SourceUrl = "https://raw.githubusercontent.com/omarenserat1980/MySimpleProject/brain/raw-server-composer-20261009/brain_v12/raw_server/composer.py"
-    $TemporaryDownload = "$Composer.download"
+    $PinnedCommit = "1f48c790e55b3d8df3279bda8e7078923316769e"
+    $SourceUrl = "https://raw.githubusercontent.com/omarenserat1980/MySimpleProject/$PinnedCommit/brain_v12/raw_server/composer.py"
+    $TemporaryDownload = "$Composer.download-$PID"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        # Always refresh the fallback copy from the immutable source. Do not trust
+        # a stale or locally modified ProgramData copy merely because it exists.
         Invoke-WebRequest -Uri $SourceUrl -OutFile $TemporaryDownload -UseBasicParsing -TimeoutSec 30
         if (-not (Test-Path -LiteralPath $TemporaryDownload -PathType Leaf) -or (Get-Item -LiteralPath $TemporaryDownload).Length -lt 1000) {
             throw "Downloaded composer file is missing or unexpectedly small."
@@ -25,7 +28,7 @@ if (-not (Test-Path -LiteralPath $Composer -PathType Leaf)) {
     }
     catch {
         Remove-Item -LiteralPath $TemporaryDownload -Force -ErrorAction SilentlyContinue
-        throw "Could not download the Brain Raw Server Composer. Check network access and retry. Details: $($_.Exception.Message)"
+        throw "Could not download the pinned Brain Raw Server Composer. Check network access and retry. Details: $($_.Exception.Message)"
     }
 }
 $Python = Get-Command python -ErrorAction SilentlyContinue
