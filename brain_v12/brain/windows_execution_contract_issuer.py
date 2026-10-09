@@ -44,12 +44,14 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     require_authorized(decision)
     now=time.time() if now is None else float(now)
     if expires_seconds<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_EXPIRY_TOO_SHORT")
+    contract_expires_at=min(now+int(expires_seconds),owner.expires_at)
+    if contract_expires_at-now<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_APPROVAL_EXPIRY_TOO_SOON")
     c={"schema":SCHEMA,"status":"VERIFIED","capability":CAPABILITY,"executor":EXECUTOR,
        "authority_policy_version":POLICY,"authority_decision":"AUTHORIZED",
        "brain_id":verified["brain_id"],"generation":verified["generation"],
        "fencing_token":lease.fencing_token,"lease_id":lease.lease_id,"holder_id":lease.holder_id,
        "task_id":str(task_id).strip(),"attempt_id":str(attempt_id).strip(),
-       "source_commit":source_commit,"issued_at":now,"expires_at":now+int(expires_seconds),
+       "source_commit":source_commit,"issued_at":now,"expires_at":contract_expires_at,
        "owner_id":owner.owner_id,"owner_challenge_id":owner.challenge_id,"owner_scope":owner.scope,
        "owner_approval_source_commit":owner.source_commit,"owner_approval_task_id":owner.task_id,
        "owner_approval_attempt_id":owner.attempt_id}
