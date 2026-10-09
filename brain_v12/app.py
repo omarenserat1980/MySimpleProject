@@ -2290,6 +2290,9 @@ app.mount('/brain-chat', StaticFiles(directory=os.path.join(ROOT,'web','brain-ch
 app.mount('/text-to-drawing', StaticFiles(directory=os.path.join(ROOT,'web','text-to-drawing'), html=True), name='text-to-drawing')
 app.mount('/local-painter', StaticFiles(directory=os.path.join(ROOT,'web','local-painter'), html=True), name='local-painter')
 app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-app-v2"),html=True),name="brain-app-v2")
+from .brain.brain_mcp import build_mcp_router
+app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
@@ -2298,8 +2301,6 @@ if __name__=="__main__":
 
 # Governed MCP Streamable HTTP endpoint. Kept inside the deployed FastAPI app
 # so Render's existing start command continues to work.
-from .brain.brain_mcp import build_mcp_router
-app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 
 @app.middleware("http")
 async def brain_mcp_auth(request: Request, call_next):
