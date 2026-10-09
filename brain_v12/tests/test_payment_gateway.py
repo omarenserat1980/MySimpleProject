@@ -35,6 +35,15 @@ class PaymentGatewayTests(unittest.TestCase):
         journal_path=self.db + ".payment-events.json"
         journal=PaymentEventJournal(journal_path)
         journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.parse_obj(p))
+        # Simulate a crash after the durable commerce commit but before the replay cache write.
+        self.store.transition(p["order_id"], "PAYMENT_VERIFIED", {
+            "transaction_id": p["payment_reference"],
+            "evidence_ref": f"payment-webhook:{p['provider']}:{p['event_id']}",
+            "provider": p["provider"],
+            "event_id": p["event_id"],
+            "verified_at": int(time.time()),
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+        })
         journal.mark(p["event_id"], "COMMERCE_COMMITTED")
         second=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(second.status_code,200)
