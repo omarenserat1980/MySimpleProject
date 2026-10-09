@@ -7,7 +7,6 @@ on:
     paths:
       - ".github/workflows/brain-human-intermediary-autopilot.yml"
       - ".github/workflows/validate-autopilot-workflow.yml"
-      - ".github/actionlint.yaml"
   workflow_dispatch:
 
 permissions:
@@ -31,4 +30,9 @@ jobs:
           tar -xzf "/tmp/${archive}" -C /tmp actionlint
           /tmp/actionlint -version
       - name: Validate workflow syntax and expressions
-        run: /tmp/actionlint -config-file .github/actionlint.yaml .github/workflows/brain-human-intermediary-autopilot.yml
+        run: |
+          /tmp/actionlint \
+            -ignore 'label "brain-internal" is unknown' \
+            -ignore 'label "qemu" is unknown' \
+            -ignore 'label "windows-real-boot" is unknown' \
+            .github/workflows/brain-human-intermediary-autopilot.yml
