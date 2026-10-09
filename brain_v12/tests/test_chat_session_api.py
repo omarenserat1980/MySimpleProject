@@ -170,6 +170,36 @@ class ChatSessionApiTests(unittest.TestCase):
             self.assertEqual(len(user_messages), 1)
             self.assertEqual(len(assistant_messages), 1)
 
+    def test_message_endpoint_recovers_reply_persisted_before_ledger_completion(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("Crash recovery")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+            body = MessageIn(message="hello", client_message_id="crash-window-1")
+            first = endpoint(session["id"], body)
+            self.assertTrue(first["ok"])
+            self.assertEqual(len(brain.calls), 1)
+
+            # Simulate a process crash after the assistant message was committed
+            # but before the idempotency ledger could persist its cached response.
+            with store.connect() as con:
+                con.execute(
+                    "UPDATE chat_request_idempotency SET status='PROCESSING',response_json=NULL "
+                    "WHERE session_id=? AND client_message_id=?",
+                    (session["id"], "crash-window-1"),
+                )
+                con.commit()
+
+            recovered = endpoint(session["id"], body)
+            self.assertTrue(recovered["idempotent_replay"])
+            self.assertEqual(recovered["response"]["content"], "Brain verified reply")
+            self.assertEqual(len(brain.calls), 1)
+            messages = recovered["session"]["messages"]
+            self.assertEqual(sum(1 for m in messages if m["role"] == "assistant"), 1)
+
     def test_message_endpoint_rejects_reused_id_with_changed_payload(self):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
