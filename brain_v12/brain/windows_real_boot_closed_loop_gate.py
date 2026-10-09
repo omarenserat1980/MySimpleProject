@@ -41,19 +41,19 @@ def load_and_verify(path: str | Path | None = None, *, now: float | None = None)
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_POLICY_INVALID")
     if contract.get("authority_decision") != "AUTHORIZED":
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_NOT_AUTHORIZED")
-    signature = str(contract.get("authority_signature", "")).strip()
-    if not signature:
-        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_REQUIRED")
-    from brain_v12.brain.authority_signature import verify_contract_signature
-    if not verify_contract_signature(contract, signature):
-        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
-
     if not str(contract.get("owner_id", "")).strip():
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_ID_REQUIRED")
     if not str(contract.get("owner_challenge_id", "")).strip():
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_CHALLENGE_REQUIRED")
     if contract.get("owner_scope") != "windows-server-2025-real-boot":
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_SCOPE_INVALID")
+
+    signature = str(contract.get("authority_signature", "")).strip()
+    if not signature:
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_REQUIRED")
+    from brain_v12.brain.authority_signature import verify_contract_signature
+    if not verify_contract_signature(contract, signature):
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
 
     brain_id = str(contract.get("brain_id", "")).strip()
     if not brain_id:
