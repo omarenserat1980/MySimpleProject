@@ -158,10 +158,7 @@ class HomeServerAgentRoundTripTests(unittest.TestCase):
             calls.append((method, path, payload))
             return responses.pop(0)
 
-        with patch("unittest.mock") as _unused:
-            pass
-        from unittest.mock import patch as mock_patch
-        with mock_patch.object(self.agent, "request_json", side_effect=fake_request):
+        with patch.object(self.agent, "request_json", side_effect=fake_request):
             result = self.agent.run_once("test-key")
 
         self.assertTrue(result["ok"])
