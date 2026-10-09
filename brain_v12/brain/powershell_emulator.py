@@ -59,7 +59,7 @@ class PowerShellEmulator:
         if name in {"get-location","pwd"}: return {"ok":True,"output":self.cwd}
         if name in {"set-location","cd"}:
             path=self._arg(args)
-            target=(self.desktop.root / path).resolve()
+            target=(self.desktop.root / self.cwd / path).resolve()
             if target != self.desktop.root and self.desktop.root not in target.parents:
                 return {"ok":False,"status":"PATH_ESCAPE_DENIED"}
             if not target.is_dir(): return {"ok":False,"status":"PATH_NOT_FOUND"}
