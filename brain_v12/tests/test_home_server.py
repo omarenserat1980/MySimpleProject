@@ -100,6 +100,14 @@ class HomeServerQueueTests(unittest.TestCase):
         self.assertEqual(next_claim["task"]["task_id"], created["task_id"])
         self.assertEqual(next_claim["task"]["attempts"], 2)
 
+    def test_report_rejects_expired_lease(self):
+        created = self.store.enqueue("status", {}, None)
+        self.store.claim("worker-a", 60)
+        with self.store.connect() as db:
+            db.execute("UPDATE home_tasks SET lease_until=0 WHERE task_id=?", (created["task_id"],))
+        with self.assertRaisesRegex(PermissionError, "WORKER_LEASE_EXPIRED"):
+            self.store.report(created["task_id"], "worker-a", True, {"status": "late"}, "")
+
     def test_scheduler_prefers_higher_priority(self):
         low = self.store.enqueue("status", {}, None, priority=0)
         high = self.store.enqueue("python_version", {}, None, priority=8)
