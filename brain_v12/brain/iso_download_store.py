@@ -241,11 +241,9 @@ class DownloadStore:
         if candidate.is_symlink():
             raise DownloadError("INVALID_STORAGE_PATH")
         target = candidate.resolve()
-        if target.parent != base:
-            raise DownloadError("INVALID_STORAGE_PATH")
-        # Reject a target that appeared as a symlink between the first check and
-        # resolution. Callers must still use safe open flags to close TOCTOU windows.
-        if target.is_symlink():
+        # If a symlink appeared after the lexical check, resolve() changes the path.
+        # This narrows the race but is not a substitute for no-follow/openat-style I/O.
+        if target != candidate or target.parent != base:
             raise DownloadError("INVALID_STORAGE_PATH")
         return target
 
