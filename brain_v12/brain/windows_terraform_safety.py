@@ -11,6 +11,9 @@ FORBIDDEN_TRACKED_NAMES = {
 }
 
 FORBIDDEN_OPEN_NETWORKS = {"0.0.0.0/0", "::/0"}
+OPEN_NETWORK_ASSIGNMENT_PATTERNS = (
+    re.compile(r"""(?im)^\s*(?:source_address_prefix(?:es)?|source_cidr|cidr_blocks|address_prefixes)\s*=.*["'](?:0\.0\.0\.0/0|::/0)["']"""),
+)
 SENSITIVE_TFVARS_PATTERNS = ("*.tfvars", "*.tfvars.json", "*.auto.tfvars", "*.auto.tfvars.json")
 INLINE_SECRET_PATTERNS = (
     re.compile(r"""^\s*client_secret\s*=\s*["']"""),
@@ -42,7 +45,7 @@ def inspect_windows_terraform_root(
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 continue
-            if "0.0.0.0/0" in text or "::/0" in text:
+            if any(pattern.search(text) for pattern in OPEN_NETWORK_ASSIGNMENT_PATTERNS):
                 violations.append(f"OPEN_NETWORK_RULE:{path.name}")
             if any(pattern.search(text) for pattern in INLINE_SECRET_PATTERNS):
                 for pattern in INLINE_SECRET_PATTERNS:
