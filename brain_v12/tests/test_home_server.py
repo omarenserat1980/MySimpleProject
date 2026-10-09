@@ -62,8 +62,11 @@ class HomeServerQueueTests(unittest.TestCase):
         # Import the same app object used by Render's uvicorn start command.
         from brain_v12.app import app as main_app
 
+        from brain_v12.home_server import router as home_server_router
+        router_paths = {getattr(route, "path", "") for route in home_server_router.routes}
         paths = {getattr(route, "path", "") for route in main_app.routes}
-        self.assertIn("/api/home-server/status", paths)
+        self.assertIn("/api/home-server/status", router_paths, f"Home Server router itself lacks status route: {sorted(router_paths)}")
+        self.assertIn("/api/home-server/status", paths, f"Main app lacks Home Server route; router paths={sorted(router_paths)}; app route count={len(main_app.routes)}")
         self.assertIn("/api/home-server/tasks", paths)
         self.assertIn("/api/home-server/claim", paths)
         self.assertIn("/api/home-server/tasks/{task_id}/report", paths)
