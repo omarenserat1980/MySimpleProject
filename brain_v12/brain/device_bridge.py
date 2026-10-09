@@ -21,14 +21,21 @@ class DeviceBridge:
         )
 
     def configured(self):
-        # Match authenticate(): a supported local key file is also a configuration.
-        return bool(
-            os.getenv(AGENT_KEY_ENV)
-            or os.getenv(AGENT_KEY_SHA256_ENV)
-            or os.getenv("BRAIN_EMULATOR_KEY")
-            or os.getenv("BRAIN_EMULATOR_AGENT_KEY")
-            or os.path.isfile(self._local_key_file())
-        )
+        # Only report authentication as configured when a usable source is present.
+        if any(os.getenv(name, "") for name in (
+            AGENT_KEY_ENV, "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY"
+        )):
+            return True
+        if os.getenv(AGENT_KEY_SHA256_ENV, "").strip():
+            return True
+        key_file = self._local_key_file()
+        if not key_file or not os.path.isfile(key_file) or not os.access(key_file, os.R_OK):
+            return False
+        try:
+            with open(key_file, encoding="utf-8") as f:
+                return bool(f.read().strip())
+        except (OSError, UnicodeError):
+            return False
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV, ""):
             return "DIRECT_KEY"
