@@ -82,7 +82,7 @@ class PowerShellEmulator:
             return {"ok":True,"output":json.dumps(self.desktop.process_snapshot()["processes"],sort_keys=True)}
         if name=="new-item":
             if not self.policy.allow_mutation:return {"ok":False,"status":"MUTATION_DISABLED"}
-            path=self._arg(args)
+            path=self._target_path(args)
             typ="directory" if any("directory" in a.lower() for a in args) else "file"
             if typ=="directory":r=self.desktop.mkdir(path)
             else:r=self.desktop.write_file(path,"")
@@ -108,5 +108,9 @@ class PowerShellEmulator:
         for a in args:
             if not a.startswith("-"):return self._clean(a)
         return "."
+
+    def _target_path(self,args:list[str])->str:
+        values=[self._clean(a) for a in args if not a.startswith("-")]
+        return values[-1] if values else "."
 
 __all__=["PowerShellPolicy","PowerShellEmulator","SCHEMA"]
