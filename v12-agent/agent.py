@@ -39,8 +39,6 @@ def execute(task, params):
                 "agent_id": AGENT_ID, "status": "READY"}
     if task == "python_version":
         return {"python": platform.python_version()}
-    if task == "termux_path":
-        return {"path": os.getcwd(), "home": os.path.expanduser("~")}
     if task == "platform":
         return {"system": platform.system(), "release": platform.release(),
                 "machine": platform.machine(), "processor": platform.processor()}
@@ -51,8 +49,14 @@ def main():
     print("V12-Termux-Agent ONLINE")
     print("Brain:", BRAIN_URL)
     print("Agent:", AGENT_ID)
+    last_heartbeat = 0.0
     while True:
         try:
+            now = time.monotonic()
+            if now - last_heartbeat >= 10:
+                request("POST", "/api/device/heartbeat",
+                        payload={"agent_id": AGENT_ID, "metadata": {"agent": "V12-Termux-Agent"}}, key=key)
+                last_heartbeat = now
             polled = request("GET", "/api/device/poll?agent_id=" + urllib.parse.quote(AGENT_ID, safe=""), key=key)
             task = polled.get("task")
             if task:
