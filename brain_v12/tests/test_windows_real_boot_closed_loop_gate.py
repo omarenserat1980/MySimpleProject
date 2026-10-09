@@ -87,10 +87,18 @@ class WindowsClosedLoopGateTests(unittest.TestCase):
                 os.environ["GITHUB_SHA"] = old
 
     def test_rejects_expired_contract(self):
-        c = contract()
-        c["expires_at"] = time.time() - 1
-        with self.assertRaisesRegex(RuntimeError, "EXPIRED"):
-            load_and_verify(self.write(c))
+        old = os.environ.get("GITHUB_SHA")
+        os.environ["GITHUB_SHA"] = "a" * 40
+        try:
+            c = contract()
+            c["expires_at"] = time.time() - 1
+            with self.assertRaisesRegex(RuntimeError, "EXPIRED"):
+                load_and_verify(self.write(c))
+        finally:
+            if old is None:
+                os.environ.pop("GITHUB_SHA", None)
+            else:
+                os.environ["GITHUB_SHA"] = old
 
     def test_rejects_stale_source_commit(self):
         old = os.environ.get("GITHUB_SHA")
