@@ -81,6 +81,18 @@ class IsoDownloadStoreTests(unittest.TestCase):
         with self.assertRaisesRegex(DownloadError, "INVALID_REQUEST"):
             self.store.server_path(self.task["download_id"], area="../../tmp")
 
+    def test_server_path_rejects_symlink_even_when_target_stays_inside_root(self):
+        task_id = self.task["download_id"]
+        original = self.store.partial / f"{task_id}.part"
+        linked_target = self.store.partial / "other-task.part"
+        linked_target.write_bytes(b"fixture")
+        try:
+            original.symlink_to(linked_target)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks unavailable on this platform")
+        with self.assertRaisesRegex(DownloadError, "INVALID_STORAGE_PATH"):
+            self.store.server_path(task_id, area="partial")
+
     def test_cleanup_result_is_explicit_and_owned(self):
         self.store.record_cleanup(self.task["download_id"], owner_id="alice",
                                   result="CLEANUP_FAILED", reason="permission denied")

@@ -235,10 +235,17 @@ class DownloadStore:
         if area not in bases or suffix not in (".part", ".iso", ".bin"):
             raise DownloadError("INVALID_REQUEST")
         base = bases[area].resolve()
-        target = (base / f"{download_id}{suffix}").resolve()
+        # Inspect the lexical entry before resolving it: Path.resolve() follows a
+        # symlink, making a later is_symlink() check on the resolved target ineffective.
+        candidate = base / f"{download_id}{suffix}"
+        if candidate.is_symlink():
+            raise DownloadError("INVALID_STORAGE_PATH")
+        target = candidate.resolve()
         if target.parent != base:
             raise DownloadError("INVALID_STORAGE_PATH")
-        if target.exists() and target.is_symlink():
+        # Reject a target that appeared as a symlink between the first check and
+        # resolution. Callers must still use safe open flags to close TOCTOU windows.
+        if target.is_symlink():
             raise DownloadError("INVALID_STORAGE_PATH")
         return target
 
