@@ -100,6 +100,42 @@ class ExecutionProof:
             raise ProofTransitionError(f"TERMINAL_STATE:{self.state}")
         return self._append(state, payload)
 
+    @classmethod
+    def from_export(cls, exported: dict[str, Any]) -> "ExecutionProof":
+        """Rehydrate a persisted proof without creating a new event."""
+        if not isinstance(exported, dict) or exported.get("proof_version") != 1:
+            raise ValueError("INVALID_PROOF_VERSION")
+        task_id = exported.get("task_id", "")
+        worker_id = exported.get("worker_id", "")
+        events = exported.get("events")
+        if not task_id or not worker_id or not isinstance(events, list) or not events:
+            raise ValueError("INVALID_PROOF_EXPORT")
+        proof = cls.__new__(cls)
+        proof.task_id = task_id
+        proof.worker_id = worker_id
+        proof._now = time.time
+        proof._events = [
+            EvidenceEvent(
+                sequence=int(e["sequence"]), state=e["state"], task_id=e["task_id"],
+                worker_id=e["worker_id"], timestamp=float(e["timestamp"]),
+                payload=dict(e.get("payload", {})), previous_hash=e["previous_hash"],
+                event_hash=e["event_hash"],
+            ) for e in events
+        ]
+        if proof.task_id != proof._events[0].task_id or proof.worker_id != proof._events[0].worker_id:
+            raise ValueError("PROOF_IDENTITY_MISMATCH")
+        if not proof.verify_chain() or exported.get("state") != proof.state:
+            raise ValueError("INVALID_PROOF_CHAIN")
+        return proof
+
+    @classmethod
+    def verify_export(cls, exported: dict[str, Any]) -> bool:
+        try:
+            cls.from_export(exported)
+            return True
+        except (KeyError, TypeError, ValueError, IndexError):
+            return False
+
     def verify_chain(self) -> bool:
         previous = "GENESIS"
         for event in self._events:
