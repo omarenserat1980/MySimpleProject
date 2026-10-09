@@ -2,10 +2,8 @@ from __future__ import annotations
 
 """Brain-owned bounded background thread runtime.
 
-This is infrastructure, not an authority bypass. Background jobs must call the
-same Brain gateways/contracts used by foreground execution. The supervisor
-owns lifecycle, duplicate prevention, crash recovery, exponential backoff,
-health snapshots, and graceful shutdown.
+Threads are workers, never independent authorities. One supervisor owns their
+lifecycle and resource budget. Execution authority remains in Brain gateways.
 """
 
 from dataclasses import dataclass, field
@@ -26,6 +24,8 @@ class BackgroundJobSpec:
     initial_delay_seconds: float = 0.0
     max_backoff_seconds: float = 300.0
     restart_on_failure: bool = True
+    priority: int = 50
+    weight: int = 1
 
     def validate(self) -> None:
         if not self.name.strip():
@@ -36,11 +36,17 @@ class BackgroundJobSpec:
             raise ValueError("BACKGROUND_JOB_INITIAL_DELAY_INVALID")
         if self.max_backoff_seconds < self.interval_seconds:
             raise ValueError("BACKGROUND_JOB_MAX_BACKOFF_INVALID")
+        if not 0 <= self.priority <= 100:
+            raise ValueError("BACKGROUND_JOB_PRIORITY_INVALID")
+        if self.weight < 1:
+            raise ValueError("BACKGROUND_JOB_WEIGHT_INVALID")
 
 
 @dataclass
 class BackgroundJobState:
     name: str
+    priority: int = 50
+    weight: int = 1
     state: str = "REGISTERED"
     started_at: float | None = None
     last_started_at: float | None = None
@@ -58,20 +64,26 @@ class _RuntimeJob:
     state: BackgroundJobState = field(init=False)
 
     def __post_init__(self) -> None:
-        self.state = BackgroundJobState(self.spec.name)
+        self.state = BackgroundJobState(
+            self.spec.name, priority=self.spec.priority, weight=self.spec.weight
+        )
 
 
 class BackgroundThreadSupervisor:
-    """One owner for Brain background threads.
+    """Single owner for Brain resident workers with a hard concurrency budget."""
 
-    The supervisor never silently creates duplicate jobs. A failed job is
-    restarted with bounded exponential backoff. Shutdown is cooperative first.
-    """
-
-    def __init__(self, *, join_timeout_seconds: float = 5.0) -> None:
+    def __init__(
+        self,
+        *,
+        join_timeout_seconds: float = 5.0,
+        max_threads: int = 4,
+    ) -> None:
         if join_timeout_seconds <= 0:
             raise ValueError("BACKGROUND_JOIN_TIMEOUT_INVALID")
+        if max_threads < 1:
+            raise ValueError("BACKGROUND_MAX_THREADS_INVALID")
         self.join_timeout_seconds = join_timeout_seconds
+        self.max_threads = max_threads
         self._stop = Event()
         self._lock = Lock()
         self._jobs: dict[str, _RuntimeJob] = {}
@@ -84,6 +96,8 @@ class BackgroundThreadSupervisor:
                 raise RuntimeError("BACKGROUND_REGISTER_AFTER_START")
             if spec.name in self._jobs:
                 raise RuntimeError("BACKGROUND_JOB_ALREADY_REGISTERED:" + spec.name)
+            if len(self._jobs) >= self.max_threads:
+                raise RuntimeError("BACKGROUND_THREAD_BUDGET_EXCEEDED")
             self._jobs[spec.name] = _RuntimeJob(spec)
 
     def start(self) -> None:
@@ -91,7 +105,9 @@ class BackgroundThreadSupervisor:
             if self._started:
                 return
             self._started = True
-            for job in self._jobs.values():
+            # Priority is scheduling intent only; it never changes authority.
+            ordered = sorted(self._jobs.values(), key=lambda j: (-j.spec.priority, j.spec.name))
+            for job in ordered:
                 job.thread = Thread(
                     target=self._run_job,
                     args=(job,),
@@ -123,10 +139,15 @@ class BackgroundThreadSupervisor:
                 }
                 for name, job in self._jobs.items()
             }
+            alive = sum(1 for job in self._jobs.values() if job.thread and job.thread.is_alive())
             return {
                 "ok": True,
                 "running": self._started and not self._stop.is_set(),
                 "stop_requested": self._stop.is_set(),
+                "max_threads": self.max_threads,
+                "registered_threads": len(self._jobs),
+                "alive_threads": alive,
+                "budget_available": max(0, self.max_threads - len(self._jobs)),
                 "jobs": jobs,
             }
 
@@ -156,10 +177,7 @@ class BackgroundThreadSupervisor:
                 traceback.print_exc()
                 if not spec.restart_on_failure:
                     break
-                backoff = min(
-                    spec.max_backoff_seconds,
-                    max(spec.interval_seconds, backoff * 2),
-                )
+                backoff = min(spec.max_backoff_seconds, max(spec.interval_seconds, backoff * 2))
             finally:
                 job.state.last_finished_at = time.time()
 
