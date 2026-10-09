@@ -42,7 +42,7 @@ class WindowsRealBootQemuAdapter:
         code="/usr/share/OVMF/OVMF_CODE_4M.fd"
         missing=[p for p in (os_disk,evidence_disk,proof_iso,ovmf_vars,code) if not Path(p).exists()]
         if missing: raise RuntimeError("WINDOWS_QEMU_RUNTIME_INPUT_MISSING:"+",".join(missing))
-        return ["qemu-system-x86_64"," -machine","q35,accel=kvm","-cpu","max","-m",memory,
+        return ["qemu-system-x86_64","-machine","q35,accel=kvm","-cpu","max","-m",memory,
                 "-smp",str(smp),"-drive",f"if=pflash,format=raw,readonly=on,file={code}",
                 "-drive",f"if=pflash,format=raw,file={ovmf_vars}","-device","ich9-ahci,id=sata",
                 "-drive",f"file={os_disk},format=qcow2,if=none,id=osdisk","-device","ide-hd,bus=sata.2,drive=osdisk",
