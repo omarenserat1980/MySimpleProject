@@ -17,7 +17,7 @@ class ArkanTwinGoldenLoop:
         self.workload=WorkloadController()
         self._committed:dict[str,Any]={}
 
-    def run(self,script:str,*,task_id="arkan-twin-smoke",max_attempts=2)->dict[str,Any]:
+    def close(self)->None:\n        self.evidence.close()\n\n    def __enter__(self):\n        return self\n\n    def __exit__(self,exc_type,exc,tb):\n        self.close()\n        return False\n\n    def run(self,script:str,*,task_id="arkan-twin-smoke",max_attempts=2)->dict[str,Any]:
         task=GoldenTask(task_id=task_id,action="powershell-emulator",
                         parameters={"script":script},max_attempts=max_attempts)
 
