@@ -30,10 +30,16 @@ class DeviceBridge:
             or os.path.isfile(self._local_key_file())
         )
     def auth_mode(self):
-        if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
-        if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
-        if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
-        if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY"
+        if os.getenv(AGENT_KEY_ENV, ""):
+            return "DIRECT_KEY"
+        if os.getenv("BRAIN_EMULATOR_KEY", ""):
+            return "BRAIN_EMULATOR_KEY"
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY", ""):
+            return "BRAIN_EMULATOR_AGENT_KEY"
+        if os.path.isfile(self._local_key_file()):
+            return "LOCAL_KEY_FILE"
+        if os.getenv(AGENT_KEY_SHA256_ENV, "").strip():
+            return "SHA256_KEY"
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
         if not supplied:return False
