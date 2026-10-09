@@ -7,6 +7,14 @@ on:
       - "brain_v12/tests/test_home_server.py"
       - "brain_v12/requirements.txt"
       - ".github/workflows/brain-home-server-tests.yml"
+  push:
+    branches:
+      - "integration/brain-home-azure-clean"
+    paths:
+      - "brain_v12/home_server.py"
+      - "brain_v12/tests/test_home_server.py"
+      - "brain_v12/requirements.txt"
+      - ".github/workflows/brain-home-server-tests.yml"
   workflow_dispatch:
 
 permissions:
