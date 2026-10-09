@@ -47,6 +47,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .home_server import router as home_server_router
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -2292,6 +2293,35 @@ app.mount('/local-painter', StaticFiles(directory=os.path.join(ROOT,'web','local
 app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-app-v2"),html=True),name="brain-app-v2")
 from .brain.brain_mcp import build_mcp_router
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+# Register Home Server after all application imports and before the catch-all UI mount.
+app.include_router(home_server_router)
+
+# Defensive registration guard: verify the router's API endpoints actually landed
+# on the deployed application. If the framework/version leaves any endpoint out,
+# append only missing path+method pairs from the already-built APIRoute objects.
+_home_server_api_paths = {
+    "/api/home-server/status",
+    "/api/home-server/tasks",
+    "/api/home-server/claim",
+    "/api/home-server/tasks/{task_id}/report",
+}
+_registered_home_server = {
+    (getattr(route, "path", ""), method)
+    for route in app.routes
+    for method in (getattr(route, "methods", None) or set())
+}
+for _route in home_server_router.routes:
+    _path = getattr(_route, "path", "")
+    _methods = getattr(_route, "methods", None) or set()
+    if _path not in _home_server_api_paths:
+        continue
+    for _method in _methods:
+        if (_path, _method) not in _registered_home_server:
+            app.router.routes.append(_route)
+            _registered_home_server.update((_path, method) for method in _methods)
+            break
+
+# API routers are registered before the catch-all static UI mount.
 
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
@@ -2324,3 +2354,4 @@ async def brain_mcp_auth(request: Request, call_next):
                 status_code=401,
             )
     return await call_next(request)
+
