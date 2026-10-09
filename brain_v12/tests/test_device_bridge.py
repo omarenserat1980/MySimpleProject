@@ -11,7 +11,7 @@ class DeviceBridgeTests(unittest.TestCase):
         self.old_env = {k: os.environ.get(k) for k in self.env_keys}
         for key in self.env_keys:
             os.environ.pop(key, None)
-        os.environ["TERMUX_AGENT_KEY"] = "test-device-key"
+        os.environ["BRAIN_AGENT_KEY"] = "test-device-key"
         self.tmp = tempfile.NamedTemporaryFile(delete=False)
         self.tmp.close()
         self.store = MemoryStore(self.tmp.name)
@@ -30,8 +30,8 @@ class DeviceBridgeTests(unittest.TestCase):
             pass
 
     def test_authentication(self):
-        self.assertFalse(self.bridge.configured())
-        self.assertFalse(self.bridge.authenticate("test-device-key"))
+        self.assertTrue(self.bridge.configured())
+        self.assertTrue(self.bridge.authenticate("test-device-key"))
         self.assertFalse(self.bridge.authenticate("wrong-key"))
 
 
