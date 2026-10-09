@@ -9,7 +9,24 @@ $ErrorActionPreference = "Stop"
 $Composer = Join-Path $PSScriptRoot "..\brain_v12\raw_server\composer.py"
 $Composer = [System.IO.Path]::GetFullPath($Composer)
 if (-not (Test-Path -LiteralPath $Composer -PathType Leaf)) {
-    throw "Composer not found at '$Composer'. Run this script from a complete repository checkout."
+    # This makes the installer usable when only this .ps1 file was downloaded.
+    $Composer = Join-Path $env:ProgramData "ElectronicBrain\RawServer\composer.py"
+    $ComposerDirectory = Split-Path -Parent $Composer
+    New-Item -ItemType Directory -Force -Path $ComposerDirectory | Out-Null
+    $SourceUrl = "https://raw.githubusercontent.com/omarenserat1980/MySimpleProject/brain/raw-server-composer-20261009/brain_v12/raw_server/composer.py"
+    $TemporaryDownload = "$Composer.download"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $SourceUrl -OutFile $TemporaryDownload -UseBasicParsing -TimeoutSec 30
+        if (-not (Test-Path -LiteralPath $TemporaryDownload -PathType Leaf) -or (Get-Item -LiteralPath $TemporaryDownload).Length -lt 1000) {
+            throw "Downloaded composer file is missing or unexpectedly small."
+        }
+        Move-Item -LiteralPath $TemporaryDownload -Destination $Composer -Force
+    }
+    catch {
+        Remove-Item -LiteralPath $TemporaryDownload -Force -ErrorAction SilentlyContinue
+        throw "Could not download the Brain Raw Server Composer. Check network access and retry. Details: $($_.Exception.Message)"
+    }
 }
 $Python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $Python) { $Python = Get-Command py -ErrorAction SilentlyContinue }
