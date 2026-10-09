@@ -255,7 +255,7 @@ class RawServerComposer:
             raise ValueError("A component did not pass its gate; refusing final composition.")
         return {
             "id": "BRAIN-RAW-SERVER-01",
-            "status": "READY_FOR_REVIEW",
+            "readiness": "READY_FOR_REVIEW",
             "components": [component["kind"] for component in components],
             "ram_gib_planned": ram["requested_gib"],
             "vcpu_upper_bound": cpu["planned_vcpu_upper_bound"],
