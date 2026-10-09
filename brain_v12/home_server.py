@@ -125,9 +125,10 @@ class HomeServerStore:
                 task_id = "home-" + uuid4().hex
                 db.execute(
                     """INSERT INTO home_tasks
-                    (task_id, task, params_json, status, idempotency_key, created_at, updated_at)
-                    VALUES (?, ?, ?, 'QUEUED', ?, ?, ?)""",
-                    (task_id, task, json.dumps(params, separators=(",", ":"), sort_keys=True), idempotency_key, now, now),
+                    (task_id, task, params_json, priority, required_capabilities_json, status, idempotency_key, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'QUEUED', ?, ?, ?)""",
+                    (task_id, task, json.dumps(params, separators=(",", ":"), sort_keys=True),
+                     priority, json.dumps(capabilities), idempotency_key, now, now),
                 )
                 row = db.execute("SELECT * FROM home_tasks WHERE task_id=?", (task_id,)).fetchone()
                 db.execute("COMMIT")
