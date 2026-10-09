@@ -19,6 +19,7 @@ from .execution_policy import (
     choose_executor,
 )
 from .internal_runner import InternalRunner
+from .windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
 from .windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
 from .windows_native_executor import WindowsNativeExecutorContract
 from .windows_server_network_contract import (
@@ -133,7 +134,9 @@ class BrainExecutionGateway:
             executor_type = str(metadata.get("executor", "")).strip().lower()
             if executor_type != "windows-real-boot-qemu":
                 raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD_EXECUTOR")
-            raise RuntimeError("WINDOWS_REAL_BOOT_QEMU_RUNTIME_ADAPTER_NOT_CONFIGURED")
+            adapter = WindowsRealBootQemuAdapter(self.runner)
+            adapter.authorize(metadata.get("contract_path"))
+            return ExecutionDecision(executor="windows-real-boot-qemu", capability=WINDOWS_REAL_BOOT, verified=True, reason="WINDOWS_REAL_BOOT_QEMU_ADAPTER_VERIFIED")
         if capability == WINDOWS_CLOUD_NATIVE:
             executor_type = str(metadata.get("executor", "")).strip().lower()
             if executor_type != WINDOWS_CLOUD:
