@@ -8,6 +8,7 @@ from __future__ import annotations
 import json, os, platform, shutil, subprocess, time, sys
 from pathlib import Path
 from datetime import datetime, timezone
+from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 
 ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
 QUEUED, RUNNING, COMPLETED, FAILED = (ROOT / x for x in ("queued", "running", "completed", "failed"))
@@ -29,7 +30,33 @@ def safe_command_version(binary: str):
     return {"available": out.returncode == 0, "binary": binary,
             "version": (out.stdout or out.stderr).splitlines()[0][:300]}
 
+CI_PROFILES = {
+    "runner_policy": ("tests/test_execution_policy.py", "tests/test_runner_policy_audit.py"),
+    "foundation": ("tests/test_platform_foundation.py", "tests/test_brain_supervisor_bridge.py"),
+    "autonomous_pipeline": ("tests/test_autonomous_pipeline.py",),
+}
+
 def execute(task: str, params: dict):
+    if task == "brain_ci_verify":
+        profile = str(params.get("profile", "")).strip()
+        if profile not in CI_PROFILES:
+            raise ValueError(f"unknown_ci_profile:{profile}")
+        root = Path(__file__).resolve().parents[2]
+        tests = [str(root / item) for item in CI_PROFILES[profile]]
+        started = time.monotonic()
+        p = subprocess.run([sys.executable, "-m", "pytest", "-q", *tests],
+                           cwd=str(root), capture_output=True, text=True)
+        duration = round(time.monotonic() - started, 6)
+        return {
+            "provider": "brain_local_ci",
+            "profile": profile,
+            "verified": p.returncode == 0,
+            "status": "VERIFIED" if p.returncode == 0 else "FAILED",
+            "exit_code": p.returncode,
+            "duration_seconds": duration,
+            "stdout": p.stdout[-12000:],
+            "stderr": p.stderr[-12000:],
+        }
     if task == "python_version":
         return {"python": platform.python_version()}
     if task == "platform":
@@ -105,8 +132,11 @@ def process(path: Path):
 
 def main():
     setup()
+    authority = BrainExecutionAuthority(executor_id=WORKER_ID)
+    authority.heartbeat()
     print(f"Brain Local Worker {WORKER_ID} -> {ROOT}")
     while True:
+        authority.heartbeat()
         for path in sorted(QUEUED.glob("*.json")):
             process(path)
         time.sleep(POLL)

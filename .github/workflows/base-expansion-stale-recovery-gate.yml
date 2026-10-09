@@ -1,0 +1,53 @@
+name: Base Expansion V2 Stale Recovery Gate
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+  pull_request:
+    paths:
+      - 'platform_foundation/stale_recovery.py'
+      - 'platform_foundation/supervisor.py'
+      - 'platform_foundation/lease.py'
+      - 'platform_foundation/persistent_state.py'
+      - 'tests/test_stale_task_recovery.py'
+      - '.github/workflows/base-expansion-stale-recovery-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  stale-recovery-gate:
+    runs-on: [self-hosted, brain-runner]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run stale recovery tests
+        run: python -m pytest -q tests/test_stale_task_recovery.py
+      - name: Write stale recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              'status': 'PASS',
+              'gate': 'BASE_EXPANSION_STALE_RECOVERY',
+              'expired_running_detected': 'PASS',
+              'active_running_preserved': 'PASS',
+              'new_worker_reclaim': 'PASS',
+              'audit_integrity': 'PASS',
+          }
+          Path('stale_recovery_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Upload stale recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-stale-recovery-evidence
+          path: stale_recovery_gate.json

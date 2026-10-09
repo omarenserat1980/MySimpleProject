@@ -1,0 +1,16 @@
+{
+  "policy": "BRAIN_ONLY",
+  "external_fallback": false,
+  "execution_authority": "brain_local_executor",
+  "github_role": ["source", "evidence", "mirror"],
+  "authoritative_workflows": [
+    "base-expansion-foundation.yml",
+    "base-expansion-integrated-gate.yml",
+    "base-expansion-lease-gate.yml",
+    "base-expansion-recovery-e2e.yml",
+    "base-expansion-stale-recovery-gate.yml",
+    "brain-local-worker-ci.yml"
+  ],
+  "required_runner_labels": ["self-hosted", "brain-runner"],
+  "missing_executor_action": "BLOCKED"
+}

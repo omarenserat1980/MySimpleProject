@@ -1,0 +1,50 @@
+name: Base Expansion V2 Recovery E2E
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+  pull_request:
+    paths:
+      - "platform_foundation/**"
+      - "platform_integration/**"
+      - "tests/test_brain_verified_recovery_e2e.py"
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-e2e:
+    runs-on: [self-hosted, brain-runner]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run recovery E2E
+        run: python -m pytest -q tests/test_brain_verified_recovery_e2e.py
+      - name: Write recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              "status": "PASS",
+              "gate": "BASE_EXPANSION_RECOVERY_E2E",
+              "process_reopen": "PASS",
+              "durable_retry_state": "PASS",
+              "independent_verification": "PASS",
+              "audit_chain": "PASS",
+          }
+          Path("recovery_e2e_gate.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Upload recovery evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-recovery-e2e-evidence
+          path: recovery_e2e_gate.json

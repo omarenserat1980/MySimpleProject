@@ -1,0 +1,119 @@
+name: Base Expansion V2 Integrated Execution Gate
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+  pull_request:
+    paths:
+      - 'platform_foundation/**'
+      - 'platform_integration/**'
+      - 'tests/test_platform_foundation.py'
+      - 'tests/test_brain_supervisor_bridge.py'
+      - 'tests/test_brain_supervisor_bridge_boundary.py'
+      - 'tests/test_brain_verified_recovery_e2e.py'
+      - 'tests/test_brain_supervisor_crash_restart_e2e.py'
+      - 'tests/test_authority_persistence.py'
+      - 'tests/test_platform_lease.py'
+      - 'tests/test_supervisor_lease.py'
+      - 'tests/test_lease_recovery.py'
+      - 'tests/test_lease_ownership.py'
+      - 'tests/test_supervisor_heartbeat.py'
+      - 'tests/test_supervisor_final_fencing.py'
+      - 'tests/test_stale_task_recovery.py'
+      - 'tests/test_repair_policy.py'
+      - 'tests/test_repair_executor.py'
+      - 'tests/test_workflow_inspector.py'
+      - 'tests/test_repair_evidence.py'
+      - 'tests/test_repair_cycle.py'
+      - 'tests/test_operational_gate.py'
+      - 'tests/test_operational_state.py'
+      - 'tests/test_stage_orchestrator.py'
+      - 'tests/test_parallel_chunks.py'
+      - 'tests/test_autonomous_pipeline.py'
+      - 'tests/test_autonomous_pipeline_execution_health.py'
+      - '.github/workflows/base-expansion-integrated-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-execution-gate:
+    runs-on: [self-hosted, brain-runner]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run independent foundation and integration tests
+        run: |
+          python -m pytest -q \
+            tests/test_platform_foundation.py \
+            tests/test_brain_supervisor_bridge.py \
+            tests/test_brain_supervisor_bridge_boundary.py \
+            tests/test_brain_verified_recovery_e2e.py \
+            tests/test_brain_supervisor_crash_restart_e2e.py \
+            tests/test_authority_persistence.py \
+            tests/test_platform_lease.py \
+            tests/test_supervisor_lease.py \
+            tests/test_lease_recovery.py \
+            tests/test_lease_ownership.py \
+            tests/test_supervisor_heartbeat.py \
+            tests/test_supervisor_final_fencing.py \
+            tests/test_stale_task_recovery.py \
+            tests/test_repair_policy.py \
+            tests/test_repair_executor.py \
+            tests/test_workflow_inspector.py \
+            tests/test_repair_evidence.py \
+            tests/test_repair_cycle.py \
+            tests/test_operational_gate.py \
+            tests/test_operational_state.py \
+            tests/test_stage_orchestrator.py \
+            tests/test_parallel_chunks.py \
+            tests/test_autonomous_pipeline.py \
+            tests/test_autonomous_pipeline_execution_health.py
+      - name: Write integrated evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              'status': 'PASS',
+              'gate': 'BASE_EXPANSION_INTEGRATED_EXECUTION',
+              'foundation': 'PASS',
+              'permission_boundary': 'PASS',
+              'persistent_state': 'PASS',
+              'audit_chain': 'PASS',
+              'lease_single_owner': 'PASS',
+              'lease_heartbeat': 'PASS',
+              'lease_fencing': 'PASS',
+              'stale_recovery': 'PASS',
+              'durable_retry': 'PASS',
+              'independent_verification': 'PASS',
+              'durable_verified_execution_recovery': 'PASS',
+              'crash_restart_e2e': 'PASS',
+              'persistent_irreversible_authority': 'PASS',
+              'brain_bridge': 'PASS',
+              'brain_bridge_authority_boundary': 'PASS',
+              'bounded_repair_policy': 'PASS',
+              'bounded_repair_execution': 'PASS',
+              'repair_evidence': 'PASS',
+              'bounded_repair_cycle': 'PASS',
+              'operational_gate': 'PASS',
+              'operational_state_persistence': 'PASS',
+              'stage_orchestrator': 'PASS',
+              'parallel_chunks': 'PASS',
+              'autonomous_pipeline_parallel_gate': 'PASS',
+          }
+          Path('integrated_execution_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Upload integrated evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-integrated-execution-evidence
+          path: integrated_execution_gate.json

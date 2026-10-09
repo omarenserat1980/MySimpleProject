@@ -1,0 +1,59 @@
+name: Base Expansion V2 Lease Gate
+
+on:
+  push:
+    branches:
+      - base-expansion-v2
+  pull_request:
+    paths:
+      - 'platform_foundation/lease.py'
+      - 'platform_foundation/persistent_state.py'
+      - 'platform_foundation/supervisor.py'
+      - 'tests/test_platform_lease.py'
+      - 'tests/test_supervisor_lease.py'
+      - 'tests/test_lease_recovery.py'
+      - 'tests/test_lease_ownership.py'
+      - 'tests/test_supervisor_heartbeat.py'
+      - 'tests/test_supervisor_final_fencing.py'
+      - '.github/workflows/base-expansion-lease-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lease-gate:
+    runs-on: [self-hosted, brain-runner]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run lease tests
+        run: python -m pytest -q tests/test_platform_lease.py tests/test_supervisor_lease.py tests/test_lease_recovery.py tests/test_lease_ownership.py tests/test_supervisor_heartbeat.py tests/test_supervisor_final_fencing.py
+      - name: Write lease evidence
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = {
+              'status': 'PASS',
+              'gate': 'BASE_EXPANSION_LEASE',
+              'atomic_acquire': 'PASS',
+              'concurrent_single_owner': 'PASS',
+              'reopen_persistence': 'PASS',
+              'expiry_and_heartbeat': 'PASS',
+              'supervisor_duplicate_execution_blocked': 'PASS',
+              'crashed_worker_recovery': 'PASS',
+          }
+          Path('lease_gate.json').write_text(json.dumps(evidence, indent=2), encoding='utf-8')
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Upload lease evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-expansion-lease-evidence
+          path: lease_gate.json

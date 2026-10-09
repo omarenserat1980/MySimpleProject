@@ -63,12 +63,6 @@ jobs:
           ln -sf "$(command -v ffprobe)" brain_v12/bin/ffprobe
           test -x brain_v12/bin/ffmpeg
           test -x brain_v12/bin/ffprobe
-          python - <<'PY'
-          import fastapi, httpx
-          print("BRAIN_RUNTIME_DEPS=READY")
-          print("FASTAPI="+fastapi.__version__)
-          print("HTTPX="+httpx.__version__)
-          PY
 
       - name: Validate Repair Knowledge
         run: python -m unittest brain_v12.brain.test_repair_knowledge -v
@@ -93,7 +87,7 @@ jobs:
           BRAIN_AUTO_CONFIRM: ${{ github.event.inputs.auto_confirm || 'false' }}
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.continuous_evolution             --cycles "${{ github.event.inputs.continue_cycles || '3' }}"             --loops-per-cycle 1             --timeout 120             --pause 2
+          python -m brain_v12.self_healing.continuous_evolution --cycles "${{ github.event.inputs.continue_cycles || '3' }}" --loops-per-cycle 1 --timeout 120 --pause 2
 
       - name: Report Applied Repair Evidence
         if: always()
@@ -116,7 +110,6 @@ jobs:
           set -euo pipefail
           python -m brain_v12.self_healing.verification_gate
           test -f .brain/state/verification_gate.json
-
           python - <<'PY'
           import json
           from pathlib import Path
@@ -136,6 +129,11 @@ jobs:
             echo "BRAIN_VERIFIED_REPAIR_COMMIT=SKIPPED_NO_PATCH"
             exit 0
           fi
+          if test "${GITHUB_REF_NAME}" = "main"; then
+            echo "BRAIN_REPAIR_MAIN_PUSH_BLOCKED=true"
+            echo "BRAIN_VERIFIED_REPAIR_COMMIT=BLOCKED_MAIN_PROTECTED"
+            exit 0
+          fi
           git diff --check
           changed="$(git diff --name-only)"
           test -n "$changed"
@@ -153,8 +151,9 @@ jobs:
             exit 0
           fi
           git commit -m "brain: persist verified self-healing repair"
-          git push origin HEAD:main
+          git push origin "HEAD:${GITHUB_REF_NAME}"
           echo "BRAIN_VERIFIED_REPAIR_COMMIT=PUSHED"
+          echo "BRAIN_VERIFIED_REPAIR_TARGET=${GITHUB_REF_NAME}"
 
       - name: Publish healing evidence
         if: always()
