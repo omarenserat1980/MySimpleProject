@@ -129,6 +129,24 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         chat_handler,
     )
 
+    def enqueue_smoke_test_handler(_: dict[str, Any]) -> dict[str, Any]:
+        """Queue only a harmless Python-version probe on the paired device."""
+        try:
+            return device_bridge.enqueue("python_version", {})
+        except Exception as exc:
+            return {
+                "ok": False,
+                "status": "DEVICE_TASK_ENQUEUE_ERROR",
+                "error": str(exc)[:300],
+            }
+
+    register(
+        "brain.enqueue_smoke_test",
+        "Queue a safe python_version probe for the configured Android executor; does not run arbitrary shell commands.",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+        enqueue_smoke_test_handler,
+    )
+
     def rpc_result(request_id: Any, result: dict[str, Any]) -> JSONResponse:
         return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})
 
