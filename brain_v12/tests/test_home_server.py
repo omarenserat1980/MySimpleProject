@@ -28,6 +28,8 @@ class HomeServerQueueTests(unittest.TestCase):
             self.store.report(created["task_id"], "worker-b", True, {"system": "test"}, "")
         report = self.store.report(created["task_id"], "worker-a", True, {"system": "test"}, "")
         self.assertEqual(report["task"]["status"], "COMPLETED")
+        self.assertTrue(report["task"]["proof"]["verified"])
+        self.assertEqual(report["task"]["proof"]["state"], "ACCEPTED")
         self.assertEqual(self.store.status()["queue"]["COMPLETED"], 1)
 
     def test_unknown_task_is_rejected(self):
@@ -65,3 +67,14 @@ class HomeServerQueueTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_completion_requires_valid_execution_proof(self):
+        created = self.store.enqueue("status", {}, None)
+        claim = self.store.claim("worker-proof", 60)
+        self.assertEqual(claim["task"]["task_id"], created["task_id"])
+        with self.store.connect() as db:
+            db.execute("UPDATE home_tasks SET proof_json=? WHERE task_id=?", ('{"proof_version":1,"state":"CLAIMED","events":[]}', created["task_id"]))
+        with self.assertRaises(ValueError):
+            self.store.report(created["task_id"], "worker-proof", True, {"ok": True}, "")
+        self.assertEqual(self.store.status()["queue"]["CLAIMED"], 1)
