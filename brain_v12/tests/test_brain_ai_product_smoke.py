@@ -23,7 +23,7 @@ class BrainProductSmokeTest(unittest.TestCase):
         cls.app = brain_app
         cls.client = TestClient(brain_app.app)
         from brain_v12.brain.chat_identity import ChatIdentityStore
-        identity_store = ChatIdentityStore(os.environ["BRAIN_CHAT_DB"])
+        identity_store = ChatIdentityStore(os.environ["BRAIN_DB"])
         identity_store.init()
         credential = identity_store.issue("product-smoke-account", "product-smoke-device")
         cls.chat_headers = {"Authorization": "Bearer " + credential["token"]}
