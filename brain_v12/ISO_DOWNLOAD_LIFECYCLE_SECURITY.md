@@ -30,7 +30,7 @@ Expected edges:
 - COMPLETED | CANCELLED | FAILED → EXPIRED
 - EXPIRED has no outgoing edges.
 
-Transitions must atomically record old/new state, timestamp, reason, and request ID without secrets. A task can hold at most one worker lease. Repeated pause/resume/cancel requests must return a stable idempotent result. Terminal states must never return to active states. A recovery supervisor must explicitly mark interrupted tasks; do not fabricate a transition from a state not allowed by the store.
+Transitions must atomically record old/new state, timestamp, reason, and request ID without secrets. A task can hold at most one worker lease. Leases expire after a configurable TTL (120 seconds by default); workers must heartbeat with `renew_worker` more frequently than that TTL, and recovery may reclaim an expired lease. This is only a storage primitive: no supervised downloader currently calls the heartbeat, so crash recovery is not yet implemented end-to-end. Repeated pause/resume/cancel requests must return a stable idempotent result. Terminal states must never return to active states. A recovery supervisor must explicitly mark interrupted tasks; do not fabricate a transition from a state not allowed by the store.
 
 ## Authentication and authorization gate
 
@@ -53,7 +53,7 @@ Transitions must atomically record old/new state, timestamp, reason, and request
 - Separate `metadata/`, `partial/`, `completed/`, and `quarantine/` under a server-configured root. Keep binaries out of Git and static web roots.
 - Write to a task-owned temporary file. Promote to `completed` only after expected-size checks and a trusted SHA-256 digest pass; otherwise do not claim integrity.
 - Before declaring PAUSED, flush the partial data and persist resume metadata atomically as supported by the filesystem.
-- A resumable task must be refused with `PERSISTENT_STORAGE_REQUIRED` if persistent storage is not explicitly configured and established.
+- A resumable task must be refused with `PERSISTENT_STORAGE_REQUIRED` unless the caller declares persistent storage. The current `persistent=True` argument is a caller assertion, not an independent mount/durability probe; deployment integration must verify the actual storage contract before passing it.
 - Cancellation never deletes completed media or VM-linked files. Failure or interruption alone does not authorize deletion.
 - Delete only a task-owned partial file when no worker/recovery lease can write to it; re-check resolved paths remain under the partial root and reject symlinks/path traversal. Never use wildcard deletion or user-provided paths.
 - Do not run global cleanup on startup. Record `CLEANED`, `RETAINED`, or `CLEANUP_FAILED`. Retention applies only to inactive metadata and unreferenced partials; never automatically delete completed media, quarantine, or VM disks.
