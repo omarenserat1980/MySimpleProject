@@ -107,12 +107,12 @@ def router(brain_ai, store=None, context_limit=24):
             history = store.context_messages(session_id, limit=context_limit)
             memory = store.get_memory(session_id)
             context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
-            session_context = "\\n".join(context_lines)
+            session_context = "\n".join(context_lines)
             instructions = body.instructions
             if memory and memory.get("summary"):
-                instructions = (instructions + "\\n\\n" if instructions else "") + "[BRAIN_SESSION_MEMORY]\\n" + memory["summary"]
+                instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_MEMORY]\n" + memory["summary"]
             if session_context:
-                instructions = (instructions + "\\n\\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\\n" + session_context
+                instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
             result = brain_ai.chat(body.message, instructions, approved=body.approved)
             model_routing = next((e for e in result.evidence if e.get("type") == "model_routing"), None)
             assistant = {"role":"assistant","content":result.reply,"ok":result.ok,"mode":result.mode,
