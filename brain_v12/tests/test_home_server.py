@@ -127,5 +127,51 @@ class HomeServerQueueTests(unittest.TestCase):
             self.store.enqueue("status", {}, None, priority=11)
 
 
+class HomeServerAgentRoundTripTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        agent_path = Path(__file__).resolve().parents[2] / "v12-agent" / "home_server_agent.py"
+        spec = importlib.util.spec_from_file_location("brain_home_server_agent", agent_path)
+        cls.agent = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.agent)
+
+    def test_agent_executes_allowlisted_python_version(self):
+        result = self.agent.execute_task("python_version")
+        self.assertTrue(result["python"])
+        self.assertTrue(result["executable"])
+
+    def test_agent_rejects_arbitrary_commands(self):
+        with self.assertRaisesRegex(ValueError, "TASK_NOT_ALLOWED"):
+            self.agent.execute_task("shell", {"command": "whoami"})
+
+    def test_agent_claim_execute_report_round_trip(self):
+        responses = [
+            {"ok": True, "status": "TASK_AVAILABLE", "task": {
+                "task_id": "home-test-1", "task": "python_version", "params": {}
+            }},
+            {"ok": True, "task": {"task_id": "home-test-1", "status": "COMPLETED"}},
+        ]
+        calls = []
+
+        def fake_request(method, path, key, payload=None):
+            calls.append((method, path, payload))
+            return responses.pop(0)
+
+        with patch("unittest.mock") as _unused:
+            pass
+        from unittest.mock import patch as mock_patch
+        with mock_patch.object(self.agent, "request_json", side_effect=fake_request):
+            result = self.agent.run_once("test-key")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["task_id"], "home-test-1")
+        self.assertEqual(result["reported_status"], "COMPLETED")
+        self.assertEqual(calls[0][1], "/api/home-server/claim")
+        self.assertEqual(calls[1][1], "/api/home-server/tasks/home-test-1/report")
+        self.assertTrue(calls[1][2]["ok"])
+        self.assertIn("python", calls[1][2]["result"])
+
+
 if __name__ == "__main__":
     unittest.main()
