@@ -46,6 +46,13 @@ class BrainLeadershipStore:
               expires_at REAL NOT NULL
             )"""
         )
+        self.db.execute(
+            """CREATE TABLE IF NOT EXISTS consumed_owner_approvals(
+              challenge_id TEXT PRIMARY KEY,
+              attempt_id TEXT NOT NULL,
+              consumed_at REAL NOT NULL
+            )"""
+        )
 
     @staticmethod
     def _valid_identity(identity: dict[str, Any], checkpoint: dict[str, Any]) -> dict[str, Any]:
@@ -95,6 +102,33 @@ class BrainLeadershipStore:
             verified["brain_id"], verified["generation"], lease_id, next_token,
             holder_id, now, expires
         )
+
+    def consume_owner_approval(self, challenge_id: str, attempt_id: str, *, now: float | None = None) -> None:
+        """Atomically consume an owner approval challenge once per Control Plane store."""
+        challenge_id = str(challenge_id).strip()
+        attempt_id = str(attempt_id).strip()
+        if not challenge_id or not attempt_id:
+            raise ValueError("OWNER_APPROVAL_CHALLENGE_ATTEMPT_REQUIRED")
+        consumed_at = time.time() if now is None else float(now)
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute(
+                "INSERT INTO consumed_owner_approvals(challenge_id, attempt_id, consumed_at) VALUES(?,?,?)",
+                (challenge_id, attempt_id, consumed_at),
+            )
+            self.db.execute("COMMIT")
+        except sqlite3.IntegrityError as exc:
+            try:
+                self.db.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise RuntimeError("OWNER_APPROVAL_REPLAY") from exc
+        except Exception:
+            try:
+                self.db.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
 
     def renew(self, lease: LeadershipLease, *, lease_seconds: int = 300, now: float | None = None) -> LeadershipLease:
         now = time.time() if now is None else float(now)
