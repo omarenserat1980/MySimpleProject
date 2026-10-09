@@ -207,7 +207,7 @@ class ChatSessionApiTests(unittest.TestCase):
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
             body = MessageIn(message="hello", client_message_id="crash-window-1")
-            first = endpoint(session["id"], body)
+            first = endpoint(session["id"], body, authorization=authorization)
             self.assertTrue(first["ok"])
             self.assertEqual(len(brain.calls), 1)
 
@@ -221,7 +221,7 @@ class ChatSessionApiTests(unittest.TestCase):
                 )
                 con.commit()
 
-            recovered = endpoint(session["id"], body)
+            recovered = endpoint(session["id"], body, authorization=authorization)
             self.assertTrue(recovered["idempotent_replay"])
             self.assertEqual(recovered["response"]["content"], "Brain verified reply")
             self.assertEqual(len(brain.calls), 1)
@@ -241,7 +241,7 @@ class ChatSessionApiTests(unittest.TestCase):
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
             body = MessageIn(message="hello", client_message_id="failed-ledger-1")
-            first = endpoint(session["id"], body)
+            first = endpoint(session["id"], body, authorization=authorization)
             self.assertTrue(first["ok"])
             self.assertEqual(len(brain.calls), 1)
 
@@ -255,7 +255,7 @@ class ChatSessionApiTests(unittest.TestCase):
                 )
                 con.commit()
 
-            recovered = endpoint(session["id"], body)
+            recovered = endpoint(session["id"], body, authorization=authorization)
             self.assertTrue(recovered["idempotent_replay"])
             self.assertEqual(recovered["response"]["content"], "Brain verified reply")
             self.assertEqual(len(brain.calls), 1)
