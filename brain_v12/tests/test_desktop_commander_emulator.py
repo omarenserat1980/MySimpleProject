@@ -20,8 +20,8 @@ class EmulatorTests(unittest.TestCase):
         self.assertEqual(self.e.start_process("python --version")["status"],"SHELL_DISABLED")
     def test_process_roundtrip_when_explicitly_enabled(self):
         e=DesktopCommanderEmulator(self.tmp.name,policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True))
-        r=e.start_process("python -c "print('OK')"")
+        r=e.start_process("python --version")
         self.assertTrue(r["ok"])
         out=e.read_process_output(r["process_id"],2)
-        self.assertEqual(out["returncode"],0); self.assertIn("OK",out["output"])
+        self.assertEqual(out["returncode"],0); self.assertIn("Python",out["output"])
 if __name__=="__main__": unittest.main()
