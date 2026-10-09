@@ -178,7 +178,8 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
+# Do not present a fallback variable as proof of the deployed GitHub commit.
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or "unknown"
 DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
 DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
