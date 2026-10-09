@@ -1,0 +1,92 @@
+name: BRAIN Windows Cloud Terraform Validation
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/cloud/windows_terraform/**"
+      - "brain_v12/brain/terraform_windows_cloud_provider.py"
+      - "brain_v12/brain/terraform_plan_gate.py"
+      - "brain_v12/brain/windows_terraform_safety.py"
+      - "brain_v12/brain/azure_auth_gate.py"
+      - "brain_v12/tests/test_azure_auth_gate.py"
+      - "brain_v12/brain/windows_cloud_executor.py"
+      - "brain_v12/brain/windows_cloud_gate.py"
+      - "brain_v12/tests/test_windows_cloud_executor.py"
+      - "brain_v12/brain/execution_gateway.py"
+      - "brain_v12/tests/test_execution_gateway_windows_cloud.py"
+      - "brain_v12/tests/test_windows_cloud_task_routing.py"
+      - "brain_v12/tests/test_windows_cloud_agent.py"
+      - "brain_v12/brain/windows_cloud_task_executor.py"
+      - "brain_v12/tests/test_windows_cloud_task_executor.py"
+      - "brain_v12/brain/internal_task_runtime.py"
+      - "brain_v12/cloud_windows_agent.py"
+      - "brain_v12/tests/test_windows_cloud_agent.py"
+      - ".github/workflows/brain-windows-cloud-terraform-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform-validation:
+    runs-on: ubuntu-24.04
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install test dependency
+        run: python -m pip install pytest
+        working-directory: .
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform version
+        run: terraform version
+
+      - name: Terraform format check
+        run: terraform fmt -diff -check -recursive
+
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Verify Brain Terraform safety contract
+        working-directory: .
+        run: |
+          python -m pytest -q brain_v12/tests/test_windows_terraform_safety.py brain_v12/tests/test_terraform_plan_gate.py
+
+      - name: Verify Azure auth readiness contract
+        working-directory: .
+        run: |
+          python -m pytest -q brain_v12/tests/test_azure_auth_gate.py
+
+      - name: Verify Windows cloud runtime gate
+        working-directory: .
+        run: |
+          python -m pytest -q brain_v12/tests/test_windows_cloud_gate.py brain_v12/tests/test_windows_cloud_executor.py brain_v12/tests/test_execution_gateway_windows_cloud.py brain_v12/tests/test_windows_cloud_task_routing.py brain_v12/tests/test_windows_cloud_task_executor.py brain_v12/tests/test_windows_cloud_agent.py
+
+      - name: Verify no provisioning command is present
+        working-directory: .
+        run: |
+          ! grep -R -nE '(^|[[:space:]])terraform[[:space:]]+apply([[:space:]]|$)' .github/workflows/brain-windows-cloud-terraform-plan.yml
+
+      - name: Verify plan must remain an explicit runtime action
+        run: |
+          echo "CI validates Terraform structure only."
+          echo "A real terraform plan requires authenticated Azure runtime context."
+          echo "This workflow never runs terraform apply."
