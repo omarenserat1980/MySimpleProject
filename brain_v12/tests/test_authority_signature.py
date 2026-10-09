@@ -7,7 +7,7 @@ class AuthoritySignatureTests(unittest.TestCase):
         private=Ed25519PrivateKey.generate()
         raw=private.private_bytes_raw()
         pub=private.public_key().public_bytes_raw()
-        contract={"brain_id":"b","generation":1,"fencing_token":2,"lease_id":"l","holder_id":"h","task_id":"t","attempt_id":"a","source_commit":"0"*40,"capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","authority_policy_version":"authority-policy-v1","authority_decision":"AUTHORIZED","authority_signature_algorithm":ALGORITHM}
+        contract={"brain_id":"b","generation":1,"fencing_token":2,"lease_id":"l","holder_id":"h","task_id":"t","attempt_id":"a","source_commit":"0"*40,"capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","authority_policy_version":"authority-policy-v1","authority_decision":"AUTHORIZED","authority_signature_algorithm":ALGORITHM,"schema":"brain.windows-execution-contract.v1","status":"VERIFIED","issued_at":100.0,"expires_at":200.0,"owner_id":"owner","owner_challenge_id":"challenge","owner_scope":"windows-server-2025-real-boot","owner_approval_source_commit":"0"*40,"owner_approval_task_id":"t","owner_approval_attempt_id":"a"}
         sig=sign_contract(contract,base64.b64encode(raw).decode())
         self.assertTrue(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
         contract["task_id"]="tampered"
