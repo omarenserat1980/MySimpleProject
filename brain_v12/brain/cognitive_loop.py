@@ -108,18 +108,19 @@ class CognitiveLoop:
         self.events.publish("UNDERSTAND",{"goal":goal,"summary":"تحديد المطلوب والنتيجة المتوقعة","run_id":run_id})
 
         self._state("MEMORY",goal=goal,run_id=run_id)
-        memories=self.store.memories()[-12:]
+        # MemoryStore.memories() is newest-first; take the first 12 to keep recent context.
+        memories=self.store.memories()[:12]
         self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
-        options=self.decisions.generate(goal)
+        options=self.decisions.generate(goal, memories=memories)
         self.events.publish("ANALYZE",{"options_count":len(options),"run_id":run_id})
 
         self._state("PLAN",goal=goal,run_id=run_id)
         self.events.publish("PLAN_CREATED",{"steps":["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"],"run_id":run_id})
 
         self._state("DECIDE",goal=goal,run_id=run_id)
-        decision=self.decisions.choose(goal,options,self.permissions.grants)
+        decision=self.decisions.choose(goal,options,self.permissions.grants,memories=memories)
         decision["run_id"]=run_id
         self.events.publish("DECISION_MADE",decision)
 
