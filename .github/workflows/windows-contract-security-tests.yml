@@ -1,0 +1,34 @@
+name: Windows Contract Security Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/brain_leadership.py"
+      - "brain_v12/brain/windows_execution_contract_issuer.py"
+      - "brain_v12/brain/owner_cryptographic_approval.py"
+      - "brain_v12/tests/test_windows_owner_approval_replay.py"
+      - "brain_v12/tests/test_windows_execution_contract_issuer.py"
+      - ".github/workflows/windows-contract-security-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-approval-replay:
+    name: Owner approval replay and issuer tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography
+      - name: Test durable approval replay protection
+        run: python -m unittest brain_v12.tests.test_windows_owner_approval_replay -v
+      - name: Test Windows execution contract issuer authorization
+        run: python -m unittest brain_v12.tests.test_windows_execution_contract_issuer -v
