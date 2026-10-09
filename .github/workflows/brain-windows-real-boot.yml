@@ -280,7 +280,7 @@ jobs:
           from brain_v12.brain.windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
 
           timeout_minutes=int(os.environ.get("BOOT_TIMEOUT","55"))
-          contract_path=os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE") or "/etc/brain/windows-execution-contract.json"
+          contract_path=os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE") or "/run/brain/windows-execution-contract.json"
 
           decision=BrainExecutionGateway().authorize_task(
               "windows-server-2025-real-boot",
