@@ -1,0 +1,73 @@
+name: Brain Raw Server Composer Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/raw_server/**"
+      - "brain_v12/tests/test_raw_server_composer.py"
+      - "brain_v12/tests/test_raw_server_capacity_gate.py"
+      - "scripts/Install-BrainRawServer.ps1"
+      - "scripts/Test-BrainHyperVPreflight.ps1"
+      - "scripts/Test-BrainHyperVCapacity.ps1"
+      - "brain_v12/raw_server/CONTRACTS.md"
+      - ".github/workflows/brain-raw-server-composer.yml"
+      - ".github/workflows/brain-arkan-readonly-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/raw_server/**"
+      - "brain_v12/tests/test_raw_server_composer.py"
+      - "brain_v12/tests/test_raw_server_capacity_gate.py"
+      - "scripts/Install-BrainRawServer.ps1"
+      - "scripts/Test-BrainHyperVPreflight.ps1"
+      - "scripts/Test-BrainHyperVCapacity.ps1"
+      - "brain_v12/raw_server/CONTRACTS.md"
+      - ".github/workflows/brain-raw-server-composer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python modules
+        run: python -m py_compile brain_v12/raw_server/composer.py brain_v12/raw_server/capacity_gate.py
+      - name: Run staged composer and capacity gate tests
+        run: python -m unittest brain_v12.tests.test_raw_server_composer brain_v12.tests.test_raw_server_capacity_gate -v
+      - name: Check scripts and contracts exist
+        run: |
+          test -s scripts/Install-BrainRawServer.ps1
+          test -s scripts/Test-BrainHyperVPreflight.ps1
+          test -s scripts/Test-BrainHyperVCapacity.ps1
+          test -s brain_v12/raw_server/CONTRACTS.md
+      - name: Parse PowerShell syntax
+        shell: pwsh
+        run: |
+          foreach ($file in @("scripts/Test-BrainHyperVPreflight.ps1", "scripts/Test-BrainHyperVCapacity.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "$file has PowerShell syntax errors: $($errors | Out-String)" }
+          }
+      - name: Guard Hyper-V scripts against mutation commands
+        shell: bash
+        run: |
+          for file in scripts/Test-BrainHyperVPreflight.ps1 scripts/Test-BrainHyperVCapacity.ps1; do
+            if grep -Eiq '^[[:space:]]*(Start-VM|New-VM|Remove-VM|Set-VM|New-VHD|Set-VMProcessor|Set-VMMemory|Stop-VM|Restart-VM)([[:space:]]|$)' "$file"; then
+              echo "Mutation command detected in $file"
+              exit 1
+            fi
+            grep -Eiq 'Get-CimInstance' "$file"
+            grep -Eiq 'Get-FileHash' "$file"
+          done
+          grep -Eiq 'Get-VM' scripts/Test-BrainHyperVPreflight.ps1
+          grep -Eiq 'Get-VM' scripts/Test-BrainHyperVCapacity.ps1
+          grep -Eiq 'workflow_dispatch:' .github/workflows/brain-arkan-readonly-preflight.yml
+          grep -Eiq 'windows-real-boot' .github/workflows/brain-arkan-readonly-preflight.yml
+          ! grep -Eiq '^[[:space:]]*(Start-VM|New-VM|Remove-VM|Set-VM|New-VHD|Set-VMProcessor|Set-VMMemory|Stop-VM|Restart-VM)([[:space:]]|$)' .github/workflows/brain-arkan-readonly-preflight.yml
