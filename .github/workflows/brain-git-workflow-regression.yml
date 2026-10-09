@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "brain_v12/brain_git/api.py"
+      - "brain_v12/app.py"
+      - "brain_v12/brain_git/workflow_engine.py"
       - "brain_v12/tests/test_brain_git_workflow_routes.py"
       - ".github/workflows/brain-git-workflow-regression.yml"
 
