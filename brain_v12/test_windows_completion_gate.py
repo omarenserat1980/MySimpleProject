@@ -10,6 +10,7 @@ def complete():
         "storage":{"filesystem":"NTFS","size_bytes":64*1024*1024*1024},
         "guest":{"os":"Windows Server 2025","architecture":"x86_64","boot_verified":True},
         "boot_source":"windows-installed-disk",
+        "executor":{"verified":True,"executor_id":"executor-test","hostname":"runner-test","evidence_ref":"cloud-executor-gate:test","runner_name":"runner-test","workflow_run_id":"123"},
         "control": {"schema":"brain.windows-execution-contract.v1","status":"VERIFIED","capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","brain_id":"brain-test","generation":1,"fencing_token":1,"task_id":"t1","attempt_id":"a1"},
     }
 
@@ -23,6 +24,13 @@ class WindowsCompletionGateTests(unittest.TestCase):
         self.assertIn("QEMU_EXIT_IS_NOT_BOOT_PROOF",r["reasons"])
     def test_accepts_complete_evidence(self):
         self.assertEqual(WindowsCompletionGate().verify(complete())["status"],"WINDOWS_BOOT_VERIFIED")
+    def test_refuses_missing_executor_binding(self):
+        e=complete()
+        e.pop("executor")
+        r=WindowsCompletionGate().verify(e)
+        self.assertFalse(r["verified"])
+        self.assertIn("MISSING_EXECUTOR",r["reasons"])
+
     def test_refuses_missing_control(self):
         e=complete()
         e.pop("control")

@@ -73,6 +73,17 @@ jobs:
           print(json.dumps(r, indent=2, sort_keys=True))
           PY
           echo "BRAIN_INTERNAL_RUNNER=VERIFIED"
+          echo "BRAIN_BOOT_RUNNER_NAME=${RUNNER_NAME:-unknown}"
+          # Re-check cloud executor capability on the exact runner that will boot Windows.
+          python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open("cloud-executor-gate.json", encoding="utf-8"))
+          assert e.get("verified") is True, e
+          assert e.get("evidence_ref"), e
+          print("SAME_JOB_CLOUD_EXECUTOR_GATE=VERIFIED")
+          print("SAME_JOB_CLOUD_EXECUTOR_EVIDENCE_REF="+e["evidence_ref"])
+          PY
 
       - name: Verify pre-issued Brain closed-loop execution contract
         run: |
@@ -252,11 +263,10 @@ jobs:
           truncate -s 64M windows-evidence.img
           mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
           cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
-          if [ -e /dev/kvm ]; then
-            echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
-          else
-            echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
-          fi
+          # Do not silently downgrade a real-boot run to software emulation.
+          test -c /dev/kvm || { echo 'BLOCKED: /dev/kvm is not a character device'; exit 2; }
+          test -r /dev/kvm && test -w /dev/kvm || { echo 'BLOCKED: /dev/kvm is not readable and writable'; exit 2; }
+          echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
 
       - name: Boot and install Windows Server 2025 through Brain Gateway
         env:
@@ -354,10 +364,25 @@ jobs:
           set -euo pipefail
           mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
           python3 - <<'PY'
-          import json,pathlib
+          import json,pathlib,os
           e=json.loads(pathlib.Path("windows-boot-evidence.json").read_text(encoding="utf-8-sig"))
           contract_gate=json.loads(pathlib.Path("windows-execution-contract-gate.json").read_text(encoding="utf-8"))
           assert contract_gate["verified"] is True, contract_gate
+          executor_gate=json.loads(pathlib.Path("cloud-executor-gate.json").read_text(encoding="utf-8"))
+          assert executor_gate.get("verified") is True, executor_gate
+          executor_id=executor_gate.get("executor_id","").strip()
+          hostname=(executor_gate.get("checks",{}).get("hostname",{}).get("value") or "").strip()
+          evidence_ref=(executor_gate.get("evidence_ref") or "").strip()
+          assert executor_id and hostname and evidence_ref, executor_gate
+          e["executor"]={
+              "verified":True,
+              "executor_id":executor_id,
+              "hostname":hostname,
+              "evidence_ref":evidence_ref,
+              "runner_name":os.environ.get("RUNNER_NAME","").strip(),
+              "workflow_run_id":os.environ.get("GITHUB_RUN_ID","").strip(),
+          }
+          assert e["executor"]["runner_name"] and e["executor"]["workflow_run_id"], e["executor"]
           e["control"]=contract_gate["contract"]
           assert e["status"]=="WINDOWS_BOOT_VERIFIED", e
           assert e["guest"]["os"]=="Windows Server 2025", e
@@ -406,6 +431,7 @@ jobs:
             qemu-accel.txt
             windows-boot-phase.txt
             windows-execution-contract-gate.json
+            cloud-executor-gate.json
             qemu-console.log
             qemu-serial.log
 
