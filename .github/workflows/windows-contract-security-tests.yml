@@ -3,6 +3,7 @@ name: Windows Contract Security Tests
 on:
   pull_request:
     paths:
+      - "brain_v12/app.py"
       - "brain_v12/brain/brain_leadership.py"
       - "brain_v12/brain/windows_execution_contract_issuer.py"
       - "brain_v12/brain/owner_cryptographic_approval.py"
@@ -31,6 +32,8 @@ jobs:
           python-version: "3.12"
       - name: Install minimal crypto dependency
         run: python -m pip install --disable-pip-version-check cryptography
+      - name: Compile authenticated contract API route
+        run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
       - name: Test durable approval replay protection
         run: python -m unittest brain_v12.tests.test_windows_owner_approval_replay -v
       - name: Test authority signature covers expiry and owner binding
