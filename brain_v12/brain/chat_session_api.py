@@ -36,7 +36,9 @@ def router(brain_ai, store=None, context_limit=24):
     identities.init()
 
     def require_identity(authorization):
-        scheme, _, token = (authorization or "").partition(" ")
+        if not isinstance(authorization, str):
+            raise HTTPException(status_code=401, detail="BRAIN_CHAT_AUTH_REQUIRED")
+        scheme, _, token = authorization.partition(" ")
         principal = identities.authenticate(token.strip()) if scheme.lower() == "bearer" else None
         if principal is None:
             raise HTTPException(status_code=401, detail="BRAIN_CHAT_AUTH_REQUIRED")
