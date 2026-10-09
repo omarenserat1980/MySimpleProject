@@ -37,7 +37,7 @@ class DeviceBridgeTests(unittest.TestCase):
 
     def test_invalid_utf8_key_file_fails_closed_without_crashing(self):
         with tempfile.NamedTemporaryFile(delete=False) as key_file:
-            key_file.write(b"\\xff\\xfe\\xfa")
+            key_file.write(bytes([0xff, 0xfe, 0xfa]))
             key_path = key_file.name
         try:
             os.environ["BRAIN_AGENT_KEY_FILE"] = key_path
