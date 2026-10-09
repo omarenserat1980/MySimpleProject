@@ -1,6 +1,6 @@
 # ADR: Brain Chat Identity, Device Pairing, and Session Isolation
 
-- Status: Proposed; implementation is not yet authorized by this ADR alone.
+- Status: In progress; backend device-token enforcement and focused tests are implemented on the PR branch; rollout is not complete.
 - Date: 2026-10-10
 - Scope: `brain_v12/brain/chat_session_api.py`, `chat_session_store.py`, and the Brain Chat web client.
 
@@ -39,12 +39,12 @@ Use a self-hosted, free, server-side device-pairing model. Do not add a paid ide
 
 ## Rollout plan
 
-1. Add tests and a documented threat model before changing authorization behavior.
-2. Implement credential storage, trusted bootstrap/pairing, and authentication middleware behind an explicit configuration gate.
-3. Enforce ownership across every route and add revocation/migration support.
-4. Update the web client to use pairing; never put server secrets in client assets.
-5. Run focused API tests, the full pytest suite, security checks, and CI.
-6. Keep the change in a separate PR. Do not merge until tests and migration behavior are reviewed and passing.
+1. The threat model and acceptance gates are documented here.
+2. Implemented on this branch: server-side device-token hash storage, token expiry/revocation, and local operator issuance via `python -m brain_v12.brain.chat_identity --db brain_v12.db issue --account <account-id> --device-label <device-label>`. The raw token is printed once.
+3. Implemented on this branch: bearer authentication and account ownership checks across session create/list/get, sync, memory read/write, compact, and message endpoints. The server ignores caller-supplied account IDs and device IDs for authorization.
+4. The web client now attaches the per-device token; it asks for the token once and stores it in localStorage. This has an XSS exposure tradeoff and requires careful deployment of CSP and output encoding.
+5. Focused tests now cover missing/revoked credentials and cross-account access; full API tests, full pytest, and CI results must still be verified.
+6. Legacy sessions without an account owner remain inaccessible to authenticated accounts until an explicit migration/recovery process is defined. Keep this change in a separate PR; do not merge until checks pass and migration behavior is reviewed.
 
 ## Non-goals
 
