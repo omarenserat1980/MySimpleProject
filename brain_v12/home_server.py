@@ -34,11 +34,14 @@ def _db_path() -> Path:
 class TaskInput(BaseModel):
     task: str
     params: dict[str, Any] = Field(default_factory=dict)
+    priority: int = Field(default=0, ge=-10, le=10)
+    required_capabilities: list[str] = Field(default_factory=list, max_length=20)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class ClaimInput(BaseModel):
     worker_id: str = Field(min_length=1, max_length=120)
+    capabilities: list[str] = Field(default_factory=list, max_length=50)
     lease_seconds: int = Field(default=60, ge=10, le=900)
 
 
@@ -73,6 +76,8 @@ class HomeServerStore:
                     task_id TEXT PRIMARY KEY,
                     task TEXT NOT NULL,
                     params_json TEXT NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 0,
+                    required_capabilities_json TEXT NOT NULL DEFAULT '[]',
                     status TEXT NOT NULL,
                     idempotency_key TEXT UNIQUE,
                     created_at REAL NOT NULL,
@@ -84,19 +89,30 @@ class HomeServerStore:
                     error TEXT NOT NULL DEFAULT ''
                 )
             """)
-            db.execute("CREATE INDEX IF NOT EXISTS idx_home_tasks_status_created ON home_tasks(status, created_at)")
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(home_tasks)")}
+            if "priority" not in columns:
+                db.execute("ALTER TABLE home_tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+            if "required_capabilities_json" not in columns:
+                db.execute("ALTER TABLE home_tasks ADD COLUMN required_capabilities_json TEXT NOT NULL DEFAULT '[]'")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_home_tasks_status_created ON home_tasks(status, priority DESC, created_at)")
 
     @staticmethod
     def _item(row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)
         item["params"] = json.loads(item.pop("params_json"))
+        item["required_capabilities"] = json.loads(item.pop("required_capabilities_json", "[]"))
         item["result"] = json.loads(item.pop("result_json")) if item.get("result_json") else None
         item.pop("result_json", None)
         return item
 
-    def enqueue(self, task: str, params: dict[str, Any], idempotency_key: str | None) -> dict[str, Any]:
+    def enqueue(self, task: str, params: dict[str, Any], idempotency_key: str | None, priority: int = 0, required_capabilities: list[str] | None = None) -> dict[str, Any]:
         if task not in ALLOWED_TASKS:
             raise ValueError("TASK_NOT_ALLOWED")
+        if not -10 <= priority <= 10:
+            raise ValueError("PRIORITY_OUT_OF_RANGE")
+        capabilities = sorted(set(required_capabilities or []))
+        if any(not cap or len(cap) > 80 for cap in capabilities):
+            raise ValueError("INVALID_CAPABILITY")
         now = time.time()
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -144,8 +160,9 @@ class HomeServerStore:
             rows = db.execute("SELECT * FROM home_tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         return [self._item(row) for row in rows]
 
-    def claim(self, worker_id: str, lease_seconds: int) -> dict[str, Any]:
+    def claim(self, worker_id: str, lease_seconds: int, capabilities: list[str] | None = None) -> dict[str, Any]:
         now = time.time()
+        worker_capabilities = set(capabilities or [])
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -153,7 +170,8 @@ class HomeServerStore:
                     "UPDATE home_tasks SET status='QUEUED', worker_id=NULL, lease_until=NULL, updated_at=? WHERE status='CLAIMED' AND lease_until < ?",
                     (now, now),
                 )
-                row = db.execute("SELECT * FROM home_tasks WHERE status='QUEUED' ORDER BY created_at LIMIT 1").fetchone()
+                queued = db.execute("SELECT * FROM home_tasks WHERE status='QUEUED' ORDER BY priority DESC, created_at ASC").fetchall()
+                row = next((candidate for candidate in queued if set(json.loads(candidate["required_capabilities_json"])).issubset(worker_capabilities)), None)
                 if row is None:
                     db.execute("COMMIT")
                     return {"ok": True, "status": "IDLE", "task": None}
@@ -247,7 +265,7 @@ def list_tasks(limit: int = 50, authorization: str | None = Header(default=None)
 def create_task(body: TaskInput, authorization: str | None = Header(default=None)):
     _authorize(authorization)
     try:
-        return {"ok": True, "task": get_store().enqueue(body.task, body.params, body.idempotency_key)}
+        return {"ok": True, "task": get_store().enqueue(body.task, body.params, body.idempotency_key, body.priority, body.required_capabilities)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -255,7 +273,7 @@ def create_task(body: TaskInput, authorization: str | None = Header(default=None
 @app.post("/api/home-server/claim")
 def claim_task(body: ClaimInput, authorization: str | None = Header(default=None)):
     _authorize(authorization, worker=True)
-    return get_store().claim(body.worker_id, body.lease_seconds)
+    return get_store().claim(body.worker_id, body.lease_seconds, body.capabilities)
 
 
 @app.post("/api/home-server/tasks/{task_id}/report")
