@@ -89,8 +89,11 @@ class PaymentEventJournal:
             return self._read().get(event_id)
 
     def begin(self, payload: "WebhookEnvelope") -> dict:
+        # Pydantic v1 uses dict(); v2 uses model_dump().
+        dump_payload = getattr(payload, "model_dump", None)
+        payload_data = dump_payload() if callable(dump_payload) else payload.dict()
         fingerprint = hashlib.sha256(
-            json.dumps(payload.model_dump(), sort_keys=True).encode("utf-8")
+            json.dumps(payload_data, sort_keys=True).encode("utf-8")
         ).hexdigest()
         with self.lock:
             data = self._read()
