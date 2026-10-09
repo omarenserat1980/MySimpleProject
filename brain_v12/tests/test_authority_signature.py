@@ -12,5 +12,8 @@ class AuthoritySignatureTests(unittest.TestCase):
         self.assertTrue(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
         contract["task_id"]="tampered"
         self.assertFalse(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
+        contract["task_id"]="t"
+        contract["expires_at"]=999999.0
+        self.assertFalse(verify_contract_signature(contract,sig,base64.b64encode(pub).decode()))
 
 if __name__=="__main__": unittest.main()
