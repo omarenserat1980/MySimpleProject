@@ -152,11 +152,16 @@ class CognitiveLoop:
 
         self._state("VERIFY",goal=goal,run_id=run_id,task_id=task["id"])
         verified_task=next((x for x in self.tasks.snapshot()["tasks"] if x["id"]==task["id"]),None)
+        verified = bool(
+            verified_task
+            and verified_task["status"] == "COMPLETED"
+            and (action != "device" or device_success)
+        )
         verification={
-            "status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" and (action!="device" or device_success) else "PENDING",
+            "status":"VERIFIED" if verified else "PENDING",
             "task_status":verified_task["status"] if verified_task else "UNKNOWN",
             "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else "تم فحص حالة المهمة بعد التنفيذ الداخلي.",
-            "result_verified":bool(action!="device" or device_success),
+            "result_verified":verified,
             "run_id":run_id
         }
         self.events.publish("VERIFIED",verification)
