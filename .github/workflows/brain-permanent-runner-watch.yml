@@ -26,6 +26,7 @@ jobs:
       runner_id: ${{ steps.inspect.outputs.runner_id }}
       runner_name: ${{ steps.inspect.outputs.runner_name }}
       runner_busy: ${{ steps.inspect.outputs.runner_busy }}
+      runner_status: ${{ steps.inspect.outputs.runner_status }}
     steps:
       - name: Inspect registration, labels and online state
         id: inspect
@@ -35,27 +36,42 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .brain/state
-          json="$(gh api "/repos/${REPO}/actions/runners?per_page=100")"
-
-          runner="$(printf '%s' "$json" | jq -c --argjson required "${REQUIRED_LABELS}" '
-            .runners[]
-            | select(([.labels[].name] | map(ascii_downcase)) as $labels
-              | ($required | all(. as $x | ($labels | index($x)) != null)))
-            | {id,name,status,busy,labels:[.labels[].name]}
-          ' | head -n1 || true)"
-
-          if [ -z "$runner" ]; then
-            status="NOT_REGISTERED"
-            online="false"
-            id=""
-            name=""
-            busy="false"
+          # The repository GITHUB_TOKEN may not have Administration: read,
+          # which GitHub requires for the self-hosted runners endpoint.
+          # Do not misreport an authorization failure as an absent runner.
+          if ! response="$(gh api "/repos/${REPO}/actions/runners?per_page=100" 2>&1)"; then
+            if printf '%s' "$response" | grep -Eqi '403|Resource not accessible by integration'; then
+              status="ACCESS_DENIED"
+              online="false"
+              id=""
+              name=""
+              busy="false"
+              echo "::warning::Runner state is UNKNOWN: token lacks access to the runners API."
+            else
+              printf '%s\n' "$response" >&2
+              exit 1
+            fi
           else
-            status="$(jq -r '.status' <<<"$runner")"
-            online="$(jq -r '(.status == "online")' <<<"$runner")"
-            id="$(jq -r '.id' <<<"$runner")"
-            name="$(jq -r '.name' <<<"$runner")"
-            busy="$(jq -r '.busy' <<<"$runner")"
+            runner="$(printf '%s' "$response" | jq -c --argjson required "${REQUIRED_LABELS}" '
+              .runners[]
+              | select(([.labels[].name] | map(ascii_downcase)) as $labels
+                | ($required | all(. as $x | ($labels | index($x)) != null)))
+              | {id,name,status,busy,labels:[.labels[].name]}
+            ' | head -n1 || true)"
+
+            if [ -z "$runner" ]; then
+              status="NOT_FOUND_MATCHING_LABELS"
+              online="false"
+              id=""
+              name=""
+              busy="false"
+            else
+              status="$(jq -r '.status' <<<"$runner")"
+              online="$(jq -r '(.status == "online")' <<<"$runner")"
+              id="$(jq -r '.id' <<<"$runner")"
+              name="$(jq -r '.name' <<<"$runner")"
+              busy="$(jq -r '.busy' <<<"$runner")"
+            fi
           fi
 
           cat > .brain/state/runner-watch.json <<EOF
@@ -77,6 +93,7 @@ jobs:
           echo "runner_id=${id}" >> "$GITHUB_OUTPUT"
           echo "runner_name=${name}" >> "$GITHUB_OUTPUT"
           echo "runner_busy=${busy}" >> "$GITHUB_OUTPUT"
+          echo "runner_status=${status}" >> "$GITHUB_OUTPUT"
 
   probe:
     name: Prove Job Execution Capability
@@ -131,11 +148,14 @@ jobs:
           RUNNER_ID: ${{ needs.detect.outputs.runner_id }}
           RUNNER_NAME: ${{ needs.detect.outputs.runner_name }}
           PROBE_RESULT: ${{ needs.probe.result }}
+          DETECT_STATUS: ${{ needs.detect.outputs.runner_status }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .brain/state
-          if [ "${DETECT_ONLINE}" = "true" ] && [ "${PROBE_RESULT}" = "success" ]; then
+          if [ "${DETECT_STATUS}" = "ACCESS_DENIED" ]; then
+            health="ACCESS_DENIED"
+          elif [ "${DETECT_ONLINE}" = "true" ] && [ "${PROBE_RESULT}" = "success" ]; then
             health="VERIFIED"
           elif [ "${DETECT_ONLINE}" = "true" ]; then
             health="ONLINE_BUT_EXECUTION_UNVERIFIED"
@@ -146,6 +166,7 @@ jobs:
           cat > .brain/state/runner-health.json <<EOF
           {
             "health": "${health}",
+            "detected_status": "${DETECT_STATUS}",
             "online": ${DETECT_ONLINE:-false},
             "runner_id": "${RUNNER_ID}",
             "runner_name": "${RUNNER_NAME}",
@@ -157,7 +178,9 @@ jobs:
 
           cat .brain/state/runner-health.json
 
-          if [ "${health}" = "NOT_VERIFIED" ]; then
+          if [ "${health}" = "ACCESS_DENIED" ]; then
+            echo "::warning::Runner state is unknown because the workflow token cannot read the runners API; no absence/offline claim is made."
+          elif [ "${health}" = "NOT_VERIFIED" ]; then
             echo "::warning::Brain internal runner is not verified; inspect registration/WSL/service/network."
           elif [ "${health}" = "ONLINE_BUT_EXECUTION_UNVERIFIED" ]; then
             echo "::warning::Runner is online but failed the execution proof."
