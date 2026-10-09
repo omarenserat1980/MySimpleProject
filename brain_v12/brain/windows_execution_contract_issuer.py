@@ -73,6 +73,9 @@ def issue_from_files(*,identity_file:str,checkpoint_file:str,lease_file:str,outp
             task_id=task_id,attempt_id=attempt_id,
             capability_verified=capability_verified,human_approval_token=human_approval_token,
             owner_approval=owner_approval,owner_public_key_b64=owner_public_key_b64)
+        # The challenge is consumed durably before the contract is written or returned.
+        # If delivery fails afterwards, require a fresh owner approval rather than replaying it.
+        store.consume_owner_approval(c["owner_challenge_id"], c["attempt_id"])
     finally: store.close()
     out=Path(output); out.parent.mkdir(parents=True,exist_ok=True)
     tmp=out.with_suffix(out.suffix+".tmp"); tmp.write_text(json.dumps(c,indent=2,sort_keys=True),encoding="utf-8"); os.replace(tmp,out)
