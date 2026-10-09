@@ -50,7 +50,17 @@ class ExecutorService : Service() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
         val agentId = prefs.getString("agent_id", "android-executor-01") ?: "android-executor-01"
         val key = prefs.getString("agent_key", "") ?: ""
-        val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
+        val savedBaseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trim()?.trimEnd('/').orEmpty()
+        val baseUrl = if (savedBaseUrl.isBlank() ||
+            savedBaseUrl.equals("http://127.0.0.1:8012", ignoreCase = true) ||
+            savedBaseUrl.equals("http://localhost:8012", ignoreCase = true)) {
+            DEFAULT_BASE_URL
+        } else {
+            savedBaseUrl
+        }
+        if (baseUrl != savedBaseUrl) {
+            prefs.edit().putString("brain_base_url", baseUrl).apply()
+        }
         if (key.isBlank()) {
             updateNotification("ERROR: agent key missing")
             running = false
