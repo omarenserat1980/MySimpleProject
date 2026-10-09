@@ -54,8 +54,15 @@ A production executor must also provide these host/service environment values:
 
 - BRAIN_CLOUD_EXECUTOR=1
 - BRAIN_CLOUD_EXECUTOR_ID=<stable-or-ephemeral executor identity>
-- BRAIN_CLOUD_EXECUTOR_ATTESTATION=<non-empty host attestation reference>
+- BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64=<base64-encoded signed JSON attestation>
+- BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64=<trusted Ed25519 public key>
 
-The workflow must never set these values. Missing identity or attestation fails the
-Cloud Executor Gate. The attestation is evidence of the executor's externally
-managed identity; it is not itself proof that Windows booted.
+The workflow must never set executor identity or attestation. The trusted provisioning
+service must sign schema brain.cloud-executor-attestation.v1, binding executor_id,
+exact hostname, architecture=x86_64, issued_at, and expires_at. The signature is
+Ed25519 over the canonical JSON payload (the six fields named in that schema, sorted
+by key with compact separators). The verifier rejects missing trust roots, invalid
+signatures, identity mismatches, future-issued/expired attestations, and lifetimes
+over 15 minutes. Use an ephemeral one-job runner with a fresh attestation; a long-lived
+runner's static attestation will expire and intentionally fail closed. This proves
+runner identity/capability only, not that Windows booted.
