@@ -5,6 +5,7 @@ on:
     paths:
       - "brain_v12/brain/device_bridge.py"
       - "brain_v12/app.py"
+      - "brain_v12/tests/test_device_bridge_auth.py"
       - ".github/workflows/device-bridge-compile.yml"
   workflow_dispatch:
 
@@ -20,4 +21,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile changed Python modules
-        run: python -m py_compile brain_v12/brain/device_bridge.py brain_v12/app.py
+        run: python -m py_compile brain_v12/brain/device_bridge.py brain_v12/app.py brain_v12/tests/test_device_bridge_auth.py
+      - name: Run DeviceBridge authentication tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_device_bridge_auth -v
