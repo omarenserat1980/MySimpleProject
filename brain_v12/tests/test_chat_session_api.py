@@ -1,7 +1,10 @@
 import tempfile
 import unittest
 
+from fastapi import HTTPException
+
 from brain_v12.brain.brain_ai_api import BrainAIChatIn
+from brain_v12.brain.chat_identity import ChatIdentityStore
 from brain_v12.brain.chat_session_api import MemoryIn, MessageIn, SessionCreateIn, router
 from brain_v12.brain.chat_session_store import ChatSessionStore
 
@@ -171,12 +174,16 @@ class ChatSessionApiTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
             store.init()
-            session = store.create("API idempotency")
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            token = identities.issue("test-account", "test-device")["token"]
+            authorization = "Bearer " + token
+            session = store.create("API idempotency", account_id="test-account", device_id="test-device")
             brain = FakeBrain()
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
             body = MessageIn(message="hello", client_message_id="retry-1", device_id="phone")
-            first = endpoint(session["id"], body)
+            first = endpoint(session["id"], body, authorization=authorization)
             second = endpoint(session["id"], body)
             self.assertEqual(len(brain.calls), 1)
             self.assertFalse(first["idempotent_replay"])
@@ -191,7 +198,11 @@ class ChatSessionApiTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
             store.init()
-            session = store.create("Crash recovery")
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            token = identities.issue("test-account", "test-device")["token"]
+            authorization = "Bearer " + token
+            session = store.create("Crash recovery", account_id="test-account", device_id="test-device")
             brain = FakeBrain()
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
@@ -221,7 +232,11 @@ class ChatSessionApiTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
             store.init()
-            session = store.create("Failed ledger recovery")
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            token = identities.issue("test-account", "test-device")["token"]
+            authorization = "Bearer " + token
+            session = store.create("Failed ledger recovery", account_id="test-account", device_id="test-device")
             brain = FakeBrain()
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
@@ -252,16 +267,60 @@ class ChatSessionApiTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
             store.init()
-            session = store.create("API id conflict")
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            token = identities.issue("test-account", "test-device")["token"]
+            authorization = "Bearer " + token
+            session = store.create("API id conflict", account_id="test-account", device_id="test-device")
             brain = FakeBrain()
             endpoint = next(route.endpoint for route in router(brain, store=store).routes
                             if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
-            first = endpoint(session["id"], MessageIn(message="hello", client_message_id="same-id"))
-            conflict = endpoint(session["id"], MessageIn(message="different", client_message_id="same-id"))
+            first = endpoint(session["id"], MessageIn(message="hello", client_message_id="same-id"), authorization=authorization)
+            conflict = endpoint(session["id"], MessageIn(message="different", client_message_id="same-id"), authorization=authorization)
             self.assertTrue(first["ok"])
             self.assertEqual(conflict["status"], "CLIENT_MESSAGE_ID_CONFLICT")
             self.assertEqual(len(brain.calls), 1)
 
+
+    def test_chat_api_rejects_missing_and_revoked_credentials(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            credential = identities.issue("account-a", "phone")
+            list_endpoint = next(route.endpoint for route in router(FakeBrain(), store=store).routes
+                                 if getattr(route, "path", "") == "/api/brain-chat/sessions")
+            with self.assertRaises(HTTPException) as missing:
+                list_endpoint(authorization=None)
+            self.assertEqual(missing.exception.status_code, 401)
+            self.assertTrue(identities.revoke(credential["device_id"]))
+            with self.assertRaises(HTTPException) as revoked:
+                list_endpoint(authorization="Bearer " + credential["token"])
+            self.assertEqual(revoked.exception.status_code, 401)
+
+    def test_chat_api_enforces_session_ownership_and_ignores_account_query(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            owner_session = store.create("Owner", account_id="account-a", device_id="phone")
+            other_session = store.create("Other", account_id="account-b", device_id="desktop")
+            identities = ChatIdentityStore(f.name)
+            identities.init()
+            credential = identities.issue("account-a", "phone")
+            authorization = "Bearer " + credential["token"]
+            routes = router(FakeBrain(), store=store).routes
+            get_endpoint = next(route.endpoint for route in routes
+                                if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}")
+            list_endpoint = next(route.endpoint for route in routes
+                                 if getattr(route, "path", "") == "/api/brain-chat/sessions")
+            self.assertEqual(get_endpoint(owner_session["id"], authorization=authorization)["session"]["id"],
+                             owner_session["id"])
+            with self.assertRaises(HTTPException) as cross_account:
+                get_endpoint(other_session["id"], authorization=authorization)
+            self.assertEqual(cross_account.exception.status_code, 404)
+            listed = list_endpoint(account_id="account-b", authorization=authorization)["sessions"]
+            self.assertEqual({item["id"] for item in listed}, {owner_session["id"]})
 
 if __name__ == "__main__":
     unittest.main()
