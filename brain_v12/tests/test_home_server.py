@@ -58,6 +58,16 @@ class HomeServerQueueTests(unittest.TestCase):
         claim = self.store.claim("worker-gpu", 60, capabilities=["python", "gpu"])
         self.assertEqual(claim["task"]["task_id"], gpu_task["task_id"])
 
+    def test_main_app_registers_home_server_routes(self):
+        # Import the same app object used by Render's uvicorn start command.
+        from brain_v12.app import app as main_app
+
+        paths = {getattr(route, "path", "") for route in main_app.routes}
+        self.assertIn("/api/home-server/status", paths)
+        self.assertIn("/api/home-server/tasks", paths)
+        self.assertIn("/api/home-server/claim", paths)
+        self.assertIn("/api/home-server/tasks/{task_id}/report", paths)
+
     def test_priority_range_is_validated(self):
         with self.assertRaises(ValueError):
             self.store.enqueue("status", {}, None, priority=11)
