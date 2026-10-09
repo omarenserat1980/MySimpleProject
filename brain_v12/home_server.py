@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from brain_v12.execution_proof import ExecutionProof, ProofTransitionError
+
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
@@ -86,7 +88,8 @@ class HomeServerStore:
                     worker_id TEXT,
                     lease_until REAL,
                     result_json TEXT,
-                    error TEXT NOT NULL DEFAULT ''
+                    error TEXT NOT NULL DEFAULT '',
+                    proof_json TEXT
                 )
             """)
             columns = {row["name"] for row in db.execute("PRAGMA table_info(home_tasks)")}
@@ -94,6 +97,8 @@ class HomeServerStore:
                 db.execute("ALTER TABLE home_tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
             if "required_capabilities_json" not in columns:
                 db.execute("ALTER TABLE home_tasks ADD COLUMN required_capabilities_json TEXT NOT NULL DEFAULT '[]'")
+            if "proof_json" not in columns:
+                db.execute("ALTER TABLE home_tasks ADD COLUMN proof_json TEXT")
             db.execute("CREATE INDEX IF NOT EXISTS idx_home_tasks_status_created ON home_tasks(status, priority DESC, created_at)")
 
     @staticmethod
@@ -102,6 +107,8 @@ class HomeServerStore:
         item["params"] = json.loads(item.pop("params_json"))
         item["required_capabilities"] = json.loads(item.pop("required_capabilities_json", "[]"))
         item["result"] = json.loads(item.pop("result_json")) if item.get("result_json") else None
+        proof_json = item.pop("proof_json", None)
+        item["proof"] = json.loads(proof_json) if proof_json else None
         item.pop("result_json", None)
         return item
 
@@ -177,9 +184,11 @@ class HomeServerStore:
                     db.execute("COMMIT")
                     return {"ok": True, "status": "IDLE", "task": None}
                 lease_until = now + lease_seconds
+                proof = ExecutionProof(row["task_id"], worker_id)
+                proof.transition("CLAIMED", lease_seconds=lease_seconds)
                 db.execute(
-                    "UPDATE home_tasks SET status='CLAIMED', worker_id=?, lease_until=?, attempts=attempts+1, updated_at=? WHERE task_id=? AND status='QUEUED'",
-                    (worker_id, lease_until, now, row["task_id"]),
+                    "UPDATE home_tasks SET status='CLAIMED', worker_id=?, lease_until=?, attempts=attempts+1, updated_at=?, proof_json=? WHERE task_id=? AND status='QUEUED'",
+                    (worker_id, lease_until, now, json.dumps(proof.export(), separators=(",", ":"), sort_keys=True), row["task_id"]),
                 )
                 claimed = db.execute("SELECT * FROM home_tasks WHERE task_id=?", (row["task_id"],)).fetchone()
                 db.execute("COMMIT")
@@ -190,7 +199,6 @@ class HomeServerStore:
 
     def report(self, task_id: str, worker_id: str, ok: bool, result: dict[str, Any], error: str) -> dict[str, Any]:
         now = time.time()
-        final_status = "COMPLETED" if ok else "FAILED"
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT * FROM home_tasks WHERE task_id=?", (task_id,)).fetchone()
@@ -200,13 +208,37 @@ class HomeServerStore:
             if row["status"] != "CLAIMED" or row["worker_id"] != worker_id:
                 db.execute("ROLLBACK")
                 raise PermissionError("WORKER_LEASE_MISMATCH")
+            try:
+                proof = ExecutionProof.from_export(json.loads(row["proof_json"] or ""))
+                if proof.worker_id != worker_id or proof.state != "CLAIMED":
+                    raise ValueError("PROOF_WORKER_OR_STATE_MISMATCH")
+                proof.transition("RUNNING")
+                if ok:
+                    proof.transition("RESULT_READY", result=result)
+                    proof.transition("EVIDENCE_READY", evidence_count=1)
+                    proof.transition("VERIFYING")
+                    proof.transition("ACCEPTED", verifier="home-server", result_ok=True)
+                    final_status = "COMPLETED"
+                else:
+                    proof.transition("FAILED", error=error)
+                    proof.transition("VERIFYING")
+                    proof.transition("REJECTED", verifier="home-server", result_ok=False)
+                    final_status = "FAILED"
+                exported = proof.export()
+                if not exported["verified"]:
+                    raise ValueError("EXECUTION_PROOF_NOT_VERIFIED")
+            except (ValueError, KeyError, TypeError, ProofTransitionError) as exc:
+                db.execute("ROLLBACK")
+                raise ValueError(f"EXECUTION_PROOF_REJECTED:{exc}") from exc
             db.execute(
-                "UPDATE home_tasks SET status=?, result_json=?, error=?, updated_at=?, lease_until=NULL WHERE task_id=?",
-                (final_status, json.dumps(result, separators=(",", ":"), sort_keys=True), error, now, task_id),
+                "UPDATE home_tasks SET status=?, result_json=?, error=?, updated_at=?, lease_until=NULL, proof_json=? WHERE task_id=?",
+                (final_status, json.dumps(result, separators=(",", ":"), sort_keys=True), error, now,
+                 json.dumps(exported, separators=(",", ":"), sort_keys=True), task_id),
             )
             updated = db.execute("SELECT * FROM home_tasks WHERE task_id=?", (task_id,)).fetchone()
             db.execute("COMMIT")
             return {"ok": True, "task": self._item(updated)}
+
 
 
 store: HomeServerStore | None = None
@@ -285,4 +317,6 @@ def report_task(task_id: str, body: ReportInput, authorization: str | None = Hea
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
