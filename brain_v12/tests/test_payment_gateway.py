@@ -32,6 +32,16 @@ class PaymentGatewayTests(unittest.TestCase):
         p={"event_id":"evt_journal_recover","event_type":"payment.verified","order_id":self.order["order_id"],"provider":"test","payment_reference":"pay_journal","amount_usd":9,"currency":"USD","timestamp":int(time.time())}
         raw,h=self.signed(p)
         from brain_v12.brain.payment_gateway import PaymentEventJournal
+        # Simulate the crash window after the commerce transaction committed,
+        # but before the replay record was durably written. Recovery must verify
+        # the committed order against the authenticated webhook, not trust the journal alone.
+        self.store.transition(self.order["order_id"], "PAYMENT_VERIFIED", {
+            "transaction_id": p["payment_reference"],
+            "evidence_ref": f"payment-webhook:{p['provider']}:{p['event_id']}",
+            "provider": p["provider"],
+            "event_id": p["event_id"],
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+        })
         journal_path=self.db + ".payment-events.json"
         journal=PaymentEventJournal(journal_path)
         journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope(**p))
