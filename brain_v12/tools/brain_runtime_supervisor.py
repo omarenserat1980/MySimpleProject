@@ -31,11 +31,49 @@ def record(row):
     with HISTORY.open("a", encoding="utf-8") as f:
         f.write(json.dumps({"ts": time.time(), **row}, ensure_ascii=False) + "\n")
 
-def recent_fingerprints(limit=30):
+def recent_fingerprints(limit=300):
+    """Return only objectives completed under the strict verification contract."""
     if not HISTORY.exists():
         return set()
     rows = HISTORY.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]
-    return {json.loads(x).get("fingerprint") for x in rows if x.strip()}
+    verified = set()
+    for raw in rows:
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if (row.get("event") == "completed"
+                and row.get("verification_contract") == "strict-v1"
+                and row.get("verified") is True
+                and row.get("fingerprint")):
+            verified.add(row["fingerprint"])
+    return verified
+
+def pending_tracked_goals():
+    """Recover the latest unfinished/failed objective from the durable task journal."""
+    path = STATE / "continuous_tasks.jsonl"
+    if not path.exists():
+        return []
+    latest = {}
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        fingerprint = row.get("fingerprint")
+        if fingerprint and row.get("goal"):
+            latest[fingerprint] = row
+    pending = [
+        row for row in latest.values()
+        if row.get("status") in {"FAILED", "RUNNING"}
+        and str(row.get("goal", "")).strip()
+    ]
+    pending.sort(key=lambda row: float(row.get("priority", 0)), reverse=True)
+    return pending
 
 def refresh_predictions():
     """Recompute future risks before choosing the next unit of work."""
@@ -98,12 +136,24 @@ def candidates():
     return sorted(items, key=lambda x: x[1], reverse=True)
 
 def choose_goal():
+    # Resume the same durable objective before selecting unrelated new work.
+    pending = pending_tracked_goals()
+    if pending:
+        task = pending[0]
+        return (
+            str(task.get("kind", "task")),
+            float(task.get("priority", 0.8)),
+            str(task["goal"]),
+            str(task["fingerprint"]),
+        )
+
     seen = recent_fingerprints()
-    for kind, priority, text in candidates():
+    available = candidates()
+    for kind, priority, text in available:
         fingerprint = f"{kind}:{text}"
         if fingerprint not in seen:
             return kind, priority, text, fingerprint
-    kind, priority, text = candidates()[0]
+    kind, priority, text = available[0]
     return kind, priority, text, f"{kind}:{text}"
 
 def think_and_act(goal):
@@ -199,7 +249,12 @@ def main():
             task = create_tracked_task(kind, priority, goal, fingerprint)
             result = think_and_act(goal)
             verification = result.get("verification", {}) if isinstance(result, dict) else {}
-            verified = verification.get("status") == "VERIFIED" or bool(verification.get("result_verified"))
+            # Success requires both an explicit VERIFIED status and a positive result flag.
+            # A stale/overly broad result_verified=True must never override PENDING/FAILED.
+            verified = (
+                verification.get("status") == "VERIFIED"
+                and verification.get("result_verified") is True
+            )
             finish_tracked_task(
                 task,
                 "VERIFIED" if verified else "FAILED",
@@ -208,6 +263,7 @@ def main():
             record({
                 "cycle": cycle, "event": "completed", "goal": goal,
                 "fingerprint": fingerprint, "verified": verified,
+                "verification_contract": "strict-v1",
                 "status": verification.get("status", result.get("status", "UNKNOWN")),
             })
             print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
