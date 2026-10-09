@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Location = "northeurope", [string]$VmSize = "Standard_D4s_v5")
+param([string]$Location = "westeurope", [string]$VmSize = "Standard_B1s")
 $ErrorActionPreference = "Stop"
 function Fail([string]$Message) { throw $Message }
 foreach ($tool in @("az","terraform")) {
@@ -32,7 +32,7 @@ $quotaRaw = az vm list-usage --location $Location --output json --only-show-erro
 if ($LASTEXITCODE -eq 0 -and $quotaRaw) {
     try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { $quotas = @() }
     $totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "Total Regional vCPUs" } | Select-Object -First 1)
-    $familyQuota = @($quotas | Where-Object { $_.name.value -match "standardDSv5Family" -or $_.name.localizedValue -match "DSv5 Family" } | Select-Object -First 1)
+    $familyQuota = @($quotas | Where-Object { $_.name.value -match "standard(B|BS)Family" -or $_.name.localizedValue -match "BS.?Family|B.?Family" } | Select-Object -First 1)
     foreach ($quota in @($totalQuota + $familyQuota)) {
         if ($quota.Count -gt 0 -and $null -ne $quota[0].limit -and $null -ne $quota[0].currentValue) {
             $available = [int]$quota[0].limit - [int]$quota[0].currentValue
