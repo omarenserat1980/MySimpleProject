@@ -25,6 +25,7 @@ def _load(path: str, error: str) -> dict[str, Any]:
 def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     lease:LeadershipLease, source_commit:str, task_id:str, attempt_id:str,
     capability_verified:bool, human_approval_token:str|None=None,
+    owner_approval:dict[str,Any]|None=None, owner_public_key_b64:str|None=None,
     now:float|None=None, expires_seconds:int=900)->dict[str,Any]:
     verified=require_checkpoint_identity(identity,checkpoint)
     source_commit=str(source_commit).strip().lower()
