@@ -15,7 +15,8 @@ Binding to `127.0.0.1` keeps the first run local to that computer. Do not expose
 ## Configuration
 
 - `BRAIN_HOME_SERVER_DB` (optional): SQLite database path. Default: `~/.brain/home-server.sqlite3`.
-- `BRAIN_CONTROL_KEY` (required for task/control APIs): reuse an already-authorized control key. This service never generates or prints a key. If it is absent, control endpoints fail closed with HTTP 503.
+- `BRAIN_CONTROL_KEY` (required for task creation/listing): reuse an already-authorized control key. This service never generates or prints a key.
+- `BRAIN_AGENT_KEY` (or existing compatibility aliases `BRAIN_EMULATOR_KEY`, `BRAIN_EMULATOR_AGENT_KEY`, `TERMUX_AGENT_KEY`) for worker claim/report calls. Worker credentials are kept separate from the control key. If the appropriate key is absent, that API fails closed with HTTP 503.
 
 ## Endpoints
 
