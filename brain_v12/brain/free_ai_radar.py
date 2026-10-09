@@ -15,6 +15,13 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+import sys
+
+# Running a file by path puts brain_v12/brain, not the repository root, on sys.path.
+# Add the repository root explicitly so package imports work in GitHub Actions and locally.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from brain_v12.brain.free_ai_capability_registry import snapshot
 
