@@ -200,6 +200,9 @@ class HomeServerStore:
             if row["status"] != "CLAIMED" or row["worker_id"] != worker_id:
                 db.execute("ROLLBACK")
                 raise PermissionError("WORKER_LEASE_MISMATCH")
+            if row["lease_until"] is None or row["lease_until"] <= now:
+                db.execute("ROLLBACK")
+                raise PermissionError("WORKER_LEASE_EXPIRED")
             db.execute(
                 "UPDATE home_tasks SET status=?, result_json=?, error=?, updated_at=?, lease_until=NULL WHERE task_id=?",
                 (final_status, json.dumps(result, separators=(",", ":"), sort_keys=True), error, now, task_id),
