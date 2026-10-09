@@ -14,9 +14,11 @@ jobs:
   preflight:
     runs-on: [self-hosted, brain-internal]
     timeout-minutes: 10
+    defaults:
+      run:
+        shell: powershell
     steps:
       - name: Runner identity
-        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           Write-Host "RUNNER_OK"
@@ -26,7 +28,6 @@ jobs:
           Get-Date -Format o
 
       - name: Workspace health
-        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $root = "C:\actions-runner\actions-runner"
@@ -37,9 +38,15 @@ jobs:
           Write-Host "WORKDIR_EXISTS=$(Test-Path "$root\_work")"
 
       - name: Azure CLI session check
-        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
           if ($LASTEXITCODE -ne 0) { throw "Azure CLI session unavailable" }
           Write-Host "AZURE_SESSION_OK"
+
+      - name: Terraform availability
+        run: |
+          $ErrorActionPreference = "Stop"
+          terraform version
+          if ($LASTEXITCODE -ne 0) { throw "Terraform unavailable" }
+          Write-Host "TERRAFORM_OK"
