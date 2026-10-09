@@ -69,6 +69,26 @@ class BackgroundThreadRuntimeTests(unittest.TestCase):
         finally:
             supervisor.stop()
 
+    def test_thread_budget_is_hard_limit(self) -> None:
+        supervisor = BackgroundThreadSupervisor(max_threads=2)
+        supervisor.register(BackgroundJobSpec("a", lambda stop: None))
+        supervisor.register(BackgroundJobSpec("b", lambda stop: None))
+        with self.assertRaisesRegex(RuntimeError, "BUDGET_EXCEEDED"):
+            supervisor.register(BackgroundJobSpec("c", lambda stop: None))
+
+    def test_priority_is_visible_without_changing_authority(self) -> None:
+        supervisor = BackgroundThreadSupervisor(max_threads=2)
+        supervisor.register(BackgroundJobSpec("low", lambda stop: None, priority=10))
+        supervisor.register(BackgroundJobSpec("high", lambda stop: None, priority=90))
+        supervisor.start()
+        try:
+            snapshot = supervisor.snapshot()
+            self.assertEqual(snapshot["jobs"]["high"]["priority"], 90)
+            self.assertEqual(snapshot["jobs"]["low"]["priority"], 10)
+            self.assertEqual(snapshot["max_threads"], 2)
+        finally:
+            supervisor.stop()
+
 
 if __name__ == "__main__":
     unittest.main()
