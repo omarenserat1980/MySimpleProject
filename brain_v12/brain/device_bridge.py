@@ -13,22 +13,19 @@ class DeviceBridge:
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
-    def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"))
+    def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("TERMUX_AGENT_KEY") or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"))
     def auth_mode(self):
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
+        if os.getenv("TERMUX_AGENT_KEY",""): return "TERMUX_AGENT_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
         if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY"
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
         if not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
-        if not expected:
-            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
-            if key_file and os.path.isfile(key_file):
-                try:
-                    with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
-                except OSError: expected=""
+        expected=(os.getenv(AGENT_KEY_ENV,"") or os.getenv("TERMUX_AGENT_KEY","")
+                  or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY",""))
+        # Authenticate only against server-configured secrets, never a device-local key file.
         if expected and hmac.compare_digest(supplied,expected):return True
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
@@ -65,7 +62,10 @@ class DeviceBridge:
         if task in ("python_unittest","brain_self_test"):
             combined="\n".join((str(result.get("stdout","")),str(result.get("stderr","")))); exit_code=result.get("returncode",result.get("exit_code")); verified=exit_code in (None,0) and "Ran " in combined and "OK" in combined
         elif task=="python_version":
-            stdout=str(result.get("stdout","")).strip(); exit_code=result.get("returncode",result.get("exit_code")); verified=bool(stdout) and exit_code in (None,0)
+            stdout=str(result.get("stdout","")).strip()
+            version=str(result.get("python","")).strip()
+            exit_code=result.get("returncode",result.get("exit_code"))
+            verified=bool(stdout or version) and exit_code in (None,0)
         elif task in ("brain_machine_cinema_60m","brain_machine_cinema_120m"):
             evidence=result.get("result") or result; verified=bool(result.get("ok") and evidence.get("status")=="VERIFIED_COMPLETED" and evidence.get("final"))
         else: verified=bool(item.get("ok"))
