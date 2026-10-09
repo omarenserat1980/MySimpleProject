@@ -27,9 +27,9 @@ class DeviceBridgeAuthTests(unittest.TestCase):
     def test_empty_and_whitespace_environment_keys_are_not_configured(self):
         with self._clear_auth_env(), patch.dict(os.environ, {
             "BRAIN_AGENT_KEY": "   ",
-            "BRAIN_AGENT_KEY_SHA256": "\\t ",
+            "BRAIN_AGENT_KEY_SHA256": "\t ",
             "BRAIN_EMULATOR_KEY": " ",
-            "BRAIN_EMULATOR_AGENT_KEY": "\\n",
+            "BRAIN_EMULATOR_AGENT_KEY": "\n",
         }):
             self.assertFalse(self.bridge.configured())
             self.assertEqual(self.bridge.auth_mode(), "NOT_CONFIGURED")
