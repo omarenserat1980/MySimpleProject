@@ -24,9 +24,12 @@ def issue(request:dict[str,Any])->dict[str,Any]:
     identity=os.environ.get("BRAIN_IDENTITY_FILE","/etc/brain/identity.json")
     checkpoint=os.environ.get("BRAIN_CHECKPOINT_FILE","/etc/brain/checkpoint.json")
     lease=os.environ.get("BRAIN_LEADERSHIP_LEASE_FILE","/etc/brain/leadership-lease.json")
+    owner_approval=os.environ.get("BRAIN_OWNER_APPROVAL_FILE","/etc/brain/owner-approval.json")
+    owner_public_key=os.environ.get("BRAIN_OWNER_APPROVAL_PUBLIC_KEY_B64","")
     output=os.environ.get("BRAIN_WINDOWS_CONTRACT_OUTPUT","/run/brain/windows-execution-contract.json")
     result=issue_from_files(identity_file=identity,checkpoint_file=checkpoint,lease_file=lease,
         output=output,source_commit=str(request["source_commit"]).strip().lower(),
         task_id=str(request["task_id"]).strip(),attempt_id=str(request["attempt_id"]).strip(),
-        capability_verified=True,human_approval_token=os.environ.get("BRAIN_HUMAN_APPROVAL_TOKEN"))
+        capability_verified=True,human_approval_token=os.environ.get("BRAIN_HUMAN_APPROVAL_TOKEN"),
+        owner_approval_file=owner_approval,owner_public_key_b64=owner_public_key)
     return {**result,"capability":cap,"control_plane":"brain","issued_at":time.time()}
