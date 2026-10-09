@@ -146,6 +146,8 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+# Register Home Server API on the same FastAPI instance used by Render.
+app.include_router(home_server_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
 from .brain_git.api import router as brain_git_router
@@ -2294,8 +2296,7 @@ app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-a
 from .brain.brain_mcp import build_mcp_router
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 
-# Register API routes before the catch-all static UI mount.
-app.include_router(home_server_router)
+# API routers are registered before the catch-all static UI mount.
 
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
