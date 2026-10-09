@@ -15,6 +15,8 @@ class WindowsRealBootQemuAdapterTests(unittest.TestCase):
                                       proof_iso="proof.iso",ovmf_vars="OVMF_VARS.fd")
         joined=" ".join(cmd)
         self.assertEqual(cmd[0],"qemu-system-x86_64")
+        self.assertIn("q35,accel=kvm",cmd)
+        self.assertNotIn("q35,accel=kvm:tcg",cmd)
         self.assertIn("file=os.qcow2,format=qcow2",joined)
         self.assertIn("if=none,id=osdisk",joined)
         self.assertIn("-nic",cmd)
