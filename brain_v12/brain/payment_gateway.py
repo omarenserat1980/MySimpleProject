@@ -90,7 +90,7 @@ class PaymentEventJournal:
 
     def begin(self, payload: "WebhookEnvelope") -> dict:
         fingerprint = hashlib.sha256(
-            json.dumps(payload.model_dump(), sort_keys=True).encode("utf-8")
+            json.dumps(payload.dict(), sort_keys=True).encode("utf-8")
         ).hexdigest()
         with self.lock:
             data = self._read()
@@ -231,7 +231,7 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = WebhookEnvelope.model_validate_json(raw)
+            payload = WebhookEnvelope.parse_raw(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:
