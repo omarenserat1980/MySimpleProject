@@ -44,6 +44,9 @@ jobs:
           with open(os.environ["GITHUB_ENV"],"a") as f:
               f.write("CHECKPOINT_SOURCE_COMMIT="+commit+"\n")
           PY
+          # GITHUB_ENV affects later steps only; export this value in the current shell too.
+          CHECKPOINT_SOURCE_COMMIT="$(python -c 'import json; print(json.load(open("recovery/BRAIN_GOLDEN_CHECKPOINT_01.json", encoding="utf-8"))["source_commit"])')"
+          export CHECKPOINT_SOURCE_COMMIT
           git cat-file -e "$CHECKPOINT_SOURCE_COMMIT^{commit}"
 
       - name: Checkout immutable checkpoint source
