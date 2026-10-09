@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse, json, os, time
 from pathlib import Path
 from typing import Any
-from .brain_authority import BrainAuthorityPolicy, authority_proof, require_authorized
+from .brain_authority import BrainAuthorityPolicy, require_authorized
+from .authority_signature import sign_contract, ALGORITHM
 from .brain_identity import require_checkpoint_identity
 from .brain_leadership import BrainLeadershipStore, LeadershipLease
 
@@ -42,7 +43,8 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
        "fencing_token":lease.fencing_token,"lease_id":lease.lease_id,"holder_id":lease.holder_id,
        "task_id":str(task_id).strip(),"attempt_id":str(attempt_id).strip(),
        "source_commit":source_commit,"issued_at":now,"expires_at":now+int(expires_seconds)}
-    c["authority_proof"]=authority_proof(c)
+    c["authority_signature_algorithm"]=ALGORITHM
+    c["authority_signature"]=sign_contract(c)
     return c
 
 def issue_from_files(*,identity_file:str,checkpoint_file:str,lease_file:str,output:str,
