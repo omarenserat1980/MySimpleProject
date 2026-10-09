@@ -34,6 +34,8 @@ if (-not $Python) { throw "Python 3.11+ is required. Install Python from python.
 $PythonExe = $Python.Source
 $Version = & $PythonExe --version 2>&1
 if ($LASTEXITCODE -ne 0) { throw "Python could not be started." }
+& $PythonExe -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"
+if ($LASTEXITCODE -ne 0) { throw "Python 3.11 or newer is required. Detected: $Version" }
 Write-Host "Python: $Version"
 New-Item -ItemType Directory -Force -Path $OutputPath | Out-Null
 $Arguments = @($Composer, "--output", $OutputPath)
