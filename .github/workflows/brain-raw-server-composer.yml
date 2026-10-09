@@ -6,6 +6,8 @@ on:
       - "brain_v12/raw_server/**"
       - "brain_v12/tests/test_raw_server_composer.py"
       - "scripts/Install-BrainRawServer.ps1"
+      - "scripts/Test-BrainHyperVPreflight.ps1"
+      - "brain_v12/raw_server/CONTRACTS.md"
       - ".github/workflows/brain-raw-server-composer.yml"
   push:
     branches: [main]
@@ -31,5 +33,15 @@ jobs:
         run: python -m py_compile brain_v12/raw_server/composer.py
       - name: Run staged composer tests
         run: python -m unittest brain_v12.tests.test_raw_server_composer -v
-      - name: Check PowerShell bootstrap exists
-        run: test -s scripts/Install-BrainRawServer.ps1
+      - name: Check PowerShell scripts and contracts exist
+        run: |
+          test -s scripts/Install-BrainRawServer.ps1
+          test -s scripts/Test-BrainHyperVPreflight.ps1
+          test -s brain_v12/raw_server/CONTRACTS.md
+      - name: Guard read-only Hyper-V preflight against VM mutations
+        shell: bash
+        run: |
+          ! grep -Eiq '^[[:space:]]*(Start-VM|New-VM|Remove-VM|Set-VM|New-VHD|Set-VMProcessor|Set-VMMemory|Stop-VM|Restart-VM)([[:space:]]|$)' scripts/Test-BrainHyperVPreflight.ps1
+          grep -Eiq 'Get-VM' scripts/Test-BrainHyperVPreflight.ps1
+          grep -Eiq 'Get-CimInstance' scripts/Test-BrainHyperVPreflight.ps1
+          grep -Eiq 'Get-FileHash' scripts/Test-BrainHyperVPreflight.ps1
