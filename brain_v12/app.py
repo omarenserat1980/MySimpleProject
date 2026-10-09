@@ -84,6 +84,7 @@ from .brain import internal_clients
 from cloud.brain_fabric import list_nodes as list_fabric_nodes
 
 from .brain.security_middleware import apply_security_headers
+from .home_server import router as home_server_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -2890,6 +2891,8 @@ def brain_life_certificate():
 def brain_liveness():
     """Read-only evidence-based Brain liveness assessment."""
     return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+app.include_router(home_server_router)
 
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
