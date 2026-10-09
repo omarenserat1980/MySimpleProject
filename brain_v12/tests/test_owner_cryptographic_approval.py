@@ -12,7 +12,11 @@ class OwnerApprovalTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_EXPIRED"): verify_owner_approval(self.a,self.pub,now=2000)
  def test_replay(self):
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_REPLAY"): verify_owner_approval(self.a,self.pub,now=1000,used_challenges={"c-1"})
- def test_wrong_commit_is_rejected(self):\n  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_SOURCE_COMMIT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,source_commit="b"*40)\n def test_wrong_attempt_is_rejected(self):\n  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_ATTEMPT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,attempt_id="attempt-2")\n def test_tamper(self):
+ def test_wrong_commit_is_rejected(self):
+  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_SOURCE_COMMIT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,source_commit="b"*40)
+ def test_wrong_attempt_is_rejected(self):
+  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_ATTEMPT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,attempt_id="attempt-2")
+ def test_tamper(self):
   self.a["scope"]="other"
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_SIGNATURE_INVALID"): verify_owner_approval(self.a,self.pub,now=1000)
  def test_bad_schema(self):
