@@ -32,7 +32,7 @@ jobs:
       TF_VAR_resource_group_location: "westeurope"
       TF_VAR_vm_name: "brain-windows-2025"
       TF_VAR_resource_group_name: "brain-windows-rg"
-      TF_VAR_vm_size: "Standard_D4s_v5"
+      TF_VAR_vm_size: "Standard_B1s"
     defaults:
       run:
         working-directory: brain_v12/cloud/windows_terraform
@@ -59,7 +59,7 @@ jobs:
 
       - name: Terraform init
         shell: cmd
-        run: terraform init -input=false
+        run: terraform init -upgrade -input=false
 
       - name: Terraform fmt check
         shell: cmd
@@ -75,6 +75,7 @@ jobs:
 
       - name: Terraform apply (explicit approval only)
         if: ${{ inputs.approve_apply == true }}
+        shell: cmd
         run: terraform apply -input=false brain.tfplan
 
       - name: Export infrastructure proof
