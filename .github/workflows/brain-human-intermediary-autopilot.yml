@@ -11,9 +11,15 @@ on:
       - "brain_v12/self_healing/test_human_intermediary_predictor.py"
       - "PROJECT_ROADMAP.md"
       - ".github/workflows/brain-human-intermediary-autopilot.yml"
+  pull_request:
+    paths:
+      - "brain_v12/self_healing/human_intermediary_predictor.py"
+      - "brain_v12/self_healing/test_human_intermediary_predictor.py"
+      - "PROJECT_ROADMAP.md"
+      - ".github/workflows/brain-human-intermediary-autopilot.yml"
 
 concurrency:
-  group: brain-human-intermediary-autopilot
+  group: brain-human-intermediary-autopilot-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -88,7 +94,9 @@ jobs:
           PY
 
       - name: Commit only monotonic state/report changes
+        if: github.event_name != 'pull_request'
         run: |
+          set -euo pipefail
           git config user.name "brain-autopilot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add brain_v12/state/human_intermediary_state.json brain_v12/state/human_intermediary_prediction.json
@@ -98,6 +106,7 @@ jobs:
             git commit -m "brain: persist human intermediary continuation state"
             git push
           fi
+
       - name: Upload prediction evidence
         uses: actions/upload-artifact@v4
         with:
