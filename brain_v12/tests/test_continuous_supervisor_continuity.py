@@ -74,7 +74,7 @@ class BrainTaskContinuityTests(unittest.TestCase):
                 "task_id": "blocked", "fingerprint": "goal:needs-approval",
                 "goal": "needs approval", "kind": "goal",
                 "priority": 1.0, "status": "BLOCKED",
-            }) + "\\n", encoding="utf-8")
+            }) + "\n", encoding="utf-8")
             with patch.object(supervisor, "STATE", root), patch.object(
                 supervisor, "HISTORY", root / "history.jsonl"
             ), patch.object(
