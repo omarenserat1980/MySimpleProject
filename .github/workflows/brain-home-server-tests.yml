@@ -29,3 +29,27 @@ jobs:
           PYTHONPATH: .
           BRAIN_HOME_SERVER_DB: ${{ runner.temp }}/brain-home-server-test.sqlite3
         run: python -m unittest brain_v12.tests.test_home_server -v
+      - name: Compile Windows Server 2025 provider modules and tests
+        run: >-
+          python -m py_compile
+          brain_v12/brain/windows_cloud_executor.py
+          brain_v12/brain/windows_cloud_gate.py
+          brain_v12/brain/terraform_windows_cloud_provider.py
+          brain_v12/brain/opennebula_windows_cloud_provider.py
+          brain_v12/brain/windows_cloud_provider_factory.py
+          brain_v12/brain/windows_terraform_safety.py
+          brain_v12/tests/test_windows_cloud_executor.py
+          brain_v12/tests/test_terraform_windows_cloud_provider.py
+          brain_v12/tests/test_windows_terraform_safety.py
+          brain_v12/tests/test_windows_cloud_provider_factory.py
+          brain_v12/tests/test_opennebula_windows_cloud_provider.py
+      - name: Run Windows Server 2025 provider contract and safety tests
+        env:
+          PYTHONPATH: .
+        run: >-
+          python -m pytest -q
+          brain_v12/tests/test_windows_cloud_executor.py
+          brain_v12/tests/test_terraform_windows_cloud_provider.py
+          brain_v12/tests/test_windows_terraform_safety.py
+          brain_v12/tests/test_windows_cloud_provider_factory.py
+          brain_v12/tests/test_opennebula_windows_cloud_provider.py
