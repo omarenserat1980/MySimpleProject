@@ -17,8 +17,12 @@ class FakeResult:
 
 
 class FakeBrain:
+    def __init__(self):
+        self.calls = []
+
     def chat(self, message, instructions="", approved=False):
         self.last = (message, instructions, approved)
+        self.calls.append(self.last)
         return FakeResult()
 
 
@@ -145,6 +149,40 @@ class ChatSessionApiTests(unittest.TestCase):
     def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
+
+    def test_message_endpoint_replays_completed_request_without_second_ai_call(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("API idempotency")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+            body = MessageIn(message="hello", client_message_id="retry-1", device_id="phone")
+            first = endpoint(session["id"], body)
+            second = endpoint(session["id"], body)
+            self.assertEqual(len(brain.calls), 1)
+            self.assertFalse(first["idempotent_replay"])
+            self.assertTrue(second["idempotent_replay"])
+            self.assertEqual(first["response"], second["response"])
+            user_messages = [m for m in second["session"]["messages"] if m["role"] == "user"]
+            assistant_messages = [m for m in second["session"]["messages"] if m["role"] == "assistant"]
+            self.assertEqual(len(user_messages), 1)
+            self.assertEqual(len(assistant_messages), 1)
+
+    def test_message_endpoint_rejects_reused_id_with_changed_payload(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("API id conflict")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+            first = endpoint(session["id"], MessageIn(message="hello", client_message_id="same-id"))
+            conflict = endpoint(session["id"], MessageIn(message="different", client_message_id="same-id"))
+            self.assertTrue(first["ok"])
+            self.assertEqual(conflict["status"], "CLIENT_MESSAGE_ID_CONFLICT")
+            self.assertEqual(len(brain.calls), 1)
 
 
 if __name__ == "__main__":
