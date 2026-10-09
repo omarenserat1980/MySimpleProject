@@ -1424,7 +1424,7 @@ def brain_windows_provision(request:Request, body:dict):
         ram_bytes=int(body.get("ram_bytes",4*1024*1024*1024)),
         disk_bytes=int(body.get("disk_bytes",64*1024*1024*1024))
     )
-    return {"ok":True,"provision":provision,"windows":result}
+    return {"ok":bool(result.get("ok")),"provision":provision,"windows":result}
 
 @app.post("/api/brain/windows/boot/{vm_name}")
 def brain_windows_boot(request:Request, vm_name:str):
