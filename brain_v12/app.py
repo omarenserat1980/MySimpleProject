@@ -140,11 +140,15 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+# Render injects deployment identity independently of GitHub Actions.
+_RENDER_GIT_COMMIT=os.getenv("RENDER_GIT_COMMIT","").strip()
+_CI_GIT_COMMIT=os.getenv("GITHUB_SHA","").strip() or os.getenv("GIT_COMMIT","").strip()
+DEPLOY_COMMIT=_RENDER_GIT_COMMIT or _CI_GIT_COMMIT or "unknown"
+DEPLOY_BRANCH=os.getenv("RENDER_GIT_BRANCH","").strip() or os.getenv("GITHUB_REF_NAME","").strip() or "unknown"
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","").strip() or "unknown"
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","").strip() or "unknown"
+RENDER_SERVICE_ID=os.getenv("RENDER_SERVICE_ID","").strip() or "unknown"
+RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID","").strip() or os.getenv("HOSTNAME","").strip() or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
@@ -1242,16 +1246,29 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
+    # Only compare against an independent expected commit. A Render commit by
+    # itself identifies the deployed source but cannot prove convergence.
+    expected = (os.getenv("BRAIN_EXPECTED_COMMIT", "").strip()
+                or os.getenv("GITHUB_SHA", "").strip())
+    actual = "" if DEPLOY_COMMIT == "unknown" else DEPLOY_COMMIT
+    if not actual or not expected:
+        convergence_status = "unverifiable"
+    elif actual == expected:
+        convergence_status = "matched"
+    else:
+        convergence_status = "mismatched"
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "github_sha": expected or None,
+        "expected_commit": expected or None,
+        "github_sha": os.getenv("GITHUB_SHA", "").strip() or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
         "run_id": DEPLOY_SERVICE_ID,
+        "service_id": RENDER_SERVICE_ID,
         "instance": RUNTIME_INSTANCE,
-        "converged": bool(DEPLOY_COMMIT and expected and DEPLOY_COMMIT == expected),
+        "convergence_status": convergence_status,
+        "converged": convergence_status == "matched",
     }
 
 @app.get("/api/deploy/diagnostics")
