@@ -34,7 +34,7 @@ class PaymentGatewayTests(unittest.TestCase):
         from brain_v12.brain.payment_gateway import PaymentEventJournal
         journal_path=self.db + ".payment-events.json"
         journal=PaymentEventJournal(journal_path)
-        journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.model_validate(p))
+        journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.parse_obj(p))
         journal.mark(p["event_id"], "COMMERCE_COMMITTED")
         second=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(second.status_code,200)
