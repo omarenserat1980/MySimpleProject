@@ -11,10 +11,12 @@ RUNNER_DIR="${BRAIN_RUNNER_DIR:-$HOME/brain-cloud-executor}"
 RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
 RUNNER_ARCH="linux-x64"
 EXECUTOR_ID="${BRAIN_CLOUD_EXECUTOR_ID:-brain-cloud-$(hostname)-$(cat /etc/machine-id 2>/dev/null || echo unknown)}"
-ATTESTATION="${BRAIN_CLOUD_EXECUTOR_ATTESTATION:-}"
+ATTESTATION_B64="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64:-}"
+ATTESTATION_PUBLIC_KEY_B64="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}"
 
 [ "${BRAIN_CLOUD_EXECUTOR:-}" = "1" ] || { echo "BRAIN_CLOUD_EXECUTOR=1_REQUIRED"; exit 20; }
-[ -n "$ATTESTATION" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_REQUIRED"; exit 21; }
+[ -n "$ATTESTATION_B64" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64_REQUIRED"; exit 21; }
+[ -n "$ATTESTATION_PUBLIC_KEY_B64" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_REQUIRED"; exit 24; }
 
 command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
@@ -41,20 +43,24 @@ fi
 
 TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
 export RUNNER_ALLOW_RUNASROOT=0
-./config.sh --unattended   --url "https://github.com/$REPO"   --token "$TOKEN"   --name "$EXECUTOR_ID"   --labels "self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor"   --work "_work"   --replace
+# Ephemeral registration limits this attestation to a single job. If it expires
+# while the runner waits in queue, the security gate fails closed and provisioning
+# must issue a fresh attestation before retrying.
+./config.sh --unattended --ephemeral --url "https://github.com/$REPO" --token "$TOKEN" --name "$EXECUTOR_ID" --labels "self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor" --work "_work" --replace
 unset TOKEN
 
 cat > .env <<EOF
 BRAIN_CLOUD_EXECUTOR=1
 BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID
-BRAIN_CLOUD_EXECUTOR_ATTESTATION=$ATTESTATION
+BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64=$ATTESTATION_B64
+BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64=$ATTESTATION_PUBLIC_KEY_B64
 BRAIN_INTERNAL_RUNNER_FLAG=1
 EOF
 chmod 600 .env
 
 # Prove the substrate before the service is allowed to become available.
 cd "$ROOT"
-export BRAIN_CLOUD_EXECUTOR BRAIN_CLOUD_EXECUTOR_ID BRAIN_CLOUD_EXECUTOR_ATTESTATION
+export BRAIN_CLOUD_EXECUTOR BRAIN_CLOUD_EXECUTOR_ID BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64 BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
 python3 brain_v12/brain/cloud_executor_gate.py --output "$RUNNER_DIR/cloud-executor-gate.json"
 grep -q '"verified": true' "$RUNNER_DIR/cloud-executor-gate.json"
 
