@@ -19,7 +19,7 @@ SHA40 = re.compile(r"^[0-9a-f]{40}$")
 def load_and_verify(path: str | Path | None = None, *, now: float | None = None) -> dict[str, Any]:
     contract_path = Path(path or os.environ.get(
         "BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE",
-        "/etc/brain/windows-execution-contract.json",
+        "/run/brain/windows-execution-contract.json",
     ))
     if not contract_path.is_file():
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_FILE_REQUIRED")
