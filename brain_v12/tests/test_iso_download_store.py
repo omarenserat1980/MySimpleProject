@@ -86,6 +86,34 @@ class IsoDownloadStoreTests(unittest.TestCase):
         self.assertFalse(self.store.renew_worker(task_id, worker_id="worker-b"))
         self.assertTrue(self.store.renew_worker(task_id, worker_id="worker-a"))
 
+    def test_fencing_token_invalidates_worker_after_lease_recovery(self):
+        task_id = self.task["download_id"]
+        first = self.store.acquire_worker_token(task_id, worker_id="worker-a")
+        self.assertIsInstance(first, int)
+        self.assertTrue(self.store.assert_worker_lease(
+            task_id, worker_id="worker-a", generation=first))
+        with self.store._db() as db:
+            db.execute("UPDATE worker_leases SET acquired_at=0 WHERE download_id=?", (task_id,))
+        second = self.store.acquire_worker_token(task_id, worker_id="worker-b")
+        self.assertGreater(second, first)
+        self.assertFalse(self.store.assert_worker_lease(
+            task_id, worker_id="worker-a", generation=first))
+        self.assertFalse(self.store.renew_worker_lease(
+            task_id, worker_id="worker-a", generation=first))
+        self.assertTrue(self.store.renew_worker_lease(
+            task_id, worker_id="worker-b", generation=second))
+
+    def test_existing_worker_lease_schema_is_migrated(self):
+        root = Path(self.tmp.name) / "legacy-db"
+        legacy = DownloadStore(root, persistent=True)
+        with legacy._db() as db:
+            db.execute("ALTER TABLE downloads DROP COLUMN lease_generation")
+            db.execute("ALTER TABLE worker_leases DROP COLUMN generation")
+        migrated = DownloadStore(root, persistent=True)
+        task = migrated.create(owner_id="bob", source="https://downloads.example.test/a.iso")
+        token = migrated.acquire_worker_token(task["download_id"], worker_id="migrated-worker")
+        self.assertEqual(token, 1)
+
     def test_invalid_lease_ttl_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "lease_ttl_seconds"):
             DownloadStore(Path(self.tmp.name) / "invalid-ttl", persistent=True,

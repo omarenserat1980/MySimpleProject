@@ -99,6 +99,7 @@ class DownloadStore:
                 source_last_modified TEXT,
                 attempts INTEGER NOT NULL DEFAULT 0,
                 worker_id TEXT,
+                lease_generation INTEGER NOT NULL DEFAULT 0,
                 cleanup_result TEXT,
                 cleanup_reason TEXT,
                 created_at REAL NOT NULL,
@@ -114,11 +115,19 @@ class DownloadStore:
                 reason TEXT NOT NULL,
                 request_id TEXT
             )""")
+            # Lightweight additive migrations keep existing metadata databases usable.
+            download_columns = {row["name"] for row in db.execute("PRAGMA table_info(downloads)")}
+            if "lease_generation" not in download_columns:
+                db.execute("ALTER TABLE downloads ADD COLUMN lease_generation INTEGER NOT NULL DEFAULT 0")
             db.execute("""CREATE TABLE IF NOT EXISTS worker_leases (
                 download_id TEXT PRIMARY KEY REFERENCES downloads(download_id),
                 worker_id TEXT NOT NULL,
-                acquired_at REAL NOT NULL
+                acquired_at REAL NOT NULL,
+                generation INTEGER NOT NULL DEFAULT 0
             )""")
+            lease_columns = {row["name"] for row in db.execute("PRAGMA table_info(worker_leases)")}
+            if "generation" not in lease_columns:
+                db.execute("ALTER TABLE worker_leases ADD COLUMN generation INTEGER NOT NULL DEFAULT 0")
 
     def create(self, *, owner_id: str, source: str, expected_size: int | None = None,
                expected_sha256: str | None = None, resumable: bool = True,
@@ -195,33 +204,70 @@ class DownloadStore:
         return self.get(download_id, owner_id=owner_id)
 
     def acquire_worker(self, download_id: str, *, worker_id: str) -> bool:
-        """Acquire one writer lease, reclaiming leases whose heartbeat expired.
+        """Compatibility wrapper. New workers should retain the fencing token."""
+        return self.acquire_worker_token(download_id, worker_id=worker_id) is not None
 
-        A worker must call renew_worker more frequently than lease_ttl_seconds.
+    def acquire_worker_token(self, download_id: str, *, worker_id: str) -> int | None:
+        """Acquire a lease and return its monotonically increasing fencing token.
+
+        None means another unexpired worker owns the lease. A worker must stop all
+        writes if heartbeat renewal fails and must present this token at write/commit
+        boundaries. The store cannot fence filesystem writes that ignore the token.
         """
         if not worker_id:
             raise DownloadError("INVALID_REQUEST")
         now = time.time()
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
-            exists = db.execute(
-                "SELECT 1 FROM downloads WHERE download_id=?", (download_id,)).fetchone()
-            if not exists:
+            row = db.execute(
+                "SELECT lease_generation FROM downloads WHERE download_id=?",
+                (download_id,)).fetchone()
+            if row is None:
                 db.execute("ROLLBACK")
                 raise DownloadError("TASK_NOT_FOUND")
             db.execute("DELETE FROM worker_leases WHERE download_id=? AND acquired_at<=?",
                        (download_id, now - self.lease_ttl_seconds))
-            try:
-                db.execute("INSERT INTO worker_leases VALUES(?,?,?)",
-                           (download_id, worker_id, now))
-            except sqlite3.IntegrityError:
+            occupied = db.execute(
+                "SELECT 1 FROM worker_leases WHERE download_id=?", (download_id,)).fetchone()
+            if occupied:
                 db.execute("ROLLBACK")
-                return False
+                return None
+            generation = int(row["lease_generation"]) + 1
+            db.execute("UPDATE downloads SET lease_generation=? WHERE download_id=?",
+                       (generation, download_id))
+            db.execute("""INSERT INTO worker_leases
+                (download_id,worker_id,acquired_at,generation) VALUES(?,?,?,?)""",
+                (download_id, worker_id, now, generation))
             db.execute("COMMIT")
-            return True
+            return generation
+
+    def renew_worker_lease(self, download_id: str, *, worker_id: str,
+                           generation: int) -> bool:
+        """Renew only the exact current lease generation; stale workers are fenced out."""
+        if not worker_id or isinstance(generation, bool) or generation < 1:
+            raise DownloadError("INVALID_REQUEST")
+        now = time.time()
+        with self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("""UPDATE worker_leases SET acquired_at=?
+                WHERE download_id=? AND worker_id=? AND generation=? AND acquired_at>?""",
+                (now, download_id, worker_id, generation, now - self.lease_ttl_seconds))
+            changed = db.execute("SELECT changes()").fetchone()[0] == 1
+            db.execute("COMMIT")
+            return changed
+
+    def assert_worker_lease(self, download_id: str, *, worker_id: str,
+                            generation: int) -> bool:
+        """Check the live lease immediately before a protected write/commit operation."""
+        now = time.time()
+        with self._db() as db:
+            row = db.execute("""SELECT 1 FROM worker_leases
+                WHERE download_id=? AND worker_id=? AND generation=? AND acquired_at>?""",
+                (download_id, worker_id, generation, now - self.lease_ttl_seconds)).fetchone()
+        return row is not None
 
     def renew_worker(self, download_id: str, *, worker_id: str) -> bool:
-        """Refresh only the caller's lease; return False if it expired or was replaced."""
+        """Legacy renewal API; prefer renew_worker_lease with a fencing token."""
         if not worker_id:
             raise DownloadError("INVALID_REQUEST")
         now = time.time()
