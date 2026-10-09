@@ -116,17 +116,32 @@ foreach ($nic in @($nics)) {
 $report.publicIps = @($publicIps)
 Add-Check "public_ip" "INFO" "Resolved $($publicIps.Count) public IP resource(s). Presence does not prove reachability."
 
-$nsgArgs = @("network","nsg","list","--resource-group",$ResourceGroup,"--query","[].{name:name,id:id,securityRules:securityRules[].{name:name,direction:direction,access:access,protocol:protocol,priority:priority,source:sourceAddressPrefix,sourcePrefixes:sourceAddressPrefixes,destinationPort:destinationPortRange,destinationPorts:destinationPortRanges}}")
-if ($SubscriptionId) { $nsgArgs += @("--subscription",$SubscriptionId) }
-$report.networkSecurityGroups = @(Invoke-AzJson $nsgArgs)
-Add-Check "network_security_groups" "INFO" "Read NSG rule summaries only. Confirm effective rules and NIC/subnet associations in Azure Portal."
+# Inspect effective NSG for NICs attached to the VM, including NICs in other resource groups.
+$effectiveNsg = [System.Collections.Generic.List[object]]::new()
+foreach ($nicId in @($vm.networkInterfaceIds)) {
+    if (-not $nicId) { continue }
+    $effArgs = @("network","nic","list-effective-nsg","--ids",$nicId)
+    if ($SubscriptionId) { $effArgs += @("--subscription",$SubscriptionId) }
+    $eff = Invoke-AzJson $effArgs
+    $effectiveNsg.Add([ordered]@{ nicId=$nicId; result=$eff })
+}
+$report.effectiveNetworkSecurityGroups = @($effectiveNsg)
+Add-Check "effective_network_security_groups" "INFO" "Requested effective NSG data for VM-attached NICs. Missing results may mean insufficient permissions or API limitations."
 
-$bastionArgs = @("network","bastion","list","--resource-group",$ResourceGroup,"--query","[].{name:name,provisioningState:provisioningState,sku:sku.name}")
+# Discover Bastion anywhere in the selected subscription without creating anything.
+$bastionArgs = @("network","bastion","list","--query","[].{name:name,resourceGroup:resourceGroup,location:location,provisioningState:provisioningState,sku:sku.name}")
 if ($SubscriptionId) { $bastionArgs += @("--subscription",$SubscriptionId) }
 $report.bastionHosts = @(Invoke-AzJson $bastionArgs)
-if (@($report.bastionHosts).Count -gt 0) { Add-Check "bastion" "INFO" "Bastion found in this resource group; confirm status and existing billing before using it." }
-else { Add-Check "bastion" "INFO" "No Bastion found in this resource group; one may exist elsewhere." }
+if (@($report.bastionHosts).Count -gt 0) { Add-Check "bastion" "INFO" "Bastion resource(s) found in selected subscription. Confirm status, VNet connectivity, and existing billing before use." }
+else { Add-Check "bastion" "INFO" "No Bastion resource was returned for selected subscription, or the read failed." }
 
-$report.findings.Add("Inventory only: no resource changes, port probes, start/stop, NSG edits, Bastion creation, or billing estimates were performed.")
-$report.nextStep = "REVIEW_VM_STATE_AND_EXISTING_SECURE_ACCESS"
+# Recent activity log is read-only and can explain failed provisioning/deletion.
+$activityArgs = @("monitor","activity-log","list","--resource-group",$ResourceGroup,"--offset","30d","--max-events","50","--query","[].{eventTimestamp:eventTimestamp,operationName:operationName.value,status:status.value,subStatus:subStatus.value,resourceId:resourceId,caller:caller}")
+if ($SubscriptionId) { $activityArgs += @("--subscription",$SubscriptionId) }
+$report.recentActivity = @(Invoke-AzJson $activityArgs)
+Add-Check "activity_log" "INFO" "Read up to 50 activity events for the last 30 days in the target resource group. An empty result may reflect retention, scope, or permissions."
+
+$report.findings.Add("Inventory only: no resource changes, port probes, start/stop, NSG edits, Bastion creation, subscription switching, or billing estimates were performed.")
+$report.findings.Add("A successful control-plane read does not prove Windows is booted, RDP is enabled, credentials are valid, or a network path is reachable.")
+$report.nextStep = "REVIEW_VM_STATE_EFFECTIVE_NETWORK_AND_ACTIVITY_LOG"
 $report | ConvertTo-Json -Depth 30
