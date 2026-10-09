@@ -20,6 +20,12 @@ Then run:
 ./tools/bootstrap_brain_cloud_executor.sh
 ```
 
+The bootstrap configures the runner as the invoking user, then installs its
+systemd service through non-interactive `sudo`. It adds a systemd drop-in that
+loads the runner's mode-600 `.env` file, so the service and its jobs receive the
+same executor identity and attestation values that passed the bootstrap gate.
+The VM account must therefore have passwordless sudo for service installation.
+
 The bootstrap refuses to register unless x86_64, /dev/kvm, QEMU, OVMF tooling and
 the cryptographic Cloud Executor Gate all pass. It registers an ephemeral, one-job
 GitHub runner with the complete Brain Cloud labels. If the attestation expires while

@@ -18,9 +18,19 @@ ATTESTATION_PUBLIC_KEY_B64="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}
 [ -n "$ATTESTATION_B64" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64_REQUIRED"; exit 21; }
 [ -n "$ATTESTATION_PUBLIC_KEY_B64" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_REQUIRED"; exit 24; }
 
+# The runner is configured as the invoking user, while its systemd service is
+# installed through sudo. Keep the EnvironmentFile path systemd-safe and stable.
+mkdir -p "$RUNNER_DIR"
+RUNNER_DIR="$(cd "$RUNNER_DIR" && pwd -P)"
+[[ "$RUNNER_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]] || { echo "UNSUPPORTED_RUNNER_DIR_FOR_SYSTEMD"; exit 25; }
+[[ "$EXECUTOR_ID" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "INVALID_CLOUD_EXECUTOR_ID"; exit 26; }
+[[ "$ATTESTATION_B64" =~ ^[A-Za-z0-9+/]+={0,2}$ ]] || { echo "INVALID_CLOUD_EXECUTOR_ATTESTATION_B64"; exit 27; }
+[[ "$ATTESTATION_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/]+={0,2}$ ]] || { echo "INVALID_CLOUD_EXECUTOR_PUBLIC_KEY_B64"; exit 28; }
+
 command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
 command -v tar >/dev/null || { echo "MISSING:tar"; exit 2; }
+command -v sudo >/dev/null || { echo "MISSING:sudo"; exit 2; }
 gh auth status >/dev/null 2>&1 || { echo "GITHUB_AUTH_REQUIRED"; exit 3; }
 
 arch="$(uname -m)"
@@ -49,7 +59,14 @@ export RUNNER_ALLOW_RUNASROOT=0
 ./config.sh --unattended --ephemeral --url "https://github.com/$REPO" --token "$TOKEN" --name "$EXECUTOR_ID" --labels "self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor" --work "_work" --replace
 unset TOKEN
 
-cat > .env <<EOF
+sed -i \
+  -e '/^BRAIN_CLOUD_EXECUTOR=/d' \
+  -e '/^BRAIN_CLOUD_EXECUTOR_ID=/d' \
+  -e '/^BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64=/d' \
+  -e '/^BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64=/d' \
+  -e '/^BRAIN_INTERNAL_RUNNER_FLAG=/d' \
+  .env
+cat >> .env <<EOF
 BRAIN_CLOUD_EXECUTOR=1
 BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID
 BRAIN_CLOUD_EXECUTOR_ATTESTATION_B64=$ATTESTATION_B64
@@ -65,8 +82,25 @@ python3 brain_v12/brain/cloud_executor_gate.py --output "$RUNNER_DIR/cloud-execu
 grep -q '"verified": true' "$RUNNER_DIR/cloud-executor-gate.json"
 
 cd "$RUNNER_DIR"
-./svc.sh install
-./svc.sh start
+SERVICE_USER="$(id -un)"
+sudo -n ./svc.sh install "$SERVICE_USER"
+
+# systemd starts runsvc.sh with a clean service environment; the variables
+# exported above only reach this bootstrap process. Attach the protected runner
+# .env file to the generated unit so the gate sees the same identity at job time.
+SERVICE_UNIT="$(cat .service 2>/dev/null || true)"
+[[ "$SERVICE_UNIT" =~ ^actions\.runner\.[A-Za-z0-9._-]+\.service$ ]] || {
+  echo "CLOUD_EXECUTOR_SYSTEMD_UNIT_NOT_FOUND"
+  exit 29
+}
+DROPIN_DIR="/etc/systemd/system/${SERVICE_UNIT}.d"
+DROPIN_TMP="$(mktemp)"
+trap 'rm -f "$DROPIN_TMP"' EXIT
+printf '[Service]\nEnvironmentFile=%s/.env\n' "$RUNNER_DIR" > "$DROPIN_TMP"
+sudo -n install -d -m 0755 "$DROPIN_DIR"
+sudo -n install -m 0644 "$DROPIN_TMP" "$DROPIN_DIR/brain-cloud-executor.conf"
+sudo -n systemctl daemon-reload
+sudo -n ./svc.sh start
 
 echo "BRAIN_CLOUD_EXECUTOR_BOOTSTRAP=VERIFIED"
 echo "BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID"
