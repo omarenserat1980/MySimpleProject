@@ -32,6 +32,6 @@ class WindowsOwnerBoundGateTests(unittest.TestCase):
   c=self.contract(); c.pop("owner_id")
   with self.assertRaisesRegex(RuntimeError,"OWNER_ID_REQUIRED"): load_and_verify(self.write(c))
  def test_owner_tamper_breaks_signature(self):
-  c=self.contract(); c["owner_scope"]="tampered"
+  c=self.contract(); c["owner_id"]="tampered-owner"
   with self.assertRaisesRegex(RuntimeError,"AUTHORITY_SIGNATURE_INVALID"): load_and_verify(self.write(c))
 if __name__=="__main__": unittest.main()
