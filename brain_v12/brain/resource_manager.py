@@ -17,7 +17,7 @@ class ResourceReservation:
 
 @dataclass
 class ResourceManager:
-    """Resource accounting with explicit, immutable reservations."""
+    """Account virtual capacity separately from the emulator's physical backing."""
     reservations:dict[str,ResourceReservation]=field(default_factory=dict)
 
     @staticmethod
@@ -32,10 +32,14 @@ class ResourceManager:
         c=blade.computer; ram_used=self._ram_used(c); storage_used=self._storage_used(c)
         cpu_cores=1
         cpu_load=100 if not c.powered else min(100,int(c.cpu.cycles/max(1,c.cpu.cycles+100)*100))
+        ram_total=int(getattr(blade,"ram_capacity_bytes",c.ram.size))
+        storage_total=int(getattr(blade,"storage_capacity_bytes",c.storage.capacity))
         return {"blade_id":blade.blade_id,"state":blade.state,"capabilities":sorted(blade.capabilities),
           "cpu":{"architecture":"brain-virtual","cores":cpu_cores,"load_percent":cpu_load,"cycles":c.cpu.cycles},
-          "ram":{"total_bytes":c.ram.size,"used_bytes":ram_used,"free_bytes":c.ram.size-ram_used},
-          "storage":{"total_bytes":c.storage.capacity,"used_bytes":storage_used,"free_bytes":c.storage.capacity-storage_used},
+          "ram":{"total_bytes":ram_total,"used_bytes":ram_used,"free_bytes":max(0,ram_total-ram_used),
+                 "backing_bytes":c.ram.size},
+          "storage":{"total_bytes":storage_total,"used_bytes":storage_used,"free_bytes":max(0,storage_total-storage_used),
+                     "backing_bytes":c.storage.capacity},
           "network":{"available":"network" in blade.capabilities,"rx_packets":len(c.nic.rx),"tx_packets":len(c.nic.tx)},
           "gpu":{"available":"gpu" in blade.capabilities,"width":c.gpu.width,"height":c.gpu.height}}
 
