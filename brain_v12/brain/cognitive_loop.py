@@ -109,7 +109,13 @@ class CognitiveLoop:
 
         self._state("MEMORY",goal=goal,run_id=run_id)
         memories=self.store.memories()[-12:]
-        self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
+        # Keep prior verified run records available to the current cycle.
+        prior_lessons=[m for m in memories if str(m.get("key","")).startswith("cognitive.run.")]
+        self.events.publish("MEMORY_RECALL",{
+            "count":len(memories),
+            "prior_lesson_count":len(prior_lessons),
+            "run_id":run_id
+        })
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
         options=self.decisions.generate(goal)
@@ -167,8 +173,23 @@ class CognitiveLoop:
         self.events.publish("VERIFIED",verification)
 
         self._state("LEARN",status="READY",goal=goal,run_id=run_id)
-        lesson="تم تنفيذ خطوة داخلية آمنة والتحقق من نتيجتها." if execution.get("status")=="COMPLETED" else "تم تسجيل أن الخطوة تحتاج صلاحية قبل التنفيذ."
-        self.store.save_memory("cognitive.last_verified_run",f"{run_id} | {lesson}")
+        outcome = "VERIFIED_SUCCESS" if verification.get("result_verified") else (
+            "WAITING_PERMISSION" if execution.get("status")=="WAITING_PERMISSION" else "FAILED_OR_UNVERIFIED"
+        )
+        lesson={
+            "run_id":run_id,
+            "goal":goal,
+            "action":action,
+            "outcome":outcome,
+            "execution_status":execution.get("status"),
+            "verification_status":verification.get("status"),
+            "verified":bool(verification.get("result_verified")),
+        }
+        # A unique key preserves history instead of overwriting the previous run.
+        self.store.save_memory(
+            f"cognitive.run.{run_id}",
+            __import__("json").dumps(lesson,ensure_ascii=False,sort_keys=True)
+        )
         self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
 
         return {
@@ -177,6 +198,7 @@ class CognitiveLoop:
             "stages":self.STAGES,
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
+            "prior_lesson_count":len(prior_lessons),
             "options":options,
             "decision":decision,
             "execution":execution,
