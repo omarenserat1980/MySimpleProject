@@ -57,6 +57,8 @@ class BrainTaskContinuityTests(unittest.TestCase):
                 "priority": 1.0, "status": "FAILED",
             }) + "\n", encoding="utf-8")
             with patch.object(supervisor, "STATE", root), patch.object(
+                supervisor, "HISTORY", root / "history.jsonl"
+            ), patch.object(
                 supervisor, "candidates",
                 return_value=[("health", 0.7, "unrelated new work")],
             ):
@@ -64,6 +66,29 @@ class BrainTaskContinuityTests(unittest.TestCase):
                     supervisor.choose_goal(),
                     ("goal", 1.0, "resume the original goal", "goal:original"),
                 )
+
+    def test_blocked_objective_is_parked_until_human_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "continuous_tasks.jsonl").write_text(json.dumps({
+                "task_id": "blocked", "fingerprint": "goal:needs-approval",
+                "goal": "needs approval", "kind": "goal",
+                "priority": 1.0, "status": "BLOCKED",
+            }) + "\\n", encoding="utf-8")
+            with patch.object(supervisor, "STATE", root), patch.object(
+                supervisor, "HISTORY", root / "history.jsonl"
+            ), patch.object(
+                supervisor, "candidates",
+                return_value=[
+                    ("goal", 1.0, "needs approval"),
+                    ("health", 0.7, "safe health review"),
+                ],
+            ):
+                self.assertEqual(
+                    supervisor.choose_goal(),
+                    ("health", 0.7, "safe health review", "health:safe health review"),
+                )
+
 
 
 if __name__ == "__main__":
