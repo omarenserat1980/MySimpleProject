@@ -95,10 +95,27 @@ def router(brain_ai, store=None, context_limit=24):
                 cached = claimed["response"]
                 return {"ok": bool(cached.get("ok")), "session": store.get(session_id),
                         "response": cached, "idempotent_replay": True}
-            if claimed["status"] == "IN_PROGRESS":
-                return {"ok": False, "status": "REQUEST_IN_PROGRESS", "retryable": True}
             if claimed["status"] == "ID_CONFLICT":
                 return {"ok": False, "status": "CLIENT_MESSAGE_ID_CONFLICT", "retryable": False}
+
+            # Recover the crash window where the assistant message was persisted
+            # but the idempotency ledger was not marked COMPLETED. The assistant
+            # metadata carries the same client ID so retries do not call the model
+            # again after a process restart.
+            if claimed["status"] in ("IN_PROGRESS", "CLAIMED"):
+                persisted = store.get(session_id) or {}
+                recovered = next((
+                    item.get("metadata", {})
+                    for item in reversed(persisted.get("messages", []))
+                    if item.get("role") == "assistant"
+                    and item.get("metadata", {}).get("client_message_id") == request_key
+                ), None)
+                if recovered is not None:
+                    ledger.complete(session_id, request_key, recovered)
+                    return {"ok": bool(recovered.get("ok")), "session": store.get(session_id),
+                            "response": recovered, "idempotent_replay": True}
+                if claimed["status"] == "IN_PROGRESS":
+                    return {"ok": False, "status": "REQUEST_IN_PROGRESS", "retryable": True}
 
         try:
             store.add_message(session_id, "user", body.message,
@@ -118,6 +135,8 @@ def router(brain_ai, store=None, context_limit=24):
             assistant = {"role":"assistant","content":result.reply,"ok":result.ok,"mode":result.mode,
                          "model":result.model,"tool_calls":result.tool_calls,
                          "evidence":result.evidence,"model_routing":model_routing,"error":result.error}
+            if request_key:
+                assistant["client_message_id"] = request_key
             store.add_message(session_id, "assistant", result.reply, assistant)
             if request_key:
                 ledger.complete(session_id, request_key, assistant)
