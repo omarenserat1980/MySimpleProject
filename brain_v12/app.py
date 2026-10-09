@@ -47,6 +47,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .home_server import router as home_server_router
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
@@ -1423,7 +1424,7 @@ def brain_windows_provision(request:Request, body:dict):
         ram_bytes=int(body.get("ram_bytes",4*1024*1024*1024)),
         disk_bytes=int(body.get("disk_bytes",64*1024*1024*1024))
     )
-    return {"ok":True,"provision":provision,"windows":result}
+    return {"ok":bool(result.get("ok")),"provision":provision,"windows":result}
 
 @app.post("/api/brain/windows/boot/{vm_name}")
 def brain_windows_boot(request:Request, vm_name:str):
@@ -2290,7 +2291,67 @@ app.mount('/brain-chat', StaticFiles(directory=os.path.join(ROOT,'web','brain-ch
 app.mount('/text-to-drawing', StaticFiles(directory=os.path.join(ROOT,'web','text-to-drawing'), html=True), name='text-to-drawing')
 app.mount('/local-painter', StaticFiles(directory=os.path.join(ROOT,'web','local-painter'), html=True), name='local-painter')
 app.mount("/brain-app-v2",StaticFiles(directory=os.path.join(ROOT,"web","brain-app-v2"),html=True),name="brain-app-v2")
+from .brain.brain_mcp import build_mcp_router
+app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+# Register Home Server after all application imports and before the catch-all UI mount.
+app.include_router(home_server_router)
+
+# Defensive registration guard: verify the router's API endpoints actually landed
+# on the deployed application. If the framework/version leaves any endpoint out,
+# append only missing path+method pairs from the already-built APIRoute objects.
+_home_server_api_paths = {
+    "/api/home-server/status",
+    "/api/home-server/tasks",
+    "/api/home-server/claim",
+    "/api/home-server/tasks/{task_id}/report",
+}
+_registered_home_server = {
+    (getattr(route, "path", ""), method)
+    for route in app.routes
+    for method in (getattr(route, "methods", None) or set())
+}
+for _route in home_server_router.routes:
+    _path = getattr(_route, "path", "")
+    _methods = getattr(_route, "methods", None) or set()
+    if _path not in _home_server_api_paths:
+        continue
+    for _method in _methods:
+        if (_path, _method) not in _registered_home_server:
+            app.router.routes.append(_route)
+            _registered_home_server.update((_path, method) for method in _methods)
+            break
+
+# API routers are registered before the catch-all static UI mount.
+
 app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
+
+
+
+# Governed MCP Streamable HTTP endpoint. Kept inside the deployed FastAPI app
+# so Render's existing start command continues to work.
+
+@app.middleware("http")
+async def brain_mcp_auth(request: Request, call_next):
+    if request.url.path == "/mcp":
+        # Prefer a dedicated MCP token. If the deployment already has the
+        # control-plane key, allow it to authenticate MCP without creating a
+        # second secret or exposing the secret value.
+        expected = (
+            os.getenv("BRAIN_MCP_TOKEN", "").strip()
+            or os.getenv("BRAIN_CONTROL_KEY", "").strip()
+        )
+        if not expected:
+            return JSONResponse(
+                {"ok": False, "status": "MCP_NOT_CONFIGURED"},
+                status_code=503,
+            )
+        authorization = request.headers.get("authorization", "")
+        if authorization != f"Bearer {expected}":
+            return JSONResponse(
+                {"ok": False, "status": "MCP_AUTH_REQUIRED"},
+                status_code=401,
+            )
+    return await call_next(request)
 

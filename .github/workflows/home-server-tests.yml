@@ -1,0 +1,41 @@
+name: Brain Home Server Tests
+
+on:
+  pull_request:
+    branches:
+      - brain-independent-executor-pool
+    paths:
+      - "brain_v12/home_server.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_home_server.py"
+      - ".github/workflows/home-server-tests.yml"
+  push:
+    branches:
+      - feat/brain-home-server-runtime
+    paths:
+      - "brain_v12/home_server.py"
+      - "brain_v12/tests/test_home_server.py"
+      - ".github/workflows/home-server-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  home-server-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runtime dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r brain_v12/requirements.txt
+      - name: Compile app and Home Server tests
+        run: python -m py_compile brain_v12/app.py brain_v12/home_server.py brain_v12/tests/test_home_server.py
+      - name: Run Home Server tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_home_server -v

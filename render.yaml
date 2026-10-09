@@ -1,0 +1,13 @@
+# OPTIONAL EXTERNAL SERVICE — NEVER the Brain runtime authority.
+# Brain-local executor remains PRIMARY and independent of this service.
+# Render is intentionally non-authoritative and may be absent, paused, deleted,
+# recreated, or unavailable without changing Brain autonomy.
+services:
+  - type: web
+    name: electronic-brain-optional
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn brain_v12.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/system/readiness
+    autoDeploy: false

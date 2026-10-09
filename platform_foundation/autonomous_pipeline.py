@@ -30,6 +30,11 @@ class PipelineRun:
     status: str
     run_id: str | None = None
 
+    @property
+    def completed_stages(self) -> int:
+        """Compatibility alias for the public pipeline contract."""
+        return self.stages_completed
+
 
 class AutonomousPipeline:
     """Durable 41-stage driver with optional dependency-aware chunk parallelism."""

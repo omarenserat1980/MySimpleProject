@@ -31,3 +31,22 @@ def test_missing_or_stale_heartbeat_blocks(tmp_path):
         "capabilities": ["ci"],
     }))
     assert authority.readiness()["ready"] is False
+
+
+def test_dead_heartbeat_pid_blocks(tmp_path):
+    path = tmp_path / "heartbeat.json"
+    authority = BrainExecutionAuthority(
+        executor_id="brain-local-test",
+        heartbeat_path=path,
+    )
+    path.write_text(json.dumps({
+        "executor_id": "brain-local-test",
+        "owner": "brain",
+        "persistent": True,
+        "pid": 99999999,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "capabilities": ["ci"],
+    }))
+    result = authority.readiness()
+    assert result["ready"] is False
+    assert result["heartbeat_pid_alive"] is False

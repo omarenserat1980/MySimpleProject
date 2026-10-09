@@ -86,11 +86,11 @@ class VirtualTaskQueue:
             result=blade.execute(task.program)
             with self.lock:
                 task.result=result; task.status="COMPLETED"; task.lease_expires_at=None; task.finished_at=time()
-                self.store.finish(task_id,True,result)
+                self.store.finish(task_id,task.lease_id,True,result)
         except Exception as exc:
             with self.lock:
                 task.result={"ok":False,"error":str(exc)}; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
-                self.store.finish(task_id,False,task.result)
+                self.store.finish(task_id,task.lease_id,False,task.result)
         finally:
             self.resources.release(task_id); self.pump()
 

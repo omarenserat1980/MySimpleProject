@@ -128,9 +128,14 @@ class Supervisor:
             stop = threading.Event()
             interval = max(0.01, min(1.0, lease_ttl_seconds / 4.0))
             def heartbeat() -> None:
-                while not stop.wait(interval):
+                # Renew immediately, then keep the lease alive at a bounded cadence.
+                # An initial sleep can let very short TTLs expire before the first
+                # heartbeat under normal scheduler/load jitter.
+                while not stop.is_set():
                     if not self.lease.heartbeat(task_id, self.owner, ttl_seconds=lease_ttl_seconds).acquired:
                         lease_lost.set()
+                        return
+                    if stop.wait(interval):
                         return
             thread = threading.Thread(target=heartbeat, daemon=True)
             thread.start()

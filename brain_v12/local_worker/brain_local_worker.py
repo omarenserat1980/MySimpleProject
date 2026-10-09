@@ -8,12 +8,22 @@ from __future__ import annotations
 import json, os, platform, shutil, subprocess, time, sys
 from pathlib import Path
 from datetime import datetime, timezone
+
+# Make the repository importable even when this worker is launched directly.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from platform_foundation.brain_execution_authority import BrainExecutionAuthority
 
 ROOT = Path(os.environ.get("BRAIN_LOCAL_WORKER_ROOT", "brain6_artifacts/local_worker"))
 QUEUED, RUNNING, COMPLETED, FAILED = (ROOT / x for x in ("queued", "running", "completed", "failed"))
 WORKER_ID = os.environ.get("BRAIN_WORKER_ID", "brain-local-01")
 POLL = max(1.0, float(os.environ.get("BRAIN_LOCAL_WORKER_POLL_SECONDS", "2")))
+RECOVERY_TTL = max(30.0, float(os.environ.get("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", "300")))
+
+def recovery_ttl() -> float:
+    return max(30.0, float(os.environ.get("BRAIN_LOCAL_WORKER_RECOVERY_TTL_SECONDS", str(RECOVERY_TTL))))
 
 def utc():
     return datetime.now(timezone.utc).isoformat()
@@ -21,6 +31,22 @@ def utc():
 def setup():
     for p in (QUEUED, RUNNING, COMPLETED, FAILED):
         p.mkdir(parents=True, exist_ok=True)
+
+def recover_stale_jobs():
+    """Return abandoned RUNNING jobs to QUEUED after a bounded TTL."""
+    now = time.time()
+    recovered = []
+    for path in sorted(RUNNING.glob("*.json")):
+        try:
+            age = now - path.stat().st_mtime
+            if age < recovery_ttl():
+                continue
+            target = QUEUED / path.name
+            path.replace(target)
+            recovered.append(path.name)
+        except (FileNotFoundError, OSError):
+            continue
+    return recovered
 
 def safe_command_version(binary: str):
     path = shutil.which(binary)
@@ -57,6 +83,21 @@ def execute(task: str, params: dict):
             "stdout": p.stdout[-12000:],
             "stderr": p.stderr[-12000:],
         }
+    if task == "brain_base_expansion_integrity":
+        root = Path(__file__).resolve().parents[2]
+        script = root / "tools" / "base_expansion_integrity.py"
+        env = os.environ.copy()
+        env["BRAIN_INTEGRITY_NESTED"] = "1"
+        p = subprocess.run([sys.executable, str(script)], cwd=str(root), env=env, capture_output=True, text=True, timeout=60*60)
+        return {"provider": "brain-local-worker", "verified": p.returncode == 0, "status": "VERIFIED" if p.returncode == 0 else "FAILED", "returncode": p.returncode, "stdout": p.stdout[-20000:], "stderr": p.stderr[-12000:]}
+    if task == "brain_local_verification":
+        script = Path(__file__).resolve().parents[2] / "tools" / "verify_brain_local.py"
+        p = subprocess.run([sys.executable, str(script)], cwd=str(Path(__file__).resolve().parents[2]),
+                           capture_output=True, text=True, timeout=30*60)
+        if p.returncode != 0:
+            raise RuntimeError("brain_local_verification_failed:" + (p.stderr or p.stdout)[-4000:])
+        return {"provider": "brain-local-worker", "verified": True,
+                "status": "VERIFIED", "stdout": p.stdout[-12000:]}
     if task == "python_version":
         return {"python": platform.python_version()}
     if task == "platform":
@@ -71,7 +112,6 @@ def execute(task: str, params: dict):
         usage = shutil.disk_usage(Path.cwd())
         return {"free_bytes": usage.free, "total_bytes": usage.total}
     if task in ("brain_machine_cinema_60m", "brain_machine_cinema_120m"):
-        import subprocess
         title = str(params.get("title", "BRAIN — فيلم الآلة")).strip()
         env = os.environ.copy()
         env["BRAIN_FILM_TITLE"] = title
@@ -88,7 +128,6 @@ def execute(task: str, params: dict):
         prompt = str(params.get("prompt", "")).strip()
         if not prompt:
             raise ValueError("prompt_required")
-        import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
         from brain_v12.brain.draw_gateway import draw_local
         result = draw_local(prompt)
@@ -118,10 +157,14 @@ def process(path: Path):
         task = job.get("task")
         if not isinstance(task, str):
             raise ValueError("task_required")
+        evidence = execute(task, job.get("params", {}))
+        verified = evidence.get("verified", True) if isinstance(evidence, dict) else True
         result = {"job_id": job.get("job_id", claimed.stem), "worker_id": WORKER_ID,
-                  "status": "VERIFIED", "started_at": started, "completed_at": utc(),
-                  "evidence": execute(task, job.get("params", {}))}
-        (COMPLETED / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
+                  "status": "VERIFIED" if verified else "FAILED",
+                  "started_at": started, "completed_at": utc(),
+                  "evidence": evidence}
+        target = COMPLETED if verified else FAILED
+        (target / claimed.name).write_text(json.dumps(result, indent=2), encoding="utf-8")
         claimed.unlink(missing_ok=True)
     except Exception as exc:
         result = {"job_id": claimed.stem, "worker_id": WORKER_ID, "status": "FAILED",
@@ -137,6 +180,9 @@ def main():
     print(f"Brain Local Worker {WORKER_ID} -> {ROOT}")
     while True:
         authority.heartbeat()
+        recovered = recover_stale_jobs()
+        if recovered:
+            print(json.dumps({"event": "stale_jobs_recovered", "jobs": recovered}))
         for path in sorted(QUEUED.glob("*.json")):
             process(path)
         time.sleep(POLL)

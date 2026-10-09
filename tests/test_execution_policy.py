@@ -42,3 +42,8 @@ def test_brain_must_be_persistent():
     transient = ExecutorDescriptor("brain-transient", "brain", False, frozenset({"python"}))
     result = BrainExecutionPolicy().select([transient])
     assert result.decision is ExecutorDecision.BLOCKED
+
+
+def test_external_allowed_is_not_the_default():
+    policy = BrainExecutionPolicy()
+    assert policy.mode is ExecutionMode.BRAIN_ONLY

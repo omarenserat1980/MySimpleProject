@@ -23,7 +23,7 @@ class MainActivity : ComponentActivity() {
         }
         val brainUrl = EditText(this).apply {
             hint = "BRAIN_BASE_URL"
-            setText(prefs.getString("brain_base_url", "http://127.0.0.1:8012"))
+            setText(prefs.getString("brain_base_url", "https://mysimpleproject.onrender.com"))
         }
         val agentKey = EditText(this).apply {
             hint = "V12_AGENT_KEY"

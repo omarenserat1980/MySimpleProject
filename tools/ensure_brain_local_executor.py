@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Ensure the Brain-owned local executor Guardian is running and prove heartbeat.
+
+This launcher is a repair utility only. It never changes the autonomy result.
+It starts the supervisor when needed, then waits for a fresh heartbeat. If the
+worker cannot start, it returns the guardian log as failure evidence.
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+GUARDIAN = ROOT / "brain_v12" / "local_worker" / "brain_local_guardian.py"
+ARTIFACTS = ROOT / "brain6_artifacts" / "local_worker"
+PID_FILE = ARTIFACTS / "guardian.pid"
+LOG_FILE = ARTIFACTS / "guardian.log"
+STATE_FILE = ARTIFACTS / "launcher.json"
+HEARTBEAT = ARTIFACTS / "heartbeat.json"
+WAIT_SECONDS = max(5.0, float(os.environ.get("BRAIN_EXECUTOR_STARTUP_WAIT_SECONDS", "15")))
+
+
+def running_pid(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+    except OSError:
+        return False
+
+
+def find_existing() -> int | None:
+    if PID_FILE.exists():
+        try:
+            pid = int(PID_FILE.read_text().strip())
+            if running_pid(pid):
+                return pid
+        except (ValueError, OSError):
+            pass
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-f", "brain_v12/local_worker/brain_local_guardian.py"],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        for item in out.split():
+            try:
+                pid = int(item)
+                if pid != os.getpid() and running_pid(pid):
+                    return pid
+            except ValueError:
+                continue
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass
+    return None
+
+
+def legacy_supervisor_pids() -> list[int]:
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-f", "brain_v12/local_worker/brain_local_supervisor.py"],
+            text=True, stderr=subprocess.DEVNULL,
+        )
+        return [int(x) for x in out.split() if x.isdigit() and int(x) != os.getpid()]
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+        return []
+
+
+def worker_pids() -> list[int]:
+    try:
+        out = subprocess.check_output(["pgrep", "-f", "brain_v12/local_worker/brain_local_worker.py"], text=True, stderr=subprocess.DEVNULL)
+        return [int(x) for x in out.split() if x.isdigit() and int(x) != os.getpid()]
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+        return []
+
+
+def stop_pids(pids: list[int]) -> None:
+    unique = sorted(set(pids))
+    for pid in unique:
+        try:
+            os.kill(pid, 15)
+        except OSError:
+            pass
+    deadline = time.time() + 5
+    while time.time() < deadline and any(running_pid(pid) for pid in unique):
+        time.sleep(0.1)
+    for pid in unique:
+        if running_pid(pid):
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+
+def heartbeat_is_fresh(max_age: float = 15.0) -> bool:
+    try:
+        age = time.time() - HEARTBEAT.stat().st_mtime
+        if age > max_age:
+            return False
+        payload = json.loads(HEARTBEAT.read_text(encoding="utf-8"))
+        pid = int(payload.get("pid", 0))
+        if pid <= 0 or not running_pid(pid):
+            return False
+        return True
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+
+def heartbeat_pid() -> int | None:
+    try:
+        payload = json.loads(HEARTBEAT.read_text(encoding="utf-8"))
+        pid = int(payload.get("pid", 0))
+        return pid if pid > 0 else None
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def log_tail(limit: int = 12000) -> str:
+    try:
+        return LOG_FILE.read_text(encoding="utf-8", errors="replace")[-limit:]
+    except OSError as exc:
+        return f"log_unavailable:{type(exc).__name__}:{exc}"
+
+
+def main() -> int:
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    existing = find_existing()
+    started = False
+    # Retire the legacy supervisor whenever the heartbeat is stale, so an old
+    # process cannot race the hardened guardian or hide its failure.
+    stale = existing is not None and not heartbeat_is_fresh()
+    legacy = legacy_supervisor_pids()
+    if stale or (existing is None and legacy):
+        pids = ([existing] if existing is not None else []) + legacy
+        stop_pids(pids)
+        existing = None
+    if existing is None:
+        stop_pids(worker_pids())
+    if existing is None:
+        log = LOG_FILE.open("a", encoding="utf-8")
+        proc = subprocess.Popen(
+            [sys.executable, str(GUARDIAN)],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        PID_FILE.write_text(str(proc.pid), encoding="utf-8")
+        existing = proc.pid
+        started = True
+        log.close()
+
+    deadline = time.time() + WAIT_SECONDS
+    while time.time() < deadline:
+        if heartbeat_is_fresh():
+            result = {
+                "schema": "brain.local_executor_launcher.v3",
+                "status": "READY",
+                "guardian_pid": existing,
+                "started_by_launcher": started,
+                "heartbeat": str(HEARTBEAT),
+            }
+            STATE_FILE.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            print(json.dumps(result, indent=2))
+            return 0
+        time.sleep(0.5)
+
+    result = {
+        "schema": "brain.local_executor_launcher.v3",
+        "status": "FAILED",
+        "reason": "fresh_heartbeat_not_observed",
+        "guardian_pid": existing,
+        "started_by_launcher": started,
+        "heartbeat": str(HEARTBEAT),
+        "log_tail": log_tail(),
+    }
+    STATE_FILE.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    print(json.dumps(result, indent=2))
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

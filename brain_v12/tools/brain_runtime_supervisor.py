@@ -31,11 +31,60 @@ def record(row):
     with HISTORY.open("a", encoding="utf-8") as f:
         f.write(json.dumps({"ts": time.time(), **row}, ensure_ascii=False) + "\n")
 
-def recent_fingerprints(limit=30):
+def recent_fingerprints(limit=300):
+    """Return only objectives completed under the strict verification contract."""
     if not HISTORY.exists():
         return set()
     rows = HISTORY.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]
-    return {json.loads(x).get("fingerprint") for x in rows if x.strip()}
+    verified = set()
+    for raw in rows:
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if (row.get("event") == "completed"
+                and row.get("verification_contract") == "strict-v1"
+                and row.get("verified") is True
+                and row.get("fingerprint")):
+            verified.add(row["fingerprint"])
+    return verified
+
+def latest_tracked_tasks():
+    """Read the last durable state for each objective fingerprint."""
+    path = STATE / "continuous_tasks.jsonl"
+    if not path.exists():
+        return {}
+    latest = {}
+    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        fingerprint = row.get("fingerprint")
+        if fingerprint and row.get("goal"):
+            latest[fingerprint] = row
+    return latest
+
+def pending_tracked_goals():
+    """Recover unfinished work, but never auto-resume an explicitly blocked objective."""
+    pending = [
+        row for row in latest_tracked_tasks().values()
+        if row.get("status") in {"FAILED", "RUNNING"}
+        and str(row.get("goal", "")).strip()
+    ]
+    pending.sort(key=lambda row: float(row.get("priority", 0)), reverse=True)
+    return pending
+
+def blocked_fingerprints():
+    """Keep permission/review-blocked work parked until a human resolves the blocker."""
+    return {
+        fingerprint for fingerprint, row in latest_tracked_tasks().items()
+        if row.get("status") == "BLOCKED"
+    }
 
 def refresh_predictions():
     """Recompute future risks before choosing the next unit of work."""
@@ -98,12 +147,29 @@ def candidates():
     return sorted(items, key=lambda x: x[1], reverse=True)
 
 def choose_goal():
-    seen = recent_fingerprints()
-    for kind, priority, text in candidates():
+    # Resume the same durable objective before selecting unrelated new work.
+    pending = pending_tracked_goals()
+    if pending:
+        task = pending[0]
+        return (
+            str(task.get("kind", "task")),
+            float(task.get("priority", 0.8)),
+            str(task["goal"]),
+            str(task["fingerprint"]),
+        )
+
+    seen = recent_fingerprints() | blocked_fingerprints()
+    available = candidates()
+    for kind, priority, text in available:
         fingerprint = f"{kind}:{text}"
         if fingerprint not in seen:
             return kind, priority, text, fingerprint
-    kind, priority, text = candidates()[0]
+    # If every normal candidate is complete or human-blocked, review health instead.
+    health = next((item for item in available if item[0] == "health"), None)
+    if health:
+        kind, priority, text = health
+        return kind, priority, text, f"{kind}:{text}"
+    kind, priority, text = available[0]
     return kind, priority, text, f"{kind}:{text}"
 
 def think_and_act(goal):
@@ -199,25 +265,50 @@ def main():
             task = create_tracked_task(kind, priority, goal, fingerprint)
             result = think_and_act(goal)
             verification = result.get("verification", {}) if isinstance(result, dict) else {}
-            verified = verification.get("status") == "VERIFIED" or bool(verification.get("result_verified"))
+            # Success requires both an explicit VERIFIED status and a positive result flag.
+            # A stale/overly broad result_verified=True must never override PENDING/FAILED.
+            verified = (
+                verification.get("status") == "VERIFIED"
+                and verification.get("result_verified") is True
+            )
+            execution = result.get("execution", {}) if isinstance(result, dict) else {}
+            blocked = (
+                execution.get("status") == "WAITING_PERMISSION"
+                or verification.get("status") in {"WAITING_PERMISSION", "BLOCKED"}
+            )
             finish_tracked_task(
                 task,
-                "VERIFIED" if verified else "FAILED",
-                {"verification": verification, "status": result.get("status") if isinstance(result, dict) else "UNKNOWN"},
+                "VERIFIED" if verified else ("BLOCKED" if blocked else "FAILED"),
+                {
+                    "verification": verification,
+                    "execution_status": execution.get("status", "UNKNOWN"),
+                    "status": result.get("status") if isinstance(result, dict) else "UNKNOWN",
+                },
             )
             record({
                 "cycle": cycle, "event": "completed", "goal": goal,
                 "fingerprint": fingerprint, "verified": verified,
+                "verification_contract": "strict-v1",
                 "status": verification.get("status", result.get("status", "UNKNOWN")),
             })
             print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
 
-            if not verified:
+            if not verified and not blocked:
                 repair = repair_from_evidence(
                     json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
                 )
                 record({"cycle": cycle, "event": "repair", "goal": goal, **repair})
+                if repair.get("status") in {"REVIEW_REQUIRED", "REPAIR_EXCEPTION"}:
+                    finish_tracked_task(task, "BLOCKED", {"repair": repair, "reason": "human_review_required"})
+                    blocked = True
                 print(f"JET_BRAIN_CYCLE {cycle} REPAIR={repair.get('status')}", flush=True)
+            elif blocked:
+                record({
+                    "cycle": cycle, "event": "blocked_for_human",
+                    "goal": goal, "fingerprint": fingerprint,
+                    "reason": execution.get("status", verification.get("status")),
+                })
+                print(f"JET_BRAIN_CYCLE {cycle} BLOCKED_FOR_HUMAN", flush=True)
 
             prediction = evolve_from_evidence()
             record({"cycle": cycle, "event": "prediction_refresh", "ok": prediction["ok"]})

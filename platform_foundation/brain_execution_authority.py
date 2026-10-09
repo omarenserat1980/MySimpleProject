@@ -49,6 +49,7 @@ class BrainExecutionAuthority:
             "persistent": True,
             "host": socket.gethostname(),
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "pid": os.getpid(),
             "capabilities": list(self.capabilities),
         }
         self.heartbeat_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
@@ -70,17 +71,29 @@ class BrainExecutionAuthority:
             payload = json.loads(self.heartbeat_path.read_text(encoding="utf-8"))
             timestamp = datetime.fromisoformat(str(payload["timestamp"]))
             age = (datetime.now(timezone.utc) - timestamp).total_seconds()
+            heartbeat_pid = int(payload.get("pid", 0))
+            pid_alive = False
+            if heartbeat_pid > 0:
+                try:
+                    os.kill(heartbeat_pid, 0)
+                    pid_alive = True
+                except (ProcessLookupError, PermissionError, OSError):
+                    pid_alive = False
             valid = (
                 payload.get("owner") == "brain"
                 and payload.get("persistent") is True
                 and payload.get("executor_id") == self.executor_id
                 and required_capability in payload.get("capabilities", [])
                 and age <= self.max_heartbeat_age_seconds
+                and heartbeat_pid > 0
+                and pid_alive
             )
             return {
                 "ready": valid,
                 "executor": asdict(self.descriptor()),
                 "heartbeat_age_seconds": round(age, 3),
+                "heartbeat_pid": heartbeat_pid,
+                "heartbeat_pid_alive": pid_alive,
                 "reason": None if valid else "brain_executor_not_ready",
                 "runner_policy": policy,
             }

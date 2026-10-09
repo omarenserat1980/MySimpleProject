@@ -13,9 +13,30 @@ class ResourceManagerTests(unittest.TestCase):
         self.assertEqual(report["cpu"]["cores"],1)
         self.assertEqual(report["ram"]["total_bytes"],1024)
         self.assertEqual(report["ram"]["used_bytes"],1)
+        self.assertEqual(report["ram"]["backing_bytes"],1024)
         self.assertEqual(report["storage"]["used_bytes"],5)
         self.assertTrue(report["network"]["available"])
         self.assertTrue(report["gpu"]["available"])
+
+    def test_default_blade_separates_virtual_capacity_from_backing(self):
+        blade=BladeChassis().create_blade()
+        report=ResourceManager().snapshot(blade)
+        self.assertEqual(report["ram"]["total_bytes"],4*1024*1024*1024)
+        self.assertEqual(report["ram"]["backing_bytes"],65536)
+        self.assertEqual(report["storage"]["total_bytes"],64*1024*1024*1024)
+        self.assertEqual(report["storage"]["backing_bytes"],1024*1024)
+
+    def test_windows_sized_resource_requirement_fits_default_virtual_blade(self):
+        chassis=BladeChassis()
+        blade=chassis.create_blade()
+        blade.power_on()
+        manager=ResourceManager()
+        result=manager.reserve(blade,"windows-vm",ResourceRequirement(
+            ram_bytes=4*1024*1024*1024,
+            storage_bytes=64*1024*1024*1024,
+        ))
+        self.assertTrue(result["ok"],result)
+        self.assertEqual(result["status"],"RESERVED")
 
     def test_reservation_is_capability_and_capacity_checked(self):
         chassis=BladeChassis()

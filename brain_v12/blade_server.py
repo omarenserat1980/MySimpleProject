@@ -4,12 +4,18 @@ from uuid import uuid4
 from .virtual_hardware.computer import VirtualComputer
 from .brain.resource_manager import ResourceManager, ResourceRequirement
 
+DEFAULT_VIRTUAL_RAM_BYTES = 4 * 1024 * 1024 * 1024
+DEFAULT_VIRTUAL_STORAGE_BYTES = 64 * 1024 * 1024 * 1024
+
+
 @dataclass
 class BladeServer:
     blade_id: str
     computer: VirtualComputer
     state: str = "OFFLINE"
     capabilities: set[str] = field(default_factory=lambda: {"cpu","ram","storage","network","gpu"})
+    ram_capacity_bytes: int = 65536
+    storage_capacity_bytes: int = 1024 * 1024
 
     def power_on(self):
         self.computer.power_on(); self.state="ONLINE"; return self.status()
@@ -23,16 +29,27 @@ class BladeServer:
         return {"ok":True,"blade_id":self.blade_id,"result":result}
 
     def status(self):
-        return {"blade_id":self.blade_id,"state":self.state,"capabilities":sorted(self.capabilities),"computer":self.computer.status()}
+        return {"blade_id":self.blade_id,"state":self.state,"capabilities":sorted(self.capabilities),
+                "virtual_capacity":{"ram_bytes":self.ram_capacity_bytes,"storage_bytes":self.storage_capacity_bytes},
+                "computer":self.computer.status()}
+
 
 class BladeChassis:
     def __init__(self,name="BRAIN-CHASSIS-01"):
         self.name=name; self.blades={}
 
-    def create_blade(self,capabilities=None,ram_size=65536):
+    def create_blade(self,capabilities=None,ram_size=None,storage_size=None,
+                     ram_capacity_bytes=None,storage_capacity_bytes=None):
         blade_id=f"blade-{uuid4().hex[:12]}"
-        computer=VirtualComputer(blade_id,ram_size=ram_size)
-        blade=BladeServer(blade_id,computer,capabilities=set(capabilities or {"cpu","ram","storage","network","gpu"}))
+        backing_ram_size=65536 if ram_size is None else int(ram_size)
+        backing_storage_size=1024*1024 if storage_size is None else int(storage_size)
+        virtual_ram_capacity=(DEFAULT_VIRTUAL_RAM_BYTES if ram_size is None else backing_ram_size) if ram_capacity_bytes is None else int(ram_capacity_bytes)
+        virtual_storage_capacity=(DEFAULT_VIRTUAL_STORAGE_BYTES if storage_size is None else backing_storage_size) if storage_capacity_bytes is None else int(storage_capacity_bytes)
+        if min(backing_ram_size,backing_storage_size,virtual_ram_capacity,virtual_storage_capacity) <= 0:
+            raise ValueError("BLADE_CAPACITIES_MUST_BE_POSITIVE")
+        computer=VirtualComputer(blade_id,ram_size=backing_ram_size,storage_size=backing_storage_size)
+        blade=BladeServer(blade_id,computer,capabilities=set(capabilities or {"cpu","ram","storage","network","gpu"}),
+                          ram_capacity_bytes=virtual_ram_capacity,storage_capacity_bytes=virtual_storage_capacity)
         self.blades[blade_id]=blade
         return blade
 
@@ -55,6 +72,7 @@ class BladeChassis:
             return max(candidates, key=lambda b:(resource_manager.snapshot(b)["ram"]["free_bytes"],
                                                 resource_manager.snapshot(b)["storage"]["free_bytes"]))
         return candidates[0]
+
 
 class BladeScheduler:
     def __init__(self,chassis:BladeChassis,resource_manager=None):
