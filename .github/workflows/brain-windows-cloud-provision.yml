@@ -3,8 +3,13 @@ name: BRAIN Windows Cloud Provision
 on:
   workflow_dispatch:
     inputs:
+      bootstrap_state:
+        description: "Authorize creation of Azure Storage resources for Terraform state; may incur charges"
+        required: true
+        type: boolean
+        default: false
       approve_apply:
-        description: "Explicitly authorize Terraform apply"
+        description: "Explicitly authorize creation or modification of the Windows VM; may incur Azure charges"
         required: true
         type: boolean
         default: false
@@ -57,9 +62,37 @@ jobs:
         shell: cmd
         run: terraform version
 
+      - name: Require explicit state-backend authorization
+        if: ${{ inputs.bootstrap_state != true }}
+        shell: powershell
+        run: |
+          Write-Error "Blocked safely: Terraform Azure state backend is not configured. Re-run manually with bootstrap_state=true only after reviewing Azure storage costs and account/region."
+          exit 1
+
+      - name: Bootstrap approved Terraform state backend
+        if: ${{ inputs.bootstrap_state == true }}
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $scriptPath = Join-Path $env:GITHUB_WORKSPACE "scripts/windows-cloud/bootstrap-state.ps1"
+          $state = & $scriptPath -Location "northeurope" -ResourceGroup "brain-tfstate-rg" | ConvertFrom-Json
+          if (-not $state.storage_account -or -not $state.container -or -not $state.state_resource_group) { throw "State bootstrap did not return complete backend metadata." }
+          "TF_STATE_RESOURCE_GROUP=$($state.state_resource_group)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TF_STATE_STORAGE_ACCOUNT=$($state.storage_account)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TF_STATE_CONTAINER=$($state.container)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "TF_STATE_KEY=$($state.state_key)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Terraform init
-        shell: cmd
-        run: terraform init -upgrade -input=false
+        if: ${{ inputs.bootstrap_state == true }}
+        shell: powershell
+        run: |
+          terraform init -upgrade -input=false \\
+            -backend-config="resource_group_name=$env:TF_STATE_RESOURCE_GROUP" \\
+            -backend-config="storage_account_name=$env:TF_STATE_STORAGE_ACCOUNT" \\
+            -backend-config="container_name=$env:TF_STATE_CONTAINER" \\
+            -backend-config="key=$env:TF_STATE_KEY" \\
+            -backend-config="use_azuread_auth=true" \\
+            -backend-config="use_cli=true"
 
       - name: Terraform fmt check
         shell: cmd
