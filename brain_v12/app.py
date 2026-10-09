@@ -2294,3 +2294,26 @@ app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui
 if __name__=="__main__":
     import uvicorn; uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8012")))
 
+
+
+# Governed MCP Streamable HTTP endpoint. Kept inside the deployed FastAPI app
+# so Render's existing start command continues to work.
+from .brain.brain_mcp import build_mcp_router
+app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+
+@app.middleware("http")
+async def brain_mcp_auth(request: Request, call_next):
+    if request.url.path == "/mcp":
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse(
+                {"ok": False, "status": "MCP_NOT_CONFIGURED"},
+                status_code=503,
+            )
+        authorization = request.headers.get("authorization", "")
+        if authorization != f"Bearer {expected}":
+            return JSONResponse(
+                {"ok": False, "status": "MCP_AUTH_REQUIRED"},
+                status_code=401,
+            )
+    return await call_next(request)
