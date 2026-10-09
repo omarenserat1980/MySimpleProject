@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: brain-fabric-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   fabric:
     runs-on: ubuntu-latest
@@ -24,6 +28,19 @@ jobs:
         run: >-
           python -m pytest -q
           brain_v12/tests/test_secret_broker.py
+          brain_v12/tests/test_resource_fabric.py
+          brain_v12/tests/test_hardware_truth.py
+          brain_v12/tests/test_hardware_twin.py
+          brain_v12/tests/test_resource_fabric_federation.py
+          brain_v12/tests/test_resource_providers.py
+          brain_v12/tests/test_vdc_resource_provider.py
+          brain_v12/tests/test_piece_graph.py
+          brain_v12/tests/test_graph_composer.py
+          brain_v12/tests/test_hardware_truth_kernel.py
+          brain_v12/tests/test_hardware_reconciler_deep.py
+          brain_v12/tests/test_execution_authority.py
+          brain_v12/tests/test_execution_kernel.py
+          brain_v12/tests/test_mission_execution_kernel_integration.py
           cloud/test_brain_fabric.py
           cloud/test_brain_node_security.py
           cloud/test_brain_fabric_integration.py
