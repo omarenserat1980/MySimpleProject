@@ -44,5 +44,24 @@ class HomeServerQueueTests(unittest.TestCase):
         self.assertEqual(next_claim["task"]["attempts"], 2)
 
 
+    def test_scheduler_prefers_higher_priority(self):
+        low = self.store.enqueue("status", {}, None, priority=0)
+        high = self.store.enqueue("python_version", {}, None, priority=8)
+        claim = self.store.claim("worker-a", 60)
+        self.assertEqual(claim["task"]["task_id"], high["task_id"])
+        self.assertNotEqual(claim["task"]["task_id"], low["task_id"])
+
+    def test_scheduler_only_assigns_supported_capabilities(self):
+        gpu_task = self.store.enqueue("brain_self_test", {}, None, required_capabilities=["gpu"])
+        claim = self.store.claim("worker-cpu", 60, capabilities=["python"])
+        self.assertEqual(claim["status"], "IDLE")
+        claim = self.store.claim("worker-gpu", 60, capabilities=["python", "gpu"])
+        self.assertEqual(claim["task"]["task_id"], gpu_task["task_id"])
+
+    def test_priority_range_is_validated(self):
+        with self.assertRaises(ValueError):
+            self.store.enqueue("status", {}, None, priority=11)
+
+
 if __name__ == "__main__":
     unittest.main()
