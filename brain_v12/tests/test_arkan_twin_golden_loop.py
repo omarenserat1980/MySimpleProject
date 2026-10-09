@@ -9,7 +9,8 @@ class ArkanTwinGoldenLoopTests(unittest.TestCase):
    self.assertTrue(r["ok"]); self.assertEqual(r["status"],"GOLDEN_CLOSED_LOOP_VERIFIED")
    self.assertEqual(r["transitions"][-1],"CLOSED")
    self.assertGreaterEqual(len(r["evidence_ids"]),9)
-   self.assertIn("CLOSED",r["transitions"])\n   loop.close()
+   self.assertIn("CLOSED",r["transitions"])
+   loop.close()
  def test_resource_gate_blocks_then_recovery_can_close(self):
   with tempfile.TemporaryDirectory() as d:
    loop=ArkanTwinGoldenLoop(d)
