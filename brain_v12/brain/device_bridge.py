@@ -20,11 +20,17 @@ class DeviceBridge:
             or "~/v12-agent/agent.key"
         )
 
+    def _configured_env_key(self):
+        # Treat whitespace-only environment values as absent, without altering valid key bytes.
+        for name in (AGENT_KEY_ENV, "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY"):
+            value = os.getenv(name, "")
+            if value.strip():
+                return value
+        return ""
+
     def configured(self):
         # Only report authentication as configured when a usable source is present.
-        if any(os.getenv(name, "") for name in (
-            AGENT_KEY_ENV, "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY"
-        )):
+        if self._configured_env_key():
             return True
         if os.getenv(AGENT_KEY_SHA256_ENV, "").strip():
             return True
@@ -37,11 +43,11 @@ class DeviceBridge:
         except (OSError, UnicodeError):
             return False
     def auth_mode(self):
-        if os.getenv(AGENT_KEY_ENV, ""):
+        if os.getenv(AGENT_KEY_ENV, "").strip():
             return "DIRECT_KEY"
-        if os.getenv("BRAIN_EMULATOR_KEY", ""):
+        if os.getenv("BRAIN_EMULATOR_KEY", "").strip():
             return "BRAIN_EMULATOR_KEY"
-        if os.getenv("BRAIN_EMULATOR_AGENT_KEY", ""):
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY", "").strip():
             return "BRAIN_EMULATOR_AGENT_KEY"
         key_file = self._local_key_file()
         if key_file and os.path.isfile(key_file) and os.access(key_file, os.R_OK):
@@ -56,7 +62,7 @@ class DeviceBridge:
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
         if not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
+        expected=self._configured_env_key()
         if not expected:
             key_file=self._local_key_file()
             if key_file and os.path.isfile(key_file):
