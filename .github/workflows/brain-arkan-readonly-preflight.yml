@@ -1,0 +1,46 @@
+name: Arkan Read-only Hyper-V Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    # Runs only when manually dispatched and only on the specifically labelled
+    # Windows host. It never creates/starts/stops/modifies a VM or cloud resource.
+    runs-on: [self-hosted, windows, brain-internal, windows-real-boot]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm target is Windows
+        shell: pwsh
+        run: |
+          if ($env:OS -ne "Windows_NT") { throw "This job must run on the Windows Arkan runner." }
+          Write-Output "Runner=$env:COMPUTERNAME"
+      - name: Run read-only Hyper-V preflight
+        id: preflight
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "brain-hyperv-preflight"
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          & "$env:GITHUB_WORKSPACE\scripts\Test-BrainHyperVPreflight.ps1" -OutputDirectory $out
+          $code = $LASTEXITCODE
+          "preflight_exit_code=$code" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($code -ne 0) { Write-Error "Preflight did not PASS; inspect uploaded evidence." }
+      - name: Upload preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkan-hyperv-preflight
+          path: |
+            ${{ runner.temp }}/brain-hyperv-preflight/**
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Fail run unless preflight passed
+        if: steps.preflight.outcome != 'success'
+        shell: pwsh
+        run: |
+          throw "Arkan preflight did not pass. No VM changes were attempted; inspect the evidence artifact."
