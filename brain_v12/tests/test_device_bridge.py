@@ -48,6 +48,13 @@ class DeviceBridgeTests(unittest.TestCase):
         verified = self.bridge.verify_result(task_id)
         self.assertTrue(verified["verified"])
 
+    def test_heartbeat_registers_agent(self):
+        result = self.bridge.heartbeat("redmi3-01", {"agent": "V12-Termux-Agent"})
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "HEARTBEAT")
+        status = self.bridge.agent_status()
+        self.assertTrue(any(agent["agent_id"] == "redmi3-01" for agent in status["agents"]))
+
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
         self.assertTrue(queued["ok"])
