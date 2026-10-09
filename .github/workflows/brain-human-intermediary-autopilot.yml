@@ -31,38 +31,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Validate Autopilot logic in isolated CI
+
+      - name: Validate Autopilot source
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.test_human_intermediary_predictor -v
           python -m py_compile brain_v12/self_healing/human_intermediary_predictor.py
-          echo "AUTOPILOT_LOGIC=VERIFIED"
-      - name: Record production executor boundary
+          echo "AUTOPILOT_SOURCE=VALID"
+
+      - name: Run Autopilot unit tests
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          Path("autopilot-executor-boundary.json").write_text(json.dumps({
-              "autopilot_logic_verified": True,
-              "production_executor_required": True,
-              "production_executor_status": "BLOCKED_UNTIL_BRAIN_OWNED_LINUX_X64_KVM",
-              "policy": "diagnostic_ci_must_never_claim_production_executor_verification",
-          }, indent=2, sort_keys=True), encoding="utf-8")
-          print("AUTOPILOT_PRODUCTION_EXECUTOR=BLOCKED_BY_POLICY")
-          PY
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Run predictor tests
-        run: python -m unittest brain_v12.self_healing.test_human_intermediary_predictor -v
+          python -m unittest brain_v12.self_healing.test_human_intermediary_predictor -v
+          echo "AUTOPILOT_TESTS=PASS"
+
       - name: Predict current human-intermediary continuation
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python -m brain_v12.self_healing.human_intermediary_predictor
+        run: |
+          set -euo pipefail
+          python -m brain_v12.self_healing.human_intermediary_predictor
+          test -s brain_v12/state/human_intermediary_prediction.json
+          echo "AUTOPILOT_PREDICTION=GENERATED"
+
       - name: Verify monotonic continuation contract
         run: |
+          set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
@@ -77,6 +71,22 @@ jobs:
           print("FRONTIER=", d["current_frontier"])
           print("NEXT_ACTION=", d["next_safe_action"])
           PY
+
+      - name: Record production executor boundary
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          Path("autopilot-executor-boundary.json").write_text(json.dumps({
+              "autopilot_logic_verified": True,
+              "production_executor_required": True,
+              "production_executor_status": "BLOCKED_UNTIL_BRAIN_OWNED_LINUX_X64_KVM",
+              "policy": "diagnostic_ci_must_never_claim_production_executor_verification",
+          }, indent=2, sort_keys=True), encoding="utf-8")
+          print("AUTOPILOT_PRODUCTION_EXECUTOR=BLOCKED_BY_POLICY")
+          PY
+
       - name: Commit only monotonic state/report changes
         run: |
           git config user.name "brain-autopilot"
