@@ -122,6 +122,23 @@ class ChatSessionApiTests(unittest.TestCase):
             message_events = [e for e in feed["events"] if e["event_type"] == "MESSAGE_ADDED"]
             self.assertEqual(len(message_events), 1)
 
+    def test_client_message_ids_with_like_wildcards_are_compared_exactly(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("Wildcard IDs")
+            first = store.add_message(
+                session["id"], "user", "first", client_message_id="clientX1"
+            )
+            second = store.add_message(
+                session["id"], "user", "second", client_message_id="client_1"
+            )
+            self.assertEqual(
+                [m["content"] for m in second["messages"] if m["role"] == "user"],
+                ["first", "second"],
+            )
+            self.assertEqual(len(first["messages"]), 1)
+
     def test_sync_event_feed_is_session_isolated(self):
         with tempfile.NamedTemporaryFile() as f:
             store = ChatSessionStore(f.name)
