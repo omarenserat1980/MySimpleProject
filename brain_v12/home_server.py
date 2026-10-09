@@ -203,13 +203,26 @@ def get_store() -> HomeServerStore:
 app = FastAPI(title="Brain Home Server", version=APP_VERSION)
 
 
-def _authorize(authorization: str | None) -> None:
-    expected = os.getenv("BRAIN_CONTROL_KEY", "").strip()
+def _authorize(authorization: str | None, *, worker: bool = False) -> None:
+    if worker:
+        # Device/worker credentials are deliberately separate from admin control.
+        expected = (
+            os.getenv("BRAIN_AGENT_KEY", "").strip()
+            or os.getenv("BRAIN_EMULATOR_KEY", "").strip()
+            or os.getenv("BRAIN_EMULATOR_AGENT_KEY", "").strip()
+            or os.getenv("TERMUX_AGENT_KEY", "").strip()
+        )
+        missing_code = "HOME_SERVER_WORKER_AUTH_NOT_CONFIGURED"
+        required_code = "WORKER_AUTH_REQUIRED"
+    else:
+        expected = os.getenv("BRAIN_CONTROL_KEY", "").strip()
+        missing_code = "HOME_SERVER_CONTROL_NOT_CONFIGURED"
+        required_code = "CONTROL_AUTH_REQUIRED"
     if not expected:
-        raise HTTPException(status_code=503, detail="HOME_SERVER_CONTROL_NOT_CONFIGURED")
+        raise HTTPException(status_code=503, detail=missing_code)
     supplied = (authorization or "").strip()
     if not hmac.compare_digest(supplied, "Bearer " + expected):
-        raise HTTPException(status_code=401, detail="CONTROL_AUTH_REQUIRED")
+        raise HTTPException(status_code=401, detail=required_code)
 
 
 @app.get("/health")
@@ -241,13 +254,13 @@ def create_task(body: TaskInput, authorization: str | None = Header(default=None
 
 @app.post("/api/home-server/claim")
 def claim_task(body: ClaimInput, authorization: str | None = Header(default=None)):
-    _authorize(authorization)
+    _authorize(authorization, worker=True)
     return get_store().claim(body.worker_id, body.lease_seconds)
 
 
 @app.post("/api/home-server/tasks/{task_id}/report")
 def report_task(task_id: str, body: ReportInput, authorization: str | None = Header(default=None)):
-    _authorize(authorization)
+    _authorize(authorization, worker=True)
     try:
         return get_store().report(task_id, body.worker_id, body.ok, body.result, body.error)
     except KeyError as exc:
