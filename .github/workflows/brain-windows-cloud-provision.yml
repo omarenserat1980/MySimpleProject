@@ -42,7 +42,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          clean: true
+          clean: false
+          sparse-checkout: |
+            brain_v12/cloud/windows_terraform
+            scripts/windows-cloud
+          sparse-checkout-cone-mode: false
 
       - name: Verify Azure CLI session
         shell: pwsh
