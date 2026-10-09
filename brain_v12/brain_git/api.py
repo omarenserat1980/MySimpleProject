@@ -1,10 +1,11 @@
 """Brain-native HTTP API for Git repositories."""
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from ..brain.control_auth import require_control_key
 from pydantic import BaseModel, Field
 from .service import BrainGitError, BrainGitService
 from .file_browser import BrainGitFileBrowser
+from .workflow_engine import BrainWorkflowEngine
 import time
 
 class RepoIn(BaseModel):
@@ -26,8 +27,9 @@ class WorkflowIn(BaseModel):
     metadata:dict=Field(default_factory=dict)
 
 
-def router(service:BrainGitService|None=None):
+def router(service:BrainGitService|None=None, workflow_engine:BrainWorkflowEngine|None=None):
     svc=service or BrainGitService()
+    engine=workflow_engine or BrainWorkflowEngine(svc.root)
     r=APIRouter(prefix="/api/brain-git",tags=["Brain Git"])
     @r.get("/status")
     def status():
@@ -66,14 +68,16 @@ def router(service:BrainGitService|None=None):
         try:return svc.fsck(name)
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.post("/workflows")
-    def create_workflow(request:Request,body:WorkflowIn):
+    def create_workflow(request:Request, body:WorkflowIn, background_tasks:BackgroundTasks):
         require_control_key(request)
-        wf_id=f"brain-wf-{int(time.time()*1000)}"
-        svc.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
-        import json
-        p=svc.root/"workflows"/f"{wf_id}.json"
-        p.write_text(json.dumps({"id":wf_id,"name":body.name,"status":"QUEUED","created_at":time.time(),"command":body.command,"metadata":body.metadata},ensure_ascii=False,indent=2),encoding="utf-8")
-        return {"ok":True,"workflow":{"id":wf_id,"name":body.name,"status":"QUEUED"}}
+        try:
+            workflow = engine.create(body.name, body.command, metadata=body.metadata)
+        except (TypeError, ValueError) as e:
+            raise HTTPException(400, str(e))
+        # Durable creation happens before dispatch. The background task is isolated
+        # from the request handler; its failure is recorded by the workflow engine.
+        background_tasks.add_task(engine.run, workflow)
+        return {"ok":True,"workflow":{"id":workflow["id"],"name":workflow["name"],"status":"QUEUED"}}
     @r.get("/workflows")
     def workflows():
         d=svc.root/"workflows"; items=[]
