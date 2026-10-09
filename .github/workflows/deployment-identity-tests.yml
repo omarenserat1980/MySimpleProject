@@ -1,0 +1,43 @@
+name: Deployment Identity Regression Tests
+
+on:
+  pull_request:
+    branches:
+      - brain-independent-executor-pool
+    paths:
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_deployment_identity.py"
+      - ".github/workflows/deployment-identity-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-identity-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deployment-identity-tests:
+    name: Deployment identity regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out proposed changes
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: brain_v12/requirements.txt
+
+      - name: Install Brain dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r brain_v12/requirements.txt
+
+      - name: Run deployment identity regression tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q brain_v12/tests/test_deployment_identity.py
