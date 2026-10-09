@@ -2305,7 +2305,13 @@ if __name__=="__main__":
 @app.middleware("http")
 async def brain_mcp_auth(request: Request, call_next):
     if request.url.path == "/mcp":
-        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        # Prefer a dedicated MCP token. If the deployment already has the
+        # control-plane key, allow it to authenticate MCP without creating a
+        # second secret or exposing the secret value.
+        expected = (
+            os.getenv("BRAIN_MCP_TOKEN", "").strip()
+            or os.getenv("BRAIN_CONTROL_KEY", "").strip()
+        )
         if not expected:
             return JSONResponse(
                 {"ok": False, "status": "MCP_NOT_CONFIGURED"},
