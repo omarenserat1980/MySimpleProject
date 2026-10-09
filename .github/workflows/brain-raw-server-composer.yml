@@ -5,6 +5,7 @@ on:
     paths:
       - "brain_v12/raw_server/**"
       - "brain_v12/tests/test_raw_server_composer.py"
+      - "brain_v12/tests/test_raw_server_capacity_gate.py"
       - "scripts/Install-BrainRawServer.ps1"
       - "scripts/Test-BrainHyperVPreflight.ps1"
       - "brain_v12/raw_server/CONTRACTS.md"
@@ -32,9 +33,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Python module
-        run: python -m py_compile brain_v12/raw_server/composer.py
-      - name: Run staged composer tests
-        run: python -m unittest brain_v12.tests.test_raw_server_composer -v
+        run: python -m py_compile brain_v12/raw_server/composer.py brain_v12/raw_server/capacity_gate.py
+      - name: Run staged composer and capacity gate tests
+        run: python -m unittest brain_v12.tests.test_raw_server_composer brain_v12.tests.test_raw_server_capacity_gate -v
       - name: Check PowerShell scripts and contracts exist
         run: |
           test -s scripts/Install-BrainRawServer.ps1
