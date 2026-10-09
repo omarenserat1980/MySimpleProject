@@ -6,6 +6,7 @@ on:
       - brain-independent-executor-pool
     paths:
       - "brain_v12/home_server.py"
+      - "brain_v12/app.py"
       - "brain_v12/tests/test_home_server.py"
       - ".github/workflows/home-server-tests.yml"
   push:
@@ -30,7 +31,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install minimal runtime dependencies
-        run: python -m pip install --upgrade pip fastapi pydantic
+      - name: Install runtime dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r brain_v12/requirements.txt
+      - name: Compile app and Home Server tests
+        run: python -m py_compile brain_v12/app.py brain_v12/home_server.py brain_v12/tests/test_home_server.py
       - name: Run Home Server tests
+        env:
+          PYTHONPATH: .
         run: python -m unittest brain_v12.tests.test_home_server -v
