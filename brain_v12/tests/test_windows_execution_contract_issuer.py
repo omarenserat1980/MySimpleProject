@@ -22,6 +22,30 @@ class WindowsExecutionContractIssuerTests(unittest.TestCase):
           "source_commit":"a"*40,"checkpoint_id":"BRAIN-GOLDEN-01"}
  def checkpoint(self):
   return {"checkpoint_id":"BRAIN-GOLDEN-01","source_commit":"a"*40,"status":"STABLE_BASELINE"}
+ def test_contract_cannot_outlive_owner_approval(self):
+  old=os.environ.get("BRAIN_HUMAN_APPROVAL_TOKEN"); oldkey=os.environ.get("BRAIN_AUTHORITY_PRIVATE_KEY_B64")
+  os.environ["BRAIN_HUMAN_APPROVAL_TOKEN"]="approval-secret"
+  os.environ["BRAIN_AUTHORITY_PRIVATE_KEY_B64"]=base64.b64encode(self.k.private_bytes_raw()).decode()
+  try:
+   approval=dict(self.approval); approval["expires_at"]=150.0
+   approval["signature"]=base64.b64encode(self.k.sign(approval_payload(
+    approval["owner_id"],approval["challenge_id"],approval["scope"],approval["expires_at"],
+    approval["source_commit"],approval["task_id"],approval["attempt_id"]))).decode()
+   with tempfile.TemporaryDirectory() as d:
+    store=BrainLeadershipStore(Path(d)/"leadership.db")
+    lease=store.acquire(self.identity(),self.checkpoint(),"windows-real-boot-qemu",now=100)
+    try:
+     with self.assertRaisesRegex(RuntimeError,"OWNER_APPROVAL_EXPIRY_TOO_SOON"):
+      issue_windows_contract(identity=self.identity(),checkpoint=self.checkpoint(),lease=lease,
+       source_commit="a"*40,task_id="windows-real-boot",attempt_id="attempt-1",
+       capability_verified=True,human_approval_token="approval-secret",
+       owner_approval=approval,owner_public_key_b64=self.pub,now=100)
+    finally: store.close()
+  finally:
+   if old is None: os.environ.pop("BRAIN_HUMAN_APPROVAL_TOKEN",None)
+   else: os.environ["BRAIN_HUMAN_APPROVAL_TOKEN"]=old
+   if oldkey is None: os.environ.pop("BRAIN_AUTHORITY_PRIVATE_KEY_B64",None)
+   else: os.environ["BRAIN_AUTHORITY_PRIVATE_KEY_B64"]=oldkey
  def test_owner_approval_is_required(self):
   with tempfile.TemporaryDirectory() as d:
    store=BrainLeadershipStore(Path(d)/"leadership.db")
