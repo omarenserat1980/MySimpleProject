@@ -67,16 +67,16 @@ jobs:
       - name: Bootstrap remote Terraform state and Azure providers
         if: ${{ inputs.approve_apply == true }}
         shell: pwsh
-        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location northeurope -RegisterProviders
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location westeurope -RegisterProviders
 
       - name: Preflight (no VM changes)
         shell: pwsh
-        run: ./scripts/windows-cloud/preflight.ps1 -Location northeurope -VmSize Standard_D4s_v5
+        run: ./scripts/windows-cloud/preflight.ps1 -Location westeurope -VmSize Standard_B1s
 
       - name: Deploy and verify Windows Server 2025
         if: ${{ inputs.approve_apply == true }}
         shell: pwsh
-        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location northeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_D4s_v5 -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location westeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B1s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
 
       - name: Explain preflight-only run
         if: ${{ inputs.approve_apply != true }}
