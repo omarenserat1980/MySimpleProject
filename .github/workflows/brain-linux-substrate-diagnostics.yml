@@ -1,0 +1,48 @@
+name: Brain Linux Substrate Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "brain-tcg-diagnostic-lane"
+    paths:
+      - "scripts/brain-linux-substrate/preflight.sh"
+      - ".github/workflows/brain-linux-substrate-diagnostics.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  substrate-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Inspect Linux substrate
+        run: |
+          set -e
+          echo "OS=$(uname -s)"
+          echo "ARCH=$(uname -m)"
+          echo "KERNEL=$(uname -r)"
+          if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+            echo "KVM_DEVICE=AVAILABLE"
+          else
+            echo "KVM_DEVICE=UNAVAILABLE"
+          fi
+          command -v qemu-system-x86_64 || true
+          command -v qemu-img || true
+      - name: Run Brain substrate preflight without mutation
+        run: |
+          set +e
+          ./scripts/brain-linux-substrate/preflight.sh
+          rc=$?
+          echo "BRAIN_SUBSTRATE_PREFLIGHT_EXIT=$rc"
+          if [[ $rc -eq 0 ]]; then
+            echo "BRAIN_LINUX_SUBSTRATE=VERIFIED"
+          else
+            echo "BRAIN_LINUX_SUBSTRATE=BLOCKED"
+          fi
+          exit 0
+      - name: Assert hosted runner is not production authority
+        run: |
+          echo "GITHUB_HOSTED_RUNNER_IS_NOT_PRODUCTION_EXECUTOR=true"
+          echo "PRODUCTION_KVM_REQUIRES_BRAIN_OWNED_LINUX_HOST=true"
