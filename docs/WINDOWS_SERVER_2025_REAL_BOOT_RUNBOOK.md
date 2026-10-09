@@ -23,8 +23,11 @@ In repository Settings → Secrets and variables → Actions, add these reposito
 - `BRAIN_WINDOWS_CONTROL_PLANE_URL`: base URL of the real HTTPS Control Plane (no credentials embedded in the URL).
 - `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY`: high-entropy delivery key shared by the Control Plane endpoint and GitHub Actions.
 - `BRAIN_AUTHORITY_PUBLIC_KEY_B64`: authority public key used by the runner-side contract gate to verify the signed contract.
+- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64`: trusted Ed25519 public key for executor attestations.
 
-Never put the authority private key, owner approval signing key, human approval token, or raw owner approval in GitHub secrets. The runner receives only the short-lived signed contract and public verification key. Rotate the delivery key if it may have been exposed.
+The selected runner must provide `BRAIN_CLOUD_EXECUTOR_ATTESTATION` as a JSON attestation signed by the matching trusted private key held only by the executor provisioning/attestation service. The payload schema is `brain.cloud-executor-attestation.v1` and binds `executor_id`, exact `hostname`, `architecture=x86_64`, `issued_at`, and `expires_at`. The gate rejects missing keys, invalid signatures, identity mismatches, future-issued or expired statements, and statements whose lifetime exceeds 15 minutes. Do not create a placeholder attestation. If no trusted attestation issuer exists yet, the workflow must remain blocked until one is provisioned and its public key is configured.
+
+Never put the authority private key, owner approval signing key, human approval token, or raw owner approval in GitHub secrets. The runner receives only the short-lived signed contract and public verification keys. Rotate delivery keys if they may have been exposed.
 
 ### 3. Verify the runner
 
