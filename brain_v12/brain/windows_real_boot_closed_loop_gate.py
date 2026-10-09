@@ -48,6 +48,13 @@ def load_and_verify(path: str | Path | None = None, *, now: float | None = None)
     if not verify_contract_signature(contract, signature):
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
 
+    if not str(contract.get("owner_id", "")).strip():
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_ID_REQUIRED")
+    if not str(contract.get("owner_challenge_id", "")).strip():
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_CHALLENGE_REQUIRED")
+    if contract.get("owner_scope") != "windows-server-2025-real-boot":
+        raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_SCOPE_INVALID")
+
     brain_id = str(contract.get("brain_id", "")).strip()
     if not brain_id:
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_BRAIN_ID_REQUIRED")
