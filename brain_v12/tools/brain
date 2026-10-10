@@ -1,0 +1,155 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -uo pipefail
+
+ROOT="${BRAIN_ROOT:-$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)}"
+SCRIPT="$ROOT/brain_v12/tools/brain"
+BOOTSTRAP="$ROOT/brain_v12/tools/brain_runtime_bootstrap.sh"
+LAUNCHER="$ROOT/brain_v12/tools/brain_runtime_launcher.sh"
+STATE="$ROOT/.brain/state"
+CONFIG="$HOME/v12-agent/agent_config.sh"
+
+usage() {
+  cat <<'HELP'
+Electronic Brain — Termux control
+  brain install    Install the short 'brain' command in Termux
+  brain start      Start/recover the local runtime safely
+  brain status     Show a compact, read-only status
+  brain diagnose   Diagnose repository, identity, key-file presence and endpoint
+  brain logs       Show the latest runtime logs (never prints keys)
+  brain help       Show this help
+HELP
+}
+
+config_value() {
+  local name="$1"
+  [ -f "$CONFIG" ] || return 0
+  sed -nE "s/^[[:space:]]*(export[[:space:]]+)?${name}=(.*)$/\\2/p" "$CONFIG" |
+    tail -n 1 | sed -E "s/^[\"'](.*)[\"']$/\\1/" | tr -d '\r'
+}
+
+model="$(getprop ro.product.model 2>/dev/null || true)"
+agent_id="$(config_value V12_AGENT_ID)"
+agent_url="$(config_value V12_BRAIN_URL)"
+[ -n "$agent_url" ] || agent_url="$(config_value BRAIN_URL)"
+[ -n "$agent_url" ] || agent_url="http://127.0.0.1:8012"
+
+safe_endpoint() {
+  BRAIN_ENDPOINT="$1" python3 - <<'PY' 2>/dev/null || echo "unparseable"
+import os
+from urllib.parse import urlsplit
+u=urlsplit(os.environ.get("BRAIN_ENDPOINT", ""))
+if not u.scheme or not u.hostname:
+    print("unconfigured")
+else:
+    host=u.hostname
+    port=(":"+str(u.port)) if u.port else ""
+    path=u.path.rstrip("/")
+    print(u.scheme+"://"+host+port+path)
+PY
+}
+
+require_repo() {
+  if [ ! -d "$ROOT/.git" ] || [ ! -f "$LAUNCHER" ] || [ ! -f "$BOOTSTRAP" ]; then
+    echo "BRAIN_ERROR=REPOSITORY_OR_RUNTIME_MISSING"
+    echo "Expected repository: $HOME/MySimpleProject"
+    return 1
+  fi
+  return 0
+}
+
+install_cli() {
+  require_repo || return 1
+  if [ -z "${PREFIX:-}" ] || [ ! -d "$PREFIX/bin" ]; then
+    echo "BRAIN_ERROR=TERMUX_PREFIX_NOT_FOUND"
+    echo "Open this command from Termux, not Android shell."
+    return 1
+  fi
+  local target="$PREFIX/bin/brain"
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    if [ -f "$target" ] && grep -qF '# Electronic Brain Termux CLI shim' "$target" 2>/dev/null; then
+      :
+    elif [ -L "$target" ] && [ "$(readlink "$target" 2>/dev/null || true)" = "$SCRIPT" ]; then
+      echo "BRAIN_INSTALL already_installed=true"
+      return 0
+    else
+      echo "BRAIN_ERROR=COMMAND_NAME_ALREADY_IN_USE path=$target"
+      echo "Nothing was overwritten. Inspect that file before choosing another command name."
+      return 2
+    fi
+  fi
+  local tmp="$target.tmp.$$"
+  {
+    echo '#!/data/data/com.termux/files/usr/bin/bash'
+    echo '# Electronic Brain Termux CLI shim'
+    printf 'export BRAIN_ROOT=%q\n' "$ROOT"
+    printf 'exec %q %q "$@"\n' "/data/data/com.termux/files/usr/bin/bash" "$SCRIPT"
+  } > "$tmp" || return 1
+  chmod 700 "$tmp"
+  mv -f "$tmp" "$target"
+  echo "BRAIN_INSTALL installed=true command=brain"
+  echo "Next: brain status"
+}
+
+show_status() {
+  require_repo || return 1
+  echo "BRAIN_STATUS"
+  echo "device_model=${model:-unknown}"
+  echo "architecture=$(uname -m 2>/dev/null || echo unknown)"
+  echo "agent_id=${agent_id:-not_configured}"
+  echo "endpoint=$(safe_endpoint "$agent_url")"
+  if [ -s "$HOME/v12-agent/agent.key" ]; then echo "agent_key_file=present"; else echo "agent_key_file=missing"; fi
+  if git -C "$ROOT" rev-parse --short HEAD >/dev/null 2>&1; then
+    echo "git_commit=$(git -C "$ROOT" rev-parse --short HEAD)"
+    echo "git_worktree=$(if [ -z "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then echo clean; else echo has_changes; fi)"
+  else
+    echo "git_commit=unknown"
+  fi
+  if [ "$agent_id" != "redmi3-01" ] && printf '%s' "$agent_url" | grep -Eq '^https?://(localhost|127\.|\[::1\])'; then
+    echo "connection=BLOCKED_LOOPBACK_FOR_REMOTE_DEVICE"
+    return 0
+  fi
+  local code
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 2 --max-time 4 "${agent_url%/}/health" 2>/dev/null || true)"
+  if [ "$code" = "200" ]; then echo "api_health=HTTP_200"; else echo "api_health=UNREACHABLE_OR_HTTP_${code:-NO_RESPONSE}"; fi
+}
+
+diagnose() {
+  show_status || return $?
+  echo "BRAIN_DIAGNOSTICS"
+  command -v git >/dev/null 2>&1 && echo "git=available" || echo "git=missing"
+  command -v python3 >/dev/null 2>&1 && echo "python3=available" || { command -v python >/dev/null 2>&1 && echo "python=available" || echo "python=missing"; }
+  [ -f "$HOME/.brain_env" ] && echo "brain_env=present_not_read" || echo "brain_env=absent"
+  [ -f "$STATE/api.log" ] && echo "api_log=present" || echo "api_log=absent"
+  [ -f "$STATE/runtime-bootstrap.log" ] && echo "bootstrap_log=present" || echo "bootstrap_log=absent"
+  [ -f "$STATE/one_boot.log" ] && echo "one_boot_log=present" || echo "one_boot_log=absent"
+  echo "secrets_printed=false"
+}
+
+show_logs() {
+  local found=0 file
+  for file in "$STATE/runtime-bootstrap.log" "$STATE/api.log" "$STATE/one_boot.log" "$STATE/supervisor.log"; do
+    if [ -f "$file" ]; then
+      found=1
+      echo "=== ${file##*/} (last 40 lines) ==="
+      tail -n 40 "$file"
+    fi
+  done
+  [ "$found" -eq 1 ] || echo "BRAIN_LOGS no_runtime_logs_yet"
+}
+
+case "${1:-help}" in
+  install) install_cli ;;
+  start)
+    require_repo || exit $?
+    if [ "$ROOT" != "$HOME/MySimpleProject" ]; then
+      echo "BRAIN_ERROR=NONCANONICAL_REPOSITORY_PATH expected=$HOME/MySimpleProject actual=$ROOT"
+      exit 2
+    fi
+    bash "$BOOTSTRAP"
+    ;;
+  status) show_status ;;
+  diagnose) diagnose ;;
+  logs) show_logs ;;
+  help|-h|--help) usage ;;
+  *) echo "BRAIN_ERROR=UNKNOWN_COMMAND command=$1"; usage; exit 2 ;;
+esac
