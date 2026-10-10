@@ -46,6 +46,14 @@ class GoldenMissionControllerTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_rejects_duplicate_acceptance_criteria(self):
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_MUST_BE_UNIQUE"):
+            self.controller.create(
+                title="Duplicate criteria",
+                objective="Reject duplicate acceptance criteria before execution",
+                acceptance=["criterion A", "criterion A"],
+            )
+
     def test_persists_mission_across_controller_instances(self):
         restored = GoldenMissionController(str(Path(self.tmp.name) / "missions.sqlite3"))
         self.assertEqual(restored.get(self.mission["mission_id"])["status"], "PLANNED")
