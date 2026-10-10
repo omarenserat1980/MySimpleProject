@@ -36,21 +36,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install PowerShell on Ubuntu runner
+      - name: Install PowerShell without modifying apt repositories
         shell: bash
         run: |
           set -euo pipefail
           . /etc/os-release
-          if [ "${ID}" != "ubuntu" ]; then
-            echo "This runner job requires Ubuntu for PowerShell installation; detected ${ID}."
+          if [ "${ID}" != "ubuntu" ] || [ "$(dpkg --print-architecture)" != "amd64" ]; then
+            echo "This job requires Ubuntu x86_64; detected ${ID}/$(dpkg --print-architecture)." >&2
             exit 1
           fi
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https
-          wget -q "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb" -O /tmp/packages-microsoft-prod.deb
-          sudo dpkg -i /tmp/packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
+          command -v python3 >/dev/null
+          command -v tar >/dev/null
+          install_dir="$RUNNER_TEMP/pwsh"
+          mkdir -p "$install_dir"
+          asset_url="$(python3 - <<'PY'
+          import json, urllib.request
+          req = urllib.request.Request(
+              "https://api.github.com/repos/PowerShell/PowerShell/releases/latest",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "ElectronicBrain-CI"}
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              release = json.load(response)
+          assets = [a["browser_download_url"] for a in release.get("assets", [])
+                    if a.get("name", "").endswith("-linux-x64.tar.gz")
+                    and a.get("name", "").startswith("powershell-")]
+          if not assets:
+              raise SystemExit("No official Linux x64 PowerShell release archive found.")
+          print(assets[0])
+          PY
+          )"
+          echo "Downloading official PowerShell Linux x64 archive."
+          curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 --max-time 180 "$asset_url" -o "$install_dir/powershell.tar.gz"
+          tar -xzf "$install_dir/powershell.tar.gz" -C "$install_dir"
+          chmod +x "$install_dir/pwsh"
+          "$install_dir/pwsh" -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          echo "$install_dir" >> "$GITHUB_PATH"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
