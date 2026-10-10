@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "brain_v12/web/brain-chat/**"
+      - "brain_v12/brain/brain_gpt_20_layer_pipeline.py"
+      - "brain_v12/tests/test_brain_gpt_20_layer_pipeline.py"
+      - "docs/BRAIN_GPT_20_LAYER_ARCHITECTURE.md"
       - "brain_v12/tests/test_brain_ai_frontend.py"
       - "brain_v12/tests/test_chat_session_api.py"
       - "brain_v12/tests/test_chat_session_api.py"
@@ -26,7 +29,9 @@ on:
       - ".github/workflows/brain-ai-frontend.yml"
   pull_request:
     paths:
-      - "brain_v12/web/brain-chat/**"
+      - "brain_v12/brain/brain_gpt_20_layer_pipeline.py"
+      - "brain_v12/tests/test_brain_gpt_20_layer_pipeline.py"
+      - "docs/BRAIN_GPT_20_LAYER_ARCHITECTURE.md"
       - "brain_v12/tests/test_brain_ai_frontend.py"
       - "brain_v12/tests/test_chat_session_api.py"
       - "brain_v12/tests/test_brain_ai_api.py"
@@ -66,6 +71,8 @@ jobs:
         run: python -m unittest brain_v12.tests.test_brain_ai_frontend -v
       - name: Validate Brain AI session API and sync contract
         run: python -m unittest brain_v12.tests.test_chat_session_api -v
+      - name: Validate Brain GPT 20-layer orchestration contract
+        run: python -m unittest brain_v12.tests.test_brain_gpt_20_layer_pipeline -v
       - name: Run Brain product end-to-end verification gate
         run: python -m unittest brain_v12.tests.test_brain_ai_product_smoke -v
       - name: Python compile sanity
