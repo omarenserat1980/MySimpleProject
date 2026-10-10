@@ -32,7 +32,6 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     _touch(tmp_path, ".github/workflows/brain-deploy.yml", "name: Brain Deploy\non:\n  workflow_dispatch:\n")
     for path in (
         "README.md", "PROJECT_MASTER_SPEC.md", "PROJECT_ROADMAP.md", "DECISIONS.md", "CHANGELOG.md",
-        "LEGACY_REQUIREMENTS.md", "TODO_FROM_LEGACY.md",
         "brain_v12/app.py", "brain_v12/brain/device_bridge.py",
         ".github/workflows/brain-github-cloud.yml", ".github/workflows/brain-github-supervisor.yml",
         "brain_v12/movie_summary_factory", ".github/workflows/brain-release-gate.yml",
@@ -43,6 +42,8 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
         "brain_v12/virtual_hardware", ".github/workflows/brain-windows-real-boot.yml",
     ):
         _touch(tmp_path, path)
+    _touch(tmp_path, "LEGACY_REQUIREMENTS.md", "RESTORATION_STATUS: COMPLETE\n")
+    _touch(tmp_path, "TODO_FROM_LEGACY.md", "RESTORATION_STATUS: COMPLETE\n")
     evidence_path = tmp_path / ".brain/state/production_runtime_evidence.json"
     evidence_path.parent.mkdir(parents=True)
     evidence_path.write_text(json.dumps({"status": "VERIFIED", "checks": [{"name": "api", "passed": True}]}), encoding="utf-8")
@@ -53,6 +54,17 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     deploy_workflow = next(item for item in report["workflows"] if item["path"].endswith("brain-deploy.yml"))
     assert deploy_workflow["launch_policy"] == "REVIEW_BEFORE_MANUAL_LAUNCH"
 
+
+def test_legacy_recovery_placeholders_do_not_satisfy_launch_gate(tmp_path):
+    _touch(tmp_path, ".github/workflows/check.yml", "name: Check\non:\n  pull_request:\n")
+    for path in ("README.md", "PROJECT_MASTER_SPEC.md", "PROJECT_ROADMAP.md", "DECISIONS.md", "CHANGELOG.md"):
+        _touch(tmp_path, path)
+    _touch(tmp_path, "LEGACY_REQUIREMENTS.md", "RESTORATION_STATUS: INCOMPLETE\n")
+    _touch(tmp_path, "TODO_FROM_LEGACY.md", "RESTORATION_STATUS: INCOMPLETE\n")
+    report = audit_repository(tmp_path)
+    assert report["legacy_documentation"]["LEGACY_REQUIREMENTS.md"] is False
+    assert report["legacy_documentation"]["TODO_FROM_LEGACY.md"] is False
+    assert "LEGACY_REQUIREMENTS_NOT_RESTORED" in {item["code"] for item in report["launch_blockers"]}
 
 def test_invalid_runtime_evidence_never_unlocks_launch(tmp_path):
     _touch(tmp_path, ".github/workflows/check.yml", "name: Check\non:\n  pull_request:\n")
