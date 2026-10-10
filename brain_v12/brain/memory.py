@@ -43,6 +43,9 @@ class MemoryStore:
               reason TEXT NOT NULL,
               status TEXT NOT NULL DEFAULT 'OPEN',
               created_at TEXT NOT NULL,
+              resolution_evidence TEXT NOT NULL DEFAULT '',
+              resolved_by TEXT NOT NULL DEFAULT '',
+              resolved_at TEXT,
               UNIQUE(memory_key,conflicting_key)
             );
             CREATE TABLE IF NOT EXISTS goals(
@@ -354,6 +357,66 @@ class MemoryStore:
         return {
             "memory_key": first, "conflicting_key": second, "reason": reason,
             "status": "OPEN", "created_at": created_at
+        }
+
+    def resolve_memory_conflict(self, key, conflicting_key, accepted_key, evidence, verifier):
+        """Resolve a recorded conflict by activating one evidence-backed fact and superseding the other."""
+        key = str(key or "").strip()
+        conflicting_key = str(conflicting_key or "").strip()
+        accepted_key = str(accepted_key or "").strip()
+        evidence = str(evidence or "").strip()[:2000]
+        verifier = str(verifier or "").strip()[:500]
+        if not key or not conflicting_key or key == conflicting_key:
+            raise ValueError("two distinct memory keys are required")
+        if accepted_key not in {key, conflicting_key}:
+            raise ValueError("accepted_key must identify one side of the conflict")
+        if not evidence or not verifier:
+            raise ValueError("resolution evidence and verifier identity are required")
+        first, second = sorted((key, conflicting_key))
+        resolved_at = now()
+        rejected_key = conflicting_key if accepted_key == key else key
+        with self.connect() as con:
+            conflict = con.execute(
+                "SELECT status FROM memory_conflicts WHERE memory_key=? AND conflicting_key=?",
+                (first, second)
+            ).fetchone()
+            if not conflict:
+                raise KeyError(f"{first} <> {second}")
+            if conflict["status"] != "OPEN":
+                raise ValueError("only an OPEN memory conflict can be resolved")
+            for memory_key, status in ((accepted_key, "ACTIVE"), (rejected_key, "SUPERSEDED")):
+                current = con.execute(
+                    "SELECT source,confidence,expires_at,tags FROM memory_metadata WHERE memory_key=?",
+                    (memory_key,)
+                ).fetchone()
+                if current:
+                    source = f"conflict_resolution:{verifier}"
+                    con.execute("""
+                        UPDATE memory_metadata SET source=?,status=?,updated_at=?
+                        WHERE memory_key=?
+                    """, (source, status, resolved_at, memory_key))
+                else:
+                    con.execute("""
+                        INSERT INTO memory_metadata(
+                            memory_key,source,confidence,expires_at,status,tags,updated_at
+                        ) VALUES(?,?,0.5,NULL,?,'[]',?)
+                    """, (memory_key, f"conflict_resolution:{verifier}", status, resolved_at))
+            con.execute("""
+                UPDATE memory_conflicts
+                SET status='RESOLVED',resolution_evidence=?,resolved_by=?,resolved_at=?
+                WHERE memory_key=? AND conflicting_key=?
+            """, (evidence, verifier, resolved_at, first, second))
+            con.commit()
+        self.event("MEMORY_CONFLICT_RESOLVED", {
+            "memory_key": first, "conflicting_key": second,
+            "accepted_key": accepted_key, "rejected_key": rejected_key,
+            "verifier": verifier, "evidence": evidence
+        })
+        return {
+            "memory_key": first, "conflicting_key": second,
+            "accepted_key": accepted_key, "rejected_key": rejected_key,
+            "status": "RESOLVED", "evidence": evidence, "verifier": verifier,
+            "resolved_at": resolved_at
         }
 
     def memory_conflicts(self, limit=100):
