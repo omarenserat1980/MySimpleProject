@@ -3,6 +3,7 @@ from .event_bus import EventBus
 from .permissions import PermissionGate
 from .task_engine import TaskEngine
 from .world_model import WorldModel
+from .quranic_reasoning_paths import select_reasoning_path
 from uuid import uuid4
 
 class CognitiveLoop:
@@ -112,13 +113,29 @@ class CognitiveLoop:
         recall = getattr(self.store, "recall_memories", None)
         memories = recall(goal, limit=12) if callable(recall) else self.store.memories()[:12]
         self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
+        reasoning_path = select_reasoning_path(goal, memories)
+        if reasoning_path:
+            self.events.publish("REASONING_PATH_SELECTED",{
+                "key":reasoning_path["key"],
+                "title":reasoning_path["title"],
+                "stages":reasoning_path["stages"],
+                "source_references":reasoning_path["source_references"],
+                "status":reasoning_path["status"],
+                "run_id":run_id,
+            })
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
         options=self.decisions.generate(goal, memories=memories)
         self.events.publish("ANALYZE",{"options_count":len(options),"run_id":run_id})
 
         self._state("PLAN",goal=goal,run_id=run_id)
-        self.events.publish("PLAN_CREATED",{"steps":["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"],"run_id":run_id})
+        plan_steps = reasoning_path["stages"] if reasoning_path else ["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"]
+        self.events.publish("PLAN_CREATED",{
+            "steps":plan_steps,
+            "reasoning_path_key":reasoning_path["key"] if reasoning_path else None,
+            "reasoning_path_title":reasoning_path["title"] if reasoning_path else None,
+            "run_id":run_id,
+        })
 
         self._state("DECIDE",goal=goal,run_id=run_id)
         decision=self.decisions.choose(goal,options,self.permissions.grants,memories=memories)
@@ -179,6 +196,8 @@ class CognitiveLoop:
             "stages":self.STAGES,
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
+            "reasoning_path":reasoning_path,
+            "plan_steps":plan_steps,
             "options":options,
             "decision":decision,
             "execution":execution,
