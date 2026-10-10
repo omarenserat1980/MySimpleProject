@@ -15,8 +15,9 @@ The first increment is intentionally an **inventory and evidence registry**, not
 - Registration defaults to `planned`; only `planned`, `observed`, and `unknown` may be
   set by registration. Observed/installed/running claims require a separate evidence-bearing observation.
 - A runtime observation is accepted only for an existing record and requires a non-empty
-  evidence reference. A successful observation is a record of supplied evidence, not proof
-  that the API independently ran a check.
+  evidence reference. The API cannot self-assert `verified`: a supplied URL/reference is
+  not independent proof. Records remain unverified until a trusted verifier validates the
+  evidence and updates the registry through a separately controlled path.
 - No shell execution, package installation, downloads, updates, service control, Azure
   resource creation, or deletion is performed.
 
