@@ -287,4 +287,3 @@ class SyntheticCustomer:
         safe = environment.upper() in {"TEST", "SANDBOX"} and (payment_mode or "NONE").upper() != "PRODUCTION"
         return {"allowed": safe, "environment": environment, "payment_mode": payment_mode or "NONE",
                 "reason": "OK" if safe else "PAYMENT_SAFETY_GATE_BLOCKED"}
-"
