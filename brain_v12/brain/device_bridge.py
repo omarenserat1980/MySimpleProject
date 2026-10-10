@@ -34,7 +34,7 @@ class DeviceBridge:
         try:
             with open(key_file, encoding="utf-8") as f:
                 return bool(f.read().strip())
-        except OSError:
+        except (OSError, UnicodeError):
             return False
 
     def enabled(self):
@@ -60,7 +60,7 @@ class DeviceBridge:
             if key_file and os.path.isfile(key_file):
                 try:
                     with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
-                except OSError: expected=""
+                except (OSError, UnicodeError): expected=""
         if expected and hmac.compare_digest(supplied,expected):return True
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
