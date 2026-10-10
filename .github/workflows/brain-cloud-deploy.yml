@@ -62,10 +62,9 @@ jobs:
           HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
           USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
           REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
-          SSH_PRIVATE_KEY_FILE: ~/.ssh/brain_cloud_key
         run: |
           set -euo pipefail
-          ssh -i "$SSH_PRIVATE_KEY_FILE" \
+          ssh -i "$HOME/.ssh/brain_cloud_key" \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
