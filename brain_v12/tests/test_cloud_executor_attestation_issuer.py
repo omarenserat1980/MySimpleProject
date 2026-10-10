@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from brain_v12.brain.cloud_executor_attestation import verify_attestation
-from brain_v12.brain.cloud_executor_attestation_issuer import create_challenge, issue_attestation
+from brain_v12.brain.cloud_executor_attestation_issuer import create_challenge, issue_attestation, consume_issued_attestation
 
 
 class CloudExecutorAttestationIssuerTests(unittest.TestCase):
@@ -57,6 +57,33 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "CHALLENGE_EXPIRED"):
             issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
                 challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now + 61)
+
+    def test_central_registry_consumes_attestation_once(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+            challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
+        result = consume_issued_attestation(authenticated_executor_id="cloud-test-01",
+            nonce=att["nonce"], registry_db_path=self.db, now=self.now + 1)
+        self.assertTrue(result["consumed"])
+        with self.assertRaisesRegex(ValueError, "REPLAY_DETECTED"):
+            consume_issued_attestation(authenticated_executor_id="cloud-test-01",
+                nonce=att["nonce"], registry_db_path=self.db, now=self.now + 2)
+
+    def test_central_registry_rejects_other_executor(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+            challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
+        with self.assertRaisesRegex(ValueError, "EXECUTOR_MISMATCH"):
+            consume_issued_attestation(authenticated_executor_id="attacker",
+                nonce=att["nonce"], registry_db_path=self.db, now=self.now + 1)
+
+    def test_central_registry_rejects_expired_attestation(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+            challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now, lifetime_seconds=10)
+        with self.assertRaisesRegex(ValueError, "EXPIRED"):
+            consume_issued_attestation(authenticated_executor_id="cloud-test-01",
+                nonce=att["nonce"], registry_db_path=self.db, now=self.now + 11)
 
 
 if __name__ == "__main__":
