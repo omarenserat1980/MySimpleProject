@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "executor": {
+    "id": "example-executor",
+    "class": "cpu|gpu|storage|recovery|control",
+    "status": "online|offline|quarantined"
+  },
+  "capabilities": {
+    "cpu": {"architecture": "x86_64", "logical_cores": 0},
+    "memory": {"bytes": 0},
+    "gpu": {"count": 0, "models": [], "vram_bytes": 0},
+    "storage": {"fast_bytes": 0, "object_bytes": 0},
+    "network": {"bandwidth_bps": 0, "rdma": false},
+    "virtualization": {"kvm": false, "qemu": false},
+    "security": {"tpm": false, "secure_boot": false},
+    "availability": {"zones": 1},
+    "recovery": {"snapshots": false, "cross_region": false}
+  },
+  "health": {
+    "heartbeat": null,
+    "load": null,
+    "thermal": null,
+    "power": null
+  },
+  "policy": {
+    "max_concurrency": 1,
+    "single_flight": true,
+    "repair_budget": 3
+  }
+}
