@@ -79,13 +79,42 @@ class GoldenMissionControllerTests(unittest.TestCase):
     def test_closes_only_with_verified_objective_evidence(self):
         self.controller.start(self.mission["mission_id"])
         proof = self.evidence.append(self.mission["mission_id"], "objective-verification", {
-            "objective_verified":True,"acceptance_passed":True,
+            "objective_verified":True,"acceptance_passed":True,"attempt_number":1,
             "criteria_results":[{"criterion":"objective passes","passed":True},{"criterion":"evidence hash is verified","passed":True}],
         },"brain-golden-mission-verifier")
         m = self.controller.close(self.mission["mission_id"], proof["evidence_id"], proof["sha256"], "all acceptance criteria passed")
         self.assertEqual(m["status"], "CLOSED")
         self.assertEqual(m["result"]["evidence_sha256"], proof["sha256"])
         self.assertTrue(any(e["event"] == "GOLDEN_LOOP_CLOSED" for e in m["evidence"]))
+
+    def test_rejects_evidence_from_previous_attempt(self):
+        mission_id = self.mission["mission_id"]
+        self.controller.start(mission_id)
+        stale = self.evidence.append(mission_id, "objective-verification", {
+            "objective_verified": True, "acceptance_passed": True, "attempt_number": 1,
+            "criteria_results": [
+                {"criterion": "objective passes", "passed": True},
+                {"criterion": "evidence hash is verified", "passed": True},
+            ],
+        }, "test-verifier")
+        self.controller.record_retry(mission_id, "first attempt failed")
+        with self.assertRaisesRegex(ValueError, "OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED"):
+            self.controller.close(mission_id, stale["evidence_id"], stale["sha256"])
+        self.assertEqual(self.controller.get(mission_id)["status"], "RUNNING")
+
+    def test_rejects_evidence_that_does_not_cover_exact_acceptance_criteria(self):
+        mission_id = self.mission["mission_id"]
+        self.controller.start(mission_id)
+        incomplete = self.evidence.append(mission_id, "objective-verification", {
+            "objective_verified": True, "acceptance_passed": True, "attempt_number": 1,
+            "criteria_results": [
+                {"criterion": "some unrelated criterion", "passed": True},
+                {"criterion": "objective passes", "passed": True},
+            ],
+        }, "test-verifier")
+        with self.assertRaisesRegex(ValueError, "OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED"):
+            self.controller.close(mission_id, incomplete["evidence_id"], incomplete["sha256"])
+        self.assertEqual(self.controller.get(mission_id)["status"], "RUNNING")
 
     def test_closes_with_real_evidence_store_hash_verification(self):
         from brain_v12.brain.evidence_store import EvidenceStore
@@ -106,6 +135,7 @@ class GoldenMissionControllerTests(unittest.TestCase):
             payload = {
                 "objective_verified": True,
                 "acceptance_passed": True,
+                "attempt_number": 1,
                 "criteria_results": [{"criterion": "objective verified", "passed": True}],
             }
             evidence = store.append(mission["mission_id"], "objective-verification", payload, "test-verifier")
