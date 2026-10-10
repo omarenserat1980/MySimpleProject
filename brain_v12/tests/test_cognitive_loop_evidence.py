@@ -35,8 +35,11 @@ class CognitiveLoopEvidenceTests(unittest.TestCase):
         self.assertEqual(result["execution"]["status"], "COMPLETED")
         self.assertTrue(result["execution"]["evidence_ref"].startswith("cognitive://"))
         self.assertTrue(result["verification"]["result_verified"])
+        self.assertTrue(result["verification"]["action_verified"])
+        self.assertFalse(result["verification"]["goal_verified"])
         self.assertEqual(result["learning"]["status"], "RECORDED")
-        self.assertTrue(result["learning"]["lesson"]["verified"])
+        self.assertFalse(result["learning"]["lesson"]["verified"])
+        self.assertEqual(result["learning"]["lesson"]["outcome"], "ACTION_VERIFIED_NOT_GOAL")
         task = next(
             task for task in result["tasks"]["tasks"]
             if task["id"] == result["execution"]["task_id"]
