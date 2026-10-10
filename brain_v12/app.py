@@ -1960,6 +1960,25 @@ def system_diagnostics():
 
 golden_mission_reminder_worker = None
 
+@app.get("/api/golden-missions/worker-status")
+def golden_mission_worker_status(request: Request):
+    require_control_key(request)
+    enabled = os.getenv("BRAIN_GOLDEN_MISSION_SCHEDULER_ENABLED", "false").lower() == "true"
+    worker = golden_mission_reminder_worker
+    return {
+        "ok": True,
+        "enabled": enabled,
+        "worker": worker.status() if worker is not None else {
+            "running": False,
+            "interval_seconds": max(30, int(os.getenv("BRAIN_GOLDEN_MISSION_POLL_SECONDS", "300"))),
+            "started_at": None,
+            "last_tick_at": None,
+            "last_result": None,
+            "last_error": None,
+            "mode": "REMINDERS_ONLY",
+        },
+    }
+
 @app.on_event("startup")
 def start_background_services():
     global golden_mission_reminder_worker
