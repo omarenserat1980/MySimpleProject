@@ -31,9 +31,12 @@ if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
 # copied Redmi config silently register another handset as redmi3-01.
 DEVICE_MODEL="$(getprop ro.product.model 2>/dev/null || true)"
 DETECTED_AGENT_ID=""
+# Only exact known hardware model identifiers are auto-mapped. Brand-name
+# matching is deliberately avoided because multiple phones can share a brand.
+# Unknown models must use an explicitly configured, unique V12_AGENT_ID.
 case "$DEVICE_MODEL" in
-  *23129RN51X*|*Redmi*|*redmi*) DETECTED_AGENT_ID="redmi3-01" ;;
-  *RMX3710*|*realme*|*Realme*) DETECTED_AGENT_ID="realme-01" ;;
+  23129RN51X) DETECTED_AGENT_ID="redmi3-01" ;;
+  RMX3710) DETECTED_AGENT_ID="realme-01" ;;
 esac
 if [ -n "$DETECTED_AGENT_ID" ]; then
   if [ -n "${V12_AGENT_ID:-}" ] && [ "$V12_AGENT_ID" != "$DETECTED_AGENT_ID" ]; then
