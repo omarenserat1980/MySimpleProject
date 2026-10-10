@@ -1,5 +1,7 @@
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
+import os
+from pathlib import Path
 from dataclasses import dataclass,field
 from threading import RLock
 from time import time
@@ -31,6 +33,11 @@ class VirtualTask:
 class VirtualTaskQueue:
     """Durable queue with startup recovery and explicit verification boundary."""
     def __init__(self,chassis,resource_manager,max_workers=8,store_path=None,workload_controller=None,workload_router=None):
+        if store_path is None:
+            store_path = os.getenv("BRAIN_VIRTUAL_TASK_DB")
+        if store_path is None:
+            runtime_home = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
+            store_path = runtime_home / "brain6_artifacts" / "virtual_tasks" / "tasks.db"
         self.chassis=chassis; self.resources=resource_manager; self.tasks={}; self.lock=RLock()
         self.workload_controller=workload_controller or WorkloadController()
         self.workload_router=workload_router or WorkloadRouter(self.workload_controller)
