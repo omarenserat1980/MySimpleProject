@@ -91,7 +91,7 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
             safety = payload.get("safety", {})
             valid = (
                 payload.get("status") == "VERIFIED"
-                and payload.get("source") == "live_read_only_runtime_probe"
+                and payload.get("source") == "assembled_live_runtime_and_drills"
                 and bool(payload.get("target_host"))
                 and fresh
                 and isinstance(safety, dict)
