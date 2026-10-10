@@ -47,8 +47,9 @@ def prepare_execution_review(
 ) -> FoundationPreparation:
     """Validate contracts and prepare a review-only receipt, failing closed."""
     instant = now or datetime.now(timezone.utc)
-    if instant.tzinfo is None:
+    if instant.tzinfo is None or instant.utcoffset() is None:
         return _blocked(envelope.task_id, ("CURRENT_TIME_MUST_BE_TIMEZONE_AWARE",), instant)
+    instant = instant.astimezone(timezone.utc)
 
     reasons = list(envelope.validate())
     gate = evaluate_free_capacity(capacity_request, capacity_evidence, now=instant)
@@ -61,9 +62,7 @@ def prepare_execution_review(
     healthy_resources: list[ResourceRecord] = []
     for resource in resources:
         observation = health_observations.get(resource.resource_id)
-        if observation is None:
-            continue
-        if observation.resource_id != resource.resource_id:
+        if observation is None or observation.resource_id != resource.resource_id:
             continue
         if observation.classify() != HealthState.HEALTHY:
             continue
@@ -81,11 +80,7 @@ def prepare_execution_review(
         healthy_resources,
     )
     if decision.status != ScheduleStatus.SELECTED or not decision.resource_id:
-        return _blocked(
-            envelope.task_id,
-            (f"SCHEDULER:{decision.reason}",),
-            instant,
-        )
+        return _blocked(envelope.task_id, (f"SCHEDULER:{decision.reason}",), instant)
 
     try:
         lease = issue_lease(
@@ -98,7 +93,7 @@ def prepare_execution_review(
     except (TypeError, ValueError):
         return _blocked(envelope.task_id, ("EXECUTION_LEASE_INVALID",), instant)
 
-    if lease.validate(instant.timestamp()) .value != "VALID":
+    if lease.validate(instant.timestamp()).value != "VALID":
         return _blocked(envelope.task_id, ("EXECUTION_LEASE_NOT_VALID",), instant)
 
     executor_impl = executor or BrainCloudExecutor(executor_id=executor_id)
@@ -134,7 +129,8 @@ def prepare_execution_review(
             "executor_reason": receipt.reason,
             "execution_performed": False,
             "capacity_gate_eligible": gate["eligible"],
-            "provider_evidence_is_external": True,
+            "capacity_evidence_source_ref": gate.get("evidence_source_ref"),
+            "capacity_evidence_provider": gate.get("provider"),
         },
     )
     return FoundationPreparation(
@@ -149,7 +145,7 @@ def prepare_execution_review(
 
 
 def _blocked(task_id: str, reasons: tuple[str, ...], now: datetime) -> FoundationPreparation:
-    safe_now = now if now.tzinfo is not None else now.replace(tzinfo=timezone.utc)
+    safe_now = now if now.tzinfo is not None and now.utcoffset() is not None else now.replace(tzinfo=timezone.utc)
     bundle = build_evidence_bundle(
         task_id or "invalid-task",
         "BLOCKED",
