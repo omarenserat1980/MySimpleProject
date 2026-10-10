@@ -75,6 +75,8 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
         self.assertEqual(result["selected"]["id"], "observe")
         self.assertEqual(result["approval_required_options"][0]["id"], "device")
         self.assertEqual(result["approval_required_options"][0]["missing_permissions"], ["device_agent"])
+        self.assertEqual(result["selected"]["decision_score_breakdown"]["base_confidence"], 0.7)
+        self.assertEqual(result["selected"]["decision_score"], 0.7)
 
     def test_high_risk_option_requires_explicit_approval_even_if_permission_is_granted(self):
         from brain_v12.brain.decision_engine import DecisionEngine
