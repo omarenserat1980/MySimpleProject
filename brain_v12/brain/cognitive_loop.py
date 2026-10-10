@@ -3,6 +3,7 @@ from .event_bus import EventBus
 from .permissions import PermissionGate
 from .task_engine import TaskEngine
 from .world_model import WorldModel
+from .quranic_reasoning_paths import select_reasoning_path
 from uuid import uuid4
 import hashlib
 import json
@@ -110,24 +111,44 @@ class CognitiveLoop:
         self.events.publish("UNDERSTAND",{"goal":goal,"summary":"تحديد المطلوب والنتيجة المتوقعة","run_id":run_id})
 
         self._state("MEMORY",goal=goal,run_id=run_id)
-        memories=self.store.memories()[-12:]
-        # Keep prior verified run records available to the current cycle.
-        prior_lessons=[m for m in memories if str(m.get("key","")).startswith("cognitive.run.")]
+        all_memories=self.store.memories()
+        recall_fn=getattr(self.store,"recall_memories",None)
+        memories=recall_fn(goal,limit=12) if callable(recall_fn) else all_memories[-12:]
+        # Count durable run lessons across the full store, not only the recalled slice.
+        prior_lessons=[m for m in all_memories if str(m.get("key","")).startswith("cognitive.run.")]
+        reasoning_path=select_reasoning_path(goal,memories)
+        decision_memories=list(memories)
+        if reasoning_path:
+            decision_memories.append({
+                "key":reasoning_path["key"],
+                "value":" ".join([reasoning_path["title"],reasoning_path["engineering_application"]," ".join(reasoning_path["stages"])])
+            })
+            self.events.publish("REASONING_PATH_SELECTED",{
+                "key":reasoning_path["key"],
+                "title":reasoning_path["title"],
+                "stages":reasoning_path["stages"],
+                "source_references":reasoning_path["source_references"],
+                "interpretation_type":reasoning_path.get("interpretation_type","bounded_engineering_inference"),
+                "run_id":run_id
+            })
         self.events.publish("MEMORY_RECALL",{
             "count":len(memories),
             "prior_lesson_count":len(prior_lessons),
+            "memory_keys":[str(m.get("key","")) for m in memories[:12]],
+            "reasoning_path_key":reasoning_path.get("key") if reasoning_path else None,
             "run_id":run_id
         })
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
-        options=self.decisions.generate(goal)
-        self.events.publish("ANALYZE",{"options_count":len(options),"run_id":run_id})
+        options=self.decisions.generate(goal,memories=decision_memories)
+        self.events.publish("ANALYZE",{"options_count":len(options),"memory_context_count":len(decision_memories),"run_id":run_id})
 
         self._state("PLAN",goal=goal,run_id=run_id)
-        self.events.publish("PLAN_CREATED",{"steps":["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"],"run_id":run_id})
+        plan_steps=reasoning_path["stages"] if reasoning_path else ["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"]
+        self.events.publish("PLAN_CREATED",{"steps":plan_steps,"reasoning_path_key":reasoning_path.get("key") if reasoning_path else None,"run_id":run_id})
 
         self._state("DECIDE",goal=goal,run_id=run_id)
-        decision=self.decisions.choose(goal,options,self.permissions.grants)
+        decision=self.decisions.choose(goal,options,self.permissions.grants,memories=decision_memories)
         decision["run_id"]=run_id
         self.events.publish("DECISION_MADE",decision)
 
@@ -210,6 +231,8 @@ class CognitiveLoop:
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
             "prior_lesson_count":len(prior_lessons),
+            "reasoning_path":({"key":reasoning_path["key"],"title":reasoning_path["title"],"source_references":reasoning_path["source_references"],"interpretation_type":reasoning_path.get("interpretation_type","bounded_engineering_inference")} if reasoning_path else None),
+            "plan_steps":plan_steps,
             "options":options,
             "decision":decision,
             "execution":execution,
