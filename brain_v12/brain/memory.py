@@ -157,7 +157,7 @@ class MemoryStore:
         rows = list(candidates) if candidates is not None else self.memories()
         query_terms = self._memory_terms(query)
         if not query_terms:
-            return rows[:limit]
+            return rows[:limit] if fallback_recent else []
 
         prepared = []
         document_frequency = {term: 0 for term in query_terms}
