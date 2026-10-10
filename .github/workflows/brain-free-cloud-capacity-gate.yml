@@ -1,0 +1,159 @@
+name: Brain Free Cloud Capacity Gate
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/cloud_capacity_gate.py"
+      - "brain_v12/brain/cloud_provider_adapter.py"
+      - "brain_v12/brain/resource_fabric.py"
+      - "brain_v12/brain/task_scheduler.py"
+      - "brain_v12/brain/cloud_executor.py"
+      - "brain_v12/brain/verification_recovery.py"
+      - "brain_v12/brain/task_envelope.py"
+      - "brain_v12/brain/resource_health.py"
+      - "brain_v12/brain/execution_evidence_bundle.py"
+      - "brain_v12/brain/execution_lease.py"
+      - "brain_v12/brain/cloud_foundation_coordinator.py"
+      - "brain_v12/tests/test_cloud_capacity_gate.py"
+      - "brain_v12/tests/test_cloud_provider_adapter.py"
+      - "brain_v12/tests/test_task_scheduler.py"
+      - "brain_v12/tests/test_cloud_executor.py"
+      - "brain_v12/tests/test_verification_recovery.py"
+      - "brain_v12/tests/test_task_envelope.py"
+      - "brain_v12/tests/test_resource_health.py"
+      - "brain_v12/tests/test_execution_evidence_bundle.py"
+      - "brain_v12/tests/test_execution_lease.py"
+      - "brain_v12/tests/test_cloud_foundation_integration.py"
+      - "brain_v12/tests/test_cloud_foundation_coordinator.py"
+      - "tools/windows/asus_brain_runtime.ps1"
+      - "tools/windows/asus_diagnostic_report.ps1"
+      - "tools/windows/ASUS_BRAIN_RUNTIME.md"
+      - ".github/workflows/brain-free-cloud-capacity-gate.yml"
+  push:
+    branches:
+      - main
+      - "feat/brain-free-cloud-capacity-gate"
+    paths:
+      - "brain_v12/brain/cloud_capacity_gate.py"
+      - "brain_v12/brain/cloud_provider_adapter.py"
+      - "brain_v12/brain/resource_fabric.py"
+      - "brain_v12/brain/task_scheduler.py"
+      - "brain_v12/brain/cloud_executor.py"
+      - "brain_v12/brain/verification_recovery.py"
+      - "brain_v12/brain/task_envelope.py"
+      - "brain_v12/brain/resource_health.py"
+      - "brain_v12/brain/execution_evidence_bundle.py"
+      - "brain_v12/brain/execution_lease.py"
+      - "brain_v12/brain/cloud_foundation_coordinator.py"
+      - "brain_v12/tests/test_cloud_capacity_gate.py"
+      - "brain_v12/tests/test_cloud_provider_adapter.py"
+      - "brain_v12/tests/test_task_scheduler.py"
+      - "brain_v12/tests/test_cloud_executor.py"
+      - "brain_v12/tests/test_verification_recovery.py"
+      - "brain_v12/tests/test_task_envelope.py"
+      - "brain_v12/tests/test_resource_health.py"
+      - "brain_v12/tests/test_execution_evidence_bundle.py"
+      - "brain_v12/tests/test_execution_lease.py"
+      - "brain_v12/tests/test_cloud_foundation_integration.py"
+      - "brain_v12/tests/test_cloud_foundation_coordinator.py"
+      - "tools/windows/asus_brain_runtime.ps1"
+      - "tools/windows/ASUS_BRAIN_RUNTIME.md"
+      - ".github/workflows/brain-free-cloud-capacity-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-cloud-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Compile cloud foundation modules
+        run: |
+          python -m py_compile brain_v12/brain/cloud_capacity_gate.py
+          python -m py_compile brain_v12/brain/cloud_provider_adapter.py
+          python -m py_compile brain_v12/brain/resource_fabric.py
+          python -m py_compile brain_v12/brain/task_scheduler.py
+          python -m py_compile brain_v12/brain/cloud_executor.py
+          python -m py_compile brain_v12/brain/verification_recovery.py
+          python -m py_compile brain_v12/brain/task_envelope.py
+          python -m py_compile brain_v12/brain/resource_health.py
+          python -m py_compile brain_v12/brain/execution_evidence_bundle.py
+          python -m py_compile brain_v12/brain/execution_lease.py
+          python -m py_compile brain_v12/brain/cloud_foundation_coordinator.py
+      - name: Run cloud foundation unit and integration tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_cloud_capacity_gate.py \
+            brain_v12/tests/test_cloud_provider_adapter.py \
+            brain_v12/tests/test_task_scheduler.py \
+            brain_v12/tests/test_cloud_executor.py \
+            brain_v12/tests/test_verification_recovery.py \
+            brain_v12/tests/test_task_envelope.py \
+            brain_v12/tests/test_resource_health.py \
+            brain_v12/tests/test_execution_evidence_bundle.py \
+            brain_v12/tests/test_execution_lease.py \
+            brain_v12/tests/test_cloud_foundation_integration.py \
+            brain_v12/tests/test_cloud_foundation_coordinator.py
+
+  validate-asus-powershell-script:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install runtime dependencies
+        shell: pwsh
+        run: python -m pip install -r requirements.txt pytest
+      - name: Run application preflight on Windows runner
+        shell: pwsh
+        env:
+          PYTHONPATH: .
+          BRAIN_DB: ${{ runner.temp }}\brain-v12-preflight.db
+          BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
+          BRAIN_WORKFORCE_ENABLED: "false"
+          BRAIN_V14_VERSION: "14.0"
+        run: python brain_v12/tools/ci_preflight.py
+      - name: Parse ASUS runtime script without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$env:GITHUB_WORKSPACE\tools\windows\asus_brain_runtime.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+          Write-Output "ASUS_SCRIPT_SYNTAX=PASS"
+
+          $diagnosticPath = "$env:GITHUB_WORKSPACE\\tools\\windows\\asus_diagnostic_report.ps1"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $diagnosticPath,
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+          Write-Output "ASUS_DIAGNOSTIC_SYNTAX=PASS"
