@@ -15,6 +15,7 @@ on:
       - ".github/workflows/brain-runtime-paths.yml"
   push:
     branches:
+      - "main"
       - "fix/**"
     paths:
       - "brain_v12/runtime_paths.py"
