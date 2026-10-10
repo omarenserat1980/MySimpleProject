@@ -124,6 +124,60 @@ class MemoryStore:
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
 
+    @staticmethod
+    def _memory_terms(text):
+        """Normalize simple lexical terms for multilingual memory retrieval."""
+        import re
+        import unicodedata
+        text = unicodedata.normalize("NFKC", str(text or "")).lower()
+        text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+        text = text.translate(str.maketrans({
+            "أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي", "ؤ": "و", "ئ": "ي",
+            "ة": "ه",
+        }))
+        return {
+            term for term in re.findall(r"[\\w]+", text, flags=re.UNICODE)
+            if len(term) > 1 and term not in {
+                "من", "في", "على", "الى", "عن", "هذا", "هذه", "ذلك", "تلك",
+                "مع", "كان", "كانت", "هو", "هي", "هم", "ثم", "او", "و", "the",
+                "and", "for", "with", "from", "that", "this", "are", "was",
+            }
+        }
+
+    def recall_memories(self, query="", limit=12):
+        """Return relevant saved memories first, with recent memories as a safe fallback.
+
+        This is lexical retrieval, not semantic understanding. It never grants permissions
+        or changes stored memory; it only ranks the existing key/value records.
+        """
+        limit = max(1, min(int(limit), 100))
+        query = str(query or "").strip()
+        query_terms = self._memory_terms(query)
+        rows = self.memories()
+        if not rows:
+            return []
+        if not query_terms:
+            return rows[:limit]
+
+        ranked = []
+        for index, item in enumerate(rows):
+            key_terms = self._memory_terms(item.get("key", ""))
+            value_terms = self._memory_terms(item.get("value", ""))
+            all_terms = key_terms | value_terms
+            overlap = query_terms & all_terms
+            if not overlap:
+                continue
+            # Key matches are more discriminative than value-only matches.
+            score = (2.0 * len(query_terms & key_terms)) + len(query_terms & value_terms)
+            if query.lower() in (str(item.get("key", "")) + " " + str(item.get("value", ""))).lower():
+                score += 2.0
+            # Stable tie-break: the existing list is newest-first.
+            ranked.append((score, index, item))
+        if not ranked:
+            return rows[:limit]
+        ranked.sort(key=lambda entry: (-entry[0], entry[1]))
+        return [item for _, _, item in ranked[:limit]]
+
     def save_memory(self,key,value):
         with self.connect() as con:
             con.execute("""INSERT INTO memories(key,value,updated_at) VALUES(?,?,?)
