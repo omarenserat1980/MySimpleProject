@@ -7,8 +7,8 @@ set -euo pipefail
 
 REPO="${BRAIN_GITHUB_REPOSITORY:-omarenserat1980/MySimpleProject}"
 RUNNER_DIR="${BRAIN_RUNNER_DIR:-$HOME/brain-internal-runner}"
-RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.329.0}"
-LABELS="self-hosted,linux,x64,brain-internal,qemu,windows-real-boot"
+RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
+LABELS="self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor"
 RUNNER_ARCH="linux-x64"
 
 command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
@@ -23,6 +23,12 @@ fi
 for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy; do
   command -v "$tool" >/dev/null || { echo "MISSING_INTERNAL_RUNNER_TOOL=$tool"; exit 4; }
 done
+
+# Real-boot gate requires firmware evidence to exist before registration.
+if [ ! -e /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
+  echo "MISSING_INTERNAL_RUNNER_TOOL=OVMF_CODE_4M.fd"
+  exit 5
+fi
 
 mkdir -p "$RUNNER_DIR"
 cd "$RUNNER_DIR"
@@ -55,7 +61,7 @@ unset TOKEN
 
 cat > .env <<'EOF'
 BRAIN_INTERNAL_RUNNER_FLAG=1
-BRAIN_INTERNAL_RUNNER_LABELS=self-hosted,linux,x64,brain-internal,qemu,windows-real-boot
+BRAIN_INTERNAL_RUNNER_LABELS=self-hosted,linux,x64,brain-internal,qemu,windows-real-boot,brain-cloud-executor
 EOF
 chmod 600 .env
 
