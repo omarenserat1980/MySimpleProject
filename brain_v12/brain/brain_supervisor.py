@@ -111,6 +111,8 @@ class BrainSupervisor:
         return gate.decision(verification.get("verified_world",{}),verification.get("evidence",verification))
 
     def next_action(self,job,verification):
+        if verification.get("ok"):
+            return {"action":"deliver","reason":"verification_ok"}
         completion=self._completion_decision(verification)
         if completion:
             if completion["action"]=="deliver":return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
