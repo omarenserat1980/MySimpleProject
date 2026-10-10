@@ -45,7 +45,7 @@ jobs:
           with open(os.environ["GITHUB_ENV"],"a") as f:
               f.write("CHECKPOINT_SOURCE_COMMIT="+commit+"\n")
           with open(os.environ["GITHUB_OUTPUT"],"a") as f:
-              f.write("source_commit="+commit+"\\n")
+              f.write("source_commit="+commit+"\n")
           PY
           git cat-file -e "$CHECKPOINT_SOURCE_COMMIT^{commit}"
 
