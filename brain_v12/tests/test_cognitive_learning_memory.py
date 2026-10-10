@@ -59,5 +59,35 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
 
 
 
+    def test_blocked_medium_risk_option_is_not_reported_as_decided(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        options = [
+            {"id":"device","action":"query device","risk":"medium","requirements":["device_agent"],
+             "reversible":True,"confidence":0.99},
+            {"id":"observe","action":"read state","risk":"low","requirements":[],
+             "reversible":True,"confidence":0.70},
+        ]
+        result = DecisionEngine().choose("check device", options, permissions=set())
+
+        self.assertEqual(result["status"], "DECIDED")
+        self.assertEqual(result["selected"]["id"], "observe")
+        self.assertEqual(result["approval_required_options"][0]["id"], "device")
+        self.assertEqual(result["approval_required_options"][0]["missing_permissions"], ["device_agent"])
+
+    def test_high_risk_option_requires_explicit_approval_even_if_permission_is_granted(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        options = [
+            {"id":"apply_code","action":"apply code","risk":"high","requirements":["developer_approval"],
+             "reversible":True,"confidence":0.99},
+        ]
+        result = DecisionEngine().choose("apply code", options, permissions={"developer_approval"})
+
+        self.assertEqual(result["status"], "WAITING_APPROVAL")
+        self.assertEqual(result["selected"]["id"], "apply_code")
+        self.assertTrue(result["approval_required"])
+
+
 if __name__ == "__main__":
     unittest.main()
