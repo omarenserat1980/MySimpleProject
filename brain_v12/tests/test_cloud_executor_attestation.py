@@ -23,6 +23,9 @@ class CloudExecutorAttestationTests(unittest.TestCase):
             )
         ).decode()
         self.now = 1_800_000_000
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.replay_db = str(Path(self.tmp.name) / 'used-nonces.sqlite3')
         self.document = {
             "schema": SCHEMA,
             "executor_id": "cloud-test-01",
@@ -35,11 +38,9 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def write_signed(self, document=None):
         doc = dict(self.document if document is None else document)
         doc["signature"] = base64.b64encode(self.private_key.sign(signing_payload(doc))).decode()
-        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False)
-        json.dump(doc, handle)
-        handle.close()
-        self.addCleanup(lambda: Path(handle.name).unlink(missing_ok=True))
-        return handle.name
+        path = Path(self.tmp.name) / f'attestation-{len(list(Path(self.tmp.name).glob("attestation-*.json")))}.json'
+        path.write_text(json.dumps(doc), encoding='utf-8')
+        return str(path)
 
     def verify(self, path, **kwargs):
         return verify_attestation(
@@ -86,6 +87,28 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def test_rejects_missing_trust_key(self):
         with self.assertRaisesRegex(ValueError, "TRUST_KEY_REQUIRED"):
             verify_attestation(self.write_signed(), "", "cloud-test-01", now=self.now)
+
+    def test_rejects_reuse_of_consumed_nonce(self):
+        path = self.write_signed()
+        self.verify(path, replay_db_path=self.replay_db)
+        with self.assertRaisesRegex(ValueError, "REPLAY_DETECTED"):
+            self.verify(path, replay_db_path=self.replay_db)
+
+    def test_replay_ledger_is_shared_across_attestation_files(self):
+        first = self.write_signed()
+        second = self.write_signed()
+        self.verify(first, replay_db_path=self.replay_db)
+        with self.assertRaisesRegex(ValueError, "REPLAY_DETECTED"):
+            self.verify(second, replay_db_path=self.replay_db)
+
+    def test_rejects_replay_store_symlink(self):
+        real_db = str(Path(self.tmp.name) / "real.sqlite3")
+        self.verify(self.write_signed(), replay_db_path=real_db)
+        link = str(Path(self.tmp.name) / "link.sqlite3")
+        Path(link).symlink_to(real_db)
+        fresh = dict(self.document, nonce="nonce-abcdefghijklmnop")
+        with self.assertRaisesRegex(ValueError, "SYMLINK_REJECTED"):
+            self.verify(self.write_signed(fresh), replay_db_path=link)
 
 
 if __name__ == "__main__":
