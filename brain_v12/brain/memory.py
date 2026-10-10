@@ -156,7 +156,6 @@ class MemoryStore:
             key_overlap = len(query_terms & key_terms)
             value_overlap = len(query_terms & value_terms)
             score = (key_overlap * 3) + (value_overlap * 2)
-            normalized_query = " ".join(sorted(query_terms))
             if score:
                 ranked.append((score, position, memory))
         if not ranked:
