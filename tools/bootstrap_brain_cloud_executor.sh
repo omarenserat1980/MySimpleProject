@@ -20,7 +20,8 @@ EXECUTOR_ID="${BRAIN_CLOUD_EXECUTOR_ID:-brain-cloud-$(hostname)-$(cat /etc/machi
 ATTESTATION_FILE="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE:-$HOME/.local/state/brain/cloud-executor-attestation.json}"
 TRUST_KEY_FILE="${BRAIN_EXECUTOR_ATTESTATION_PUBLIC_KEY_FILE:-/etc/brain/trust/cloud-executor-attestation-ed25519.pub.b64}"
 GATE_TMP="$(mktemp /tmp/brain-cloud-executor-gate.XXXXXX.json)"
-trap 'rm -f "$GATE_TMP"' EXIT
+STAGING_DIR="$(mktemp -d /tmp/brain-cloud-runner.XXXXXX)"
+trap 'rm -f "$GATE_TMP"; rm -rf "$STAGING_DIR"' EXIT
 
 [ "${BRAIN_CLOUD_EXECUTOR:-}" = "1" ] || { echo "BRAIN_CLOUD_EXECUTOR=1_REQUIRED"; exit 20; }
 [ -n "$EXECUTOR_ID" ] || { echo "BRAIN_CLOUD_EXECUTOR_ID_REQUIRED"; exit 24; }
@@ -83,13 +84,14 @@ rm -f "$ATTESTATION_FILE"
 unset BRAIN_CLOUD_EXECUTOR_TOKEN BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
 
 sudo install -d -o "$RUNNER_USER" -g "$RUNNER_GROUP" -m 0750 "$RUNNER_DIR"
-cd "$RUNNER_DIR"
 
-if [ ! -x ./run.sh ]; then
+# Download/extract as the operator in a private staging directory, then install files as root.
+# The operator never needs write access to the runner-owned installation directory.
+if [ ! -x "$RUNNER_DIR/run.sh" ]; then
   archive="actions-runner-$RUNNER_VERSION-$RUNNER_ARCH.tar.gz"
-  curl -fsSL -o "$archive" "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/$archive"
-  tar -xzf "$archive"
-  rm -f "$archive"
+  curl -fsSL -o "$STAGING_DIR/$archive" "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/$archive"
+  tar -xzf "$STAGING_DIR/$archive" -C "$STAGING_DIR"
+  sudo cp -a "$STAGING_DIR/." "$RUNNER_DIR/"
 fi
 sudo chown -R "$RUNNER_USER:$RUNNER_GROUP" "$RUNNER_DIR"
 
