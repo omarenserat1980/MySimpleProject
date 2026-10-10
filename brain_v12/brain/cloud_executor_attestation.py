@@ -62,8 +62,9 @@ def verify_attestation(
     expected_executor_id: str,
     *,
     now: float | None = None,
+    replay_db_path: str | None = None,
 ) -> dict[str, Any]:
-    """Validate issuer signature, executor binding, audience, and short validity."""
+    """Validate issuer signature and optionally consume its nonce atomically."""
     if not attestation_file:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_FILE_REQUIRED")
     if not public_key_b64:
