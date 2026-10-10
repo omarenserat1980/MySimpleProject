@@ -1,0 +1,41 @@
+name: Arkan Runner Service Inspection
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-runner-service-inspect.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect Arkan runner service without changes
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect runner service identity and filesystem ownership
+        shell: bash
+        run: |
+          set +e
+          SERVICE=actions.runner.omarenserat1980-MySimpleProject.brain-internal-arkan.service
+          R=/home/brain/linux-runner-new/_work/MySimpleProject/MySimpleProject
+          echo "=== EXECUTION IDENTITY ==="
+          id
+          printf 'HOME=%s\n' "${HOME-<unset>}"
+          echo "=== RUNNER SERVICE PROPERTIES ==="
+          systemctl show "$SERVICE" -p User -p Group -p WorkingDirectory -p ExecStart -p FragmentPath -p Restart -p SupplementaryGroups --no-pager 2>&1
+          echo "=== SERVICE STATE ==="
+          systemctl is-active "$SERVICE" 2>&1
+          echo "=== RUNNER PROCESSES ==="
+          ps -eo user:18,pid,ppid,args | grep -E '[R]unner\.Listener|[R]unner\.Worker|[r]unsvc\.sh'
+          echo "=== WORKSPACE OWNERSHIP ==="
+          namei -l "$R/brain_v12/web/media/engine" 2>&1
+          for p in "$R" "$R/.git" "$R/brain_v12" "$R/brain_v12/web" "$R/brain_v12/brain6_artifacts" /home/brain "$HOME/.brain" "/.brain/diagnostics/permission-13-20261010"; do
+            if [ -e "$p" ]; then stat -c '%U:%G mode=%a type=%F path=%n' "$p"; else echo "MISSING $p"; fi
+          done
+          echo "=== RUNNER INSTALL OWNERSHIP ==="
+          stat -c '%U:%G mode=%a path=%n' /home/brain/linux-runner-new /home/brain/linux-runner-new/run.sh 2>&1
+          echo "=== END INSPECTION (NO CHANGES MADE) ==="
