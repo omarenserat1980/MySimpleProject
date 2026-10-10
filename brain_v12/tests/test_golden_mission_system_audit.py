@@ -60,8 +60,8 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
         "checks": [
             {"name": "runtime_api_readiness", "passed": True, "response_sha256": "a" * 64},
             {"name": "runtime_worker_status", "passed": True, "response_sha256": "b" * 64},
-            {"name": "mission_persistence_restart", "passed": True},
-            {"name": "restore_drill", "passed": True},
+            {"name": "mission_persistence_restart", "passed": True, "evidence_ref": "restart-drill.log", "evidence_sha256": "c" * 64},
+            {"name": "restore_drill", "passed": True, "evidence_ref": "restore-drill.log", "evidence_sha256": "d" * 64},
         ],
     }), encoding="utf-8")
     report = audit_repository(tmp_path)
@@ -113,8 +113,8 @@ def test_stale_or_wrong_source_runtime_evidence_does_not_unlock_launch(tmp_path)
         "checks": [
             {"name": "runtime_api_readiness", "passed": True, "response_sha256": "a" * 64},
             {"name": "runtime_worker_status", "passed": True, "response_sha256": "b" * 64},
-            {"name": "mission_persistence_restart", "passed": True},
-            {"name": "restore_drill", "passed": True},
+            {"name": "mission_persistence_restart", "passed": True, "evidence_ref": "restart-drill.log", "evidence_sha256": "c" * 64},
+            {"name": "restore_drill", "passed": True, "evidence_ref": "restore-drill.log", "evidence_sha256": "d" * 64},
         ],
     }), encoding="utf-8")
     report = audit_repository(tmp_path)
