@@ -35,14 +35,27 @@ class CognitiveLoopEvidenceTests(unittest.TestCase):
         self.assertEqual(result["execution"]["status"], "COMPLETED")
         self.assertTrue(result["execution"]["evidence_ref"].startswith("cognitive://"))
         self.assertTrue(result["verification"]["result_verified"])
+        self.assertTrue(result["verification"]["action_verified"])
+        self.assertFalse(result["verification"]["goal_verified"])
         self.assertEqual(result["learning"]["status"], "RECORDED")
-        self.assertTrue(result["learning"]["lesson"]["verified"])
+        self.assertFalse(result["learning"]["lesson"]["verified"])
+        self.assertEqual(result["learning"]["lesson"]["outcome"], "ACTION_VERIFIED_NOT_GOAL")
         task = next(
             task for task in result["tasks"]["tasks"]
             if task["id"] == result["execution"]["task_id"]
         )
         self.assertEqual(task["status"], "COMPLETED")
         self.assertEqual(task["evidence_ref"], result["execution"]["evidence_ref"])
+
+    def test_cognitive_loop_preserves_caller_provided_run_id(self):
+        store = MemoryStore()
+        loop = CognitiveLoop(store)
+
+        result = loop.run("review current state safely", run_id="api-run-123")
+
+        self.assertEqual(result["run_id"], "api-run-123")
+        self.assertEqual(result["verification"]["run_id"], "api-run-123")
+        self.assertEqual(store.state()["cognitive_trace"]["run_id"], "api-run-123")
 
     def test_cognitive_loop_does_not_complete_when_tool_fails(self):
         store = MemoryStore()

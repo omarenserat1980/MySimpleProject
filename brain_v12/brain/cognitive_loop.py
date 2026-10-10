@@ -23,8 +23,9 @@ class CognitiveLoop:
         {"id":"agent.execute","name":"تنفيذ معزول","risk":"high","permission":"agent_approval"},
     ]
 
-    def __init__(self,store):
+    def __init__(self,store,goal_verifier=None):
         self.store=store
+        self.goal_verifier=goal_verifier
         self.events=EventBus(store)
         self.decisions=DecisionEngine()
         self.permissions=PermissionGate()
@@ -100,9 +101,30 @@ class CognitiveLoop:
             return self.execute_tool(tool_id,params,approved,True)
         return result
 
-    def run(self,goal):
+    def _verify_goal(self, goal, execution, tool_result):
+        """Require explicit semantic verification before teaching the brain that a goal succeeded."""
+        if not callable(self.goal_verifier):
+            return {"verified": False, "status": "UNVERIFIED", "reason": "NO_GOAL_VERIFIER"}
+        try:
+            result = self.goal_verifier(goal, execution, tool_result)
+        except Exception as exc:
+            return {"verified": False, "status": "UNVERIFIED", "reason": "GOAL_VERIFIER_ERROR", "error_type": type(exc).__name__}
+        if not isinstance(result, dict):
+            return {"verified": False, "status": "UNVERIFIED", "reason": "INVALID_GOAL_VERIFIER_RESULT"}
+        evidence = str(result.get("evidence", "")).strip()
+        verifier = str(result.get("verifier", "")).strip()
+        verified = result.get("verified") is True and bool(evidence) and bool(verifier)
+        return {
+            "verified": verified,
+            "status": "VERIFIED" if verified else "UNVERIFIED",
+            "reason": "EXPLICIT_GOAL_EVIDENCE" if verified else "INSUFFICIENT_GOAL_EVIDENCE",
+            "evidence": evidence if verified else "",
+            "verifier": verifier if verified else "",
+        }
+
+    def run(self,goal,run_id=None):
         goal=(goal or "").strip()
-        run_id=str(uuid4())
+        run_id=str(run_id or uuid4())
         self._state("PERCEIVE",goal=goal,run_id=run_id)
         self.events.publish("COGNITIVE_RUN_STARTED",{"run_id":run_id,"goal":goal})
         self.events.publish("PERCEIVE",{"goal":goal,"run_id":run_id})
@@ -113,7 +135,7 @@ class CognitiveLoop:
         self._state("MEMORY",goal=goal,run_id=run_id)
         all_memories=self.store.memories()
         recall_fn=getattr(self.store,"recall_memories",None)
-        memories=recall_fn(goal,limit=12,candidates=all_memories) if callable(recall_fn) else all_memories[-12:]
+        memories=recall_fn(goal,limit=12,candidates=all_memories,fallback_recent=False) if callable(recall_fn) else all_memories[-12:]
         # Count durable run lessons across the full store, not only the recalled slice.
         prior_lessons=[m for m in all_memories if str(m.get("key","")).startswith("cognitive.run.")]
         reasoning_path=select_reasoning_path(goal,memories)
@@ -161,7 +183,12 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
+        # Execute the tool chosen by the decision candidate. Re-mapping by action
+        # alone can silently run a different tool than the one that was scored.
+        tool_id=(selected.get("tool_id") if isinstance(selected,dict) else None) or {
+            "observe":"state.read","plan":"tasks.create","inspect_code":"code.inspect",
+            "verify_code":"code.verify","device":"device.enqueue"
+        }.get(action)
         tool_params = (
             {"title":task_title} if tool_id=="tasks.create"
             else {"path":"brain_v12/app.py"} if tool_id=="code.inspect"
@@ -195,18 +222,27 @@ class CognitiveLoop:
             and verified_task["status"] == "COMPLETED"
             and (action != "device" or device_success)
         )
+        goal_check=self._verify_goal(goal,execution,tool_result) if verified else {
+            "verified": False, "status": "UNVERIFIED", "reason": "ACTION_NOT_VERIFIED"
+        }
+        goal_verified=bool(verified and goal_check.get("verified") is True)
         verification={
-            "status":"VERIFIED" if verified else "PENDING",
+            "status":"GOAL_VERIFIED" if goal_verified else ("ACTION_VERIFIED" if verified else "PENDING"),
             "task_status":verified_task["status"] if verified_task else "UNKNOWN",
             "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else "تم فحص حالة المهمة بعد التنفيذ الداخلي.",
             "result_verified":verified,
+            "action_verified":verified,
+            "goal_verified":goal_verified,
+            "goal_verification":goal_check,
             "run_id":run_id
         }
         self.events.publish("VERIFIED",verification)
 
         self._state("LEARN",status="READY",goal=goal,run_id=run_id)
-        outcome = "VERIFIED_SUCCESS" if verification.get("result_verified") else (
-            "WAITING_PERMISSION" if execution.get("status")=="WAITING_PERMISSION" else "FAILED_OR_UNVERIFIED"
+        outcome = "VERIFIED_SUCCESS" if goal_verified else (
+            "ACTION_VERIFIED_NOT_GOAL" if verified else (
+                "WAITING_PERMISSION" if execution.get("status")=="WAITING_PERMISSION" else "FAILED_OR_UNVERIFIED"
+            )
         )
         lesson={
             "run_id":run_id,
@@ -215,13 +251,33 @@ class CognitiveLoop:
             "outcome":outcome,
             "execution_status":execution.get("status"),
             "verification_status":verification.get("status"),
-            "verified":bool(verification.get("result_verified")),
+            "action_verified":bool(verification.get("action_verified")),
+            "goal_verified":bool(verification.get("goal_verified")),
+            "verified":bool(verification.get("goal_verified")),
         }
         # A unique key preserves history instead of overwriting the previous run.
+        lesson_key = f"cognitive.run.{run_id}"
         self.store.save_memory(
-            f"cognitive.run.{run_id}",
+            lesson_key,
             __import__("json").dumps(lesson,ensure_ascii=False,sort_keys=True)
         )
+        # A tool completing is not proof of goal completion. Only goal-verified
+        # lessons stay active for retrieval; weaker records remain auditable.
+        metadata_writer = getattr(self.store, "set_memory_metadata", None)
+        if callable(metadata_writer):
+            verifier_id = str(goal_check.get("verifier") or "").strip()
+            source = (
+                f"goal_verifier:{verifier_id}" if goal_verified and verifier_id
+                else "cognitive_loop:action_only" if verified
+                else "cognitive_loop:unverified_run"
+            )
+            metadata_writer(
+                lesson_key,
+                source=source,
+                confidence=0.95 if goal_verified else (0.55 if verified else 0.2),
+                status="ACTIVE" if goal_verified else "UNVERIFIED",
+                tags=["cognitive_lesson", outcome.lower()],
+            )
         self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
 
         return {
