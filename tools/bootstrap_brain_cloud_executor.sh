@@ -11,6 +11,8 @@ RUNNER_USER="${BRAIN_RUNNER_USER:-brainrunner}"
 RUNNER_HOME="$(getent passwd "$RUNNER_USER" | cut -d: -f6)"
 [ -n "$RUNNER_HOME" ] || { echo "DEDICATED_RUNNER_USER_REQUIRED:$RUNNER_USER"; exit 35; }
 [ "$(id -un)" != "$RUNNER_USER" ] || { echo "OPERATOR_AND_RUNNER_ACCOUNTS_MUST_DIFFER"; exit 36; }
+[ "$RUNNER_HOME" != "$HOME" ] || { echo "OPERATOR_AND_RUNNER_HOMES_MUST_DIFFER"; exit 39; }
+RUNNER_GROUP="$(id -gn "$RUNNER_USER")"
 RUNNER_DIR="${BRAIN_RUNNER_DIR:-/opt/brain-cloud-executor}"
 RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
 RUNNER_ARCH="linux-x64"
@@ -80,7 +82,7 @@ PY
 rm -f "$ATTESTATION_FILE"
 unset BRAIN_CLOUD_EXECUTOR_TOKEN BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
 
-sudo install -d -o "$RUNNER_USER" -g "$RUNNER_USER" -m 0750 "$RUNNER_DIR"
+sudo install -d -o "$RUNNER_USER" -g "$RUNNER_GROUP" -m 0750 "$RUNNER_DIR"
 cd "$RUNNER_DIR"
 
 if [ ! -x ./run.sh ]; then
@@ -89,7 +91,7 @@ if [ ! -x ./run.sh ]; then
   tar -xzf "$archive"
   rm -f "$archive"
 fi
-sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
+sudo chown -R "$RUNNER_USER:$RUNNER_GROUP" "$RUNNER_DIR"
 
 TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
 # The operator obtains the short-lived token; the isolated runner account never receives gh CLI credentials.
@@ -110,4 +112,4 @@ echo "BRAIN_CLOUD_EXECUTOR_BOOTSTRAP=VERIFIED"
 echo "BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID"
 echo "BRAIN_CLOUD_EXECUTOR_MODE=EPHEMERAL_ONE_JOB"
 echo "Starting one-job ephemeral runner in the foreground."
-exec sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 ./run.sh
+exec sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 "$RUNNER_DIR/run.sh"
