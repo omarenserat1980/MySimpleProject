@@ -16,13 +16,17 @@ The issuer fails closed when required identity/checkpoint/lease/approval materia
 
 The Control Plane must expose the Brain API over HTTPS, reachable from the dedicated self-hosted runner. Confirm the deployed code includes `POST /api/brain/windows/contracts/issue`.
 
-### 2. Configure GitHub Actions secrets
+### 2. Configure the protected GitHub Actions Environment
 
-In repository Settings → Secrets and variables → Actions, add these repository or appropriately scoped environment secrets:
+In repository Settings → Environments, create `windows-real-boot` and configure **Required reviewers** so the repository owner must approve the deployment. Save and verify the protection rules before any manual dispatch. A workflow's `environment:` reference does not itself enable reviewer protection. Restrict deployment branches to the reviewed boot workflow branch and/or `main`, according to the repository's release policy.
 
-- `BRAIN_WINDOWS_CONTROL_PLANE_URL`: base URL of the real HTTPS Control Plane (no credentials embedded in the URL).
-- `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY`: high-entropy delivery key shared by the Control Plane endpoint and GitHub Actions.
-- `BRAIN_AUTHORITY_PUBLIC_KEY_B64`: authority public key used by the runner-side contract gate to verify the signed contract.
+Create these **environment secrets only** in `windows-real-boot`:
+
+- `BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED`: base URL of the real HTTPS Control Plane (no credentials embedded in the URL).
+- `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED`: high-entropy delivery key shared by the Control Plane endpoint and GitHub Actions.
+- `BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED`: authority public key used by the runner-side contract gate to verify the signed contract.
+
+Do not create repository-level copies of these protected secret names. Remove any old repository-level `BRAIN_WINDOWS_CONTROL_PLANE_URL`, `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY`, or `BRAIN_AUTHORITY_PUBLIC_KEY_B64` secrets if they were configured for this workflow; the workflow must not fall back to unprotected repository secrets.
 
 Never put the authority private key, owner approval signing key, human approval token, or raw owner approval in GitHub secrets. The runner receives only the short-lived signed contract and public verification key. Rotate the delivery key if it may have been exposed.
 
