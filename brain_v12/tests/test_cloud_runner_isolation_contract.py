@@ -36,8 +36,11 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
         self.assertIn("RUNNER_CAN_READ_OPERATOR_GH_CREDENTIALS", script)
         self.assertIn("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED", script)
         self.assertIn("exit 40", script)
-        self.assertLess(script.index("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED"),
-                        script.index('"/repos/$REPO/actions/runners/registration-token"'))
+        boundary_ok = script.index("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED")
+        token_injection = script.index('TOKEN="$BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN"')
+        runner_config = script.index('"$RUNNER_DIR/config.sh" --unattended')
+        self.assertLess(boundary_ok, token_injection)
+        self.assertLess(token_injection, runner_config)
 
     def test_credential_boundary_expression_with_real_unix_permissions(self):
         # GitHub-hosted Ubuntu runners provide passwordless sudo. On other
