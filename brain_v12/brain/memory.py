@@ -136,7 +136,7 @@ class MemoryStore:
             "ة": "ه",
         }))
         return {
-            term for term in re.findall(r"[\\w]+", text, flags=re.UNICODE)
+            term for term in re.findall(r"[\w]+", text, flags=re.UNICODE)
             if len(term) > 1 and term not in {
                 "من", "في", "على", "الى", "عن", "هذا", "هذه", "ذلك", "تلك",
                 "مع", "كان", "كانت", "هو", "هي", "هم", "ثم", "او", "و", "the",
