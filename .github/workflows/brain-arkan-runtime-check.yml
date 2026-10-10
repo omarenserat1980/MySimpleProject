@@ -1,0 +1,77 @@
+name: Brain Arkan Runtime Permission Check
+
+on:
+  push:
+    branches:
+      - "fix/arkan-runtime-validation-20261010"
+
+permissions:
+  contents: read
+
+jobs:
+  arkan-readonly-check:
+    name: Boot Brain API on Arkan with read-only source
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout into a run-specific isolated directory
+        uses: actions/checkout@v5
+        with:
+          path: _brain_arkan_validation_${{ github.run_id }}
+          clean: false
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Start API from read-only source and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$GITHUB_WORKSPACE/_brain_arkan_validation_${GITHUB_RUN_ID}"
+          PY="/home/brain/brain-runtime-venv/bin/python"
+          test -x "$PY" || { echo "BRAIN_VENV_MISSING:$PY"; exit 1; }
+          test -f "$SRC/brain_v12/app.py" || { echo "CHECKOUT_MISSING:$SRC"; exit 1; }
+          temp_root="$(mktemp -d "${RUNNER_TEMP:-/tmp}/brain-arkan-runtime.XXXXXX")"
+          log_file="$temp_root/uvicorn.log"
+          health_file="$temp_root/health.json"
+          port=18012
+          server_pid=""
+          cleanup() {
+            rc=$?
+            trap - EXIT
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            if [ -d "$SRC" ] && [[ "$SRC" == "$GITHUB_WORKSPACE"/_brain_arkan_validation_* ]]; then
+              chmod -R u+w "$SRC" 2>/dev/null || true
+              rm -rf -- "$SRC"
+            fi
+            rm -rf -- "$temp_root"
+            exit "$rc"
+          }
+          trap cleanup EXIT
+          chmod -R a-w "$SRC"
+          cd "$SRC"
+          BRAIN_RUNTIME_HOME="$temp_root/runtime" PYTHONPATH="$SRC" PYTHONDONTWRITEBYTECODE=1 "$PY" -m uvicorn brain_v12.app:app --host 127.0.0.1 --port "$port" --log-level info >"$log_file" 2>&1 &
+          server_pid=$!
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail "http://127.0.0.1:$port/health" >"$health_file"; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$log_file"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ ! -s "$health_file" ]; then
+            cat "$log_file"
+            echo "BRAIN_ARKAN_API_HEALTH_TIMEOUT"
+            exit 1
+          fi
+          "$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d.get("ok") is True and d.get("status") == "healthy", d; print("BRAIN_ARKAN_API_HEALTH_OK")' "$health_file"
+          test -d "$temp_root/runtime/media/engine"
+          echo "BRAIN_ARKAN_READONLY_SOURCE=PASS"
+          echo "BRAIN_ARKAN_RUNTIME_HOME=ISOLATED_TEMP"
+          cat "$health_file"
+          tail -n 25 "$log_file"
