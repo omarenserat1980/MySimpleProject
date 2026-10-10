@@ -15,6 +15,15 @@ import time
 from pathlib import Path
 from typing import Any
 
+# When executed as `python3 brain_v12/brain/cloud_executor_gate.py`, Python's
+# import path starts at this file's directory rather than the repository root.
+# Add the repository root explicitly so package imports work in GitHub Actions
+# regardless of runner environment or PYTHONPATH configuration.
+import sys
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPOSITORY_ROOT))
+
 from brain_v12.brain.cloud_executor_attestation import verify_from_environment
 
 
