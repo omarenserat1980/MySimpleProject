@@ -57,6 +57,9 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
             )
             created = True
             with tempfile.TemporaryDirectory(prefix="brain-gh-boundary-") as temp:
+                # Make the parent traversable so this test measures the GH config ACL itself,
+                # not TemporaryDirectory's default private parent directory.
+                Path(temp).chmod(0o755)
                 config_dir = Path(temp) / "gh"
                 config_dir.mkdir(mode=0o700)
                 hosts = config_dir / "hosts.yml"
