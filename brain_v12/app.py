@@ -200,7 +200,7 @@ from .youtube.router_bundle import router as youtube_router
 from .marketing.router_bundle import router as marketing_router
 from .intelligence.router_bundle import router as intelligence_router
 from .integration.api import build_router as mission_router_builder
-app.include_router(brain_git_router(brain_git))
+app.include_router(brain_git_router(brain_git, brain_workflows))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(ai_fabric_router(fabric))
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
