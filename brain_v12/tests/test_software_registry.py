@@ -41,14 +41,16 @@ class SoftwareRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_LICENSE"):
             self.registry.register("python", self.metadata(license=" "))
 
-    def test_verified_observation_requires_evidence(self):
+    def test_observation_cannot_self_assert_verified(self):
         self.registry.register("python", self.metadata())
         with self.assertRaisesRegex(ValueError, "EVIDENCE_REFERENCE_REQUIRED"):
-            self.registry.record_observation("python", "running", "verified", " ")
+            self.registry.record_observation("python", "running", "unverified", " ")
+        with self.assertRaisesRegex(ValueError, "INDEPENDENT_VERIFICATION_REQUIRED"):
+            self.registry.record_observation("python", "running", "verified", "ci://run/123")
         item = self.registry.record_observation(
-            "python", "running", "verified", "ci://run/123"
+            "python", "running", "unverified", "ci://run/123"
         )
-        self.assertEqual(item["verification_state"], "verified")
+        self.assertEqual(item["verification_state"], "unverified")
         self.assertEqual(item["evidence_ref"], "ci://run/123")
 
     def test_unknown_software_cannot_be_observed(self):
