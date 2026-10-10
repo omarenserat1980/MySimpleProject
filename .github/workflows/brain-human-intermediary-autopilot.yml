@@ -24,8 +24,6 @@ jobs:
   predict-and-advance:
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 8
-    env:
-      BRAIN_INTERNAL_RUNNER_FLAG: "1"
     steps:
       - uses: actions/checkout@v4
         with:
