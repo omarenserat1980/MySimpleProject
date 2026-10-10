@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib,hmac,os,time
 from uuid import uuid4
 from .device_sync_adapter import DeviceTaskSyncAdapter
-AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; HEARTBEAT_STALE="STALE"
+AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; LEGACY_AGENT_KEY_ENV="TERMUX_AGENT_KEY"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
@@ -13,16 +13,25 @@ class DeviceBridge:
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
-    def configured(self): return bool(os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"))
+    def _direct_key(self):
+        """Resolve supported direct-key aliases without exposing their values."""
+        return (os.getenv(AGENT_KEY_ENV, "").strip()
+                or os.getenv("BRAIN_EMULATOR_KEY", "").strip()
+                or os.getenv("BRAIN_EMULATOR_AGENT_KEY", "").strip()
+                or os.getenv(LEGACY_AGENT_KEY_ENV, "").strip())
+
+    def configured(self):
+        return bool(self._direct_key() or os.getenv(AGENT_KEY_SHA256_ENV, "").strip())
     def auth_mode(self):
-        if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
-        if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
-        if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
-        if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY"
+        if os.getenv(AGENT_KEY_ENV, "").strip(): return "DIRECT_KEY"
+        if os.getenv(AGENT_KEY_SHA256_ENV, "").strip(): return "SHA256_KEY"
+        if os.getenv("BRAIN_EMULATOR_KEY", "").strip(): return "BRAIN_EMULATOR_KEY"
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY", "").strip(): return "BRAIN_EMULATOR_AGENT_KEY"
+        if os.getenv(LEGACY_AGENT_KEY_ENV, "").strip(): return "LEGACY_TERMUX_AGENT_KEY"
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
         if not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
+        expected=self._direct_key()
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
             if key_file and os.path.isfile(key_file):
