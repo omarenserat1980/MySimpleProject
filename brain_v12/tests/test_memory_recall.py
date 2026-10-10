@@ -42,6 +42,13 @@ class MemoryRecallTests(unittest.TestCase):
             self.assertEqual([item["key"] for item in recalled], ["memory.two"])
 
 
+    def test_goal_directed_recall_does_not_fallback_for_empty_normalized_query(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("recent.unrelated", "معلومة غير مرتبطة")
+            self.assertEqual(store.recall_memories("the and to", limit=5, fallback_recent=False), [])
+
     def test_goal_directed_recall_can_avoid_unrelated_recent_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             store = MemoryStore(str(Path(directory) / "brain.db"))
