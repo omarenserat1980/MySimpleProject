@@ -52,7 +52,7 @@ A replacement phone must obtain source/config from the canonical recovery path a
 
 ### Device identity
 - The launcher auto-maps only explicitly supported exact model identifiers: `23129RN51X` to `redmi3-01`, and `RMX3710` to `realme-01`.
-- A model not in that exact allowlist must have a deliberately configured, unique `V12_AGENT_ID` in `~/v12-agent/agent_config.sh`. Do not copy another phone's ID.
+- A model not in that exact allowlist must have a deliberately configured, unique `V12_AGENT_ID` and `V12_DEVICE_MODEL` equal to the exact `getprop ro.product.model` output in `~/v12-agent/agent_config.sh`. This pin is required to stop startup when an unknown phone inherits another device's config. Do not copy another phone's ID or model pin.
 - If a recognized model conflicts with the configured ID, startup stops with `DEVICE_ID_MISMATCH`; investigate the model and local configuration instead of bypassing the guard.
 - Brand names are not sufficient evidence of hardware identity. Update the allowlist only with verified model identifiers and corresponding tests.
 
