@@ -32,6 +32,7 @@ from .brain.model_router import ModelRouter
 from .brain.model_providers import configured_model_providers
 from .ai_fabric import AIFabric, FabricPolicy
 from .ai_fabric.api import router as ai_fabric_router
+from cloud.brain_fabric_api import router as cloud_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
@@ -158,6 +159,8 @@ from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(ai_fabric_router(fabric))
+# Cloud Fabric control-plane routes; separate from the AI model/tool fabric above.
+app.include_router(cloud_fabric_router)
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
