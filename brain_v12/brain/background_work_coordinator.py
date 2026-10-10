@@ -15,11 +15,13 @@ class BackgroundWorkCoordinator:
     ALLOWED = {"simulation_health", "simulation_inventory", "simulation_readiness"}
 
     def __init__(self, *, max_workers: int | None = None, max_pending: int = 64,
-                 db_path: str | Path | None = None, autostart: bool = True):
+                 db_path: str | Path | None = None, autostart: bool = True,
+                 handlers: dict[str, Any] | None = None):
         cpu = os.cpu_count() or 2
         requested = max_workers if max_workers is not None else int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, cpu))))
         self.max_workers = max(1, min(int(requested), 8, max(1, cpu)))
         self.max_pending = max(1, int(max_pending))
+        self.handlers = dict(handlers or {})
         self.db_path = Path(db_path or os.getenv("BRAIN_BACKGROUND_DB", ".brain/state/background_work.sqlite3"))
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
@@ -90,7 +92,12 @@ class BackgroundWorkCoordinator:
             self._db.commit()
             if cur.rowcount != 1: return
         try:
-            if kind == "simulation_health":
+            handler = self.handlers.get(kind)
+            if handler is not None:
+                result = handler()
+                if not isinstance(result, dict):
+                    raise TypeError("BACKGROUND_HANDLER_MUST_RETURN_MAPPING")
+            elif kind == "simulation_health":
                 result = {"healthy": True, "worker_pool": "bounded", "policy": "SIMULATION_FIRST"}
             elif kind == "simulation_inventory":
                 result = {"virtual_node": "arkan", "inventory": ["cpu", "memory", "disk", "network", "services", "vms"]}
