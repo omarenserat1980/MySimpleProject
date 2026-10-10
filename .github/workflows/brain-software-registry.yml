@@ -1,0 +1,35 @@
+name: Brain Software Registry Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/software_registry.py"
+      - "brain_v12/tests/test_software_registry.py"
+      - ".github/workflows/brain-software-registry.yml"
+  push:
+    branches:
+      - main
+      - brain-software-ownership-runtime
+    paths:
+      - "brain_v12/brain/software_registry.py"
+      - "brain_v12/tests/test_software_registry.py"
+      - ".github/workflows/brain-software-registry.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  software-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile registry and tests
+        run: python -m py_compile brain_v12/brain/software_registry.py brain_v12/tests/test_software_registry.py
+      - name: Run software registry unit tests
+        run: python -m unittest brain_v12.tests.test_software_registry -v
