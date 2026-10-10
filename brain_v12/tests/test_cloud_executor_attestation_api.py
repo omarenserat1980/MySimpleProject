@@ -59,10 +59,10 @@ class CloudExecutorAttestationApiTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 403)
 
     def test_refuses_challenge_when_issuer_key_missing(self):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {"BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64": ""}):
             with self.assertRaises(HTTPException) as raised:
                 attestation_challenge(ExecutorRequest(executor_id="cloud-test-01"), self.token)
-        self.assertEqual(raised.exception.status_code, 401)
+        self.assertEqual(raised.exception.status_code, 503)
 
 
 if __name__ == "__main__":
