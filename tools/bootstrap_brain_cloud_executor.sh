@@ -69,6 +69,10 @@ print("CLOUD_EXECUTOR_PRE_REGISTRATION_GATE=VERIFIED")
 print("CLOUD_EXECUTOR_EVIDENCE_REF=" + str(evidence.get("evidence_ref", "")))
 PY
 
+# Proof is single-use; remove it and clear enrollment credentials before runner registration.
+rm -f "$ATTESTATION_FILE"
+unset BRAIN_CLOUD_EXECUTOR_TOKEN BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
+
 mkdir -p "$RUNNER_DIR"
 cd "$RUNNER_DIR"
 
