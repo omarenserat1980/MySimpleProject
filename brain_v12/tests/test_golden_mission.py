@@ -225,6 +225,44 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertFalse(worker.status()["running"])
         self.assertGreaterEqual(stub.calls, 1)
 
+    def test_reminder_worker_concurrent_start_creates_only_one_worker(self):
+        import threading
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class Stub:
+            def __init__(self):
+                self.calls = 0
+                self.lock = threading.Lock()
+
+            def notify_due(self):
+                with self.lock:
+                    self.calls += 1
+                return {"checked": 0, "notifications_sent": 0,
+                        "notifications_failed_or_unconfigured": 0}
+
+        worker = GoldenMissionReminderWorker(Stub(), interval_seconds=30)
+        barrier = threading.Barrier(8)
+        results = []
+        results_lock = threading.Lock()
+
+        def launch():
+            barrier.wait()
+            result = worker.start()
+            with results_lock:
+                results.append(result)
+
+        threads = [threading.Thread(target=launch) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(False), 7)
+        worker.stop(timeout=1)
+        self.assertFalse(worker.status()["running"])
+
     def test_reminder_worker_records_tick_failure_without_swallowing_manual_tick(self):
         from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
 
