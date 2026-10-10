@@ -68,9 +68,32 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
             checks = payload.get("checks", [])
-            valid = payload.get("status") == "VERIFIED" and isinstance(checks, list) and bool(checks) and all(
-                isinstance(item, dict) and item.get("passed") is True for item in checks)
-            evidence.append({"path": relative, "valid": valid, "check_count": len(checks) if isinstance(checks, list) else 0})
+            required_checks = {
+                "runtime_api_readiness",
+                "runtime_worker_status",
+                "mission_persistence_restart",
+                "restore_drill",
+            }
+            named_checks = {
+                item.get("name"): item for item in checks
+                if isinstance(item, dict) and isinstance(item.get("name"), str)
+            } if isinstance(checks, list) else {}
+            valid = (
+                payload.get("status") == "VERIFIED"
+                and required_checks.issubset(named_checks)
+                and all(named_checks[name].get("passed") is True for name in required_checks)
+                and all(
+                    isinstance(named_checks[name].get("response_sha256"), str)
+                    and re.fullmatch(r"[0-9a-f]{64}", named_checks[name]["response_sha256"])
+                    for name in ("runtime_api_readiness", "runtime_worker_status")
+                )
+            )
+            evidence.append({
+                "path": relative,
+                "valid": valid,
+                "check_count": len(checks) if isinstance(checks, list) else 0,
+                "missing_required_checks": sorted(required_checks - set(named_checks)),
+            })
         except (OSError, ValueError, TypeError):
             evidence.append({"path": relative, "valid": False, "check_count": 0})
     missing_core = [p for p, exists in core_docs.items() if not exists]
