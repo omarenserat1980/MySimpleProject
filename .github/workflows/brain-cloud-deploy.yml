@@ -71,12 +71,7 @@ jobs:
           REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
         run: |
           set -euo pipefail
-          scp -i "$HOME/.ssh/brain_cloud_key" \\
-            -o BatchMode=yes \\
-            -o StrictHostKeyChecking=yes \\
-            -o ConnectTimeout=15 \\
-            cloud/docker-compose.production.yml \\
-            "$USER@$HOST:$REMOTE_DIR/docker-compose.production.yml"
+          scp -i "$HOME/.ssh/brain_cloud_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 cloud/docker-compose.production.yml "$USER@$HOST:$REMOTE_DIR/docker-compose.production.yml"
           echo "PRODUCTION_COMPOSE_SYNC=PASS"
 
       - name: Deploy existing host
