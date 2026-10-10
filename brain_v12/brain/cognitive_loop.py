@@ -247,6 +247,7 @@ class CognitiveLoop:
             "execution_status":execution.get("status"),
             "verification_status":verification.get("status"),
             "action_verified":bool(verification.get("action_verified")),
+            "goal_verified":bool(verification.get("goal_verified")),
             "verified":bool(verification.get("goal_verified")),
         }
         # A unique key preserves history instead of overwriting the previous run.
