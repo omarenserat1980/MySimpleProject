@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - ".github/workflows/brain-virtual-computer.yml"
+      - "cloud/brain_fabric_api.py"
       - "brain_v12/virtual_hardware/**"
       - "brain_v12/blade_server.py"
       - "brain_v12/brain/virtual_datacenter.py"
