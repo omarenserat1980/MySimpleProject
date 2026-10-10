@@ -14,6 +14,9 @@ say() { printf '%s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 is_termux() { [[ "${PREFIX:-}" == *com.termux/files/usr ]]; }
 
+INSTALL_DIR="$HOME_DIR/.local/share/brain"
+mkdir -p "$INSTALL_DIR"
+
 # Never run a dirty or non-main checkout as the activation source. Preserve it,
 # and use a dedicated managed runtime checkout instead.
 if [[ -n "${BRAIN_ROOT:-}" && -d "${BRAIN_ROOT}/.git" ]]; then
