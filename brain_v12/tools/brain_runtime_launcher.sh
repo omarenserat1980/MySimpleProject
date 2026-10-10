@@ -65,8 +65,9 @@ if [ "$V12_AGENT_ID" != "redmi3-01" ]; then
   esac
 fi
 
-# Local Termux runtime must use exactly one on-device key. Never copy a key
-# between devices; the target Brain must explicitly authorize this agent key.
+# Keep a local key file for this runtime. Remote acceptance depends on the
+# server's configured authentication policy; never copy another device's key
+# just to bypass an authentication failure.
 unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
