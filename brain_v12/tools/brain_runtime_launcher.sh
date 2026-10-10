@@ -35,8 +35,8 @@ DETECTED_AGENT_ID=""
 # matching is deliberately avoided because multiple phones can share a brand.
 # Unknown models must use an explicitly configured, unique V12_AGENT_ID.
 case "$DEVICE_MODEL" in
-  23129RN51X) DETECTED_AGENT_ID="redmi3-01" ;;
-  RMX3710) DETECTED_AGENT_ID="realme-01" ;;
+  *23129RN51X*) DETECTED_AGENT_ID="redmi3-01" ;;
+  *RMX3710*) DETECTED_AGENT_ID="realme-01" ;;
 esac
 if [ -n "$DETECTED_AGENT_ID" ]; then
   if [ -n "${V12_AGENT_ID:-}" ] && [ "$V12_AGENT_ID" != "$DETECTED_AGENT_ID" ]; then
