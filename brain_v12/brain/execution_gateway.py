@@ -22,6 +22,7 @@ from .internal_runner import InternalRunner
 from .windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
 from .windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
 from .windows_native_executor import WindowsNativeExecutorContract
+from .windows_native_enrollment import VerifiedAttestationRegistry
 from .windows_server_network_contract import (
     NetworkZone,
     NodeTrustState,
@@ -75,7 +76,7 @@ def _native_contract_from_metadata(metadata: dict[str, Any]) -> WindowsNativeExe
     return WindowsNativeExecutorContract(
         executor_id=str(raw.get("executor_id", "")),
         server=server,
-        agent_attestation_verified=bool(raw.get("agent_attestation_verified", False)),
+        attestation=raw.get("attestation"),
         brain_generation=int(raw.get("brain_generation", 0)),
         fencing_token=int(raw.get("fencing_token", 0)),
         authority_policy_version=str(raw.get("authority_policy_version", "authority-policy-v1")),
@@ -86,8 +87,9 @@ def _native_contract_from_metadata(metadata: dict[str, Any]) -> WindowsNativeExe
 class BrainExecutionGateway:
     """Fail-closed authority for Brain-owned execution."""
 
-    def __init__(self, runner: InternalRunner | None = None) -> None:
+    def __init__(self, runner: InternalRunner | None = None, attestation_registry: VerifiedAttestationRegistry | None = None) -> None:
         self.runner = runner or InternalRunner()
+        self.attestation_registry = attestation_registry or VerifiedAttestationRegistry()
 
     def authorize_windows_cloud(
         self,
@@ -123,6 +125,19 @@ class BrainExecutionGateway:
         metadata = metadata or {}
         if capability == WINDOWS_NATIVE_EXECUTOR:
             contract = _native_contract_from_metadata(metadata)
+            digest = str((contract.attestation or {}).get("attestation_digest", "")).strip()
+            trusted = self.attestation_registry.get(digest)
+            if trusted is None:
+                raise RuntimeError("WINDOWS_NATIVE_ATTESTATION_NOT_REGISTERED")
+            contract = WindowsNativeExecutorContract(
+                executor_id=contract.executor_id,
+                server=contract.server,
+                attestation=trusted,
+                brain_generation=contract.brain_generation,
+                fencing_token=contract.fencing_token,
+                authority_policy_version=contract.authority_policy_version,
+                state=contract.state,
+            )
             contract.validate()
             return ExecutionDecision(
                 executor=WINDOWS_NATIVE_EXECUTOR,

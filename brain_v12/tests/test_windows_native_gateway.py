@@ -1,7 +1,10 @@
+import os
+import tempfile
 import unittest
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
 from brain_v12.brain.execution_policy import WINDOWS_NATIVE_EXECUTOR
+from brain_v12.brain.windows_native_enrollment import VerifiedAttestationRegistry
 from brain_v12.brain.windows_server_network_contract import (
     WINDOWS_SERVER_NATIVE,
     WINDOWS_SERVER_CLIENT_GATEWAY,
@@ -14,7 +17,7 @@ def metadata(attested=True, fencing=19, state="READY"):
     return {
         "native_contract": {
             "executor_id": "windows-native-vivobook-01",
-            "agent_attestation_verified": attested,
+            "attestation": {\n                "verified": attested,\n                "replay_protected": True,\n                "attestation_digest": "digest-v1",\n                "challenge": "challenge-123",\n                "executor_id": "windows-native-vivobook-01",\n                "server_id": "vivobook-01",\n                "brain_generation": 8,\n                "network_generation": 7,\n            },
             "brain_generation": 8,
             "fencing_token": fencing,
             "authority_policy_version": "authority-policy-v1",
@@ -42,15 +45,25 @@ def metadata(attested=True, fencing=19, state="READY"):
 
 
 class WindowsNativeGatewayTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.NamedTemporaryFile(delete=False)
+        self.tmp.close()
+        self.registry = VerifiedAttestationRegistry(self.tmp.name)
+        self.registry.register({"verified": True, "attestation_digest": "digest-v1", "enrollment_id": "enroll-01", "executor_id": "windows-native-vivobook-01", "server_id": "vivobook-01", "brain_generation": 8, "network_generation": 7})
+
+    def tearDown(self):
+        self.registry.close()
+        os.unlink(self.tmp.name)
+
     def test_gateway_requires_verified_native_contract(self):
-        decision = BrainExecutionGateway().authorize_task(
+        decision = BrainExecutionGateway(attestation_registry=self.registry).authorize_task(
             WINDOWS_NATIVE_EXECUTOR, metadata()
         )
         self.assertTrue(decision.verified)
         self.assertEqual(WINDOWS_NATIVE_EXECUTOR, decision.executor)
 
     def test_gateway_rejects_missing_agent_attestation(self):
-        with self.assertRaisesRegex(ValueError, "agent_attestation"):
+        with self.assertRaisesRegex(ValueError, "attestation_not_verified"):
             BrainExecutionGateway().authorize_task(
                 WINDOWS_NATIVE_EXECUTOR, metadata(attested=False)
             )

@@ -1,9 +1,4 @@
-"""Fail-closed contract for a physical/native Windows Server executor.
-
-This is intentionally separate from the QEMU real-boot executor. It does not
-execute commands or provision Windows; it validates the trust prerequisites
-that must exist before a VivoBook-class Windows host can receive Brain work.
-"""
+"""Fail-closed contract for a physical/native Windows Server executor."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,7 +19,7 @@ WINDOWS_NATIVE_EXECUTOR = "windows-native-agent"
 class WindowsNativeExecutorContract:
     executor_id: str
     server: WindowsServerNetworkContract
-    agent_attestation_verified: bool
+    attestation: dict[str, Any]
     brain_generation: int
     fencing_token: int
     authority_policy_version: str = "authority-policy-v1"
@@ -39,8 +34,26 @@ class WindowsNativeExecutorContract:
             raise ValueError("windows_native_capability_required")
         if WINDOWS_SERVER_CLIENT_GATEWAY not in self.server.capabilities:
             raise ValueError("windows_native_client_gateway_capability_required")
-        if not self.agent_attestation_verified:
-            raise ValueError("windows_native_agent_attestation_required")
+
+        if not isinstance(self.attestation, dict):
+            raise ValueError("windows_native_attestation_record_required")
+        if self.attestation.get("verified") is not True:
+            raise ValueError("windows_native_attestation_not_verified")
+        if not str(self.attestation.get("attestation_digest", "")).strip():
+            raise ValueError("windows_native_attestation_digest_required")
+        if not str(self.attestation.get("challenge", "")).strip():
+            raise ValueError("windows_native_attestation_challenge_required")
+        if self.attestation.get("replay_protected") is not True:
+            raise ValueError("windows_native_attestation_replay_protection_required")
+        if self.attestation.get("executor_id") != self.executor_id:
+            raise ValueError("windows_native_attestation_executor_mismatch")
+        if self.attestation.get("server_id") != self.server.server_id:
+            raise ValueError("windows_native_attestation_server_mismatch")
+        if int(self.attestation.get("brain_generation", 0)) != self.brain_generation:
+            raise ValueError("windows_native_attestation_generation_mismatch")
+        if int(self.attestation.get("network_generation", 0)) != self.server.network_generation:
+            raise ValueError("windows_native_attestation_network_generation_mismatch")
+
         if self.brain_generation < 1:
             raise ValueError("windows_native_generation_invalid")
         if self.fencing_token < 1:
@@ -65,4 +78,5 @@ class WindowsNativeExecutorContract:
             "fencing_token": self.fencing_token,
             "authority_policy_version": self.authority_policy_version,
             "contract_status": self.state,
+            "attestation_digest": self.attestation["attestation_digest"],
         }
