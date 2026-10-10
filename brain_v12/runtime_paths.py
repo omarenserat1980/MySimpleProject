@@ -100,6 +100,8 @@ def configure_runtime_paths(source_root: str | os.PathLike[str] | None = None) -
         "BRAIN_GIT_ROOT": source / "brain_git_data",
         "BRAIN_EVIDENCE_DB": source / "brain6_artifacts" / "evidence" / "evidence.db",
         "AGENT_SANDBOX": source.parent / "agent_sandbox",
+        "BRAIN_SUPERVISOR_ROOT": source.parent / "brain6_artifacts" / "supervisor",
+        "BRAIN_SUCCESS_BOT_ROOT": source.parent / "brain6_artifacts" / "success_bot",
     }
     defaults = {
         "BRAIN_DB": runtime_home / "brain_v12.db",
@@ -107,6 +109,8 @@ def configure_runtime_paths(source_root: str | os.PathLike[str] | None = None) -
         "BRAIN_GIT_ROOT": runtime_home / "brain_git_data",
         "BRAIN_EVIDENCE_DB": runtime_home / "brain6_artifacts" / "evidence" / "evidence.db",
         "AGENT_SANDBOX": runtime_home / "agent_sandbox",
+        "BRAIN_SUPERVISOR_ROOT": runtime_home / "brain6_artifacts" / "supervisor",
+        "BRAIN_SUCCESS_BOT_ROOT": runtime_home / "brain6_artifacts" / "success_bot",
     }
     migrators = {
         "BRAIN_DB": _copy_sqlite_if_missing,
@@ -114,6 +118,8 @@ def configure_runtime_paths(source_root: str | os.PathLike[str] | None = None) -
         "BRAIN_GIT_ROOT": _copy_tree_if_missing,
         "BRAIN_EVIDENCE_DB": _copy_sqlite_if_missing,
         "AGENT_SANDBOX": _copy_tree_if_missing,
+        "BRAIN_SUPERVISOR_ROOT": _copy_tree_if_missing,
+        "BRAIN_SUCCESS_BOT_ROOT": _copy_tree_if_missing,
     }
     for name, default_path in defaults.items():
         os.environ.setdefault(name, str(default_path.resolve()))
