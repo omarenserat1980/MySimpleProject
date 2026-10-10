@@ -122,9 +122,9 @@ class CognitiveLoop:
             "verifier": verifier if verified else "",
         }
 
-    def run(self,goal):
+    def run(self,goal,run_id=None):
         goal=(goal or "").strip()
-        run_id=str(uuid4())
+        run_id=str(run_id or uuid4())
         self._state("PERCEIVE",goal=goal,run_id=run_id)
         self.events.publish("COGNITIVE_RUN_STARTED",{"run_id":run_id,"goal":goal})
         self.events.publish("PERCEIVE",{"goal":goal,"run_id":run_id})
