@@ -23,6 +23,16 @@ RISK_TOKENS = ("deploy", "publish", "payment", "payout", "mining", "provision", 
 def _present(root: Path, relative: str) -> bool:
     return (root / relative).exists()
 
+def _legacy_restored(root: Path, relative: str) -> bool:
+    path = root / relative
+    if not path.is_file():
+        return False
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return "RESTORATION_STATUS: COMPLETE" in content and "RESTORATION_STATUS: INCOMPLETE" not in content
+
 def _workflow_record(path: Path, root: Path) -> dict[str, Any]:
     text = (root / path).read_text(encoding="utf-8", errors="replace")
     match = re.search(r"(?m)^name:\s*(.+?)\s*$", text)
@@ -48,7 +58,7 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
     lanes = {name: {"required_paths": required, "source_present": all(_present(root, p) for p in required)}
              for name, required in PROJECT_LANES.items()}
     core_docs = {p: _present(root, p) for p in CORE_DOCS}
-    legacy_docs = {p: _present(root, p) for p in LEGACY_DOCS}
+    legacy_docs = {p: _legacy_restored(root, p) for p in LEGACY_DOCS}
     evidence_candidates = [".brain/state/production_runtime_evidence.json", "brain6_artifacts/evidence/live_runtime_evidence.json"]
     evidence = []
     for relative in evidence_candidates:
