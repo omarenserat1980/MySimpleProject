@@ -128,13 +128,19 @@ $payload = [ordered]@{
         secrets_or_serial_numbers_collected = $false
     }
 }
-$payloadJson = $payload | ConvertTo-Json -Depth 8
+# Hash the exact compact JSON string and include that exact string so a reviewer
+# can independently recompute SHA-256 without guessing serializer whitespace.
+$payloadJson = $payload | ConvertTo-Json -Depth 8 -Compress
 $sha = [System.Security.Cryptography.SHA256]::Create()
 try {
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($payloadJson)
     $payloadHash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
 } finally { $sha.Dispose() }
-$result = [ordered]@{ payload_sha256 = $payloadHash; payload = $payload }
+$result = [ordered]@{
+    payload_sha256 = $payloadHash
+    payload_canonical_json = $payloadJson
+    payload = $payload
+}
 Write-Output '=== BRAIN GOLDEN LOOP / ARKAN ASUS — READ-ONLY OBSERVATION ==='
 $result | ConvertTo-Json -Depth 10
 Write-Output '=== END OBSERVATION ==='
