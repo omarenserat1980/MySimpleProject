@@ -4,7 +4,7 @@ Deploy only on the Brain control-plane service. Per-executor bearer tokens are
 configured out of band; the runner never receives the signing private key.
 """
 from __future__ import annotations
-import hmac, json, os
+import hashlib, hmac, json, os
 from pathlib import Path
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -33,11 +33,12 @@ def _authenticate(executor_id: str, token: str) -> None:
     if not token:
         raise HTTPException(status_code=401, detail="CLOUD_EXECUTOR_AUTH_REQUIRED")
     try:
-        enrollments = json.loads(os.environ.get("BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_JSON", "{}"))
+        enrollments = json.loads(os.environ.get("BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON", "{}"))
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_ENROLLMENTS_CONFIG_INVALID") from exc
     expected = enrollments.get(executor_id) if isinstance(enrollments, dict) else None
-    if not isinstance(expected, str) or not expected or not hmac.compare_digest(expected, token):
+    supplied_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    if not isinstance(expected, str) or len(expected) != 64 or not hmac.compare_digest(expected.lower(), supplied_hash):
         raise HTTPException(status_code=403, detail="CLOUD_EXECUTOR_AUTH_REJECTED")
 
 @router.post("/challenge")
