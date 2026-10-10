@@ -6,6 +6,8 @@ operating systems, runtimes, services, and compute substrates it is allowed to m
 The first increment is intentionally an **inventory and evidence registry**, not an installer.
 
 ## Implemented in this increment
+- A declarative target catalog for Brain V12, Python, SQLite, Git, .NET SDK, Windows Server 2025, QEMU, OVMF, and FFmpeg; every target is explicitly marked as a goal, not an installation claim.
+- A readiness comparison that requires both the target runtime state and a verified inventory record; it does not run probes or claim missing software is ready.
 - SQLite-backed software records with stable IDs, category, version, source, license,
   optional install path, declared permissions, runtime state, verification state, evidence
   reference, notes, and timestamps.
@@ -21,6 +23,8 @@ The first increment is intentionally an **inventory and evidence registry**, not
 ## API
 All endpoints require the existing Brain control key.
 
+- `GET /api/software/catalog` — desired software catalog; not live host inventory.
+- `GET /api/software/readiness` — compares catalog targets to evidence-bearing registry records.
 - `GET /api/software/status` — counts and safety boundary.
 - `GET /api/software` — list records; optional `category` and `runtime_state` filters.
 - `GET /api/software/{software_id}` — one record.
@@ -51,7 +55,7 @@ Example registration body:
 5. Execution substrates (GitHub runner, container/sandbox, VM executor).
 6. Observability and recovery (health checks, logs, backups, restore verification).
 
-These are inventory categories and goals, not a claim that each component is installed.
+These are target-state goals, not a claim that each component is installed. The readiness endpoint remains false until each target has matching state and verification evidence.
 
 ## Required next gates before execution features
 - Read-only host discovery with explicit allowlist and bounded output.
