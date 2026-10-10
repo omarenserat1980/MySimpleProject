@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from shutil import which
 import json
-import platform
 import os
+import platform
+import stat
 from pathlib import Path
 
 from .performance import ShortTTLCache, performance_cache_ttl
@@ -20,6 +21,7 @@ REQUIRED_BINARIES = (
     "mkfs.vfat",
     "mcopy",
 )
+HOST_ATTESTATION_FILE = Path("/etc/brain/internal-runner-attestation.json")
 
 
 @dataclass(frozen=True)
@@ -57,12 +59,36 @@ def _cache() -> ShortTTLCache[RunnerPreflight]:
     return _PREFLIGHT_CACHE
 
 
+def _host_attestation_valid(runner_name: str, path: Path = HOST_ATTESTATION_FILE) -> bool:
+    """Require a root-owned, non-writable-by-group/others host attestation.
+
+    This file must be provisioned out-of-band by the host administrator; a
+    workflow-level environment variable is deliberately not accepted as proof.
+    """
+    if not runner_name:
+        return False
+    try:
+        st = path.stat()
+        if st.st_uid != 0 or stat.S_IMODE(st.st_mode) & 0o022:
+            return False
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return (
+            data.get("version") == 1
+            and data.get("purpose") == "brain-internal-runner"
+            and data.get("runner_name") == runner_name
+        )
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
     binaries = {name: which(name) is not None for name in REQUIRED_BINARIES}
     reasons: list[str] = []
+    runner_name = os.environ.get("RUNNER_NAME", "")
+    attested = _host_attestation_valid(runner_name)
 
-    if os.environ.get("BRAIN_INTERNAL_RUNNER_FLAG") != "1":
-        reasons.append("INTERNAL_RUNNER_FLAG_MISSING")
+    if not attested:
+        reasons.append("HOST_ATTESTATION_MISSING_OR_INVALID")
     if platform.system() != "Linux":
         reasons.append("HOST_OS_NOT_LINUX")
     if platform.machine().lower() not in {"x86_64", "amd64"}:
@@ -72,7 +98,7 @@ def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
 
     return RunnerPreflight(
         runner_id=runner_id,
-        online=(os.environ.get("BRAIN_INTERNAL_RUNNER_FLAG") == "1"),
+        online=attested,
         os=platform.system(),
         arch=platform.machine(),
         binaries=binaries,
@@ -84,7 +110,7 @@ def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
     # Cache only verified substrate results. Failed probes always execute fresh,
     # so a transient failure cannot be hidden. Authority/contracts/evidence are
     # deliberately outside this cache and remain live on every execution.
-    key = f"{runner_id}:{os.environ.get('BRAIN_INTERNAL_RUNNER_FLAG', '')}"
+    key = f"{runner_id}:{os.environ.get('RUNNER_NAME', '')}"
     return _cache().get_or_compute(
         key,
         lambda: _inspect_runner_uncached(runner_id),
