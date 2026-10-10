@@ -22,6 +22,11 @@ def build_layer_runtime_status(brain_ai: Any, session_store: Any = None) -> dict
     memory_store = getattr(brain_ai, "memory_store", None)
     cognitive = getattr(brain_ai, "cognitive", None)
 
+    try:
+        model_selection = router.select("chat") if router is not None and callable(getattr(router, "select", None)) else {"ok": False}
+    except Exception:
+        model_selection = {"ok": False}
+
     states = {
         "input_gateway": _state("READY", "Brain AI HTTP request model validates input."),
         "identity_access": _state("NOT_WIRED", "No authenticated identity/scope adapter is passed to this pipeline."),
@@ -35,8 +40,8 @@ def build_layer_runtime_status(brain_ai: Any, session_store: Any = None) -> dict
         "intent_router": _state("READY" if callable(getattr(brain_ai, "_tool_intents", None)) else "NOT_WIRED",
                                 "Brain AI tool-intent normalizer is available."),
         "task_planner": _state("NOT_WIRED", "A structured task-plan contract is not yet connected to this runtime."),
-        "model_router": _state("READY" if router is not None and callable(getattr(router, "select", None)) else ("PARTIAL" if provider_status is not None else "NOT_WIRED"),
-                               "ModelRouter selection/fallback is available." if router is not None else "Only the default provider is available or no router was detected."),
+        "model_router": _state("READY" if model_selection.get("ok") else ("PARTIAL" if router is not None or provider_status is not None else "NOT_WIRED"),
+                               "At least one chat model can be selected." if model_selection.get("ok") else "Router/provider exists but no selectable chat model was confirmed."),
         "reasoning_adapter": _state("READY" if callable(getattr(brain_ai, "chat", None)) else "NOT_WIRED",
                                     "Existing Brain AI reasoning facade is available; its governed tool loop remains responsible for execution."),
         "response_guard": _state("PARTIAL", "Structured BrainAIResponse and error states exist; a dedicated 20-layer output guard is not wired."),
