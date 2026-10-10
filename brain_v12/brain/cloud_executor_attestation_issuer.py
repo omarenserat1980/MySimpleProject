@@ -6,6 +6,7 @@ must authenticate the executor before challenge creation and signing.
 """
 from __future__ import annotations
 import base64, os, secrets, sqlite3, time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -25,6 +26,14 @@ def _connect(db_path: str):
     db.execute("CREATE TABLE IF NOT EXISTS issued_attestations (nonce TEXT PRIMARY KEY, executor_id TEXT NOT NULL, expires_at REAL NOT NULL, consumed_at REAL)")
     return db
 
+@contextmanager
+def _connection(db_path: str):
+    db = _connect(db_path)
+    try:
+        yield db
+    finally:
+        db.close()
+
 def create_challenge(*, authenticated_executor_id: str, challenge_db_path: str, now: float | None = None) -> dict[str, Any]:
     executor_id = authenticated_executor_id.strip()
     if not executor_id:
@@ -33,7 +42,7 @@ def create_challenge(*, authenticated_executor_id: str, challenge_db_path: str, 
     nonce = secrets.token_urlsafe(32)
     expires_at = current + CHALLENGE_TTL_SECONDS
     try:
-        with _connect(challenge_db_path) as db:
+        with _connection(challenge_db_path) as db:
             db.execute("INSERT INTO issued_challenges VALUES (?, ?, ?, NULL)", (nonce, executor_id, expires_at))
     except sqlite3.Error as exc:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_UNAVAILABLE") from exc
@@ -94,7 +103,7 @@ def consume_issued_attestation(*, authenticated_executor_id: str, nonce: str, re
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_CONSUME_FIELDS_REQUIRED")
     current = time.time() if now is None else float(now)
     try:
-        with _connect(registry_db_path) as db:
+        with _connection(registry_db_path) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT executor_id, expires_at, consumed_at FROM issued_attestations WHERE nonce=?", (nonce,)).fetchone()
             if row is None:
