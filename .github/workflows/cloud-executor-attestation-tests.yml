@@ -16,6 +16,7 @@ on:
       - "tools/bootstrap_brain_cloud_executor.sh"
       - "tools/install_brain_executor_trust_anchor.sh"
       - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
+      - "brain_v12/CLOUD_EXECUTOR_CONTROL_PLANE_SETUP.md"
       - ".github/workflows/cloud-executor-attestation-tests.yml"
   push:
     branches: [main]
