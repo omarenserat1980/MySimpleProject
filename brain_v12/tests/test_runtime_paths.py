@@ -23,6 +23,7 @@ PATH_VARIABLES = (
     "AGENT_SANDBOX",
     "BRAIN_SUPERVISOR_ROOT",
     "BRAIN_SUCCESS_BOT_ROOT",
+    "BRAIN_VIRTUAL_TASK_DB",
 )
 
 
@@ -64,6 +65,8 @@ class RuntimePathsTests(unittest.TestCase):
             legacy_success_bot = source.parent / "brain6_artifacts" / "success_bot"
             legacy_success_bot.mkdir(parents=True)
             (legacy_success_bot / "state.json").write_text("legacy-success-bot", encoding="utf-8")
+            legacy_virtual_tasks = source.parent / "brain6_artifacts" / "virtual_tasks" / "tasks.db"
+            create_db(legacy_virtual_tasks, "virtual_tasks")
 
             with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
                 resolved = configure_runtime_paths(source_root=source)
@@ -102,6 +105,15 @@ class RuntimePathsTests(unittest.TestCase):
                     (runtime_home / "brain6_artifacts" / "success_bot" / "state.json").read_text(encoding="utf-8"),
                     "legacy-success-bot",
                 )
+                self.assertEqual(
+                    Path(os.environ["BRAIN_VIRTUAL_TASK_DB"]),
+                    runtime_home / "brain6_artifacts" / "virtual_tasks" / "tasks.db",
+                )
+                with sqlite3.connect(os.environ["BRAIN_VIRTUAL_TASK_DB"]) as db:
+                    self.assertEqual(
+                        db.execute("SELECT value FROM virtual_tasks").fetchone()[0],
+                        "legacy-virtual_tasks",
+                    )
                 runtime_media = runtime_home / "media"
                 self.assertEqual(Path(os.environ["BRAIN_MEDIA_ROOT"]), runtime_media.resolve())
                 self.assertEqual((runtime_media / "existing.mp4").read_bytes(), b"existing-media")
@@ -134,6 +146,7 @@ class RuntimePathsTests(unittest.TestCase):
             self.assertTrue((legacy_sandbox / "existing.txt").is_file())
             self.assertTrue((legacy_supervisor / "state.json").is_file())
             self.assertTrue((legacy_success_bot / "state.json").is_file())
+            self.assertTrue(legacy_virtual_tasks.is_file())
 
     def test_explicit_database_override_is_preserved_and_not_seeded(self):
         with tempfile.TemporaryDirectory() as temporary:
