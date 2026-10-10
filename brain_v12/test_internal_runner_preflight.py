@@ -6,16 +6,30 @@ from brain_v12.brain.internal_runner_preflight import inspect_runner
 
 
 class InternalRunnerPreflightTests(unittest.TestCase):
-    def test_not_online_without_runtime_flag(self):
-        with patch.dict(os.environ, {}, clear=True):
+    def test_not_online_without_host_attestation(self):
+        with (
+            patch.dict(os.environ, {"RUNNER_NAME": "brain-internal-arkan"}, clear=True),
+            patch("brain_v12.brain.internal_runner_preflight._host_attestation_valid", return_value=False),
+            patch("brain_v12.brain.internal_runner_preflight.which", return_value="/usr/bin/mock-tool"),
+            patch("brain_v12.brain.internal_runner_preflight.platform.system", return_value="Linux"),
+            patch("brain_v12.brain.internal_runner_preflight.platform.machine", return_value="x86_64"),
+        ):
             r = inspect_runner()
             self.assertFalse(r.online)
-            self.assertIn("INTERNAL_RUNNER_FLAG_MISSING", r.reasons)
+            self.assertIn("HOST_ATTESTATION_MISSING_OR_INVALID", r.reasons)
 
-    def test_online_claim_requires_runtime_flag(self):
-        with patch.dict(os.environ, {"BRAIN_INTERNAL_RUNNER_FLAG": "1"}, clear=True):
+    def test_online_requires_host_attestation(self):
+        with (
+            patch.dict(os.environ, {"RUNNER_NAME": "brain-internal-arkan"}, clear=True),
+            patch("brain_v12.brain.internal_runner_preflight._host_attestation_valid", return_value=True),
+            patch("brain_v12.brain.internal_runner_preflight.which", return_value="/usr/bin/mock-tool"),
+            patch("brain_v12.brain.internal_runner_preflight.platform.system", return_value="Linux"),
+            patch("brain_v12.brain.internal_runner_preflight.platform.machine", return_value="x86_64"),
+        ):
             r = inspect_runner()
             self.assertTrue(r.online)
+            self.assertTrue(r.verified)
+            self.assertEqual(r.reasons, ())
 
 
 if __name__ == "__main__":
