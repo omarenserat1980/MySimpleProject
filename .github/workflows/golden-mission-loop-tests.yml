@@ -9,6 +9,7 @@ on:
       - "brain_v12/brain/golden_mission.py"
       - "brain_v12/brain/golden_mission_worker.py"
       - "brain_v12/brain/golden_mission_system_audit.py"
+      - "brain_v12/brain/golden_mission_live_probe.py"
       - "brain_v12/golden_mission_api.py"
       - "brain_v12/brain/synthetic_customer.py"
       - "brain_v12/tests/test_golden_mission*.py"
@@ -53,7 +54,7 @@ jobs:
 
       - name: Run Golden Mission and Synthetic Customer tests
         run: |
-          python -m pytest -q brain_v12/tests/test_golden_mission.py brain_v12/tests/test_golden_mission_system_audit.py brain_v12/tests/test_golden_mission_api.py brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
+          python -m pytest -q brain_v12/tests/test_golden_mission.py brain_v12/tests/test_golden_mission_system_audit.py brain_v12/tests/test_golden_mission_live_probe.py brain_v12/tests/test_golden_mission_api.py brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
 
       - name: Upload Golden Mission system audit evidence
         if: always()
