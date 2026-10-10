@@ -12,48 +12,74 @@ permissions:
 
 jobs:
   test:
-    name: Import Brain as unprivileged brain user
+    name: Boot Brain temporarily as unprivileged user
     runs-on: [self-hosted, linux, x64, brain-internal]
     timeout-minutes: 8
     steps:
-      - name: Inspect persistent paths and test import without root
+      - name: Check state files then smoke-test API without root
         shell: bash
         run: |
           set +e
           R=/home/brain/linux-runner-new/_work/MySimpleProject/MySimpleProject
           PY=/home/brain/brain-runtime-venv/bin/python
           BASE=/home/brain/.brain/diagnostics/permission-13-as-brain
-          echo "=== ROOT CAUSE CONFIRMATION ==="
+          SERVICE=actions.runner.omarenserat1980-MySimpleProject.brain-internal-arkan.service
+          echo "=== RUNNER SECURITY CONDITION ==="
           id
-          systemctl show actions.runner.omarenserat1980-MySimpleProject.brain-internal-arkan.service -p User -p Group --no-pager
-          echo "=== EXISTING PERSISTENT FILES (METADATA ONLY) ==="
-          for p in \
-            "$R/brain_v12/brain_v12.db" \
-            "$R/brain_v12/.brain/state/sync_queue.jsonl" \
-            "$R/brain_v12/brain_git_data" \
-            "$R/brain_v12/brain6_artifacts/evidence/evidence.db" \
-            /home/brain/.brain/brain_v12.db \
-            /home/brain/.brain/state/sync_queue.jsonl; do
+          systemctl show "$SERVICE" -p User -p Group --no-pager
+          echo "=== SEARCH EXISTING DATABASES / RECOVERY FILES (METADATA ONLY) ==="
+          find /home/brain -xdev -type f \( -name 'brain_v12.db' -o -name 'evidence.db' -o -name '*.sqlite3' -o -name 'Brain-Recovery-*.bin' -o -name 'Brain-Recovery-*.zip' \) -printf '%u:%g mode=%m size=%s path=%p\n' 2>/dev/null | head -80
+          echo "=== CANONICAL PATHS ==="
+          for p in "$R/brain_v12/brain_v12.db" "$R/brain_v12/.brain/state/sync_queue.jsonl" "$R/brain_v12/brain_git_data" "$R/brain_v12/brain6_artifacts/evidence/evidence.db"; do
             if [ -e "$p" ]; then stat -c '%U:%G mode=%a size=%s type=%F path=%n' "$p"; else echo "MISSING $p"; fi
           done
-          echo "=== CREATE USER-OWNED DIAGNOSTIC DIRS ==="
-          runuser -u brain -- env HOME=/home/brain BASE="$BASE" bash -c 'mkdir -p "$BASE/media" "$BASE/state" "$BASE/git"'
-          setup_status=$?
-          echo "SETUP_EXIT=$setup_status"
-          if [ "$setup_status" -ne 0 ]; then exit "$setup_status"; fi
-          echo "=== IMPORT AS BRAIN USER ==="
-          cd "$R"
-          runuser -u brain -- env \
-            HOME=/home/brain \
-            BRAIN_MEDIA_ROOT="$BASE/media" \
-            BRAIN_DB="$BASE/brain-test.sqlite3" \
-            BRAIN_SYNC_QUEUE="$BASE/state/sync_queue.jsonl" \
-            BRAIN_GIT_ROOT="$BASE/git" \
-            BRAIN_EVIDENCE_DB="$BASE/evidence.db" \
-            PYTHONPATH="$R" \
-            "$PY" -c 'import brain_v12.app; print("BRAIN_APP_IMPORT_AS_BRAIN_OK")' 2>&1
-          import_status=$?
-          echo "IMPORT_AS_BRAIN_EXIT=$import_status"
-          echo "=== PORT 8012 ==="
-          ss -ltnp 2>/dev/null | grep ':8012' || echo PORT_8012_NOT_LISTENING
-          exit "$import_status"
+          echo "=== CHECK TARGET PORT ==="
+          if ss -ltn 2>/dev/null | grep -qE '(^|[[:space:]])[^[:space:]]*:8012([[:space:]]|$)'; then
+            echo "PORT_8012_ALREADY_IN_USE; refusing to start a second test process"
+            exit 50
+          fi
+          echo "=== TEMPORARY API SMOKE TEST AS BRAIN ==="
+          runuser -u brain -- env HOME=/home/brain R="$R" PY="$PY" BASE="$BASE" bash -c '
+            set -u
+            mkdir -p "$BASE/media" "$BASE/state" "$BASE/git"
+            cd "$R" || exit 51
+            env HOME=/home/brain \
+              BRAIN_MEDIA_ROOT="$BASE/media" \
+              BRAIN_DB="$BASE/brain-test.sqlite3" \
+              BRAIN_SYNC_QUEUE="$BASE/state/sync_queue.jsonl" \
+              BRAIN_GIT_ROOT="$BASE/git" \
+              BRAIN_EVIDENCE_DB="$BASE/evidence.db" \
+              PYTHONPATH="$R" \
+              "$PY" -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 --workers 1 --log-level warning >"$BASE/api-smoke.log" 2>&1 &
+            API_PID=$!
+            cleanup() {
+              kill -TERM "$API_PID" 2>/dev/null || true
+              wait "$API_PID" 2>/dev/null || true
+              echo "TEMPORARY_API_STOPPED"
+            }
+            trap cleanup EXIT
+            ready=0
+            for i in $(seq 1 25); do
+              if curl -fsS --max-time 2 http://127.0.0.1:8012/health -o "$BASE/health.json"; then ready=1; break; fi
+              if ! kill -0 "$API_PID" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            if [ "$ready" -ne 1 ]; then
+              echo "API_HEALTH_FAILED"
+              tail -n 80 "$BASE/api-smoke.log"
+              exit 52
+            fi
+            echo "API_HEALTH_HTTP=200"
+            cat "$BASE/health.json"
+            echo
+            for path in /api/system/readiness /api/media/health /api/cinema/status; do
+              code=$(curl -sS --max-time 4 -o "$BASE/response.json" -w "%{http_code}" "http://127.0.0.1:8012$path" 2>/dev/null)
+              echo "API_ENDPOINT $path HTTP=$code"
+              head -c 1200 "$BASE/response.json" 2>/dev/null
+              echo
+            done
+            echo "API_IMPORT_AND_HEALTH_SMOKE=PASS"
+          '
+          smoke_status=$?
+          echo "SMOKE_EXIT=$smoke_status"
+          exit "$smoke_status"
