@@ -279,6 +279,26 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertIsNone(status["last_result"])
         self.assertEqual(status["mode"], "REMINDERS_ONLY")
 
+    def test_reminder_worker_survives_background_tick_failure_and_reports_it(self):
+        import time
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class BrokenController:
+            def notify_due(self):
+                raise RuntimeError("background tick failed")
+
+        worker = GoldenMissionReminderWorker(BrokenController(), interval_seconds=30)
+        self.assertTrue(worker.start())
+        deadline = time.monotonic() + 1.0
+        status = worker.status()
+        while time.monotonic() < deadline and status["last_error"] is None:
+            time.sleep(0.01)
+            status = worker.status()
+        worker.stop(timeout=1.0)
+        self.assertEqual(status["last_error"], "RuntimeError: background tick failed")
+        self.assertIsNotNone(status["last_tick_at"])
+        self.assertFalse(worker.status()["running"])
+
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):
             result=GoldenMissionController._send_email(self.mission,"test")
