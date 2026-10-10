@@ -11,7 +11,7 @@ The first increment is intentionally an **inventory and evidence registry**, not
   reference, notes, and timestamps.
 - Protected API access in the Brain FastAPI application.
 - Registration defaults to `planned`; only `planned`, `observed`, and `unknown` may be
-  set by registration. Registration cannot claim an item is installed or running.
+  set by registration. Observed/installed/running claims require a separate evidence-bearing observation.
 - A runtime observation is accepted only for an existing record and requires a non-empty
   evidence reference. A successful observation is a record of supplied evidence, not proof
   that the API independently ran a check.
