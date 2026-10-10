@@ -69,7 +69,6 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
                     'test ! -x "$GH_CONFIG_DIR" && '
                     'test ! -r "$GH_CONFIG_DIR/hosts.yml"'
                 )
-                env = {"HOME": "/nonexistent", "GH_CONFIG_DIR": str(config_dir)}
                 denied = subprocess.run(
                     sudo + ["-u", username, "--", "env",
                             "HOME=/nonexistent", "GH_CONFIG_DIR=" + str(config_dir),
