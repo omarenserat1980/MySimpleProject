@@ -24,6 +24,16 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
         self.assertIn("unset TOKEN", script)
         self.assertIn("unset BRAIN_CLOUD_EXECUTOR_TOKEN", script)
 
+    def test_runner_credential_boundary_is_checked_before_registration(self):
+        script = Path("tools/bootstrap_brain_cloud_executor.sh").read_text(encoding="utf-8")
+        self.assertIn('GH_CONFIG_DIR="${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}"', script)
+        self.assertIn('test ! -r "$GH_CONFIG_DIR" && test ! -x "$GH_CONFIG_DIR" && test ! -r "$GH_CONFIG_DIR/hosts.yml"', script)
+        self.assertIn("RUNNER_CAN_READ_OPERATOR_GH_CREDENTIALS", script)
+        self.assertIn("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED", script)
+        self.assertIn("exit 40", script)
+        self.assertLess(script.index("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED"),
+                        script.index('"/repos/$REPO/actions/runners/registration-token"'))
+
     def test_runner_workspace_is_owned_by_runner_account(self):
         script = Path("tools/bootstrap_brain_cloud_executor.sh").read_text(encoding="utf-8")
         self.assertIn('sudo chown -R "$RUNNER_USER:$RUNNER_GROUP" "$RUNNER_DIR"', script)
