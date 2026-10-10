@@ -1,8 +1,7 @@
-"""Cloud Executor capability gate.
+"""Cloud Executor capability and signed-identity gate.
 
-This gate proves only the execution substrate. It does not claim that
-Windows Server booted. A Windows capability may proceed only after this
-independent substrate gate is VERIFIED.
+This proves the execution substrate and verifies a short-lived signed executor
+attestation. It does not claim that Windows Server booted.
 """
 from __future__ import annotations
 
@@ -15,6 +14,8 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any
+
+from brain_v12.brain.cloud_executor_attestation import verify_from_environment
 
 
 def _run(cmd: list[str], timeout: int = 10) -> tuple[bool, str]:
@@ -53,23 +54,32 @@ def _probe_kvm(qemu: str) -> tuple[bool, str]:
 
 def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
     checks: dict[str, Any] = {}
-
     cloud_flag = os.environ.get("BRAIN_CLOUD_EXECUTOR", "")
     executor_id = os.environ.get("BRAIN_CLOUD_EXECUTOR_ID", "").strip()
-    executor_attestation = os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION", "").strip()
-    checks["cloud_executor_attestation"] = {"ok": bool(executor_attestation), "value": "present" if executor_attestation else "missing"}
-
     checks["cloud_executor_identity"] = {
         "ok": cloud_flag == "1" and bool(executor_id),
         "value": executor_id if executor_id else "missing",
     }
 
+    try:
+        attestation = verify_from_environment(executor_id)
+        checks["cloud_executor_attestation"] = {
+            "ok": True,
+            "value": "cryptographically-verified",
+            "expires_at": attestation["expires_at"],
+            "audience": attestation["audience"],
+        }
+    except (ValueError, OSError) as exc:
+        # Keep secrets and the attestation contents out of logs/evidence.
+        checks["cloud_executor_attestation"] = {
+            "ok": False,
+            "value": str(exc) if str(exc).startswith("CLOUD_EXECUTOR_") else "verification-failed",
+        }
+
     arch = platform.machine().lower()
     checks["x86_64"] = {"ok": arch in {"x86_64", "amd64"}, "value": arch}
-
     kvm = Path("/dev/kvm")
     checks["kvm_device"] = {"ok": kvm.exists() and os.access(kvm, os.R_OK | os.W_OK), "value": str(kvm)}
-
     qemu = shutil.which("qemu-system-x86_64")
     checks["qemu"] = {"ok": bool(qemu), "value": qemu or ""}
 
@@ -91,13 +101,13 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
 
     verified = all(v.get("ok") is True for v in checks.values())
     evidence = {
-        "schema": "brain.cloud-executor-gate.v1",
+        "schema": "brain.cloud-executor-gate.v2",
         "verified": verified,
         "evidence_ref": f"cloud-executor-gate:{int(time.time())}",
         "executor": "cloud-ephemeral-or-equivalent",
         "executor_id": executor_id,
         "checks": checks,
-        "rule": "cloud identity + x86_64 + KVM device + QEMU + actual KVM initialization + writable execution surface",
+        "rule": "signed executor identity + x86_64 + KVM + QEMU + actual KVM initialization + writable execution surface",
     }
     Path(output).write_text(json.dumps(evidence, indent=2, sort_keys=True), encoding="utf-8")
     return evidence
@@ -105,7 +115,7 @@ def check(output: str = "cloud-executor-gate.json") -> dict[str, Any]:
 
 if __name__ == "__main__":
     import argparse
-    p = argparse.ArgumentParser()
-    p.add_argument("--output", default="cloud-executor-gate.json")
-    args = p.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", default="cloud-executor-gate.json")
+    args = parser.parse_args()
     print(json.dumps(check(args.output), indent=2, sort_keys=True))

@@ -1,0 +1,59 @@
+name: Brain Cloud Executor Attestation Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/cloud_executor_attestation.py"
+      - "tools/request_cloud_executor_attestation.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
+      - "brain_v12/brain/cloud_executor_gate.py"
+      - "brain_v12/tests/test_cloud_executor_attestation.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
+      - "brain_v12/tests/test_cloud_executor_gate.py"
+      - "tools/bootstrap_brain_cloud_executor.sh"
+      - "tools/install_brain_executor_trust_anchor.sh"
+      - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
+      - "brain_v12/CLOUD_EXECUTOR_CONTROL_PLANE_SETUP.md"
+      - ".github/workflows/cloud-executor-attestation-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/cloud_executor_attestation.py"
+      - "tools/request_cloud_executor_attestation.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
+      - "brain_v12/brain/cloud_executor_gate.py"
+      - "brain_v12/tests/test_cloud_executor_attestation.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
+      - "brain_v12/tests/test_cloud_executor_gate.py"
+      - "tools/bootstrap_brain_cloud_executor.sh"
+      - "tools/install_brain_executor_trust_anchor.sh"
+      - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
+      - ".github/workflows/cloud-executor-attestation-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  attestation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install cryptography
+        run: python -m pip install --disable-pip-version-check "cryptography>=42" "fastapi>=0.110"
+      - name: Run signed attestation, issuer, replay and gate tests
+        run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_attestation_api brain_v12.tests.test_cloud_executor_gate
+      - name: Validate shell scripts
+        run: bash -n tools/bootstrap_brain_cloud_executor.sh tools/install_brain_executor_trust_anchor.sh
+      - name: Compile attestation modules and client
+        run: python -m py_compile brain_v12/brain/cloud_executor_attestation.py brain_v12/brain/cloud_executor_attestation_issuer.py brain_v12/brain/cloud_executor_attestation_api.py tools/request_cloud_executor_attestation.py brain_v12/app.py
