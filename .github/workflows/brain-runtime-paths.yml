@@ -1,0 +1,77 @@
+name: Brain Runtime Paths
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/app.py"
+      - "brain_v12/media_engine.py"
+      - "brain_v12/tests/test_runtime_paths.py"
+      - "requirements.txt"
+      - ".github/workflows/brain-runtime-paths.yml"
+  push:
+    branches:
+      - "fix/portable-writable-runtime-state-20261010"
+    paths:
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/tests/test_runtime_paths.py"
+      - ".github/workflows/brain-runtime-paths.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install application dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Test writable runtime path defaults and overrides
+        run: python -m unittest brain_v12.tests.test_runtime_paths -v
+      - name: Start Brain API with a read-only source checkout
+        run: |
+          set -euo pipefail
+          temp_root="$(mktemp -d)"
+          source_root="$temp_root/readonly-source"
+          log_file="$temp_root/uvicorn.log"
+          health_file="$temp_root/health.json"
+          port=18012
+          cleanup() {
+            if [ -n "${server_pid:-}" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            chmod -R u+w "$source_root" 2>/dev/null || true
+            rm -rf "$temp_root"
+          }
+          trap cleanup EXIT
+          mkdir -p "$source_root"
+          git archive HEAD | tar -x -C "$source_root"
+          chmod -R a-w "$source_root"
+          cd "$source_root"
+          BRAIN_RUNTIME_HOME="$temp_root/brain-runtime" PYTHONPATH="$source_root" PYTHONDONTWRITEBYTECODE=1 python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port "$port" --log-level info >"$log_file" 2>&1 &
+          server_pid=$!
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail "http://127.0.0.1:$port/health" >"$health_file"; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$log_file"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ ! -s "$health_file" ]; then
+            cat "$log_file"
+            echo "BRAIN_API_HEALTH_TIMEOUT"
+            exit 1
+          fi
+          python -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d.get("ok") is True and d.get("status") == "healthy", d; print("BRAIN_API_HEALTH_OK_READ_ONLY_SOURCE")' "$health_file"
+          test -d "$temp_root/brain-runtime/media/engine"

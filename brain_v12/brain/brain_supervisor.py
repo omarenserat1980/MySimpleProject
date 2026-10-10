@@ -1,6 +1,6 @@
 """Brain Supervisor: bounded autonomous orchestration over the existing Control Plane."""
 from __future__ import annotations
-import json, time
+import json, os, time
 from pathlib import Path
 from .autonomy_control_plane import ControlPlane
 from .autonomous_reasoner import AutonomousReasoner
@@ -18,7 +18,12 @@ SAFE_EXTERNAL_ACTIONS={"submit_application","publish_external","move_money","wit
 
 class BrainSupervisor:
     """Single authoritative orchestrator. V13 primitives are policy/state layers only."""
-    def __init__(self,root="brain6_artifacts/supervisor",max_cycles=5,execution_gateway=None):
+    def __init__(self,root=None,max_cycles=5,execution_gateway=None):
+        if root is None:
+            root = os.getenv("BRAIN_SUPERVISOR_ROOT")
+        if root is None:
+            runtime_home = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
+            root = runtime_home / "brain6_artifacts" / "supervisor"
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         self.state_path=self.root/"state.json"; self.events_path=self.root/"events.jsonl"
         self.max_cycles=max(1,min(int(max_cycles),5))

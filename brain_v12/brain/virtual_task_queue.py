@@ -30,7 +30,7 @@ class VirtualTask:
 
 class VirtualTaskQueue:
     """Durable queue with startup recovery and explicit verification boundary."""
-    def __init__(self,chassis,resource_manager,max_workers=8,store_path="brain6_artifacts/virtual_tasks/tasks.db",workload_controller=None,workload_router=None):
+    def __init__(self,chassis,resource_manager,max_workers=8,store_path=None,workload_controller=None,workload_router=None):
         self.chassis=chassis; self.resources=resource_manager; self.tasks={}; self.lock=RLock()
         self.workload_controller=workload_controller or WorkloadController()
         self.workload_router=workload_router or WorkloadRouter(self.workload_controller)
