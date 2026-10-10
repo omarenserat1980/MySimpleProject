@@ -146,3 +146,7 @@ For an enrolled Android Executor/Termux agent, the heartbeat metadata must repor
 ```
 Do not copy this sample as a claim about a real device; capacity values must be measured at runtime. Android app enrollment, signing/identity, actual heartbeat delivery, polling/claiming, result upload, and on-device evidence verification remain deployment tasks. Do not mark any phone online based only on this source change.
 
+
+## Ralmi device profile
+
+The Android Executor app's clean-install default agent identity is `android-executor-ralmi-01`, and the UI identifies the profile as Ralmi. This changes the default only when no saved agent ID exists; an already configured Redmi 3 installation keeps its saved `agent_id`. For the three-device setup, enroll Ralmi and Redmi 3 as separate physical agents with distinct credentials. A successful APK build proves compilation and artifact creation only; it does not prove either phone is connected or enrolled at runtime.
