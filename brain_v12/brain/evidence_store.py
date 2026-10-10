@@ -48,4 +48,19 @@ class EvidenceStore:
         self.db.commit()
         return {"ok":valid,"status":status,"evidence_id":evidence_id,"sha256":item["sha256"]}
 
+    def recent_golden(self, limit=100):
+        """Return recent Golden-loop evidence only; this is a read-only projection."""
+        limit = max(1, min(int(limit), 200))
+        rows = self.db.execute(
+            "SELECT evidence_id FROM evidence WHERE kind LIKE 'golden:%' ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [self.get(row["evidence_id"]) for row in rows]
+
+    def golden_count(self):
+        row = self.db.execute(
+            "SELECT COUNT(*) AS total FROM evidence WHERE kind LIKE 'golden:%'"
+        ).fetchone()
+        return int(row["total"])
+
     def close(self): self.db.close()
