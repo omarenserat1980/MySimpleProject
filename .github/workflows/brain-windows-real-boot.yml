@@ -49,6 +49,11 @@ jobs:
 
   real_windows_boot:
     needs: cloud_executor_gate
+    environment:
+      name: windows-real-boot
+    env:
+      BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
+      BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 70
     steps:
@@ -85,24 +90,28 @@ jobs:
           print("SAME_JOB_CLOUD_EXECUTOR_EVIDENCE_REF="+e["evidence_ref"])
           PY
 
-      - name: Preflight Brain execution contract path
+      - name: Preflight Brain execution contract destination
         run: |
           set -euo pipefail
-          CONTRACT_FILE="${BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE:-/run/brain/windows-execution-contract.json}"
-          if [[ ! -f "$CONTRACT_FILE" ]]; then
-            echo "BLOCKED: signed Brain execution contract is missing on this runner."
-            echo "Expected BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE to point to a pre-issued contract file."
-            echo "Default path checked: /run/brain/windows-execution-contract.json"
-            echo "Provision the contract securely on the runner host; do not create or sign one in this workflow."
-            exit 2
-          fi
-          test -r "$CONTRACT_FILE" || { echo "BLOCKED: contract file is not readable by the runner service."; exit 2; }
-          echo "WINDOWS_EXECUTION_CONTRACT_FILE=PRESENT"
+          CONTRACT_FILE="$BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"
+          CONTRACT_DIR="$(dirname "$CONTRACT_FILE")"
+          mkdir -p "$CONTRACT_DIR"
+          test -w "$CONTRACT_DIR" || { echo "BLOCKED: contract destination is not writable."; exit 2; }
+          echo "WINDOWS_EXECUTION_CONTRACT_DESTINATION=READY"
 
-      - name: Verify pre-issued Brain closed-loop execution contract
+      - name: Fetch short-lived contract from Brain Control Plane
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/fetch_windows_execution_contract.py
+
+      - name: Verify Brain closed-loop execution contract
         run: |
           set -euo pipefail
           python3 brain_v12/brain/windows_real_boot_closed_loop_gate.py \
+            --path "$BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE" \
             --output windows-execution-contract-gate.json
           grep -q '"verified": true' windows-execution-contract-gate.json
           echo "WINDOWS_EXECUTION_CONTRACT=VERIFIED"

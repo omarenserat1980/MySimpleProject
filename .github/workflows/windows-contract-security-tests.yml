@@ -1,0 +1,81 @@
+name: Windows Contract Security Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/app.py"
+      - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - "brain_v12/brain/windows_contract_service.py"
+      - "brain_v12/tests/test_windows_contract_service.py"
+      - ".github/workflows/brain-windows-real-boot.yml"
+      - "brain_v12/brain/brain_leadership.py"
+      - "brain_v12/brain/windows_execution_contract_issuer.py"
+      - "brain_v12/brain/owner_cryptographic_approval.py"
+      - "brain_v12/brain/authority_signature.py"
+      - "brain_v12/tests/test_authority_signature.py"
+      - "brain_v12/tests/test_windows_owner_approval_replay.py"
+      - "brain_v12/tests/test_windows_execution_contract_issuer.py"
+      - "brain_v12/tests/test_windows_contract_fetch.py"
+      - "brain_v12/tests/test_owner_cryptographic_approval.py"
+      - "brain_v12/brain/cloud_executor_attestation.py"
+      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
+      - "brain_v12/brain/cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_gate.py"
+      - "brain_v12/tests/test_cloud_executor_attestation.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
+      - "brain_v12/tests/test_cloud_executor_gate.py"
+      - "tools/request_cloud_executor_attestation.py"
+      - "brain_v12/CLOUD_EXECUTOR_ACTIVATION.md"
+      - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
+      - ".github/workflows/windows-contract-security-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-approval-replay:
+    name: Owner approval replay and issuer tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal security test dependencies
+        run: python -m pip install --disable-pip-version-check cryptography fastapi
+      - name: Compile executor attestation trust chain
+        run: |
+          python -m py_compile brain_v12/brain/cloud_executor_attestation.py
+          python -m py_compile brain_v12/brain/cloud_executor_attestation_issuer.py
+          python -m py_compile brain_v12/brain/cloud_executor_attestation_api.py
+          python -m py_compile brain_v12/brain/cloud_executor_gate.py
+          python -m py_compile tools/request_cloud_executor_attestation.py
+      - name: Test signed host and architecture binding
+        run: python -m unittest brain_v12.tests.test_cloud_executor_attestation -v
+      - name: Test trusted host inventory and central nonce registry
+        run: |
+          python -m unittest brain_v12.tests.test_cloud_executor_attestation_issuer -v
+          python -m unittest brain_v12.tests.test_cloud_executor_attestation_api -v
+      - name: Test executor capability gate
+        run: python -m unittest brain_v12.tests.test_cloud_executor_gate -v
+      - name: Compile authenticated contract API route
+        run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
+      - name: Test Control Plane and executor capability separation
+        run: python -m unittest brain_v12.tests.test_windows_contract_service -v
+      - name: Test contract fetch client compilation
+        run: python -m py_compile brain_v12/brain/fetch_windows_execution_contract.py
+      - name: Test contract fetch client behavior
+        run: python -m unittest brain_v12.tests.test_windows_contract_fetch -v
+      - name: Test durable approval replay protection
+        run: python -m unittest brain_v12.tests.test_windows_owner_approval_replay -v
+      - name: Test authority signature covers expiry and owner binding
+        run: python -m unittest brain_v12.tests.test_authority_signature -v
+      - name: Test owner approval signature and attempt binding
+        run: python -m unittest brain_v12.tests.test_owner_cryptographic_approval -v
+      - name: Test Windows execution contract issuer authorization
+        run: python -m unittest brain_v12.tests.test_windows_execution_contract_issuer -v

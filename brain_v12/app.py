@@ -3,6 +3,8 @@ import os
 import ast
 import base64
 import json
+import hmac
+import re
 import pathlib
 import threading
 import subprocess
@@ -660,6 +662,45 @@ def industrial_client_request_status():
         "conclusion": conclusion,
         "verified": verified,
     }
+
+
+class WindowsContractIssueRequest(BaseModel):
+    source_commit: str
+    task_id: str
+    attempt_id: str
+
+
+@app.post("/api/brain/windows/contracts/issue")
+async def issue_windows_execution_contract(payload: WindowsContractIssueRequest, request: Request):
+    """Issue a signed short-lived contract to the dedicated HTTPS delivery client."""
+    configured = os.environ.get("BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY", "")
+    supplied = request.headers.get("X-Brain-Contract-Delivery-Key", "")
+    if not configured or not supplied or not hmac.compare_digest(configured, supplied):
+        raise HTTPException(status_code=401, detail="WINDOWS_CONTRACT_DELIVERY_UNAUTHORIZED")
+    commit = payload.source_commit.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_SOURCE_COMMIT_INVALID")
+    task_id, attempt_id = payload.task_id.strip(), payload.attempt_id.strip()
+    if not task_id or not attempt_id:
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_TASK_ATTEMPT_REQUIRED")
+    try:
+        from .brain.windows_contract_service import issue as issue_contract
+        result = issue_contract({"source_commit": commit, "task_id": task_id, "attempt_id": attempt_id})
+        contract_path = pathlib.Path(result["contract_path"])
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        if any(contract.get(k) != v for k, v in {
+            "source_commit": commit, "task_id": task_id, "attempt_id": attempt_id
+        }.items()):
+            raise RuntimeError("WINDOWS_CONTRACT_REQUEST_BINDING_MISMATCH")
+        return {"issued": True, "contract": contract, "metadata": {
+            "schema": contract.get("schema"), "source_commit": contract.get("source_commit"),
+            "task_id": contract.get("task_id"), "attempt_id": contract.get("attempt_id"),
+            "expires_at": contract.get("expires_at"),
+        }}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc).splitlines()[0][:160]) from exc
+    except (OSError, ValueError, KeyError) as exc:
+        raise HTTPException(status_code=503, detail="WINDOWS_CONTRACT_ISSUANCE_UNAVAILABLE") from exc
 
 
 @app.get("/api/brain/windows/cloud/status")

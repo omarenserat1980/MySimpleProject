@@ -1,6 +1,8 @@
 import base64
 import json
 import os
+import platform
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -34,7 +36,9 @@ class CloudExecutorAttestationTests(unittest.TestCase):
         self.replay_db = str(Path(self.tmp.name) / "used-nonces.sqlite3")
         self.document = {
             "schema": SCHEMA, "executor_id": "cloud-test-01", "audience": AUDIENCE,
-            "issued_at": self.now - 5, "expires_at": self.now + 300,
+            "hostname": socket.gethostname(),
+            "architecture": "x86_64" if platform.machine().lower() in {"x86_64", "amd64"} else platform.machine().lower(),
+            "issued_at": self.now - 5, "expires_at": self.now + 295,
             "nonce": "nonce-1234567890",
         }
 
@@ -48,7 +52,10 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def verify(self, path, **kwargs):
         return verify_attestation(path, self.public_key_b64,
             kwargs.pop("expected_executor_id", "cloud-test-01"),
-            now=kwargs.pop("now", self.now), **kwargs)
+            now=kwargs.pop("now", self.now),
+            expected_hostname=kwargs.pop("expected_hostname", socket.gethostname()),
+            expected_architecture=kwargs.pop("expected_architecture", "x86_64" if platform.machine().lower() in {"x86_64", "amd64"} else platform.machine().lower()),
+            **kwargs)
 
     def test_accepts_valid_signed_attestation(self):
         self.assertTrue(self.verify(self.write_signed())["verified"])
@@ -71,6 +78,22 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def test_rejects_expired_attestation(self):
         with self.assertRaisesRegex(ValueError, "EXPIRED"):
             self.verify(self.write_signed(dict(self.document, expires_at=self.now - 1)))
+
+    def test_rejects_wrong_hostname_binding(self):
+        document = dict(self.document, hostname="different-host.example")
+        with self.assertRaisesRegex(ValueError, "HOSTNAME_MISMATCH"):
+            self.verify(self.write_signed(document))
+
+    def test_rejects_wrong_architecture_binding(self):
+        document = dict(self.document, architecture="aarch64")
+        with self.assertRaisesRegex(ValueError, "ARCHITECTURE_INVALID"):
+            self.verify(self.write_signed(document))
+
+    def test_rejects_missing_host_binding_fields(self):
+        document = dict(self.document)
+        document.pop("hostname")
+        with self.assertRaisesRegex(ValueError, "FIELDS_REQUIRED"):
+            self.verify(self.write_signed(document))
 
     def test_rejects_wrong_audience(self):
         with self.assertRaisesRegex(ValueError, "AUDIENCE_MISMATCH"):
