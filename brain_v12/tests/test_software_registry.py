@@ -28,7 +28,7 @@ class SoftwareRegistryTests(unittest.TestCase):
 
     def test_registration_is_not_verification_or_installation(self):
         item = self.registry.register("python", self.metadata())
-        self.assertEqual(item["runtime_state"], "observed")
+        self.assertEqual(item["runtime_state"], "planned")
         self.assertEqual(item["verification_state"], "unverified")
         self.assertIsNone(item["evidence_ref"])
         self.assertFalse(self.registry.summary()["execution_enabled"])
