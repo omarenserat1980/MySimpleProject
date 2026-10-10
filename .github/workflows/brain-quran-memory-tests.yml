@@ -11,6 +11,8 @@ on:
       - "brain_v12/tests/test_memory_recall.py"
       - "brain_v12/tests/test_github_header_policy.py"
       - "brain_v12/tests/test_quranic_reasoning_paths.py"
+      - "brain_v12/tests/test_cognitive_learning_memory.py"
+      - "brain_v12/tests/test_cognitive_loop_evidence.py"
       - ".github/workflows/brain-quran-memory-tests.yml"
   workflow_dispatch:
 
