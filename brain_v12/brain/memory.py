@@ -1,5 +1,7 @@
 import json
+import re
 import sqlite3
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -123,6 +125,45 @@ class MemoryStore:
     def memories(self):
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
+
+    @staticmethod
+    def _memory_terms(text):
+        """Normalize Arabic/English text into simple searchable terms; no external NLP dependency."""
+        text = unicodedata.normalize("NFKC", str(text or "")).lower()
+        text = re.sub(r"[\u064B-\u065F\u0670\u0640]", "", text)
+        text = text.translate(str.maketrans({"أ":"ا","إ":"ا","آ":"ا","ى":"ي","ؤ":"و","ئ":"ي","ة":"ه"}))
+        terms = re.findall(r"[a-z0-9_]+|[\u0621-\u064A]+", text)
+        stop = {
+            "the","and","for","with","from","this","that","have","has","was","were","are","is","to","of","in","on",
+            "a","an","it","my","our","brain","goal","run","الذي","التي","هذا","هذه","ذلك","تلك","من","في","على",
+            "الى","إلى","عن","مع","هو","هي","كان","كانت","تم","قد","ما","ماذا","كيف","اريد","أريد","عند","بعد",
+            "قبل","بين","كل","ثم","او","أو","و","ف","ب","ل"
+        }
+        return {term for term in terms if len(term) > 1 and term not in stop}
+
+    def recall_memories(self, query="", limit=12):
+        """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
+        limit = max(1, min(int(limit), 100))
+        rows = self.memories()
+        query_terms = self._memory_terms(query)
+        if not query_terms:
+            return rows[:limit]
+
+        ranked = []
+        for position, memory in enumerate(rows):
+            key_terms = self._memory_terms(memory.get("key", ""))
+            value_terms = self._memory_terms(memory.get("value", ""))
+            key_overlap = len(query_terms & key_terms)
+            value_overlap = len(query_terms & value_terms)
+            score = (key_overlap * 3) + (value_overlap * 2)
+            normalized_query = " ".join(sorted(query_terms))
+            if score:
+                ranked.append((score, position, memory))
+        if not ranked:
+            return rows[:limit]
+
+        ranked.sort(key=lambda item: (-item[0], item[1]))
+        return [memory for _, _, memory in ranked[:limit]]
 
     def save_memory(self,key,value):
         with self.connect() as con:
