@@ -1,0 +1,26 @@
+name: Brain Git Workflow Route Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain_git/api.py"
+      - "brain_v12/tests/test_brain_git_workflow_routes.py"
+      - ".github/workflows/brain-git-workflow-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-route-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal test dependencies
+        run: python -m pip install "fastapi" "pydantic<2" "httpx<0.28" pytest
+      - name: Test Brain Git workflow route initialization
+        run: PYTHONPATH=. python -m pytest -q brain_v12/tests/test_brain_git_workflow_routes.py

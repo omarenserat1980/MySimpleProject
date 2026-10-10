@@ -69,14 +69,14 @@ def router(service:BrainGitService|None=None):
     def create_workflow(request:Request,body:WorkflowIn):
         require_control_key(request)
         wf_id=f"brain-wf-{int(time.time()*1000)}"
-        service.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
+        svc.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
         import json
-        p=service.root/"workflows"/f"{wf_id}.json"
+        p=svc.root/"workflows"/f"{wf_id}.json"
         p.write_text(json.dumps({"id":wf_id,"name":body.name,"status":"QUEUED","created_at":time.time(),"command":body.command,"metadata":body.metadata},ensure_ascii=False,indent=2),encoding="utf-8")
         return {"ok":True,"workflow":{"id":wf_id,"name":body.name,"status":"QUEUED"}}
     @r.get("/workflows")
     def workflows():
-        d=service.root/"workflows"; items=[]
+        d=svc.root/"workflows"; items=[]
         if d.exists():
             import json
             for p in sorted(d.glob("*.json"),reverse=True):
@@ -86,7 +86,7 @@ def router(service:BrainGitService|None=None):
     @r.get("/workflows/{workflow_id}")
     def workflow(workflow_id:str):
         import json
-        p=service.root/"workflows"/f"{workflow_id}.json"
+        p=svc.root/"workflows"/f"{workflow_id}.json"
         if not p.exists(): raise HTTPException(404,"WORKFLOW_NOT_FOUND")
         return {"ok":True,"workflow":json.loads(p.read_text(encoding="utf-8"))}
     @r.get("/audit")
