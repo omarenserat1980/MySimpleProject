@@ -1,0 +1,35 @@
+name: Brain Cloud Compose Validation
+
+on:
+  pull_request:
+    paths:
+      - "cloud/docker-compose.yml"
+      - "cloud/Dockerfile"
+      - ".github/workflows/brain-cloud-compose-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Compose configuration
+        run: docker compose -f cloud/docker-compose.yml config --quiet
+
+      - name: Confirm safe bootstrap and single API owner
+        shell: bash
+        run: |
+          grep -Fq 'BRAIN_CLOUD_SKIP_FACTORY: "1"' cloud/docker-compose.yml
+          grep -Fq 'FACTORY_ALLOW_PRODUCTION: "0"' cloud/docker-compose.yml
+          grep -Fq 'BRAIN_GOAL_EXECUTE: "0"' cloud/docker-compose.yml
+          grep -Fq 'command: ["python", "cloud/brain_cloud.py"]' cloud/docker-compose.yml
+          if grep -Fq 'uvicorn cloud.api_server:app' cloud/docker-compose.yml; then
+            echo "Compose must not launch a second API process; brain_cloud.py owns the API subprocess."
+            exit 1
+          fi

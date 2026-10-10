@@ -6,12 +6,16 @@ on:
       - "brain_v12/ai_fabric/intelligence.py"
       - "brain_v12/tests/test_ai_fabric_v3_loop.py"
       - "brain_v12/tests/test_device_bridge.py"
+      - "cloud/docker-compose.yml"
+      - "cloud/Dockerfile"
       - ".github/workflows/brain-cloud-regression.yml"
   pull_request:
     paths:
       - "brain_v12/ai_fabric/intelligence.py"
       - "brain_v12/tests/test_ai_fabric_v3_loop.py"
       - "brain_v12/tests/test_device_bridge.py"
+      - "cloud/docker-compose.yml"
+      - "cloud/Dockerfile"
       - ".github/workflows/brain-cloud-regression.yml"
   workflow_dispatch:
 
@@ -29,6 +33,19 @@ jobs:
           python-version: "3.12"
       - name: Install Brain dependencies
         run: python -m pip install -r requirements.txt
+      - name: Validate Brain Cloud Compose configuration
+        run: docker compose -f cloud/docker-compose.yml config --quiet
+      - name: Confirm safe bootstrap and single API owner
+        shell: bash
+        run: |
+          grep -Fq 'BRAIN_CLOUD_SKIP_FACTORY: "1"' cloud/docker-compose.yml
+          grep -Fq 'FACTORY_ALLOW_PRODUCTION: "0"' cloud/docker-compose.yml
+          grep -Fq 'BRAIN_GOAL_EXECUTE: "0"' cloud/docker-compose.yml
+          grep -Fq 'command: ["python", "cloud/brain_cloud.py"]' cloud/docker-compose.yml
+          if grep -Fq 'uvicorn cloud.api_server:app' cloud/docker-compose.yml; then
+            echo "Compose must not launch a second API process; brain_cloud.py owns the API subprocess."
+            exit 1
+          fi
       - name: Run Fabric learning regression
         run: python -m unittest brain_v12.tests.test_ai_fabric_v3_loop -v
       - name: Run DeviceBridge regression
