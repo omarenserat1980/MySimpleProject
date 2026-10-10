@@ -7,6 +7,7 @@ from .capability_registry import CapabilityRegistry
 from .executor_adapter import BladeExecutorAdapter
 from .supervisor_executor import SupervisorExecutor
 from .brain_supervisor import BrainSupervisor
+from .resource_fabric import ResourceFabric, ResourceKind, ResourceSpec, ResourceState
 
 class BrainVirtualDatacenter:
     """Brain-owned datacenter with durable queue and supervisor-controlled execution."""
@@ -45,6 +46,38 @@ class BrainVirtualDatacenter:
 
     def queue_status(self): return self.task_queue.status()
     def resources(self): return self.resource_manager.cluster(self.chassis)
+
+    def sync_resource_fabric(self, fabric: ResourceFabric, provider_prefix="vdc"):
+        specs=[]
+        for blade in self.chassis.blades.values():
+            snap=self.resource_manager.snapshot(blade)
+            reserved=self.resource_manager.reserved_for_blade(blade.blade_id)
+            state=ResourceState.AVAILABLE if snap["state"]=="ONLINE" else ResourceState.OFFLINE
+            prefix=f"{provider_prefix}:{blade.blade_id}"
+            cpu_free=max(0, snap["cpu"]["cores"]-reserved.cpu_cores)
+            ram_free=max(0, snap["ram"]["free_bytes"]-reserved.ram_bytes)
+            storage_free=max(0, snap["storage"]["free_bytes"]-reserved.storage_bytes)
+            specs.extend([
+                ResourceSpec(prefix+":cpu",ResourceKind.COMPUTE,self.name,
+                             cpu_free,"core",{"blade_id":blade.blade_id},
+                             state=state),
+                ResourceSpec(prefix+":ram",ResourceKind.MEMORY,self.name,
+                             ram_free,"bytes",{"blade_id":blade.blade_id},
+                             state=state),
+                ResourceSpec(prefix+":storage",ResourceKind.STORAGE,self.name,
+                             storage_free,"bytes",{"blade_id":blade.blade_id},
+                             state=state),
+            ])
+            if snap["network"]["available"]:
+                specs.append(ResourceSpec(prefix+":network",ResourceKind.NETWORK,self.name,
+                                          1,"network",{"blade_id":blade.blade_id},state=state))
+            if snap["gpu"]["available"]:
+                specs.append(ResourceSpec(prefix+":gpu",ResourceKind.ACCELERATOR,self.name,
+                                          1,"gpu",{"blade_id":blade.blade_id},state=state))
+        fabric.register_many(specs)
+        return {"ok":True,"status":"SYNCED","provider_id":self.name,
+                "resource_count":len(specs),"resources":[x.public() for x in specs]}
+
 
     def blade_resources(self,blade_id):
         blade=self.chassis.blades.get(blade_id)

@@ -67,6 +67,12 @@ from .brain_git.workflow_engine import BrainWorkflowEngine
 from .brain.mining_engine import MiningEngine
 from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
+from .brain.resource_fabric import ResourceFabric, ResourceKind, ResourceRequest, ResourceSpec, ResourceState
+from .brain.resource_providers import HostResourceProvider
+from .brain.vdc_resource_provider import VirtualDatacenterResourceProvider
+from .integration.execution_coordinator import MissionExecutionCoordinator
+from .brain.execution_authority import ExecutionAuthority
+from .brain.execution_kernel import ExecutionKernel
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
@@ -160,6 +166,12 @@ workload_router=WorkloadRouter(workload_controller)
 worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
+resource_fabric=ResourceFabric(lease_seconds=int(os.getenv("BRAIN_RESOURCE_LEASE_SECONDS","300")))
+host_resource_provider=HostResourceProvider(resource_fabric)
+vdc_resource_provider=VirtualDatacenterResourceProvider(brain_datacenter, resource_fabric)
+execution_authority=ExecutionAuthority()
+execution_kernel=ExecutionKernel(os.getenv("BRAIN_EXECUTION_KERNEL_STATE", os.path.join(ROOT, ".brain", "state", "execution_kernel.json")))
+mission_execution=MissionExecutionCoordinator(resource_fabric, execution_kernel)
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
 cognitive.device_bridge=device_bridge
@@ -2865,6 +2877,174 @@ def agent_execute(request:Request, body:Exec):
 @app.post("/api/builder/plan")
 def builder_plan(project:str,objective:str):
     plan=builder.plan(project,objective); store.event("BUILDER_PLAN",plan); return plan
+
+@app.post("/api/brain/fabric/sync-host")
+def brain_fabric_sync_host(request: Request):
+    require_control_key(request)
+    result=host_resource_provider.sync()
+    store.event("BRAIN_RESOURCE_PROVIDER_SYNC", result)
+    return result
+
+
+@app.get("/api/brain/fabric")
+def brain_fabric_status():
+    return resource_fabric.inspect()
+
+
+@app.post("/api/brain/fabric/register")
+def brain_fabric_register(request: Request, body: dict):
+    require_control_key(request)
+    spec = ResourceSpec(
+        resource_id=str(body["resource_id"]),
+        kind=ResourceKind(str(body["kind"])),
+        provider_id=str(body.get("provider_id") or "unknown"),
+        capacity=int(body["capacity"]),
+        unit=str(body["unit"]),
+        attributes=dict(body.get("attributes") or {}),
+        state=ResourceState(str(body.get("state") or "AVAILABLE")),
+    )
+    return resource_fabric.register(spec)
+
+
+@app.post("/api/brain/fabric/compose")
+def brain_fabric_compose(request: Request, body: dict):
+    require_control_key(request)
+    intent_id=str(body.get("intent_id") or uuid4().hex)
+    requests=[]
+    for item in body.get("resources") or []:
+        requests.append(ResourceRequest(
+            kind=ResourceKind(str(item["kind"])),
+            amount=int(item["amount"]),
+            unit=str(item["unit"]),
+            attributes=dict(item.get("attributes") or {}),
+            required=bool(item.get("required", True)),
+            co_locate_key=item.get("co_locate_key"),
+        ))
+    result=resource_fabric.compose(intent_id, requests, body.get("ttl_seconds"))
+    store.event("BRAIN_RESOURCE_FABRIC_COMPOSE", {
+        "intent_id": intent_id, "status": result.get("status"),
+        "resource_ids": result.get("resource_ids", []),
+    })
+    return result
+
+
+@app.post("/api/brain/fabric/release/{reservation_id}")
+def brain_fabric_release(request: Request, reservation_id: str):
+    require_control_key(request)
+    result=resource_fabric.release(reservation_id)
+    store.event("BRAIN_RESOURCE_FABRIC_RELEASE", {
+        "reservation_id": reservation_id, "status": result.get("status"),
+    })
+    return result
+
+
+@app.get("/api/brain/fabric/capacity")
+def brain_fabric_capacity(request: Request):
+    require_control_key(request)
+    return resource_fabric.federated_capacity()
+
+
+@app.get("/api/brain/fabric/provider/{provider_id}/capacity")
+def brain_fabric_provider_capacity(request: Request, provider_id: str):
+    require_control_key(request)
+    return resource_fabric.provider_capacity(provider_id)
+
+
+@app.get("/api/brain/execution/kernel")
+def brain_execution_kernel_status(request: Request):
+    require_control_key(request)
+    return execution_kernel.status()
+
+
+@app.post("/api/brain/mission/admit")
+def brain_mission_admit(request: Request, body: dict):
+    require_control_key(request)
+    from .brain.resource_fabric import ResourceRequest, ResourceKind
+    requests = []
+    for item in body.get("resources", []):
+        requests.append(ResourceRequest(
+            kind=ResourceKind(str(item["kind"])),
+            amount=int(item["amount"]),
+            unit=str(item["unit"]),
+            attributes=dict(item.get("attributes") or {}),
+            required=bool(item.get("required", True)),
+            co_locate_key=str(item.get("co_locate_key") or body.get("mission") or "mission"),
+        ))
+    return mission_execution.admit(
+        mission=str(body.get("mission") or ""),
+        owner=str(body.get("owner") or "brain"),
+        requests=requests,
+        evidence_confidence=float(body.get("evidence_confidence", 0.0)),
+        external_side_effects=bool(body.get("external_side_effects", False)),
+        ttl_seconds=int(body["ttl_seconds"]) if body.get("ttl_seconds") is not None else None,
+    )
+
+
+@app.post("/api/brain/mission/finish")
+def brain_mission_finish(request: Request, body: dict):
+    require_control_key(request)
+    return mission_execution.finish(
+        execution_id=str(body.get("execution_id") or ""),
+        epoch=int(body.get("epoch")),
+        reservation_id=str(body.get("reservation_id") or ""),
+        status=str(body.get("status") or "COMPLETED"),
+    )
+
+
+@app.get("/api/brain/execution/status")
+def brain_execution_status(request: Request):
+    require_control_key(request)
+    return execution_authority.status()
+
+
+@app.post("/api/brain/fabric/sync-vdc")
+def brain_fabric_sync_vdc(request: Request):
+    require_control_key(request)
+    result=brain_datacenter.sync_resource_fabric(resource_fabric)
+    store.event("BRAIN_VDC_RESOURCE_PROVIDER_SYNC", result)
+    return result
+
+
+@app.post("/api/brain/fabric/compose-server")
+def brain_fabric_compose_server(request: Request, body: dict):
+    require_control_key(request)
+    intent_id=str(body.get("intent_id") or uuid4().hex)
+    result=vdc_resource_provider.compose_server(
+        intent_id=intent_id,
+        cpu_cores=int(body.get("cpu_cores", 1)),
+        ram_bytes=int(body.get("ram_bytes", 4*1024*1024*1024)),
+        storage_bytes=int(body.get("storage_bytes", 64*1024*1024*1024)),
+        network=bool(body.get("network", False)),
+        gpu=bool(body.get("gpu", False)),
+        ttl_seconds=body.get("ttl_seconds"),
+    )
+    store.event("BRAIN_VDC_SERVER_COMPOSE", {
+        "intent_id": intent_id,
+        "status": result.get("status"),
+        "blade_id": result.get("blade_id"),
+        "reservation_id": result.get("reservation_id"),
+    })
+    return result
+
+
+@app.post("/api/brain/fabric/reap")
+def brain_fabric_reap(request: Request):
+    require_control_key(request)
+    result=vdc_resource_provider.reap_expired()
+    store.event("BRAIN_RESOURCE_FABRIC_REAP", result)
+    return result
+
+
+@app.post("/api/brain/fabric/release-vdc/{reservation_id}")
+def brain_fabric_release_vdc(request: Request, reservation_id: str):
+    require_control_key(request)
+    result=vdc_resource_provider.release(reservation_id)
+    store.event("BRAIN_VDC_SERVER_RELEASE", {
+        "reservation_id": reservation_id,
+        "status": result.get("status"),
+    })
+    return result
+
 
 @app.get("/api/brain/recovery")
 def brain_recovery():
