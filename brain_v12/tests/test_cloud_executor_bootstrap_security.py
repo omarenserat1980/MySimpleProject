@@ -22,6 +22,11 @@ class CloudExecutorBootstrapSecurityTests(unittest.TestCase):
         self.assertLess(unset_at, config_at)
         self.assertLess(token_unset_at, run_at)
 
+    def test_bootstrap_refuses_root_execution(self):
+        script = BOOTSTRAP.read_text(encoding="utf-8")
+        self.assertIn("CLOUD_EXECUTOR_UNPRIVILEGED_ACCOUNT_REQUIRED", script)
+        self.assertIn('[ "$(id -u)" -ne 0 ]', script)
+
     def test_runner_is_ephemeral(self):
         script = BOOTSTRAP.read_text(encoding="utf-8")
         self.assertIn("--ephemeral", script)
