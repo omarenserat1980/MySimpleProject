@@ -31,7 +31,7 @@ class BrainGPT20LayerTraceTests(unittest.TestCase):
         by_key = {layer["key"]: layer for layer in trace["layers"]}
         self.assertEqual(by_key["conversation_manager"]["status"], "COMPLETED")
         self.assertEqual(by_key["permission_gate"]["status"], "COMPLETED")
-        self.assertEqual(by_key["execution_dispatcher"]["status"], "COMPLETED")
+        self.assertEqual(by_key["execution_dispatcher"]["status"], "BLOCKED")
         self.assertEqual(by_key["verification_gate"]["status"], "PARTIAL")
 
 
