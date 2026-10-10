@@ -47,6 +47,11 @@ class GoldenLoopDashboardTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_public_timeline_does_not_return_raw_evidence_payloads(self):
+        source = Path("brain_v12/app.py").read_text(encoding="utf-8")
+        self.assertNotIn('"payload": event["payload"]', source)
+        self.assertIn('"phase": event["payload"].get("phase")', source)
+
     def test_app_exposes_read_only_golden_events_route(self):
         source = Path("brain_v12/app.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
