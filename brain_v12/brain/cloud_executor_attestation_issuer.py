@@ -38,6 +38,13 @@ def create_challenge(*, authenticated_executor_id: str, challenge_db_path: str, 
     executor_id = authenticated_executor_id.strip()
     if not executor_id:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_EXECUTOR_ID_REQUIRED")
+    hostname = expected_hostname.strip()
+    architecture = expected_architecture.strip().lower()
+    architecture = "x86_64" if architecture in {"x86_64", "amd64"} else architecture
+    if not hostname:
+        raise ValueError("CLOUD_EXECUTOR_ISSUER_HOSTNAME_REQUIRED")
+    if architecture != "x86_64":
+        raise ValueError("CLOUD_EXECUTOR_ISSUER_ARCHITECTURE_INVALID")
     current = time.time() if now is None else float(now)
     nonce = secrets.token_urlsafe(32)
     expires_at = current + CHALLENGE_TTL_SECONDS
@@ -70,7 +77,7 @@ def _consume_challenge(db_path: str, executor_id: str, nonce: str, now: float) -
     except sqlite3.Error as exc:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_UNAVAILABLE") from exc
 
-def issue_attestation(*, authenticated_executor_id: str, challenge_nonce: str, challenge_db_path: str, lifetime_seconds: int = 300, issued_at: float | None = None, private_key_b64: str | None = None) -> dict[str, Any]:
+def issue_attestation(*, authenticated_executor_id: str, challenge_nonce: str, challenge_db_path: str, expected_hostname: str, expected_architecture: str, lifetime_seconds: int = 300, issued_at: float | None = None, private_key_b64: str | None = None) -> dict[str, Any]:
     executor_id, nonce = authenticated_executor_id.strip(), challenge_nonce.strip()
     if not executor_id:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_EXECUTOR_ID_REQUIRED")
@@ -86,6 +93,7 @@ def issue_attestation(*, authenticated_executor_id: str, challenge_nonce: str, c
     current = time.time() if issued_at is None else float(issued_at)
     _consume_challenge(challenge_db_path, executor_id, nonce, current)
     document = {"schema": SCHEMA, "executor_id": executor_id, "audience": AUDIENCE,
+                "hostname": hostname, "architecture": architecture,
                 "issued_at": current, "expires_at": current + lifetime_seconds, "nonce": nonce}
     document["signature"] = base64.b64encode(key.sign(signing_payload(document))).decode("ascii")
     try:
