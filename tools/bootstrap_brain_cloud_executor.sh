@@ -6,6 +6,8 @@ set -euo pipefail
 # Secrets/tokens are never committed or printed.
 
 REPO="${BRAIN_GITHUB_REPOSITORY:-omarenserat1980/MySimpleProject}"
+# Never run this bootstrap as root; it uses sudo only for explicit host setup.
+[ "$(id -u)" -ne 0 ] || { echo "CLOUD_EXECUTOR_UNPRIVILEGED_ACCOUNT_REQUIRED"; exit 21; }
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 RUNNER_USER="${BRAIN_RUNNER_USER:-brainrunner}"
 RUNNER_HOME="$(getent passwd "$RUNNER_USER" | cut -d: -f6)"
@@ -35,14 +37,13 @@ mode="$(stat -c %a "$TRUST_KEY_FILE")"
 (( (8#$mode & 0022) == 0 )) || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_WRITABLE_BY_NON_ROOT"; exit 32; }
 ATTESTATION_PUBLIC_KEY="$(cat "$TRUST_KEY_FILE")"
 
-command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
 command -v tar >/dev/null || { echo "MISSING:tar"; exit 2; }
 command -v python3 >/dev/null || { echo "MISSING:python3"; exit 2; }
 command -v sudo >/dev/null || { echo "MISSING:sudo"; exit 2; }
 getent group kvm >/dev/null || { echo "CLOUD_EXECUTOR_KVM_GROUP_REQUIRED"; exit 37; }
 id -nG "$RUNNER_USER" | tr ' ' '\n' | grep -qx kvm || { echo "RUNNER_USER_MUST_BELONG_TO_KVM_GROUP"; exit 38; }
-gh auth status >/dev/null 2>&1 || { echo "GITHUB_AUTH_REQUIRED"; exit 3; }
+[ -n "${BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN:-}" ] || { echo "GITHUB_RUNNER_REGISTRATION_TOKEN_REQUIRED"; exit 41; }
 
 # Enforce the credential boundary, not merely a distinct HOME. A runner job must
 # be unable to list/read the operator's GitHub CLI config or its credential file.
@@ -106,8 +107,10 @@ if [ ! -x "$RUNNER_DIR/run.sh" ]; then
 fi
 sudo chown -R "$RUNNER_USER:$RUNNER_GROUP" "$RUNNER_DIR"
 
-TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
-# The operator obtains the short-lived token; the isolated runner account never receives gh CLI credentials.
+TOKEN="$BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN"
+# Keep the short-lived registration token out of the runner process environment.
+unset BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN
+# The isolated runner account never receives the operator's GitHub CLI credentials.
 sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 "$RUNNER_DIR/config.sh" --unattended \
   --url "https://github.com/$REPO" \
   --token "$TOKEN" \
