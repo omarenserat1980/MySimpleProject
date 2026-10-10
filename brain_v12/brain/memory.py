@@ -27,6 +27,15 @@ class MemoryStore:
               value TEXT NOT NULL,
               updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS memory_metadata(
+              memory_key TEXT PRIMARY KEY REFERENCES memories(key) ON DELETE CASCADE,
+              source TEXT NOT NULL DEFAULT 'LEGACY_UNKNOWN',
+              confidence REAL NOT NULL DEFAULT 0.5,
+              expires_at TEXT,
+              status TEXT NOT NULL DEFAULT 'ACTIVE',
+              tags TEXT NOT NULL DEFAULT '[]',
+              updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS goals(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               text TEXT NOT NULL,
@@ -125,7 +134,107 @@ class MemoryStore:
 
     def memories(self):
         with self.connect() as con:
-            return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
+            rows = con.execute("""
+                SELECT m.key,m.value,m.updated_at,
+                       COALESCE(mm.source,'LEGACY_UNKNOWN') AS source,
+                       COALESCE(mm.confidence,0.5) AS confidence,
+                       mm.expires_at,
+                       COALESCE(mm.status,'ACTIVE') AS status,
+                       COALESCE(mm.tags,'[]') AS tags
+                FROM memories AS m
+                LEFT JOIN memory_metadata AS mm ON mm.memory_key=m.key
+                ORDER BY m.id DESC
+            """).fetchall()
+        out = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["tags"] = json.loads(item.get("tags") or "[]")
+            except (TypeError, ValueError):
+                item["tags"] = []
+            out.append(item)
+        return out
+
+    @staticmethod
+    def _memory_is_recallable(memory, at=None):
+        """Exclude inactive, disputed, or expired memories from decision recall."""
+        status = str(memory.get("status") or "ACTIVE").strip().upper()
+        if status != "ACTIVE":
+            return False
+        expires_at = memory.get("expires_at")
+        if not expires_at:
+            return True
+        try:
+            expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            current = at or datetime.now(timezone.utc)
+            if current.tzinfo is None:
+                current = current.replace(tzinfo=timezone.utc)
+            return expiry > current
+        except (TypeError, ValueError, OverflowError):
+            # A malformed expiry must not silently turn stale data into live evidence.
+            return False
+
+    def set_memory_metadata(self, key, *, source=None, confidence=None, expires_at=None,
+                            status=None, tags=None):
+        """Set provenance/lifecycle metadata without rewriting the memory value."""
+        allowed_statuses = {"ACTIVE", "CONFLICTED", "SUPERSEDED", "RETRACTED", "ARCHIVED"}
+        if confidence is not None:
+            try:
+                confidence = float(confidence)
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("confidence must be a finite number from 0 to 1")
+            if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+                raise ValueError("confidence must be a finite number from 0 to 1")
+        if status is not None:
+            status = str(status).strip().upper()
+            if status not in allowed_statuses:
+                raise ValueError("unsupported memory status")
+        if source is not None:
+            source = str(source).strip()[:500] or "UNKNOWN"
+        if expires_at is not None:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("expires_at must be an ISO-8601 datetime")
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            expires_at = expiry.astimezone(timezone.utc).isoformat()
+        if tags is not None:
+            if not isinstance(tags, (list, tuple, set)):
+                raise ValueError("tags must be a list, tuple, or set")
+            tags = sorted({str(tag).strip()[:80] for tag in tags if str(tag).strip()})[:50]
+        with self.connect() as con:
+            exists = con.execute("SELECT 1 FROM memories WHERE key=?", (key,)).fetchone()
+            if not exists:
+                raise KeyError(key)
+            current = con.execute("SELECT * FROM memory_metadata WHERE memory_key=?", (key,)).fetchone()
+            current = dict(current) if current else {
+                "source": "LEGACY_UNKNOWN", "confidence": 0.5, "expires_at": None,
+                "status": "ACTIVE", "tags": "[]", "updated_at": now()
+            }
+            merged = {
+                "source": current["source"] if source is None else source,
+                "confidence": current["confidence"] if confidence is None else confidence,
+                "expires_at": current["expires_at"] if expires_at is None else expires_at,
+                "status": current["status"] if status is None else status,
+                "tags": current["tags"] if tags is None else json.dumps(tags, ensure_ascii=False),
+                "updated_at": now(),
+            }
+            con.execute("""
+                INSERT INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                VALUES(?,?,?,?,?,?,?)
+                ON CONFLICT(memory_key) DO UPDATE SET
+                    source=excluded.source, confidence=excluded.confidence,
+                    expires_at=excluded.expires_at, status=excluded.status,
+                    tags=excluded.tags, updated_at=excluded.updated_at
+            """, (key, merged["source"], merged["confidence"], merged["expires_at"],
+                  merged["status"], merged["tags"], merged["updated_at"]))
+            con.commit()
+        self.event("MEMORY_METADATA_UPDATED", {"key": key, "status": merged["status"]})
+        return {**merged, "memory_key": key, "tags": json.loads(merged["tags"])}
+
 
     @staticmethod
     def _memory_terms(text):
@@ -155,6 +264,7 @@ class MemoryStore:
         """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
         limit = max(1, min(int(limit), 100))
         rows = list(candidates) if candidates is not None else self.memories()
+        rows = [memory for memory in rows if self._memory_is_recallable(memory)]
         query_terms = self._memory_terms(query)
         if not query_terms:
             return rows[:limit] if fallback_recent else []
@@ -193,6 +303,10 @@ class MemoryStore:
         with self.connect() as con:
             con.execute("""INSERT INTO memories(key,value,updated_at) VALUES(?,?,?)
                            ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at""",(key,value,now()))
+            con.execute("""
+                INSERT OR IGNORE INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                VALUES(?,?,?,?,?,?,?)
+            """, (key, "LEGACY_UNKNOWN", 0.5, None, "ACTIVE", "[]", now()))
             con.commit()
         self.event("MEMORY_UPDATED",{"key":key})
 
