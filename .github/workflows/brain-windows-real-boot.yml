@@ -86,11 +86,9 @@ jobs:
           PY
 
       - name: Preflight Brain execution contract path
-        env:
-          CONTRACT_FILE: ${{ env.BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE }}
         run: |
           set -euo pipefail
-          CONTRACT_FILE="${CONTRACT_FILE:-/run/brain/windows-execution-contract.json}"
+          CONTRACT_FILE="${BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE:-/run/brain/windows-execution-contract.json}"
           if [[ ! -f "$CONTRACT_FILE" ]]; then
             echo "BLOCKED: signed Brain execution contract is missing on this runner."
             echo "Expected BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE to point to a pre-issued contract file."
