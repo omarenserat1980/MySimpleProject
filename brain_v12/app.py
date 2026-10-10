@@ -300,7 +300,7 @@ async def brain_hub_file(path:str,branch:str="main",owner:str="",repo:str=""):
     url=f"https://api.github.com/repos/{full}/contents/{path}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers(),params={"ref":branch})
+            r=await client.get(url,headers=_github_headers(require_token=False),params={"ref":branch})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         x=r.json(); raw=x.get("content","")
         content=base64.b64decode(raw.replace("\n","")).decode("utf-8") if raw else ""
@@ -392,7 +392,7 @@ async def cinema_retry(request:Request, body:BrainHubActionIn=BrainHubActionIn()
     require_control_key(request)
     full=_github_repo()
     async with httpx.AsyncClient(timeout=30) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(),params={"per_page":20})
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(require_token=False),params={"per_page":20})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         runs=[x for x in r.json().get("workflow_runs",[]) if x.get("name")=="BRAIN 120 Minute Cinema"]
         if not runs: return {"ok":False,"state":"NO_RUN"}
@@ -495,7 +495,7 @@ async def brain_hub_create_branch(request:Request, body:BrainHubCreateBranchIn):
         raise HTTPException(status_code=400,detail="INVALID_BRANCH_NAME")
     base=body.from_ref.strip() or "main"
     async with httpx.AsyncClient(timeout=30) as client:
-        ref=await client.get(f"https://api.github.com/repos/{full}/git/ref/heads/{base}",headers=_github_headers())
+        ref=await client.get(f"https://api.github.com/repos/{full}/git/ref/heads/{base}",headers=_github_headers(require_token=False))
         if ref.status_code>=400:
             raise HTTPException(status_code=ref.status_code,detail=ref.text[:1000])
         sha=ref.json().get("object",{}).get("sha")
