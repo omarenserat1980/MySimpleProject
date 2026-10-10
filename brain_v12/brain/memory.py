@@ -422,7 +422,8 @@ class MemoryStore:
     def memory_conflicts(self, limit=100):
         with self.connect() as con:
             rows = con.execute(
-                "SELECT memory_key,conflicting_key,reason,status,created_at "
+                "SELECT memory_key,conflicting_key,reason,status,created_at,"
+                "resolution_evidence,resolved_by,resolved_at "
                 "FROM memory_conflicts ORDER BY id DESC LIMIT ?",
                 (max(1, min(int(limit), 500)),)
             ).fetchall()
