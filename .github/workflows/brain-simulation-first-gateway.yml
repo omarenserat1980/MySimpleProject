@@ -52,4 +52,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify simulation-first gateway contract
-        run: python -m unittest brain_v12.tests.test_arkan_failover_gateway brain_v12.tests.test_simulation_first_remote_api_contract brain_v12.tests.test_background_work_coordinator brain_v12.test_durable_task_store brain_v12.test_durable_task_recovery -v
+        run: python -m unittest brain_v12.tests.test_arkan_failover_gateway brain_v12.tests.test_simulation_first_remote_api_contract brain_v12.tests.test_background_work_coordinator brain_v12.test_durable_task_store brain_v12.test_durable_task_recovery brain_v12.test_virtual_task_queue -v
