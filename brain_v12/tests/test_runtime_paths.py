@@ -6,6 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from brain_v12.runtime_paths import configure_runtime_paths
+from brain_v12.brain.durable_task_store import DurableTaskStore
+from brain_v12.brain.virtual_task_queue import VirtualTaskQueue
+from unittest.mock import MagicMock
 
 
 PATH_VARIABLES = (
@@ -168,6 +171,29 @@ class RuntimePathsTests(unittest.TestCase):
                 configure_runtime_paths(source_root=source)
                 with sqlite3.connect(existing_db) as db:
                     self.assertEqual(db.execute("SELECT value FROM chosen").fetchone()[0], "runtime-wins")
+
+    def test_durable_task_store_default_uses_runtime_home(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_home = Path(temporary) / "runtime"
+            with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
+                store = DurableTaskStore()
+                try:
+                    self.assertEqual(
+                        store.path,
+                        runtime_home / "brain6_artifacts" / "virtual_tasks" / "tasks.db",
+                    )
+                    self.assertTrue(store.path.is_file())
+                finally:
+                    store.close()
+
+    def test_virtual_task_queue_passes_default_store_path_through(self):
+        store_mock = MagicMock()
+        with patch("brain_v12.brain.virtual_task_queue.DurableTaskStore", return_value=store_mock) as factory:
+            queue = VirtualTaskQueue(chassis=MagicMock(), resource_manager=MagicMock())
+            try:
+                factory.assert_called_once_with(None)
+            finally:
+                queue.shutdown()
 
 
 if __name__ == "__main__":
