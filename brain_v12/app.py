@@ -2891,6 +2891,107 @@ def brain_liveness():
     """Read-only evidence-based Brain liveness assessment."""
     return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
 
+
+# Simulation-first remote fabric. All routes operate on the virtual twin unless a
+# separately configured, independently validated real-device probe is supplied.
+from .brain.arkan_failover_gateway import ArkanFailoverGateway
+_arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(ROOT, ".brain", "virtual", "arkan"))
+arkan_remote_fabric = ArkanFailoverGateway(_arkan_virtual_root)
+from .brain.background_work_coordinator import BackgroundWorkCoordinator
+
+def _background_simulation_health():
+    gateway = arkan_remote_fabric.connect()
+    return {"gateway": gateway, "heartbeat": arkan_remote_fabric.heartbeat(), "reality": "SIMULATED"}
+
+def _background_simulation_inventory():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.info()
+
+def _background_simulation_readiness():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.readiness()
+
+background_work = BackgroundWorkCoordinator(
+    max_workers=int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, os.cpu_count() or 2)))),
+    max_pending=int(os.getenv("BRAIN_BACKGROUND_MAX_PENDING", "64")),
+    db_path=os.getenv("BRAIN_BACKGROUND_DB", os.path.join(ROOT, ".brain", "state", "background_work.sqlite3")),
+    handlers={
+        "simulation_health": _background_simulation_health,
+        "simulation_inventory": _background_simulation_inventory,
+        "simulation_readiness": _background_simulation_readiness,
+    },
+)
+
+
+class ArkanSimulationCommand(BaseModel):
+    command: str
+
+
+@app.on_event("startup")
+def background_work_startup():
+    return background_work.resume_pending()
+
+@app.on_event("shutdown")
+def background_work_shutdown():
+    background_work.shutdown(wait=True)
+
+@app.get("/api/background-work/status")
+def background_work_status(request: Request):
+    require_control_key(request)
+    return background_work.snapshot()
+
+@app.post("/api/background-work/submit")
+def background_work_submit(request: Request, body: dict):
+    require_control_key(request)
+    kind = str(body.get("kind", "")).strip()
+    key = str(body.get("idempotency_key", "")).strip() or None
+    result = background_work.submit(kind, idempotency_key=key)
+    store.event("BACKGROUND_WORK_SUBMITTED", {"kind": kind, "status": result.get("status"), "job_id": (result.get("job") or {}).get("job_id"), "reality": "SIMULATED"})
+    return result
+
+@app.get("/api/background-work/{job_id}")
+def background_work_result(job_id: str, request: Request):
+    require_control_key(request)
+    item = background_work.get(job_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="BACKGROUND_JOB_NOT_FOUND")
+    return {"ok": True, "job": item}
+
+@app.get("/api/remote-fabric/status")
+def remote_fabric_status():
+    """Read-only status of the simulation-first remote endpoint."""
+    return {**arkan_remote_fabric.status(), "heartbeat": arkan_remote_fabric.heartbeat() if arkan_remote_fabric.mode != "UNAVAILABLE" else None}
+
+@app.post("/api/remote-fabric/connect")
+def remote_fabric_connect(request: Request):
+    """Activate the virtual twin; does not connect to or alter physical hardware."""
+    require_control_key(request)
+    result = arkan_remote_fabric.connect()
+    store.event("REMOTE_FABRIC_CONNECTED", {"mode": result.get("mode"), "reality": result.get("reality"), "policy": result.get("policy")})
+    return result
+
+@app.post("/api/remote-fabric/simulation/command")
+def remote_fabric_simulation_command(request: Request, body: ArkanSimulationCommand):
+    """Run a command only inside the PowerShell emulator, never on the real host."""
+    require_control_key(request)
+    if len(body.command) > 2000:
+        raise HTTPException(status_code=413, detail="SIMULATION_COMMAND_TOO_LARGE")
+    if arkan_remote_fabric.mode == "UNAVAILABLE":
+        arkan_remote_fabric.connect()
+    if arkan_remote_fabric.mode != "VIRTUAL":
+        raise HTTPException(status_code=409, detail="SIMULATION_ENDPOINT_NOT_ACTIVE")
+    result = arkan_remote_fabric.run_powershell(body.command)
+    store.event("REMOTE_FABRIC_SIMULATION_COMMAND", {"ok": bool(result.get("ok")), "reality": "SIMULATED"})
+    return {**result, "mode": "VIRTUAL", "reality": "SIMULATED"}
+
+@app.post("/api/remote-fabric/recover-real")
+def remote_fabric_recover_real(request: Request):
+    """Explicit real promotion; without a configured validated probe this remains virtual."""
+    require_control_key(request)
+    result = arkan_remote_fabric.recover_real()
+    store.event("REMOTE_FABRIC_REAL_PROMOTION_ATTEMPT", {"mode": result.get("mode"), "reality": result.get("reality"), "reason": result.get("reason")})
+    return result
+
 app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
 app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
