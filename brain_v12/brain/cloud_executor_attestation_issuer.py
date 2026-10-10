@@ -25,7 +25,8 @@ def create_challenge(*, authenticated_executor_id: str, challenge_db_path: str, 
         with sqlite3.connect(challenge_db_path, timeout=5, isolation_level=None) as db:
             db.execute("CREATE TABLE IF NOT EXISTS issued_challenges (nonce TEXT PRIMARY KEY, executor_id TEXT NOT NULL, expires_at REAL NOT NULL, consumed_at REAL)")
             db.execute("INSERT INTO issued_challenges VALUES (?, ?, ?, NULL)", (nonce, executor_id, expires_at))
-    except sqlite3.Error as exc:
+        os.chmod(challenge_db_path, 0o600)
+    except (sqlite3.Error, OSError) as exc:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_UNAVAILABLE") from exc
     return {"nonce": nonce, "expires_at": expires_at, "executor_id": executor_id}
 
