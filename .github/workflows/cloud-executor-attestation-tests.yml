@@ -5,26 +5,25 @@ on:
     paths:
       - "brain_v12/brain/cloud_executor_attestation.py"
       - "brain_v12/brain/cloud_executor_attestation_issuer.py"
-      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
-      - "tools/install_brain_executor_trust_anchor.sh"
-      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
-      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
-      - "tools/install_brain_executor_trust_anchor.sh"
       - "brain_v12/brain/cloud_executor_gate.py"
       - "brain_v12/tests/test_cloud_executor_attestation.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
       - "brain_v12/tests/test_cloud_executor_gate.py"
       - "tools/bootstrap_brain_cloud_executor.sh"
+      - "tools/install_brain_executor_trust_anchor.sh"
       - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
       - ".github/workflows/cloud-executor-attestation-tests.yml"
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - "brain_v12/brain/cloud_executor_attestation.py"
+      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
       - "brain_v12/brain/cloud_executor_gate.py"
       - "brain_v12/tests/test_cloud_executor_attestation.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
       - "brain_v12/tests/test_cloud_executor_gate.py"
       - "tools/bootstrap_brain_cloud_executor.sh"
+      - "tools/install_brain_executor_trust_anchor.sh"
       - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
       - ".github/workflows/cloud-executor-attestation-tests.yml"
 
@@ -43,7 +42,7 @@ jobs:
           cache: "pip"
       - name: Install cryptography
         run: python -m pip install --disable-pip-version-check "cryptography>=42"
-      - name: Run signed attestation rejection tests
+      - name: Run signed attestation, issuer, replay and gate tests
         run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_gate
-      - name: Validate bootstrap shell syntax
+      - name: Validate shell scripts
         run: bash -n tools/bootstrap_brain_cloud_executor.sh tools/install_brain_executor_trust_anchor.sh
