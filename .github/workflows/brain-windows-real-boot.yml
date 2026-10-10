@@ -174,25 +174,40 @@ jobs:
           sudo mkdir -p /mnt/ws
           sudo mount -o loop,ro windows-server-2025.iso /mnt/ws
           trap 'sudo umount /mnt/ws || true' EXIT
-          test -f /mnt/ws/sources/install.wim
-          wimlib-imagex info /mnt/ws/sources/install.wim | tee wim-info.txt
-          grep -Eq 'Windows Server 2025|SERVERSTANDARD' wim-info.txt
+          image_file=""
+          if [ -f /mnt/ws/sources/install.wim ]; then
+            image_file=/mnt/ws/sources/install.wim
+          elif [ -f /mnt/ws/sources/install.esd ]; then
+            image_file=/mnt/ws/sources/install.esd
+          else
+            echo "BLOCKED: neither sources/install.wim nor sources/install.esd exists"
+            find /mnt/ws/sources -maxdepth 1 -type f -printf '%f\\n' | sort | tee windows-sources-files.txt
+            exit 2
+          fi
+          printf 'IMAGE_FILE=%s\\n' "$image_file" | tee windows-image-file.txt
+          wimlib-imagex info "$image_file" | tee wim-info.txt
+          grep -Eiq 'Windows Server 2025|SERVERSTANDARD|SERVERDATACENTER' wim-info.txt
+          # Prefer Datacenter when available; accept Core/non-Core product names.
           image_index="$(
             awk '
               /^Index:/ {idx=$2}
-              /^Name:[[:space:]]+Windows Server 2025 SERVERDATACENTER$/ {print idx; exit}
+              tolower($0) ~ /^name:[[:space:]]*windows server 2025.*serverdatacenter/ {print idx; exit}
             ' wim-info.txt
           )"
           if [ -z "$image_index" ]; then
             image_index="$(
               awk '
                 /^Index:/ {idx=$2}
-                /^Name:[[:space:]]+Windows Server 2025 SERVERSTANDARD$/ {print idx; exit}
+                tolower($0) ~ /^name:[[:space:]]*windows server 2025.*serverstandard/ {print idx; exit}
               ' wim-info.txt
             )"
           fi
-          test -n "$image_index"
-          printf 'IMAGE_INDEX=%s\n' "$image_index" | tee windows-image-index.txt
+          if [ -z "$image_index" ]; then
+            echo "BLOCKED: no supported Windows Server 2025 Datacenter/Standard image was found"
+            grep -E '^(Index|Name):' wim-info.txt || true
+            exit 2
+          fi
+          printf 'IMAGE_INDEX=%s\\n' "$image_index" | tee windows-image-index.txt
           echo "Selected Windows Server 2025 image index: $image_index"
 
       - name: Build evidence-enabled unattended media
