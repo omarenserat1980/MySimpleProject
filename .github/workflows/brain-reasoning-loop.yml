@@ -44,5 +44,7 @@ jobs:
           else:
               print('CHATGPT_PROVIDER=CONFIGURED')
           PY
+      - name: Run cognitive loop evidence tests
+        run: python3 -m unittest brain_v12.tests.test_cognitive_loop_evidence -v
       - name: Run complete self-test
         run: python3 brain_v12/self_healing/self_test.py
