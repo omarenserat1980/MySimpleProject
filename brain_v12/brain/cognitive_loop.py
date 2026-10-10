@@ -183,7 +183,12 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
+        # Execute the tool chosen by the decision candidate. Re-mapping by action
+        # alone can silently run a different tool than the one that was scored.
+        tool_id=(selected.get("tool_id") if isinstance(selected,dict) else None) or {
+            "observe":"state.read","plan":"tasks.create","inspect_code":"code.inspect",
+            "verify_code":"code.verify","device":"device.enqueue"
+        }.get(action)
         tool_params = (
             {"title":task_title} if tool_id=="tasks.create"
             else {"path":"brain_v12/app.py"} if tool_id=="code.inspect"
