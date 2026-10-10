@@ -49,7 +49,7 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     evidence_path.parent.mkdir(parents=True)
     evidence_path.write_text(json.dumps({
         "status": "VERIFIED",
-        "source": "live_read_only_runtime_probe",
+        "source": "assembled_live_runtime_and_drills",
         "target_host": "brain-test.internal",
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "safety": {
