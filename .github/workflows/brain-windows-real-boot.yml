@@ -159,7 +159,25 @@ jobs:
           # FirstLogonCommands only fires after a real user logon. Create a
           # one-shot, runner-generated Administrator password so the evidence
           # agent cannot stall at the Server OOBE/login boundary.
-          BRAIN_AUTOPASS="$(openssl rand -hex 24)"
+          # Windows local-account complexity normally requires upper, lower,
+          # numeric and non-alphanumeric characters. Generate XML-safe characters
+          # and never print the password into logs.
+          BRAIN_AUTOPASS="$(python3 - <<'PY'
+          import secrets, string
+          rng = secrets.SystemRandom()
+          symbols = "!@#%+=_-"
+          alphabet = string.ascii_letters + string.digits + symbols
+          chars = [
+              rng.choice(string.ascii_lowercase),
+              rng.choice(string.ascii_uppercase),
+              rng.choice(string.digits),
+              rng.choice(symbols),
+          ]
+          chars.extend(rng.choice(alphabet) for _ in range(28))
+          rng.shuffle(chars)
+          print("".join(chars))
+          PY
+          )"
           export BRAIN_AUTOPASS
 
           cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
@@ -248,6 +266,24 @@ jobs:
           assert "AutoLogon" in xml
           assert "Administrator" in xml
           assert "brain-windows-evidence.ps1" in xml
+          ns={"u":"urn:schemas-microsoft-com:unattend"}
+          root=ET.parse(p).getroot()
+          passwords=[
+              (node.text or "")
+              for node in (
+                  root.findall(".//u:AdministratorPassword/u:Value", ns)
+                  + root.findall(".//u:AutoLogon/u:Password/u:Value", ns)
+              )
+          ]
+          assert len(passwords)==2 and passwords[0]==passwords[1], "ADMIN_PASSWORD_MISMATCH"
+          password=passwords[0]
+          assert len(password)>=14, "ADMIN_PASSWORD_TOO_SHORT"
+          assert any(c.islower() for c in password), "ADMIN_PASSWORD_MISSING_LOWERCASE"
+          assert any(c.isupper() for c in password), "ADMIN_PASSWORD_MISSING_UPPERCASE"
+          assert any(c.isdigit() for c in password), "ADMIN_PASSWORD_MISSING_DIGIT"
+          assert any(c in "!@#%+=_-" for c in password), "ADMIN_PASSWORD_MISSING_SYMBOL"
+          assert not any(c in password for c in '&<>"'), "ADMIN_PASSWORD_NOT_XML_SAFE"
+          print("AUTOUNATTEND_PASSWORD_POLICY=PASS")
           print("AUTOUNATTEND_PREFLIGHT=PASS")
           PY
           xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
