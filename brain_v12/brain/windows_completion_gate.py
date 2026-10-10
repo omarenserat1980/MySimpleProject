@@ -18,6 +18,8 @@ class WindowsCompletionGate:
         if guest.get("os")!="Windows Server 2025": reasons.append("GUEST_OS_NOT_VERIFIED")
         if guest.get("architecture")!="x86_64": reasons.append("GUEST_ARCH_NOT_VERIFIED")
         if not guest.get("boot_verified"): reasons.append("GUEST_BOOT_NOT_VERIFIED")
+        if evidence.get("boot_source") != "windows-installed-disk":
+            reasons.append("BOOT_SOURCE_NOT_INSTALLED_DISK")
         if not media.get("sha256"): reasons.append("MEDIA_HASH_MISSING")
         if uefi.get("ready") is not True: reasons.append("UEFI_NOT_VERIFIED")
         if cpu.get("x86_64") is not True: reasons.append("X86_64_CPU_NOT_VERIFIED")

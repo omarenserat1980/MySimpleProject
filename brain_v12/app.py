@@ -32,6 +32,7 @@ from .brain.model_router import ModelRouter
 from .brain.model_providers import configured_model_providers
 from .ai_fabric import AIFabric, FabricPolicy
 from .ai_fabric.api import router as ai_fabric_router
+from cloud.brain_fabric_api import router as cloud_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
@@ -158,6 +159,8 @@ from .brain.commerce_reversals import router as commerce_reversals_router
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai))
 app.include_router(ai_fabric_router(fabric))
+# Cloud Fabric control-plane routes; separate from the AI model/tool fabric above.
+app.include_router(cloud_fabric_router)
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
@@ -172,6 +175,36 @@ app.include_router(commercial_dashboard_router())
 def brain_cloud_status():
     """Return verified Brain Cloud bootstrap/runtime state without exposing secrets."""
     return bootstrap_status()
+
+@app.get("/api/golden-loop/events")
+def golden_loop_events(limit: int = 100):
+    """Read-only timeline of persisted Golden-loop evidence; never executes work."""
+    bounded_limit = max(1, min(int(limit), 200))
+    events = evidence_store.recent_golden(bounded_limit)
+    return {
+        "ok": True,
+        "read_only": True,
+        "source": "evidence_store",
+        "total_evidence": evidence_store.golden_count(),
+        "returned": len(events),
+        "events": [
+            {
+                "evidence_id": event["evidence_id"],
+                "task_id": event["task_id"],
+                "kind": event["kind"],
+                "created_at": event["created_at"],
+                "sha256": event["sha256"],
+                "verification_status": event["verification_status"],
+                "phase": event["payload"].get("phase") or (
+                    event["payload"].get("payload", {}).get("phase")
+                    if isinstance(event["payload"].get("payload"), dict) else None
+                ),
+                "attempt": event["payload"].get("attempt"),
+            }
+            for event in events
+        ],
+    }
+
 
 @app.middleware("http")
 async def no_cache(request, call_next):
