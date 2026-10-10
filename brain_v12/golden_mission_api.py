@@ -1,7 +1,8 @@
 """HTTP API for persistent Golden Mission Loop tracking."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from .brain.golden_mission import GoldenMissionController
+from .brain.control_auth import require_control_key
 
 
 class MissionCreate(BaseModel):
@@ -41,25 +42,29 @@ def router(controller: GoldenMissionController | None = None):
     r = APIRouter(prefix="/api/golden-missions", tags=["golden-missions"])
 
     @r.post("")
-    def create(body: MissionCreate):
+    def create(request: Request, body: MissionCreate):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.create(**body.model_dump())}
         except ValueError as exc:
             raise HTTPException(422, str(exc))
 
     @r.get("/due")
-    def due():
+    def due(request: Request):
+        require_control_key(request)
         return {"ok": True, "missions": c.list_due()}
 
     @r.get("/{mission_id}")
-    def get(mission_id: str):
+    def get(mission_id: str, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.get(mission_id)}
         except KeyError:
             raise HTTPException(404, "MISSION_NOT_FOUND")
 
     @r.post("/{mission_id}/start")
-    def start(mission_id: str):
+    def start(mission_id: str, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.start(mission_id)}
         except KeyError:
@@ -68,7 +73,8 @@ def router(controller: GoldenMissionController | None = None):
             raise HTTPException(409, str(exc))
 
     @r.post("/{mission_id}/permission-required")
-    def permission_required(mission_id: str, body: PermissionRequest):
+    def permission_required(mission_id: str, body: PermissionRequest, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.require_permission(mission_id, body.permission, body.detail)}
         except KeyError:
@@ -77,7 +83,8 @@ def router(controller: GoldenMissionController | None = None):
             raise HTTPException(409, str(exc))
 
     @r.post("/{mission_id}/permission-grant")
-    def permission_grant(mission_id: str, body: PermissionGrant):
+    def permission_grant(mission_id: str, body: PermissionGrant, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.grant_permission(mission_id, body.permission, body.approved_by)}
         except KeyError:
@@ -86,7 +93,8 @@ def router(controller: GoldenMissionController | None = None):
             raise HTTPException(409, str(exc))
 
     @r.post("/{mission_id}/checkpoint")
-    def checkpoint(mission_id: str, body: CheckpointRequest):
+    def checkpoint(mission_id: str, body: CheckpointRequest, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.checkpoint(mission_id, **body.model_dump())}
         except KeyError:
@@ -95,7 +103,8 @@ def router(controller: GoldenMissionController | None = None):
             raise HTTPException(409, str(exc))
 
     @r.post("/{mission_id}/close")
-    def close(mission_id: str, body: CloseRequest):
+    def close(mission_id: str, body: CloseRequest, request: Request):
+        require_control_key(request)
         try:
             return {"ok": True, "mission": c.close(mission_id, **body.model_dump())}
         except KeyError:
