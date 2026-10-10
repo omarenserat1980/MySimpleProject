@@ -13,6 +13,7 @@ on:
       - "brain_v12/tests/test_golden_mission*.py"
       - "brain_v12/tests/test_synthetic_customer*.py"
       - "brain_v12/app.py"
+      - "docs/GOLDEN_MISSION_LOOP.md"
       - ".github/workflows/golden-mission-loop-tests.yml"
   workflow_dispatch:
 
