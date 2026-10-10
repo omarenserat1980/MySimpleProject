@@ -28,7 +28,7 @@ DEFAULT_SOFTWARE_CATALOG: tuple[dict[str, Any], ...] = (
         "software_id": "python-runtime",
         "name": "Python",
         "category": "runtime",
-        "target_state": "running",
+        "target_state": "installed",
         "rollout_phase": "current",
         "priority": "critical",
         "execution_class": "runtime",
