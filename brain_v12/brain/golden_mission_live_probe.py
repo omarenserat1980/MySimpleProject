@@ -8,7 +8,6 @@ import hashlib
 import ipaddress
 import json
 import os
-import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -82,16 +81,13 @@ def probe_runtime(base_url: str, control_key: str = "", timeout: float = 5.0) ->
         checks.append({"name": "runtime_worker_status", "passed": passed, "http_status": code, "response_sha256": digest})
     except Exception as exc:
         checks.append({"name": "runtime_worker_status", "passed": False, "error_type": type(exc).__name__})
-    # Deliberately fail-closed for full closure: these need dedicated real drills.
-    checks.extend([
-        {"name": "mission_persistence_restart", "passed": False, "reason": "Requires a separately executed real service restart and mission state comparison"},
-        {"name": "restore_drill", "passed": False, "reason": "Requires a separately executed checkpoint restore and hash comparison"},
-    ])
-    passed = all(item.get("passed") is True for item in checks)
+    # A live probe alone can only establish a partial result. Restart and
+    # restore proofs must be supplied separately to the evidence assembler.
+    runtime_passed = len(checks) == 2 and all(item.get("passed") is True for item in checks)
     host = urllib.parse.urlparse(base).hostname or "unknown"
     return {
         "schema_version": 1,
-        "status": "VERIFIED" if passed else "BLOCKED",
+        "status": "PARTIAL" if runtime_passed else "BLOCKED",
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "source": "live_read_only_runtime_probe",
         "target_host": host,
