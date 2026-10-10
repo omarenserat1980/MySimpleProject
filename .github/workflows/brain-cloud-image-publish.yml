@@ -51,8 +51,55 @@ jobs:
           context: .
           file: cloud/Dockerfile
           push: ${{ github.ref == 'refs/heads/main' && github.repository == 'omarenserat1980/MySimpleProject' }}
+          load: ${{ github.ref != 'refs/heads/main' }}
           tags: |
             ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:latest
             ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Pull published image for smoke test
+        if: github.ref == 'refs/heads/main' && github.repository == 'omarenserat1980/MySimpleProject'
+        run: docker pull ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:sha-${{ github.sha }}
+
+      - name: Start Brain Cloud container
+        run: |
+          docker run -d --name brain-cloud-smoke \
+            -p 127.0.0.1:18000:8000 \
+            -e BRAIN_CONTROL_TOKEN=ci-smoke-token-not-for-production \
+            -e BRAIN_CLOUD_SKIP_FACTORY=1 \
+            -e BRAIN_API_QUEUE_WORKER=0 \
+            -e BRAIN_STATE_DIR=/tmp/brain-state \
+            ghcr.io/omarenserat1980/mysimpleproject-brain-cloud:sha-${{ github.sha }}
+
+      - name: Verify live health and readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:18000/healthz >/tmp/brain-health.json; then
+              break
+            fi
+            if [ "$attempt" -eq 45 ]; then
+              docker logs brain-cloud-smoke
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:18000/readyz | tee /tmp/brain-ready.json
+          python - <<'PY'
+          import json
+          health = json.load(open("/tmp/brain-health.json", encoding="utf-8"))
+          ready = json.load(open("/tmp/brain-ready.json", encoding="utf-8"))
+          assert health.get("status") == "ok", health
+          assert ready.get("ready") is True, ready
+          print("BRAIN_CLOUD_CONTAINER_SMOKE=PASS")
+          PY
+
+      - name: Print container logs on failure
+        if: failure()
+        run: docker logs brain-cloud-smoke || true
+
+      - name: Remove smoke-test container
+        if: always()
+        run: docker rm -f brain-cloud-smoke || true
