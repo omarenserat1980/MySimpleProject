@@ -24,7 +24,7 @@ All endpoints require the existing Brain control key.
 - `GET /api/software/status` — counts and safety boundary.
 - `GET /api/software` — list records; optional `category` and `runtime_state` filters.
 - `GET /api/software/{software_id}` — one record.
-- `POST /api/software` — register a planned/observed inventory item.
+- `POST /api/software` — register a planned/unknown inventory item.
 - `POST /api/software/{software_id}/observation` — record state and evidence reference.
 
 Example registration body:
