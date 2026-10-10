@@ -1,0 +1,56 @@
+name: Verify Persistent Arkan Brain API
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-verify-persistent-api.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify user-scoped systemd service and API
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 5
+    steps:
+      - name: Verify service, health, readiness, and persistent data paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVICE=brain-api-arkan.service
+          echo "=== SERVICE ==="
+          systemctl is-active "$SERVICE"
+          systemctl is-enabled "$SERVICE"
+          systemctl show "$SERVICE" -p User -p Group -p MainPID -p WorkingDirectory -p ExecStart --no-pager
+          PID="$(systemctl show "$SERVICE" -p MainPID --value)"
+          test "$PID" -gt 1
+          ps -p "$PID" -o user=,uid=,gid=,pid=,args=
+          PROCESS_USER="$(ps -p "$PID" -o user= | xargs)"
+          test "$PROCESS_USER" = brain
+          echo "API_PROCESS_RUNS_AS_BRAIN=PASS"
+          echo "=== HEALTH ==="
+          curl -fsS --max-time 5 http://127.0.0.1:8012/health
+          echo
+          echo "=== READINESS ==="
+          curl -fsS --max-time 8 http://127.0.0.1:8012/api/system/readiness -o /tmp/arkan-api-readiness.json
+          "$HOME/brain-runtime-venv/bin/python" - /tmp/arkan-api-readiness.json <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          print(json.dumps({"ok":data.get("ok"),"status":data.get("status"),"passed":data.get("passed"),"total":data.get("total")},ensure_ascii=False))
+          if data.get("ok") is not True or data.get("status") != "READY":
+              raise SystemExit("API_READINESS_FAILED")
+          print("API_READINESS=PASS")
+          PY
+          echo "=== MEDIA HEALTH ==="
+          curl -sS --max-time 5 http://127.0.0.1:8012/api/media/health
+          echo
+          echo "=== LISTENER ==="
+          ss -ltnp | grep ':8012'
+          echo "=== STATEFUL DATA PATHS ==="
+          for p in /home/brain/eb-bootstrap/brain_v12/brain_v12.db /home/brain/eb-bootstrap/brain_v12/brain6_artifacts/evidence/evidence.db /home/brain/.brain/media /home/brain/eb-bootstrap/brain_v12/.brain/state; do
+            stat -c '%U:%G mode=%a size=%s type=%F path=%n' "$p"
+          done
+          echo "PERSISTENT_API_VERIFY=PASS"
