@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 
 from brain_v12.brain.brain_gpt_20_layer_runtime import build_layer_runtime_status
+from brain_v12.brain.brain_ai_api import router as brain_ai_router
 
 
 class BrainGPT20LayerRuntimeTests(unittest.TestCase):
@@ -51,6 +52,21 @@ class BrainGPT20LayerRuntimeTests(unittest.TestCase):
         for key in ("conversation_manager", "context_builder", "memory_retrieval", "memory_consolidation"):
             self.assertEqual(by_key[key]["status"], "READY" if key != "memory_consolidation" else "PARTIAL")
         self.assertFalse(status["ready"])
+
+
+    def test_status_endpoint_exposes_runtime_coverage_without_running_chat(self):
+        brain_ai = SimpleNamespace(
+            model_router=None, provider=object(), tools={}, memory_store=None, cognitive=None,
+            _tool_intents=lambda result: [], chat=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("chat must not run")),
+            execute_tool=lambda *args, **kwargs: {}, _verify_tool_outcome=lambda result: False,
+            _diagnose_and_repair=lambda *args, **kwargs: None,
+        )
+        api = brain_ai_router(brain_ai)
+        route = next(item for item in api.routes if getattr(item, "path", "") == "/api/brain-ai/layers/status")
+        payload = route.endpoint()
+        self.assertEqual(payload["architecture_layers"], 20)
+        self.assertFalse(payload["execution_performed"])
+        self.assertEqual(payload["status"], "INTEGRATION_INCOMPLETE")
 
 
 if __name__ == "__main__":
