@@ -11,6 +11,8 @@ import json
 import os
 import sqlite3
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -129,10 +131,31 @@ def verify_attestation(
 
 def verify_from_environment(expected_executor_id: str, *, now: float | None = None) -> dict[str, Any]:
     """Verify host-provisioned attestation using a host-provisioned trust anchor."""
-    return verify_attestation(
+    result = verify_attestation(
         os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE", ""),
         os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64", ""),
         expected_executor_id,
         now=now,
-        replay_db_path=os.environ.get("BRAIN_CLOUD_EXECUTOR_REPLAY_DB", DEFAULT_REPLAY_DB),
+        replay_db_path=None,
     )
+    registry_url = os.environ.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_URL", "").rstrip("/")
+    token = os.environ.get("BRAIN_CLOUD_EXECUTOR_TOKEN", "")
+    if not registry_url or not token:
+        raise ValueError("CLOUD_EXECUTOR_CENTRAL_REGISTRY_CONFIGURATION_REQUIRED")
+    if not registry_url.startswith("https://"):
+        raise ValueError("CLOUD_EXECUTOR_CENTRAL_REGISTRY_HTTPS_REQUIRED")
+    body = json.dumps({"executor_id": expected_executor_id, "nonce": result["nonce"]}).encode("utf-8")
+    request = urllib.request.Request(
+        registry_url + "/api/cloud-executor/attestation/consume",
+        data=body,
+        headers={"Content-Type": "application/json", "X-Brain-Executor-Token": token},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            registry_result = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        raise ValueError("CLOUD_EXECUTOR_CENTRAL_REGISTRY_UNAVAILABLE") from exc
+    if not isinstance(registry_result, dict) or registry_result.get("consumed") is not True:
+        raise ValueError("CLOUD_EXECUTOR_CENTRAL_REGISTRY_REJECTED")
+    return result
