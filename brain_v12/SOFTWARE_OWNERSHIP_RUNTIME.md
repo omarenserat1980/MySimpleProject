@@ -72,6 +72,6 @@ These are target-state goals, not a claim that each component is installed. The 
 
 ## Security and semantics
 - A software registry entry is not ownership of a software copyright or license.
-- `verified` means the caller supplied an evidence reference for the stated observation;
-  it does not mean the reference was independently validated by this module.
+- The registry API cannot set `verified` from a caller-supplied evidence reference. A
+  future trusted verifier must validate provenance and content before marking a record verified.
 - No automatic software installation is enabled by this increment.
