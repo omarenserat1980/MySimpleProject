@@ -57,7 +57,14 @@ class DecisionEngine:
                 lesson = json.loads(memory.get("value", "{}"))
             except (TypeError, ValueError):
                 continue
-            if lesson.get("verified") is not True or lesson.get("outcome") != "VERIFIED_SUCCESS":
+            # Legacy records may have marked a successful tool call as goal success.
+            # Only accept lessons carrying the new explicit goal-verification contract.
+            if (
+                lesson.get("verified") is not True
+                or lesson.get("goal_verified") is not True
+                or lesson.get("verification_status") != "GOAL_VERIFIED"
+                or lesson.get("outcome") != "VERIFIED_SUCCESS"
+            ):
                 continue
             if lesson.get("action") != action:
                 continue
