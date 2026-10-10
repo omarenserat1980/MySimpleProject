@@ -341,7 +341,8 @@ class MemoryStore:
                 INSERT INTO memory_conflicts(memory_key,conflicting_key,reason,status,created_at)
                 VALUES(?,?,?,'OPEN',?)
                 ON CONFLICT(memory_key,conflicting_key) DO UPDATE SET
-                    reason=excluded.reason,status='OPEN',created_at=excluded.created_at
+                    reason=excluded.reason,status='OPEN',created_at=excluded.created_at,
+                    resolution_evidence='',resolved_by='',resolved_at=NULL
             """, (first, second, reason, created_at))
             for memory_key in (first, second):
                 con.execute("""
