@@ -70,7 +70,9 @@ def attestation_challenge(body: ExecutorRequest, x_brain_executor_token: str = H
     if not os.environ.get("BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64"):
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED")
     try:
-        return create_challenge(authenticated_executor_id=body.executor_id, challenge_db_path=_registry_db())
+        binding = _host_binding(body.executor_id)
+        return create_challenge(authenticated_executor_id=body.executor_id, challenge_db_path=_registry_db(),
+                                expected_hostname=binding["hostname"], expected_architecture=binding["architecture"])
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
