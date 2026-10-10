@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from brain_v12.brain.golden_mission import GoldenMissionController
@@ -90,11 +91,23 @@ class GoldenMissionControllerTests(unittest.TestCase):
         m=self.controller.checkpoint(self.mission["mission_id"],"first step",25,next_estimate_minutes=20)
         self.assertEqual(m["status"],"RUNNING")
         self.assertEqual(m["attempts"],0)
-        self.assertEqual(m["estimate_minutes"],10)
+        self.assertEqual(m["estimate_minutes"],20)
 
     def test_email_is_explicitly_unconfigured_when_missing(self):
-        result=GoldenMissionController._send_email(self.mission,"test")
-        self.assertIn(result["reason"],{"EMAIL_NOT_CONFIGURED","SMTPRecipientsRefused","SMTPServerDisconnected","OSError","TimeoutError"})
+        with patch.dict("os.environ", {}, clear=True):
+            result=GoldenMissionController._send_email(self.mission,"test")
+        self.assertEqual(result["reason"],"EMAIL_NOT_CONFIGURED")
+
+    def test_retry_limit_blocks_and_notifies(self):
+        m=self.controller.create("Bounded","Retry bounded test",["passes"],estimate_minutes=3,max_attempts=2)
+        self.controller.start(m["mission_id"])
+        first=self.controller.record_retry(m["mission_id"],"first failure")
+        self.assertEqual(first["status"],"RUNNING")
+        self.assertEqual(first["attempts"],1)
+        second=self.controller.record_retry(m["mission_id"],"second failure")
+        self.assertEqual(second["status"],"BLOCKED")
+        self.assertEqual(second["attempts"],2)
+        self.assertTrue(any(e["event"]=="RETRY_LIMIT_REACHED" for e in second["evidence"]))
 
 if __name__ == "__main__":
     unittest.main()
