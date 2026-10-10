@@ -1,0 +1,38 @@
+name: Validate Brain Autopilot Workflow
+
+on:
+  push:
+    branches:
+      - fix/brain-human-intermediary-autopilot-workflow-20261010
+    paths:
+      - ".github/workflows/brain-human-intermediary-autopilot.yml"
+      - ".github/workflows/validate-autopilot-workflow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.7"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}" \
+            --output "/tmp/${archive}"
+          tar -xzf "/tmp/${archive}" -C /tmp actionlint
+          /tmp/actionlint -version
+      - name: Validate workflow syntax and expressions
+        run: |
+          /tmp/actionlint \
+            -ignore 'label "brain-internal" is unknown' \
+            -ignore 'label "qemu" is unknown' \
+            -ignore 'label "windows-real-boot" is unknown' \
+            .github/workflows/brain-human-intermediary-autopilot.yml
