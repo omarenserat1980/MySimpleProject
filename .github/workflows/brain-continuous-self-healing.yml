@@ -6,7 +6,7 @@ on:
       command:
         description: "Brain command to run"
         required: false
-        default: "python -m brain_v12.self_healing.self_test"
+        default: "python3 -m brain_v12.self_healing.self_test"
       max_attempts:
         description: "Maximum repair/verify cycles"
         required: false
@@ -44,8 +44,8 @@ jobs:
       - name: Fail-closed Brain internal runtime preflight
         run: |
           set -euo pipefail
-          python -m brain_v12.brain.internal_runner_preflight
-          python - <<'PY'
+          python3 -m brain_v12.brain.internal_runner_preflight
+          python3 - <<'PY'
           from brain_v12.brain.internal_runner_preflight import verify_and_write
           e=verify_and_write("internal-runner-preflight.json")
           assert e["verified"] is True, e
@@ -55,7 +55,7 @@ jobs:
       - name: Prepare Brain runtime
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check -q httpx fastapi python-multipart google-api-python-client google-auth-oauthlib google-auth-httplib2
+          python3 -m pip install --disable-pip-version-check -q httpx fastapi python3-multipart google-api-python3-client google-auth-oauthlib google-auth-httplib2
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           mkdir -p brain_v12/bin
@@ -63,7 +63,7 @@ jobs:
           ln -sf "$(command -v ffprobe)" brain_v12/bin/ffprobe
           test -x brain_v12/bin/ffmpeg
           test -x brain_v12/bin/ffprobe
-          python - <<'PY'
+          python3 - <<'PY'
           import fastapi, httpx
           print("BRAIN_RUNTIME_DEPS=READY")
           print("FASTAPI="+fastapi.__version__)
@@ -71,29 +71,29 @@ jobs:
           PY
 
       - name: Validate Repair Knowledge
-        run: python -m unittest brain_v12.brain.test_repair_knowledge -v
+        run: python3 -m unittest brain_v12.brain.test_repair_knowledge -v
 
       - name: Validate Minute Watchdog
-        run: python -m unittest brain_v12.brain.test_brain_minute_watchdog -v
+        run: python3 -m unittest brain_v12.brain.test_brain_minute_watchdog -v
 
       - name: Validate Self-Healing Contracts
         run: |
           set -euo pipefail
-          python -m unittest brain_v12.self_healing.test_command_contract brain_v12.self_healing.test_generator_registry brain_v12.self_healing.test_improvement_eligibility brain_v12.self_healing.test_native_patch_generator brain_v12.self_healing.test_future_evolution -v
+          python3 -m unittest brain_v12.self_healing.test_command_contract brain_v12.self_healing.test_generator_registry brain_v12.self_healing.test_improvement_eligibility brain_v12.self_healing.test_native_patch_generator brain_v12.self_healing.test_future_evolution -v
 
       - name: Run Brain Supervisor + Self-Healing
         env:
           BRAIN_MAX_ATTEMPTS: ${{ github.event.inputs.max_attempts || '5' }}
           BRAIN_BACKOFF_SECONDS: "2"
           BRAIN_MAX_BACKOFF_SECONDS: "20"
-          BRAIN_REPAIR_COMMAND: "python -m brain_v12.self_healing.repair"
-          BRAIN_CODE_GENERATOR_COMMAND: "python -m brain_v12.self_healing.native_patch_generator"
+          BRAIN_REPAIR_COMMAND: "python3 -m brain_v12.self_healing.repair"
+          BRAIN_CODE_GENERATOR_COMMAND: "python3 -m brain_v12.self_healing.native_patch_generator"
           BRAIN_GATE_PYTEST: "1"
           BRAIN_COMMAND: ${{ github.event.inputs.brain_command || 'BRAIN_CONTINUE_AUTONOMOUSLY' }}
           BRAIN_AUTO_CONFIRM: ${{ github.event.inputs.auto_confirm || 'false' }}
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.continuous_evolution             --cycles "${{ github.event.inputs.continue_cycles || '3' }}"             --loops-per-cycle 1             --timeout 120             --pause 2
+          python3 -m brain_v12.self_healing.continuous_evolution             --cycles "${{ github.event.inputs.continue_cycles || '3' }}"             --loops-per-cycle 1             --timeout 120             --pause 2
 
       - name: Report Applied Repair Evidence
         if: always()
@@ -114,10 +114,10 @@ jobs:
           BRAIN_GATE_PYTEST: "1"
         run: |
           set -euo pipefail
-          python -m brain_v12.self_healing.verification_gate
+          python3 -m brain_v12.self_healing.verification_gate
           test -f .brain/state/verification_gate.json
 
-          python - <<'PY'
+          python3 - <<'PY'
           import json
           from pathlib import Path
           data = json.loads(Path(".brain/state/verification_gate.json").read_text(encoding="utf-8"))
