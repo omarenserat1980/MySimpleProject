@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import sqlite3
 import unicodedata
@@ -158,13 +159,28 @@ class MemoryStore:
         if not query_terms:
             return rows[:limit]
 
-        ranked = []
-        for position, memory in enumerate(rows):
+        prepared = []
+        document_frequency = {term: 0 for term in query_terms}
+        for memory in rows:
             key_terms = self._memory_terms(memory.get("key", ""))
             value_terms = self._memory_terms(memory.get("value", ""))
-            key_overlap = len(query_terms & key_terms)
-            value_overlap = len(query_terms & value_terms)
-            score = (key_overlap * 3) + (value_overlap * 2)
+            document_terms = key_terms | value_terms
+            for term in query_terms & document_terms:
+                document_frequency[term] += 1
+            prepared.append((memory, key_terms, value_terms))
+
+        # Rare goal terms carry more information than generic words repeated
+        # across many memories. This is a small corpus-local IDF weighting.
+        corpus_size = max(1, len(prepared))
+        term_weights = {
+            term: math.log((corpus_size + 1) / (document_frequency[term] + 1)) + 1.0
+            for term in query_terms
+        }
+        ranked = []
+        for position, (memory, key_terms, value_terms) in enumerate(prepared):
+            key_score = sum(term_weights[term] for term in query_terms & key_terms)
+            value_score = sum(term_weights[term] for term in query_terms & value_terms)
+            score = (key_score * 3) + (value_score * 2)
             if score:
                 ranked.append((score, position, memory))
         if not ranked:
