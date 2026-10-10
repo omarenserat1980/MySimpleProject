@@ -17,6 +17,8 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
         self.assertIn(isolated + ' "$RUNNER_DIR/config.sh"', script)
         self.assertIn('STAGING_DIR="$(mktemp -d /tmp/brain-cloud-runner.XXXXXX)"', script)
         self.assertIn('sudo cp -a "$STAGING_DIR/." "$RUNNER_DIR/"', script)
+        self.assertIn('rm -rf "$STAGING_DIR"\nSTAGING_DIR=""', script)
+        self.assertIn('install -d -m 700 "$HOME/.local/state/brain"', script)
         self.assertNotIn('cd "$RUNNER_DIR"', script)
         self.assertIn(isolated + ' "$RUNNER_DIR/run.sh"', script)
         self.assertIn("unset TOKEN", script)
