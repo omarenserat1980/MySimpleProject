@@ -174,5 +174,6 @@ jobs:
             echo "- Python compile sanity: executed"
             echo "- JavaScript syntax: executed"
             echo "- Static security/contract sanity: executed"
+            echo "- Live Brain API layer-status smoke: executed"
             echo "- Verification status: see preceding steps"
           } >> "$GITHUB_STEP_SUMMARY"
