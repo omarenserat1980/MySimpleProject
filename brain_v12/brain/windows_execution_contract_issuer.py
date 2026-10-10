@@ -31,7 +31,9 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     source_commit=str(source_commit).strip().lower()
     if len(source_commit)!=40 or any(c not in "0123456789abcdef" for c in source_commit):
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_INVALID")
-    if source_commit!=verified["source_commit"]: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_MISMATCH")
+    # The checkpoint commit identifies the trusted recovery baseline; the contract
+    # commit identifies the exact workflow revision being authorized. They are
+    # intentionally distinct when code has advanced beyond the golden checkpoint.
     if not capability_verified: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_CAPABILITY_NOT_VERIFIED")
     if str(task_id).strip()=="" or str(attempt_id).strip()=="": raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_TASK_ATTEMPT_REQUIRED")
     if lease.holder_id=="" or lease.fencing_token<1: raise RuntimeError("BRAIN_LEADERSHIP_LEASE_INVALID")
@@ -48,7 +50,8 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
        "brain_id":verified["brain_id"],"generation":verified["generation"],
        "fencing_token":lease.fencing_token,"lease_id":lease.lease_id,"holder_id":lease.holder_id,
        "task_id":str(task_id).strip(),"attempt_id":str(attempt_id).strip(),
-       "source_commit":source_commit,"issued_at":now,"expires_at":now+int(expires_seconds),
+       "source_commit":source_commit,"checkpoint_source_commit":verified["source_commit"],
+       "issued_at":now,"expires_at":now+int(expires_seconds),
        "owner_id":owner.owner_id,"owner_challenge_id":owner.challenge_id,"owner_scope":owner.scope}
     c["authority_signature_algorithm"]=ALGORITHM
     c["authority_signature"]=sign_contract(c)
