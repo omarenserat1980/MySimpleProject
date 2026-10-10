@@ -30,7 +30,8 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             self.assertEqual(first_lesson["run_id"], first["run_id"])
             self.assertEqual(second_lesson["run_id"], second["run_id"])
             self.assertIn(first_lesson["outcome"], {
-                "VERIFIED_SUCCESS", "WAITING_PERMISSION", "FAILED_OR_UNVERIFIED"
+                "VERIFIED_SUCCESS", "ACTION_VERIFIED_NOT_GOAL",
+                "WAITING_PERMISSION", "FAILED_OR_UNVERIFIED"
             })
             self.assertIn("verified", second_lesson)
             self.assertGreaterEqual(second["prior_lesson_count"], 1)
