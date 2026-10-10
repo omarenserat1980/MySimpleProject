@@ -65,7 +65,9 @@ class RuntimePathsTests(unittest.TestCase):
                     Path(os.environ["BRAIN_EVIDENCE_DB"]),
                     runtime_home / "brain6_artifacts" / "evidence" / "evidence.db",
                 )
-                self.assertEqual(Path(os.environ["BRAIN_MEDIA_ROOT"]), legacy_media.resolve())
+                runtime_media = runtime_home / "media"
+                self.assertEqual(Path(os.environ["BRAIN_MEDIA_ROOT"]), runtime_media.resolve())
+                self.assertEqual((runtime_media / "existing.mp4").read_bytes(), b"existing-media")
                 self.assertEqual(
                     Path(os.environ["BRAIN_MEDIA_OUTPUT_ROOT"]),
                     runtime_home / "media" / "engine",
@@ -85,6 +87,7 @@ class RuntimePathsTests(unittest.TestCase):
                     "legacy-workflow",
                 )
                 self.assertTrue((Path(os.environ["BRAIN_MEDIA_ROOT"]) / "existing.mp4").is_file())
+                self.assertTrue((legacy_media / "existing.mp4").is_file())
 
             # Migration is copy-only: every original state source remains available.
             self.assertTrue(legacy_db.is_file())
