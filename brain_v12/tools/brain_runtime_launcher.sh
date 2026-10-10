@@ -17,6 +17,11 @@ else
   ROOT="$SOURCE_ROOT"
 fi
 cd "$ROOT"
+# Keep the established development database when running the isolated runtime
+# worktree. Never silently create a fresh empty DB in the runtime checkout.
+if [ -z "${BRAIN_DB:-}" ] && [ -s "$SOURCE_ROOT/brain_v12/brain_v12.db" ]; then
+  export BRAIN_DB="$SOURCE_ROOT/brain_v12/brain_v12.db"
+fi
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
@@ -44,6 +49,8 @@ export PYTHONPATH="$ROOT:${PYTHONPATH:-}"
 PYTHON="${V12_PYTHON_EXECUTABLE:-$(command -v python3 || command -v python)}"
 if [ -z "$PYTHON" ]; then echo "BRAIN_RUNTIME_ERROR: PYTHON_NOT_FOUND" >&2; exit 42; fi
 mkdir -p "$ROOT/.brain/state"
+RUNTIME_COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+API_COMMIT_MARKER="$ROOT/.brain/state/api-runtime-commit"
 status_snapshot() {
   "$PYTHON" - <<'PY'
 import json, os, urllib.request
@@ -114,7 +121,8 @@ start_api() {
     exit 43
   fi
   if ! health_ok; then echo "BRAIN_RUNTIME_ERROR: API_START_FAILED pid=$API_PID" >&2; exit 43; fi
-  echo "JET_BRAIN_API ready pid=$API_PID" >&2
+  printf "%s\n" "$RUNTIME_COMMIT" > "$API_COMMIT_MARKER"
+  echo "JET_BRAIN_API ready pid=$API_PID runtime_commit=$RUNTIME_COMMIT" >&2
 }
 is_local_api() {
   "$PYTHON" -c 'import ipaddress,os,urllib.parse
@@ -126,7 +134,28 @@ except ValueError: raise SystemExit(1)'
 if is_local_api; then
   if health_ok; then
     if auth_ok; then
-      echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+      # A healthy API may still have old Python modules loaded even when its
+      # working directory is unchanged. Compare the commit recorded at the
+      # last successful launch with the currently converged runtime commit.
+      API_PID_ACTIVE=""
+      API_CWD=""
+      for candidate_pid in $(pgrep -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true); do
+        candidate_cwd="$(readlink "/proc/$candidate_pid/cwd" 2>/dev/null || true)"
+        if [ -n "$candidate_cwd" ]; then
+          API_PID_ACTIVE="$candidate_pid"
+          API_CWD="$candidate_cwd"
+          break
+        fi
+      done
+      RECORDED_COMMIT="$(cat "$API_COMMIT_MARKER" 2>/dev/null || true)"
+      if [ "$RECORDED_COMMIT" != "$RUNTIME_COMMIT" ] || [ "$API_CWD" != "$ROOT" ]; then
+        echo "JET_BRAIN_API restart_for_runtime_convergence old_commit=${RECORDED_COMMIT:-unknown} new_commit=$RUNTIME_COMMIT old_root=${API_CWD:-unknown} new_root=$ROOT" >&2
+        pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+        sleep 1
+        start_api
+      else
+        echo "JET_BRAIN_API already_running_from_converged_root pid=$API_PID_ACTIVE runtime_commit=$RUNTIME_COMMIT" >&2
+      fi
     else
       echo "JET_BRAIN_API local_auth_failed_restart_once" >&2
       pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
