@@ -89,7 +89,7 @@ Run from repository root:
 python -m brain_v12.brain.golden_mission_system_audit --root . --output .brain/state/golden_mission_system_audit.json
 \`\`\`
 
-The command is read-only with respect to external systems. Its JSON records workflow inventory, project source presence, missing legacy documents, launch blockers, and whether an explicit live-runtime evidence manifest passed the narrow schema check.
+The command is read-only with respect to external systems. Its JSON records workflow inventory, project source presence, missing legacy documents, launch blockers, and whether an explicit live-runtime evidence manifest passed the schema checks. A runtime manifest must identify source `live_read_only_runtime_probe`, target host, timezone-aware `checked_at` no older than 24 hours, safety assertions, all four required checks, and SHA-256 response hashes for the two HTTP probes. A JSON manifest is still mutable and not cryptographically signed; treat it as a local gate input, not standalone proof of authenticity. For high assurance, retain the original CI/runtime logs and artifacts, compare hashes from a trusted runner, and independently review the restart and restore drill evidence.
 
 ## Closure definition
 
