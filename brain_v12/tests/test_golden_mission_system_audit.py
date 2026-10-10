@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from brain_v12.brain.golden_mission_system_audit import audit_repository
@@ -48,6 +49,14 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     evidence_path.parent.mkdir(parents=True)
     evidence_path.write_text(json.dumps({
         "status": "VERIFIED",
+        "source": "live_read_only_runtime_probe",
+        "target_host": "brain-test.internal",
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "safety": {
+            "executes_missions": False,
+            "changes_service_state": False,
+            "stores_control_key": False,
+        },
         "checks": [
             {"name": "runtime_api_readiness", "passed": True, "response_sha256": "a" * 64},
             {"name": "runtime_worker_status", "passed": True, "response_sha256": "b" * 64},
@@ -81,6 +90,33 @@ def test_invalid_runtime_evidence_never_unlocks_launch(tmp_path):
     evidence_path = tmp_path / ".brain/state/production_runtime_evidence.json"
     evidence_path.parent.mkdir(parents=True)
     evidence_path.write_text(json.dumps({"status": "VERIFIED", "checks": [{"name": "api", "passed": False}]}), encoding="utf-8")
+    report = audit_repository(tmp_path)
+    assert report["launch_readiness"] == "BLOCKED"
+    assert "LIVE_RUNTIME_EVIDENCE_MISSING" in {item["code"] for item in report["launch_blockers"]}
+
+
+
+def test_stale_or_wrong_source_runtime_evidence_does_not_unlock_launch(tmp_path):
+    from datetime import timedelta
+
+    _touch(tmp_path, ".github/workflows/check.yml", "name: Check\non:\n  pull_request:\n")
+    for path in ("README.md", "PROJECT_MASTER_SPEC.md", "PROJECT_ROADMAP.md", "DECISIONS.md", "CHANGELOG.md"):
+        _touch(tmp_path, path)
+    evidence_path = tmp_path / ".brain/state/production_runtime_evidence.json"
+    evidence_path.parent.mkdir(parents=True)
+    evidence_path.write_text(json.dumps({
+        "status": "VERIFIED",
+        "source": "manual",
+        "target_host": "brain-test.internal",
+        "checked_at": (datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
+        "safety": {"executes_missions": False, "changes_service_state": False, "stores_control_key": False},
+        "checks": [
+            {"name": "runtime_api_readiness", "passed": True, "response_sha256": "a" * 64},
+            {"name": "runtime_worker_status", "passed": True, "response_sha256": "b" * 64},
+            {"name": "mission_persistence_restart", "passed": True},
+            {"name": "restore_drill", "passed": True},
+        ],
+    }), encoding="utf-8")
     report = audit_repository(tmp_path)
     assert report["launch_readiness"] == "BLOCKED"
     assert "LIVE_RUNTIME_EVIDENCE_MISSING" in {item["code"] for item in report["launch_blockers"]}
