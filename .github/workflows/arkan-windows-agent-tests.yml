@@ -1,0 +1,31 @@
+name: Arkan Windows Heartbeat Agent Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_windows_agent/**"
+      - "brain_v12/tests/test_arkan_windows_heartbeat_agent.py"
+      - ".github/workflows/arkan-windows-agent-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_windows_agent/**"
+      - "brain_v12/tests/test_arkan_windows_heartbeat_agent.py"
+      - ".github/workflows/arkan-windows-agent-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat-agent-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile heartbeat agent
+        run: python -m py_compile brain_windows_agent/arkan_heartbeat_agent.py
+      - name: Run heartbeat agent safety tests
+        run: python -m unittest -v brain_v12.tests.test_arkan_windows_heartbeat_agent
