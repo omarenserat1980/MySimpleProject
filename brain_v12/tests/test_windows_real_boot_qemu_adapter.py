@@ -17,6 +17,7 @@ class WindowsRealBootQemuAdapterTests(unittest.TestCase):
         self.assertEqual(cmd[0],"qemu-system-x86_64")
         self.assertIn("-machine",cmd)
         self.assertEqual(cmd[cmd.index("-machine")+1],"q35,accel=kvm")
+        self.assertEqual(cmd[cmd.index("-m")+1],"2G")
         self.assertNotIn(" -machine",cmd)
         self.assertTrue(all(arg == arg.strip() for arg in cmd))
         self.assertNotIn("q35,accel=kvm:tcg",cmd)
