@@ -6,6 +6,10 @@ import json
 import pathlib
 import threading
 import subprocess
+from .runtime_paths import configure_runtime_paths
+
+# Initialize runtime storage before importing components with import-time state.
+RUNTIME_STATE_ROOT = configure_runtime_paths()
 import httpx
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
