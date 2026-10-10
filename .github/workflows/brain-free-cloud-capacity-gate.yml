@@ -13,6 +13,7 @@ on:
       - "brain_v12/brain/resource_health.py"
       - "brain_v12/brain/execution_evidence_bundle.py"
       - "brain_v12/brain/execution_lease.py"
+      - "brain_v12/brain/cloud_foundation_coordinator.py"
       - "brain_v12/tests/test_cloud_capacity_gate.py"
       - "brain_v12/tests/test_cloud_provider_adapter.py"
       - "brain_v12/tests/test_task_scheduler.py"
@@ -23,6 +24,7 @@ on:
       - "brain_v12/tests/test_execution_evidence_bundle.py"
       - "brain_v12/tests/test_execution_lease.py"
       - "brain_v12/tests/test_cloud_foundation_integration.py"
+      - "brain_v12/tests/test_cloud_foundation_coordinator.py"
       - ".github/workflows/brain-free-cloud-capacity-gate.yml"
   push:
     branches:
@@ -39,6 +41,7 @@ on:
       - "brain_v12/brain/resource_health.py"
       - "brain_v12/brain/execution_evidence_bundle.py"
       - "brain_v12/brain/execution_lease.py"
+      - "brain_v12/brain/cloud_foundation_coordinator.py"
       - "brain_v12/tests/test_cloud_capacity_gate.py"
       - "brain_v12/tests/test_cloud_provider_adapter.py"
       - "brain_v12/tests/test_task_scheduler.py"
@@ -49,6 +52,7 @@ on:
       - "brain_v12/tests/test_execution_evidence_bundle.py"
       - "brain_v12/tests/test_execution_lease.py"
       - "brain_v12/tests/test_cloud_foundation_integration.py"
+      - "brain_v12/tests/test_cloud_foundation_coordinator.py"
       - ".github/workflows/brain-free-cloud-capacity-gate.yml"
 
 permissions:
@@ -79,6 +83,7 @@ jobs:
           python -m py_compile brain_v12/brain/resource_health.py
           python -m py_compile brain_v12/brain/execution_evidence_bundle.py
           python -m py_compile brain_v12/brain/execution_lease.py
+          python -m py_compile brain_v12/brain/cloud_foundation_coordinator.py
       - name: Run cloud foundation unit and integration tests
         env:
           PYTHONPATH: .
@@ -93,4 +98,5 @@ jobs:
             brain_v12/tests/test_resource_health.py \
             brain_v12/tests/test_execution_evidence_bundle.py \
             brain_v12/tests/test_execution_lease.py \
-            brain_v12/tests/test_cloud_foundation_integration.py
+            brain_v12/tests/test_cloud_foundation_integration.py \
+            brain_v12/tests/test_cloud_foundation_coordinator.py
