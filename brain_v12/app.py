@@ -176,6 +176,33 @@ def brain_cloud_status():
     """Return verified Brain Cloud bootstrap/runtime state without exposing secrets."""
     return bootstrap_status()
 
+@app.get("/api/golden-loop/events")
+def golden_loop_events(limit: int = 100):
+    """Read-only timeline of persisted Golden-loop evidence; never executes work."""
+    bounded_limit = max(1, min(int(limit), 200))
+    events = evidence_store.recent_golden(bounded_limit)
+    return {
+        "ok": True,
+        "read_only": True,
+        "source": "evidence_store",
+        "total_evidence": evidence_store.golden_count(),
+        "returned": len(events),
+        "events": [
+            {
+                "evidence_id": event["evidence_id"],
+                "task_id": event["task_id"],
+                "kind": event["kind"],
+                "created_at": event["created_at"],
+                "sha256": event["sha256"],
+                "verification_status": event["verification_status"],
+                "producer": event["producer"],
+                "payload": event["payload"],
+            }
+            for event in events
+        ],
+    }
+
+
 @app.middleware("http")
 async def no_cache(request, call_next):
     response=await call_next(request)
