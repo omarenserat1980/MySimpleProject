@@ -124,7 +124,7 @@ def main() -> int:
     parser.add_argument("--probe", required=True, help="JSON from the read-only live runtime probe")
     parser.add_argument("--restart-evidence", required=True, help="Evidence record created after an actual service restart")
     parser.add_argument("--restore-evidence", required=True, help="Evidence record created after an actual checkpoint restore")
-    parser.add_argument("--output", default=".brain/state/production_runtime_evidence.json")
+    parser.add_argument("--output", default="brain6_artifacts/evidence/live_runtime_evidence.json")
     args = parser.parse_args()
     try:
         report = assemble(_load(args.probe), _load(args.restart_evidence), _load(args.restore_evidence))
