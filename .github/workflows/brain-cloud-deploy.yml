@@ -57,12 +57,38 @@ jobs:
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/brain_cloud_key
+          printf '%s\\n' "$SSH_PRIVATE_KEY" > ~/.ssh/brain_cloud_key
           chmod 600 ~/.ssh/brain_cloud_key
-          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
           ssh-keygen -y -f ~/.ssh/brain_cloud_key >/dev/null
           echo "SSH_KEY_AND_PINNED_HOST_KEY=VALID"
+
+      - name: Preflight existing host before copying files
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/brain_cloud_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$USER@$HOST" "REMOTE_DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          test -d "$REMOTE_DIR" || { echo "Remote directory does not exist"; exit 1; }
+          test -f "$REMOTE_DIR/.env" || { echo "Remote .env file is missing"; exit 1; }
+          grep -Eq '^BRAIN_CONTROL_TOKEN=.{32,}$' "$REMOTE_DIR/.env" || {
+            echo "BRAIN_CONTROL_TOKEN missing or too short"
+            exit 1
+          }
+          command -v docker >/dev/null || { echo "Docker is not installed"; exit 1; }
+          docker compose version >/dev/null || { echo "Docker Compose plugin is unavailable"; exit 1; }
+          command -v curl >/dev/null || { echo "curl is not installed"; exit 1; }
+          command -v python3 >/dev/null || { echo "Python 3 is not installed"; exit 1; }
+          echo "REMOTE_HOST_PREFLIGHT=PASS"
+          REMOTE
 
       - name: Copy production Compose file to host
         env:
