@@ -37,6 +37,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Preflight all protected Windows boot secrets
+        env:
+          BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            BRAIN_CLOUD_EXECUTOR_REGISTRY_URL \
+            BRAIN_CLOUD_EXECUTOR_TOKEN \
+            BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64 \
+            BRAIN_AUTHORITY_PUBLIC_KEY_B64 \
+            BRAIN_WINDOWS_CONTROL_PLANE_URL \
+            BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY; do
+            if [ -z "${!name:-}" ]; then
+              printf 'BLOCKED: required protected environment secret is empty: %s\n' "$name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "WINDOWS_REAL_BOOT_SECRET_PREFLIGHT=BLOCKED"
+            exit 2
+          fi
+          echo "WINDOWS_REAL_BOOT_SECRET_PREFLIGHT=PASS"
+
       - name: Verify Brain-owned runner and VM toolchain
         run: |
           set -euo pipefail
