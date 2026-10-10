@@ -42,5 +42,15 @@ class MemoryRecallTests(unittest.TestCase):
             self.assertEqual([item["key"] for item in recalled], ["memory.two"])
 
 
+    def test_goal_directed_recall_can_avoid_unrelated_recent_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("recent.unrelated", "طقس ورياضة")
+            recalled = store.recall_memories("مجرة بعيدة", limit=5, fallback_recent=False)
+            self.assertEqual(recalled, [])
+
+
+
 if __name__ == "__main__":
     unittest.main()
