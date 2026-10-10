@@ -26,9 +26,6 @@ class CloudExecutorAttestationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.replay_db = str(Path(self.tmp.name) / 'used-nonces.sqlite3')
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.replay_db = str(Path(self.tmp.name) / 'used-nonces.sqlite3')
         self.document = {
             "schema": SCHEMA,
             "executor_id": "cloud-test-01",
