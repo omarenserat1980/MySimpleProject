@@ -9,6 +9,8 @@ from __future__ import annotations
 import base64
 import json
 import os
+import platform
+import socket
 import sqlite3
 import time
 import urllib.error
@@ -19,9 +21,9 @@ from typing import Any
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-SCHEMA = "brain.cloud-executor-attestation.v1"
+SCHEMA = "brain.cloud-executor-attestation.v2"
 AUDIENCE = "brain-cloud-executor"
-MAX_VALIDITY_SECONDS = 3600
+MAX_VALIDITY_SECONDS = 300
 MAX_CLOCK_SKEW_SECONDS = 120
 DEFAULT_REPLAY_DB = "/var/lib/brain/cloud-executor-attestation-nonces.sqlite3"
 
@@ -65,6 +67,8 @@ def verify_attestation(
     *,
     now: float | None = None,
     replay_db_path: str | None = None,
+    expected_hostname: str | None = None,
+    expected_architecture: str | None = None,
 ) -> dict[str, Any]:
     """Validate issuer signature and optionally consume its nonce atomically."""
     if not attestation_file:
@@ -83,13 +87,27 @@ def verify_attestation(
     if not isinstance(document, dict) or document.get("schema") != SCHEMA:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_SCHEMA_INVALID")
 
-    required = ("executor_id", "audience", "issued_at", "expires_at", "nonce", "signature")
+    required = ("executor_id", "audience", "hostname", "architecture", "issued_at", "expires_at", "nonce", "signature")
     if any(key not in document for key in required):
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_FIELDS_REQUIRED")
     if document["executor_id"] != expected_executor_id:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_EXECUTOR_MISMATCH")
     if document["audience"] != AUDIENCE:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_AUDIENCE_MISMATCH")
+    actual_hostname = socket.gethostname()
+    actual_arch = platform.machine().lower()
+    actual_arch = "x86_64" if actual_arch in {"x86_64", "amd64"} else actual_arch
+    wanted_hostname = actual_hostname if expected_hostname is None else expected_hostname
+    wanted_arch = actual_arch if expected_architecture is None else expected_architecture.lower()
+    wanted_arch = "x86_64" if wanted_arch in {"x86_64", "amd64"} else wanted_arch
+    if not isinstance(document["hostname"], str) or not document["hostname"].strip():
+        raise ValueError("CLOUD_EXECUTOR_ATTESTATION_HOSTNAME_INVALID")
+    if not isinstance(document["architecture"], str) or document["architecture"] != "x86_64":
+        raise ValueError("CLOUD_EXECUTOR_ATTESTATION_ARCHITECTURE_INVALID")
+    if not wanted_hostname or document["hostname"] != wanted_hostname:
+        raise ValueError("CLOUD_EXECUTOR_ATTESTATION_HOSTNAME_MISMATCH")
+    if wanted_arch != "x86_64" or document["architecture"] != wanted_arch:
+        raise ValueError("CLOUD_EXECUTOR_ATTESTATION_ARCHITECTURE_MISMATCH")
     if not isinstance(document["nonce"], str) or len(document["nonce"].strip()) < 16:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_NONCE_INVALID")
     if isinstance(document["issued_at"], bool) or not isinstance(document["issued_at"], (int, float)):
@@ -123,6 +141,8 @@ def verify_attestation(
         "schema": SCHEMA,
         "executor_id": expected_executor_id,
         "audience": AUDIENCE,
+        "hostname": document["hostname"],
+        "architecture": document["architecture"],
         "issued_at": issued_at,
         "expires_at": expires_at,
         "nonce": document["nonce"],
