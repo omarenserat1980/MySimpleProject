@@ -1,4 +1,9 @@
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
+import uuid
 from pathlib import Path
 
 
@@ -33,6 +38,59 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
         self.assertIn("exit 40", script)
         self.assertLess(script.index("RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED"),
                         script.index('"/repos/$REPO/actions/runners/registration-token"'))
+
+    def test_credential_boundary_expression_with_real_unix_permissions(self):
+        # GitHub-hosted Ubuntu runners provide passwordless sudo. On other
+        # environments, retain the static contract tests without assuming root.
+        if not shutil.which("sudo"):
+            self.skipTest("sudo unavailable; real-identity permission test requires sudo")
+        sudo = ["sudo", "-n"]
+        if subprocess.run(sudo + ["true"], capture_output=True).returncode != 0:
+            self.skipTest("passwordless sudo unavailable; real-identity permission test requires sudo")
+
+        username = "brain-ci-" + uuid.uuid4().hex[:10]
+        created = False
+        try:
+            subprocess.run(
+                sudo + ["useradd", "--system", "--no-create-home", "--home-dir", "/nonexistent", username],
+                check=True, capture_output=True, text=True,
+            )
+            created = True
+            with tempfile.TemporaryDirectory(prefix="brain-gh-boundary-") as temp:
+                config_dir = Path(temp) / "gh"
+                config_dir.mkdir(mode=0o700)
+                hosts = config_dir / "hosts.yml"
+                hosts.write_text("fixture-not-a-real-token\n", encoding="utf-8")
+                hosts.chmod(0o600)
+                config_dir.chmod(0o700)
+
+                check = (
+                    'test ! -r "$GH_CONFIG_DIR" && '
+                    'test ! -x "$GH_CONFIG_DIR" && '
+                    'test ! -r "$GH_CONFIG_DIR/hosts.yml"'
+                )
+                env = {"HOME": "/nonexistent", "GH_CONFIG_DIR": str(config_dir)}
+                denied = subprocess.run(
+                    sudo + ["-u", username, "--", "env",
+                            "HOME=/nonexistent", "GH_CONFIG_DIR=" + str(config_dir),
+                            "bash", "-c", check],
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(denied.returncode, 0, "private config should be unreadable by runner identity")
+
+                # A deliberately permissive directory must make the same check fail.
+                config_dir.chmod(0o755)
+                hosts.chmod(0o644)
+                allowed = subprocess.run(
+                    sudo + ["-u", username, "--", "env",
+                            "HOME=/nonexistent", "GH_CONFIG_DIR=" + str(config_dir),
+                            "bash", "-c", check],
+                    capture_output=True, text=True,
+                )
+                self.assertNotEqual(allowed.returncode, 0, "readable config must fail closed")
+        finally:
+            if created:
+                subprocess.run(sudo + ["userdel", username], capture_output=True, text=True)
 
     def test_runner_workspace_is_owned_by_runner_account(self):
         script = Path("tools/bootstrap_brain_cloud_executor.sh").read_text(encoding="utf-8")
