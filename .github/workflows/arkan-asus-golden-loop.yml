@@ -16,6 +16,8 @@ on:
       - feature/arkan-asus-golden-loop
     paths:
       - "tools/windows/arkan_asus_golden_probe.ps1"
+      - "tools/windows/verify_arkan_asus_observation.py"
+      - "tools/windows/test_verify_arkan_asus_observation.py"
       - "docs/ARKAN_ASUS_GOLDEN_MISSION.md"
       - ".github/workflows/arkan-asus-golden-loop.yml"
   workflow_dispatch:
