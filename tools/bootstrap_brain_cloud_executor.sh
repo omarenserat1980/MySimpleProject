@@ -19,6 +19,7 @@ RUNNER_ARCH="linux-x64"
 EXECUTOR_ID="${BRAIN_CLOUD_EXECUTOR_ID:-brain-cloud-$(hostname)-$(cat /etc/machine-id 2>/dev/null || echo unknown)}"
 ATTESTATION_FILE="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE:-$HOME/.local/state/brain/cloud-executor-attestation.json}"
 TRUST_KEY_FILE="${BRAIN_EXECUTOR_ATTESTATION_PUBLIC_KEY_FILE:-/etc/brain/trust/cloud-executor-attestation-ed25519.pub.b64}"
+GH_CONFIG_DIR="${GH_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/gh}"
 GATE_TMP="$(mktemp /tmp/brain-cloud-executor-gate.XXXXXX.json)"
 STAGING_DIR="$(mktemp -d /tmp/brain-cloud-runner.XXXXXX)"
 trap 'rm -f "$GATE_TMP"; rm -rf "$STAGING_DIR"' EXIT
@@ -42,6 +43,16 @@ command -v sudo >/dev/null || { echo "MISSING:sudo"; exit 2; }
 getent group kvm >/dev/null || { echo "CLOUD_EXECUTOR_KVM_GROUP_REQUIRED"; exit 37; }
 id -nG "$RUNNER_USER" | tr ' ' '\n' | grep -qx kvm || { echo "RUNNER_USER_MUST_BELONG_TO_KVM_GROUP"; exit 38; }
 gh auth status >/dev/null 2>&1 || { echo "GITHUB_AUTH_REQUIRED"; exit 3; }
+
+# Enforce the credential boundary, not merely a distinct HOME. A runner job must
+# be unable to list/read the operator's GitHub CLI config or its credential file.
+if sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" GH_CONFIG_DIR="$GH_CONFIG_DIR" \
+  bash -c 'test ! -r "$GH_CONFIG_DIR" && test ! -x "$GH_CONFIG_DIR" && test ! -r "$GH_CONFIG_DIR/hosts.yml"'; then
+  echo "RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED"
+else
+  echo "RUNNER_CAN_READ_OPERATOR_GH_CREDENTIALS"
+  exit 40
+fi
 
 arch="$(uname -m)"
 [ "$arch" = "x86_64" ] || { echo "CLOUD_EXECUTOR_X86_64_REQUIRED:$arch"; exit 22; }
