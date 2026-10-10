@@ -78,6 +78,19 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
         self.assertEqual(result["selected"]["decision_score_breakdown"]["base_confidence"], 0.7)
         self.assertEqual(result["selected"]["decision_score"], 0.7)
 
+    def test_only_caller_approved_action_id_satisfies_high_risk_approval(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        options = [
+            {"id":"apply_code","action":"apply code","risk":"high","requirements":[],
+             "reversible":True,"confidence":0.99},
+        ]
+        result = DecisionEngine().choose(
+            "apply code", options, permissions=set(), approved_actions={"apply_code"}
+        )
+        self.assertEqual(result["status"], "DECIDED")
+        self.assertEqual(result["selected"]["id"], "apply_code")
+
     def test_legacy_tool_success_does_not_count_as_verified_goal_memory(self):
         import json
         from brain_v12.brain.decision_engine import DecisionEngine
@@ -105,7 +118,9 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             {"id":"apply_code","action":"apply code","risk":"high","requirements":["developer_approval"],
              "reversible":True,"confidence":0.99},
         ]
-        result = DecisionEngine().choose("apply code", options, permissions={"developer_approval"})
+        result = DecisionEngine().choose(
+            "apply code", options, permissions={"developer_approval"}, approved_actions=set()
+        )
 
         self.assertEqual(result["status"], "WAITING_APPROVAL")
         self.assertEqual(result["selected"]["id"], "apply_code")
