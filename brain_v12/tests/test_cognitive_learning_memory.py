@@ -78,6 +78,26 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
         self.assertEqual(result["selected"]["decision_score_breakdown"]["base_confidence"], 0.7)
         self.assertEqual(result["selected"]["decision_score"], 0.7)
 
+    def test_legacy_tool_success_does_not_count_as_verified_goal_memory(self):
+        import json
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        legacy = {
+            "key": "cognitive.run.legacy",
+            "value": json.dumps({
+                "goal": "inspect repository status",
+                "action": "observe",
+                "outcome": "VERIFIED_SUCCESS",
+                "verified": True,
+                "verification_status": "VERIFIED",
+            }),
+        }
+        self.assertFalse(
+            DecisionEngine._has_verified_similar_success(
+                "inspect repository status", "observe", [legacy]
+            )
+        )
+
     def test_high_risk_option_requires_explicit_approval_even_if_permission_is_granted(self):
         from brain_v12.brain.decision_engine import DecisionEngine
 
