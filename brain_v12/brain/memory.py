@@ -139,7 +139,16 @@ class MemoryStore:
             "الى","إلى","عن","مع","هو","هي","كان","كانت","تم","قد","ما","ماذا","كيف","اريد","أريد","عند","بعد",
             "قبل","بين","كل","ثم","او","أو","و","ف","ب","ل"
         }
-        return {term for term in terms if len(term) > 1 and term not in stop}
+        normalized = set()
+        for term in terms:
+            if term in stop:
+                continue
+            # Strip Arabic definite article so الخبر/خبر and الدليل/دليل match.
+            if term.startswith("ال") and len(term) > 4:
+                term = term[2:]
+            if len(term) > 1 and term not in stop:
+                normalized.add(term)
+        return normalized
 
     def recall_memories(self, query="", limit=12):
         """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
