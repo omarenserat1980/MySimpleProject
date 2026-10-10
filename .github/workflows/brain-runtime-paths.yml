@@ -1,0 +1,32 @@
+name: Brain Runtime Paths
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/tests/test_runtime_paths.py"
+      - ".github/workflows/brain-runtime-paths.yml"
+  push:
+    branches:
+      - "fix/portable-writable-runtime-state-20261010"
+    paths:
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/tests/test_runtime_paths.py"
+      - ".github/workflows/brain-runtime-paths.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-paths:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test writable runtime path defaults and overrides
+        run: python -m unittest brain_v12.tests.test_runtime_paths -v
