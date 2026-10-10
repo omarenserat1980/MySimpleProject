@@ -252,11 +252,12 @@ jobs:
           truncate -s 64M windows-evidence.img
           mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
           cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
-          if [ -e /dev/kvm ]; then
-            echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
-          else
-            echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            echo 'QEMU_ACCEL=KVM_REQUIRED_BUT_UNAVAILABLE' | tee qemu-accel.txt
+            echo 'WINDOWS_REAL_BOOT_BLOCKED=KVM_REQUIRED' >&2
+            exit 24
           fi
+          echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
 
       - name: Boot and install Windows Server 2025 through Brain Gateway
         env:
