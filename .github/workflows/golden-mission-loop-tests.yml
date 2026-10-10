@@ -45,7 +45,7 @@ jobs:
           python -m pip install -r requirements.txt pytest
       - name: Compile changed Python modules
         run: |
-          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/brain/golden_mission_worker.py brain_v12/brain/golden_mission_system_audit.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
+          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/brain/golden_mission_worker.py brain_v12/brain/golden_mission_system_audit.py brain_v12/brain/golden_mission_live_probe.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
       - name: Produce read-only system-wide launch audit evidence
         if: always()
         run: |
