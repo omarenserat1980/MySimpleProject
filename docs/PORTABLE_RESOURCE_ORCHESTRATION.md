@@ -114,3 +114,35 @@ Added on this branch:
 - `brain_v12/tests/test_portable_resource_orchestrator.py`: tests for remote-free preference, local-budget enforcement, paid opt-in and ceiling, missing capability, and stable intent hashes.
 
 The scheduler returns `PLANNED` or `BLOCKED_NO_EXECUTOR`; `PLANNED` explicitly means that no task has started. It is not yet wired into live execution and cannot provision cloud resources. Automated test results must be checked before this work is considered validated.
+
+## Android Brain-device enrollment
+
+Android is a first-class *remote executor candidate*, not automatically trusted capacity. The initial adapter lives in `brain_v12/brain/android_executor_adapter.py` and is surfaced through `DeviceBridge.executor_capacities()`.
+
+A device is schedulable only when all of these are true:
+- Agent ID starts with `android-executor-`.
+- Its heartbeat is within `TERMUX_AGENT_TTL_SECONDS` (minimum 5 seconds).
+- Heartbeat metadata explicitly contains `enrolled: true` and `healthy: true`.
+- Metadata advertises positive CPU, memory, and disk capacity.
+- The requested capability is in the adapter allowlist and any requested permission is explicitly advertised.
+
+Initial capability allowlist: `python.test`, `code.build`, `device.status`, `device.info`, `media.image`, `media.render`. Arbitrary shell is deliberately excluded. Missing/stale/untrusted metadata yields no schedulable capacity. This adapter discovers candidates and feeds the policy scheduler; it does not dispatch or execute a task yet.
+
+For an enrolled Android Executor/Termux agent, the heartbeat metadata must report bounded, measured values such as:
+```json
+{
+  "enrolled": true,
+  "healthy": true,
+  "enrollment_version": "1",
+  "platform": "android",
+  "model": "redmi",
+  "android_version": "16",
+  "capabilities": ["python.test", "device.info"],
+  "permissions": ["python.test"],
+  "cpu_cores": 1,
+  "memory_mb": 512,
+  "disk_mb": 1024
+}
+```
+Do not copy this sample as a claim about a real device; capacity values must be measured at runtime. Android app enrollment, signing/identity, actual heartbeat delivery, polling/claiming, result upload, and on-device evidence verification remain deployment tasks. Do not mark any phone online based only on this source change.
+
