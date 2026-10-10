@@ -7,9 +7,11 @@ on:
       - "brain_v12/brain/portable_resource_orchestrator.py"
       - "brain_v12/brain/executor_contract.py"
       - "brain_v12/brain/run_evidence_store.py"
+      - "brain_v12/brain/android_executor_adapter.py"
       - "brain_v12/tests/test_portable_resource_orchestrator.py"
       - "brain_v12/tests/test_executor_contract.py"
       - "brain_v12/tests/test_run_evidence_store.py"
+      - "brain_v12/tests/test_android_executor_adapter.py"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
   workflow_dispatch:
 
@@ -39,7 +41,8 @@ jobs:
           python -m py_compile \
             brain_v12/brain/portable_resource_orchestrator.py \
             brain_v12/brain/executor_contract.py \
-            brain_v12/brain/run_evidence_store.py
+            brain_v12/brain/run_evidence_store.py \\
+            brain_v12/brain/android_executor_adapter.py
 
       - name: Run focused tests
         env:
@@ -48,4 +51,5 @@ jobs:
           python -m unittest \
             brain_v12.tests.test_portable_resource_orchestrator \
             brain_v12.tests.test_executor_contract \
-            brain_v12.tests.test_run_evidence_store -v
+            brain_v12.tests.test_run_evidence_store \\
+            brain_v12.tests.test_android_executor_adapter -v
