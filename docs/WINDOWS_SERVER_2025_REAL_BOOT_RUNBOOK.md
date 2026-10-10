@@ -38,6 +38,22 @@ The selected runner must be the authorized Brain-owned Linux x64 self-hosted run
 
 It must already have `qemu-system-x86_64`, `qemu-img`, `xorriso`, `wimlib-imagex`, `mkfs.vfat`, `mcopy`, OVMF firmware, and readable/writable `/dev/kvm`. This workflow does not install host packages automatically.
 
+
+### 4. Provision the signed cloud-executor attestation (host-side)
+
+The cloud-executor gate requires more than runner labels and installed binaries. Before the runner is eligible, provision these variables through the trusted runner service/host configuration, never in workflow YAML and never by a job step:
+
+- `BRAIN_CLOUD_EXECUTOR=1`
+- `BRAIN_CLOUD_EXECUTOR_ID`: stable ID for this authorized executor
+- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE`: path to a fresh signed attestation document on the host
+- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64`: out-of-band trusted Ed25519 issuer public key
+- `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL`: HTTPS base URL for the central Brain executor registry
+- `BRAIN_CLOUD_EXECUTOR_TOKEN`: host-provisioned registry credential
+
+The attestation must use schema `brain.cloud-executor-attestation.v2`, match the current hostname and `x86_64` architecture, target audience `brain-cloud-executor`, have a valid issuer signature, and expire within the verifier's five-minute maximum validity window. The central registry must atomically consume the attestation nonce at `POST /api/cloud-executor/attestation/consume`; repeated nonces must be rejected. The gate also actually starts QEMU with `-accel kvm` to probe KVM initialization.
+
+Do not mint a production signing key in CI, fabricate an attestation, echo tokens, or bypass the registry. If these host-side values or the trusted registry are unavailable, the gate must fail closed and real boot must remain blocked. Verify only the presence and successful gate result; do not publish secret values in logs or artifacts.
+
 ## Manual dispatch
 
 1. Open Actions → **Brain Windows Real Boot Evidence**.
