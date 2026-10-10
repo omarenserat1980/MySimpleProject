@@ -54,6 +54,17 @@ class TestBackgroundWorkCoordinator(unittest.TestCase):
         duplicate = self.coordinator.submit("simulation_readiness", idempotency_key="persist-me")
         self.assertEqual(duplicate["job"]["job_id"], job_id)
 
+    def test_injected_simulation_handler_is_used(self):
+        seen = []
+        coordinator = BackgroundWorkCoordinator(max_workers=1, db_path=Path(self.tmp.name) / "handler.sqlite3",
+            handlers={"simulation_inventory": lambda: {"reality": "SIMULATED", "seen": True}})
+        try:
+            result = coordinator.submit("simulation_inventory")
+            coordinator._futures[result["job"]["job_id"]].result(timeout=3)
+            self.assertTrue(coordinator.get(result["job"]["job_id"])["result"]["seen"])
+        finally:
+            coordinator.shutdown(wait=True)
+
     def test_interrupted_running_job_is_recovered(self):
         self.coordinator.shutdown(wait=True)
         with sqlite3.connect(self.db) as db:
