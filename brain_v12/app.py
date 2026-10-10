@@ -37,6 +37,8 @@ from .ai_fabric import AIFabric, FabricPolicy
 from .ai_fabric.api import router as ai_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
+from .brain.software_registry import SoftwareRegistry
+from .brain.software_catalog import get_catalog, build_readiness
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
 from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
 from brain_v7.braincore_v2.code_tool_api import CodeTool
@@ -89,6 +91,7 @@ from .brain.cloud_executor_attestation_api import router as cloud_executor_attes
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
+software_registry=SoftwareRegistry(os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")))
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
@@ -224,6 +227,72 @@ app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
 app.include_router(cloud_executor_attestation_router)
+
+
+@app.get("/api/software/catalog")
+def software_catalog_read(request: Request):
+    require_control_key(request)
+    return get_catalog()
+
+
+@app.get("/api/software/readiness")
+def software_catalog_readiness(request: Request):
+    require_control_key(request)
+    return build_readiness(software_registry.list())
+
+
+@app.get("/api/software/status")
+def software_registry_status(request: Request):
+    require_control_key(request)
+    return software_registry.summary()
+
+
+@app.get("/api/software")
+def software_registry_list(request: Request, category: str | None = None, runtime_state: str | None = None):
+    require_control_key(request)
+    try:
+        return {"ok": True, "items": software_registry.list(category=category, runtime_state=runtime_state)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/software/{software_id}")
+def software_registry_get(request: Request, software_id: str):
+    require_control_key(request)
+    item = software_registry.get(software_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="SOFTWARE_NOT_FOUND")
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/software")
+def software_registry_register(request: Request, body: dict):
+    require_control_key(request)
+    software_id = body.get("software_id")
+    metadata = {key: value for key, value in body.items() if key != "software_id"}
+    try:
+        return {"ok": True, "item": software_registry.register(software_id, metadata)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/software/{software_id}/observation")
+def software_registry_observe(request: Request, software_id: str, body: dict):
+    require_control_key(request)
+    try:
+        item = software_registry.record_observation(
+            software_id=software_id,
+            runtime_state=body.get("runtime_state", "unknown"),
+            verification_state=body.get("verification_state", "unverified"),
+            evidence_ref=body.get("evidence_ref", ""),
+            install_path=body.get("install_path"),
+            notes=body.get("notes"),
+        )
+        return {"ok": True, "item": item}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc).strip("'")) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/brain/workload")
