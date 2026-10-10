@@ -178,10 +178,13 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
+# Do not present a fallback variable as proof of the deployed GitHub commit.
+# Prefer GitHub Actions identity when present; otherwise use Render's runtime
+# deployment metadata. Never treat an unrelated legacy variable as proof.
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("RENDER_GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME") or os.getenv("RENDER_GIT_BRANCH") or "unknown"
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_SLUG") or "unknown"
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
 RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
@@ -1768,11 +1771,13 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
+    github_sha = os.getenv("GITHUB_SHA", "")
+    render_commit = os.getenv("RENDER_GIT_COMMIT", "")
+    expected = github_sha or render_commit
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "github_sha": expected or None,
+        "github_sha": github_sha or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
         "run_id": DEPLOY_SERVICE_ID,

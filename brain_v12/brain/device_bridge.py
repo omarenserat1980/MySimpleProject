@@ -20,21 +20,31 @@ class DeviceBridge:
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
             os.getenv("BRAIN_SYNC_QUEUE","brain6_artifacts/sync/device-sync.jsonl")
         )
-    def _key_file(self):
+    def _local_key_file(self):
         return os.path.expanduser(
             os.getenv("BRAIN_AGENT_KEY_FILE")
             or os.getenv("V12_AGENT_KEY_FILE")
             or "~/v12-agent/agent.key"
         )
 
+    def _configured_env_key(self):
+        # Ignore empty/whitespace-only values while preserving valid key bytes.
+        for name in (AGENT_KEY_ENV, "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY"):
+            value = os.getenv(name, "")
+            if value.strip():
+                return value
+        return ""
+
     def configured(self):
-        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"):
+        if self._configured_env_key() or os.getenv(AGENT_KEY_SHA256_ENV, "").strip():
             return True
-        key_file = self._key_file()
+        key_file = self._local_key_file()
+        if not key_file or not os.path.isfile(key_file) or not os.access(key_file, os.R_OK):
+            return False
         try:
             with open(key_file, encoding="utf-8") as f:
                 return bool(f.read().strip())
-        except OSError:
+        except (OSError, UnicodeError):
             return False
 
     def enabled(self):
@@ -48,22 +58,38 @@ class DeviceBridge:
             return True
         return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
-        if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
-        if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
-        if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
+        if os.getenv(AGENT_KEY_ENV, "").strip(): return "DIRECT_KEY"
+        if os.getenv("BRAIN_EMULATOR_KEY", "").strip(): return "BRAIN_EMULATOR_KEY"
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY", "").strip(): return "BRAIN_EMULATOR_AGENT_KEY"
+        key_file = self._local_key_file()
+        if key_file and os.path.isfile(key_file) and os.access(key_file, os.R_OK):
+            try:
+                with open(key_file, encoding="utf-8") as f:
+                    if f.read().strip():
+                        return "LOCAL_KEY_FILE"
+            except (OSError, UnicodeError):
+                pass
+        if os.getenv(AGENT_KEY_SHA256_ENV, "").strip(): return "SHA256_KEY"
         return "NOT_CONFIGURED"
-    def authenticate(self,supplied):
-        if not self.enabled() or not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
+
+    def authenticate(self, supplied):
+        if not self.enabled() or not supplied:
+            return False
+        expected = self._configured_env_key()
         if not expected:
-            key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
-            if key_file and os.path.isfile(key_file):
+            key_file = self._local_key_file()
+            if key_file and os.path.isfile(key_file) and os.access(key_file, os.R_OK):
                 try:
-                    with open(key_file,encoding="utf-8") as f: expected=f.read().strip()
-                except OSError: expected=""
-        if expected and hmac.compare_digest(supplied,expected):return True
-        expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
-        return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
+                    with open(key_file, encoding="utf-8") as f:
+                        expected = f.read().strip()
+                except (OSError, UnicodeError):
+                    expected = ""
+        if expected and hmac.compare_digest(supplied, expected):
+            return True
+        expected_hash = os.getenv(AGENT_KEY_SHA256_ENV, "").strip().lower()
+        return bool(expected_hash) and hmac.compare_digest(
+            hashlib.sha256(supplied.encode()).hexdigest(), expected_hash
+        )
     def authorized_executor_for_task(self, task):
         capability=self.TASK_CAPABILITIES.get(task)
         if capability is None: return None
