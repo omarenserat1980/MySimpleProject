@@ -95,3 +95,9 @@ Minimize routine human intervention while maximizing Brain's independent capabil
 - A visual/demo impression is not sufficient for commercial launch.
 - No claim of COMMERCIAL_READY is permitted until the public API, persistent customer state, trial enforcement, service execution path, and payment path are each verified in production-like conditions.
 - Reviewer feedback becomes improvement input; no reviewer score is fabricated or inferred as an external opinion.
+
+
+## D-013 — Autonomous Pipeline Mode (APM)
+Decision: Adopt a dynamic, evidence-first, resumable stage orchestrator for long-running Brain work.
+
+Constraints: stage count is N rather than a fixed number; each stage requires execution and verification gates plus complete evidence; self-healing is opt-in, bounded, and committed in the stage contract; checkpoints are commit-bound; external side effects remain behind existing authorization gates; final success requires an independent evidence verification step.

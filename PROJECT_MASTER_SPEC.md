@@ -100,3 +100,11 @@ Paid execution may be enabled only when:
 4. explicit authorization enables commercial mode.
 
 This gate only authorizes capability selection. It never purchases services, moves funds, withdraws money, or creates a contract automatically.
+
+## 16. Autonomous Pipeline Mode (APM)
+
+APM is the repository-native execution contract for long-running Brain work. The stage count is dynamic (N), not fixed at 41.
+
+Each enabled stage follows Execute -> Verify -> Gate -> Evidence -> Checkpoint. A stage advances only when execution and verification pass and complete evidence is recorded. Recovery is bounded by the committed stage contract and may use explicit repair and rollback commands. Checkpoints bind execution to the pipeline identity and commit SHA. GitHub Actions uses concurrency control and persists APM state as workflow artifacts so later runners can resume when the checkpoint is compatible.
+
+APM must never equate a green workflow with product success. A separate final verification gate must validate checkpoint/evidence completeness before the pipeline can report PASS.
