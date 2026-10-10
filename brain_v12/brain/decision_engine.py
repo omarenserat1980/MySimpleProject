@@ -75,16 +75,26 @@ class DecisionEngine:
             missing=[r for r in req if r not in permissions]
             explicit_approval_required = o.get("risk")=="high" and o.get("approved") is not True
             blocked=bool(missing) or explicit_approval_required
-            score=float(o.get("confidence",.5))
-            if o.get("risk")=="high": score-=.30
-            if not o.get("reversible",True): score-=.15
-            if missing: score-=.50
-            if explicit_approval_required: score-=.20
+            base_score=float(o.get("confidence",.5))
+            risk_penalty=.30 if o.get("risk")=="high" else 0.0
+            reversibility_penalty=.15 if not o.get("reversible",True) else 0.0
+            permission_penalty=.50 if missing else 0.0
+            approval_penalty=.20 if explicit_approval_required else 0.0
+            score=base_score-risk_penalty-reversibility_penalty-permission_penalty-approval_penalty
             learned_support=self._has_verified_similar_success(goal,o.get("id",""),memories)
             # Memory may break close ties, but cannot override permissions or approval.
-            if learned_support:
-                score+=0.02
+            memory_tiebreaker=.02 if learned_support else 0.0
+            score+=memory_tiebreaker
             o["learned_memory_support"]=learned_support
+            o["decision_score"]=round(score,3)
+            o["decision_score_breakdown"]={
+                "base_confidence":round(base_score,3),
+                "risk_penalty":risk_penalty,
+                "irreversibility_penalty":reversibility_penalty,
+                "missing_permission_penalty":permission_penalty,
+                "approval_penalty":approval_penalty,
+                "verified_memory_tiebreaker":memory_tiebreaker,
+            }
             item={"score":score,"option":o,"missing_permissions":missing,
                   "approval_required":explicit_approval_required}
             if blocked:
