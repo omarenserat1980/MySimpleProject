@@ -26,6 +26,9 @@ class CloudExecutorAttestationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.replay_db = str(Path(self.tmp.name) / 'used-nonces.sqlite3')
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.replay_db = str(Path(self.tmp.name) / 'used-nonces.sqlite3')
         self.document = {
             "schema": SCHEMA,
             "executor_id": "cloud-test-01",
@@ -87,6 +90,28 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def test_rejects_missing_trust_key(self):
         with self.assertRaisesRegex(ValueError, "TRUST_KEY_REQUIRED"):
             verify_attestation(self.write_signed(), "", "cloud-test-01", now=self.now)
+
+    def test_rejects_reuse_of_consumed_nonce(self):
+        path = self.write_signed()
+        self.verify(path, replay_db_path=self.replay_db)
+        with self.assertRaisesRegex(ValueError, "REPLAY_DETECTED"):
+            self.verify(path, replay_db_path=self.replay_db)
+
+    def test_replay_ledger_is_shared_across_attestation_files(self):
+        first = self.write_signed()
+        second = self.write_signed()
+        self.verify(first, replay_db_path=self.replay_db)
+        with self.assertRaisesRegex(ValueError, "REPLAY_DETECTED"):
+            self.verify(second, replay_db_path=self.replay_db)
+
+    def test_rejects_replay_store_symlink(self):
+        real_db = str(Path(self.tmp.name) / "real.sqlite3")
+        self.verify(self.write_signed(), replay_db_path=real_db)
+        link = str(Path(self.tmp.name) / "link.sqlite3")
+        Path(link).symlink_to(real_db)
+        fresh = dict(self.document, nonce="nonce-abcdefghijklmnop")
+        with self.assertRaisesRegex(ValueError, "SYMLINK_REJECTED"):
+            self.verify(self.write_signed(fresh), replay_db_path=link)
 
     def test_rejects_reuse_of_consumed_nonce(self):
         path = self.write_signed()
