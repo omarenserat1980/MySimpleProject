@@ -17,6 +17,11 @@ else
   ROOT="$SOURCE_ROOT"
 fi
 cd "$ROOT"
+# Keep the established development database when running the isolated runtime
+# worktree. Never silently create a fresh empty DB in the runtime checkout.
+if [ -z "${BRAIN_DB:-}" ] && [ -s "$SOURCE_ROOT/brain_v12/brain_v12.db" ]; then
+  export BRAIN_DB="$SOURCE_ROOT/brain_v12/brain_v12.db"
+fi
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
@@ -126,7 +131,26 @@ except ValueError: raise SystemExit(1)'
 if is_local_api; then
   if health_ok; then
     if auth_ok; then
-      echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+      # A healthy API can still be serving old code from SOURCE_ROOT. Compare
+      # its process working directory with the converged runtime root and
+      # restart only when the active API is not running from that root.
+      API_PID_ACTIVE=""
+      for candidate_pid in $(pgrep -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true); do
+        API_CWD="$(readlink "/proc/$candidate_pid/cwd" 2>/dev/null || true)"
+        if [ -n "$API_CWD" ]; then
+          API_PID_ACTIVE="$candidate_pid"
+          if [ "$API_CWD" = "$ROOT" ]; then
+            echo "JET_BRAIN_API already_running_from_converged_root pid=$candidate_pid" >&2
+            break
+          fi
+        fi
+      done
+      if [ -z "$API_PID_ACTIVE" ] || [ "$(readlink "/proc/$API_PID_ACTIVE/cwd" 2>/dev/null || true)" != "$ROOT" ]; then
+        echo "JET_BRAIN_API restart_for_runtime_convergence root=$ROOT" >&2
+        pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+        sleep 1
+        start_api
+      fi
     else
       echo "JET_BRAIN_API local_auth_failed_restart_once" >&2
       pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
