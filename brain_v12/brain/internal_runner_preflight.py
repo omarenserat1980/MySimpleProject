@@ -87,6 +87,8 @@ def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
     runner_name = os.environ.get("RUNNER_NAME", "")
     attested = _host_attestation_valid(runner_name)
 
+    if os.geteuid() == 0:
+        reasons.append("RUNNER_MUST_NOT_RUN_AS_ROOT")
     if not attested:
         reasons.append("HOST_ATTESTATION_MISSING_OR_INVALID")
     if platform.system() != "Linux":
