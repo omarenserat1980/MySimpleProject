@@ -20,7 +20,7 @@ class SoftwareRegistryTests(unittest.TestCase):
             "version": "3.x",
             "source": "system inventory",
             "license": "PSF",
-            "runtime_state": "observed",
+            "runtime_state": "planned",
             "permissions": ["read-only"],
         }
         value.update(overrides)
