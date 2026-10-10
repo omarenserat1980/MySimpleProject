@@ -22,6 +22,8 @@ trap 'rm -f "$GATE_TMP"' EXIT
 [ -f "$TRUST_KEY_FILE" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_FILE_MISSING"; exit 26; }
 [ ! -L "$TRUST_KEY_FILE" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_SYMLINK_REJECTED"; exit 27; }
 [ "$(stat -c %u "$TRUST_KEY_FILE")" = "0" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_NOT_ROOT_OWNED"; exit 28; }
+mode="$(stat -c %a "$TRUST_KEY_FILE")"
+(( (8#$mode & 0022) == 0 )) || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_WRITABLE_BY_NON_ROOT"; exit 32; }
 ATTESTATION_PUBLIC_KEY="$(cat "$TRUST_KEY_FILE")"
 
 command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
