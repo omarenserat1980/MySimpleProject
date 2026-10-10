@@ -170,6 +170,30 @@ class GoldenMissionController:
         self._event(mission_id,"CHECKPOINT",payload)
         return self.get(mission_id)
 
+    def notify_due(self, now: datetime | None = None) -> dict[str, Any]:
+        """Send due status reminders and advance cadence; never execute mission actions."""
+        current = now or _now()
+        due = self.list_due(current)
+        notified = 0
+        failed = 0
+        for mission in due:
+            message = "Mission update reminder. Status={}; objective={}".format(mission['status'], mission['objective'][:500])
+            try:
+                outcome = self.notifier(mission, message)
+            except Exception as exc:
+                outcome = {"sent": False, "reason": type(exc).__name__}
+            sent = isinstance(outcome, dict) and outcome.get("sent") is True
+            notified += int(sent)
+            failed += int(not sent)
+            next_update = current + timedelta(minutes=mission["update_interval_minutes"])
+            self._update(mission["mission_id"], next_update_at=_iso(next_update), updated_at=_iso(current))
+            self._event(mission["mission_id"], "MISSION_UPDATE_REMINDER", {
+                "at": _iso(current), "sent": sent,
+                "outcome": outcome if isinstance(outcome, dict) else {"result": str(outcome)[:500]},
+                "next_update_at": _iso(next_update),
+            })
+        return {"checked": len(due), "notifications_sent": notified, "notifications_failed_or_unconfigured": failed}
+
     def record_retry(self, mission_id: str, reason: str) -> dict[str, Any]:
         mission = self.get(mission_id)
         if mission["status"] != "RUNNING":
