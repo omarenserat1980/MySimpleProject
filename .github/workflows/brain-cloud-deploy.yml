@@ -22,6 +22,9 @@ jobs:
     timeout-minutes: 15
     environment: production
     steps:
+      - name: Checkout deployment source
+        uses: actions/checkout@v4
+
       - name: Validate deployment configuration
         env:
           HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
@@ -60,6 +63,16 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
           ssh-keygen -y -f ~/.ssh/brain_cloud_key >/dev/null
           echo "SSH_KEY_AND_PINNED_HOST_KEY=VALID"
+
+      - name: Copy production Compose file to host
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          scp -i "$HOME/.ssh/brain_cloud_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 cloud/docker-compose.production.yml "$USER@$HOST:$REMOTE_DIR/docker-compose.production.yml"
+          echo "PRODUCTION_COMPOSE_SYNC=PASS"
 
       - name: Deploy existing host
         env:
