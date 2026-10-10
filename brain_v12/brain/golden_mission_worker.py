@@ -17,6 +17,7 @@ class GoldenMissionReminderWorker:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._state_lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self._started_at: str | None = None
         self._last_tick_at: str | None = None
         self._last_result: dict[str, Any] | None = None
@@ -53,20 +54,25 @@ class GoldenMissionReminderWorker:
         return result
 
     def start(self) -> bool:
-        if self._thread and self._thread.is_alive():
-            return False
-        self._stop.clear()
-        with self._state_lock:
-            self._started_at = self._now()
-            self._last_error = None
-        self._thread = threading.Thread(target=self._run, name="brain-golden-mission-reminders", daemon=True)
-        self._thread.start()
-        return True
+        # Serialize lifecycle changes so concurrent startup calls cannot create
+        # duplicate reminder threads.
+        with self._lifecycle_lock:
+            if self._thread and self._thread.is_alive():
+                return False
+            self._stop.clear()
+            with self._state_lock:
+                self._started_at = self._now()
+                self._last_error = None
+            self._thread = threading.Thread(target=self._run, name="brain-golden-mission-reminders", daemon=True)
+            self._thread.start()
+            return True
 
     def stop(self, timeout: float = 2.0) -> None:
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=timeout)
+        with self._lifecycle_lock:
+            self._stop.set()
+            thread = self._thread
+            if thread:
+                thread.join(timeout=timeout)
 
     def _run(self) -> None:
         while not self._stop.is_set():
