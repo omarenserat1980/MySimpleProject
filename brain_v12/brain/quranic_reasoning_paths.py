@@ -88,6 +88,20 @@ PATHWAYS = [
     }
 ]
 
+# Retrieval synonyms are engineering labels, not Quranic wording.
+PATHWAY_KEYWORDS = {
+    "verify_before_action": ["تحقق", "تثبت", "مصدر", "خبر", "دليل", "معلومة", "verify", "source", "evidence", "check", "fact"],
+    "review_and_accountability": ["مراجعة", "محاسبة", "نتيجة", "تقييم", "تعلم", "راجع", "review", "audit", "outcome", "lesson"],
+    "contextual_cross_check": ["سياق", "اتساق", "ربط", "مقارنة", "شواهد", "context", "consistency", "cross-check", "compare"],
+    "consult_then_resolve": ["مشاورة", "استشارة", "بدائل", "قرار", "خطة", "consult", "options", "decision", "plan"],
+    "fairness_under_bias": ["عدل", "تحيز", "انحياز", "خصومة", "معيار", "fairness", "bias", "fair", "criteria"],
+    "preserve_knowledge": ["ذاكرة", "حفظ", "معرفة", "مصدر", "استرجاع", "تذكر", "memory", "preserve", "retrieve", "knowledge"],
+    "learn_from_cases": ["عبرة", "حالات", "تجارب", "دروس", "سابقة", "lesson", "case", "history", "learn"],
+    "observe_then_infer": ["ملاحظة", "مشاهدة", "استنتاج", "دليل", "فرضية", "observe", "infer", "evidence", "hypothesis"],
+    "plan_resources_over_time": ["موارد", "تخطيط", "ذاكرة", "وقت", "قدرة", "resource", "planning", "capacity", "time"],
+    "capacity_and_recovery": ["قدرة", "تدرج", "فشل", "تعافي", "استمرار", "capacity", "recovery", "failure", "resilience"],
+}
+
 def register_quranic_reasoning_paths(store):
     """Idempotently seed curated paths into persistent memory."""
     existing = {item.get("key"): item.get("value") for item in store.memories()}
@@ -117,10 +131,21 @@ def select_reasoning_path(goal, memories):
             continue
         searchable = " ".join([
             path.get("title", ""), path.get("engineering_application", ""),
-            " ".join(path.get("stages", []))
+            " ".join(path.get("stages", [])),
+            " ".join(PATHWAY_KEYWORDS.get(path.get("id", ""), []))
         ])
-        overlap = query_terms & MemoryStore._memory_terms(searchable)
-        score = len(overlap)
+        path_terms = MemoryStore._memory_terms(searchable)
+        overlap = query_terms & path_terms
+        # Arabic inflections commonly differ by a prefix/suffix; permit a
+        # bounded prefix match only for terms long enough to be distinctive.
+        matched = set(overlap)
+        for query_term in query_terms - overlap:
+            if len(query_term) >= 4 and any(
+                len(path_term) >= 4 and (query_term.startswith(path_term) or path_term.startswith(query_term))
+                for path_term in path_terms
+            ):
+                matched.add(query_term)
+        score = len(matched)
         if score:
             ranked.append((score, path.get("id", ""), path))
     if not ranked:
