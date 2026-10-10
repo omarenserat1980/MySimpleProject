@@ -33,6 +33,7 @@ on:
       - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
       - "brain_v12/tests/test_cloud_executor_gate.py"
       - "tools/bootstrap_brain_cloud_executor.sh"
+      - "brain_v12/tests/test_cloud_runner_isolation_contract.py"
       - "tools/install_brain_executor_trust_anchor.sh"
       - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
       - ".github/workflows/cloud-executor-attestation-tests.yml"
