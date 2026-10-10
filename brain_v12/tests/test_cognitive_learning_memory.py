@@ -60,6 +60,16 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
 
 
 
+    def test_execution_uses_the_tool_selected_by_the_decision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            result = CognitiveLoop(store).run("review current state safely")
+
+            self.assertEqual(result["decision"]["selected"]["tool_id"], "state.read")
+            self.assertEqual(result["execution"]["tool"], "state.read")
+            self.assertTrue(result["execution"]["tool_result"]["ok"])
+
     def test_blocked_medium_risk_option_is_not_reported_as_decided(self):
         from brain_v12.brain.decision_engine import DecisionEngine
 
