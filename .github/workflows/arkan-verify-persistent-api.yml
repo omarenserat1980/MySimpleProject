@@ -21,6 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           SERVICE=brain-api-arkan.service
+          PY=/home/brain/brain-runtime-venv/bin/python
           echo "=== SERVICE ==="
           systemctl is-active "$SERVICE"
           systemctl is-enabled "$SERVICE"
@@ -36,7 +37,7 @@ jobs:
           echo
           echo "=== READINESS ==="
           curl -fsS --max-time 8 http://127.0.0.1:8012/api/system/readiness -o /tmp/arkan-api-readiness.json
-          "$HOME/brain-runtime-venv/bin/python" - /tmp/arkan-api-readiness.json <<'PY'
+          "$PY" - /tmp/arkan-api-readiness.json <<'PY'
           import json,sys
           data=json.load(open(sys.argv[1],encoding="utf-8"))
           print(json.dumps({"ok":data.get("ok"),"status":data.get("status"),"passed":data.get("passed"),"total":data.get("total")},ensure_ascii=False))
