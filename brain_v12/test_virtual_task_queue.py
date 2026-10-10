@@ -87,10 +87,6 @@ class VirtualTaskQueueTests(unittest.TestCase):
         self.assertEqual(final.status, "COMPLETED")
         self.assertEqual(final.result["result"]["output"], ["new"])
 
-if __name__=="__main__":
-    unittest.main()
-
-
     def test_emergency_backpressure_holds_background_work(self):
         self.queue.workload_controller = WorkloadController()
         self.queue.workload_controller.policy = WorkloadController().policy
@@ -106,3 +102,7 @@ if __name__=="__main__":
     def test_priority_is_persisted(self):
         task=self.queue.submit([("HALT",)], task_id="high-priority", priority="HIGH")
         self.assertEqual(task.priority, "HIGH")
+
+if __name__=="__main__":
+    unittest.main()
+
