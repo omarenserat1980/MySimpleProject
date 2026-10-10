@@ -113,7 +113,7 @@ class CognitiveLoop:
         self._state("MEMORY",goal=goal,run_id=run_id)
         all_memories=self.store.memories()
         recall_fn=getattr(self.store,"recall_memories",None)
-        memories=recall_fn(goal,limit=12) if callable(recall_fn) else all_memories[-12:]
+        memories=recall_fn(goal,limit=12,candidates=all_memories) if callable(recall_fn) else all_memories[-12:]
         # Count durable run lessons across the full store, not only the recalled slice.
         prior_lessons=[m for m in all_memories if str(m.get("key","")).startswith("cognitive.run.")]
         reasoning_path=select_reasoning_path(goal,memories)
