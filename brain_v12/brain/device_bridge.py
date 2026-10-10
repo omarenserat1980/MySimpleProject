@@ -22,7 +22,7 @@ class DeviceBridge:
         return "NOT_CONFIGURED"
     def authenticate(self,supplied):
         if not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
+        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
             if key_file and os.path.isfile(key_file):
