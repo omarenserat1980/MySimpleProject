@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import tempfile
 import unittest
@@ -27,7 +28,7 @@ class CloudExecutorAttestationApiTests(unittest.TestCase):
         self.token = "test-only-enrollment-token"
         self.env = patch.dict("os.environ", {
             "BRAIN_CLOUD_EXECUTOR_REGISTRY_DB": self.db,
-            "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_JSON": json.dumps({"cloud-test-01": self.token}),
+            "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON": json.dumps({"cloud-test-01": hashlib.sha256(self.token.encode()).hexdigest()}),
             "BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64": self.private_b64,
         })
         self.env.start()
