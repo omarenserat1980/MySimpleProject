@@ -31,6 +31,16 @@ Build a first-party, ChatGPT-like experience inside Electronic Brain with twenty
 - `brain_v12/brain/chat_session_store.py` and `chat_session_api.py` for persistent sessions and per-session memory.
 - Existing supervisor, permission, evidence, and verification components where compatible.
 
+## Runtime diagnostics API
+
+The current integration exposes a read-only endpoint:
+
+`GET /api/brain-ai/layers/status`
+
+It returns the twenty ordered layers with `READY`, `PARTIAL`, or `NOT_WIRED` statuses, aggregate counts, and `execution_performed: false`. This endpoint is diagnostic only; it does not invoke a model or execute tools. It must report `INTEGRATION_INCOMPLETE` while any layer is not fully ready.
+
+The application injects its persistent `ChatSessionStore` into this diagnostics route so session, context, and memory adapters can be detected. Model readiness is counted only when the router confirms a selectable chat model.
+
 ## Contract implementation
 `brain_v12/brain/brain_gpt_20_layer_pipeline.py` defines the ordered layer contract and requires an explicit handler for every required layer. It fails closed when configuration is incomplete, a layer fails, or a handler raises an exception. This avoids treating an architecture diagram as a working deployed system.
 
