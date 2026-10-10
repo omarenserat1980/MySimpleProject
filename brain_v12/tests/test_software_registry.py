@@ -55,7 +55,7 @@ class SoftwareRegistryTests(unittest.TestCase):
 
     def test_unknown_software_cannot_be_observed(self):
         with self.assertRaisesRegex(KeyError, "SOFTWARE_NOT_FOUND"):
-            self.registry.record_observation("missing", "running", "verified", "ci://run/1")
+            self.registry.record_observation("missing", "running", "unverified", "ci://run/1")
 
     def test_list_filter_and_summary(self):
         self.registry.register("python", self.metadata())
