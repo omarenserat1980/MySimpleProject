@@ -60,3 +60,11 @@ The application injects its persistent `ChatSessionStore` into this diagnostics 
 - Unit and end-to-end tests pass in CI.
 - Existing APIs remain backward compatible.
 - Runtime status distinguishes configured, ready, and unverified states.
+
+
+## Per-request trace
+
+The existing `BrainAI.chat` response now includes a `brain_gpt_20_layer_trace` evidence record. It summarizes what the current request actually reached, distinguishes `NOT_WIRED`, `NOT_TRIGGERED`, `PARTIAL`, and `BLOCKED` states, and explicitly records `execution_performed_by_trace: false`. This is observational evidence; it does not replace the existing governed tool loop or imply that the twenty-layer contract is already the live orchestrator.
+
+The trace is also returned through the existing Brain AI and persistent chat response evidence because those APIs already expose `BrainAIResponse.evidence`.
+
