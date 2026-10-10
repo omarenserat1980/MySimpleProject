@@ -11,7 +11,7 @@ param(
     [string]$StateContainer = "tfstate"
 )
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../../..")).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $tfDir = Join-Path $repoRoot "brain_v12/cloud/windows_terraform"
 $preflight = Join-Path $PSScriptRoot "preflight.ps1"
 $verify = Join-Path $PSScriptRoot "verify.ps1"
@@ -37,7 +37,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Terraform init/backend failed. Bootstrap state and grant Storage Blob Data Contributor." }
     & terraform validate
     if ($LASTEXITCODE -ne 0) { throw "Terraform validation failed." }
-    $planPath = Join-Path $tfDir "brain-windows.tfplan"
+    # Keep the plan artifact aligned with TerraformPlanGate.
+    $planPath = Join-Path $tfDir "brain.tfplan"
     & terraform plan -input=false -out=$planPath
     if ($LASTEXITCODE -ne 0) { throw "Terraform plan failed. No apply was attempted." }
     if (-not $Apply) {
