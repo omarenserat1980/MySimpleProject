@@ -19,7 +19,7 @@ class DecisionEngine:
     def __init__(self):
         self.history=[]
 
-    def generate(self,goal):
+    def generate(self,goal,memories=None):
         text=(goal or "").lower()
         code=any(x in text for x in ("كود","برمج","ملف","github","github","code","تطوير","إصلاح"))
         device=any(x in text for x in ("termux","redmi","هاتف","جهاز","موبايل","جوال","android","device","agent"))
@@ -36,9 +36,14 @@ class DecisionEngine:
             options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",[],True,["code"],.84,"code.verify")))
             options.append(asdict(Candidate("apply_code","تطبيق تحسين برمجي","تغيير قابل للتراجع مع تحقق","high",["developer_approval"],True,["code","approval"],.65,"code.apply")))
         options.append(asdict(Candidate("act","تنفيذ خطوة حساسة","نتيجة خارجية قابلة للتحقق","high",["agent_approval"],True,["goal","approval"],.55,"agent.execute")))
+        memory_keys = [str(m.get("key")) for m in (memories or []) if m.get("key")]
+        for option in options:
+            option["memory_context_keys"] = memory_keys[:12]
+            if memory_keys:
+                option["evidence"] = list(option.get("evidence") or []) + [f"memory:{key}" for key in memory_keys[:3]]
         return options
 
-    def choose(self,goal,options,permissions=None):
+    def choose(self,goal,options,permissions=None,memories=None):
         permissions=permissions or set()
         ranked=[]
         for o in options:
