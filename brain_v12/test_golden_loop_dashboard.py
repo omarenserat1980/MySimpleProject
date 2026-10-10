@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from brain_v12.brain.evidence_store import EvidenceStore
+from brain_v12.brain.golden_closed_loop import GoldenClosedLoop, GoldenTask
 
 
 class GoldenLoopDashboardTests(unittest.TestCase):
@@ -19,6 +20,30 @@ class GoldenLoopDashboardTests(unittest.TestCase):
                 self.assertEqual(len(events), 1)
                 self.assertEqual(events[0]["task_id"], "task-1")
                 self.assertEqual(store.golden_count(), 1)
+            finally:
+                store.close()
+
+    def test_golden_loop_runs_only_after_verified_authority_and_persists_phases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = EvidenceStore(str(Path(directory) / "evidence.db"))
+            try:
+                loop = GoldenClosedLoop(
+                    evidence_store=store,
+                    authorize=lambda task, attempt: {"ok": True, "verified": True, "admit": True},
+                    execute=lambda task, attempt, key: {"ok": True, "output": "safe-test"},
+                    observe=lambda task, attempt, result: {"ok": True, "observed": True},
+                    verify=lambda task, attempt, result, observation: {"ok": True, "status": "VERIFIED"},
+                    commit=lambda task, attempt, verified: {"ok": True, "status": "COMMITTED"},
+                    learn=lambda task, attempt, verified: {"ok": True, "status": "LEARNED"},
+                    sleep_fn=lambda seconds: None,
+                )
+                result = loop.run(GoldenTask(task_id="golden-test", action="test", max_attempts=1))
+                self.assertTrue(result["ok"])
+                self.assertEqual(result["status"], "GOLDEN_CLOSED_LOOP_VERIFIED")
+                self.assertIn("VERIFY", result["transitions"])
+                self.assertIn("CLOSED", result["transitions"])
+                self.assertEqual(store.golden_count(), len(result["evidence_ids"]))
+                self.assertTrue(all(store.verify_hash(eid)["ok"] for eid in result["evidence_ids"]))
             finally:
                 store.close()
 
