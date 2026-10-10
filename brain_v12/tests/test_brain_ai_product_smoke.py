@@ -22,6 +22,11 @@ class BrainProductSmokeTest(unittest.TestCase):
         from brain_v12 import app as brain_app
         cls.app = brain_app
         cls.client = TestClient(brain_app.app)
+        from brain_v12.brain.chat_identity import ChatIdentityStore
+        identity_store = ChatIdentityStore(brain_app.chat_session_store.path)
+        identity_store.init()
+        credential = identity_store.issue("product-smoke-account", "product-smoke-device")
+        cls.chat_headers = {"Authorization": "Bearer " + credential["token"]}
 
     @classmethod
     def tearDownClass(cls):
@@ -42,16 +47,16 @@ class BrainProductSmokeTest(unittest.TestCase):
         self.assertTrue(ai.json()["tool_loop_enabled"])
 
         created = self.client.post("/api/brain-chat/sessions",
-                                   json={"title": "Product Smoke"})
+                                   json={"title": "Product Smoke"}, headers=self.chat_headers)
         self.assertEqual(created.status_code, 200)
         sid = created.json()["session"]["id"]
 
         saved = self.client.put(f"/api/brain-chat/sessions/{sid}/memory",
-                                 json={"summary": "product-smoke-memory"})
+                                 json={"summary": "product-smoke-memory"}, headers=self.chat_headers)
         self.assertEqual(saved.status_code, 200)
         self.assertEqual(saved.json()["memory"]["summary"], "product-smoke-memory")
 
-        memory = self.client.get(f"/api/brain-chat/sessions/{sid}/memory")
+        memory = self.client.get(f"/api/brain-chat/sessions/{sid}/memory", headers=self.chat_headers)
         self.assertEqual(memory.status_code, 200)
         self.assertEqual(memory.json()["memory"]["summary"], "product-smoke-memory")
 

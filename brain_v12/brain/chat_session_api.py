@@ -1,8 +1,9 @@
 """Browser-first persistent conversation API for Brain AI."""
 from __future__ import annotations
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 from .chat_session_store import ChatSessionStore
+from .chat_identity import ChatIdentityStore
 from .chat_request_ledger import ChatRequestLedger
 import hashlib
 import json
@@ -31,57 +32,72 @@ def router(brain_ai, store=None, context_limit=24):
     store.init()
     ledger = ChatRequestLedger(store.path)
     ledger.init()
+    identities = ChatIdentityStore(store.path)
+    identities.init()
+
+    def require_identity(authorization):
+        if not isinstance(authorization, str):
+            raise HTTPException(status_code=401, detail="BRAIN_CHAT_AUTH_REQUIRED")
+        scheme, _, token = authorization.partition(" ")
+        principal = identities.authenticate(token.strip()) if scheme.lower() == "bearer" else None
+        if principal is None:
+            raise HTTPException(status_code=401, detail="BRAIN_CHAT_AUTH_REQUIRED")
+        return principal
+
+    def owned_session(session_id, principal):
+        session = store.get(session_id)
+        if session is None or session.get("account_id") != principal["account_id"]:
+            raise HTTPException(status_code=404, detail="SESSION_NOT_FOUND")
+        return session
     r = APIRouter(prefix="/api/brain-chat", tags=["Brain Chat"])
 
     @r.post("/sessions")
-    def create_session(body: SessionCreateIn = SessionCreateIn()):
-        account_id = (body.account_id or "").strip() or None
-        device_id = (body.device_id or "").strip() or None
-        return {"ok": True, "session": store.create(body.title, account_id=account_id, device_id=device_id)}
+    def create_session(body: SessionCreateIn = SessionCreateIn(), authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        return {"ok": True, "session": store.create(body.title, account_id=principal["account_id"], device_id=principal["device_id"])}
 
     @r.get("/sessions")
-    def list_sessions(account_id: str | None = None):
-        return {"ok": True, "sessions": store.list(account_id=(account_id or "").strip() or None)}
+    def list_sessions(account_id: str | None = None, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        return {"ok": True, "sessions": store.list(account_id=principal["account_id"])}
 
     @r.get("/sessions/{session_id}")
-    def get_session(session_id: str):
-        session = store.get(session_id)
-        if session is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
-        return {"ok": True, "session": session}
+    def get_session(session_id: str, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        return {"ok": True, "session": owned_session(session_id, principal)}
 
     @r.get("/sessions/{session_id}/sync")
-    def sync_session(session_id: str, after: int = 0, limit: int = 100, device_id: str | None = None):
-        if store.get(session_id) is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+    def sync_session(session_id: str, after: int = 0, limit: int = 100, device_id: str | None = None, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        owned_session(session_id, principal)
         feed = store.sync_events(session_id, after=after, limit=limit)
-        return {"ok": True, "session_id": session_id, "device_id": device_id, **feed}
+        return {"ok": True, "session_id": session_id, "device_id": principal["device_id"], **feed}
 
     @r.get("/sessions/{session_id}/memory")
-    def get_memory(session_id: str):
-        if store.get(session_id) is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+    def get_memory(session_id: str, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        owned_session(session_id, principal)
         return {"ok": True, "memory": store.get_memory(session_id)}
 
     @r.put("/sessions/{session_id}/memory")
-    def set_memory(session_id: str, body: MemoryIn):
-        if store.get(session_id) is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+    def set_memory(session_id: str, body: MemoryIn, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        owned_session(session_id, principal)
         return {"ok": True, "memory": store.set_memory(session_id, body.summary)}
 
     @r.post("/sessions/{session_id}/compact")
-    def compact_session(session_id: str, body: CompactIn = CompactIn()):
-        if store.get(session_id) is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+    def compact_session(session_id: str, body: CompactIn = CompactIn(), authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        owned_session(session_id, principal)
         result = store.compact_session(
             session_id, keep_recent=body.keep_recent, max_summary_chars=body.max_summary_chars
         )
         return {"ok": True, "compaction": result}
 
     @r.post("/sessions/{session_id}/messages")
-    def send_message(session_id: str, body: MessageIn):
-        if store.get(session_id) is None:
-            return {"ok": False, "status": "SESSION_NOT_FOUND"}
+    def send_message(session_id: str, body: MessageIn, authorization: str | None = Header(default=None)):
+        principal = require_identity(authorization)
+        owned_session(session_id, principal)
 
         request_key = (body.client_message_id or "").strip()
         request_hash = hashlib.sha256(json.dumps({
@@ -120,7 +136,7 @@ def router(brain_ai, store=None, context_limit=24):
         try:
             store.add_message(session_id, "user", body.message,
                               client_message_id=body.client_message_id,
-                              metadata={"device_id": body.device_id} if body.device_id else None)
+                              metadata={"device_id": principal["device_id"]})
             history = store.context_messages(session_id, limit=context_limit)
             memory = store.get_memory(session_id)
             context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
