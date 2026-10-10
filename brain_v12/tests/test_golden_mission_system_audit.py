@@ -46,7 +46,15 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     _touch(tmp_path, "TODO_FROM_LEGACY.md", "RESTORATION_STATUS: COMPLETE\n")
     evidence_path = tmp_path / ".brain/state/production_runtime_evidence.json"
     evidence_path.parent.mkdir(parents=True)
-    evidence_path.write_text(json.dumps({"status": "VERIFIED", "checks": [{"name": "api", "passed": True}]}), encoding="utf-8")
+    evidence_path.write_text(json.dumps({
+        "status": "VERIFIED",
+        "checks": [
+            {"name": "runtime_api_readiness", "passed": True, "response_sha256": "a" * 64},
+            {"name": "runtime_worker_status", "passed": True, "response_sha256": "b" * 64},
+            {"name": "mission_persistence_restart", "passed": True},
+            {"name": "restore_drill", "passed": True},
+        ],
+    }), encoding="utf-8")
     report = audit_repository(tmp_path)
     assert report["audit_status"] == "PASS"
     assert report["launch_readiness"] == "READY"
