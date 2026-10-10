@@ -106,8 +106,11 @@ sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 "$RUN
   --ephemeral \
   --replace
 unset TOKEN
+install -d -m 700 "$HOME/.local/state/brain"
 install -m 600 "$GATE_TMP" "$HOME/.local/state/brain/cloud-executor-gate.json"
 rm -f "$ATTESTATION_FILE"
+rm -rf "$STAGING_DIR"
+STAGING_DIR=""
 unset BRAIN_CLOUD_EXECUTOR_TOKEN BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
 
 echo "BRAIN_CLOUD_EXECUTOR_BOOTSTRAP=VERIFIED"
