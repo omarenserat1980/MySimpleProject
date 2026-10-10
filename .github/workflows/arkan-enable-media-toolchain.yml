@@ -1,0 +1,83 @@
+name: Enable Brain Native Media Toolchain on Arkan
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-enable-media-toolchain.yml
+
+permissions:
+  contents: read
+
+jobs:
+  media:
+    name: Install free FFmpeg and configure Brain media engine
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 15
+    steps:
+      - name: Install system FFmpeg and safely configure user-scoped API
+        shell: bash
+        run: |
+          set -euo pipefail
+          SERVICE=brain-api-arkan.service
+          echo "=== CHECK API SERVICE ==="
+          systemctl is-active "$SERVICE"
+          test "$(systemctl show "$SERVICE" -p User --value)" = brain
+          echo "=== INSTALL FREE FFMPEG TOOLCHAIN IF NEEDED ==="
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            command -v apt-get >/dev/null
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y --no-install-recommends ffmpeg
+          fi
+          FFMPEG="$(command -v ffmpeg)"
+          FFPROBE="$(command -v ffprobe)"
+          test -x "$FFMPEG"
+          test -x "$FFPROBE"
+          ffmpeg -version | head -n 2
+          ffprobe -version | head -n 2
+          echo "FFMPEG_BIN=$FFMPEG"
+          echo "FFPROBE_BIN=$FFPROBE"
+          echo "=== CONFIGURE BRAIN-NATIVE TOOLCHAIN ==="
+          mkdir -p /etc/systemd/system/brain-api-arkan.service.d
+          cat > /etc/systemd/system/brain-api-arkan.service.d/media-toolchain.conf <<EOF
+          [Service]
+          Environment=BRAIN_FFMPEG_BIN=$FFMPEG
+          Environment=BRAIN_FFPROBE_BIN=$FFPROBE
+          EOF
+          chmod 644 /etc/systemd/system/brain-api-arkan.service.d/media-toolchain.conf
+          systemctl daemon-reload
+          systemctl restart "$SERVICE"
+          echo "=== VERIFY LIVE API ==="
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8012/health -o /tmp/arkan-media-health.json; then ready=1; break; fi
+            if ! systemctl is-active --quiet "$SERVICE"; then break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            journalctl -u "$SERVICE" -n 100 --no-pager || true
+            exit 81
+          fi
+          echo "API_HEALTH=PASS"
+          curl -fsS --max-time 8 http://127.0.0.1:8012/api/media/health -o /tmp/arkan-media-engine.json
+          "$(/usr/bin/which python3)" - /tmp/arkan-media-engine.json <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding="utf-8"))
+          print(json.dumps(d,ensure_ascii=False))
+          if d.get("ok") is not True or d.get("ffmpeg") is not True or d.get("ffprobe") is not True:
+              raise SystemExit("MEDIA_ENGINE_NOT_READY")
+          print("BRAIN_MEDIA_ENGINE=READY")
+          PY
+          curl -fsS --max-time 8 http://127.0.0.1:8012/api/system/readiness -o /tmp/arkan-media-readiness.json
+          /home/brain/brain-runtime-venv/bin/python - /tmp/arkan-media-readiness.json <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding="utf-8"))
+          print("API_READINESS="+str(d.get("status"))+" checks="+str(d.get("passed"))+"/"+str(d.get("total")))
+          if d.get("ok") is not True or d.get("status") != "READY":
+              raise SystemExit("API_READINESS_FAILED")
+          PY
+          systemctl is-active "$SERVICE"
+          ss -ltnp | grep ':8012'
+          echo "BRAIN_API_AND_MEDIA_ENGINE=READY"
