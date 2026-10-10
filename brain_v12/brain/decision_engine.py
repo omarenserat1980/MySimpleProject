@@ -73,14 +73,16 @@ class DecisionEngine:
                 return True
         return False
 
-    def choose(self,goal,options,permissions=None,memories=None):
+    def choose(self,goal,options,permissions=None,memories=None,approved_actions=None):
         permissions=permissions or set()
+        approved_actions=set(approved_actions or [])
         eligible=[]
         blocked_options=[]
         for o in options:
             req=o.get("requirements",[])
             missing=[r for r in req if r not in permissions]
-            explicit_approval_required = o.get("risk")=="high" and o.get("approved") is not True
+            # Approval is caller-supplied authority, never a self-asserted option field.
+            explicit_approval_required = o.get("risk")=="high" and o.get("id") not in approved_actions
             blocked=bool(missing) or explicit_approval_required
             base_score=float(o.get("confidence",.5))
             risk_penalty=.30 if o.get("risk")=="high" else 0.0
