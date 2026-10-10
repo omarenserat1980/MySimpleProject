@@ -10,7 +10,7 @@ from cryptography.exceptions import InvalidSignature
 
 ALGORITHM="Ed25519"
 _FIELDS=("brain_id","generation","fencing_token","lease_id","holder_id","task_id","attempt_id",
-         "source_commit","capability","executor","authority_policy_version","authority_decision")
+         "source_commit","checkpoint_source_commit","capability","executor","authority_policy_version","authority_decision")
 
 def signing_payload(contract:dict)->bytes:
     fields={k:contract.get(k) for k in _FIELDS}
