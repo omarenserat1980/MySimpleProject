@@ -34,8 +34,8 @@ class RuntimeLauncherStaticTests(unittest.TestCase):
     def test_device_identity_is_not_silently_shared_between_phones(self):
         source = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn("DEVICE_MODEL=", source)
-        self.assertIn('23129RN51X) DETECTED_AGENT_ID="redmi3-01"', source)
-        self.assertIn('RMX3710) DETECTED_AGENT_ID="realme-01"', source)
+        self.assertIn('*23129RN51X*) DETECTED_AGENT_ID="redmi3-01"', source)
+        self.assertIn('*RMX3710*) DETECTED_AGENT_ID="realme-01"', source)
         self.assertNotIn("*Redmi*", source)
         self.assertNotIn("*redmi*", source)
         self.assertNotIn("*realme*", source)
