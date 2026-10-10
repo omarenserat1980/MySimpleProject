@@ -68,32 +68,65 @@ class DecisionEngine:
 
     def choose(self,goal,options,permissions=None,memories=None):
         permissions=permissions or set()
-        ranked=[]
+        eligible=[]
+        blocked_options=[]
         for o in options:
             req=o.get("requirements",[])
             missing=[r for r in req if r not in permissions]
-            blocked=bool(missing)
+            explicit_approval_required = o.get("risk")=="high" and o.get("approved") is not True
+            blocked=bool(missing) or explicit_approval_required
             score=float(o.get("confidence",.5))
             if o.get("risk")=="high": score-=.30
             if not o.get("reversible",True): score-=.15
-            if blocked: score-=.50
+            if missing: score-=.50
+            if explicit_approval_required: score-=.20
             learned_support=self._has_verified_similar_success(goal,o.get("id",""),memories)
-            # A tiny, capped tie-breaker from verified similar outcomes only.
+            # Memory may break close ties, but cannot override permissions or approval.
             if learned_support:
                 score+=0.02
             o["learned_memory_support"]=learned_support
-            ranked.append((score,o,blocked,missing))
-        ranked.sort(key=lambda x:x[0],reverse=True)
-        if not ranked:
-            result={"status":"NO_OPTIONS","goal":goal}
-        else:
-            score,selected,blocked,missing=ranked[0]
-            if blocked and selected.get("risk")=="high":
-                result={"status":"WAITING_APPROVAL","goal":goal,"selected":selected,"score":round(score,3),
-                        "reason":"required_permission","missing_permissions":missing,
-                        "alternatives":[x[1] for x in ranked[1:]]}
+            item={"score":score,"option":o,"missing_permissions":missing,
+                  "approval_required":explicit_approval_required}
+            if blocked:
+                blocked_options.append(item)
             else:
-                result={"status":"DECIDED","goal":goal,"selected":selected,"score":round(score,3),
-                        "reason":"tool_aware_heuristic","alternatives":[x[1] for x in ranked[1:]]}
+                eligible.append(item)
+
+        eligible.sort(key=lambda x:x["score"],reverse=True)
+        blocked_options.sort(key=lambda x:x["score"],reverse=True)
+        approval_summary=[
+            {"id":item["option"].get("id"),"action":item["option"].get("action"),
+             "missing_permissions":item["missing_permissions"],
+             "approval_required":item["approval_required"],"score":round(item["score"],3)}
+            for item in blocked_options
+        ]
+
+        if eligible:
+            best=eligible[0]
+            result={
+                "status":"DECIDED",
+                "goal":goal,
+                "selected":best["option"],
+                "score":round(best["score"],3),
+                "reason":"highest_scoring_eligible_option",
+                "alternatives":[item["option"] for item in eligible[1:]],
+                "approval_required_options":approval_summary,
+            }
+        elif blocked_options:
+            best=blocked_options[0]
+            status="WAITING_PERMISSION" if best["missing_permissions"] else "WAITING_APPROVAL"
+            result={
+                "status":status,
+                "goal":goal,
+                "selected":best["option"],
+                "score":round(best["score"],3),
+                "reason":"required_permission" if best["missing_permissions"] else "explicit_approval_required",
+                "missing_permissions":best["missing_permissions"],
+                "approval_required":best["approval_required"],
+                "alternatives":[],
+                "approval_required_options":approval_summary,
+            }
+        else:
+            result={"status":"NO_OPTIONS","goal":goal,"approval_required_options":[]}
         self.history.append(result)
         return result
