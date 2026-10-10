@@ -4,6 +4,7 @@ import unittest
 from brain_v12.brain.quranic_reasoning_paths import (
     PATHWAYS,
     register_quranic_reasoning_paths,
+    select_reasoning_path,
 )
 
 
@@ -37,6 +38,17 @@ class QuranicReasoningPathTests(unittest.TestCase):
                 record["epistemic_status"],
                 "curated_application_not_literal_scriptural_algorithm",
             )
+
+    def test_relevant_goal_selects_a_path_and_unrelated_goal_does_not(self):
+        store = InMemoryStore()
+        register_quranic_reasoning_paths(store)
+        memories = store.memories()
+        selected = select_reasoning_path("راجع ما أُنجز وقارن النتيجة بالهدف", memories)
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["key"], "reasoning_path.quranic.self_accountability")
+        self.assertTrue(selected["source_references"])
+        self.assertTrue(selected["stages"])
+        self.assertIsNone(select_reasoning_path("طقس عمّان غدًا", memories))
 
     def test_registration_is_idempotent_without_rewriting_unchanged_records(self):
         store = InMemoryStore()
