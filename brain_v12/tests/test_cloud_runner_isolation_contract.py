@@ -15,6 +15,9 @@ class CloudRunnerIsolationContractTests(unittest.TestCase):
         script = Path("tools/bootstrap_brain_cloud_executor.sh").read_text(encoding="utf-8")
         isolated = 'sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0'
         self.assertIn(isolated + ' "$RUNNER_DIR/config.sh"', script)
+        self.assertIn('STAGING_DIR="$(mktemp -d /tmp/brain-cloud-runner.XXXXXX)"', script)
+        self.assertIn('sudo cp -a "$STAGING_DIR/." "$RUNNER_DIR/"', script)
+        self.assertNotIn('cd "$RUNNER_DIR"', script)
         self.assertIn(isolated + ' "$RUNNER_DIR/run.sh"', script)
         self.assertIn("unset TOKEN", script)
         self.assertIn("unset BRAIN_CLOUD_EXECUTOR_TOKEN", script)
