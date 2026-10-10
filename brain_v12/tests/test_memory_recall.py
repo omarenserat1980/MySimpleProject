@@ -144,6 +144,33 @@ class MemoryRecallTests(unittest.TestCase):
                 store.set_memory_metadata("project.validation", status="MAGICALLY_VERIFIED")
 
 
+    def test_recall_ranks_higher_confidence_evidence_first(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("record.low_confidence", "deployment evidence verified")
+            store.set_memory_metadata("record.low_confidence", source="test", confidence=0.1)
+            store.save_memory("record.high_confidence", "deployment evidence verified")
+            store.set_memory_metadata("record.high_confidence", source="test", confidence=0.95)
+
+            recalled = store.recall_memories("deployment evidence", fallback_recent=False)
+
+            self.assertEqual(recalled[0]["key"], "record.high_confidence")
+
+    def test_unverified_memory_is_not_used_as_active_goal_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("record.unverified", "deployment evidence verified")
+            store.set_memory_metadata(
+                "record.unverified", source="test", confidence=0.2, status="UNVERIFIED"
+            )
+
+            recalled = store.recall_memories("deployment evidence", fallback_recent=False)
+
+            self.assertEqual(recalled, [])
+
+
 
 if __name__ == "__main__":
     unittest.main()
