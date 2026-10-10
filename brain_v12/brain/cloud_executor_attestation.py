@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import sqlite3
 import time
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,33 @@ SCHEMA = "brain.cloud-executor-attestation.v1"
 AUDIENCE = "brain-cloud-executor"
 MAX_VALIDITY_SECONDS = 3600
 MAX_CLOCK_SKEW_SECONDS = 120
+DEFAULT_REPLAY_DB = "/var/lib/brain/cloud-executor-attestation-nonces.sqlite3"
+
+
+def _consume_nonce(db_path: str, nonce: str, executor_id: str, expires_at: float, now: float) -> None:
+    path = Path(db_path)
+    if not db_path or not path.parent.is_dir():
+        raise ValueError("CLOUD_EXECUTOR_REPLAY_STORE_REQUIRED")
+    if path.is_symlink():
+        raise ValueError("CLOUD_EXECUTOR_REPLAY_STORE_SYMLINK_REJECTED")
+    try:
+        with sqlite3.connect(str(path), timeout=5, isolation_level=None) as db:
+            db.execute("PRAGMA busy_timeout=5000")
+            db.execute("CREATE TABLE IF NOT EXISTS consumed_nonces (nonce TEXT PRIMARY KEY, executor_id TEXT NOT NULL, expires_at REAL NOT NULL, consumed_at REAL NOT NULL)")
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM consumed_nonces WHERE expires_at <= ?", (now,))
+            try:
+                db.execute("INSERT INTO consumed_nonces VALUES (?, ?, ?, ?)", (nonce, executor_id, expires_at, now))
+            except sqlite3.IntegrityError as exc:
+                db.execute("ROLLBACK")
+                raise ValueError("CLOUD_EXECUTOR_ATTESTATION_REPLAY_DETECTED") from exc
+            db.execute("COMMIT")
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    except sqlite3.Error as exc:
+        raise ValueError("CLOUD_EXECUTOR_REPLAY_STORE_UNAVAILABLE") from exc
 
 
 def signing_payload(document: dict[str, Any]) -> bytes:
@@ -84,6 +112,9 @@ def verify_attestation(
     except (ValueError, TypeError, InvalidSignature) as exc:
         raise ValueError("CLOUD_EXECUTOR_ATTESTATION_SIGNATURE_INVALID") from exc
 
+    if replay_db_path is not None:
+        _consume_nonce(replay_db_path, document["nonce"], expected_executor_id, expires_at, current)
+
     return {
         "verified": True,
         "schema": SCHEMA,
@@ -102,4 +133,5 @@ def verify_from_environment(expected_executor_id: str, *, now: float | None = No
         os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64", ""),
         expected_executor_id,
         now=now,
+        replay_db_path=os.environ.get("BRAIN_CLOUD_EXECUTOR_REPLAY_DB", DEFAULT_REPLAY_DB),
     )
