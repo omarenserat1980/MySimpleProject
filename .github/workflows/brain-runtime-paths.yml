@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - "brain_v12/runtime_paths.py"
+      - "brain_v12/app.py"
+      - "brain_v12/media_engine.py"
       - "brain_v12/tests/test_runtime_paths.py"
+      - "requirements.txt"
       - ".github/workflows/brain-runtime-paths.yml"
   push:
     branches:
@@ -28,5 +31,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install application dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
       - name: Test writable runtime path defaults and overrides
         run: python -m unittest brain_v12.tests.test_runtime_paths -v
+      - name: Import Brain app with isolated writable runtime storage
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          temp_root="$(mktemp -d)"
+          trap 'rm -rf "$temp_root"' EXIT
+          BRAIN_RUNTIME_HOME="$temp_root/brain-runtime" python -c 'import brain_v12.app; print("BRAIN_APP_IMPORT_OK")'
+          test -d "$temp_root/brain-runtime/media/engine"
