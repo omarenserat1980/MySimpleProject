@@ -34,8 +34,14 @@ def test_execution_does_not_trust_ok_without_verification():
 
 def test_execution_requires_cognitive_completion_and_verification():
     result = {"ok": True, "cognitive": {
+        "status": "COMPLETED",
+        "objective_verified": True,
         "execution": {"status": "COMPLETED"},
-        "verification": {"status": "VERIFIED"},
+        "verification": {
+            "status": "VERIFIED",
+            "objective_verified": True,
+            "objective_status": "COMPLETED",
+        },
     }}
     c = SyntheticCustomer(executor=lambda *args: result)
     run = c.start("TEST_CUSTOMER_SOFTWARE", "Build a test utility.")
@@ -45,6 +51,28 @@ def test_execution_requires_cognitive_completion_and_verification():
     assert run.status == "VERIFIED"
     assert run.execution["ok"] is True
     assert any(e["event"] == "EXECUTION_VERIFIED" for e in run.evidence)
+
+
+def test_execution_rejects_verified_step_when_objective_is_still_in_progress():
+    result = {"ok": True, "verified": True, "cognitive": {
+        "status": "IN_PROGRESS",
+        "objective_verified": False,
+        "execution": {"status": "COMPLETED"},
+        "verification": {
+            "status": "VERIFIED",
+            "scope": "selected_action",
+            "objective_verified": False,
+            "objective_status": "IN_PROGRESS",
+        },
+    }}
+    c = SyntheticCustomer(executor=lambda *args: result)
+    run = c.start("TEST_CUSTOMER_SOFTWARE", "Finish the whole test objective.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="SANDBOX", payment_mode="TEST")
+    assert run.status == "EXECUTION_FAILED"
+    assert run.execution["ok"] is False
+    assert run.execution["attempts"][0]["verified"] is False
 
 
 def test_execution_uses_explicit_verified_result_when_no_cognitive_trace():
@@ -61,6 +89,20 @@ def test_payment_gate_fails_closed():
     assert c.safety_gate("SANDBOX", "TEST")["allowed"]
     assert not c.safety_gate("PRODUCTION", "TEST")["allowed"]
     assert not c.safety_gate("SANDBOX", "PRODUCTION")["allowed"]
+
+
+def test_customer_cannot_accept_failed_execution():
+    c = SyntheticCustomer(executor=lambda *args: {"ok": False, "verified": False, "error": "objective incomplete"})
+    run = c.start("TEST_CUSTOMER_SOFTWARE", "Complete a test objective.")
+    c.generate_proposals(run, {})
+    c.approve(run)
+    c.execute(run, environment="TEST", payment_mode="NONE")
+    assert run.status == "EXECUTION_FAILED"
+    try:
+        c.review(run, accepted=True, feedback="force accept")
+        assert False, "failed execution must never be accepted"
+    except ValueError as exc:
+        assert str(exc) == "VERIFIED_EXECUTION_REQUIRED_FOR_ACCEPTANCE"
 
 
 def test_customer_acceptance_and_delivery_lifecycle():

@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 from uuid import uuid4
 from typing import Any, Callable
 
@@ -145,7 +146,16 @@ class SyntheticCustomer:
         if isinstance(cognitive, dict):
             execution = cognitive.get("execution", {})
             verification = cognitive.get("verification", {})
-            return execution.get("status") == "COMPLETED" and verification.get("status") == "VERIFIED"
+            # A verified sub-step is not proof that the user's objective is complete.
+            terminal = {"VERIFIED", "COMPLETED", "ACCEPTED"}
+            return (
+                cognitive.get("objective_verified") is True
+                and str(cognitive.get("status", "")).upper() in terminal
+                and execution.get("status") == "COMPLETED"
+                and verification.get("status") == "VERIFIED"
+                and verification.get("objective_verified") is True
+                and str(verification.get("objective_status", "")).upper() in terminal
+            )
         return bool(result.get("verified") is True)
 
     def execute(self, run: TestRun, environment: str = "TEST", payment_mode: str = "NONE") -> TestRun:
@@ -193,11 +203,48 @@ class SyntheticCustomer:
             run.status, run.execution = "EXECUTION_FAILED", {"ok": False, "gate": gate, "error": str(exc)[:1000], "attempts": attempts}
             run.evidence = run.evidence or []
             run.evidence.append({"event": "EXECUTION_FAILED", "error": str(exc)[:1000]})
+        # Persist a verifiable failure receipt too; failed runs must not disappear from the audit trail.
+        if self.evidence_store and run.status != "VERIFIED":
+            try:
+                execution_snapshot = run.execution if isinstance(run.execution, dict) else {}
+                raw_result = execution_snapshot.get("result")
+                if not isinstance(raw_result, dict):
+                    raw_result = {}
+                cognitive_result = raw_result.get("cognitive")
+                if not isinstance(cognitive_result, dict):
+                    cognitive_result = {}
+                failure_receipt = {
+                    "run_id": run.run_id,
+                    "status": run.status,
+                    "request_sha256": hashlib.sha256(run.request.encode("utf-8")).hexdigest(),
+                    "attempt_count": len(execution_snapshot.get("attempts", [])),
+                    "error": str(execution_snapshot.get("error") or raw_result.get("error") or "")[:1000],
+                    "objective_verified": cognitive_result.get("objective_verified") is True,
+                    "recorded_at": datetime.now(timezone.utc).isoformat(),
+                }
+                evidence = self.evidence_store.append(run.run_id, "synthetic-customer-failure", failure_receipt, "synthetic-customer")
+                verification = self.evidence_store.verify_hash(evidence["evidence_id"])
+                run.execution = run.execution or {}
+                run.execution.update({
+                    "failure_evidence_id": evidence.get("evidence_id"),
+                    "failure_evidence_sha256": evidence.get("sha256"),
+                    "failure_evidence_verified": bool(verification.get("ok")),
+                })
+                run.evidence.append({
+                    "event": "FAILURE_EVIDENCE_STORED" if verification.get("ok") else "FAILURE_EVIDENCE_HASH_CHECK_FAILED",
+                    "evidence_id": evidence.get("evidence_id"),
+                    "sha256": evidence.get("sha256"),
+                    "at": datetime.now(timezone.utc).isoformat(),
+                })
+            except Exception as evidence_exc:
+                run.evidence.append({"event": "FAILURE_EVIDENCE_PERSISTENCE_FAILED", "error": str(evidence_exc)[:500], "at": datetime.now(timezone.utc).isoformat()})
         return run
 
     def review(self, run: TestRun, accepted: bool, feedback: str = "") -> TestRun:
         if run.status not in {"VERIFIED", "EXECUTION_FAILED"}:
             raise ValueError("CUSTOMER_REVIEW_NOT_READY")
+        if accepted and run.status != "VERIFIED":
+            raise ValueError("VERIFIED_EXECUTION_REQUIRED_FOR_ACCEPTANCE")
         run.evidence = run.evidence or []
         run.evidence.append({
             "event": "CUSTOMER_ACCEPTANCE" if accepted else "CUSTOMER_REVISION_REQUESTED",
