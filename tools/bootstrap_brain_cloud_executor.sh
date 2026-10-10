@@ -20,6 +20,7 @@ trap 'rm -f "$GATE_TMP"' EXIT
 [ -n "$EXECUTOR_ID" ] || { echo "BRAIN_CLOUD_EXECUTOR_ID_REQUIRED"; exit 24; }
 [ -n "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" ] || { echo "CLOUD_EXECUTOR_REGISTRY_URL_REQUIRED"; exit 33; }
 [ -n "${BRAIN_CLOUD_EXECUTOR_TOKEN:-}" ] || { echo "CLOUD_EXECUTOR_TOKEN_REQUIRED"; exit 34; }
+[ -n "${BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN:-}" ] || { echo "GITHUB_RUNNER_REGISTRATION_TOKEN_REQUIRED"; exit 35; }
 [ -f "$TRUST_KEY_FILE" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_FILE_MISSING"; exit 26; }
 [ ! -L "$TRUST_KEY_FILE" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_SYMLINK_REJECTED"; exit 27; }
 [ "$(stat -c %u "$TRUST_KEY_FILE")" = "0" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_NOT_ROOT_OWNED"; exit 28; }
@@ -27,11 +28,9 @@ mode="$(stat -c %a "$TRUST_KEY_FILE")"
 (( (8#$mode & 0022) == 0 )) || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_WRITABLE_BY_NON_ROOT"; exit 32; }
 ATTESTATION_PUBLIC_KEY="$(cat "$TRUST_KEY_FILE")"
 
-command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
 command -v tar >/dev/null || { echo "MISSING:tar"; exit 2; }
 command -v python3 >/dev/null || { echo "MISSING:python3"; exit 2; }
-gh auth status >/dev/null 2>&1 || { echo "GITHUB_AUTH_REQUIRED"; exit 3; }
 
 arch="$(uname -m)"
 [ "$arch" = "x86_64" ] || { echo "CLOUD_EXECUTOR_X86_64_REQUIRED:$arch"; exit 22; }
@@ -83,7 +82,10 @@ if [ ! -x ./run.sh ]; then
   rm -f "$archive"
 fi
 
-TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
+# Registration token is injected by the trusted operator from outside the runner account.
+# Never invoke gh from this account: its persisted CLI credentials could leak to jobs.
+TOKEN="$BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN"
+unset BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN
 export RUNNER_ALLOW_RUNASROOT=0
 ./config.sh --unattended \
   --url "https://github.com/$REPO" \
