@@ -82,7 +82,7 @@ install_cli() {
     echo '#!/data/data/com.termux/files/usr/bin/bash'
     echo '# Electronic Brain Termux CLI shim'
     printf 'export BRAIN_ROOT=%q\n' "$ROOT"
-    printf 'exec %q "$@"\n' "$SCRIPT"
+    printf 'exec %q %q "$@"\n' "/data/data/com.termux/files/usr/bin/bash" "$SCRIPT"
   } > "$tmp" || return 1
   chmod 700 "$tmp"
   mv -f "$tmp" "$target"
