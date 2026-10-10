@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict
 import json
+import math
 from .memory import MemoryStore
 
 @dataclass
@@ -57,8 +58,6 @@ class DecisionEngine:
                 lesson = json.loads(memory.get("value", "{}"))
             except (TypeError, ValueError):
                 continue
-            # Legacy records may have marked a successful tool call as goal success.
-            # Only accept lessons carrying the new explicit goal-verification contract.
             if (
                 lesson.get("verified") is not True
                 or lesson.get("goal_verified") is not True
@@ -73,25 +72,45 @@ class DecisionEngine:
                 return True
         return False
 
+    @staticmethod
+    def _safe_confidence(value):
+        try:
+            confidence = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 0.5
+        if not math.isfinite(confidence):
+            return 0.5
+        return min(1.0, max(0.0, confidence))
+
+    @staticmethod
+    def _safe_risk(value):
+        risk = str(value or "").strip().lower()
+        # Unknown/malformed risk labels must never silently become low risk.
+        return risk if risk in {"low", "medium", "high"} else "high"
+
     def choose(self,goal,options,permissions=None,memories=None,approved_actions=None):
-        permissions=permissions or set()
+        permissions=set(permissions or [])
         approved_actions=set(approved_actions or [])
         eligible=[]
         blocked_options=[]
-        for o in options:
+        for original in options:
+            # Return decision annotations on copies; callers' candidate objects remain unchanged.
+            o=dict(original)
+            risk=self._safe_risk(o.get("risk", "low"))
+            o["risk"]=risk
             req=o.get("requirements",[])
+            if not isinstance(req, (list, tuple, set)):
+                req=[]
             missing=[r for r in req if r not in permissions]
-            # Approval is caller-supplied authority, never a self-asserted option field.
-            explicit_approval_required = o.get("risk")=="high" and o.get("id") not in approved_actions
+            explicit_approval_required = risk=="high" and o.get("id") not in approved_actions
             blocked=bool(missing) or explicit_approval_required
-            base_score=float(o.get("confidence",.5))
-            risk_penalty=.30 if o.get("risk")=="high" else 0.0
+            base_score=self._safe_confidence(o.get("confidence",.5))
+            risk_penalty=.30 if risk=="high" else (.10 if risk=="medium" else 0.0)
             reversibility_penalty=.15 if not o.get("reversible",True) else 0.0
             permission_penalty=.50 if missing else 0.0
             approval_penalty=.20 if explicit_approval_required else 0.0
             score=base_score-risk_penalty-reversibility_penalty-permission_penalty-approval_penalty
             learned_support=self._has_verified_similar_success(goal,o.get("id",""),memories)
-            # Memory may break close ties, but cannot override permissions or approval.
             memory_tiebreaker=.02 if learned_support else 0.0
             score+=memory_tiebreaker
             o["learned_memory_support"]=learned_support
