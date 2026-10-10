@@ -75,5 +75,25 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(plan.target, "honda-enp1-2023")
 
 
+    def test_fleet_status_reports_live_heartbeat_without_claiming_identity(self):
+        from brain_v12.brain.device_cloud_federation import build_fleet_status
+        result = build_fleet_status({
+            "ttl_seconds": 15,
+            "agents": [
+                {"agent_id": "redmi3-01", "online": True, "age_seconds": 2.5},
+                {"agent_id": "other-device", "online": True, "age_seconds": 1.0},
+                {"agent_id": "realme-pending-identity", "online": False, "age_seconds": 90.0},
+            ],
+        })
+        rows = {row["endpoint_id"]: row for row in result["fleet"]}
+        self.assertEqual(rows["redmi3-01"]["observed_state"], "ONLINE")
+        self.assertFalse(rows["redmi3-01"]["identity_verified"])
+        self.assertFalse(rows["redmi3-01"]["execution_eligible"])
+        self.assertEqual(rows["realme-pending-identity"]["observed_state"], "STALE")
+        self.assertEqual(rows["arkan"]["observed_state"], "NOT_OBSERVED")
+        self.assertFalse(result["cloud"]["capacity_verified"])
+        self.assertFalse(result["cloud"]["paid_provisioning_allowed"])
+
+
 if __name__ == "__main__":
     unittest.main()
