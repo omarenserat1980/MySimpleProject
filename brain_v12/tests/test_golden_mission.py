@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from datetime import datetime, timezone
 
 from brain_v12.brain.golden_mission import GoldenMissionController
 
@@ -92,6 +93,31 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertEqual(m["status"],"RUNNING")
         self.assertEqual(m["attempts"],0)
         self.assertEqual(m["estimate_minutes"],20)
+
+    def test_due_mission_reminder_sends_and_advances_schedule(self):
+        from datetime import timedelta
+        mission_id = self.mission["mission_id"]
+        future = datetime.now(timezone.utc) + timedelta(minutes=5)
+        result = self.controller.notify_due(now=future)
+        self.assertEqual(result["checked"], 1)
+        self.assertEqual(result["notifications_sent"], 0)
+        self.assertEqual(result["notifications_failed_or_unconfigured"], 1)
+        mission = self.controller.get(mission_id)
+        self.assertTrue(any(e["event"] == "MISSION_UPDATE_REMINDER" for e in mission["evidence"]))
+        self.assertGreater(datetime.fromisoformat(mission["next_update_at"]), future)
+
+    def test_reminder_worker_tick_delegates_without_executing_objective(self):
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+        class Stub:
+            def __init__(self): self.calls = 0
+            def notify_due(self):
+                self.calls += 1
+                return {"checked": 0, "notifications_sent": 0, "notifications_failed_or_unconfigured": 0}
+        stub = Stub()
+        worker = GoldenMissionReminderWorker(stub, interval_seconds=1)
+        self.assertEqual(worker.interval_seconds, 30)
+        self.assertEqual(worker.tick()["checked"], 0)
+        self.assertEqual(stub.calls, 1)
 
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):
