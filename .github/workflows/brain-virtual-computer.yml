@@ -36,6 +36,7 @@ on:
       - "brain_v12/test_golden_loop_dashboard.py"
       - "brain_v12/brain/evidence_store.py"
       - "brain_v12/web/golden-loop.html"
+      - "brain_v12/web/index.html"
       - "brain_v12/test_supervisor_executor.py"
       - "brain_v12/brain/supervisor_executor.py"
       - "brain_v12/brain/windows_runtime_contract.py"
