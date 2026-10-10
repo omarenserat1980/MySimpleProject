@@ -57,7 +57,7 @@ class QuranicReasoningPathTests(unittest.TestCase):
             result = CognitiveLoop(store).run("التحقق من مصدر الخبر والدليل")
 
             self.assertEqual(result["reasoning_path"]["key"], "reasoning_path.quranic.verify_before_action")
-            self.assertEqual(result["plan_steps"], result["reasoning_path"]["source_references"] and result["plan_steps"])
+            self.assertEqual(result["plan_steps"], result["reasoning_path"]["stages"])
             self.assertTrue(result["decision"]["selected"]["memory_context_keys"])
 
 
