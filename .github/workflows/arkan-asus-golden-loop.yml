@@ -43,3 +43,7 @@ jobs:
           }
           Write-Output "ARKAN_ASUS_GOLDEN_PROBE_SYNTAX=PASS"
           Write-Output "PROBE_EXECUTED=NO"
+      - name: Test observation verifier integrity and freshness gates
+        shell: pwsh
+        run: |
+          python -m unittest tools/windows/test_verify_arkan_asus_observation.py -v
