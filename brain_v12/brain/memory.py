@@ -36,6 +36,15 @@ class MemoryStore:
               tags TEXT NOT NULL DEFAULT '[]',
               updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS memory_conflicts(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              memory_key TEXT NOT NULL,
+              conflicting_key TEXT NOT NULL,
+              reason TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'OPEN',
+              created_at TEXT NOT NULL,
+              UNIQUE(memory_key,conflicting_key)
+            );
             CREATE TABLE IF NOT EXISTS goals(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               text TEXT NOT NULL,
@@ -307,6 +316,54 @@ class MemoryStore:
 
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [memory for _, _, memory in ranked[:limit]]
+
+    def record_memory_conflict(self, key, conflicting_key, reason):
+        """Record an explicit conflict and quarantine both memories from active recall."""
+        key = str(key or "").strip()
+        conflicting_key = str(conflicting_key or "").strip()
+        reason = str(reason or "").strip()[:2000]
+        if not key or not conflicting_key or key == conflicting_key:
+            raise ValueError("two distinct memory keys are required")
+        if not reason:
+            raise ValueError("a conflict reason is required")
+        first, second = sorted((key, conflicting_key))
+        created_at = now()
+        with self.connect() as con:
+            existing = con.execute(
+                "SELECT key FROM memories WHERE key IN (?,?)", (first, second)
+            ).fetchall()
+            if len(existing) != 2:
+                raise KeyError(key if not any(row["key"] == key for row in existing) else conflicting_key)
+            con.execute("""
+                INSERT INTO memory_conflicts(memory_key,conflicting_key,reason,status,created_at)
+                VALUES(?,?,?,'OPEN',?)
+                ON CONFLICT(memory_key,conflicting_key) DO UPDATE SET
+                    reason=excluded.reason,status='OPEN',created_at=excluded.created_at
+            """, (first, second, reason, created_at))
+            for memory_key in (first, second):
+                con.execute("""
+                    INSERT INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                    VALUES(?,'LEGACY_UNKNOWN',0.5,NULL,'CONFLICTED','[]',?)
+                    ON CONFLICT(memory_key) DO UPDATE SET
+                        status='CONFLICTED',updated_at=excluded.updated_at
+                """, (memory_key, created_at))
+            con.commit()
+        self.event("MEMORY_CONFLICT_RECORDED", {
+            "memory_key": first, "conflicting_key": second, "reason": reason
+        })
+        return {
+            "memory_key": first, "conflicting_key": second, "reason": reason,
+            "status": "OPEN", "created_at": created_at
+        }
+
+    def memory_conflicts(self, limit=100):
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT memory_key,conflicting_key,reason,status,created_at "
+                "FROM memory_conflicts ORDER BY id DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def save_memory(self,key,value):
         with self.connect() as con:
