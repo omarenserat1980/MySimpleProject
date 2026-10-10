@@ -207,6 +207,55 @@ class MemoryRecallTests(unittest.TestCase):
                 store.record_memory_conflict("fact.one", "fact.missing", "these disagree")
 
 
+    def test_conflict_resolution_requires_evidence_and_activates_only_accepted_fact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("fact.deployment.old", "production deployment succeeded")
+            store.save_memory("fact.deployment.new", "production deployment failed")
+            store.record_memory_conflict(
+                "fact.deployment.old", "fact.deployment.new", "conflicting reports"
+            )
+
+            with self.assertRaises(ValueError):
+                store.resolve_memory_conflict(
+                    "fact.deployment.old", "fact.deployment.new",
+                    "fact.deployment.old", "", "reviewer-1"
+                )
+
+            resolved = store.resolve_memory_conflict(
+                "fact.deployment.old", "fact.deployment.new",
+                "fact.deployment.new", "Verified deploy log shows the deployment failed.",
+                "deploy-log-reviewer"
+            )
+            records = {item["key"]: item for item in store.memories()}
+            recalled = store.recall_memories("production deployment", fallback_recent=False)
+            conflict = store.memory_conflicts()[0]
+
+            self.assertEqual(resolved["status"], "RESOLVED")
+            self.assertEqual(resolved["accepted_key"], "fact.deployment.new")
+            self.assertEqual(records["fact.deployment.new"]["status"], "ACTIVE")
+            self.assertEqual(records["fact.deployment.old"]["status"], "SUPERSEDED")
+            self.assertEqual([item["key"] for item in recalled], ["fact.deployment.new"])
+            self.assertEqual(conflict["status"], "RESOLVED")
+            self.assertEqual(conflict["resolved_by"], "deploy-log-reviewer")
+            self.assertIn("Verified deploy log", conflict["resolution_evidence"])
+
+    def test_conflict_cannot_be_resolved_for_an_unrelated_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("fact.one", "first fact")
+            store.save_memory("fact.two", "second fact")
+            store.record_memory_conflict("fact.one", "fact.two", "conflicting reports")
+
+            with self.assertRaises(ValueError):
+                store.resolve_memory_conflict(
+                    "fact.one", "fact.two", "fact.three",
+                    "some evidence", "reviewer"
+                )
+
+
 
 if __name__ == "__main__":
     unittest.main()
