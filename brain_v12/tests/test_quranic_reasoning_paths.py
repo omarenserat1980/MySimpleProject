@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from brain_v12.brain.memory import MemoryStore
+from brain_v12.brain.cognitive_loop import CognitiveLoop
 from brain_v12.brain.quranic_reasoning_paths import (
     PATHWAYS,
     register_quranic_reasoning_paths,
@@ -46,6 +47,18 @@ class QuranicReasoningPathTests(unittest.TestCase):
             self.assertIsNotNone(selected)
             self.assertEqual(selected["id"], "verify_before_action")
             self.assertIsNone(unrelated)
+
+    def test_cognitive_loop_uses_selected_path_as_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            register_quranic_reasoning_paths(store)
+
+            result = CognitiveLoop(store).run("التحقق من مصدر الخبر والدليل")
+
+            self.assertEqual(result["reasoning_path"]["key"], "reasoning_path.quranic.verify_before_action")
+            self.assertEqual(result["plan_steps"], result["reasoning_path"]["source_references"] and result["plan_steps"])
+            self.assertTrue(result["decision"]["selected"]["memory_context_keys"])
 
 
 if __name__ == "__main__":
