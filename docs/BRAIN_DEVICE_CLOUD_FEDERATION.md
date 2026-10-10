@@ -29,6 +29,10 @@ The Cloud Hardware Fabric models CPU, RAM, storage, network, and optional GPU. T
 - Do not treat cloud storage as RAM/CPU; actual compute requires a VM/container/remote worker.
 - Vehicle integration is limited to companion/information workflows. No vehicle-control or safety-system commands are scheduled.
 
+## Read-only status API
+
+The authenticated endpoint `GET /api/device/cloud-federation/status` combines the current DeviceBridge heartbeat snapshot with the logical fleet profiles. It requires the Brain control credential. It reports `ONLINE`, `STALE`, or `NOT_OBSERVED` for known Android agent IDs, but deliberately keeps `identity_verified=false` and `execution_eligible=false`: the shared agent credential and heartbeat are not a unique hardware identity proof. Arkan and Honda remain `NOT_OBSERVED` unless a dedicated verified telemetry adapter is implemented. Cloud capacity remains `NOT_PROBED` and paid provisioning remains disabled.
+
 ## Current limitation / next proof gate
 
 This code provides a deterministic planning contract and tests only. It does not yet connect the registry to the live Agent Gateway or provision a cloud VM. The next gate is to discover the Realme agent identity, collect authenticated fresh heartbeats for Arkan and Redmi, and run one harmless end-to-end mission through a verified free executor. Windows Server 2025 is not considered deployed until the guest is reachable and boot evidence is captured.
