@@ -1,6 +1,6 @@
 # Cloud Executor Activation
 
-The production Windows executor is a Brain-owned Linux x86_64 cloud VM.
+The production Windows executor is a Brain-owned Linux x86_64 cloud VM. Its hostname and architecture binding must be registered in the trusted Brain Control Plane inventory; the runner may not choose these claims in an API request.
 
 ## Activation
 
@@ -8,7 +8,7 @@ On the cloud VM, provide these host environment values:
 
 - `BRAIN_CLOUD_EXECUTOR=1`
 - `BRAIN_CLOUD_EXECUTOR_ID`
-- `BRAIN_CLOUD_EXECUTOR_ATTESTATION`
+- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE`\n- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64`\n- `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL` (HTTPS)\n- `BRAIN_CLOUD_EXECUTOR_TOKEN` (per-executor enrollment token)
 
 Then run:
 
