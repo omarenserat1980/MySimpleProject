@@ -59,8 +59,9 @@ A replacement phone must obtain source/config from the canonical recovery path a
 ### Endpoint and credential isolation
 - `http://127.0.0.1:8012` is a loopback endpoint and refers only to the phone on which it is running. It is valid for a device hosting its own local Brain API, not as a way for another phone to reach Redmi.
 - A non-primary agent must use an already reachable, authenticated Brain endpoint. If that endpoint is missing or unreachable, stop and diagnose networking; do not silently launch or terminate a local API as a substitute.
-- Each agent keeps its own key file at `~/v12-agent/agent.key`. Never copy key material between phones or place it in Git. The Brain must explicitly authorize the agent's key.
-- A generated local key does not prove that the remote Brain has authorized it. Treat heartbeat authentication as a separate required check.
+- Keep each phone's local key file at `~/v12-agent/agent.key`; never copy key material between phones or place it in Git.
+- **Current backend limitation:** `DeviceBridge.authenticate` uses one server-wide configured key/hash; a per-agent credential registry is not implemented yet. A newly generated Realme key will therefore not authenticate to a remote Brain unless it matches the server-wide key. Do not copy the Redmi key to bypass this limitation.
+- Treat remote multi-device execution as BLOCKED until per-agent authentication is implemented and tested, or a deliberately shared credential policy is reviewed and approved. A local key file alone is not proof of remote authorization.
 
 ### Evidence and release gates
 - CI success proves only the checks that actually ran. It does not prove that a physical phone is connected or that a mission completed.
