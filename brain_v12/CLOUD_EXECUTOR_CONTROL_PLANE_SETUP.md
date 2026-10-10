@@ -94,3 +94,18 @@ Before considering merge:
 6. Separately verify Windows Server 2025 boot evidence. Attestation and KVM checks do not prove Windows booted.
 
 Until all six acceptance points are independently evidenced, keep PR #276 in draft and do not enable Windows Real Boot.
+
+
+## Runner account isolation — mandatory host acceptance
+
+The bootstrap now requires a pre-created dedicated unprivileged account (default `brainrunner`) that differs from the operator account and belongs to the `kvm` group. The operator account retains GitHub CLI authentication and requests the short-lived registration token. Runner configuration and execution occur under the dedicated account with its own HOME, and the runner directory is owned by that account. The runner account must not have read access to the operator's home or GitHub CLI configuration.
+
+Before use, an administrator must create the dedicated account and verify:
+- `getent passwd brainrunner` resolves to a dedicated home directory.
+- `id -nG brainrunner` includes `kvm`.
+- the operator's home and `~/.config/gh` are not readable by the runner account.
+- `/opt/brain-cloud-executor` is owned by `brainrunner`.
+- a canary job cannot read the operator's GitHub CLI credential files.
+- the one-job runner deregisters after its job and the short-lived registration token is no longer usable.
+
+This repository-level regression test checks the bootstrap contract only; it does not replace host-level acceptance evidence.
