@@ -14,18 +14,55 @@ say() { printf '%s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 is_termux() { [[ "${PREFIX:-}" == *com.termux/files/usr ]]; }
 
+# Never run a dirty or non-main checkout as the activation source. Preserve it,
+# and use a dedicated managed runtime checkout instead.
 if [[ -n "${BRAIN_ROOT:-}" && -d "${BRAIN_ROOT}/.git" ]]; then
-  ROOT="$BRAIN_ROOT"
+  CANDIDATE="$BRAIN_ROOT"
 elif [[ -d "$HOME_DIR/MySimpleProject/.git" ]]; then
-  ROOT="$HOME_DIR/MySimpleProject"
-elif [[ ! -e "$HOME_DIR/MySimpleProject" ]]; then
-  if ! have git; then say "BRAIN_ERROR=GIT_REQUIRED_FOR_FIRST_INSTALL"; exit 20; fi
-  git clone --depth 1 --branch main "$REPO_URL" "$HOME_DIR/MySimpleProject"
-  ROOT="$HOME_DIR/MySimpleProject"
+  CANDIDATE="$HOME_DIR/MySimpleProject"
 else
-  say "BRAIN_ERROR=EXISTING_PATH_IS_NOT_A_GIT_REPOSITORY"
-  say "Nothing was overwritten. Set BRAIN_ROOT to a valid checkout and retry."
-  exit 21
+  CANDIDATE=""
+fi
+
+if [[ -n "$CANDIDATE" ]]; then
+  CANDIDATE_BRANCH="$(git -C "$CANDIDATE" branch --show-current 2>/dev/null || true)"
+  CANDIDATE_DIRTY="$(git -C "$CANDIDATE" status --porcelain 2>/dev/null || true)"
+else
+  CANDIDATE_BRANCH=""
+  CANDIDATE_DIRTY=""
+fi
+
+if [[ -n "$CANDIDATE" && "$CANDIDATE_BRANCH" == "main" && -z "$CANDIDATE_DIRTY" ]]; then
+  ROOT="$CANDIDATE"
+  # Fast-forward only a clean main checkout; never reset or discard local work.
+  if have git; then
+    git -C "$ROOT" fetch --quiet origin main
+    git -C "$ROOT" merge --ff-only --quiet origin/main
+  fi
+else
+  RUNTIME_DIR="$INSTALL_DIR/runtime"
+  ROOT="$RUNTIME_DIR/MySimpleProject"
+  mkdir -p "$RUNTIME_DIR"
+  if [[ ! -e "$ROOT" ]]; then
+    have git || { say "BRAIN_ERROR=GIT_REQUIRED_FOR_RUNTIME_INSTALL"; exit 20; }
+    git clone --depth 1 --branch main "$REPO_URL" "$ROOT"
+  else
+    if [[ ! -d "$ROOT/.git" ]]; then
+      say "BRAIN_ERROR=RUNTIME_PATH_EXISTS_NOT_GIT"
+      say "Nothing was overwritten: $ROOT"
+      exit 21
+    fi
+    RUNTIME_BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
+    RUNTIME_DIRTY="$(git -C "$ROOT" status --porcelain 2>/dev/null || true)"
+    if [[ "$RUNTIME_BRANCH" != "main" || -n "$RUNTIME_DIRTY" ]]; then
+      say "BRAIN_ERROR=MANAGED_RUNTIME_NOT_CLEAN_MAIN"
+      say "Preserve and inspect: $ROOT"
+      exit 22
+    fi
+    git -C "$ROOT" fetch --quiet origin main
+    git -C "$ROOT" merge --ff-only --quiet origin/main
+  fi
+  say "BRAIN_NOTE=existing_checkout_preserved"
 fi
 
 [[ -f "$ROOT/brain_v12/tools/brain_runtime_bootstrap.sh" ]] || {
