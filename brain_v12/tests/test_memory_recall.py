@@ -171,6 +171,42 @@ class MemoryRecallTests(unittest.TestCase):
             self.assertEqual(recalled, [])
 
 
+    def test_recorded_conflict_quarantines_both_memories_and_keeps_audit_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("fact.deployment.old", "production deployment succeeded")
+            store.save_memory("fact.deployment.new", "production deployment failed")
+            conflict = store.record_memory_conflict(
+                "fact.deployment.old", "fact.deployment.new",
+                "Two source records disagree about the deployment result."
+            )
+
+            recalled = store.recall_memories("production deployment", fallback_recent=False)
+            records = {item["key"]: item for item in store.memories()}
+            audit = store.memory_conflicts()
+
+            self.assertEqual(conflict["status"], "OPEN")
+            self.assertEqual(records["fact.deployment.old"]["status"], "CONFLICTED")
+            self.assertEqual(records["fact.deployment.new"]["status"], "CONFLICTED")
+            self.assertEqual(recalled, [])
+            self.assertEqual(len(audit), 1)
+            self.assertIn("disagree", audit[0]["reason"])
+
+    def test_record_memory_conflict_requires_two_existing_distinct_keys_and_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("fact.one", "first fact")
+
+            with self.assertRaises(ValueError):
+                store.record_memory_conflict("fact.one", "fact.one", "same key")
+            with self.assertRaises(ValueError):
+                store.record_memory_conflict("fact.one", "fact.missing", " ")
+            with self.assertRaises(KeyError):
+                store.record_memory_conflict("fact.one", "fact.missing", "these disagree")
+
+
 
 if __name__ == "__main__":
     unittest.main()
