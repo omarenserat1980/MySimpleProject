@@ -202,12 +202,17 @@ class RuntimePathsTests(unittest.TestCase):
 
     def test_virtual_task_queue_passes_default_store_path_through(self):
         store_mock = MagicMock()
-        with patch("brain_v12.brain.virtual_task_queue.DurableTaskStore", return_value=store_mock) as factory:
-            queue = VirtualTaskQueue(chassis=MagicMock(), resource_manager=MagicMock())
-            try:
-                factory.assert_called_once_with(None)
-            finally:
-                queue.shutdown()
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_home = Path(temporary) / "runtime"
+            with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
+                with patch("brain_v12.brain.virtual_task_queue.DurableTaskStore", return_value=store_mock) as factory:
+                    queue = VirtualTaskQueue(chassis=MagicMock(), resource_manager=MagicMock())
+                    try:
+                        factory.assert_called_once_with(
+                            runtime_home / "brain6_artifacts" / "virtual_tasks" / "tasks.db"
+                        )
+                    finally:
+                        queue.shutdown()
 
     def test_evidence_store_default_uses_runtime_home(self):
         with tempfile.TemporaryDirectory() as temporary:
