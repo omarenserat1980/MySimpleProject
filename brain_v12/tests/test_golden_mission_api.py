@@ -16,7 +16,8 @@ class Evidence:
         return {"ok": False}
 
 
-def make_client(tmp_path):
+def make_client(tmp_path, monkeypatch):
+    monkeypatch.setenv("BRAIN_CONTROL_KEY", "test-control-key")
     controller = GoldenMissionController(
         str(Path(tmp_path) / "missions.sqlite3"),
         notifier=lambda mission, message: {"sent": False, "reason": "test"},
@@ -24,11 +25,11 @@ def make_client(tmp_path):
     )
     app = FastAPI()
     app.include_router(router(controller))
-    return TestClient(app)
+    return TestClient(app, headers={"X-Brain-Control-Key": "test-control-key"})
 
 
-def test_create_start_and_permission_gate(tmp_path):
-    client = make_client(tmp_path)
+def test_create_start_and_permission_gate(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
     created = client.post("/api/golden-missions", json={
         "title": "VM boot check",
         "objective": "Prove the test VM boots",
@@ -65,8 +66,8 @@ def test_create_start_and_permission_gate(tmp_path):
     assert granted.json()["mission"]["status"] == "RUNNING"
 
 
-def test_close_endpoint_cannot_trust_client_boolean(tmp_path):
-    client = make_client(tmp_path)
+def test_close_endpoint_cannot_trust_client_boolean(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
     created = client.post("/api/golden-missions", json={
         "title": "Close gate",
         "objective": "Do not accept unverified completion",
@@ -84,8 +85,21 @@ def test_close_endpoint_cannot_trust_client_boolean(tmp_path):
     assert response.json()["detail"] == "MISSION_EVIDENCE_NOT_FOUND_OR_MISMATCHED"
 
 
-def test_due_endpoint_returns_persistent_due_items(tmp_path):
-    client = make_client(tmp_path)
+def test_due_endpoint_returns_persistent_due_items(tmp_path, monkeypatch):
+    client = make_client(tmp_path, monkeypatch)
     response = client.get("/api/golden-missions/due")
     assert response.status_code == 200
     assert response.json()["ok"] is True
+
+
+def test_mission_control_requires_control_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("BRAIN_CONTROL_KEY", "expected-secret")
+    controller = GoldenMissionController(str(Path(tmp_path) / "auth.sqlite3"), notifier=lambda *args: {"sent": False})
+    app = FastAPI()
+    app.include_router(router(controller))
+    client = TestClient(app)
+    response = client.post("/api/golden-missions", json={
+        "title": "unauthorized", "objective": "must be blocked", "acceptance": ["blocked"]
+    })
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CONTROL_PLANE_AUTH_REQUIRED"
