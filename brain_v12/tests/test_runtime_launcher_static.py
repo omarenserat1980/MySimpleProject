@@ -35,7 +35,7 @@ class RuntimeLauncherStaticTests(unittest.TestCase):
         source = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn("auth_diagnostic()", source)
         self.assertIn("JET_BRAIN_AUTH_DIAGNOSTIC status=HTTP_", source)
-        self.assertIn("JET_BRAIN_AUTH_DIAGNOSTIC status=CONNECTION_REFUSED", source)
+        self.assertIn('status = "CONNECTION_REFUSED"', source)
         self.assertNotIn("print(key)", source)
         self.assertNotIn("print(os.environ[\"BRAIN_AGENT_KEY\"])", source)
 
