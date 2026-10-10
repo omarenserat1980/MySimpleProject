@@ -2908,6 +2908,14 @@ class ArkanSimulationCommand(BaseModel):
     command: str
 
 
+@app.on_event("startup")
+def background_work_startup():
+    return background_work.resume_pending()
+
+@app.on_event("shutdown")
+def background_work_shutdown():
+    background_work.shutdown(wait=True)
+
 @app.get("/api/background-work/status")
 def background_work_status(request: Request):
     require_control_key(request)
