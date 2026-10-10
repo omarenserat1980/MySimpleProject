@@ -104,7 +104,7 @@ health_ok() { "$PYTHON" -c 'import os,urllib.request; urllib.request.urlopen(os.
 auth_ok() {
   "$PYTHON" -c 'import json,os,urllib.request
 key=open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]),encoding="utf-8").read().strip()
-req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key},method="POST")
+req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key,"X-V12-Agent-Id":os.environ["V12_AGENT_ID"]},method="POST")
 with urllib.request.urlopen(req,timeout=3) as r: r.read()' >/dev/null 2>&1
 }
 auth_diagnostic() {
@@ -116,7 +116,7 @@ try:
     req = urllib.request.Request(
         base + "/api/device/heartbeat",
         data=json.dumps({"agent_id": os.environ["V12_AGENT_ID"]}).encode(),
-        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key},
+        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key, "X-V12-Agent-Id": os.environ["V12_AGENT_ID"]},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=3) as response:
