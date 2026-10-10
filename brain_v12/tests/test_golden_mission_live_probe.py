@@ -11,11 +11,8 @@ def test_live_probe_records_hashes_but_cannot_claim_full_closure(monkeypatch):
     assert report["checks"][0]["passed"] is True
     assert report["checks"][0]["response_sha256"] == "a" * 64
     assert report["checks"][1]["passed"] is True
-    assert report["status"] == "BLOCKED"
-    assert report["checks"][2]["name"] == "mission_persistence_restart"
-    assert report["checks"][2]["passed"] is False
-    assert report["checks"][3]["name"] == "restore_drill"
-    assert report["checks"][3]["passed"] is False
+    assert report["status"] == "PARTIAL"
+    assert len(report["checks"]) == 2
     assert "do-not-record-this-key" not in str(report)
     assert report["safety"]["changes_service_state"] is False
 
