@@ -26,6 +26,7 @@ on:
       - "brain_v12/tests/test_cloud_foundation_integration.py"
       - "brain_v12/tests/test_cloud_foundation_coordinator.py"
       - "tools/windows/asus_brain_runtime.ps1"
+      - "tools/windows/asus_diagnostic_report.ps1"
       - "tools/windows/ASUS_BRAIN_RUNTIME.md"
       - ".github/workflows/brain-free-cloud-capacity-gate.yml"
   push:
@@ -142,3 +143,17 @@ jobs:
             exit 1
           }
           Write-Output "ASUS_SCRIPT_SYNTAX=PASS"
+
+          $diagnosticPath = "$env:GITHUB_WORKSPACE\\tools\\windows\\asus_diagnostic_report.ps1"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $diagnosticPath,
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+          Write-Output "ASUS_DIAGNOSTIC_SYNTAX=PASS"
