@@ -109,3 +109,7 @@ Before use, an administrator must create the dedicated account and verify:
 - the one-job runner deregisters after its job and the short-lived registration token is no longer usable.
 
 This repository-level regression test checks the bootstrap contract only; it does not replace host-level acceptance evidence.
+
+### Automated credential-boundary preflight
+
+The bootstrap now performs a fail-closed check as the dedicated runner account against the operator's effective GitHub CLI configuration directory (GH_CONFIG_DIR, or the XDG/default location). It exits with RUNNER_CAN_READ_OPERATOR_GH_CREDENTIALS before runner registration if that account can read or traverse the configuration directory or read hosts.yml. A successful check prints only RUNNER_CANNOT_READ_OPERATOR_GH_CREDENTIALS=VERIFIED; it never prints credential contents. This is a preflight check, not a substitute for a post-registration canary job and review of actual host permissions.
