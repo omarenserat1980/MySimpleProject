@@ -41,7 +41,7 @@ footer{margin-top:18px;padding-top:8px;border-top:1px solid var(--line);color:va
 </main>
 <script>
 const $=id=>document.getElementById(id);
-function phaseOf(e){const p=e.payload||{};return (p.phase)||(p.payload&&p.payload.phase)||(e.kind||"").replace(/^golden:/,"").toUpperCase()}
+function phaseOf(e){return e.phase||(e.kind||"").replace(/^golden:/,"").toUpperCase()}
 function timeOf(v){if(!v)return "—";try{return new Date(Number(v)*1000).toISOString().replace("T"," ").replace("Z"," UTC")}catch{return String(v)}}
 function cell(tr,text){const td=document.createElement("td");td.textContent=text??"—";tr.appendChild(td)}
 async function load(){ $("status").className="status";$("status").textContent="جارٍ قراءة سجل الأدلة…";try{
