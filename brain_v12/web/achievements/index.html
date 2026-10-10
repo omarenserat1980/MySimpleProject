@@ -75,13 +75,14 @@ footer{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);font-si
     return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleString("ar-JO",{dateStyle:"medium",timeStyle:"medium"});
   };
   const summarize = event => {
-    const type = pick(event, ["type","event_type","name","kind","action"]) || "حدث مسجل";
-    const payload = pick(event, ["payload","data","details","metadata","context"]);
+    const type = pick(event, ["kind","type","event_type","name","action"]) || "حدث مسجل";
+    let payload = pick(event, ["payload","data","details","metadata","context"]);
+    if (typeof payload === "string") { try { payload = JSON.parse(payload); } catch { /* preserve non-JSON payload as text */ } }
     const details = [];
     if (payload && typeof payload === "object" && !Array.isArray(payload)) {
       for (const [key,value] of Object.entries(payload).slice(0,12)) details.push([key,pretty(value)]);
     } else if (payload !== null) details.push(["التفاصيل",pretty(payload)]);
-    for (const key of ["status","run_id","goal","objective","message","result","source"]) {
+    for (const key of ["id","status","run_id","goal","objective","message","result","source"]) {
       if (event[key] !== undefined && event[key] !== null && event[key] !== "") details.push([key,pretty(event[key])]);
     }
     return {type,details,rawTime:timeOf(event)};
