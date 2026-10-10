@@ -6,6 +6,7 @@ proof records created by the operator after those drills actually ran.
 from __future__ import annotations
 import argparse
 import hashlib
+import hmac
 import json
 import re
 from datetime import datetime, timezone
@@ -61,7 +62,7 @@ def _valid_drill(payload: dict[str, Any], name: str, host: str) -> dict[str, Any
     digest = check.get("evidence_sha256")
     if not isinstance(digest, str) or not HASH_RE.fullmatch(digest):
         raise ValueError(f"{name}: valid lowercase SHA-256 evidence_sha256 is required")
-    if not hashlib.compare_digest(actual_digest, digest):
+    if not hmac.compare_digest(actual_digest, digest):
         raise ValueError(f"{name}: evidence file SHA-256 does not match the recorded digest")
     return {
         "name": name,
