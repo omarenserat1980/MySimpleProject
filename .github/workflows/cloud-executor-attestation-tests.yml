@@ -21,6 +21,10 @@ on:
     branches: [main]
     paths:
       - "brain_v12/brain/cloud_executor_attestation.py"
+      - "tools/request_cloud_executor_attestation.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_api.py"
       - "brain_v12/brain/cloud_executor_attestation_issuer.py"
       - "brain_v12/brain/cloud_executor_gate.py"
       - "brain_v12/tests/test_cloud_executor_attestation.py"
