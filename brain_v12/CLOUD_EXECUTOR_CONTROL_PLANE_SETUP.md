@@ -77,9 +77,9 @@ On the executor host, set:
 - `BRAIN_CLOUD_EXECUTOR_ID` to the enrolled ID
 - `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL=https://<trusted-brain-api>`
 - `BRAIN_CLOUD_EXECUTOR_TOKEN` through the host's secret-injection mechanism
-- the GitHub CLI authentication needed to register the repository runner
+- a short-lived runner-registration token supplied by the trusted operator; the runner account must not have access to the operator's saved GitHub CLI credentials
 
-The host must also be Linux x86_64 with usable KVM, QEMU, OVMF, and all listed image tools. Run `tools/bootstrap_brain_cloud_executor.sh` from the checked-out repository. It fetches a fresh proof, verifies the signature, atomically consumes it at the central registry, clears the token/proof before runner registration, and starts an ephemeral runner for one job.
+The host must also be Linux x86_64 with usable KVM, QEMU, OVMF, and all listed image tools. Run `tools/bootstrap_brain_cloud_executor.sh` from the checked-out repository as a dedicated unprivileged account. The operator must obtain the short-lived GitHub runner-registration token outside that account and inject it as `BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN`. The script must not call `gh` or read the operator's saved GitHub CLI credentials. It clears the injected registration token before starting the job, fetches and verifies a fresh Brain proof, consumes it centrally, and starts an ephemeral runner for one job. Verify the runner account cannot read the operator's home directory or credential files.
 
 Do not run the bootstrap on Arkan or Redmi until the trust anchor and control-plane settings are independently configured. This runbook has not been executed on any host in this change.
 
