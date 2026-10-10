@@ -13,7 +13,10 @@ class SoftwareDiscoveryTests(unittest.TestCase):
         self.assertIn("executable", result["python"])
         self.assertIn("package_count", result)
         self.assertLessEqual(len(result["packages"]), 300)
-        self.assertEqual(result["package_count"], len(result["packages"]) if not result["packages_truncated"] else result["package_count"])
+        if result["packages_truncated"]:
+            self.assertGreater(result["package_count"], len(result["packages"]))
+        else:
+            self.assertEqual(result["package_count"], len(result["packages"]))
 
     def test_unknown_task_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "TASK_NOT_ALLOWED"):
