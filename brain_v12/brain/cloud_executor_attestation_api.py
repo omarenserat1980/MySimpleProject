@@ -29,6 +29,28 @@ def _registry_db() -> str:
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_REGISTRY_PARENT_MISSING")
     return path
 
+def _host_binding(executor_id: str) -> dict[str, str]:
+    """Read the trusted host inventory; never accept host claims from the runner request."""
+    try:
+        bindings = json.loads(os.environ.get("BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON", "{}"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID") from exc
+    binding = bindings.get(executor_id) if isinstance(bindings, dict) else None
+    if not isinstance(binding, dict):
+        raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_HOST_BINDING_REQUIRED")
+    hostname = binding.get("hostname")
+    architecture = binding.get("architecture")
+    if not isinstance(hostname, str) or not hostname.strip():
+        raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_HOST_BINDING_HOSTNAME_INVALID")
+    if not isinstance(architecture, str):
+        raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_HOST_BINDING_ARCHITECTURE_INVALID")
+    architecture = architecture.strip().lower()
+    architecture = "x86_64" if architecture in {"x86_64", "amd64"} else architecture
+    if architecture != "x86_64":
+        raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_HOST_BINDING_ARCHITECTURE_INVALID")
+    return {"hostname": hostname.strip(), "architecture": architecture}
+
+
 def _authenticate(executor_id: str, token: str) -> None:
     if not token:
         raise HTTPException(status_code=401, detail="CLOUD_EXECUTOR_AUTH_REQUIRED")
@@ -44,6 +66,7 @@ def _authenticate(executor_id: str, token: str) -> None:
 @router.post("/challenge")
 def attestation_challenge(body: ExecutorRequest, x_brain_executor_token: str = Header(default="", alias="X-Brain-Executor-Token")):
     _authenticate(body.executor_id, x_brain_executor_token)
+    _host_binding(body.executor_id)
     if not os.environ.get("BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64"):
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED")
     try:
@@ -54,9 +77,11 @@ def attestation_challenge(body: ExecutorRequest, x_brain_executor_token: str = H
 @router.post("/issue")
 def attestation_issue(body: IssueRequest, x_brain_executor_token: str = Header(default="", alias="X-Brain-Executor-Token")):
     _authenticate(body.executor_id, x_brain_executor_token)
+    binding = _host_binding(body.executor_id)
     try:
         return issue_attestation(authenticated_executor_id=body.executor_id, challenge_nonce=body.nonce,
-                                 challenge_db_path=_registry_db(), lifetime_seconds=300)
+                                 challenge_db_path=_registry_db(), lifetime_seconds=300,
+                                 expected_hostname=binding["hostname"], expected_architecture=binding["architecture"])
     except ValueError as exc:
         code = str(exc)
         status = 403 if "MISMATCH" in code or "REPLAY" in code else 503
