@@ -22,7 +22,13 @@ class EvidenceStore:
         raw=json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":")).encode()
         return hashlib.sha256(raw).hexdigest()
 
-    def append(self,task_id,kind,payload,producer="brain"):
+    def append(self,task_id,kind,payload,producer="brain",*,mission_id=None,attempt=None,phase=None):
+        # Optional Golden-loop metadata remains backward-compatible with existing producers.
+        if mission_id is not None or attempt is not None or phase is not None:
+            payload = dict(payload)
+            if mission_id is not None: payload.setdefault("mission_id", mission_id)
+            if attempt is not None: payload.setdefault("attempt", attempt)
+            if phase is not None: payload.setdefault("phase", phase)
         evidence_id="ev-"+uuid4().hex
         digest=self.digest(payload)
         self.db.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?,?)",
