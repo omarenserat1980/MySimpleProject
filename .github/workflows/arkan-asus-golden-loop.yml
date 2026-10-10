@@ -1,0 +1,45 @@
+name: Arkan ASUS Golden Loop Probe Validation
+
+on:
+  pull_request:
+    branches:
+      - feature/synthetic-customer-proposal-gate
+      - main
+    paths:
+      - "tools/windows/arkan_asus_golden_probe.ps1"
+      - "docs/ARKAN_ASUS_GOLDEN_MISSION.md"
+      - ".github/workflows/arkan-asus-golden-loop.yml"
+  push:
+    branches:
+      - feature/arkan-asus-golden-loop
+    paths:
+      - "tools/windows/arkan_asus_golden_probe.ps1"
+      - "docs/ARKAN_ASUS_GOLDEN_MISSION.md"
+      - ".github/workflows/arkan-asus-golden-loop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-probe:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell probe without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$env:GITHUB_WORKSPACE\tools\windows\arkan_asus_golden_probe.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+          Write-Output "ARKAN_ASUS_GOLDEN_PROBE_SYNTAX=PASS"
+          Write-Output "PROBE_EXECUTED=NO"
