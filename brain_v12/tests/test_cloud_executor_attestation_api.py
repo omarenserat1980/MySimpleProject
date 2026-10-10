@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 from brain_v12.brain.cloud_executor_attestation_api import (
     ConsumeRequest, ExecutorRequest, IssueRequest, attestation_challenge,
-    attestation_consume, attestation_issue,
+    attestation_consume, attestation_issue, _host_binding,
 )
 
 
@@ -30,6 +30,7 @@ class CloudExecutorAttestationApiTests(unittest.TestCase):
             "BRAIN_CLOUD_EXECUTOR_REGISTRY_DB": self.db,
             "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON": json.dumps({"cloud-test-01": hashlib.sha256(self.token.encode()).hexdigest()}),
             "BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64": self.private_b64,
+            "BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON": json.dumps({"cloud-test-01": {"hostname": "runner-test-01", "architecture": "x86_64"}}),
         })
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -39,6 +40,26 @@ class CloudExecutorAttestationApiTests(unittest.TestCase):
         att = attestation_issue(IssueRequest(executor_id="cloud-test-01", nonce=challenge["nonce"]), self.token)
         result = attestation_consume(ConsumeRequest(executor_id="cloud-test-01", nonce=att["nonce"]), self.token)
         self.assertTrue(result["consumed"])
+
+    def test_attestation_contains_inventory_host_binding(self):
+        challenge = attestation_challenge(ExecutorRequest(executor_id="cloud-test-01"), self.token)
+        att = attestation_issue(IssueRequest(executor_id="cloud-test-01", nonce=challenge["nonce"]), self.token)
+        self.assertEqual(att["hostname"], "runner-test-01")
+        self.assertEqual(att["architecture"], "x86_64")
+
+    def test_issue_request_cannot_override_trusted_host_binding(self):
+        request = IssueRequest(executor_id="cloud-test-01", nonce="n" * 32,
+                               hostname="attacker-host", architecture="aarch64")
+        self.assertFalse(hasattr(request, "hostname"))
+        self.assertFalse(hasattr(request, "architecture"))
+        self.assertEqual(_host_binding("cloud-test-01")["hostname"], "runner-test-01")
+
+    def test_missing_inventory_fails_closed_before_challenge_creation(self):
+        with patch.dict("os.environ", {"BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON": "{}"}):
+            with self.assertRaises(HTTPException) as raised:
+                attestation_challenge(ExecutorRequest(executor_id="cloud-test-01"), self.token)
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertEqual(raised.exception.detail, "CLOUD_EXECUTOR_HOST_BINDING_REQUIRED")
 
     def test_rejects_bad_executor_token(self):
         with self.assertRaisesRegex(HTTPException, ".*"):
