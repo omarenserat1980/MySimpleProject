@@ -65,15 +65,18 @@ class DurableTaskStore:
                 (lease,now,task_id,lease_id))
             self.db.commit(); return cur.rowcount==1
 
-    def finish(self,task_id,ok,result):
+    def finish(self,task_id,ok,result,lease_id):
+        """Finish only for the currently owning lease; stale workers cannot overwrite newer work."""
         status="COMPLETED" if ok else "FAILED"; now=time.time()
         with self.lock:
-            row=self.db.execute("SELECT lease_id FROM tasks WHERE task_id=? AND status='RUNNING'",(task_id,)).fetchone()
-            if not row: return self.get(task_id)
             error=None if ok else json.dumps(result,ensure_ascii=False)
-            self.db.execute("""UPDATE tasks SET status=?,result_json=?,error_json=?,lease_id=NULL,lease_expires_at=NULL,updated_at=?
-              WHERE task_id=? AND status='RUNNING'""",(status,json.dumps(result,ensure_ascii=False),error,now,task_id))
-            self.db.commit(); return self.get(task_id)
+            cur=self.db.execute("""UPDATE tasks SET status=?,result_json=?,error_json=?,lease_id=NULL,lease_expires_at=NULL,updated_at=?
+              WHERE task_id=? AND status='RUNNING' AND lease_id=?""",
+                (status,json.dumps(result,ensure_ascii=False),error,now,task_id,lease_id))
+            self.db.commit()
+            if cur.rowcount != 1:
+                return None
+            return self.get(task_id)
 
     def requeue(self,task_id):
         now=time.time()
