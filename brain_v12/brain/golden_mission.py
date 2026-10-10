@@ -70,6 +70,8 @@ class GoldenMissionController:
         acceptance = [str(x).strip() for x in acceptance if str(x).strip()]
         if not title or not objective or not acceptance:
             raise ValueError("MISSION_OBJECTIVE_AND_ACCEPTANCE_REQUIRED")
+        if len(set(acceptance)) != len(acceptance):
+            raise ValueError("ACCEPTANCE_CRITERIA_MUST_BE_UNIQUE")
         if not 1 <= estimate_minutes <= 10080:
             raise ValueError("ESTIMATE_MINUTES_OUT_OF_RANGE")
         if not 1 <= update_minutes <= 1440:
