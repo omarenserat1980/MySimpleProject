@@ -31,6 +31,24 @@ class RuntimeLauncherStaticTests(unittest.TestCase):
         self.assertGreaterEqual(guard_pos, 0, "Render endpoint guard missing")
         self.assertGreater(assignment_pos, guard_pos, "URL assignment must follow endpoint guards")
 
+    def test_device_identity_is_not_silently_shared_between_phones(self):
+        source = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn("DEVICE_MODEL=", source)
+        self.assertIn('DETECTED_AGENT_ID="redmi3-01"', source)
+        self.assertIn('DETECTED_AGENT_ID="realme-01"', source)
+        self.assertIn("DEVICE_ID_MISMATCH", source)
+        self.assertIn("DEVICE_ID_REQUIRED", source)
+
+    def test_non_primary_device_must_not_use_loopback_brain_url(self):
+        source = LAUNCHER.read_text(encoding="utf-8")
+        remote_guard = source.find('if [ "$V12_AGENT_ID" != "redmi3-01" ]; then')
+        url_assignment = source.find('export V12_BRAIN_URL=')
+        self.assertGreaterEqual(remote_guard, 0)
+        self.assertGreater(remote_guard, url_assignment)
+        self.assertIn("REMOTE_BRAIN_URL_REQUIRED", source)
+        self.assertIn("http://127.*", source)
+        self.assertIn("http://localhost*", source)
+
     def test_auth_diagnostics_do_not_log_key_material(self):
         source = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn("auth_diagnostic()", source)
