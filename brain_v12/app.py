@@ -51,6 +51,7 @@ from .brain.income_lifecycle import IncomeLifecycle
 from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.device_cloud_federation import build_fleet_status
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
@@ -1876,6 +1877,13 @@ def device_queue(request: Request):
 @app.get("/api/device/status")
 def device_status():
     return device_bridge.status()
+
+
+@app.get("/api/device/cloud-federation/status")
+def device_cloud_federation_status(request: Request):
+    """Read-only fleet/cloud readiness view; does not enqueue or provision work."""
+    require_control_key(request)
+    return JSONResponse(build_fleet_status(device_bridge.agent_status()))
 
 
 class DeviceTask(BaseModel):
