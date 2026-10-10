@@ -23,8 +23,8 @@ RISK_TOKENS = ("deploy", "publish", "payment", "payout", "mining", "provision", 
 def _present(root: Path, relative: str) -> bool:
     return (root / relative).exists()
 
-def _workflow_record(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8", errors="replace")
+def _workflow_record(path: Path, root: Path) -> dict[str, Any]:
+    text = (root / path).read_text(encoding="utf-8", errors="replace")
     match = re.search(r"(?m)^name:\s*(.+?)\s*$", text)
     name = match.group(1).strip().strip("'\"") if match else path.stem
     triggers = []
@@ -44,7 +44,7 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     wfroot = root / ".github" / "workflows"
     paths = sorted(wfroot.glob("*.yml")) + sorted(wfroot.glob("*.yaml"))
-    workflows = [_workflow_record(p.relative_to(root)) for p in paths]
+    workflows = [_workflow_record(p.relative_to(root), root) for p in paths]
     lanes = {name: {"required_paths": required, "source_present": all(_present(root, p) for p in required)}
              for name, required in PROJECT_LANES.items()}
     core_docs = {p: _present(root, p) for p in CORE_DOCS}
