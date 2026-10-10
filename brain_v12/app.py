@@ -1908,7 +1908,16 @@ def require_device_agent(request:Request, agent_id:str|None=None) -> bool:
     if header_agent_id and resolved_agent_id and header_agent_id != resolved_agent_id:
         raise HTTPException(status_code=403, detail="DEVICE_AGENT_ID_MISMATCH")
     supplied=request.headers.get("X-V12-Agent-Key","")
-    if not resolved_agent_id or not device_bridge.authenticate(supplied, resolved_agent_id):
+    if resolved_agent_id:
+        authorized=device_bridge.authenticate(supplied, resolved_agent_id)
+    else:
+        # Preserve legacy shared-key clients only when per-agent mode is off.
+        # A configured per-agent registry requires an explicit agent identity.
+        if os.getenv("BRAIN_AGENT_KEYS_JSON", "").strip():
+            authorized=False
+        else:
+            authorized=device_bridge.authenticate(supplied)
+    if not authorized:
         raise HTTPException(status_code=403, detail="DEVICE_AGENT_AUTH_REQUIRED")
     return True
 
