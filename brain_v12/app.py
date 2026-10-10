@@ -66,6 +66,7 @@ from .brain.synthetic_customer import SyntheticCustomer
 from .synthetic_customer_api import router as synthetic_customer_router
 from .brain.golden_mission import GoldenMissionController
 from .golden_mission_api import router as golden_mission_router
+from .brain.golden_mission_worker import GoldenMissionReminderWorker
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
@@ -1957,8 +1958,43 @@ def system_diagnostics():
     checks.append({"name":"decision_engine","ok":len(cognitive.decisions.generate("system diagnostics"))>0})
     return {"ok":all(x["ok"] for x in checks),"checks":checks,"timestamp":__import__("time").time()}
 
+golden_mission_reminder_worker = None
+
 @app.on_event("startup")
 def start_background_services():
+    global golden_mission_reminder_worker
+    if os.getenv("BRAIN_GOLDEN_MISSION_SCHEDULER_ENABLED", "false").lower() == "true":
+        try:
+            controller = GoldenMissionController(evidence_store=evidence_store)
+            golden_mission_reminder_worker = GoldenMissionReminderWorker(controller)
+            golden_mission_reminder_worker.start()
+            store.event("GOLDEN_MISSION_REMINDER_WORKER_STARTED", {
+                "interval_seconds": golden_mission_reminder_worker.interval_seconds,
+                "mode": "REMINDERS_ONLY",
+            })
+        except Exception as exc:
+            store.event("GOLDEN_MISSION_REMINDER_WORKER_FAILED", {"error": str(exc)[:1000]})
+    try:
+        income_strategy.income_engine.discover(20)
+    except Exception as exc:
+        store.event("INCOME_DISCOVERY_PLAN_FAILED", {"error": str(exc)[:1000]})
+    if os.getenv("BRAIN_LIVE_INCOME_SEARCH_ENABLED","true").lower()=="true":
+        try: live_income_researcher.run_once()
+        except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
+        def live_income_loop():
+            import time
+            while True:
+                time.sleep(max(900, int(os.getenv("BRAIN_LIVE_INCOME_SEARCH_INTERVAL_SECONDS", "1800"))))
+                try: live_income_researcher.run_once()
+                except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
+        threading.Thread(target=live_income_loop, daemon=True).start()
+    if os.getenv("BRAIN_WORKFORCE_ENABLED","true").lower()=="true":
+        def workforce_loop():
+            import time
+            while True:
+                time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
+                try: workforce.dispatch("scheduled_heartbeat", include_revenue=True)
+                except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
@@ -1982,6 +2018,12 @@ def start_background_services():
                 except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
         threading.Thread(target=workforce_loop, daemon=True).start()
 
+@app.on_event("shutdown")
+def stop_golden_mission_reminder_worker():
+    global golden_mission_reminder_worker
+    if golden_mission_reminder_worker is not None:
+        golden_mission_reminder_worker.stop()
+        golden_mission_reminder_worker = None
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
