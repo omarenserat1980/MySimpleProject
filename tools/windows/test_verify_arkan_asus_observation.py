@@ -72,6 +72,32 @@ class ObservationVerifierTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("stale report", result.stderr)
 
+    def test_future_timestamp_fails(self):
+        future = datetime.now(timezone.utc) + timedelta(hours=2)
+        result = self.run_verifier(make_report(future))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("timestamp is in the future", result.stderr)
+
+    def test_missing_timezone_fails(self):
+        report = make_report()
+        report["payload"]["observed_at_utc"] = datetime.now().replace(tzinfo=None).isoformat()
+        canonical = json.dumps(report["payload"], separators=(",", ":"), ensure_ascii=True)
+        report["payload_canonical_json"] = canonical
+        report["payload_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        result = self.run_verifier(report)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("has no timezone", result.stderr)
+
+    def test_incomplete_host_identity_fails(self):
+        report = make_report()
+        del report["payload"]["host"]["model"]
+        canonical = json.dumps(report["payload"], separators=(",", ":"), ensure_ascii=True)
+        report["payload_canonical_json"] = canonical
+        report["payload_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        result = self.run_verifier(report)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("host identity fields are incomplete", result.stderr)
+
     def test_non_object_payload_fails_closed_without_traceback(self):
         report = make_report()
         report["payload"] = []
@@ -85,6 +111,11 @@ class ObservationVerifierTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("report root must be a JSON object", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_invalid_max_age_is_rejected(self):
+        result = self.run_verifier(make_report(), ("--max-age-hours", "nan"))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("--max-age-hours must be a finite number greater than zero", result.stderr)
 
 
 if __name__ == "__main__":
