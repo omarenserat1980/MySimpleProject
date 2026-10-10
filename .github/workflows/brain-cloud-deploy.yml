@@ -84,16 +84,11 @@ jobs:
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8000/healthz >/tmp/brain-health.json &&
                curl --fail --silent http://127.0.0.1:8000/readyz >/tmp/brain-ready.json; then
-              python3 - <<'PY'
-          import json
-          health=json.load(open("/tmp/brain-health.json", encoding="utf-8"))
-          ready=json.load(open("/tmp/brain-ready.json", encoding="utf-8"))
-          assert health.get("status") == "ok", health
-          assert ready.get("ready") is True, ready
-          print("BRAIN_CLOUD_PRODUCTION_SMOKE=PASS")
-          PY
-              healthy=1
-              break
+              if python3 -c 'import json; h=json.load(open("/tmp/brain-health.json")); r=json.load(open("/tmp/brain-ready.json")); assert h.get("status") == "ok", h; assert r.get("ready") is True, r'; then
+                echo "BRAIN_CLOUD_PRODUCTION_SMOKE=PASS"
+                healthy=1
+                break
+              fi
             fi
             sleep 2
           done
