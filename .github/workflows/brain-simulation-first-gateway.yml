@@ -25,6 +25,8 @@ on:
       - "brain_v12/brain/digital_twin_fabric.py"
       - "brain_v12/brain/real_arkan_probe.py"
       - "brain_v12/app.py"
+      - "brain_v12/brain/background_work_coordinator.py"
+      - "brain_v12/tests/test_background_work_coordinator.py"
       - "brain_v12/tests/test_simulation_first_remote_api_contract.py"
       - "brain_v12/tests/test_arkan_failover_gateway.py"
       - ".github/workflows/brain-simulation-first-gateway.yml"
