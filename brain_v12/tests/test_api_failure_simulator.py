@@ -29,7 +29,7 @@ class ApiFailureSimulatorTests(unittest.TestCase):
     def test_auth_rejection_does_not_recommend_printing_secrets(self):
         result = diagnose_api_state(port_state="HTTP", http_status=401)
         self.assertEqual(result["status"], "AUTH_REJECTED")
-        self.assertNotIn("print", result["next_step"].lower())
+        self.assertIn("without printing or logging secrets", result["next_step"])
         self.assertEqual(result["reality"], "SIMULATED")
 
     def test_unknown_http_status_fails_closed(self):
