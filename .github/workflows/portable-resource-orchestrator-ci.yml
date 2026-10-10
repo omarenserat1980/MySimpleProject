@@ -12,6 +12,7 @@ on:
       - "brain_v12/tests/test_executor_contract.py"
       - "brain_v12/tests/test_run_evidence_store.py"
       - "brain_v12/tests/test_android_executor_adapter.py"
+      - "brain_v12/tests/test_device_bridge_android_capacity.py"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
   workflow_dispatch:
 
@@ -52,4 +53,5 @@ jobs:
             brain_v12.tests.test_portable_resource_orchestrator \
             brain_v12.tests.test_executor_contract \
             brain_v12.tests.test_run_evidence_store \\
-            brain_v12.tests.test_android_executor_adapter -v
+            brain_v12.tests.test_android_executor_adapter \\
+            brain_v12.tests.test_device_bridge_android_capacity -v
