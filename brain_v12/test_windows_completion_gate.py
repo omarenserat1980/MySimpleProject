@@ -10,6 +10,8 @@ def complete():
         "storage":{"filesystem":"NTFS","size_bytes":64*1024*1024*1024},
         "guest":{"os":"Windows Server 2025","architecture":"x86_64","boot_verified":True},
         "boot_source":"windows-installed-disk",
+        "executor":{"verified":True,"executor_id":"executor-test","hostname":"runner-test","evidence_ref":"cloud-executor-gate:test","runner_name":"runner-test","workflow_run_id":"123"},
+        "control":{"schema":"brain.windows-execution-contract.v1","status":"VERIFIED","capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu","brain_id":"brain-test","generation":1,"fencing_token":1,"task_id":"t1","attempt_id":"a1"},
     }
 
 class WindowsCompletionGateTests(unittest.TestCase):
