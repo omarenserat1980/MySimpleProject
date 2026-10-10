@@ -254,8 +254,11 @@ def health():
 
 
 @router.get("/api/home-server/status")
-def home_server_status():
+def home_server_status(authorization: str | None = Header(default=None)):
+    _authorize(authorization)
     result = get_store().status()
+    # Do not expose the filesystem path through a public API response.
+    result.pop("database_path", None)
     result["control_auth_configured"] = bool(os.getenv("BRAIN_CONTROL_KEY", "").strip())
     return result
 
