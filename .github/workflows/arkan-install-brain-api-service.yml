@@ -1,0 +1,133 @@
+name: Install Electronic Brain API on Arkan
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-install-brain-api-service.yml
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Install persistent user-scoped Brain API service
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 10
+    steps:
+      - name: Back up databases, install service, and verify live readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          P=/home/brain/eb-bootstrap
+          PY=/home/brain/brain-runtime-venv/bin/python
+          BASE="/home/brain/.brain/diagnostics/service-install-${GITHUB_RUN_ID}"
+          BACKUP="$BASE/backups"
+          SERVICE=brain-api-arkan.service
+
+          echo "=== SAFETY CHECKS ==="
+          test -x "$PY"
+          test -f "$P/brain_v12/app.py"
+          test -f "$P/brain_v12/brain_v12.db"
+          test -f "$P/brain_v12/brain6_artifacts/evidence/evidence.db"
+          if [ -e "/etc/systemd/system/$SERVICE" ] || systemctl show "$SERVICE" -p LoadState --value 2>/dev/null | grep -qv '^not-found$'; then
+            echo "SERVICE_ALREADY_EXISTS; refusing to overwrite an existing unit"
+            exit 70
+          fi
+          if ss -ltn 2>/dev/null | grep -q ':8012'; then
+            echo "PORT_8012_ALREADY_IN_USE; no existing process will be stopped"
+            exit 71
+          fi
+          id brain
+          echo "=== CREATE PRIVATE BACKUP DIRECTORY AS brain ==="
+          runuser -u brain -- env HOME=/home/brain BACKUP="$BACKUP" bash -c 'umask 077; mkdir -p "$BACKUP"'
+          echo "=== BACK UP LIVE DATABASES WITHOUT REPLACING THEM ==="
+          runuser -u brain -- env HOME=/home/brain PY="$PY" SRC="$P/brain_v12/brain_v12.db" DST="$BACKUP/brain_v12.db.snapshot" "$PY" -c 'import os,sqlite3; s=sqlite3.connect("file:"+os.environ["SRC"]+"?mode=ro",uri=True,timeout=15); d=sqlite3.connect(os.environ["DST"],timeout=15); s.backup(d); q=d.execute("PRAGMA integrity_check").fetchone()[0]; d.close(); s.close(); print("BRAIN_DB_BACKUP=PASS integrity="+q+" bytes="+str(os.path.getsize(os.environ["DST"]))); assert q=="ok"'
+          runuser -u brain -- env HOME=/home/brain PY="$PY" SRC="$P/brain_v12/brain6_artifacts/evidence/evidence.db" DST="$BACKUP/evidence.db.snapshot" "$PY" -c 'import os,sqlite3; s=sqlite3.connect("file:"+os.environ["SRC"]+"?mode=ro",uri=True,timeout=15); d=sqlite3.connect(os.environ["DST"],timeout=15); s.backup(d); q=d.execute("PRAGMA integrity_check").fetchone()[0]; d.close(); s.close(); print("EVIDENCE_DB_BACKUP=PASS integrity="+q+" bytes="+str(os.path.getsize(os.environ["DST"]))); assert q=="ok"'
+          echo "=== ENSURE USER-OWNED RUNTIME DIRECTORIES ==="
+          runuser -u brain -- env HOME=/home/brain P="$P" bash -c 'set -e; mkdir -p "$HOME/.brain/media" "$P/brain_v12/.brain/state" "$P/brain_v12/brain_git_data" "$P/brain_v12/brain6_artifacts/evidence"; test -w "$HOME/.brain/media"; test -w "$P/brain_v12/.brain/state"; test -w "$P/brain_v12/brain_git_data"; test -w "$P/brain_v12/brain6_artifacts/evidence"; echo RUNTIME_PATH_PERMISSIONS=PASS'
+          echo "=== WRITE A NEW USER-SCOPED SERVICE UNIT ==="
+          cat > "/etc/systemd/system/$SERVICE" <<'UNIT'
+          [Unit]
+          Description=Electronic Brain V14 local API (Arkan)
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=brain
+          Group=brain
+          WorkingDirectory=/home/brain/eb-bootstrap
+          Environment=HOME=/home/brain
+          Environment=PYTHONPATH=/home/brain/eb-bootstrap
+          Environment=PYTHONUNBUFFERED=1
+          Environment=BRAIN_DB=/home/brain/eb-bootstrap/brain_v12/brain_v12.db
+          Environment=BRAIN_MEDIA_ROOT=/home/brain/.brain/media
+          Environment=BRAIN_SYNC_QUEUE=/home/brain/eb-bootstrap/brain_v12/.brain/state/sync_queue.jsonl
+          Environment=BRAIN_GIT_ROOT=/home/brain/eb-bootstrap/brain_v12/brain_git_data
+          Environment=BRAIN_EVIDENCE_DB=/home/brain/eb-bootstrap/brain_v12/brain6_artifacts/evidence/evidence.db
+          ExecStart=/home/brain/brain-runtime-venv/bin/python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 --workers 1 --log-level warning
+          Restart=on-failure
+          RestartSec=5
+          UMask=0077
+          NoNewPrivileges=true
+          PrivateTmp=true
+          ProtectSystem=full
+          ProtectKernelTunables=true
+          ProtectKernelModules=true
+          ProtectControlGroups=true
+          RestrictSUIDSGID=true
+          LockPersonality=true
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          systemctl daemon-reload
+          systemctl enable --now "$SERVICE"
+          echo "=== SERVICE STATE AND PROCESS IDENTITY ==="
+          systemctl is-active "$SERVICE"
+          systemctl show "$SERVICE" -p User -p Group -p MainPID -p ExecStart --no-pager
+          ps -eo user:16,pid,ppid,args | grep -E '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012'
+          echo "=== VERIFY LIVE API ==="
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8012/health -o "$BASE/health.json"; then ready=1; break; fi
+            if ! systemctl is-active --quiet "$SERVICE"; then break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "API_HEALTH_FAILED"
+            journalctl -u "$SERVICE" -n 100 --no-pager || true
+            systemctl disable --now "$SERVICE" || true
+            exit 72
+          fi
+          echo "API_HEALTH=PASS"
+          cat "$BASE/health.json"; echo
+          code=$(curl -sS --max-time 6 -o "$BASE/readiness.json" -w "%{http_code}" http://127.0.0.1:8012/api/system/readiness)
+          echo "API_READINESS_HTTP=$code"
+          cat "$BASE/readiness.json"; echo
+          if [ "$code" != "200" ]; then
+            journalctl -u "$SERVICE" -n 100 --no-pager || true
+            systemctl disable --now "$SERVICE" || true
+            exit 73
+          fi
+          "$PY" - "$BASE/readiness.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          if data.get("ok") is not True or data.get("status") != "READY":
+              raise SystemExit("API_READINESS_NOT_READY")
+          print("API_READINESS=PASS checks="+str(data.get("passed"))+"/"+str(data.get("total")))
+          PY
+          echo "=== MEDIA DEPENDENCIES ==="
+          curl -sS --max-time 5 http://127.0.0.1:8012/api/media/health || true
+          echo
+          command -v ffmpeg || echo FFMPEG_NOT_FOUND
+          command -v ffprobe || echo FFPROBE_NOT_FOUND
+          echo "=== FINAL PORT / BACKUP ==="
+          ss -ltnp | grep ':8012'
+          stat -c '%U:%G mode=%a size=%s path=%n' "$BACKUP/brain_v12.db.snapshot" "$BACKUP/evidence.db.snapshot"
+          echo "BRAIN_API_PERSISTENT_SERVICE=ACTIVE"
+          echo "SERVICE_UNIT=$SERVICE"
+          echo "BACKUP_DIRECTORY=$BACKUP"
