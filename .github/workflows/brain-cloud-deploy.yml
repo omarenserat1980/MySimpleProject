@@ -37,10 +37,14 @@ jobs:
               exit 1
             fi
           done
-          case "$REMOTE_DIR" in
-            /*) ;;
-            *) echo "::error::BRAIN_CLOUD_REMOTE_DIR must be an absolute path."; exit 1 ;;
-          esac
+          if [[ ! "$REMOTE_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::BRAIN_CLOUD_REMOTE_DIR must be an absolute path using only letters, digits, dot, underscore, slash, or hyphen."
+            exit 1
+          fi
+          if [[ "$REMOTE_DIR" == *"/../"* || "$REMOTE_DIR" == */.. ]]; then
+            echo "::error::BRAIN_CLOUD_REMOTE_DIR must not contain parent-directory traversal."
+            exit 1
+          fi
           echo "DEPLOYMENT_CONFIGURATION=READY"
 
       - name: Configure SSH
