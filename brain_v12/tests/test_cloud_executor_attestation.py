@@ -55,9 +55,9 @@ class CloudExecutorAttestationTests(unittest.TestCase):
     def test_rejects_modified_payload(self):
         path = self.write_signed()
         doc = json.loads(Path(path).read_text())
-        doc["executor_id"] = "attacker"
+        doc["nonce"] = "nonce-abcdefghijklmnop"
         Path(path).write_text(json.dumps(doc))
-        with self.assertRaisesRegex(ValueError, "EXECUTOR_MISMATCH"):
+        with self.assertRaisesRegex(ValueError, "SIGNATURE_INVALID"):
             self.verify(path)
 
     def test_rejects_wrong_trust_key(self):
