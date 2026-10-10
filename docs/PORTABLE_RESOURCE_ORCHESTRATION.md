@@ -1,6 +1,6 @@
 # Electronic Brain — Portable Resource Orchestration Architecture
 
-Status: Design proposal on a separate branch; not deployed.
+Status: Implementation in progress on an isolated branch; not merged or deployed.
 Date: 2026-10-10
 
 ## Objective
@@ -105,3 +105,12 @@ Secrets are delivered through the provider's secret manager or short-lived ident
 ## Change safety
 
 This document is a proposal only. It does not create infrastructure, modify Windows settings, change pagefile configuration, boot a VM, or enable paid services.
+
+
+## Implementation status — 2026-10-10
+
+Added on this branch:
+- `brain_v12/brain/portable_resource_orchestrator.py`: deterministic policy-only planning with capability, health, permission, capacity, local-resource-budget, and cost gates.
+- `brain_v12/tests/test_portable_resource_orchestrator.py`: tests for remote-free preference, local-budget enforcement, paid opt-in and ceiling, missing capability, and stable intent hashes.
+
+The scheduler returns `PLANNED` or `BLOCKED_NO_EXECUTOR`; `PLANNED` explicitly means that no task has started. It is not yet wired into live execution and cannot provision cloud resources. Automated test results must be checked before this work is considered validated.
