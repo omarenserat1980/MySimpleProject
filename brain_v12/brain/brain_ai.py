@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .brain_gpt_20_layer_trace import build_request_layer_trace
+
 import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -269,6 +271,20 @@ class BrainAI:
             if name:
                 normalized.append({"name": name, "params": params if isinstance(params, dict) else {}})
         return normalized
+
+    def _with_layer_trace(self, response, user_text, instructions=""):
+        """Attach a truthful diagnostic trace without changing execution decisions."""
+        try:
+            response.evidence.append(build_request_layer_trace(self, user_text, instructions, response))
+        except Exception as exc:
+            # Observability must never break the underlying Brain AI response.
+            response.evidence.append({
+                "type": "brain_gpt_20_layer_trace",
+                "status": "TRACE_FAILED",
+                "error": type(exc).__name__,
+                "execution_performed_by_trace": False,
+            })
+        return response
 
     def chat(self, user_text: str, instructions: str = "", approved=False) -> BrainAIResponse:
         user_text=(user_text or "").strip()
