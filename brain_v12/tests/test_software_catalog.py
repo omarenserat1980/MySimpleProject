@@ -9,7 +9,8 @@ class SoftwareCatalogTests(unittest.TestCase):
         self.assertFalse(catalog["execution_enabled"])
         self.assertGreaterEqual(catalog["total"] if "total" in catalog else len(catalog["items"]), 8)
         windows = next(item for item in catalog["items"] if item["software_id"] == "windows-server-2025")
-        self.assertEqual(windows["target_state"], "planned")
+        self.assertEqual(windows["target_state"], "running")
+        self.assertEqual(windows["rollout_phase"], "planned")
         self.assertFalse(windows["install_allowed"])
         self.assertIn("guest-boot-proof", windows["verification_gates"])
 
