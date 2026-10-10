@@ -2897,9 +2897,38 @@ def brain_liveness():
 from .brain.arkan_failover_gateway import ArkanFailoverGateway
 _arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(ROOT, ".brain", "virtual", "arkan"))
 arkan_remote_fabric = ArkanFailoverGateway(_arkan_virtual_root)
+from .brain.background_work_coordinator import BackgroundWorkCoordinator
+background_work = BackgroundWorkCoordinator(
+    max_workers=int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, os.cpu_count() or 2)))),
+    max_pending=int(os.getenv("BRAIN_BACKGROUND_MAX_PENDING", "64")),
+)
+
 
 class ArkanSimulationCommand(BaseModel):
     command: str
+
+
+@app.get("/api/background-work/status")
+def background_work_status(request: Request):
+    require_control_key(request)
+    return background_work.snapshot()
+
+@app.post("/api/background-work/submit")
+def background_work_submit(request: Request, body: dict):
+    require_control_key(request)
+    kind = str(body.get("kind", "")).strip()
+    key = str(body.get("idempotency_key", "")).strip() or None
+    result = background_work.submit(kind, idempotency_key=key)
+    store.event("BACKGROUND_WORK_SUBMITTED", {"kind": kind, "status": result.get("status"), "job_id": (result.get("job") or {}).get("job_id"), "reality": "SIMULATED"})
+    return result
+
+@app.get("/api/background-work/{job_id}")
+def background_work_result(job_id: str, request: Request):
+    require_control_key(request)
+    item = background_work.get(job_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="BACKGROUND_JOB_NOT_FOUND")
+    return {"ok": True, "job": item}
 
 @app.get("/api/remote-fabric/status")
 def remote_fabric_status():
