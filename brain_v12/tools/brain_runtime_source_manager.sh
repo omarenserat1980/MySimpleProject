@@ -27,11 +27,26 @@ git fetch "$REMOTE" "$REF" >/dev/null 2>&1 || {
 
 EXPECTED="$(git rev-parse "$REMOTE/$REF")"
 
-if [ ! -d "$RUNTIME_ROOT/.git" ]; then
-  rm -rf "$RUNTIME_ROOT"
-  git worktree add --detach "$RUNTIME_ROOT" "$EXPECTED" >/dev/null
-else
+# Git worktrees use a .git *file*, not a .git directory. Detect a worktree
+# through Git itself. Never rm -rf the runtime path: it may contain state or
+# user data if it is not the expected worktree.
+if git -C "$RUNTIME_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$RUNTIME_ROOT" reset --hard "$EXPECTED" >/dev/null
+else
+  if [ -e "$RUNTIME_ROOT" ]; then
+    if [ ! -d "$RUNTIME_ROOT" ]; then
+      echo "BRAIN_RUNTIME_CONVERGENCE_ERROR=RUNTIME_PATH_EXISTS_NOT_DIRECTORY path=$RUNTIME_ROOT" >&2
+      exit 54
+    fi
+    if ! rmdir "$RUNTIME_ROOT" 2>/dev/null; then
+      echo "BRAIN_RUNTIME_CONVERGENCE_ERROR=RUNTIME_PATH_EXISTS_NOT_WORKTREE path=$RUNTIME_ROOT; preserved_existing_contents=1" >&2
+      exit 55
+    fi
+  fi
+  git worktree add --detach "$RUNTIME_ROOT" "$EXPECTED" >/dev/null || {
+    echo "BRAIN_RUNTIME_CONVERGENCE_ERROR=WORKTREE_ADD_FAILED path=$RUNTIME_ROOT" >&2
+    exit 56
+  }
 fi
 
 ACTUAL="$(git -C "$RUNTIME_ROOT" rev-parse HEAD)"
