@@ -1,4 +1,5 @@
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -38,7 +39,6 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             self.assertFalse(second["decision"]["selected"]["learned_memory_support"])
             self.assertEqual(first_lesson["outcome"], "ACTION_VERIFIED_NOT_GOAL")
 
-
     def test_only_explicitly_verified_goal_success_can_influence_future_choice(self):
         with tempfile.TemporaryDirectory() as directory:
             store = MemoryStore(str(Path(directory) / "brain.db"))
@@ -57,8 +57,6 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             self.assertTrue(first["learning"]["lesson"]["verified"])
             self.assertEqual(first["learning"]["lesson"]["outcome"], "VERIFIED_SUCCESS")
             self.assertTrue(second["decision"]["selected"]["learned_memory_support"])
-
-
 
     def test_execution_uses_the_tool_selected_by_the_decision(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -102,7 +100,6 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
         self.assertEqual(result["selected"]["id"], "apply_code")
 
     def test_legacy_tool_success_does_not_count_as_verified_goal_memory(self):
-        import json
         from brain_v12.brain.decision_engine import DecisionEngine
 
         legacy = {
@@ -135,6 +132,45 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
         self.assertEqual(result["status"], "WAITING_APPROVAL")
         self.assertEqual(result["selected"]["id"], "apply_code")
         self.assertTrue(result["approval_required"])
+
+    def test_non_finite_or_out_of_range_confidence_cannot_distort_decision_scores(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        options = [
+            {"id":"nan","action":"bad confidence","risk":"low","requirements":[],
+             "reversible":True,"confidence":math.nan},
+            {"id":"too_high","action":"oversized confidence","risk":"low","requirements":[],
+             "reversible":True,"confidence":900},
+            {"id":"too_low","action":"negative confidence","risk":"low","requirements":[],
+             "reversible":True,"confidence":-50},
+        ]
+        result = DecisionEngine().choose("rank safely", options)
+
+        by_id = {option["id"]: option for option in [result["selected"], *result["alternatives"]]}
+        self.assertEqual(by_id["nan"]["decision_score"], 0.5)
+        self.assertEqual(by_id["too_high"]["decision_score"], 1.0)
+        self.assertEqual(by_id["too_low"]["decision_score"], 0.0)
+        self.assertTrue(all(math.isfinite(option["decision_score"]) for option in by_id.values()))
+
+    def test_unknown_risk_is_treated_as_high_and_requires_approval(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        result = DecisionEngine().choose("execute unknown risk", [
+            {"id":"unknown","action":"uncategorized operation","risk":"mystery",
+             "requirements":[],"reversible":True,"confidence":1.0}
+        ])
+        self.assertEqual(result["status"], "WAITING_APPROVAL")
+        self.assertEqual(result["selected"]["risk"], "high")
+        self.assertTrue(result["approval_required"])
+
+    def test_decision_annotations_do_not_mutate_candidate_inputs(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        candidate = {"id":"observe","action":"read state","risk":"low",
+                     "requirements":[],"reversible":True,"confidence":0.8}
+        original = dict(candidate)
+        DecisionEngine().choose("read state", [candidate])
+        self.assertEqual(candidate, original)
 
 
 if __name__ == "__main__":
