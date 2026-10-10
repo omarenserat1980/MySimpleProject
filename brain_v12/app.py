@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
+from .brain.quranic_reasoning_paths import register_quranic_reasoning_paths
 from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
@@ -74,6 +75,8 @@ from .brain.security_middleware import apply_security_headers
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
+# Idempotently seed reviewed, source-anchored reasoning pathways into the existing memory store.
+QURANIC_REASONING_PATH_KEYS=register_quranic_reasoning_paths(store)
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
