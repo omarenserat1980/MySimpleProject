@@ -127,10 +127,12 @@ class SoftwareRegistry:
             raise ValueError("INVALID_RUNTIME_STATE")
         if not isinstance(verification_state, str) or verification_state not in VERIFICATION_STATES:
             raise ValueError("INVALID_VERIFICATION_STATE")
+        # A caller-supplied URL/reference is not independent proof. Only a future
+        # trusted verifier may set the registry's state to "verified".
+        if verification_state == "verified":
+            raise ValueError("INDEPENDENT_VERIFICATION_REQUIRED")
         if not isinstance(evidence_ref, str) or not evidence_ref.strip() or len(evidence_ref) > 2048:
             raise ValueError("EVIDENCE_REFERENCE_REQUIRED")
-        if verification_state == "verified" and runtime_state not in {"observed", "installed", "running", "stopped"}:
-            raise ValueError("VERIFIED_STATE_REQUIRES_OBSERVED_OR_INSTALLED_RUNTIME")
         if install_path is not None and (not isinstance(install_path, str) or len(install_path) > 1024):
             raise ValueError("INVALID_INSTALL_PATH")
         if notes is not None and (not isinstance(notes, str) or len(notes) > 4000):
