@@ -14,48 +14,45 @@ This contract defines the only runner class allowed to execute Windows Real Boot
 
 ## Required runner-provided identity
 
-The runner service environment must provide:
+The runner host/service environment must provide:
 
-BRAIN_CLOUD_EXECUTOR=1
+- `BRAIN_CLOUD_EXECUTOR=1`
+- `BRAIN_CLOUD_EXECUTOR_ID=<stable-or-ephemeral executor identity>`
+- `BRAIN_CLOUD_EXECUTOR_ATTESTATION=<host attestation reference>`
 
-This value MUST come from the runner/host environment, not from workflow YAML.
+These values MUST come from the runner/host environment, not workflow YAML.
+
+**Important security limitation:** the current `cloud_executor_gate.py` only checks that the attestation reference is non-empty. It does not cryptographically validate the reference or prove that an external identity provider issued it. Treat this as a presence check, not cryptographic attestation. Production authorization must remain blocked until signed attestation verification and trust-root configuration are implemented and tested.
 
 ## Required substrate
 
 The runner must independently provide:
 
 - x86_64
-- /dev/kvm readable and writable by the runner
-- qemu-system-x86_64
+- `/dev/kvm` readable and writable by the runner
+- `qemu-system-x86_64` and `qemu-img`
 - working KVM acceleration
 - QEMU/OVMF and the Windows workflow toolchain
-- writable work directory
+- writable execution and evidence directories
+
+The bootstrap must check architecture, KVM permissions, required tools, OVMF, and the Cloud Executor Gate **before** downloading/configuring/registering the GitHub runner. A failed preflight must not leave a newly registered runner behind.
 
 ## Lifecycle
 
 The preferred production lifecycle is:
 
-PROVISION -> REGISTER JIT/EPHEMERAL -> ONE JOB -> PRESERVE EVIDENCE -> DEREGISTER -> DESTROY
+`PROVISION -> PREFLIGHT -> REGISTER JIT/EPHEMERAL -> ONE JOB -> PRESERVE EVIDENCE -> DEREGISTER -> DESTROY`
 
 A cloud VM being created or a GitHub runner being online is not capability evidence.
 
 ## Gate
 
-brain_v12/brain/cloud_executor_gate.py is the substrate gate. It must return verified=true before Windows Real Boot can start.
+`brain_v12/brain/cloud_executor_gate.py` is the substrate gate. It must return `verified=true` before Windows Real Boot can start. This gate proves only the execution substrate; it does not prove Windows booted and, until cryptographic attestation validation is added, does not prove the authenticity of the executor identity.
 
-## Security rule
+## Security rules
 
-Never set BRAIN_CLOUD_EXECUTOR in workflow YAML. Doing so would allow a non-cloud runner to self-identify as a cloud executor.
-
-
-## Executor identity and attestation
-
-A production executor must also provide these host/service environment values:
-
-- BRAIN_CLOUD_EXECUTOR=1
-- BRAIN_CLOUD_EXECUTOR_ID=<stable-or-ephemeral executor identity>
-- BRAIN_CLOUD_EXECUTOR_ATTESTATION=<non-empty host attestation reference>
-
-The workflow must never set these values. Missing identity or attestation fails the
-Cloud Executor Gate. The attestation is evidence of the executor's externally
-managed identity; it is not itself proof that Windows booted.
+- Never set Cloud Executor identity in workflow YAML.
+- Never print registration tokens, private keys, owner approvals, or other secrets.
+- Never create or sign the Windows execution contract inside the workflow.
+- Do not start Windows Real Boot unless the separately issued Brain execution contract passes its closed-loop verification gate.
+- Preserve evidence and keep the boot result distinct from substrate-gate success.
