@@ -30,6 +30,9 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         self.now = 1_800_000_000
         self.hostname = "runner-test-01"
 
+    def challenge(self, **kwargs):
+        return create_challenge(expected_hostname=self.hostname, expected_architecture="x86_64", **kwargs)
+
     def issue(self, **kwargs):
         return issue_attestation(expected_hostname=self.hostname, expected_architecture="x86_64", **kwargs)
 
@@ -60,6 +63,13 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "expected_hostname"):
             issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
                 challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
+
+    def test_issuer_rejects_challenge_rebound_to_another_host(self):
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        with self.assertRaisesRegex(ValueError, "CHALLENGE_HOST_BINDING_MISMATCH"):
+            issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+                challenge_db_path=self.db, expected_hostname="other-host", expected_architecture="x86_64",
+                private_key_b64=self.private_b64, issued_at=self.now)
 
     def test_issuer_rejects_reused_challenge(self):
         challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
