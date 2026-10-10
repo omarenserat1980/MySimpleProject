@@ -256,10 +256,28 @@ class CognitiveLoop:
             "verified":bool(verification.get("goal_verified")),
         }
         # A unique key preserves history instead of overwriting the previous run.
+        lesson_key = f"cognitive.run.{run_id}"
         self.store.save_memory(
-            f"cognitive.run.{run_id}",
+            lesson_key,
             __import__("json").dumps(lesson,ensure_ascii=False,sort_keys=True)
         )
+        # A tool completing is not proof of goal completion. Only goal-verified
+        # lessons stay active for retrieval; weaker records remain auditable.
+        metadata_writer = getattr(self.store, "set_memory_metadata", None)
+        if callable(metadata_writer):
+            verifier_id = str(goal_check.get("verifier") or "").strip()
+            source = (
+                f"goal_verifier:{verifier_id}" if goal_verified and verifier_id
+                else "cognitive_loop:action_only" if verified
+                else "cognitive_loop:unverified_run"
+            )
+            metadata_writer(
+                lesson_key,
+                source=source,
+                confidence=0.95 if goal_verified else (0.55 if verified else 0.2),
+                status="ACTIVE" if goal_verified else "UNVERIFIED",
+                tags=["cognitive_lesson", outcome.lower()],
+            )
         self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
 
         return {
