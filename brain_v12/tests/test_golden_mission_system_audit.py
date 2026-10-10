@@ -50,7 +50,8 @@ def test_audit_requires_complete_source_lanes_and_explicit_runtime_evidence(tmp_
     assert report["audit_status"] == "PASS"
     assert report["launch_readiness"] == "READY"
     assert all(item["source_present"] for item in report["project_lanes"].values())
-    assert report["workflows"][0]["launch_policy"] == "REVIEW_BEFORE_MANUAL_LAUNCH"
+    deploy_workflow = next(item for item in report["workflows"] if item["path"].endswith("brain-deploy.yml"))
+    assert deploy_workflow["launch_policy"] == "REVIEW_BEFORE_MANUAL_LAUNCH"
 
 
 def test_invalid_runtime_evidence_never_unlocks_launch(tmp_path):
