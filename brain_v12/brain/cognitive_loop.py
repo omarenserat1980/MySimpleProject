@@ -231,7 +231,7 @@ class CognitiveLoop:
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
             "prior_lesson_count":len(prior_lessons),
-            "reasoning_path":({"key":reasoning_path["key"],"title":reasoning_path["title"],"source_references":reasoning_path["source_references"],"interpretation_type":reasoning_path.get("interpretation_type","bounded_engineering_inference")} if reasoning_path else None),
+            "reasoning_path":({"key":reasoning_path["key"],"title":reasoning_path["title"],"stages":reasoning_path["stages"],"source_references":reasoning_path["source_references"],"interpretation_type":reasoning_path.get("interpretation_type","bounded_engineering_inference")} if reasoning_path else None),
             "plan_steps":plan_steps,
             "options":options,
             "decision":decision,
