@@ -1,0 +1,54 @@
+name: Arkan Permission 13 Diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-permission-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Diagnose Arkan runtime import
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 8
+    steps:
+      - name: Test app import with isolated user-owned stores
+        shell: bash
+        run: |
+          set +e
+          R=/home/brain/linux-runner-new/_work/MySimpleProject/MySimpleProject
+          PY=/home/brain/brain-runtime-venv/bin/python
+          BASE="$HOME/.brain/diagnostics/permission-13-20261010"
+          echo "=== RUNNER IDENTITY ==="
+          id
+          echo "HOME=$HOME"
+          echo "=== CHECKOUT METADATA ==="
+          stat -c '%U:%G mode=%a path=%n' "$R" "$R/brain_v12" "$R/brain_v12/web" "$R/.git" 2>&1
+          git -c safe.directory="$R" -C "$R" rev-parse --short HEAD 2>&1
+          echo "=== PYTHON ==="
+          "$PY" --version
+          "$PY" -m uvicorn --version
+          echo "=== PREPARE ISOLATED DIAGNOSTIC STORAGE ==="
+          mkdir -p "$BASE/state" "$BASE/media" "$BASE/git"
+          mkdir_status=$?
+          echo "DIAGNOSTIC_DIR_EXIT=$mkdir_status"
+          if [ "$mkdir_status" -ne 0 ]; then
+            exit "$mkdir_status"
+          fi
+          echo "=== IMPORT TEST ==="
+          cd "$R"
+          BRAIN_MEDIA_ROOT="$BASE/media" \
+          BRAIN_DB="$BASE/brain-test.sqlite3" \
+          BRAIN_SYNC_QUEUE="$BASE/state/sync_queue.jsonl" \
+          BRAIN_GIT_ROOT="$BASE/git" \
+          BRAIN_EVIDENCE_DB="$BASE/evidence.db" \
+          PYTHONPATH="$R" "$PY" -c 'import brain_v12.app; print("BRAIN_APP_IMPORT_OK")' 2>&1
+          import_status=$?
+          echo "IMPORT_EXIT=$import_status"
+          echo "=== PORT 8012 ==="
+          ss -ltnp 2>/dev/null | grep ':8012' || echo PORT_8012_NOT_LISTENING
+          exit "$import_status"
