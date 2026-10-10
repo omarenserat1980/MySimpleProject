@@ -28,6 +28,10 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
 
             first_lesson = json.loads(memories[first_key])
             second_lesson = json.loads(memories[second_key])
+            memory_records = {item["key"]: item for item in store.memories()}
+            self.assertEqual(memory_records[first_key]["status"], "UNVERIFIED")
+            self.assertEqual(memory_records[second_key]["status"], "UNVERIFIED")
+            self.assertEqual(memory_records[first_key]["source"], "cognitive_loop:action_only")
             self.assertEqual(first_lesson["run_id"], first["run_id"])
             self.assertEqual(second_lesson["run_id"], second["run_id"])
             self.assertIn(first_lesson["outcome"], {
@@ -56,6 +60,11 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             self.assertTrue(first["verification"]["goal_verified"])
             self.assertTrue(first["learning"]["lesson"]["verified"])
             self.assertEqual(first["learning"]["lesson"]["outcome"], "VERIFIED_SUCCESS")
+            records = {item["key"]: item for item in store.memories()}
+            lesson_key = f"cognitive.run.{first['run_id']}"
+            self.assertEqual(records[lesson_key]["status"], "ACTIVE")
+            self.assertEqual(records[lesson_key]["confidence"], 0.95)
+            self.assertEqual(records[lesson_key]["source"], "goal_verifier:unit-test-goal-verifier")
             self.assertTrue(second["decision"]["selected"]["learned_memory_support"])
 
     def test_execution_uses_the_tool_selected_by_the_decision(self):
