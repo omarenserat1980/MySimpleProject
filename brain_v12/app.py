@@ -1564,7 +1564,7 @@ class CinematicReleaseIn(BaseModel):
 
 @app.post("/api/media/upload")
 async def media_upload(file:UploadFile=File(...)):
-    media_dir=os.path.join(ROOT,"web","media"); os.makedirs(media_dir,exist_ok=True)
+    media_dir=str(media_engine.MEDIA_ROOT); os.makedirs(media_dir,exist_ok=True)
     safe=os.path.basename(file.filename or "upload.bin"); target=os.path.join(media_dir,safe); data=await file.read()
     if len(data) > 20 * 1024 * 1024:
         return {"ok":False,"error":"MEDIA_TOO_LARGE","max_bytes":20 * 1024 * 1024}
@@ -2794,14 +2794,14 @@ def human_draw(body: Chat):
     if request["provider"] == "local":
         result = draw_local(prompt)
         filename = "brain-draw-" + uuid4().hex + ".png"
-        media_dir = os.path.join(ROOT, "web", "media", "drawings")
+        media_dir = os.path.join(str(media_engine.MEDIA_ROOT), "drawings")
         os.makedirs(media_dir, exist_ok=True)
         with open(os.path.join(media_dir, filename), "wb") as fh:
             fh.write(base64.b64decode(result["png_base64"]))
         result.update({"filename": filename, "url": f"/media/drawings/{filename}", "viewer_url": f"/local-painter/?src=/media/drawings/{filename}&prompt="+httpx.QueryParams({"prompt": prompt}).get("prompt",""), "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
-    result = draw_openai(prompt, openai_provider.generate_image, pathlib.Path(os.path.join(ROOT, "web", "media", "generated")))
+    result = draw_openai(prompt, openai_provider.generate_image, (media_engine.MEDIA_ROOT / "generated"))
     if result.get("ok"):
         store.event("BRAIN_DRAW", {"provider": "openai", "prompt": prompt, "verified": result.get("verified", False)})
     return result
@@ -2832,7 +2832,7 @@ def image_factory_generate(body:dict):
         b64=item.get("b64_json")
         if not b64:
             return {"ok":False,"error":"IMAGE_DATA_MISSING"}
-        media_dir=os.path.join(ROOT,"web","media","generated")
+        media_dir=os.path.join(str(media_engine.MEDIA_ROOT),"generated")
         os.makedirs(media_dir,exist_ok=True)
         filename=f"brain-image-{int(time.time()*1000)}.png"
         path=os.path.join(media_dir,filename)
@@ -2923,7 +2923,7 @@ def brain_liveness():
     """Read-only evidence-based Brain liveness assessment."""
     return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
 
-app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
+app.mount("/media",StaticFiles(directory=str(media_engine.MEDIA_ROOT),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
 app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
 app.mount('/code-hub', StaticFiles(directory=os.path.join(ROOT,'web','code-hub'), html=True), name='code-hub')
