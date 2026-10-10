@@ -39,6 +39,18 @@ class RuntimeLauncherStaticTests(unittest.TestCase):
         self.assertNotIn("print(key)", source)
         self.assertNotIn("print(os.environ[\"BRAIN_AGENT_KEY\"])", source)
 
+    def test_remote_endpoint_never_triggers_local_api_restart(self):
+        source = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn("is_local_api()", source)
+        local_gate = source.find("if is_local_api; then")
+        remote_branch = source.find("# A remote endpoint must never trigger launch/kill of the local API process.")
+        restart = source.find("pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012'")
+        self.assertGreaterEqual(local_gate, 0)
+        self.assertGreater(remote_branch, local_gate)
+        self.assertGreater(restart, local_gate)
+        self.assertGreater(remote_branch, restart, "local process kill must remain before remote-only branch")
+        self.assertIn("REMOTE_API_UNREACHABLE", source)
+
 
 if __name__ == "__main__":
     unittest.main()
