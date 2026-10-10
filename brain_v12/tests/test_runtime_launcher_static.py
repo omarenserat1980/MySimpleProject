@@ -42,6 +42,11 @@ class RuntimeLauncherStaticTests(unittest.TestCase):
         self.assertIn("DEVICE_ID_MISMATCH", source)
         self.assertIn("DEVICE_ID_REQUIRED", source)
 
+    def test_unknown_model_requires_explicit_model_pin(self):
+        source = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn("V12_DEVICE_MODEL", source)
+        self.assertIn("DEVICE_MODEL_CONFIRMATION_REQUIRED", source)
+
     def test_non_primary_device_must_not_use_loopback_brain_url(self):
         source = LAUNCHER.read_text(encoding="utf-8")
         remote_guard = source.find('if [ "$V12_AGENT_ID" != "redmi3-01" ]; then')
