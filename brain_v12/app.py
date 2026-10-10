@@ -148,7 +148,12 @@ task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
 from .github_actions_operator import GitHubActionsOperator
 from .brain.execution_gateway import BrainExecutionGateway
+from .brain.internal_task_runtime import InternalTaskRuntime
 execution_gateway=BrainExecutionGateway()
+internal_task_runtime=InternalTaskRuntime(
+    root=os.getenv("BRAIN_INTERNAL_RUNTIME_ROOT", os.path.join(ROOT, ".brain", "internal_runtime")),
+    gateway=execution_gateway,
+)
 brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")), execution_gateway=execution_gateway)
 industrial_actions=GitHubActionsOperator()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
@@ -2024,6 +2029,44 @@ def brain_windows_cloud_readiness():
     result = WindowsCloudExecutor(provider=provider).readiness()
     result["provider_readiness"] = provider_readiness
     return result
+
+@app.get("/api/brain/internal-runtime/status")
+def brain_internal_runtime_status():
+    """Report Brain-owned task runtime state without depending on external CI/cloud."""
+    from .brain.internal_runner import InternalRunner
+    return {
+        "ok": True,
+        **internal_task_runtime.status(),
+        "runner": InternalRunner().status(),
+        "execution_authority": "brain-internal",
+        "execution_mode": "local-only",
+    }
+
+
+@app.post("/api/brain/internal-runtime/probe/python-version")
+def brain_internal_runtime_queue_python_probe(request: Request):
+    """Queue a fixed, harmless runtime probe; this endpoint never executes it."""
+    require_control_key(request)
+    task = internal_task_runtime.enqueue(
+        task="Verify local Brain Python runtime",
+        argv=["python", "--version"],
+        capability="brain-internal-execution",
+        metadata={"risk": "LOW", "probe": "python-version"},
+    )
+    return {"ok": True, "status": "QUEUED", "task_id": task["id"], "execution": "not_started"}
+
+
+@app.post("/api/brain/internal-runtime/run-one")
+def brain_internal_runtime_run_one(request: Request, body: dict | None = None):
+    """Run one queued task only from loopback, so a hosted control plane cannot execute it."""
+    require_control_key(request)
+    peer = request.client.host if request.client else ""
+    if peer not in {"127.0.0.1", "::1", "localhost", "testclient"}:
+        raise HTTPException(status_code=403, detail="LOCAL_BRAIN_EXECUTOR_ONLY")
+    timeout = int((body or {}).get("timeout", 30))
+    timeout = max(1, min(timeout, 120))
+    return internal_task_runtime.run_one(timeout=timeout)
+
 
 @app.get("/api/brain/windows/status")
 def brain_windows_status():
