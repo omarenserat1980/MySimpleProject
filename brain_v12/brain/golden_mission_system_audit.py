@@ -98,12 +98,22 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
                 and safety.get("executes_missions") is False
                 and safety.get("changes_service_state") is False
                 and safety.get("stores_control_key") is False
-                and required_checks.issubset(named_checks)
+                and isinstance(checks, list)
+                and len(checks) == len(required_checks)
+                and len(named_checks) == len(required_checks)
+                and set(named_checks) == required_checks
                 and all(named_checks[name].get("passed") is True for name in required_checks)
                 and all(
                     isinstance(named_checks[name].get("response_sha256"), str)
                     and re.fullmatch(r"[0-9a-f]{64}", named_checks[name]["response_sha256"])
                     for name in ("runtime_api_readiness", "runtime_worker_status")
+                )
+                and all(
+                    isinstance(named_checks[name].get("evidence_ref"), str)
+                    and bool(named_checks[name]["evidence_ref"].strip())
+                    and isinstance(named_checks[name].get("evidence_sha256"), str)
+                    and re.fullmatch(r"[0-9a-f]{64}", named_checks[name]["evidence_sha256"])
+                    for name in ("mission_persistence_restart", "restore_drill")
                 )
             )
             evidence.append({
