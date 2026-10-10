@@ -116,15 +116,35 @@ start_api() {
   if ! health_ok; then echo "BRAIN_RUNTIME_ERROR: API_START_FAILED pid=$API_PID" >&2; exit 43; fi
   echo "JET_BRAIN_API ready pid=$API_PID" >&2
 }
-if health_ok; then
-  if auth_ok; then echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+is_local_api() {
+  "$PYTHON" -c 'import ipaddress,os,urllib.parse
+host=(urllib.parse.urlparse(os.environ["V12_BRAIN_URL"]).hostname or "").lower()
+if host == "localhost": raise SystemExit(0)
+try: raise SystemExit(0 if ipaddress.ip_address(host).is_loopback else 1)
+except ValueError: raise SystemExit(1)' 
+}
+if is_local_api; then
+  if health_ok; then
+    if auth_ok; then
+      echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+    else
+      echo "JET_BRAIN_API local_auth_failed_restart_once" >&2
+      pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+      sleep 1
+      start_api
+    fi
   else
-    echo "JET_BRAIN_API stale_auth_restart" >&2
-    pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
-    sleep 1
     start_api
   fi
-else start_api; fi
+else
+  # A remote endpoint must never trigger launch/kill of the local API process.
+  if ! health_ok; then
+    auth_diagnostic >&2 || true
+    echo "BRAIN_RUNTIME_ERROR: REMOTE_API_UNREACHABLE url=$V12_BRAIN_URL" >&2
+    exit 43
+  fi
+  echo "JET_BRAIN_API remote_endpoint_reachable url=$V12_BRAIN_URL" >&2
+fi
 if ! auth_ok; then
   auth_diagnostic >&2 || true
   echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2
