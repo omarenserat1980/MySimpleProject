@@ -12,7 +12,7 @@ This audit deliberately fails closed. It does not dispatch workflows, deploy inf
 
 ## System inventory
 
-The default branch contained 108 workflow YAML files at audit time. The inventory is generated from the repository rather than copied into a manually maintained count. A workflow name is only a weak classification signal; every external-effect workflow must be reviewed at step level before launch.
+The inspected default branch contained 108 workflow YAML files at audit time. The current PR branch snapshot contains 90 workflow YAML files in its generated CI audit; counts are ref-specific and must not be conflated. The inventory is generated from the checked-out repository rather than copied into a manually maintained count. A workflow name is only a weak classification signal; every external-effect workflow must be reviewed at step level before launch.
 
 ### Project lanes and release evidence
 
