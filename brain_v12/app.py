@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
+from .brain.github_auth import build_github_headers
+from .brain.quranic_reasoning_paths import register_quranic_reasoning_paths
 from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
@@ -74,6 +76,7 @@ from .brain.security_middleware import apply_security_headers
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
+register_quranic_reasoning_paths(store)
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
@@ -227,14 +230,20 @@ def _quick_editor_validate(path:str, content:str):
     return {"ok":not errors,"path":path,"extension":ext,"errors":errors,"warnings":warnings}
 
 def _github_config():
-    return {"configured":bool(os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GH_TOKEN")),
+    configured=bool(os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN"))
+    return {"configured":configured,
+            "read_mode":"TOKEN_AUTHENTICATED" if configured else "PUBLIC_READ_ONLY_FALLBACK",
+            "public_read_fallback_available":not configured,
             "repository":os.getenv("BRAIN_GITHUB_REPOSITORY") or os.getenv("GITHUB_REPOSITORY") or "omarenserat1980/MySimpleProject",
             "branch":os.getenv("BRAIN_GITHUB_BRANCH") or os.getenv("GITHUB_REF_NAME") or "main"}
 
-def _github_headers():
+def _github_headers(require_token=True):
     token=os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
-    if not token: raise HTTPException(status_code=503,detail="GITHUB_TOKEN_NOT_CONFIGURED")
-    return {"Accept":"application/vnd.github+json","Authorization":f"Bearer {token}","X-GitHub-Api-Version":"2026-03-10"}
+    try:
+        return build_github_headers(token, require_token=require_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=503,detail=str(exc))
+
 
 def _github_repo():
     repo=os.getenv("BRAIN_GITHUB_REPOSITORY") or os.getenv("GITHUB_REPOSITORY") or "omarenserat1980/MySimpleProject"
@@ -254,7 +263,7 @@ async def brain_hub_repositories():
     url=f"https://api.github.com/users/{owner}/repos"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers(),params={"per_page":100,"sort":"updated"})
+            r=await client.get(url,headers=_github_headers(require_token=False),params={"per_page":100,"sort":"updated"})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         return {"ok":True,"repositories":[{"name":x["name"],"full_name":x["full_name"],"private":x["private"],"default_branch":x.get("default_branch","main"),"description":x.get("description") or "","html_url":x.get("html_url")} for x in r.json()]}
     except httpx.HTTPError as exc:
@@ -266,7 +275,7 @@ async def brain_hub_repository(owner:str="",repo:str="",branch:str="main"):
     url=f"https://api.github.com/repos/{full}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers())
+            r=await client.get(url,headers=_github_headers(require_token=False))
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         x=r.json()
         return {"ok":True,"repository":{"full_name":x["full_name"],"name":x["name"],"owner":x["owner"]["login"],"default_branch":x.get("default_branch",branch),"private":x["private"],"description":x.get("description") or "","html_url":x.get("html_url"),"updated_at":x.get("updated_at")}}
@@ -279,7 +288,7 @@ async def brain_hub_tree(path:str="",branch:str="main",owner:str="",repo:str="")
     url=f"https://api.github.com/repos/{full}/contents/{path}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers(),params={"ref":branch})
+            r=await client.get(url,headers=_github_headers(require_token=False),params={"ref":branch})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         return {"ok":True,"items":[{"name":x["name"],"path":x["path"],"type":x["type"],"sha":x.get("sha"),"size":x.get("size",0),"download_url":x.get("download_url")} for x in r.json()]}
     except httpx.HTTPError as exc:
@@ -291,7 +300,7 @@ async def brain_hub_file(path:str,branch:str="main",owner:str="",repo:str=""):
     url=f"https://api.github.com/repos/{full}/contents/{path}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers(),params={"ref":branch})
+            r=await client.get(url,headers=_github_headers(require_token=False),params={"ref":branch})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         x=r.json(); raw=x.get("content","")
         content=base64.b64decode(raw.replace("\n","")).decode("utf-8") if raw else ""
@@ -304,7 +313,7 @@ async def brain_hub_commits(owner:str="",repo:str="",branch:str="main",per_page:
     full=owner and f"{owner}/{repo}" or _github_repo()
     url=f"https://api.github.com/repos/{full}/commits"
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(url,headers=_github_headers(),params={"sha":branch,"per_page":min(max(per_page,1),100)})
+        r=await client.get(url,headers=_github_headers(require_token=False),params={"sha":branch,"per_page":min(max(per_page,1),100)})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"commits":[{"sha":x["sha"],"message":x["commit"]["message"].splitlines()[0],"author":(x["author"] or {}).get("login") or x["commit"]["author"].get("name"),"date":x["commit"]["author"].get("date"),"html_url":x.get("html_url")} for x in r.json()]}
 
@@ -313,7 +322,7 @@ async def brain_hub_branches(owner:str="",repo:str=""):
     full=owner and f"{owner}/{repo}" or _github_repo()
     url=f"https://api.github.com/repos/{full}/branches"
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(url,headers=_github_headers(),params={"per_page":100})
+        r=await client.get(url,headers=_github_headers(require_token=False),params={"per_page":100})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"branches":[{"name":x["name"],"protected":bool(x.get("protected")),"sha":x["commit"]["sha"]} for x in r.json()]}
 
@@ -322,7 +331,7 @@ async def brain_hub_issues(owner:str="",repo:str="",state:str="open"):
     full=owner and f"{owner}/{repo}" or _github_repo()
     url=f"https://api.github.com/repos/{full}/issues"
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(url,headers=_github_headers(),params={"state":state,"per_page":100})
+        r=await client.get(url,headers=_github_headers(require_token=False),params={"state":state,"per_page":100})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"issues":[{"number":x["number"],"title":x["title"],"state":x["state"],"labels":[l["name"] for l in x.get("labels",[])],"user":(x.get("user") or {}).get("login"),"html_url":x.get("html_url"),"pull_request":bool(x.get("pull_request"))} for x in r.json()]}
 
@@ -332,7 +341,7 @@ async def cinema_status():
     full=_github_repo()
     async with httpx.AsyncClient(timeout=20) as client:
         r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",
-                           headers=_github_headers(),
+                           headers=_github_headers(require_token=False),
                            params={"per_page":50})
     if r.status_code>=400:
         raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
@@ -368,7 +377,7 @@ async def cinema_stop(request:Request, body:BrainHubActionIn=BrainHubActionIn())
     require_control_key(request)
     full=_github_repo()
     async with httpx.AsyncClient(timeout=30) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(),params={"per_page":20})
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(require_token=False),params={"per_page":20})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         runs=[x for x in r.json().get("workflow_runs",[]) if x.get("name")=="BRAIN 120 Minute Cinema" and x.get("status") in {"queued","in_progress","waiting"}]
         stopped=[]
@@ -383,7 +392,7 @@ async def cinema_retry(request:Request, body:BrainHubActionIn=BrainHubActionIn()
     require_control_key(request)
     full=_github_repo()
     async with httpx.AsyncClient(timeout=30) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(),params={"per_page":20})
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",headers=_github_headers(require_token=False),params={"per_page":20})
         if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
         runs=[x for x in r.json().get("workflow_runs",[]) if x.get("name")=="BRAIN 120 Minute Cinema"]
         if not runs: return {"ok":False,"state":"NO_RUN"}
@@ -413,7 +422,7 @@ async def brain_hub_actions(owner:str="",repo:str="",per_page:int=20):
     full=owner and f"{owner}/{repo}" or _github_repo()
     url=f"https://api.github.com/repos/{full}/actions/runs"
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(url,headers=_github_headers(),params={"per_page":min(max(per_page,1),100)})
+        r=await client.get(url,headers=_github_headers(require_token=False),params={"per_page":min(max(per_page,1),100)})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"runs":[{"id":x["id"],"name":x["name"],"status":x["status"],"conclusion":x["conclusion"],"branch":x.get("head_branch"),"sha":x.get("head_sha"),"html_url":x.get("html_url"),"created_at":x.get("created_at")} for x in r.json()]}
 
@@ -486,7 +495,7 @@ async def brain_hub_create_branch(request:Request, body:BrainHubCreateBranchIn):
         raise HTTPException(status_code=400,detail="INVALID_BRANCH_NAME")
     base=body.from_ref.strip() or "main"
     async with httpx.AsyncClient(timeout=30) as client:
-        ref=await client.get(f"https://api.github.com/repos/{full}/git/ref/heads/{base}",headers=_github_headers())
+        ref=await client.get(f"https://api.github.com/repos/{full}/git/ref/heads/{base}",headers=_github_headers(require_token=False))
         if ref.status_code>=400:
             raise HTTPException(status_code=ref.status_code,detail=ref.text[:1000])
         sha=ref.json().get("object",{}).get("sha")
@@ -618,7 +627,7 @@ async def brain_hub_search(body:BrainHubSearchIn):
 async def brain_hub_pulls(owner:str="",repo:str="",state:str="open"):
     full=_brain_hub_full(owner,repo)
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/pulls",headers=_github_headers(),params={"state":state,"per_page":100})
+        r=await client.get(f"https://api.github.com/repos/{full}/pulls",headers=_github_headers(require_token=False),params={"state":state,"per_page":100})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
     return {"ok":True,"pulls":[{"number":x["number"],"title":x["title"],"state":x["state"],"draft":x.get("draft",False),"head":(x.get("head") or {}).get("ref"),"base":(x.get("base") or {}).get("ref"),"html_url":x.get("html_url")} for x in r.json()]}
 
@@ -658,7 +667,7 @@ async def brain_hub_close_issue(number:int, request:Request, body:BrainHubIssueC
 async def brain_hub_action_jobs(run_id:int, owner:str="",repo:str=""):
     full=_brain_hub_full(owner,repo)
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/jobs",headers=_github_headers(),params={"per_page":100})
+        r=await client.get(f"https://api.github.com/repos/{full}/actions/runs/{run_id}/jobs",headers=_github_headers(require_token=False),params={"per_page":100})
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
     return {"ok":True,"jobs":[{"id":x.get("id"),"name":x.get("name"),"status":x.get("status"),"conclusion":x.get("conclusion"),"started_at":x.get("started_at"),"completed_at":x.get("completed_at"),"html_url":x.get("html_url")} for x in r.json().get("jobs",[])]}
 
@@ -666,7 +675,7 @@ async def brain_hub_action_jobs(run_id:int, owner:str="",repo:str=""):
 async def brain_hub_compare(owner:str="",repo:str="",base:str="main",head:str="main"):
     full=_brain_hub_full(owner,repo)
     async with httpx.AsyncClient(timeout=20) as client:
-        r=await client.get(f"https://api.github.com/repos/{full}/compare/{base}...{head}",headers=_github_headers())
+        r=await client.get(f"https://api.github.com/repos/{full}/compare/{base}...{head}",headers=_github_headers(require_token=False))
     if r.status_code>=400: raise HTTPException(status_code=r.status_code,detail=r.text[:2000])
     x=r.json()
     return {"ok":True,"status":x.get("status"),"ahead_by":x.get("ahead_by"),"behind_by":x.get("behind_by"),"total_commits":x.get("total_commits"),"files":[{"filename":f.get("filename"),"status":f.get("status"),"additions":f.get("additions"),"deletions":f.get("deletions"),"changes":f.get("changes")} for f in x.get("files",[])],"html_url":x.get("html_url")}
@@ -686,7 +695,7 @@ async def quick_editor_read(path:str,branch:str="main"):
     url=f"https://api.github.com/repos/{repo}/contents/{path}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
-            r=await client.get(url,headers=_github_headers(),params={"ref":branch})
+            r=await client.get(url,headers=_github_headers(require_token=False),params={"ref":branch})
         if r.status_code==404: raise HTTPException(status_code=404,detail="FILE_NOT_FOUND")
         if r.status_code>=400: return {"ok":False,"status_code":r.status_code,"detail":r.text[:1000]}
         data=r.json(); raw=data.get("content","")

@@ -1,0 +1,47 @@
+name: Brain Quran Memory Regression Tests
+
+on:
+  push:
+    paths:
+      - "brain_v12/brain/memory.py"
+      - "brain_v12/brain/github_auth.py"
+      - "brain_v12/brain/cognitive_loop.py"
+      - "brain_v12/brain/decision_engine.py"
+      - "brain_v12/brain/quranic_reasoning_paths.py"
+      - "brain_v12/tests/test_memory_recall.py"
+      - "brain_v12/tests/test_github_header_policy.py"
+      - "brain_v12/tests/test_quranic_reasoning_paths.py"
+      - "brain_v12/tests/test_cognitive_learning_memory.py"
+      - "brain_v12/tests/test_cognitive_loop_evidence.py"
+      - ".github/workflows/brain-quran-memory-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  memory-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile changed Python modules
+        run: |
+          python -m py_compile \
+            brain_v12/app.py \
+            brain_v12/brain/memory.py \
+            brain_v12/brain/github_auth.py \
+            brain_v12/brain/quranic_reasoning_paths.py \
+            brain_v12/brain/decision_engine.py \
+            brain_v12/brain/cognitive_loop.py
+      - name: Run memory and cognitive regression tests
+        run: |
+          python -m unittest -v \
+            brain_v12.tests.test_memory_recall \
+            brain_v12.tests.test_github_header_policy \
+            brain_v12.tests.test_quranic_reasoning_paths \
+            brain_v12.tests.test_cognitive_learning_memory \
+            brain_v12.tests.test_cognitive_loop_evidence

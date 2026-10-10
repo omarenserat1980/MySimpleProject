@@ -1,4 +1,6 @@
 from dataclasses import dataclass, asdict
+import json
+from .memory import MemoryStore
 
 @dataclass
 class Candidate:
@@ -19,7 +21,7 @@ class DecisionEngine:
     def __init__(self):
         self.history=[]
 
-    def generate(self,goal):
+    def generate(self,goal,memories=None):
         text=(goal or "").lower()
         code=any(x in text for x in ("كود","برمج","ملف","github","github","code","تطوير","إصلاح"))
         device=any(x in text for x in ("termux","redmi","هاتف","جهاز","موبايل","جوال","android","device","agent"))
@@ -36,9 +38,35 @@ class DecisionEngine:
             options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",[],True,["code"],.84,"code.verify")))
             options.append(asdict(Candidate("apply_code","تطبيق تحسين برمجي","تغيير قابل للتراجع مع تحقق","high",["developer_approval"],True,["code","approval"],.65,"code.apply")))
         options.append(asdict(Candidate("act","تنفيذ خطوة حساسة","نتيجة خارجية قابلة للتحقق","high",["agent_approval"],True,["goal","approval"],.55,"agent.execute")))
+        memory_keys = [str(m.get("key")) for m in (memories or []) if m.get("key")]
+        for option in options:
+            option["memory_context_keys"] = memory_keys[:12]
+            if memory_keys:
+                option["evidence"] = list(option.get("evidence") or []) + [f"memory:{key}" for key in memory_keys[:3]]
         return options
 
-    def choose(self,goal,options,permissions=None):
+    @staticmethod
+    def _has_verified_similar_success(goal, action, memories):
+        goal_terms = MemoryStore._memory_terms(goal)
+        if len(goal_terms) < 2:
+            return False
+        for memory in memories or []:
+            if not str(memory.get("key", "")).startswith("cognitive.run."):
+                continue
+            try:
+                lesson = json.loads(memory.get("value", "{}"))
+            except (TypeError, ValueError):
+                continue
+            if lesson.get("verified") is not True or lesson.get("outcome") != "VERIFIED_SUCCESS":
+                continue
+            if lesson.get("action") != action:
+                continue
+            prior_terms = MemoryStore._memory_terms(lesson.get("goal", ""))
+            if len(goal_terms & prior_terms) >= 2:
+                return True
+        return False
+
+    def choose(self,goal,options,permissions=None,memories=None):
         permissions=permissions or set()
         ranked=[]
         for o in options:
@@ -49,6 +77,11 @@ class DecisionEngine:
             if o.get("risk")=="high": score-=.30
             if not o.get("reversible",True): score-=.15
             if blocked: score-=.50
+            learned_support=self._has_verified_similar_success(goal,o.get("id",""),memories)
+            # A tiny, capped tie-breaker from verified similar outcomes only.
+            if learned_support:
+                score+=0.02
+            o["learned_memory_support"]=learned_support
             ranked.append((score,o,blocked,missing))
         ranked.sort(key=lambda x:x[0],reverse=True)
         if not ranked:
