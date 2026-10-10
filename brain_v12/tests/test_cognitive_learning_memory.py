@@ -34,7 +34,29 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             })
             self.assertIn("verified", second_lesson)
             self.assertGreaterEqual(second["prior_lesson_count"], 1)
+            self.assertFalse(second["decision"]["selected"]["learned_memory_support"])
+            self.assertEqual(first_lesson["outcome"], "ACTION_VERIFIED_NOT_GOAL")
+
+
+    def test_only_explicitly_verified_goal_success_can_influence_future_choice(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            verifier = lambda goal, execution, tool_result: {
+                "verified": True,
+                "evidence": "test verifier confirmed the requested goal",
+                "verifier": "unit-test-goal-verifier",
+            }
+            loop = CognitiveLoop(store, goal_verifier=verifier)
+
+            first = loop.run("observe status")
+            second = loop.run("observe status")
+
+            self.assertTrue(first["verification"]["goal_verified"])
+            self.assertTrue(first["learning"]["lesson"]["verified"])
+            self.assertEqual(first["learning"]["lesson"]["outcome"], "VERIFIED_SUCCESS")
             self.assertTrue(second["decision"]["selected"]["learned_memory_support"])
+
 
 
 if __name__ == "__main__":
