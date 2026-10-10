@@ -1,5 +1,6 @@
 package com.electronicbrain.androidexecutor
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.StatFs
 import java.io.File
 import java.io.FileInputStream
 import java.net.HttpURLConnection
@@ -125,7 +127,32 @@ class ExecutorService : Service() {
         c.setRequestProperty("X-V12-Agent-Key", key)
         c.setRequestProperty("X-V12-Agent-Id", agentId)
         c.setRequestProperty("Content-Type", "application/json")
-        val metadata = JSONObject().put("client", "ElectronicBrain-AndroidExecutor").put("model", Build.MODEL).put("sdk", Build.VERSION.SDK_INT).put("executor_agent_id", agentId)
+        // Enrollment is explicit: this heartbeat is only sent after the user taps START EXECUTOR.
+        // Advertise only capabilities the current client can safely prove; do not imply shell/build support.
+        val memory = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        memory.getMemoryInfo(memoryInfo)
+        val storage = StatFs(filesDir.absolutePath)
+        val cpuCores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+        val totalMemoryMb = (memoryInfo.totalMem / (1024L * 1024L)).coerceAtLeast(1L)
+        val availableDiskMb = (storage.availableBytes / (1024L * 1024L)).coerceAtLeast(1L)
+        val metadata = JSONObject()
+            .put("client", "ElectronicBrain-AndroidExecutor")
+            .put("model", Build.MODEL)
+            .put("sdk", Build.VERSION.SDK_INT)
+            .put("android_version", Build.VERSION.RELEASE)
+            .put("executor_agent_id", agentId)
+            .put("enrolled", true)
+            .put("enrollment_version", "1")
+            .put("healthy", true)
+            .put("cpu_cores", cpuCores)
+            .put("memory_mb", totalMemoryMb)
+            .put("available_memory_mb", (memoryInfo.availMem / (1024L * 1024L)).coerceAtLeast(0L))
+            .put("disk_mb", availableDiskMb)
+            .put("gpu_count", 0)
+            .put("capabilities", org.json.JSONArray().put("device.status").put("device.info"))
+            .put("permissions", org.json.JSONArray().put("device"))
+            .put("host_id", agentId)
         c.outputStream.use { it.write(JSONObject().put("agent_id", agentId).put("metadata", metadata).toString().toByteArray(StandardCharsets.UTF_8)) }
         val code = c.responseCode
         if (code !in 200..299) throw IllegalStateException("HEARTBEAT_HTTP_$code")
