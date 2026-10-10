@@ -37,13 +37,17 @@ class GoldenMissionController:
                 CREATE TABLE IF NOT EXISTS golden_missions (
                     mission_id TEXT PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL,
                     acceptance_json TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL,
-                    estimate_minutes INTEGER NOT NULL, due_at TEXT NOT NULL, next_update_at TEXT NOT NULL,
+                    estimate_minutes INTEGER NOT NULL, update_interval_minutes INTEGER NOT NULL DEFAULT 15,
+                    due_at TEXT NOT NULL, next_update_at TEXT NOT NULL,
                     required_permission TEXT, permission_granted INTEGER NOT NULL DEFAULT 0,
                     attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3,
                     evidence_json TEXT NOT NULL DEFAULT '[]', result_json TEXT NOT NULL DEFAULT '{}',
                     updated_at TEXT NOT NULL
                 )
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(golden_missions)").fetchall()}
+            if "update_interval_minutes" not in columns:
+                db.execute("ALTER TABLE golden_missions ADD COLUMN update_interval_minutes INTEGER NOT NULL DEFAULT 15")
 
     def _connect(self):
         db = sqlite3.connect(self.db_path, timeout=10)
@@ -79,10 +83,10 @@ class GoldenMissionController:
         with self._connect() as db:
             db.execute("""INSERT INTO golden_missions
                 (mission_id,title,objective,acceptance_json,status,created_at,estimate_minutes,
-                 due_at,next_update_at,max_attempts,evidence_json,result_json,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 update_interval_minutes,due_at,next_update_at,max_attempts,evidence_json,result_json,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (mission_id,title,objective,json.dumps(acceptance),"PLANNED",_iso(now),
-                 estimate_minutes,_iso(due),_iso(next_update),max_attempts,"[]","{}",_iso(now)))
+                 estimate_minutes,update_minutes,_iso(due),_iso(next_update),max_attempts,"[]","{}",_iso(now)))
         self._event(mission_id,"MISSION_CREATED",{"estimate_minutes":estimate_minutes,"due_at":_iso(due),"at":_iso(now)})
         return self.get(mission_id)
 
@@ -109,7 +113,7 @@ class GoldenMissionController:
             raise ValueError("MISSION_PERMISSION_REQUIRED")
         now = _now()
         self._update(mission_id,status="RUNNING",updated_at=_iso(now),
-                     next_update_at=_iso(min(now+timedelta(minutes=15),datetime.fromisoformat(mission["due_at"]))))
+                     next_update_at=_iso(min(now+timedelta(minutes=mission["update_interval_minutes"]),datetime.fromisoformat(mission["due_at"]))))
         self._event(mission_id,"MISSION_STARTED",{"at":_iso(now)})
         return self.get(mission_id)
 
@@ -122,7 +126,7 @@ class GoldenMissionController:
             raise ValueError("MISSION_ALREADY_CLOSED")
         now = _now()
         self._update(mission_id,status="WAITING_PERMISSION",required_permission=permission,
-                     permission_granted=0,updated_at=_iso(now),next_update_at=_iso(now+timedelta(minutes=30)))
+                     permission_granted=0,updated_at=_iso(now),next_update_at=_iso(now+timedelta(minutes=mission["update_interval_minutes"])))
         self._event(mission_id,"PERMISSION_REQUIRED",{"permission":permission,"detail":detail[:1000],"at":_iso(now)})
         updated = self.get(mission_id)
         outcome = self.notifier(updated, f"Permission required: {permission}. {detail}"[:2000])
@@ -139,7 +143,7 @@ class GoldenMissionController:
             raise ValueError("APPROVER_ID_REQUIRED")
         now = _now()
         self._update(mission_id,permission_granted=1,status="RUNNING",updated_at=_iso(now),
-                     next_update_at=_iso(now+timedelta(minutes=15)))
+                     next_update_at=_iso(now+timedelta(minutes=mission["update_interval_minutes"])))
         self._event(mission_id,"PERMISSION_GRANTED",{"permission":permission,"approved_by":approved_by[:200],"at":_iso(now)})
         return self.get(mission_id)
 
@@ -156,11 +160,31 @@ class GoldenMissionController:
         now = _now()
         due = now + timedelta(minutes=next_estimate_minutes) if next_estimate_minutes is not None else datetime.fromisoformat(mission["due_at"])
         update_at = min(now+timedelta(minutes=15),due)
-        self._update(mission_id,due_at=_iso(due),next_update_at=_iso(update_at),updated_at=_iso(now))
+        fields={"due_at":_iso(due),"next_update_at":_iso(update_at),"updated_at":_iso(now)}
+        if next_estimate_minutes is not None:
+            fields["estimate_minutes"]=next_estimate_minutes
+        self._update(mission_id,**fields)
         payload={"summary":summary[:2000],"progress":progress,"at":_iso(now)}
         if evidence:
             payload["evidence"]=evidence
         self._event(mission_id,"CHECKPOINT",payload)
+        return self.get(mission_id)
+
+    def record_retry(self, mission_id: str, reason: str) -> dict[str, Any]:
+        mission = self.get(mission_id)
+        if mission["status"] != "RUNNING":
+            raise ValueError("MISSION_NOT_RUNNING")
+        now = _now()
+        attempts = mission["attempts"] + 1
+        if attempts >= mission["max_attempts"]:
+            self._update(mission_id,status="BLOCKED",attempts=attempts,updated_at=_iso(now),next_update_at=_iso(now))
+            self._event(mission_id,"RETRY_LIMIT_REACHED",{"attempts":attempts,"reason":reason[:1000],"at":_iso(now)})
+            outcome = self.notifier(self.get(mission_id),"Mission blocked after retry limit: " + reason[:1000])
+            self._event(mission_id,"BLOCKED_EMAIL_ATTEMPT",outcome if isinstance(outcome,dict) else {"result":str(outcome)})
+            return self.get(mission_id)
+        self._update(mission_id,attempts=attempts,updated_at=_iso(now),
+                     next_update_at=_iso(now+timedelta(minutes=mission["update_interval_minutes"])))
+        self._event(mission_id,"RETRY_RECORDED",{"attempts":attempts,"reason":reason[:1000],"at":_iso(now)})
         return self.get(mission_id)
 
     def close(self, mission_id: str, evidence_id: str, evidence_sha256: str, summary: str = "") -> dict[str, Any]:
@@ -191,7 +215,7 @@ class GoldenMissionController:
         return self.get(mission_id)
 
     def _update(self, mission_id: str, **fields):
-        allowed={"status","updated_at","next_update_at","due_at","required_permission","permission_granted","attempts","result_json"}
+        allowed={"status","updated_at","next_update_at","due_at","required_permission","permission_granted","attempts","result_json","estimate_minutes"}
         if set(fields)-allowed:
             raise ValueError("INVALID_MISSION_UPDATE")
         assignments=",".join(f"{key}=?" for key in fields)
