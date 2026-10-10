@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import inspect
 import hashlib
 from uuid import uuid4
 from typing import Any, Callable
@@ -101,9 +102,23 @@ class SyntheticCustomer:
     def _advisor_dict(raw: Any) -> dict[str, Any]:
         return raw if isinstance(raw, dict) else {"reply": str(raw)}
 
+    @staticmethod
+    def _call_advisor(advisor, request: str, capabilities: dict[str, Any]):
+        """Support legacy one-argument and capability-aware two-argument advisors."""
+        try:
+            signature = inspect.signature(advisor)
+            positional = [p for p in signature.parameters.values()
+                          if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+            has_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in signature.parameters.values())
+            if has_varargs or len(positional) >= 2:
+                return advisor(request, capabilities)
+        except (TypeError, ValueError):
+            pass
+        return advisor(request)
+
     def generate_proposals(self, run: TestRun, capabilities: dict[str, Any] | None = None) -> dict[str, Any]:
         if self.chatgpt_advisor:
-            raw = self._advisor_dict(self.chatgpt_advisor(run.request))
+            raw = self._advisor_dict(self._call_advisor(self.chatgpt_advisor, run.request, capabilities or {}))
         else:
             raw = {}
         chat = Proposal("CHATGPT", str(raw.get("summary", raw.get("reply", "Independent product/UX proposal generated from the customer request."))),
@@ -111,7 +126,7 @@ class SyntheticCustomer:
                         list(raw.get("risks", ["scope ambiguity"])),
                         list(raw.get("acceptance", ["requested outcome verified"])))
         if self.brain_advisor:
-            raw = self._advisor_dict(self.brain_advisor(run.request, capabilities or {}))
+            raw = self._advisor_dict(self._call_advisor(self.brain_advisor, run.request, capabilities or {}))
         else:
             raw = {}
         steps = raw.get("steps", [])

@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from pathlib import Path
+from datetime import datetime, timezone
 
 from brain_v12.brain.golden_mission import GoldenMissionController
 
@@ -78,7 +79,7 @@ class GoldenMissionControllerTests(unittest.TestCase):
     def test_closes_only_with_verified_objective_evidence(self):
         self.controller.start(self.mission["mission_id"])
         proof = self.evidence.append(self.mission["mission_id"], "objective-verification", {
-            "objective_verified":True,"acceptance_passed":True,
+            "objective_verified":True,"acceptance_passed":True,"attempt_number":1,
             "criteria_results":[{"criterion":"objective passes","passed":True},{"criterion":"evidence hash is verified","passed":True}],
         },"brain-golden-mission-verifier")
         m = self.controller.close(self.mission["mission_id"], proof["evidence_id"], proof["sha256"], "all acceptance criteria passed")
@@ -86,12 +87,99 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertEqual(m["result"]["evidence_sha256"], proof["sha256"])
         self.assertTrue(any(e["event"] == "GOLDEN_LOOP_CLOSED" for e in m["evidence"]))
 
+    def test_rejects_evidence_from_previous_attempt(self):
+        mission_id = self.mission["mission_id"]
+        self.controller.start(mission_id)
+        stale = self.evidence.append(mission_id, "objective-verification", {
+            "objective_verified": True, "acceptance_passed": True, "attempt_number": 1,
+            "criteria_results": [
+                {"criterion": "objective passes", "passed": True},
+                {"criterion": "evidence hash is verified", "passed": True},
+            ],
+        }, "test-verifier")
+        self.controller.record_retry(mission_id, "first attempt failed")
+        with self.assertRaisesRegex(ValueError, "OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED"):
+            self.controller.close(mission_id, stale["evidence_id"], stale["sha256"])
+        self.assertEqual(self.controller.get(mission_id)["status"], "RUNNING")
+
+    def test_rejects_evidence_that_does_not_cover_exact_acceptance_criteria(self):
+        mission_id = self.mission["mission_id"]
+        self.controller.start(mission_id)
+        incomplete = self.evidence.append(mission_id, "objective-verification", {
+            "objective_verified": True, "acceptance_passed": True, "attempt_number": 1,
+            "criteria_results": [
+                {"criterion": "some unrelated criterion", "passed": True},
+                {"criterion": "objective passes", "passed": True},
+            ],
+        }, "test-verifier")
+        with self.assertRaisesRegex(ValueError, "OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED"):
+            self.controller.close(mission_id, incomplete["evidence_id"], incomplete["sha256"])
+        self.assertEqual(self.controller.get(mission_id)["status"], "RUNNING")
+
+    def test_closes_with_real_evidence_store_hash_verification(self):
+        from brain_v12.brain.evidence_store import EvidenceStore
+        evidence_path = Path(self.tmp.name) / "evidence.sqlite3"
+        store = EvidenceStore(str(evidence_path))
+        try:
+            controller = GoldenMissionController(
+                str(Path(self.tmp.name) / "real-missions.sqlite3"),
+                notifier=lambda mission, message: {"sent": False, "reason": "test"},
+                evidence_store=store,
+            )
+            mission = controller.create(
+                title="Real evidence store",
+                objective="Verify objective against the actual SQLite evidence store",
+                acceptance=["objective verified"],
+            )
+            controller.start(mission["mission_id"])
+            payload = {
+                "objective_verified": True,
+                "acceptance_passed": True,
+                "attempt_number": 1,
+                "criteria_results": [{"criterion": "objective verified", "passed": True}],
+            }
+            evidence = store.append(mission["mission_id"], "objective-verification", payload, "test-verifier")
+            result = controller.close(
+                mission["mission_id"], evidence["evidence_id"], evidence["sha256"],
+                "verified against real evidence store",
+            )
+            self.assertEqual(result["status"], "CLOSED")
+            self.assertEqual(result["result"]["evidence_id"], evidence["evidence_id"])
+            self.assertTrue(store.verify_hash(evidence["evidence_id"])["ok"])
+        finally:
+            store.close()
+
     def test_checkpoint_updates_estimate(self):
         self.controller.start(self.mission["mission_id"])
         m=self.controller.checkpoint(self.mission["mission_id"],"first step",25,next_estimate_minutes=20)
         self.assertEqual(m["status"],"RUNNING")
         self.assertEqual(m["attempts"],0)
         self.assertEqual(m["estimate_minutes"],20)
+
+    def test_due_mission_reminder_sends_and_advances_schedule(self):
+        from datetime import timedelta
+        mission_id = self.mission["mission_id"]
+        future = datetime.now(timezone.utc) + timedelta(minutes=5)
+        result = self.controller.notify_due(now=future)
+        self.assertEqual(result["checked"], 1)
+        self.assertEqual(result["notifications_sent"], 0)
+        self.assertEqual(result["notifications_failed_or_unconfigured"], 1)
+        mission = self.controller.get(mission_id)
+        self.assertTrue(any(e["event"] == "MISSION_UPDATE_REMINDER" for e in mission["evidence"]))
+        self.assertGreater(datetime.fromisoformat(mission["next_update_at"]), future)
+
+    def test_reminder_worker_tick_delegates_without_executing_objective(self):
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+        class Stub:
+            def __init__(self): self.calls = 0
+            def notify_due(self):
+                self.calls += 1
+                return {"checked": 0, "notifications_sent": 0, "notifications_failed_or_unconfigured": 0}
+        stub = Stub()
+        worker = GoldenMissionReminderWorker(stub, interval_seconds=1)
+        self.assertEqual(worker.interval_seconds, 30)
+        self.assertEqual(worker.tick()["checked"], 0)
+        self.assertEqual(stub.calls, 1)
 
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):

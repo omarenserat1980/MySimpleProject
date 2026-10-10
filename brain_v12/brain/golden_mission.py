@@ -70,6 +70,8 @@ class GoldenMissionController:
         acceptance = [str(x).strip() for x in acceptance if str(x).strip()]
         if not title or not objective or not acceptance:
             raise ValueError("MISSION_OBJECTIVE_AND_ACCEPTANCE_REQUIRED")
+        if len(set(acceptance)) != len(acceptance):
+            raise ValueError("ACCEPTANCE_CRITERIA_MUST_BE_UNIQUE")
         if not 1 <= estimate_minutes <= 10080:
             raise ValueError("ESTIMATE_MINUTES_OUT_OF_RANGE")
         if not 1 <= update_minutes <= 1440:
@@ -107,10 +109,10 @@ class GoldenMissionController:
 
     def start(self, mission_id: str) -> dict[str, Any]:
         mission = self.get(mission_id)
-        if mission["status"] not in {"PLANNED","RUNNING"}:
-            raise ValueError("MISSION_NOT_STARTABLE")
         if mission["required_permission"] and not mission["permission_granted"]:
             raise ValueError("MISSION_PERMISSION_REQUIRED")
+        if mission["status"] not in {"PLANNED","RUNNING"}:
+            raise ValueError("MISSION_NOT_STARTABLE")
         now = _now()
         self._update(mission_id,status="RUNNING",updated_at=_iso(now),
                      next_update_at=_iso(min(now+timedelta(minutes=mission["update_interval_minutes"]),datetime.fromisoformat(mission["due_at"]))))
@@ -170,6 +172,30 @@ class GoldenMissionController:
         self._event(mission_id,"CHECKPOINT",payload)
         return self.get(mission_id)
 
+    def notify_due(self, now: datetime | None = None) -> dict[str, Any]:
+        """Send due status reminders and advance cadence; never execute mission actions."""
+        current = now or _now()
+        due = self.list_due(current)
+        notified = 0
+        failed = 0
+        for mission in due:
+            message = "Mission update reminder. Status={}; objective={}".format(mission['status'], mission['objective'][:500])
+            try:
+                outcome = self.notifier(mission, message)
+            except Exception as exc:
+                outcome = {"sent": False, "reason": type(exc).__name__}
+            sent = isinstance(outcome, dict) and outcome.get("sent") is True
+            notified += int(sent)
+            failed += int(not sent)
+            next_update = current + timedelta(minutes=mission["update_interval_minutes"])
+            self._update(mission["mission_id"], next_update_at=_iso(next_update), updated_at=_iso(current))
+            self._event(mission["mission_id"], "MISSION_UPDATE_REMINDER", {
+                "at": _iso(current), "sent": sent,
+                "outcome": outcome if isinstance(outcome, dict) else {"result": str(outcome)[:500]},
+                "next_update_at": _iso(next_update),
+            })
+        return {"checked": len(due), "notifications_sent": notified, "notifications_failed_or_unconfigured": failed}
+
     def record_retry(self, mission_id: str, reason: str) -> dict[str, Any]:
         mission = self.get(mission_id)
         if mission["status"] != "RUNNING":
@@ -199,14 +225,38 @@ class GoldenMissionController:
         verified = self.evidence_store.verify_hash(evidence_id)
         payload = item.get("payload") if isinstance(item.get("payload"),dict) else {}
         criteria = payload.get("criteria_results")
-        criteria_pass = isinstance(criteria,list) and bool(criteria) and all(
-            isinstance(entry,dict) and entry.get("passed") is True for entry in criteria
+        # Evidence from an earlier retry must never close the current attempt.
+        expected_attempt = mission["attempts"] + 1
+        attempt_matches = payload.get("attempt_number") == expected_attempt
+        # Require an exact, one-to-one pass result for every declared acceptance criterion.
+        expected_criteria = mission["acceptance"]
+        actual_criteria = [
+            entry.get("criterion") for entry in criteria
+            if isinstance(entry, dict) and isinstance(entry.get("criterion"), str)
+        ] if isinstance(criteria, list) else []
+        criteria_pass = (
+            isinstance(criteria, list)
+            and len(criteria) == len(expected_criteria)
+            and len(actual_criteria) == len(expected_criteria)
+            and len(set(actual_criteria)) == len(expected_criteria)
+            and set(actual_criteria) == set(expected_criteria)
+            and all(isinstance(entry, dict) and entry.get("passed") is True for entry in criteria)
         )
-        if not verified.get("ok") or payload.get("objective_verified") is not True or payload.get("acceptance_passed") is not True or not criteria_pass:
-            self._event(mission_id,"CLOSE_REJECTED",{"reason":"OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED","evidence_id":evidence_id})
+        if (not verified.get("ok")
+                or payload.get("objective_verified") is not True
+                or payload.get("acceptance_passed") is not True
+                or not attempt_matches
+                or not criteria_pass):
+            self._event(mission_id,"CLOSE_REJECTED",{
+                "reason":"OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED",
+                "evidence_id":evidence_id,
+                "expected_attempt":expected_attempt,
+                "evidence_attempt":payload.get("attempt_number"),
+            })
             raise ValueError("OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED")
         result={"objective_verified":True,"evidence_verified":True,"evidence_id":evidence_id,
-                "evidence_sha256":evidence_sha256,"summary":summary[:2000],"criteria_results":criteria}
+                "evidence_sha256":evidence_sha256,"attempt_number":expected_attempt,
+                "summary":summary[:2000],"criteria_results":criteria}
         now=_now()
         self._update(mission_id,status="CLOSED",result_json=json.dumps(result,ensure_ascii=False),updated_at=_iso(now),next_update_at=_iso(now))
         self._event(mission_id,"GOLDEN_LOOP_CLOSED",{"at":_iso(now),"result":result})
