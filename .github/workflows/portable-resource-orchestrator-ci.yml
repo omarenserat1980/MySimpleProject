@@ -1,0 +1,39 @@
+name: Portable Resource Orchestrator CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/portable_resource_orchestrator.py"
+      - "brain_v12/tests/test_portable_resource_orchestrator.py"
+      - ".github/workflows/portable-resource-orchestrator-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-resource-orchestrator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-tests:
+    name: Scheduler policy tests (no provisioning)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile scheduler
+        run: python -m py_compile brain_v12/brain/portable_resource_orchestrator.py
+
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_portable_resource_orchestrator -v
