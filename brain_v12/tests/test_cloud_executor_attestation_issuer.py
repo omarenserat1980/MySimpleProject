@@ -28,6 +28,10 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
             encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
         )).decode()
         self.now = 1_800_000_000
+        self.hostname = "runner-test-01"
+
+    def issue(self, **kwargs):
+        return issue_attestation(expected_hostname=self.hostname, expected_architecture="x86_64", **kwargs)
 
     def test_issues_and_verifies_single_use_challenge(self):
         challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
@@ -36,8 +40,26 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         path = Path(self.tmp.name) / "att.json"
         path.write_text(json.dumps(att))
         result = verify_attestation(str(path), self.public_b64, "cloud-test-01", now=self.now,
-            replay_db_path=self.replay_db)
+            replay_db_path=self.replay_db, expected_hostname=self.hostname, expected_architecture="x86_64")
         self.assertTrue(result["verified"])
+
+    def test_issued_attestation_binds_trusted_host_and_architecture(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+            challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
+        self.assertEqual(att["hostname"], self.hostname)
+        self.assertEqual(att["architecture"], "x86_64")
+        path = Path(self.tmp.name) / "host-bound.json"
+        path.write_text(json.dumps(att))
+        with self.assertRaisesRegex(ValueError, "HOSTNAME_MISMATCH"):
+            verify_attestation(str(path), self.public_b64, "cloud-test-01", now=self.now,
+                expected_hostname="different-host", expected_architecture="x86_64")
+
+    def test_issuer_rejects_missing_trusted_host_binding(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        with self.assertRaisesRegex(TypeError, "expected_hostname"):
+            issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+                challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
 
     def test_issuer_rejects_reused_challenge(self):
         challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
