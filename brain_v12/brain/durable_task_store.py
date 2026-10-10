@@ -7,8 +7,9 @@ class DurableTaskStore:
     """Transactional task state: immutable spec, separate result, leases and attempts."""
     def __init__(self,path=None):
         if path is None:
+            runtime_path = os.getenv("BRAIN_VIRTUAL_TASK_DB")
             runtime_home = os.getenv("BRAIN_RUNTIME_HOME")
-            path = (Path(runtime_home).expanduser() / "brain6_artifacts" / "virtual_tasks" / "tasks.db") if runtime_home else "brain6_artifacts/virtual_tasks/tasks.db"
+            path = runtime_path or ((Path(runtime_home).expanduser() / "brain6_artifacts" / "virtual_tasks" / "tasks.db") if runtime_home else "brain6_artifacts/virtual_tasks/tasks.db")
         self.path=Path(path).expanduser(); self.path.parent.mkdir(parents=True,exist_ok=True)
         self.lock=threading.RLock()
         self.db=sqlite3.connect(self.path,check_same_thread=False)
