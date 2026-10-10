@@ -38,7 +38,7 @@ class CloudExecutorAttestationTests(unittest.TestCase):
             "schema": SCHEMA, "executor_id": "cloud-test-01", "audience": AUDIENCE,
             "hostname": socket.gethostname(),
             "architecture": "x86_64" if platform.machine().lower() in {"x86_64", "amd64"} else platform.machine().lower(),
-            "issued_at": self.now - 5, "expires_at": self.now + 300,
+            "issued_at": self.now - 5, "expires_at": self.now + 295,
             "nonce": "nonce-1234567890",
         }
 
