@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+from .brain_gpt_20_layer_runtime import build_layer_runtime_status
 
 
 class BrainAIChatIn(BaseModel):
@@ -14,12 +15,16 @@ class BrainAIToolIn(BaseModel):
     approved: bool = False
 
 
-def router(brain_ai):
+def router(brain_ai, session_store=None):
     r = APIRouter(prefix="/api/brain-ai", tags=["Brain AI"])
 
     @r.get("/status")
     def status():
         return {"ok": True, **brain_ai.status()}
+
+    @r.get("/layers/status")
+    def layers_status():
+        return build_layer_runtime_status(brain_ai, session_store)
 
     @r.post("/chat")
     def chat(body: BrainAIChatIn):
