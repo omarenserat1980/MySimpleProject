@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ class DeviceBridgeTests(unittest.TestCase):
             "TERMUX_AGENT_KEY",
             "BRAIN_AGENT_KEY",
             "BRAIN_AGENT_KEY_SHA256",
+            "BRAIN_AGENT_KEYS_JSON",
             "BRAIN_EMULATOR_KEY",
         )
         self.old_env = {key: os.environ.get(key) for key in self.env_keys}
@@ -40,6 +42,25 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertTrue(self.bridge.configured())
         self.assertTrue(self.bridge.authenticate("test-device-key"))
         self.assertFalse(self.bridge.authenticate("wrong-key"))
+
+    def test_per_agent_keys_are_isolated_and_fail_closed(self):
+        os.environ["BRAIN_AGENT_KEYS_JSON"] = json.dumps({
+            "redmi3-01": "redmi-secret-test",
+            "realme-01": "realme-secret-test",
+        })
+        self.assertEqual(self.bridge.auth_mode(), "PER_AGENT_KEYS_JSON")
+        self.assertTrue(self.bridge.authenticate("redmi-secret-test", "redmi3-01"))
+        self.assertTrue(self.bridge.authenticate("realme-secret-test", "realme-01"))
+        self.assertFalse(self.bridge.authenticate("realme-secret-test", "redmi3-01"))
+        self.assertFalse(self.bridge.authenticate("realme-secret-test", "unknown-agent"))
+        self.assertFalse(self.bridge.authenticate("test-device-key", "redmi3-01"))
+
+    def test_per_agent_registry_rejects_duplicate_credentials(self):
+        os.environ["BRAIN_AGENT_KEYS_JSON"] = json.dumps({
+            "redmi3-01": "same-secret",
+            "realme-01": "same-secret",
+        })
+        self.assertFalse(self.bridge.authenticate("same-secret", "redmi3-01"))
 
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
