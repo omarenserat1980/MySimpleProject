@@ -37,8 +37,8 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         return issue_attestation(expected_hostname=self.hostname, expected_architecture="x86_64", **kwargs)
 
     def test_issues_and_verifies_single_use_challenge(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
-        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
         path = Path(self.tmp.name) / "att.json"
         path.write_text(json.dumps(att))
@@ -47,7 +47,7 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         self.assertTrue(result["verified"])
 
     def test_issued_attestation_binds_trusted_host_and_architecture(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
         self.assertEqual(att["hostname"], self.hostname)
@@ -59,7 +59,7 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
                 expected_hostname="different-host", expected_architecture="x86_64")
 
     def test_issuer_rejects_missing_trusted_host_binding(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         with self.assertRaisesRegex(TypeError, "expected_hostname"):
             issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
                 challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
@@ -72,28 +72,28 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
                 private_key_b64=self.private_b64, issued_at=self.now)
 
     def test_issuer_rejects_reused_challenge(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         args = dict(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
-        issue_attestation(**args)
+        self.issue(**args)
         with self.assertRaisesRegex(ValueError, "CHALLENGE_REPLAY"):
-            issue_attestation(**args)
+            self.issue(**args)
 
     def test_issuer_rejects_challenge_for_other_executor(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         with self.assertRaisesRegex(ValueError, "CHALLENGE_EXECUTOR_MISMATCH"):
-            issue_attestation(authenticated_executor_id="attacker", challenge_nonce=challenge["nonce"],
+            self.issue(authenticated_executor_id="attacker", challenge_nonce=challenge["nonce"],
                 challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
 
     def test_issuer_rejects_expired_challenge(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         with self.assertRaisesRegex(ValueError, "CHALLENGE_EXPIRED"):
-            issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+            self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
                 challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now + 61)
 
     def test_central_registry_consumes_attestation_once(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
-        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
         result = consume_issued_attestation(authenticated_executor_id="cloud-test-01",
             nonce=att["nonce"], registry_db_path=self.db, now=self.now + 1)
@@ -103,28 +103,28 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
                 nonce=att["nonce"], registry_db_path=self.db, now=self.now + 2)
 
     def test_central_registry_rejects_other_executor(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
-        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now)
         with self.assertRaisesRegex(ValueError, "EXECUTOR_MISMATCH"):
             consume_issued_attestation(authenticated_executor_id="attacker",
                 nonce=att["nonce"], registry_db_path=self.db, now=self.now + 1)
 
     def test_central_registry_rejects_expired_attestation(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
-        att = issue_attestation(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        att = self.issue(authenticated_executor_id="cloud-test-01", challenge_nonce=challenge["nonce"],
             challenge_db_path=self.db, private_key_b64=self.private_b64, issued_at=self.now, lifetime_seconds=10)
         with self.assertRaisesRegex(ValueError, "EXPIRED"):
             consume_issued_attestation(authenticated_executor_id="cloud-test-01",
                 nonce=att["nonce"], registry_db_path=self.db, now=self.now + 11)
 
     def test_missing_signing_key_does_not_consume_challenge(self):
-        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
         with patch.dict("os.environ", {}, clear=True):
             with self.assertRaisesRegex(ValueError, "SIGNING_KEY_REQUIRED"):
-                issue_attestation(authenticated_executor_id="cloud-test-01",
+                self.issue(authenticated_executor_id="cloud-test-01",
                     challenge_nonce=challenge["nonce"], challenge_db_path=self.db, issued_at=self.now)
-        att = issue_attestation(authenticated_executor_id="cloud-test-01",
+        att = self.issue(authenticated_executor_id="cloud-test-01",
             challenge_nonce=challenge["nonce"], challenge_db_path=self.db,
             private_key_b64=self.private_b64, issued_at=self.now)
         self.assertEqual(att["nonce"], challenge["nonce"])
