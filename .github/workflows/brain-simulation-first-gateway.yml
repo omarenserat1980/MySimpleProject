@@ -1,0 +1,39 @@
+name: Brain Simulation-First Gateway
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/arkan_failover_gateway.py"
+      - "brain_v12/brain/arkan_device_emulator.py"
+      - "brain_v12/brain/powershell_emulator.py"
+      - "brain_v12/brain/desktop_commander_emulator.py"
+      - "brain_v12/brain/digital_twin_fabric.py"
+      - "brain_v12/brain/real_arkan_probe.py"
+      - "brain_v12/tests/test_arkan_failover_gateway.py"
+      - ".github/workflows/brain-simulation-first-gateway.yml"
+  push:
+    branches:
+      - "brain/simulation-first-remote-fabric-20261010"
+    paths:
+      - "brain_v12/brain/arkan_failover_gateway.py"
+      - "brain_v12/brain/arkan_device_emulator.py"
+      - "brain_v12/brain/powershell_emulator.py"
+      - "brain_v12/brain/desktop_commander_emulator.py"
+      - "brain_v12/brain/digital_twin_fabric.py"
+      - "brain_v12/brain/real_arkan_probe.py"
+      - "brain_v12/tests/test_arkan_failover_gateway.py"
+      - ".github/workflows/brain-simulation-first-gateway.yml"
+permissions:
+  contents: read
+jobs:
+  simulation-first-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify simulation-first gateway contract
+        run: python -m unittest brain_v12.tests.test_arkan_failover_gateway -v
