@@ -117,7 +117,6 @@ jobs:
           echo "ISO_URL_VALIDATION=PASS"
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
           test -s windows-server-2025.iso
-          test -s windows-server-2025.iso
           xorriso -indev windows-server-2025.iso -toc 2>&1 | tee iso-toc.txt
           grep -Eq 'ISO 9660|El Torito' iso-toc.txt
           sha256sum windows-server-2025.iso | tee windows-server-2025.iso.sha256
