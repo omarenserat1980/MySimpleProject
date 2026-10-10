@@ -34,12 +34,12 @@ def make_report(observed_at=None):
 
 
 class ObservationVerifierTests(unittest.TestCase):
-    def run_verifier(self, report):
+    def run_verifier(self, report, extra_args=()):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "observation.json"
             path.write_text(json.dumps(report), encoding="utf-8")
             return subprocess.run(
-                [sys.executable, str(VERIFIER), str(path)],
+                [sys.executable, str(VERIFIER), str(path), *extra_args],
                 text=True,
                 capture_output=True,
                 check=False,
@@ -71,6 +71,20 @@ class ObservationVerifierTests(unittest.TestCase):
         result = self.run_verifier(make_report(old))
         self.assertEqual(result.returncode, 2)
         self.assertIn("stale report", result.stderr)
+
+    def test_non_object_payload_fails_closed_without_traceback(self):
+        report = make_report()
+        report["payload"] = []
+        result = self.run_verifier(report)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("payload must be a JSON object", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_non_object_report_root_fails_closed_without_traceback(self):
+        result = self.run_verifier([])
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("report root must be a JSON object", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
 
 if __name__ == "__main__":
