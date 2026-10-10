@@ -4,7 +4,7 @@
 
 The Golden Mission controller stores mission state durably in SQLite and exposes authenticated control endpoints. It is a mission tracker and reminder loop, not a general-purpose privileged executor. It does not start VMs, modify devices, publish media, spend money, or deploy infrastructure.
 
-A mission can close only when the evidence store contains evidence for that same mission, the caller supplies the matching evidence ID and SHA-256, the evidence store verifies the stored hash, and the payload marks the objective and acceptance as passed with a non-empty list of passing criteria. Client-supplied booleans are not accepted by the close endpoint.
+A mission can close only when the evidence store contains evidence for that same mission, the caller supplies the matching evidence ID and SHA-256, and the evidence store verifies the stored hash. The evidence payload must identify the current attempt with `attempt_number` (initial attempt is `1`; each recorded retry advances it), mark the objective and acceptance as passed, and include exactly one passing result for every declared acceptance criterion. Evidence from an earlier attempt or evidence that omits, duplicates, or substitutes acceptance criteria is rejected.
 
 ## API
 
