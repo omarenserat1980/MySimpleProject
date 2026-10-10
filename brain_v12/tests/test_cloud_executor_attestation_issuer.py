@@ -2,6 +2,7 @@ import base64
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -84,6 +85,17 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "EXPIRED"):
             consume_issued_attestation(authenticated_executor_id="cloud-test-01",
                 nonce=att["nonce"], registry_db_path=self.db, now=self.now + 11)
+
+    def test_missing_signing_key_does_not_consume_challenge(self):
+        challenge = create_challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "SIGNING_KEY_REQUIRED"):
+                issue_attestation(authenticated_executor_id="cloud-test-01",
+                    challenge_nonce=challenge["nonce"], challenge_db_path=self.db, issued_at=self.now)
+        att = issue_attestation(authenticated_executor_id="cloud-test-01",
+            challenge_nonce=challenge["nonce"], challenge_db_path=self.db,
+            private_key_b64=self.private_b64, issued_at=self.now)
+        self.assertEqual(att["nonce"], challenge["nonce"])
 
 
 if __name__ == "__main__":
