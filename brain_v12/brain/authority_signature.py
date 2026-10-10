@@ -1,7 +1,7 @@
 """Asymmetric Brain authority signatures for portable execution contracts.
 
 Private signing material stays in the Brain Control Plane. Executors only need
-the public verification key.
+the public verification key. All security-relevant contract fields are signed.
 """
 from __future__ import annotations
 import base64, json, os
@@ -9,12 +9,17 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.exceptions import InvalidSignature
 
 ALGORITHM="Ed25519"
-_FIELDS=("brain_id","generation","fencing_token","lease_id","holder_id","task_id","attempt_id",
-         "source_commit","capability","executor","authority_policy_version","authority_decision")
+_FIELDS=(
+    "schema","status","brain_id","generation","fencing_token","lease_id","holder_id",
+    "task_id","attempt_id","source_commit","capability","executor",
+    "authority_policy_version","authority_decision","issued_at","expires_at",
+    "owner_id","owner_challenge_id","owner_scope","owner_approval_source_commit",
+    "owner_approval_task_id","owner_approval_attempt_id",
+)
 
 def signing_payload(contract:dict)->bytes:
     fields={k:contract.get(k) for k in _FIELDS}
-    return json.dumps(fields,sort_keys=True,separators=(",",":")).encode()
+    return json.dumps(fields,sort_keys=True,separators=(",",":"),allow_nan=False).encode()
 
 def _b64(value:str)->bytes:
     return base64.b64decode(value.encode(),validate=True)
@@ -24,7 +29,9 @@ def sign_contract(contract:dict, private_key_b64:str|None=None)->str:
     if not raw: raise RuntimeError("BRAIN_AUTHORITY_PRIVATE_KEY_REQUIRED")
     try: key=Ed25519PrivateKey.from_private_bytes(_b64(raw))
     except Exception as exc: raise RuntimeError("BRAIN_AUTHORITY_PRIVATE_KEY_INVALID") from exc
-    return base64.b64encode(key.sign(signing_payload(contract))).decode()
+    try: payload=signing_payload(contract)
+    except (TypeError,ValueError) as exc: raise RuntimeError("BRAIN_AUTHORITY_CONTRACT_FIELDS_INVALID") from exc
+    return base64.b64encode(key.sign(payload)).decode()
 
 def verify_contract_signature(contract:dict, signature:str, public_key_b64:str|None=None)->bool:
     raw=public_key_b64 or os.environ.get("BRAIN_AUTHORITY_PUBLIC_KEY_B64","")

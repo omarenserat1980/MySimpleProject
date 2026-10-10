@@ -89,8 +89,11 @@ class PaymentEventJournal:
             return self._read().get(event_id)
 
     def begin(self, payload: "WebhookEnvelope") -> dict:
+        # Pydantic v1 uses dict(); v2 uses model_dump().
+        dump_payload = getattr(payload, "model_dump", None)
+        payload_data = dump_payload() if callable(dump_payload) else payload.dict()
         fingerprint = hashlib.sha256(
-            json.dumps(payload.model_dump(), sort_keys=True).encode("utf-8")
+            json.dumps(payload_data, sort_keys=True).encode("utf-8")
         ).hexdigest()
         with self.lock:
             data = self._read()
@@ -231,7 +234,13 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = WebhookEnvelope.model_validate_json(raw)
+            # Support both Pydantic v1 (parse_raw) and v2 (model_validate_json).
+            # Some supported self-hosted runners still resolve Pydantic v1.
+            validate_json = getattr(WebhookEnvelope, "model_validate_json", None)
+            if callable(validate_json):
+                payload = validate_json(raw)
+            else:
+                payload = WebhookEnvelope.parse_raw(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:
