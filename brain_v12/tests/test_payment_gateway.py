@@ -34,7 +34,15 @@ class PaymentGatewayTests(unittest.TestCase):
         from brain_v12.brain.payment_gateway import PaymentEventJournal
         journal_path=self.db + ".payment-events.json"
         journal=PaymentEventJournal(journal_path)
-        journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.model_validate(p))
+        journal.begin(__import__("brain_v12.brain.payment_gateway", fromlist=["WebhookEnvelope"]).WebhookEnvelope.parse_obj(p))
+        # Recreate the durable commerce commit that the journal state claims exists.
+        self.store.transition(p["order_id"], "PAYMENT_VERIFIED", {
+            "transaction_id": p["payment_reference"],
+            "evidence_ref": f"payment-webhook:{p['provider']}:{p['event_id']}",
+            "provider": p["provider"],
+            "event_id": p["event_id"],
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+        })
         journal.mark(p["event_id"], "COMMERCE_COMMITTED")
         second=self.client.post("/api/payments/webhook",content=raw,headers=h)
         self.assertEqual(second.status_code,200)
