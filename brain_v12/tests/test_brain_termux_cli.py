@@ -1,10 +1,15 @@
 from pathlib import Path
 import unittest
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI = ROOT / "tools" / "brain"
 
 class BrainTermuxCliContractTests(unittest.TestCase):
+    def test_shell_syntax_is_valid(self):
+        result = subprocess.run(["bash", "-n", str(CLI)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_cli_has_single_command_surface(self):
         text = CLI.read_text(encoding="utf-8")
         for command in ("install", "start", "status", "diagnose", "logs"):
