@@ -11,13 +11,15 @@ RUNNER_DIR="${BRAIN_RUNNER_DIR:-$HOME/brain-cloud-executor}"
 RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
 RUNNER_ARCH="linux-x64"
 EXECUTOR_ID="${BRAIN_CLOUD_EXECUTOR_ID:-brain-cloud-$(hostname)-$(cat /etc/machine-id 2>/dev/null || echo unknown)}"
-ATTESTATION="${BRAIN_CLOUD_EXECUTOR_ATTESTATION:-}"
+ATTESTATION_FILE="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE:-}"
+ATTESTATION_PUBLIC_KEY="${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}"
 GATE_TMP="$(mktemp /tmp/brain-cloud-executor-gate.XXXXXX.json)"
 trap 'rm -f "$GATE_TMP"' EXIT
 
 [ "${BRAIN_CLOUD_EXECUTOR:-}" = "1" ] || { echo "BRAIN_CLOUD_EXECUTOR=1_REQUIRED"; exit 20; }
 [ -n "$EXECUTOR_ID" ] || { echo "BRAIN_CLOUD_EXECUTOR_ID_REQUIRED"; exit 24; }
-[ -n "$ATTESTATION" ] || { echo "BRAIN_CLOUD_EXECUTOR_ATTESTATION_REQUIRED"; exit 21; }
+[ -f "$ATTESTATION_FILE" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_FILE_REQUIRED"; exit 21; }
+[ -n "$ATTESTATION_PUBLIC_KEY" ] || { echo "CLOUD_EXECUTOR_ATTESTATION_TRUST_KEY_REQUIRED"; exit 26; }
 
 command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
@@ -42,9 +44,9 @@ done
 }
 
 # Fail closed before downloading/configuring/registering a GitHub runner.
-# The current gate checks attestation-reference presence, not its cryptographic
-# authenticity; this is not a claim of cryptographic executor attestation.
-export BRAIN_CLOUD_EXECUTOR BRAIN_CLOUD_EXECUTOR_ID BRAIN_CLOUD_EXECUTOR_ATTESTATION
+export BRAIN_CLOUD_EXECUTOR BRAIN_CLOUD_EXECUTOR_ID
+export BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE="$ATTESTATION_FILE"
+export BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64="$ATTESTATION_PUBLIC_KEY"
 python3 "$ROOT/brain_v12/brain/cloud_executor_gate.py" --output "$GATE_TMP"
 python3 - "$GATE_TMP" <<'PY'
 import json, sys
@@ -80,7 +82,8 @@ unset TOKEN
 cat > .env <<EOF
 BRAIN_CLOUD_EXECUTOR=1
 BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID
-BRAIN_CLOUD_EXECUTOR_ATTESTATION=$ATTESTATION
+BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE=$ATTESTATION_FILE
+BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64=$ATTESTATION_PUBLIC_KEY
 BRAIN_INTERNAL_RUNNER_FLAG=1
 EOF
 chmod 600 .env
