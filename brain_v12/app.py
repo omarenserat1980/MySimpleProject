@@ -1995,27 +1995,6 @@ def start_background_services():
                 time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
                 try: workforce.dispatch("scheduled_heartbeat", include_revenue=True)
                 except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
-    try:
-        income_strategy.income_engine.discover(20)
-    except Exception as exc:
-        store.event("INCOME_DISCOVERY_PLAN_FAILED", {"error": str(exc)[:1000]})
-    if os.getenv("BRAIN_LIVE_INCOME_SEARCH_ENABLED","true").lower()=="true":
-        try: live_income_researcher.run_once()
-        except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
-        def live_income_loop():
-            import time
-            while True:
-                time.sleep(max(900, int(os.getenv("BRAIN_LIVE_INCOME_SEARCH_INTERVAL_SECONDS", "1800"))))
-                try: live_income_researcher.run_once()
-                except Exception as exc: store.event("LIVE_INCOME_SEARCH_FAILED", {"error": str(exc)[:1000]})
-        threading.Thread(target=live_income_loop, daemon=True).start()
-    if os.getenv("BRAIN_WORKFORCE_ENABLED","true").lower()=="true":
-        def workforce_loop():
-            import time
-            while True:
-                time.sleep(max(300, int(os.getenv("BRAIN_WORKFORCE_INTERVAL_SECONDS","900"))))
-                try: workforce.dispatch("scheduled_heartbeat", include_revenue=True)
-                except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
         threading.Thread(target=workforce_loop, daemon=True).start()
 
 @app.on_event("shutdown")
@@ -2024,6 +2003,7 @@ def stop_golden_mission_reminder_worker():
     if golden_mission_reminder_worker is not None:
         golden_mission_reminder_worker.stop()
         golden_mission_reminder_worker = None
+
 @app.get("/api/state")
 def state(): return brain.snapshot()
 @app.get("/api/messages")
