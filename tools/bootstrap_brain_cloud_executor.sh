@@ -97,7 +97,7 @@ sudo chown -R "$RUNNER_USER:$RUNNER_GROUP" "$RUNNER_DIR"
 
 TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
 # The operator obtains the short-lived token; the isolated runner account never receives gh CLI credentials.
-sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 ./config.sh --unattended \
+sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 "$RUNNER_DIR/config.sh" --unattended \
   --url "https://github.com/$REPO" \
   --token "$TOKEN" \
   --name "$EXECUTOR_ID" \
