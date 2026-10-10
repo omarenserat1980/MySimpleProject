@@ -195,8 +195,11 @@ def golden_loop_events(limit: int = 100):
                 "created_at": event["created_at"],
                 "sha256": event["sha256"],
                 "verification_status": event["verification_status"],
-                "producer": event["producer"],
-                "payload": event["payload"],
+                "phase": event["payload"].get("phase") or (
+                    event["payload"].get("payload", {}).get("phase")
+                    if isinstance(event["payload"].get("payload"), dict) else None
+                ),
+                "attempt": event["payload"].get("attempt"),
             }
             for event in events
         ],
