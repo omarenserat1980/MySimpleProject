@@ -34,6 +34,7 @@ class CognitiveLearningMemoryTests(unittest.TestCase):
             })
             self.assertIn("verified", second_lesson)
             self.assertGreaterEqual(second["prior_lesson_count"], 1)
+            self.assertTrue(second["decision"]["selected"]["learned_memory_support"])
 
 
 if __name__ == "__main__":
