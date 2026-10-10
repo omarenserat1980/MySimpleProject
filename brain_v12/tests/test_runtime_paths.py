@@ -17,6 +17,8 @@ PATH_VARIABLES = (
     "BRAIN_MEDIA_ROOT",
     "BRAIN_MEDIA_OUTPUT_ROOT",
     "AGENT_SANDBOX",
+    "BRAIN_SUPERVISOR_ROOT",
+    "BRAIN_SUCCESS_BOT_ROOT",
 )
 
 
@@ -52,6 +54,12 @@ class RuntimePathsTests(unittest.TestCase):
             legacy_sandbox = source.parent / "agent_sandbox"
             legacy_sandbox.mkdir()
             (legacy_sandbox / "existing.txt").write_text("legacy-sandbox", encoding="utf-8")
+            legacy_supervisor = source.parent / "brain6_artifacts" / "supervisor"
+            legacy_supervisor.mkdir(parents=True)
+            (legacy_supervisor / "state.json").write_text("legacy-supervisor", encoding="utf-8")
+            legacy_success_bot = source.parent / "brain6_artifacts" / "success_bot"
+            legacy_success_bot.mkdir(parents=True)
+            (legacy_success_bot / "state.json").write_text("legacy-success-bot", encoding="utf-8")
 
             with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
                 resolved = configure_runtime_paths(source_root=source)
@@ -73,6 +81,22 @@ class RuntimePathsTests(unittest.TestCase):
                 self.assertEqual(
                     (runtime_home / "agent_sandbox" / "existing.txt").read_text(encoding="utf-8"),
                     "legacy-sandbox",
+                )
+                self.assertEqual(
+                    Path(os.environ["BRAIN_SUPERVISOR_ROOT"]),
+                    runtime_home / "brain6_artifacts" / "supervisor",
+                )
+                self.assertEqual(
+                    (runtime_home / "brain6_artifacts" / "supervisor" / "state.json").read_text(encoding="utf-8"),
+                    "legacy-supervisor",
+                )
+                self.assertEqual(
+                    Path(os.environ["BRAIN_SUCCESS_BOT_ROOT"]),
+                    runtime_home / "brain6_artifacts" / "success_bot",
+                )
+                self.assertEqual(
+                    (runtime_home / "brain6_artifacts" / "success_bot" / "state.json").read_text(encoding="utf-8"),
+                    "legacy-success-bot",
                 )
                 runtime_media = runtime_home / "media"
                 self.assertEqual(Path(os.environ["BRAIN_MEDIA_ROOT"]), runtime_media.resolve())
@@ -104,6 +128,8 @@ class RuntimePathsTests(unittest.TestCase):
             self.assertTrue(legacy_queue.is_file())
             self.assertTrue((legacy_workflows / "legacy.json").is_file())
             self.assertTrue((legacy_sandbox / "existing.txt").is_file())
+            self.assertTrue((legacy_supervisor / "state.json").is_file())
+            self.assertTrue((legacy_success_bot / "state.json").is_file())
 
     def test_explicit_database_override_is_preserved_and_not_seeded(self):
         with tempfile.TemporaryDirectory() as temporary:
