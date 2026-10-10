@@ -5,6 +5,9 @@ on:
     paths:
       - "brain_v12/brain/software_registry.py"
       - "brain_v12/brain/software_catalog.py"
+      - "brain_v12/brain/device_bridge.py"
+      - "brain_v12/tools/brain_emulator_agent.py"
+      - "brain_v12/tests/test_software_discovery.py"
       - "brain_v12/tests/test_software_registry.py"
       - "brain_v12/tests/test_software_catalog.py"
       - ".github/workflows/brain-software-registry.yml"
@@ -32,6 +35,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile software inventory and catalog
-        run: python -m py_compile brain_v12/brain/software_registry.py brain_v12/brain/software_catalog.py brain_v12/tests/test_software_registry.py brain_v12/tests/test_software_catalog.py
+        run: python -m py_compile brain_v12/brain/software_registry.py brain_v12/brain/software_catalog.py brain_v12/brain/device_bridge.py brain_v12/tools/brain_emulator_agent.py brain_v12/tests/test_software_registry.py brain_v12/tests/test_software_catalog.py brain_v12/tests/test_software_discovery.py
       - name: Run software inventory and catalog unit tests
-        run: python -m unittest brain_v12.tests.test_software_registry brain_v12.tests.test_software_catalog -v
+        run: python -m unittest brain_v12.tests.test_software_registry brain_v12.tests.test_software_catalog brain_v12.tests.test_software_discovery -v
