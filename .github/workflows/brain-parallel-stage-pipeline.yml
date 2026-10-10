@@ -1,0 +1,71 @@
+name: APM BUILD - Parallel Stage Pipeline
+on:
+  push:
+    paths:
+      - "brain_v12/brain/parallel_stage_scheduler.py"
+      - "brain_v12/brain/apm_build.py"
+      - "brain_v12/brain/apm_stage_discovery.py"
+      - "brain_v12/brain/apm_profiles.py"
+      - "brain_v12/brain/apm_media_adapter.py"
+      - "brain_v12/brain/apm_media_executor.py"
+      - "brain_v12/brain/apm_chunk_scheduler.py"
+      - "brain_v12/brain/apm_build_report.py"
+      - "brain_v12/brain/apm_orchestrator.py"
+      - "brain_v12/brain/apm_worker_protocol.py"
+      - "brain_v12/brain/apm_queue.py"
+      - "brain_v12/brain/apm_dispatcher.py"
+      - "brain_v12/brain/apm_queue_store.py"
+      - "brain_v12/brain/apm_idempotency.py"
+      - "brain_v12/brain/film_segment_manager.py"
+      - "brain_v12/brain/apm_film_assembly.py"
+      - "brain_v7/braincore_v2/media_production_pipeline.py"
+      - "brain_v12/tests/test_parallel_stage_scheduler.py"
+      - "brain_v12/tests/test_apm_build.py"
+      - "brain_v12/tests/test_apm_stage_discovery.py"
+      - "brain_v12/tests/test_apm_profiles.py"
+      - "brain_v12/tests/test_apm_media_adapter.py"
+      - "brain_v12/tests/test_apm_media_executor.py"
+      - "brain_v12/tests/test_apm_chunk_scheduler.py"
+      - "brain_v12/tests/test_apm_build_report.py"
+      - "brain_v12/tests/test_apm_orchestrator.py"
+      - "brain_v12/tests/test_apm_worker_protocol.py"
+      - "brain_v12/tests/test_apm_queue.py"
+      - "brain_v12/tests/test_apm_dispatcher.py"
+      - "brain_v12/tests/test_apm_queue_store.py"
+      - "brain_v12/tests/test_apm_idempotency.py"
+      - "brain_v12/tests/test_apm_worker_protocol.py"
+      - "brain_v12/tests/test_film_segment_manager.py"
+      - "brain_v12/tests/test_apm_film_assembly.py"
+      - ".github/workflows/brain-parallel-stage-pipeline.yml"
+  pull_request:
+    paths:
+      - "brain_v12/brain/parallel_stage_scheduler.py"
+      - "brain_v12/brain/apm_build_report.py"
+      - "brain_v12/brain/apm_orchestrator.py"
+      - "brain_v12/tests/test_parallel_stage_scheduler.py"
+      - "brain_v12/tests/test_apm_build_report.py"
+      - "brain_v12/tests/test_apm_orchestrator.py"
+      - ".github/workflows/brain-parallel-stage-pipeline.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m compileall -q brain_v12/brain brain_v12/tests
+      - name: APM BUILD Contract
+        run: python -m unittest brain_v12.tests.test_parallel_stage_scheduler brain_v12.tests.test_apm_build brain_v12.tests.test_apm_stage_discovery brain_v12.tests.test_apm_profiles brain_v12.tests.test_apm_media_adapter brain_v12.tests.test_apm_media_executor brain_v12.tests.test_apm_chunk_scheduler brain_v12.tests.test_film_segment_manager brain_v12.tests.test_apm_film_assembly brain_v12.tests.test_apm_build_report brain_v12.tests.test_apm_orchestrator brain_v12.tests.test_apm_worker_protocol brain_v12.tests.test_apm_queue brain_v12.tests.test_apm_dispatcher brain_v12.tests.test_apm_queue_store brain_v12.tests.test_apm_idempotency -v
+      - name: Evidence
+        run: |
+          mkdir -p brain-artifacts
+          printf '%s\n' "APM_BUILD_VERIFIED" > brain-artifacts/APM_BUILD_VERIFIED.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apm-build-verified
+          path: brain-artifacts/APM_BUILD_VERIFIED.txt
