@@ -16,6 +16,9 @@ preserved and take precedence:
 - `BRAIN_EVIDENCE_DB`: evidence SQLite database
 - `BRAIN_MEDIA_ROOT`: media input workspace
 - `BRAIN_MEDIA_OUTPUT_ROOT`: generated media output workspace
+- `AGENT_SANDBOX`: bounded code-execution sandbox
+- `BRAIN_SUPERVISOR_ROOT` and `BRAIN_SUCCESS_BOT_ROOT`: supervisor and SuccessBot state directories
+- `BRAIN_VIRTUAL_TASK_DB`: virtual task queue SQLite database
 
 New renders are written below `BRAIN_MEDIA_OUTPUT_ROOT`; legacy media inputs remain
 available at their existing location when the legacy media directory is present.
@@ -27,7 +30,7 @@ When an individual `BRAIN_*` setting is not explicitly configured, startup uses
 the writable runtime root and performs a conservative first-start copy of the
 corresponding legacy state **only if the destination does not already exist**.
 SQLite databases use SQLite's backup API; JSONL queue files use file copies; the
-workflow-state directory is copied as a tree. Existing source files are not deleted
+workflow, sandbox, supervisor, SuccessBot and media directories are copied as trees. Existing source files are not deleted
 or overwritten. An already existing runtime destination wins and is never replaced.
 
 This protects originals from deletion, but a migration is not a substitute for a
