@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/software_registry.py"
+      - "brain_v12/brain/software_catalog.py"
       - "brain_v12/tests/test_software_registry.py"
+      - "brain_v12/tests/test_software_catalog.py"
       - ".github/workflows/brain-software-registry.yml"
   push:
     branches:
@@ -29,7 +31,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile registry and tests
-        run: python -m py_compile brain_v12/brain/software_registry.py brain_v12/tests/test_software_registry.py
-      - name: Run software registry unit tests
-        run: python -m unittest brain_v12.tests.test_software_registry -v
+      - name: Compile software inventory and catalog
+        run: python -m py_compile brain_v12/brain/software_registry.py brain_v12/brain/software_catalog.py brain_v12/tests/test_software_registry.py brain_v12/tests/test_software_catalog.py
+      - name: Run software inventory and catalog unit tests
+        run: python -m unittest brain_v12.tests.test_software_registry brain_v12.tests.test_software_catalog -v
