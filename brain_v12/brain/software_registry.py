@@ -107,7 +107,8 @@ class SoftwareRegistry:
                 ON CONFLICT(software_id) DO UPDATE SET
                   name=excluded.name, category=excluded.category, version=excluded.version,
                   source=excluded.source, license=excluded.license, install_path=excluded.install_path,
-                  runtime_state=excluded.runtime_state, permissions_json=excluded.permissions_json,
+                  runtime_state=excluded.runtime_state, verification_state='unverified',
+                  permissions_json=excluded.permissions_json, evidence_ref=NULL,
                   notes=excluded.notes, updated_at=excluded.updated_at
             """, (
                 software_id, values["name"], values["category"], values["version"],
