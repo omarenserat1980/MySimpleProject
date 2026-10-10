@@ -8,11 +8,18 @@ on:
     paths:
       - "brain_v12/brain/golden_mission.py"
       - "brain_v12/brain/golden_mission_worker.py"
+      - "brain_v12/brain/golden_mission_system_audit.py"
+      - "brain_v12/brain/golden_mission_live_probe.py"
+      - "brain_v12/brain/golden_mission_evidence_assembler.py"
       - "brain_v12/golden_mission_api.py"
       - "brain_v12/brain/synthetic_customer.py"
       - "brain_v12/tests/test_golden_mission*.py"
       - "brain_v12/tests/test_synthetic_customer*.py"
       - "brain_v12/app.py"
+      - "docs/GOLDEN_MISSION_LOOP.md"
+      - "docs/GOLDEN_MISSION_SYSTEM_AUDIT.md"
+      - "LEGACY_REQUIREMENTS.md"
+      - "TODO_FROM_LEGACY.md"
       - ".github/workflows/golden-mission-loop-tests.yml"
   workflow_dispatch:
 
@@ -39,7 +46,22 @@ jobs:
           python -m pip install -r requirements.txt pytest
       - name: Compile changed Python modules
         run: |
-          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/brain/golden_mission_worker.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
+          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/brain/golden_mission_worker.py brain_v12/brain/golden_mission_system_audit.py brain_v12/brain/golden_mission_live_probe.py brain_v12/brain/golden_mission_evidence_assembler.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
+      - name: Produce read-only system-wide launch audit evidence
+        if: always()
+        run: |
+          mkdir -p .brain/state
+          python -m brain_v12.brain.golden_mission_system_audit --root . --output .brain/state/golden_mission_system_audit.json
+
       - name: Run Golden Mission and Synthetic Customer tests
         run: |
-          python -m pytest -q brain_v12/tests/test_golden_mission.py brain_v12/tests/test_golden_mission_api.py brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
+          python -m pytest -q brain_v12/tests/test_golden_mission.py brain_v12/tests/test_golden_mission_system_audit.py brain_v12/tests/test_golden_mission_live_probe.py brain_v12/tests/test_golden_mission_evidence_assembler.py brain_v12/tests/test_golden_mission_api.py brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
+
+      - name: Upload Golden Mission system audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-mission-system-audit
+          path: .brain/state/golden_mission_system_audit.json
+          if-no-files-found: warn
+          retention-days: 14

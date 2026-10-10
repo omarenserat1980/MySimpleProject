@@ -46,6 +46,14 @@ class GoldenMissionControllerTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_rejects_duplicate_acceptance_criteria(self):
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_MUST_BE_UNIQUE"):
+            self.controller.create(
+                title="Duplicate criteria",
+                objective="Reject duplicate acceptance criteria before execution",
+                acceptance=["criterion A", "criterion A"],
+            )
+
     def test_persists_mission_across_controller_instances(self):
         restored = GoldenMissionController(str(Path(self.tmp.name) / "missions.sqlite3"))
         self.assertEqual(restored.get(self.mission["mission_id"])["status"], "PLANNED")
@@ -180,6 +188,116 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertEqual(worker.interval_seconds, 30)
         self.assertEqual(worker.tick()["checked"], 0)
         self.assertEqual(stub.calls, 1)
+
+    def test_reminder_worker_start_is_idempotent_and_stop_joins_thread(self):
+        import time
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class Stub:
+            def __init__(self):
+                self.calls = 0
+                self.lock = __import__("threading").Lock()
+
+            def notify_due(self):
+                with self.lock:
+                    self.calls += 1
+                return {"checked": 0, "notifications_sent": 0,
+                        "notifications_failed_or_unconfigured": 0}
+
+        stub = Stub()
+        worker = GoldenMissionReminderWorker(stub, interval_seconds=30)
+        self.assertTrue(worker.start())
+        self.assertFalse(worker.start())
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            with stub.lock:
+                if stub.calls:
+                    break
+            time.sleep(0.01)
+        before_stop = worker.status()
+        self.assertTrue(before_stop["running"])
+        self.assertIsNotNone(before_stop["started_at"])
+        self.assertIsNotNone(before_stop["last_tick_at"])
+        self.assertIsNone(before_stop["last_error"])
+        self.assertEqual(before_stop["mode"], "REMINDERS_ONLY")
+        worker.stop(timeout=1.0)
+        self.assertFalse(worker._thread.is_alive())
+        self.assertFalse(worker.status()["running"])
+        self.assertGreaterEqual(stub.calls, 1)
+
+    def test_reminder_worker_concurrent_start_creates_only_one_worker(self):
+        import threading
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class Stub:
+            def __init__(self):
+                self.calls = 0
+                self.lock = threading.Lock()
+
+            def notify_due(self):
+                with self.lock:
+                    self.calls += 1
+                return {"checked": 0, "notifications_sent": 0,
+                        "notifications_failed_or_unconfigured": 0}
+
+        worker = GoldenMissionReminderWorker(Stub(), interval_seconds=30)
+        barrier = threading.Barrier(8)
+        results = []
+        results_lock = threading.Lock()
+
+        def launch():
+            barrier.wait()
+            result = worker.start()
+            with results_lock:
+                results.append(result)
+
+        threads = [threading.Thread(target=launch) for _ in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+
+        self.assertEqual(results.count(True), 1)
+        self.assertEqual(results.count(False), 7)
+        worker.stop(timeout=1)
+        self.assertFalse(worker.status()["running"])
+
+    def test_reminder_worker_records_tick_failure_without_swallowing_manual_tick(self):
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class BrokenController:
+            def notify_due(self):
+                raise RuntimeError("temporary notifier database failure")
+
+        worker = GoldenMissionReminderWorker(BrokenController(), interval_seconds=30)
+        with self.assertRaisesRegex(RuntimeError, "temporary notifier database failure"):
+            worker.tick()
+        status = worker.status()
+        self.assertIsNotNone(status["last_tick_at"])
+        self.assertEqual(status["last_error"], "RuntimeError: temporary notifier database failure")
+        self.assertIsNone(status["last_result"])
+        self.assertEqual(status["mode"], "REMINDERS_ONLY")
+
+    def test_reminder_worker_survives_background_tick_failure_and_reports_it(self):
+        import time
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class BrokenController:
+            def notify_due(self):
+                raise RuntimeError("background tick failed")
+
+        worker = GoldenMissionReminderWorker(BrokenController(), interval_seconds=30)
+        self.assertTrue(worker.start())
+        deadline = time.monotonic() + 1.0
+        status = worker.status()
+        while time.monotonic() < deadline and status["last_error"] is None:
+            time.sleep(0.01)
+            status = worker.status()
+        worker.stop(timeout=1.0)
+        self.assertEqual(status["last_error"], "RuntimeError: background tick failed")
+        self.assertIsNotNone(status["last_tick_at"])
+        self.assertFalse(worker.status()["running"])
 
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):
