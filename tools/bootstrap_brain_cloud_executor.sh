@@ -88,8 +88,8 @@ if [ ! -x ./run.sh ]; then
   curl -fsSL -o "$archive" "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/$archive"
   tar -xzf "$archive"
   rm -f "$archive"
-  sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
 fi
+sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
 
 TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
 # The operator obtains the short-lived token; the isolated runner account never receives gh CLI credentials.
