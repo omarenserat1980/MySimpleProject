@@ -179,7 +179,7 @@ class MemoryStore:
     def set_memory_metadata(self, key, *, source=None, confidence=None, expires_at=None,
                             status=None, tags=None):
         """Set provenance/lifecycle metadata without rewriting the memory value."""
-        allowed_statuses = {"ACTIVE", "CONFLICTED", "SUPERSEDED", "RETRACTED", "ARCHIVED"}
+        allowed_statuses = {"ACTIVE", "UNVERIFIED", "CONFLICTED", "SUPERSEDED", "RETRACTED", "ARCHIVED"}
         if confidence is not None:
             try:
                 confidence = float(confidence)
@@ -291,6 +291,15 @@ class MemoryStore:
             key_score = sum(term_weights[term] for term in query_terms & key_terms)
             value_score = sum(term_weights[term] for term in query_terms & value_terms)
             score = (key_score * 3) + (value_score * 2)
+            try:
+                confidence = float(memory.get("confidence", 0.5))
+            except (TypeError, ValueError, OverflowError):
+                confidence = 0.5
+            if not math.isfinite(confidence):
+                confidence = 0.5
+            confidence = min(1.0, max(0.0, confidence))
+            # Confidence adjusts relevance without erasing the lexical match.
+            score *= 0.5 + confidence
             if score:
                 ranked.append((score, position, memory))
         if not ranked:
