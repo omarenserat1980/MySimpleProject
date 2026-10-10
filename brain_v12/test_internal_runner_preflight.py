@@ -13,6 +13,7 @@ class InternalRunnerPreflightTests(unittest.TestCase):
             patch("brain_v12.brain.internal_runner_preflight.which", return_value="/usr/bin/mock-tool"),
             patch("brain_v12.brain.internal_runner_preflight.platform.system", return_value="Linux"),
             patch("brain_v12.brain.internal_runner_preflight.platform.machine", return_value="x86_64"),
+            patch("brain_v12.brain.internal_runner_preflight.os.geteuid", return_value=1000),
         ):
             r = inspect_runner()
             self.assertFalse(r.online)
@@ -25,6 +26,7 @@ class InternalRunnerPreflightTests(unittest.TestCase):
             patch("brain_v12.brain.internal_runner_preflight.which", return_value="/usr/bin/mock-tool"),
             patch("brain_v12.brain.internal_runner_preflight.platform.system", return_value="Linux"),
             patch("brain_v12.brain.internal_runner_preflight.platform.machine", return_value="x86_64"),
+            patch("brain_v12.brain.internal_runner_preflight.os.geteuid", return_value=1000),
         ):
             r = inspect_runner()
             self.assertTrue(r.online)
