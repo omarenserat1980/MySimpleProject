@@ -24,13 +24,28 @@ concurrency:
 jobs:
   cloud_executor_gate:
     name: Cloud Executor Capability Gate
+    environment:
+      name: windows-real-boot
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 10
+    env:
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ runner.temp }}/cloud-executor-attestation.json
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch fresh signed executor attestation
+        run: |
+          set -euo pipefail
+          test -n "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_TOKEN:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          python3 tools/request_cloud_executor_attestation.py --output "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"
       - name: Run independent cloud executor gate
         run: |
           set -euo pipefail
+          trap 'rm -f "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"' EXIT
           python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
           python3 - <<'PY'
           import json
@@ -54,6 +69,10 @@ jobs:
     env:
       BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
       BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ runner.temp }}/cloud-executor-attestation.json
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 70
     steps:
@@ -79,7 +98,12 @@ jobs:
           PY
           echo "BRAIN_INTERNAL_RUNNER=VERIFIED"
           echo "BRAIN_BOOT_RUNNER_NAME=${RUNNER_NAME:-unknown}"
-          # Re-check cloud executor capability on the exact runner that will boot Windows.
+          # Request a new single-use signed attestation on the exact runner that will boot Windows.
+          trap 'rm -f "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"' EXIT
+          test -n "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_TOKEN:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          python3 tools/request_cloud_executor_attestation.py --output "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"
           python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
           python3 - <<'PY'
           import json
