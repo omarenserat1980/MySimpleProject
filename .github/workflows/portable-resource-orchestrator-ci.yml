@@ -5,7 +5,11 @@ on:
     branches: [main]
     paths:
       - "brain_v12/brain/portable_resource_orchestrator.py"
+      - "brain_v12/brain/executor_contract.py"
+      - "brain_v12/brain/run_evidence_store.py"
       - "brain_v12/tests/test_portable_resource_orchestrator.py"
+      - "brain_v12/tests/test_executor_contract.py"
+      - "brain_v12/tests/test_run_evidence_store.py"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
   workflow_dispatch:
 
@@ -17,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  policy-tests:
-    name: Scheduler policy tests (no provisioning)
+  policy-and-evidence-tests:
+    name: Policy, contract and evidence tests (no provisioning)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -30,10 +34,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile scheduler
-        run: python -m py_compile brain_v12/brain/portable_resource_orchestrator.py
+      - name: Compile execution components
+        run: |
+          python -m py_compile \
+            brain_v12/brain/portable_resource_orchestrator.py \
+            brain_v12/brain/executor_contract.py \
+            brain_v12/brain/run_evidence_store.py
 
       - name: Run focused tests
         env:
           PYTHONPATH: .
-        run: python -m unittest brain_v12.tests.test_portable_resource_orchestrator -v
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_portable_resource_orchestrator \
+            brain_v12.tests.test_executor_contract \
+            brain_v12.tests.test_run_evidence_store -v
