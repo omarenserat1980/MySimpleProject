@@ -16,6 +16,9 @@ TRUST_KEY_FILE="${BRAIN_EXECUTOR_ATTESTATION_PUBLIC_KEY_FILE:-/etc/brain/trust/c
 GATE_TMP="$(mktemp /tmp/brain-cloud-executor-gate.XXXXXX.json)"
 trap 'rm -f "$GATE_TMP"' EXIT
 
+# Refuse privileged execution; the runner account must be isolated and unprivileged.
+[ "$(id -u)" -ne 0 ] || { echo "CLOUD_EXECUTOR_UNPRIVILEGED_ACCOUNT_REQUIRED"; exit 21; }
+
 [ "${BRAIN_CLOUD_EXECUTOR:-}" = "1" ] || { echo "BRAIN_CLOUD_EXECUTOR=1_REQUIRED"; exit 20; }
 [ -n "$EXECUTOR_ID" ] || { echo "BRAIN_CLOUD_EXECUTOR_ID_REQUIRED"; exit 24; }
 [ -n "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" ] || { echo "CLOUD_EXECUTOR_REGISTRY_URL_REQUIRED"; exit 33; }
