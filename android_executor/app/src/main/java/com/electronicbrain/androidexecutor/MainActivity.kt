@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
         val agentId = EditText(this).apply {
             hint = "V12_AGENT_ID"
-            setText(prefs.getString("agent_id", "android-executor-redmi3-01"))
+            setText(prefs.getString("agent_id", "android-executor-ralmi-01"))
         }
         val brainUrl = EditText(this).apply {
             hint = "BRAIN_BASE_URL"
@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 48, 32, 32)
             addView(TextView(this@MainActivity).apply {
-                text = "ELECTRONIC BRAIN\nOPTIONAL ANDROID CLIENT"
+                text = "ELECTRONIC BRAIN\nRALMI ANDROID EXECUTOR"
                 textSize = 22f
             })
             addView(agentId); addView(agentKey); addView(brainUrl); addView(start); addView(stop); addView(accessibility); addView(storage); addView(status)

@@ -133,6 +133,43 @@ class DeviceBridge:
             if r.get("ok") and r.get("task",{}).get("status") in ("COMPLETED","FAILED"):return r
             time.sleep(.5)
         return {"ok":False,"status":"RESULT_TIMEOUT","task_id":task_id}
+    def executor_capacities(self):
+        """Return only explicitly enrolled, live Android executors for scheduling."""
+        from .android_executor_adapter import android_executor_capacities
+
+        now = time.time()
+        ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
+        records = []
+        for item in self.store.device_agents():
+            agent_id = item.get("agent_id", "")
+            if not agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX):
+                continue
+            record = self.sync_adapter.store.get(f"device/agent/{agent_id}")
+            value = record.value if record and not record.deleted else {}
+            records.append({
+                "agent_id": agent_id,
+                "last_seen": item.get("last_seen", 0),
+                "metadata": value.get("metadata", {}),
+            })
+        return [
+            {
+                "executor_id": executor.executor_id,
+                "capabilities": sorted(executor.capabilities),
+                "cpu_cores": executor.cpu_cores,
+                "memory_mb": executor.memory_mb,
+                "disk_mb": executor.disk_mb,
+                "gpu_count": executor.gpu_count,
+                "tier": executor.tier,
+                "online": executor.online,
+                "healthy": executor.healthy,
+                "permissions": sorted(executor.permissions),
+                "metadata": dict(executor.metadata),
+            }
+            for executor in android_executor_capacities(
+                records, now=now, heartbeat_ttl_seconds=ttl
+            )
+        ]
+
     def agent_status(self):
         ttl=max(5,int(os.getenv("TERMUX_AGENT_TTL_SECONDS","15"))); now=time.time(); agents=[]
         for item in self.store.device_agents():

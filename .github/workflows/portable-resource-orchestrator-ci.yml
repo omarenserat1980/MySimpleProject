@@ -1,0 +1,57 @@
+name: Portable Resource Orchestrator CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/portable_resource_orchestrator.py"
+      - "brain_v12/brain/executor_contract.py"
+      - "brain_v12/brain/run_evidence_store.py"
+      - "brain_v12/brain/android_executor_adapter.py"
+      - "brain_v12/tests/test_portable_resource_orchestrator.py"
+      - "brain_v12/tests/test_executor_contract.py"
+      - "brain_v12/tests/test_run_evidence_store.py"
+      - "brain_v12/tests/test_android_executor_adapter.py"
+      - "brain_v12/tests/test_device_bridge_android_capacity.py"
+      - ".github/workflows/portable-resource-orchestrator-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-resource-orchestrator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-and-evidence-tests:
+    name: Policy, contract and evidence tests (no provisioning)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile execution components
+        run: |
+          python -m py_compile \
+            brain_v12/brain/portable_resource_orchestrator.py \
+            brain_v12/brain/executor_contract.py \
+            brain_v12/brain/run_evidence_store.py \
+            brain_v12/brain/android_executor_adapter.py
+
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_portable_resource_orchestrator \
+            brain_v12.tests.test_executor_contract \
+            brain_v12.tests.test_run_evidence_store \
+            brain_v12.tests.test_android_executor_adapter \
+            brain_v12.tests.test_device_bridge_android_capacity -v
