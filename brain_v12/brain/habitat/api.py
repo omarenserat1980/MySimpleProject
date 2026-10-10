@@ -12,8 +12,9 @@ from .project_factory import ProjectFactory
 from .source_explorer import SourceExplorer
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE = Path(os.getenv("BRAIN_HABITAT_STATE", ROOT / ".brain" / "state" / "habitat_capabilities.json"))
-WORKSPACE = Path(os.getenv("BRAIN_HABITAT_WORKSPACE", ROOT / ".brain" / "habitat" / "projects"))
+RUNTIME_HOME = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
+STATE = Path(os.getenv("BRAIN_HABITAT_STATE", RUNTIME_HOME / "state" / "habitat_capabilities.json")).expanduser()
+WORKSPACE = Path(os.getenv("BRAIN_HABITAT_WORKSPACE", RUNTIME_HOME / "habitat" / "projects")).expanduser()
 SOURCE_ROOTS = [Path(x).resolve() for x in os.getenv(
     "BRAIN_HABITAT_SOURCE_ROOTS", str(ROOT / "brain_v12")
 ).split(os.pathsep) if x.strip()]
