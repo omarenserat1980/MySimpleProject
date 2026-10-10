@@ -21,7 +21,9 @@ if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
-export V12_BRAIN_URL="${BRAIN_URL:-http://127.0.0.1:8012}"
+# Preserve an explicit non-paid endpoint from either supported variable.
+# Render guards above run first, so blocked paid endpoints cannot be restored here.
+export V12_BRAIN_URL="${V12_BRAIN_URL:-${BRAIN_URL:-http://127.0.0.1:8012}}"
 # Local Termux runtime must use exactly one on-device key. Clear stale values, then seed the direct-key variable from the canonical local key file.
 unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
 export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
@@ -61,6 +63,38 @@ key=open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]),encoding="utf-8").
 req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key},method="POST")
 with urllib.request.urlopen(req,timeout=3) as r: r.read()' >/dev/null 2>&1
 }
+auth_diagnostic() {
+  "$PYTHON" - <<'PY'
+import json, os, socket, urllib.error, urllib.request
+base = os.environ["V12_BRAIN_URL"]
+try:
+    key = open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]), encoding="utf-8").read().strip()
+    req = urllib.request.Request(
+        base + "/api/device/heartbeat",
+        data=json.dumps({"agent_id": os.environ["V12_AGENT_ID"]}).encode(),
+        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=3) as response:
+        response.read()
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=AUTH_OK")
+except urllib.error.HTTPError as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=HTTP_" + str(exc.code))
+except urllib.error.URLError as exc:
+    reason = exc.reason
+    if isinstance(reason, (socket.timeout, TimeoutError)):
+        status = "TIMEOUT"
+    elif isinstance(reason, ConnectionRefusedError):
+        status = "CONNECTION_REFUSED"
+    else:
+        status = "NETWORK_ERROR"
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=" + status)
+except (OSError, ValueError) as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=LOCAL_CONFIG_ERROR type=" + type(exc).__name__)
+except Exception as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=UNEXPECTED_ERROR type=" + type(exc).__name__)
+PY
+}
 start_api() {
   echo "JET_BRAIN_API starting url=$V12_BRAIN_URL" >&2
   "$PYTHON" -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 --workers 1 --log-level warning >> "$ROOT/.brain/state/api.log" 2>&1 &
@@ -82,16 +116,40 @@ start_api() {
   if ! health_ok; then echo "BRAIN_RUNTIME_ERROR: API_START_FAILED pid=$API_PID" >&2; exit 43; fi
   echo "JET_BRAIN_API ready pid=$API_PID" >&2
 }
-if health_ok; then
-  if auth_ok; then echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+is_local_api() {
+  "$PYTHON" -c 'import ipaddress,os,urllib.parse
+host=(urllib.parse.urlparse(os.environ["V12_BRAIN_URL"]).hostname or "").lower()
+if host == "localhost": raise SystemExit(0)
+try: raise SystemExit(0 if ipaddress.ip_address(host).is_loopback else 1)
+except ValueError: raise SystemExit(1)' 
+}
+if is_local_api; then
+  if health_ok; then
+    if auth_ok; then
+      echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+    else
+      echo "JET_BRAIN_API local_auth_failed_restart_once" >&2
+      pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+      sleep 1
+      start_api
+    fi
   else
-    echo "JET_BRAIN_API stale_auth_restart" >&2
-    pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
-    sleep 1
     start_api
   fi
-else start_api; fi
-if ! auth_ok; then echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2; exit 44; fi
+else
+  # A remote endpoint must never trigger launch/kill of the local API process.
+  if ! health_ok; then
+    auth_diagnostic >&2 || true
+    echo "BRAIN_RUNTIME_ERROR: REMOTE_API_UNREACHABLE url=$V12_BRAIN_URL" >&2
+    exit 43
+  fi
+  echo "JET_BRAIN_API remote_endpoint_reachable url=$V12_BRAIN_URL" >&2
+fi
+if ! auth_ok; then
+  auth_diagnostic >&2 || true
+  echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2
+  exit 44
+fi
 
 seed_bootstrap_task() {
   if [ -z "${BRAIN_CONTROL_KEY:-}" ]; then
