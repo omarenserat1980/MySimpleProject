@@ -2,7 +2,7 @@ name: Brain Free Cloud Capacity Gate
 
 on:
   pull_request:
-    paths: &cloud_foundation_paths
+    paths:
       - "brain_v12/brain/cloud_capacity_gate.py"
       - "brain_v12/brain/cloud_provider_adapter.py"
       - "brain_v12/brain/resource_fabric.py"
@@ -28,7 +28,28 @@ on:
     branches:
       - main
       - "feat/brain-free-cloud-capacity-gate"
-    paths: *cloud_foundation_paths
+    paths:
+      - "brain_v12/brain/cloud_capacity_gate.py"
+      - "brain_v12/brain/cloud_provider_adapter.py"
+      - "brain_v12/brain/resource_fabric.py"
+      - "brain_v12/brain/task_scheduler.py"
+      - "brain_v12/brain/cloud_executor.py"
+      - "brain_v12/brain/verification_recovery.py"
+      - "brain_v12/brain/task_envelope.py"
+      - "brain_v12/brain/resource_health.py"
+      - "brain_v12/brain/execution_evidence_bundle.py"
+      - "brain_v12/brain/execution_lease.py"
+      - "brain_v12/tests/test_cloud_capacity_gate.py"
+      - "brain_v12/tests/test_cloud_provider_adapter.py"
+      - "brain_v12/tests/test_task_scheduler.py"
+      - "brain_v12/tests/test_cloud_executor.py"
+      - "brain_v12/tests/test_verification_recovery.py"
+      - "brain_v12/tests/test_task_envelope.py"
+      - "brain_v12/tests/test_resource_health.py"
+      - "brain_v12/tests/test_execution_evidence_bundle.py"
+      - "brain_v12/tests/test_execution_lease.py"
+      - "brain_v12/tests/test_cloud_foundation_integration.py"
+      - ".github/workflows/brain-free-cloud-capacity-gate.yml"
 
 permissions:
   contents: read
