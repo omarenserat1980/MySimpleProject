@@ -113,8 +113,23 @@ class CognitiveLoop:
         recall = getattr(self.store, "recall_memories", None)
         memories = recall(goal, limit=12) if callable(recall) else self.store.memories()[:12]
         self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
-        reasoning_path = select_reasoning_path(goal, memories)
+        # Pathways are curated long-term records; search all stored memories so
+        # recent unrelated memories cannot hide them from the planning stage.
+        all_memories_fn = getattr(self.store, "memories", None)
+        all_memories = all_memories_fn() if callable(all_memories_fn) else memories
+        reasoning_path = select_reasoning_path(goal, all_memories)
+        decision_memories = list(memories)
         if reasoning_path:
+            path_context = {
+                "key": reasoning_path["key"],
+                "value": " ".join([
+                    reasoning_path["title"],
+                    reasoning_path["engineering_application"],
+                    " ".join(reasoning_path["stages"]),
+                    " ".join(str(ref.get("reference", "")) for ref in reasoning_path["source_references"]),
+                ]),
+            }
+            decision_memories.append(path_context)
             self.events.publish("REASONING_PATH_SELECTED",{
                 "key":reasoning_path["key"],
                 "title":reasoning_path["title"],
@@ -125,7 +140,7 @@ class CognitiveLoop:
             })
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
-        options=self.decisions.generate(goal, memories=memories)
+        options=self.decisions.generate(goal, memories=decision_memories)
         self.events.publish("ANALYZE",{"options_count":len(options),"run_id":run_id})
 
         self._state("PLAN",goal=goal,run_id=run_id)
@@ -138,7 +153,7 @@ class CognitiveLoop:
         })
 
         self._state("DECIDE",goal=goal,run_id=run_id)
-        decision=self.decisions.choose(goal,options,self.permissions.grants,memories=memories)
+        decision=self.decisions.choose(goal,options,self.permissions.grants,memories=decision_memories)
         decision["run_id"]=run_id
         self.events.publish("DECISION_MADE",decision)
 
