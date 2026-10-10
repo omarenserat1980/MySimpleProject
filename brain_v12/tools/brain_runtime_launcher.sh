@@ -31,9 +31,9 @@ if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
 # copied Redmi config silently register another handset as redmi3-01.
 DEVICE_MODEL="$(getprop ro.product.model 2>/dev/null || true)"
 DETECTED_AGENT_ID=""
-# Only exact known hardware model identifiers are auto-mapped. Brand-name
-# matching is deliberately avoided because multiple phones can share a brand.
-# Unknown models must use an explicitly configured, unique V12_AGENT_ID.
+# Only verified hardware model codes are auto-mapped. Broad brand matching
+# is unsafe because many devices share a brand. Unknown models require both a
+# unique configured agent ID and an exact V12_DEVICE_MODEL pin in local config.
 case "$DEVICE_MODEL" in
   *23129RN51X*) DETECTED_AGENT_ID="redmi3-01" ;;
   *RMX3710*) DETECTED_AGENT_ID="realme-01" ;;
@@ -47,6 +47,10 @@ if [ -n "$DETECTED_AGENT_ID" ]; then
   export V12_AGENT_ID="$DETECTED_AGENT_ID"
 elif [ -z "${V12_AGENT_ID:-}" ]; then
   echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_REQUIRED model=${DEVICE_MODEL:-unknown}; set a unique V12_AGENT_ID in $HOME/v12-agent/agent_config.sh" >&2
+  exit 45
+elif [ "${V12_DEVICE_MODEL:-}" != "$DEVICE_MODEL" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_MODEL_CONFIRMATION_REQUIRED detected=${DEVICE_MODEL:-unknown} configured=${V12_DEVICE_MODEL:-unset}" >&2
+  echo "Set V12_DEVICE_MODEL to this phone's exact getprop ro.product.model value in $HOME/v12-agent/agent_config.sh." >&2
   exit 45
 fi
 
