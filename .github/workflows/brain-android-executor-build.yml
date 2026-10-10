@@ -2,7 +2,7 @@ name: Brain Android Executor Build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "architecture/portable-resource-orchestrator"]
     paths:
       - "android_executor/**"
       - ".github/workflows/brain-android-executor-build.yml"
