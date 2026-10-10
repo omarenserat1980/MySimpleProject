@@ -80,8 +80,8 @@ class SoftwareRegistry:
                 raise ValueError(f"INVALID_{key.upper()}")
             values[key] = value.strip()
         state = metadata.get("runtime_state", "planned")
-        if state not in {"planned", "observed", "unknown"}:
-            raise ValueError("REGISTRATION_STATE_MUST_BE_PLANNED_OBSERVED_OR_UNKNOWN")
+        if not isinstance(state, str) or state not in {"planned", "unknown"}:
+            raise ValueError("REGISTRATION_STATE_MUST_BE_PLANNED_OR_UNKNOWN")
         permissions = metadata.get("permissions", [])
         if not isinstance(permissions, list) or len(permissions) > 64 or not all(
             isinstance(p, str) and 0 < len(p) <= 128 for p in permissions
@@ -123,14 +123,18 @@ class SoftwareRegistry:
         evidence_ref: str, install_path: str | None = None, notes: str | None = None,
     ) -> dict[str, Any]:
         """Record externally obtained evidence; never runs a probe or trusts empty evidence."""
-        if runtime_state not in SOFTWARE_STATES:
+        if not isinstance(runtime_state, str) or runtime_state not in SOFTWARE_STATES:
             raise ValueError("INVALID_RUNTIME_STATE")
-        if verification_state not in VERIFICATION_STATES:
+        if not isinstance(verification_state, str) or verification_state not in VERIFICATION_STATES:
             raise ValueError("INVALID_VERIFICATION_STATE")
         if not isinstance(evidence_ref, str) or not evidence_ref.strip() or len(evidence_ref) > 2048:
             raise ValueError("EVIDENCE_REFERENCE_REQUIRED")
         if verification_state == "verified" and runtime_state not in {"observed", "installed", "running", "stopped"}:
             raise ValueError("VERIFIED_STATE_REQUIRES_OBSERVED_OR_INSTALLED_RUNTIME")
+        if install_path is not None and (not isinstance(install_path, str) or len(install_path) > 1024):
+            raise ValueError("INVALID_INSTALL_PATH")
+        if notes is not None and (not isinstance(notes, str) or len(notes) > 4000):
+            raise ValueError("INVALID_NOTES")
         now = _now()
         with self._connect() as con:
             row = con.execute("SELECT * FROM brain_software_registry WHERE software_id=?", (software_id,)).fetchone()
