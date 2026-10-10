@@ -58,6 +58,92 @@ class MemoryRecallTests(unittest.TestCase):
             self.assertEqual(recalled, [])
 
 
+    def test_memory_metadata_round_trips_source_confidence_status_and_tags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("project.decision", "قرار مرتبط بمصدر موثق")
+            metadata = store.set_memory_metadata(
+                "project.decision",
+                source="github:commit:abc123",
+                confidence=0.93,
+                status="ACTIVE",
+                tags=["decision", "source"],
+            )
+            recalled = store.memories()[0]
+
+            self.assertEqual(metadata["source"], "github:commit:abc123")
+            self.assertEqual(metadata["confidence"], 0.93)
+            self.assertEqual(recalled["source"], "github:commit:abc123")
+            self.assertEqual(recalled["confidence"], 0.93)
+            self.assertEqual(recalled["status"], "ACTIVE")
+            self.assertEqual(recalled["tags"], ["decision", "source"])
+
+    def test_expired_memory_is_excluded_even_when_query_matches(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("project.expired", "deployment verification evidence")
+            store.set_memory_metadata("project.expired", source="test", expires_at="2000-01-01T00:00:00Z")
+
+            recalled = store.recall_memories("deployment verification evidence", fallback_recent=False)
+
+            self.assertEqual(recalled, [])
+
+    def test_conflicted_retracted_and_archived_memories_are_not_recalled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            for key, status in [
+                ("project.conflicted", "CONFLICTED"),
+                ("project.retracted", "RETRACTED"),
+                ("project.archived", "ARCHIVED"),
+            ]:
+                store.save_memory(key, "deployment verified evidence")
+                store.set_memory_metadata(key, status=status, source="test")
+
+            recalled = store.recall_memories("deployment verified evidence", fallback_recent=False)
+
+            self.assertEqual(recalled, [])
+
+    def test_malformed_expiry_fails_closed_for_goal_recall(self):
+        self.assertFalse(MemoryStore._memory_is_recallable({
+            "key": "project.bad_expiry",
+            "value": "matching evidence",
+            "status": "ACTIVE",
+            "expires_at": "not-a-date",
+        }))
+
+    def test_legacy_memory_without_metadata_remains_recallable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("project.legacy", "historical repository evidence")
+            with store.connect() as con:
+                con.execute("DELETE FROM memory_metadata WHERE memory_key=?", ("project.legacy",))
+                con.commit()
+
+            memory = store.memories()[0]
+            recalled = store.recall_memories("historical repository evidence", fallback_recent=False)
+
+            self.assertEqual(memory["source"], "LEGACY_UNKNOWN")
+            self.assertEqual(memory["status"], "ACTIVE")
+            self.assertEqual([item["key"] for item in recalled], ["project.legacy"])
+
+    def test_memory_metadata_rejects_invalid_confidence_and_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("project.validation", "metadata validation")
+
+            with self.assertRaises(ValueError):
+                store.set_memory_metadata("project.validation", confidence=float("nan"))
+            with self.assertRaises(ValueError):
+                store.set_memory_metadata("project.validation", confidence=1.5)
+            with self.assertRaises(ValueError):
+                store.set_memory_metadata("project.validation", status="MAGICALLY_VERIFIED")
+
+
 
 if __name__ == "__main__":
     unittest.main()
