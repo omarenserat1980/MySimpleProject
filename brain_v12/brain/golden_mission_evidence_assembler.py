@@ -50,16 +50,24 @@ def _valid_drill(payload: dict[str, Any], name: str, host: str) -> dict[str, Any
     check = matches[0]
     if check.get("passed") is not True:
         raise ValueError(f"{name}: check did not pass")
-    if not isinstance(check.get("evidence_ref"), str) or not check["evidence_ref"].strip():
-        raise ValueError(f"{name}: evidence_ref is required")
+    evidence_path = check.get("evidence_path")
+    if not isinstance(evidence_path, str) or not evidence_path.strip():
+        raise ValueError(f"{name}: evidence_path to retained drill output is required")
+    try:
+        evidence_bytes = Path(evidence_path).read_bytes()
+    except OSError as exc:
+        raise ValueError(f"{name}: retained evidence file cannot be read") from exc
+    actual_digest = hashlib.sha256(evidence_bytes).hexdigest()
     digest = check.get("evidence_sha256")
     if not isinstance(digest, str) or not HASH_RE.fullmatch(digest):
         raise ValueError(f"{name}: valid lowercase SHA-256 evidence_sha256 is required")
+    if not hashlib.compare_digest(actual_digest, digest):
+        raise ValueError(f"{name}: evidence file SHA-256 does not match the recorded digest")
     return {
         "name": name,
         "passed": True,
-        "evidence_ref": check["evidence_ref"],
-        "evidence_sha256": digest,
+        "evidence_ref": evidence_path,
+        "evidence_sha256": actual_digest,
         "checked_at": payload["checked_at"],
     }
 
