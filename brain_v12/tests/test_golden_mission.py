@@ -225,6 +225,22 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertFalse(worker.status()["running"])
         self.assertGreaterEqual(stub.calls, 1)
 
+    def test_reminder_worker_records_tick_failure_without_swallowing_manual_tick(self):
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class BrokenController:
+            def notify_due(self):
+                raise RuntimeError("temporary notifier database failure")
+
+        worker = GoldenMissionReminderWorker(BrokenController(), interval_seconds=30)
+        with self.assertRaisesRegex(RuntimeError, "temporary notifier database failure"):
+            worker.tick()
+        status = worker.status()
+        self.assertIsNotNone(status["last_tick_at"])
+        self.assertEqual(status["last_error"], "RuntimeError: temporary notifier database failure")
+        self.assertIsNone(status["last_result"])
+        self.assertEqual(status["mode"], "REMINDERS_ONLY")
+
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):
             result=GoldenMissionController._send_email(self.mission,"test")
