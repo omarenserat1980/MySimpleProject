@@ -7,6 +7,7 @@ on:
       - feature/synthetic-customer-proposal-gate
     paths:
       - "brain_v12/brain/golden_mission.py"
+      - "brain_v12/brain/golden_mission_worker.py"
       - "brain_v12/golden_mission_api.py"
       - "brain_v12/brain/synthetic_customer.py"
       - "brain_v12/tests/test_golden_mission*.py"
@@ -38,7 +39,7 @@ jobs:
           python -m pip install -r requirements.txt pytest
       - name: Compile changed Python modules
         run: |
-          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
+          python -m py_compile brain_v12/brain/golden_mission.py brain_v12/brain/golden_mission_worker.py brain_v12/golden_mission_api.py brain_v12/brain/synthetic_customer.py brain_v12/app.py
       - name: Run Golden Mission and Synthetic Customer tests
         run: |
           python -m pytest -q brain_v12/tests/test_golden_mission.py brain_v12/tests/test_golden_mission_api.py brain_v12/tests/test_synthetic_customer.py brain_v12/tests/test_synthetic_customer_api.py
