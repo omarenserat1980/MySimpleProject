@@ -1,4 +1,6 @@
 from dataclasses import dataclass, asdict
+import json
+from .memory import MemoryStore
 
 @dataclass
 class Candidate:
@@ -43,6 +45,27 @@ class DecisionEngine:
                 option["evidence"] = list(option.get("evidence") or []) + [f"memory:{key}" for key in memory_keys[:3]]
         return options
 
+    @staticmethod
+    def _has_verified_similar_success(goal, action, memories):
+        goal_terms = MemoryStore._memory_terms(goal)
+        if len(goal_terms) < 2:
+            return False
+        for memory in memories or []:
+            if not str(memory.get("key", "")).startswith("cognitive.run."):
+                continue
+            try:
+                lesson = json.loads(memory.get("value", "{}"))
+            except (TypeError, ValueError):
+                continue
+            if lesson.get("verified") is not True or lesson.get("outcome") != "VERIFIED_SUCCESS":
+                continue
+            if lesson.get("action") != action:
+                continue
+            prior_terms = MemoryStore._memory_terms(lesson.get("goal", ""))
+            if len(goal_terms & prior_terms) >= 2:
+                return True
+        return False
+
     def choose(self,goal,options,permissions=None,memories=None):
         permissions=permissions or set()
         ranked=[]
@@ -54,6 +77,11 @@ class DecisionEngine:
             if o.get("risk")=="high": score-=.30
             if not o.get("reversible",True): score-=.15
             if blocked: score-=.50
+            learned_support=self._has_verified_similar_success(goal,o.get("id",""),memories)
+            # A tiny, capped tie-breaker from verified similar outcomes only.
+            if learned_support:
+                score+=0.02
+            o["learned_memory_support"]=learned_support
             ranked.append((score,o,blocked,missing))
         ranked.sort(key=lambda x:x[0],reverse=True)
         if not ranked:
