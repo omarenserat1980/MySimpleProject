@@ -16,6 +16,7 @@ PATH_VARIABLES = (
     "BRAIN_EVIDENCE_DB",
     "BRAIN_MEDIA_ROOT",
     "BRAIN_MEDIA_OUTPUT_ROOT",
+    "AGENT_SANDBOX",
 )
 
 
@@ -48,6 +49,9 @@ class RuntimePathsTests(unittest.TestCase):
             legacy_media = source / "web" / "media"
             legacy_media.mkdir(parents=True)
             (legacy_media / "existing.mp4").write_bytes(b"existing-media")
+            legacy_sandbox = source.parent / "agent_sandbox"
+            legacy_sandbox.mkdir()
+            (legacy_sandbox / "existing.txt").write_text("legacy-sandbox", encoding="utf-8")
 
             with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
                 resolved = configure_runtime_paths(source_root=source)
@@ -64,6 +68,11 @@ class RuntimePathsTests(unittest.TestCase):
                 self.assertEqual(
                     Path(os.environ["BRAIN_EVIDENCE_DB"]),
                     runtime_home / "brain6_artifacts" / "evidence" / "evidence.db",
+                )
+                self.assertEqual(Path(os.environ["AGENT_SANDBOX"]), runtime_home / "agent_sandbox")
+                self.assertEqual(
+                    (runtime_home / "agent_sandbox" / "existing.txt").read_text(encoding="utf-8"),
+                    "legacy-sandbox",
                 )
                 runtime_media = runtime_home / "media"
                 self.assertEqual(Path(os.environ["BRAIN_MEDIA_ROOT"]), runtime_media.resolve())
@@ -94,6 +103,7 @@ class RuntimePathsTests(unittest.TestCase):
             self.assertTrue(legacy_evidence.is_file())
             self.assertTrue(legacy_queue.is_file())
             self.assertTrue((legacy_workflows / "legacy.json").is_file())
+            self.assertTrue((legacy_sandbox / "existing.txt").is_file())
 
     def test_explicit_database_override_is_preserved_and_not_seeded(self):
         with tempfile.TemporaryDirectory() as temporary:
