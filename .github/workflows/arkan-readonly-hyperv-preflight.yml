@@ -12,91 +12,102 @@ concurrency:
 
 jobs:
   readonly-preflight:
-    name: Read-only Arkan host and VM checks
-    runs-on: [self-hosted, windows, brain-internal]
+    name: Read-only Arkan host and VM checks (WSL bridge)
+    # Arkan's observed runner is Linux/WSL. Use Windows interop to query the host.
+    runs-on: [self-hosted, linux, x64, brain-internal]
     timeout-minutes: 10
     steps:
-      - name: Collect read-only host and Hyper-V evidence
-        shell: pwsh
+      - name: Collect read-only Windows host and Hyper-V evidence
+        shell: bash
         run: |
+          set -u
+          out_dir="$RUNNER_TEMP/arkan-readonly-hyperv-preflight"
+          mkdir -p "$out_dir"
+          report="$out_dir/arkan-hyperv-preflight.json"
+          ps_script="$out_dir/collect-arkan-preflight.ps1"
+
+          if ! command -v powershell.exe >/dev/null 2>&1 || ! command -v wslpath >/dev/null 2>&1; then
+            cat > "$report" <<'JSON'
+          {
+            "schema": "brain.arkan.readonly-hyperv-preflight.v1",
+            "evidence_type": "REAL_HOST_READ_ONLY",
+            "status": "BLOCKED",
+            "reason": "Windows interop unavailable: powershell.exe and/or wslpath not found in the Linux runner.",
+            "safety": {
+              "started_or_stopped_vm": false,
+              "changed_host_configuration": false,
+              "modified_or_deleted_disks": false,
+              "downloaded_or_installed_software": false
+            }
+          }
+          JSON
+            echo "PREFLIGHT_STATUS=BLOCKED_WINDOWS_INTEROP_UNAVAILABLE"
+            exit 0
+          fi
+
+          cat > "$ps_script" <<'POWERSHELL'
           $ErrorActionPreference = 'Continue'
           $vmName = 'Brain-WindowsServer2025'
           $root = 'C:\Brain-VM'
           $checks = [System.Collections.Generic.List[object]]::new()
 
           function Add-Check([string]$Name, $Value, [string]$Status, [string]$Details = '') {
-            $checks.Add([ordered]@{
-              name = $Name
-              status = $Status
-              value = $Value
-              details = $Details
-            })
+            $checks.Add([ordered]@{ name = $Name; status = $Status; value = $Value; details = $Details })
           }
 
-          $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
-          if ($os) {
+          try {
+            $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
             $freeGiB = [math]::Round(($os.FreePhysicalMemory * 1KB) / 1GB, 2)
             $totalGiB = [math]::Round(($os.TotalVisibleMemorySize * 1KB) / 1GB, 2)
-            Add-Check 'host_memory' @{ free_gib = $freeGiB; total_gib = $totalGiB } $(if ($freeGiB -ge 2) { 'PASS' } else { 'BLOCKED' }) 'Read-only snapshot; 2 GiB free is a conservative preflight gate, not a boot guarantee.'
-          } else {
-            $freeGiB = $null
-            Add-Check 'host_memory' $null 'UNKNOWN' 'Win32_OperatingSystem query failed.'
+            Add-Check 'host_memory' @{ free_gib = $freeGiB; total_gib = $totalGiB } $(if ($freeGiB -ge 2) { 'PASS' } else { 'BLOCKED' }) 'Read-only snapshot; 2 GiB is a conservative preflight threshold, not a boot guarantee.'
+          } catch {
+            Add-Check 'host_memory' $null 'UNKNOWN' $_.Exception.Message
           }
 
-          $vmms = Get-Service -Name vmms -ErrorAction SilentlyContinue
-          if ($vmms) {
+          try {
+            $vmms = Get-Service -Name vmms -ErrorAction Stop
             Add-Check 'hyperv_vmms_service' $vmms.Status.ToString() $(if ($vmms.Status -eq 'Running') { 'PASS' } else { 'BLOCKED' })
-          } else {
-            Add-Check 'hyperv_vmms_service' 'NOT_FOUND_OR_INACCESSIBLE' 'UNKNOWN' 'Hyper-V service not visible to this runner account.'
+          } catch {
+            Add-Check 'hyperv_vmms_service' 'UNAVAILABLE' 'UNKNOWN' $_.Exception.Message
           }
 
           $vm = $null
-          $getVmError = $null
           try {
             $vm = Get-VM -Name $vmName -ErrorAction Stop
-            Add-Check 'target_vm' @{ name = $vm.Name; state = $vm.State.ToString(); status = ($vm.Status | Out-String).Trim() } $(if ($vm.State.ToString() -eq 'Running') { 'PASS' } else { 'INFO' }) 'Observed only; workflow will not start, stop, or modify the VM.'
+            Add-Check 'target_vm' @{ name = $vm.Name; state = $vm.State.ToString(); status = ($vm.Status | Out-String).Trim() } $(if ($vm.State.ToString() -eq 'Running') { 'PASS' } else { 'INFO' }) 'Observed only; workflow never starts, stops, or modifies the VM.'
           } catch {
-            $getVmError = $_.Exception.Message
-            Add-Check 'target_vm' 'NOT_FOUND_OR_UNAVAILABLE' 'UNKNOWN' $getVmError
+            Add-Check 'target_vm' 'NOT_FOUND_OR_UNAVAILABLE' 'UNKNOWN' $_.Exception.Message
           }
 
           $vhdxPath = Join-Path $root 'Brain-WindowsServer2025.vhdx'
           if (Test-Path -LiteralPath $vhdxPath -PathType Leaf) {
             $item = Get-Item -LiteralPath $vhdxPath -ErrorAction SilentlyContinue
-            Add-Check 'expected_vhdx' @{ path = $vhdxPath; size_gib = $(if ($item) { [math]::Round($item.Length / 1GB, 2) } else { $null }) } 'PASS' 'Existence and metadata only; file contents are not changed.'
+            Add-Check 'expected_vhdx' @{ path = $vhdxPath; size_gib = $(if ($item) { [math]::Round($item.Length / 1GB, 2) } else { $null }) } 'PASS' 'Existence and metadata only.'
           } else {
-            Add-Check 'expected_vhdx' @{ path = $vhdxPath; exists = $false } 'MISSING' 'Expected path not found; no replacement or creation attempted.'
+            Add-Check 'expected_vhdx' @{ path = $vhdxPath; exists = $false } 'MISSING' 'No replacement or creation attempted.'
           }
 
           $isoCandidates = @()
-          if (Test-Path -LiteralPath $root -PathType Container) {
-            $isoCandidates += Get-ChildItem -LiteralPath $root -Filter '*Windows*Server*2025*.iso' -File -ErrorAction SilentlyContinue
-            $isoCandidates += Get-ChildItem -LiteralPath $root -Filter '*Server*2025*.iso' -File -ErrorAction SilentlyContinue
-          }
-          $downloads = Join-Path $env:USERPROFILE 'Downloads'
-          if (Test-Path -LiteralPath $downloads -PathType Container) {
-            $isoCandidates += Get-ChildItem -LiteralPath $downloads -Filter '*Windows*Server*2025*.iso' -File -ErrorAction SilentlyContinue
-            $isoCandidates += Get-ChildItem -LiteralPath $downloads -Filter '*Server*2025*.iso' -File -ErrorAction SilentlyContinue
+          foreach ($folder in @($root, (Join-Path $env:USERPROFILE 'Downloads'))) {
+            if (Test-Path -LiteralPath $folder -PathType Container) {
+              $isoCandidates += Get-ChildItem -LiteralPath $folder -Filter '*Server*2025*.iso' -File -ErrorAction SilentlyContinue
+            }
           }
           $isoCandidates = @($isoCandidates | Sort-Object FullName -Unique)
-          if ($isoCandidates.Count -gt 0) {
-            Add-Check 'windows_server_2025_iso_candidates' @($isoCandidates | ForEach-Object { @{ path = $_.FullName; size_gib = [math]::Round($_.Length / 1GB, 2) } }) 'PASS' 'Searched only C:\Brain-VM and the runner account Downloads folder.'
-          } else {
-            Add-Check 'windows_server_2025_iso_candidates' @() 'UNKNOWN' 'No matching ISO found in the two checked locations; other folders were not searched.'
-          }
+          $isoValues = @($isoCandidates | ForEach-Object { @{ path = $_.FullName; size_gib = [math]::Round($_.Length / 1GB, 2) } })
+          Add-Check 'windows_server_2025_iso_candidates' $isoValues $(if ($isoValues.Count -gt 0) { 'PASS' } else { 'UNKNOWN' }) 'Searched only C:\Brain-VM and the Windows runner account Downloads folder.'
 
           $avhdx = @()
           if (Test-Path -LiteralPath $root -PathType Container) {
             $avhdx = @(Get-ChildItem -LiteralPath $root -Filter '*.avhdx' -File -ErrorAction SilentlyContinue | ForEach-Object { @{ path = $_.FullName; size_gib = [math]::Round($_.Length / 1GB, 2) } })
           }
-          Add-Check 'avhdx_in_brain_vm_folder' $avhdx 'INFO' 'Inventory only. Presence is not itself an error; do not delete checkpoints or differencing disks.'
+          Add-Check 'avhdx_in_brain_vm_folder' $avhdx 'INFO' 'Inventory only; do not delete checkpoints or differencing disks.'
 
           if ($vm) {
             try {
               $drives = @(Get-VMHardDiskDrive -VMName $vmName -ErrorAction Stop | ForEach-Object {
                 $p = $_.Path
-                $exists = if ($p) { Test-Path -LiteralPath $p -PathType Leaf } else { $false }
-                @{ controller = $_.ControllerType.ToString(); path = $p; file_exists = $exists }
+                @{ controller = $_.ControllerType.ToString(); path = $p; file_exists = [bool]($p -and (Test-Path -LiteralPath $p -PathType Leaf)) }
               })
               Add-Check 'vm_attached_disks' $drives 'INFO' 'Read-only VM configuration query.'
             } catch {
@@ -110,33 +121,63 @@ jobs:
             schema = 'brain.arkan.readonly-hyperv-preflight.v1'
             evidence_type = 'REAL_HOST_READ_ONLY'
             collected_utc = [DateTime]::UtcNow.ToString('o')
-            runner_name = $env:RUNNER_NAME
             computer_name = $env:COMPUTERNAME
-            workflow_run_id = $env:GITHUB_RUN_ID
             vm_name = $vmName
+            checks = @($checks)
             safety = @{
               started_or_stopped_vm = $false
               changed_host_configuration = $false
               modified_or_deleted_disks = $false
               downloaded_or_installed_software = $false
             }
-            checks = @($checks)
           }
+          $report | ConvertTo-Json -Depth 8 -Compress
+          POWERSHELL
 
-          $outDir = Join-Path $env:RUNNER_TEMP 'arkan-readonly-hyperv-preflight'
-          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-          $outFile = Join-Path $outDir 'arkan-hyperv-preflight.json'
-          $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $outFile -Encoding utf8
-          Write-Host "PREFLIGHT_REPORT=$outFile"
-          Write-Host "PREFLIGHT_VM_NAME=$vmName"
-          Write-Host "PREFLIGHT_VM_STATE=$(if ($vm) { $vm.State } else { 'UNKNOWN' })"
-          Write-Host "PREFLIGHT_FREE_RAM_GIB=$(if ($null -ne $freeGiB) { $freeGiB } else { 'UNKNOWN' })"
-          Write-Host 'PREFLIGHT_MUTATION=NONE'
+          win_script="$(wslpath -w "$ps_script")"
+          if powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$win_script" > "$report" 2> "$out_dir/powershell-stderr.txt"; then
+            if python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$report"; then
+              echo "PREFLIGHT_STATUS=REPORT_CREATED"
+            else
+              cat > "$report" <<'JSON'
+          {
+            "schema": "brain.arkan.readonly-hyperv-preflight.v1",
+            "evidence_type": "REAL_HOST_READ_ONLY",
+            "status": "BLOCKED",
+            "reason": "Windows PowerShell bridge returned output that was not valid JSON.",
+            "safety": {
+              "started_or_stopped_vm": false,
+              "changed_host_configuration": false,
+              "modified_or_deleted_disks": false,
+              "downloaded_or_installed_software": false
+            }
+          }
+          JSON
+              echo "PREFLIGHT_STATUS=BLOCKED_INVALID_BRIDGE_OUTPUT"
+            fi
+          else
+            err="$(tr '\n' ' ' < "$out_dir/powershell-stderr.txt" | cut -c1-1200)"
+            python3 - "$report" "$err" <<'PY'
+          import json,sys
+          with open(sys.argv[1], "w", encoding="utf-8") as f:
+              json.dump({
+                  "schema":"brain.arkan.readonly-hyperv-preflight.v1",
+                  "evidence_type":"REAL_HOST_READ_ONLY",
+                  "status":"BLOCKED",
+                  "reason":"Windows PowerShell bridge failed: " + sys.argv[2],
+                  "safety":{"started_or_stopped_vm":False,"changed_host_configuration":False,"modified_or_deleted_disks":False,"downloaded_or_installed_software":False}
+              },f,indent=2)
+          PY
+            echo "PREFLIGHT_STATUS=BLOCKED_POWERSHELL_BRIDGE_FAILED"
+          fi
+
+          echo "PREFLIGHT_REPORT=$report"
+          echo "PREFLIGHT_MUTATION=NONE"
       - name: Upload read-only evidence report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: arkan-readonly-hyperv-preflight-${{ github.run_id }}
-          path: ${{ runner.temp }}\arkan-readonly-hyperv-preflight\arkan-hyperv-preflight.json
+          path: ${{ runner.temp }}/arkan-readonly-hyperv-preflight/arkan-hyperv-preflight.json
           if-no-files-found: warn
           retention-days: 14
