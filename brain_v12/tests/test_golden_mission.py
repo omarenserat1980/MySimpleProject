@@ -87,6 +87,38 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertEqual(m["result"]["evidence_sha256"], proof["sha256"])
         self.assertTrue(any(e["event"] == "GOLDEN_LOOP_CLOSED" for e in m["evidence"]))
 
+    def test_closes_with_real_evidence_store_hash_verification(self):
+        from brain_v12.brain.evidence_store import EvidenceStore
+        evidence_path = Path(self.tmp.name) / "evidence.sqlite3"
+        store = EvidenceStore(str(evidence_path))
+        try:
+            controller = GoldenMissionController(
+                str(Path(self.tmp.name) / "real-missions.sqlite3"),
+                notifier=lambda mission, message: {"sent": False, "reason": "test"},
+                evidence_store=store,
+            )
+            mission = controller.create(
+                title="Real evidence store",
+                objective="Verify objective against the actual SQLite evidence store",
+                acceptance=["objective verified"],
+            )
+            controller.start(mission["mission_id"])
+            payload = {
+                "objective_verified": True,
+                "acceptance_passed": True,
+                "criteria_results": [{"criterion": "objective verified", "passed": True}],
+            }
+            evidence = store.append(mission["mission_id"], "objective-verification", payload, "test-verifier")
+            result = controller.close(
+                mission["mission_id"], evidence["evidence_id"], evidence["sha256"],
+                "verified against real evidence store",
+            )
+            self.assertEqual(result["status"], "CLOSED")
+            self.assertEqual(result["result"]["evidence_id"], evidence["evidence_id"])
+            self.assertTrue(store.verify_hash(evidence["evidence_id"])["ok"])
+        finally:
+            store.close()
+
     def test_checkpoint_updates_estimate(self):
         self.controller.start(self.mission["mission_id"])
         m=self.controller.checkpoint(self.mission["mission_id"],"first step",25,next_estimate_minutes=20)
