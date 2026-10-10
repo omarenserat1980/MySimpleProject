@@ -1,0 +1,113 @@
+name: Arkan Stateful Brain API Smoke Test
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-stateful-api-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Test existing Brain data from a safe copy
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 8
+    steps:
+      - name: Copy database snapshots and test API as brain
+        shell: bash
+        run: |
+          set +e
+          P=/home/brain/eb-bootstrap
+          PY=/home/brain/brain-runtime-venv/bin/python
+          BASE="/home/brain/.brain/diagnostics/stateful-api-smoke-${GITHUB_RUN_ID}"
+          echo "=== TARGET AND SOURCE STATE ==="
+          for p in "$P/brain_v12/app.py" "$P/brain_v12/brain_v12.db" "$P/brain_v12/brain6_artifacts/evidence/evidence.db"; do
+            if [ -r "$p" ]; then stat -c '%U:%G mode=%a size=%s path=%n' "$p"; else echo "SOURCE_UNREADABLE_OR_MISSING $p"; exit 61; fi
+          done
+          echo "=== REFUSE TO COLLIDE WITH EXISTING API ==="
+          if ss -ltn 2>/dev/null | grep -qE '(^|[[:space:]])[^[:space:]]*:8012([[:space:]]|$)'; then
+            echo "PORT_8012_ALREADY_IN_USE; NO PROCESS WILL BE STOPPED"
+            exit 62
+          fi
+          echo "=== SNAPSHOT + TEST AS UNPRIVILEGED USER ==="
+          runuser -u brain -- env HOME=/home/brain R="$P" PY="$PY" BASE="$BASE" bash -s <<'USER_SCRIPT'
+          set -euo pipefail
+          mkdir -p "$BASE/media" "$BASE/state" "$BASE/git"
+          copy_sqlite() {
+            "$PY" - "$1" "$2" <<'PY'
+          import sqlite3, sys, os
+          source, dest = sys.argv[1:3]
+          src = sqlite3.connect("file:" + source + "?mode=ro", uri=True, timeout=10)
+          dst = sqlite3.connect(dest, timeout=10)
+          try:
+              src.backup(dst)
+              result = dst.execute("PRAGMA integrity_check").fetchone()[0]
+              if result != "ok":
+                  raise SystemExit("SQLITE_INTEGRITY_FAILED:" + str(result))
+              print("DATABASE_SNAPSHOT_OK", os.path.basename(source), "integrity=ok", "bytes=" + str(os.path.getsize(dest)))
+          finally:
+              dst.close()
+              src.close()
+          PY
+          }
+          copy_sqlite "$R/brain_v12/brain_v12.db" "$BASE/brain_v12.snapshot.db"
+          copy_sqlite "$R/brain_v12/brain6_artifacts/evidence/evidence.db" "$BASE/evidence.snapshot.db"
+          cd "$R"
+          env HOME=/home/brain \
+            BRAIN_MEDIA_ROOT="$BASE/media" \
+            BRAIN_DB="$BASE/brain_v12.snapshot.db" \
+            BRAIN_SYNC_QUEUE="$BASE/state/sync_queue.jsonl" \
+            BRAIN_GIT_ROOT="$BASE/git" \
+            BRAIN_EVIDENCE_DB="$BASE/evidence.snapshot.db" \
+            PYTHONPATH="$R" \
+            "$PY" -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 --workers 1 --log-level warning >"$BASE/api-smoke.log" 2>&1 &
+          API_PID=$!
+          cleanup() {
+            kill -TERM "$API_PID" 2>/dev/null || true
+            wait "$API_PID" 2>/dev/null || true
+            echo "TEMPORARY_STATEFUL_API_STOPPED"
+          }
+          trap cleanup EXIT
+          ready=0
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 2 http://127.0.0.1:8012/health -o "$BASE/health.json"; then ready=1; break; fi
+            if ! kill -0 "$API_PID" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "STATEFUL_API_HEALTH_FAILED"
+            tail -n 100 "$BASE/api-smoke.log"
+            exit 63
+          fi
+          echo "STATEFUL_API_HEALTH=PASS"
+          cat "$BASE/health.json"; echo
+          code=$(curl -sS --max-time 6 -o "$BASE/readiness.json" -w "%{http_code}" http://127.0.0.1:8012/api/system/readiness)
+          echo "STATEFUL_API_READINESS_HTTP=$code"
+          cat "$BASE/readiness.json"; echo
+          if [ "$code" != "200" ]; then tail -n 100 "$BASE/api-smoke.log"; exit 64; fi
+          "$PY" - "$BASE/readiness.json" <<'PY'
+          import json,sys
+          value=json.load(open(sys.argv[1],encoding="utf-8"))
+          if value.get("ok") is not True or value.get("status") != "READY":
+              raise SystemExit("STATEFUL_READINESS_NOT_READY")
+          print("STATEFUL_API_READINESS=PASS checks=" + str(value.get("passed")) + "/" + str(value.get("total")))
+          PY
+          for path in /api/media/health /api/cinema/status; do
+            code=$(curl -sS --max-time 5 -o "$BASE/endpoint.json" -w "%{http_code}" "http://127.0.0.1:8012$path" || true)
+            echo "ENDPOINT $path HTTP=$code"
+            head -c 1000 "$BASE/endpoint.json" 2>/dev/null || true
+            echo
+          done
+          echo "=== OPTIONAL DEPENDENCIES ==="
+          command -v ffmpeg || echo FFMPEG_NOT_FOUND
+          command -v ffprobe || echo FFPROBE_NOT_FOUND
+          echo "STATEFUL_API_SMOKE=PASS"
+          USER_SCRIPT
+          smoke_status=$?
+          echo "STATEFUL_SMOKE_EXIT=$smoke_status"
+          echo "=== PORT AFTER TEST (SHOULD BE CLOSED) ==="
+          ss -ltn 2>/dev/null | grep ':8012' || echo PORT_8012_NOT_LISTENING
+          exit "$smoke_status"
