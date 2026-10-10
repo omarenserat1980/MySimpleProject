@@ -42,14 +42,28 @@ class WindowsRealBootQemuAdapter:
         code="/usr/share/OVMF/OVMF_CODE_4M.fd"
         missing=[p for p in (os_disk,evidence_disk,proof_iso,ovmf_vars,code) if not Path(p).exists()]
         if missing: raise RuntimeError("WINDOWS_QEMU_RUNTIME_INPUT_MISSING:"+",".join(missing))
-        return ["qemu-system-x86_64"," -machine","q35,accel=kvm","-cpu","max","-m",memory,
-                "-smp",str(smp),"-drive",f"if=pflash,format=raw,readonly=on,file={code}",
-                "-drive",f"if=pflash,format=raw,file={ovmf_vars}","-device","ich9-ahci,id=sata",
-                "-drive",f"file={os_disk},format=qcow2,if=none,id=osdisk","-device","ide-hd,bus=sata.2,drive=osdisk",
-                "-drive",f"file={evidence_disk},format=raw,if=none,id=evidence","-device","ide-hd,bus=sata.3,drive=evidence",
-                "-nic","user,model=e1000","-drive",f"file={proof_iso},media=cdrom,if=none,id=installmedia,readonly=on",
-                "-device","ide-cd,bus=sata.1,drive=installmedia","-boot","once=d,menu=off","-display","none",
-                "-qmp",f"unix:{qmp_socket},server=on,wait=off","-serial",f"file:{serial_log}"]
+        # Each argv element must be a separate, unpadded option. A leading
+        # space before "-machine" makes QEMU reject the option before boot.
+        command = [
+            "qemu-system-x86_64", "-machine", "q35,accel=kvm", "-cpu", "max",
+            "-m", memory, "-smp", str(smp),
+            "-drive", f"if=pflash,format=raw,readonly=on,file={code}",
+            "-drive", f"if=pflash,format=raw,file={ovmf_vars}",
+            "-device", "ich9-ahci,id=sata",
+            "-drive", f"file={os_disk},format=qcow2,if=none,id=osdisk",
+            "-device", "ide-hd,bus=sata.2,drive=osdisk",
+            "-drive", f"file={evidence_disk},format=raw,if=none,id=evidence",
+            "-device", "ide-hd,bus=sata.3,drive=evidence",
+            "-nic", "user,model=e1000",
+            "-drive", f"file={proof_iso},media=cdrom,if=none,id=installmedia,readonly=on",
+            "-device", "ide-cd,bus=sata.1,drive=installmedia",
+            "-boot", "once=d,menu=off", "-display", "none",
+            "-qmp", f"unix:{qmp_socket},server=on,wait=off",
+            "-serial", f"file:{serial_log}",
+        ]
+        if any(arg != arg.strip() for arg in command):
+            raise RuntimeError("WINDOWS_QEMU_ARGUMENT_WHITESPACE_INVALID")
+        return command
 
     def start(self, *,os_disk:str,evidence_disk:str,proof_iso:str,ovmf_vars:str,
               contract_path:str|None=None,cwd:str|None=None,**kwargs)->tuple[subprocess.Popen,dict]:
@@ -58,7 +72,11 @@ class WindowsRealBootQemuAdapter:
                                    ovmf_vars=ovmf_vars,**kwargs)
         work=Path(cwd or ".")
         log=(work/"qemu-console.log").open("ab")
-        proc=subprocess.Popen(command,cwd=cwd,stdout=log,stderr=subprocess.STDOUT)
+        try:
+            proc=subprocess.Popen(command,cwd=cwd,stdout=log,stderr=subprocess.STDOUT)
+        except Exception:
+            log.close()
+            raise
         return proc,{"verified":True,"contract_sha256":evidence["contract_sha256"],"pid":proc.pid,"command":command}
 
     def run(self, *,os_disk:str,evidence_disk:str,proof_iso:str,ovmf_vars:str,
