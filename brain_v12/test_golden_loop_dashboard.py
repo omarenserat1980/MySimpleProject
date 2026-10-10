@@ -70,7 +70,7 @@ class GoldenLoopDashboardTests(unittest.TestCase):
         self.assertIn('dir="rtl"', page)
         self.assertIn("@page{size:A4", page)
         self.assertIn("/api/golden-loop/events", page)
-        self.assertIn("لا تُنشأ سجلات بديلة", page)
+        self.assertIn("لم تُنشأ سجلات بديلة", page)
         self.assertNotIn("method:'POST'", page)
         self.assertNotIn("method: 'POST'", page)
 
