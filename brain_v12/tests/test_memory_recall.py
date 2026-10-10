@@ -256,6 +256,30 @@ class MemoryRecallTests(unittest.TestCase):
                 )
 
 
+    def test_reopened_conflict_clears_old_resolution_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory("fact.one", "first fact")
+            store.save_memory("fact.two", "second fact")
+            store.record_memory_conflict("fact.one", "fact.two", "initial disagreement")
+            store.resolve_memory_conflict(
+                "fact.one", "fact.two", "fact.one",
+                "First source is authoritative.", "reviewer-a"
+            )
+
+            reopened = store.record_memory_conflict(
+                "fact.one", "fact.two", "New evidence creates a renewed disagreement."
+            )
+            conflict = store.memory_conflicts()[0]
+
+            self.assertEqual(reopened["status"], "OPEN")
+            self.assertEqual(conflict["status"], "OPEN")
+            self.assertEqual(conflict["resolution_evidence"], "")
+            self.assertEqual(conflict["resolved_by"], "")
+            self.assertIsNone(conflict["resolved_at"])
+
+
 
 if __name__ == "__main__":
     unittest.main()
