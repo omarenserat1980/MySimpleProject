@@ -16,6 +16,8 @@ on:
       - "brain_v12/app.py"
       - "docs/GOLDEN_MISSION_LOOP.md"
       - "docs/GOLDEN_MISSION_SYSTEM_AUDIT.md"
+      - "LEGACY_REQUIREMENTS.md"
+      - "TODO_FROM_LEGACY.md"
       - ".github/workflows/golden-mission-loop-tests.yml"
   workflow_dispatch:
 
