@@ -99,18 +99,21 @@ def configure_runtime_paths(source_root: str | os.PathLike[str] | None = None) -
         "BRAIN_SYNC_QUEUE": source / ".brain" / "state" / "sync_queue.jsonl",
         "BRAIN_GIT_ROOT": source / "brain_git_data",
         "BRAIN_EVIDENCE_DB": source / "brain6_artifacts" / "evidence" / "evidence.db",
+        "AGENT_SANDBOX": source.parent / "agent_sandbox",
     }
     defaults = {
         "BRAIN_DB": runtime_home / "brain_v12.db",
         "BRAIN_SYNC_QUEUE": runtime_home / "state" / "sync_queue.jsonl",
         "BRAIN_GIT_ROOT": runtime_home / "brain_git_data",
         "BRAIN_EVIDENCE_DB": runtime_home / "brain6_artifacts" / "evidence" / "evidence.db",
+        "AGENT_SANDBOX": runtime_home / "agent_sandbox",
     }
     migrators = {
         "BRAIN_DB": _copy_sqlite_if_missing,
         "BRAIN_SYNC_QUEUE": _copy_file_if_missing,
         "BRAIN_GIT_ROOT": _copy_tree_if_missing,
         "BRAIN_EVIDENCE_DB": _copy_sqlite_if_missing,
+        "AGENT_SANDBOX": _copy_tree_if_missing,
     }
     for name, default_path in defaults.items():
         os.environ.setdefault(name, str(default_path.resolve()))
