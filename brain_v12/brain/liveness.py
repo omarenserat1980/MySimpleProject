@@ -19,11 +19,29 @@ def run_execution_probe(device_bridge, timeout=8):
         deadline = time.time() + timeout
         while time.time() < deadline:
             result = device_bridge.result(task_id)
-            if result.get("status") == "COMPLETED":
+            # DeviceBridge.result() returns {"ok": True, "task": <task row>};
+            # read the task state from that nested row, while retaining
+            # compatibility with bridges that return a flat result.
+            task_result = result.get("task")
+            if not isinstance(task_result, dict):
+                task_result = result
+            task_status = task_result.get("status", result.get("status"))
+            if task_status == "COMPLETED":
                 verified = device_bridge.verify_result(task_id)
-                return {"ok": bool(verified.get("verified", True)), "status": "PROBE_COMPLETED", "task_id": task_id, "agent_id": result.get("agent_id"), "verification": verified}
-            if result.get("status") == "FAILED":
-                return {"ok": False, "status": "PROBE_FAILED", "task_id": task_id, "error": result.get("error", "")}
+                return {
+                    "ok": bool(verified.get("verified", True)),
+                    "status": "PROBE_COMPLETED",
+                    "task_id": task_id,
+                    "agent_id": task_result.get("agent_id", result.get("agent_id")),
+                    "verification": verified,
+                }
+            if task_status == "FAILED":
+                return {
+                    "ok": False,
+                    "status": "PROBE_FAILED",
+                    "task_id": task_id,
+                    "error": task_result.get("error", result.get("error", "")),
+                }
             time.sleep(0.25)
         return {"ok": False, "status": "PROBE_TIMEOUT", "task_id": task_id}
     except Exception as exc:
