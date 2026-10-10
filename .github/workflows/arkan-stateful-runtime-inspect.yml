@@ -1,0 +1,47 @@
+name: Arkan Stateful Runtime Inventory
+
+on:
+  push:
+    branches:
+      - diagnostics/arkan-permission-13-20261010
+    paths:
+      - .github/workflows/arkan-stateful-runtime-inspect.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Read-only inventory of existing Brain runtime
+    runs-on: [self-hosted, linux, x64, brain-internal]
+    timeout-minutes: 5
+    steps:
+      - name: Inspect existing runtime and state metadata only
+        shell: bash
+        run: |
+          set +e
+          P=/home/brain/eb-bootstrap
+          R=/home/brain/linux-runner-new/_work/MySimpleProject/MySimpleProject
+          echo "=== EXECUTION IDENTITY / SERVICE ==="
+          id
+          systemctl show actions.runner.omarenserat1980-MySimpleProject.brain-internal-arkan.service -p User -p Group -p ExecStart --no-pager 2>&1
+          echo "=== PERSISTENT CHECKOUT ==="
+          for p in "$P" "$P/.git" "$P/brain_v12" "$P/brain_v12/app.py" "$P/brain_v12/brain_v12.db" "$P/brain_v12/brain6_artifacts/evidence/evidence.db" "$P/brain_v12/tools/brain_runtime_launcher.sh" "$P/brain_v12/tools/brain_runtime_source_manager.sh" "$P/.brain" "$P/.brain/state"; do
+            if [ -e "$p" ]; then stat -c '%U:%G mode=%a size=%s type=%F path=%n' "$p"; else echo "MISSING $p"; fi
+          done
+          echo "=== PERSISTENT CHECKOUT GIT ID ==="
+          git -c safe.directory="$P" -C "$P" rev-parse --show-toplevel 2>&1
+          git -c safe.directory="$P" -C "$P" rev-parse --short HEAD 2>&1
+          git -c safe.directory="$P" -C "$P" branch --show-current 2>&1
+          git -c safe.directory="$P" -C "$P" status --short 2>&1 | head -60
+          echo "=== PERSISTENT DATABASE METADATA ==="
+          find "$P" -maxdepth 6 -type f \( -name 'brain_v12.db' -o -name 'evidence.db' -o -name 'brain*.sqlite3' -o -name 'sync_queue.jsonl' \) -printf '%u:%g mode=%m size=%s path=%p\n' 2>/dev/null | head -100
+          echo "=== SECRET CONFIG PRESENCE ONLY (NO CONTENT) ==="
+          for p in /home/brain/.brain_env /home/brain/v12-agent/agent_config.sh /home/brain/v12-agent/agent.key "$P/.env" "$P/.env.local"; do
+            if [ -f "$p" ]; then echo "PRESENT $p"; else echo "ABSENT $p"; fi
+          done
+          echo "=== OTHER RUNTIME PORT ==="
+          ss -ltnp 2>/dev/null | grep -E ':(8012|8000)([[:space:]]|$)' || echo "NO_LISTENER_ON_8012_OR_8000"
+          echo "=== ACTIVE RELEVANT SERVICES ==="
+          systemctl --no-pager --type=service --state=running 2>/dev/null | grep -Ei 'brain|uvicorn|runner' | head -50
+          echo "=== NO FILES OR SERVICES CHANGED ==="
