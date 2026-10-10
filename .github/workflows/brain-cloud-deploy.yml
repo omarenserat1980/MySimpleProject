@@ -1,0 +1,110 @@
+name: Brain Cloud Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Type DEPLOY to deploy to the already-provisioned host"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloud-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm_deploy == 'DEPLOY' && github.repository == 'omarenserat1980/MySimpleProject' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Validate deployment configuration
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.BRAIN_CLOUD_SSH_KNOWN_HOSTS }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          for name in HOST USER KEY KNOWN_HOSTS REMOTE_DIR; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing deployment configuration::$name is not configured."
+              exit 1
+            fi
+          done
+          case "$REMOTE_DIR" in
+            /*) ;;
+            *) echo "::error::BRAIN_CLOUD_REMOTE_DIR must be an absolute path."; exit 1 ;;
+          esac
+          echo "DEPLOYMENT_CONFIGURATION=READY"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.BRAIN_CLOUD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/brain_cloud_key
+          chmod 600 ~/.ssh/brain_cloud_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/brain_cloud_key >/dev/null
+          echo "SSH_KEY_AND_PINNED_HOST_KEY=VALID"
+
+      - name: Deploy existing host
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+          SSH_PRIVATE_KEY_FILE: ~/.ssh/brain_cloud_key
+        run: |
+          set -euo pipefail
+          ssh -i "$SSH_PRIVATE_KEY_FILE" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$USER@$HOST" "REMOTE_DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REMOTE_DIR"
+          test -f docker-compose.production.yml
+          test -f .env
+          grep -Eq '^BRAIN_CONTROL_TOKEN=.{32,}$' .env || {
+            echo "BRAIN_CONTROL_TOKEN missing or too short"
+            exit 1
+          }
+          docker compose -f docker-compose.production.yml pull
+          docker compose -f docker-compose.production.yml up -d --remove-orphans
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/healthz >/tmp/brain-health.json &&
+               curl --fail --silent http://127.0.0.1:8000/readyz >/tmp/brain-ready.json; then
+              python3 - <<'PY'
+          import json
+          health=json.load(open("/tmp/brain-health.json", encoding="utf-8"))
+          ready=json.load(open("/tmp/brain-ready.json", encoding="utf-8"))
+          assert health.get("status") == "ok", health
+          assert ready.get("ready") is True, ready
+          print("BRAIN_CLOUD_PRODUCTION_SMOKE=PASS")
+          PY
+              healthy=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" -ne 1 ]; then
+            docker compose -f docker-compose.production.yml ps
+            docker compose -f docker-compose.production.yml logs --tail=100
+            exit 1
+          fi
+          docker compose -f docker-compose.production.yml ps
+          REMOTE
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/brain_cloud_key
