@@ -120,8 +120,12 @@ def configure_runtime_paths(source_root: str | os.PathLike[str] | None = None) -
     # Keep legacy media available as read-only inputs, but write new renders under
     # the runtime home so app import never needs to create directories in the checkout.
     legacy_media = source / "web" / "media"
+    runtime_media = runtime_home / "media"
     if "BRAIN_MEDIA_ROOT" not in explicit:
-        media_root = legacy_media if legacy_media.is_dir() else runtime_home / "media"
+        # Media endpoints write uploads, visual scenes and generated images to this
+        # root, so never default it to a possibly read-only source-tree directory.
+        _copy_tree_if_missing(legacy_media, runtime_media)
+        media_root = runtime_media
         os.environ.setdefault("BRAIN_MEDIA_ROOT", str(media_root.resolve()))
     else:
         media_root = Path(os.environ["BRAIN_MEDIA_ROOT"]).expanduser().resolve()
