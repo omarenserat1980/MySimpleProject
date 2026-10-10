@@ -77,9 +77,9 @@ On the executor host, set:
 - `BRAIN_CLOUD_EXECUTOR_ID` to the enrolled ID
 - `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL=https://<trusted-brain-api>`
 - `BRAIN_CLOUD_EXECUTOR_TOKEN` through the host's secret-injection mechanism
-- the GitHub CLI authentication needed to register the repository runner
+- a short-lived `BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN` injected by the trusted operator; the dedicated runner account must not access the operator’s saved GitHub CLI credentials
 
-The host must also be Linux x86_64 with usable KVM, QEMU, OVMF, and all listed image tools. Run `tools/bootstrap_brain_cloud_executor.sh` from the checked-out repository. It fetches a fresh proof, verifies the signature, atomically consumes it at the central registry, clears the token/proof before runner registration, and starts an ephemeral runner for one job.
+The host must also be Linux x86_64 with usable KVM, QEMU, OVMF, and all listed image tools. Run `tools/bootstrap_brain_cloud_executor.sh` from the checked-out repository as the unprivileged operator account. Obtain the short-lived GitHub runner-registration token outside the dedicated runner account and inject it as `BRAIN_GITHUB_RUNNER_REGISTRATION_TOKEN`. The bootstrap must not invoke `gh` or read saved GitHub CLI credentials. It clears the injected token before launching the job, fetches and verifies a fresh Brain proof, consumes it centrally, and starts an ephemeral runner for one job.
 
 Do not run the bootstrap on Arkan or Redmi until the trust anchor and control-plane settings are independently configured. This runbook has not been executed on any host in this change.
 
@@ -93,7 +93,7 @@ Before considering merge:
 5. Review every required CI workflow at the exact latest PR head.
 6. Separately verify Windows Server 2025 boot evidence. Attestation and KVM checks do not prove Windows booted.
 
-Until all six acceptance points are independently evidenced, keep PR #276 in draft and do not enable Windows Real Boot.
+Until all six acceptance points are independently evidenced, keep the credential-isolation change in draft and unmerged, and do not enable Windows Real Boot.
 
 
 ## Runner account isolation — mandatory host acceptance
