@@ -115,7 +115,8 @@ $payload = [ordered]@{
         state = 'OPEN_NOT_CLOSED'
         execution_performed = $false
         acceptance_claimed = $false
-        real_host_evidence = $true
+        real_host_evidence = $false
+        host_identity_review_required = $true
         approval_required_before_vm_or_system_changes = $true
     }
     safety = @{
@@ -141,6 +142,14 @@ $result = [ordered]@{
     payload_canonical_json = $payloadJson
     payload = $payload
 }
+$reportJson = $result | ConvertTo-Json -Depth 10
+$reportPath = Join-Path (Get-Location).Path 'arkan-asus-golden-observation.json'
+try {
+    [System.IO.File]::WriteAllText($reportPath, $reportJson + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+    Write-Output "REPORT_SAVED=$reportPath"
+} catch {
+    Write-Output "REPORT_SAVE_FAILED=$($_.Exception.Message)"
+}
 Write-Output '=== BRAIN GOLDEN LOOP / ARKAN ASUS — READ-ONLY OBSERVATION ==='
-$result | ConvertTo-Json -Depth 10
+Write-Output $reportJson
 Write-Output '=== END OBSERVATION ==='
