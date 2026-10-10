@@ -6,6 +6,7 @@ set -Eeuo pipefail
 
 REPO_URL="https://github.com/omarenserat1980/MySimpleProject.git"
 RAW_BASE="https://raw.githubusercontent.com/omarenserat1980/MySimpleProject/main"
+if [[ -n "${BRAIN_ONE_SOURCE_URL:-}" ]]; then RAW_BASE="${BRAIN_ONE_SOURCE_URL%/brain-one.sh}"; fi
 ACTION="${1:-activate}"
 HOME_DIR="${HOME:-}"
 if [[ -z "$HOME_DIR" ]]; then echo "BRAIN_ERROR=HOME_NOT_SET" >&2; exit 2; fi
