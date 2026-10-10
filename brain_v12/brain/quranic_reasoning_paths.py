@@ -188,3 +188,48 @@ def register_quranic_reasoning_paths(store):
             store.save_memory(key, value)
         registered.append(key)
     return registered
+
+
+def select_reasoning_path(goal, memories):
+    """Select a relevant saved pathway for a goal; return None when evidence is weak."""
+    from .memory import MemoryStore
+
+    query_terms = MemoryStore._memory_terms(goal)
+    if not query_terms:
+        return None
+    ranked = []
+    for item in memories or []:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("key", ""))
+        if not key.startswith("reasoning_path.quranic."):
+            continue
+        try:
+            record = json.loads(str(item.get("value", "")))
+        except (TypeError, ValueError):
+            continue
+        if record.get("kind") != "reasoning_path":
+            continue
+        title_terms = MemoryStore._memory_terms(record.get("title", ""))
+        application_terms = MemoryStore._memory_terms(record.get("engineering_application", ""))
+        stage_terms = MemoryStore._memory_terms(" ".join(record.get("stages", [])))
+        score = 3 * len(query_terms & title_terms)
+        score += 2 * len(query_terms & application_terms)
+        score += len(query_terms & stage_terms)
+        if score:
+            ranked.append((score, key, record))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda entry: (-entry[0], entry[1]))
+    score, key, record = ranked[0]
+    return {
+        "key": key,
+        "title": record.get("title", key),
+        "stages": record.get("stages", []),
+        "source_references": record.get("source_references", []),
+        "textual_claim": record.get("textual_claim", ""),
+        "engineering_application": record.get("engineering_application", ""),
+        "limits": record.get("limits", ""),
+        "relevance_score": score,
+        "status": "SELECTED_BY_LEXICAL_RELEVANCE",
+    }
