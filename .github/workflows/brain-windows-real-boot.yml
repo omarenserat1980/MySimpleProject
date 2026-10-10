@@ -101,10 +101,22 @@ jobs:
 
       - name: Download and validate Microsoft media
         env:
-          ISO_URL: ${{ inputs.iso_url || 'https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us' }}
+          ISO_URL_INPUT: ${{ inputs.iso_url }}
         run: |
           set -euo pipefail
+          DEFAULT_ISO_URL='https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us'
+          ISO_URL="${ISO_URL_INPUT:-$DEFAULT_ISO_URL}"
+          if [[ -z "${ISO_URL//[[:space:]]/}" ]]; then
+            echo "BLOCKED: ISO_URL is empty."
+            exit 2
+          fi
+          case "$ISO_URL" in
+            https://*) ;;
+            *) echo "BLOCKED: ISO_URL must use HTTPS."; exit 2 ;;
+          esac
+          echo "ISO_URL_VALIDATION=PASS"
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
+          test -s windows-server-2025.iso
           test -s windows-server-2025.iso
           xorriso -indev windows-server-2025.iso -toc 2>&1 | tee iso-toc.txt
           grep -Eq 'ISO 9660|El Torito' iso-toc.txt
