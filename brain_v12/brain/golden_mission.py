@@ -223,14 +223,38 @@ class GoldenMissionController:
         verified = self.evidence_store.verify_hash(evidence_id)
         payload = item.get("payload") if isinstance(item.get("payload"),dict) else {}
         criteria = payload.get("criteria_results")
-        criteria_pass = isinstance(criteria,list) and bool(criteria) and all(
-            isinstance(entry,dict) and entry.get("passed") is True for entry in criteria
+        # Evidence from an earlier retry must never close the current attempt.
+        expected_attempt = mission["attempts"] + 1
+        attempt_matches = payload.get("attempt_number") == expected_attempt
+        # Require an exact, one-to-one pass result for every declared acceptance criterion.
+        expected_criteria = mission["acceptance"]
+        actual_criteria = [
+            entry.get("criterion") for entry in criteria
+            if isinstance(entry, dict) and isinstance(entry.get("criterion"), str)
+        ] if isinstance(criteria, list) else []
+        criteria_pass = (
+            isinstance(criteria, list)
+            and len(criteria) == len(expected_criteria)
+            and len(actual_criteria) == len(expected_criteria)
+            and len(set(actual_criteria)) == len(expected_criteria)
+            and set(actual_criteria) == set(expected_criteria)
+            and all(isinstance(entry, dict) and entry.get("passed") is True for entry in criteria)
         )
-        if not verified.get("ok") or payload.get("objective_verified") is not True or payload.get("acceptance_passed") is not True or not criteria_pass:
-            self._event(mission_id,"CLOSE_REJECTED",{"reason":"OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED","evidence_id":evidence_id})
+        if (not verified.get("ok")
+                or payload.get("objective_verified") is not True
+                or payload.get("acceptance_passed") is not True
+                or not attempt_matches
+                or not criteria_pass):
+            self._event(mission_id,"CLOSE_REJECTED",{
+                "reason":"OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED",
+                "evidence_id":evidence_id,
+                "expected_attempt":expected_attempt,
+                "evidence_attempt":payload.get("attempt_number"),
+            })
             raise ValueError("OBJECTIVE_AND_EVIDENCE_VERIFICATION_REQUIRED")
         result={"objective_verified":True,"evidence_verified":True,"evidence_id":evidence_id,
-                "evidence_sha256":evidence_sha256,"summary":summary[:2000],"criteria_results":criteria}
+                "evidence_sha256":evidence_sha256,"attempt_number":expected_attempt,
+                "summary":summary[:2000],"criteria_results":criteria}
         now=_now()
         self._update(mission_id,status="CLOSED",result_json=json.dumps(result,ensure_ascii=False),updated_at=_iso(now),next_update_at=_iso(now))
         self._event(mission_id,"GOLDEN_LOOP_CLOSED",{"at":_iso(now),"result":result})
