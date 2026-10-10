@@ -108,8 +108,9 @@ class CognitiveLoop:
         self.events.publish("UNDERSTAND",{"goal":goal,"summary":"تحديد المطلوب والنتيجة المتوقعة","run_id":run_id})
 
         self._state("MEMORY",goal=goal,run_id=run_id)
-        # MemoryStore.memories() is newest-first; take the first 12 to keep recent context.
-        memories=self.store.memories()[:12]
+        # Prefer query-relevant memories; retain the newest-first fallback for compatible stores.
+        recall = getattr(self.store, "recall_memories", None)
+        memories = recall(goal, limit=12) if callable(recall) else self.store.memories()[:12]
         self.events.publish("MEMORY_RECALL",{"count":len(memories),"run_id":run_id})
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
