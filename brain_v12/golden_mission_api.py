@@ -31,6 +31,10 @@ class CheckpointRequest(BaseModel):
     evidence: dict | None = None
 
 
+class RetryRequest(BaseModel):
+    reason: str
+
+
 class CloseRequest(BaseModel):
     evidence_id: str
     evidence_sha256: str
@@ -97,6 +101,16 @@ def router(controller: GoldenMissionController | None = None):
         require_control_key(request)
         try:
             return {"ok": True, "mission": c.checkpoint(mission_id, **body.model_dump())}
+        except KeyError:
+            raise HTTPException(404, "MISSION_NOT_FOUND")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+
+    @r.post("/{mission_id}/retry")
+    def retry(mission_id: str, body: RetryRequest, request: Request):
+        require_control_key(request)
+        try:
+            return {"ok": True, "mission": c.record_retry(mission_id, body.reason)}
         except KeyError:
             raise HTTPException(404, "MISSION_NOT_FOUND")
         except ValueError as exc:
