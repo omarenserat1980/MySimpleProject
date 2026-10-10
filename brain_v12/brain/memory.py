@@ -150,7 +150,7 @@ class MemoryStore:
                 normalized.add(term)
         return normalized
 
-    def recall_memories(self, query="", limit=12, candidates=None):
+    def recall_memories(self, query="", limit=12, candidates=None, fallback_recent=True):
         """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
         limit = max(1, min(int(limit), 100))
         rows = list(candidates) if candidates is not None else self.memories()
@@ -168,7 +168,7 @@ class MemoryStore:
             if score:
                 ranked.append((score, position, memory))
         if not ranked:
-            return rows[:limit]
+            return rows[:limit] if fallback_recent else []
 
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [memory for _, _, memory in ranked[:limit]]
