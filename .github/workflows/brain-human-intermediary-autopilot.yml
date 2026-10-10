@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 120
       - name: Fail-closed Brain internal runtime preflight
         run: |
           set -euo pipefail
@@ -36,8 +38,6 @@ jobs:
           assert e["verified"] is True, e
           print("BRAIN_INTERNAL_RUNNER=VERIFIED")
           PY
-        with:
-          fetch-depth: 120
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
