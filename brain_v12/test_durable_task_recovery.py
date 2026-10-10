@@ -8,7 +8,7 @@ class DurableTaskRecoveryTests(unittest.TestCase):
             s=DurableTaskStore(Path(d)/"tasks.db")
             s.submit("t1",{"program":[["HALT"]],"required_capabilities":["cpu"],"requirement":{}})
             row=s.claim("t1","blade-1",30); self.assertEqual(row["attempt"],1)
-            s.finish("t1",True,{"ok":True,"stdout":"done"})
+            s.finish("t1",True,{"ok":True,"stdout":"done"},row["lease_id"])
             row=s.get("t1")
             self.assertIn("HALT",row["payload"]); self.assertIn("done",row["result_json"])
             s.close()
