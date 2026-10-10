@@ -47,6 +47,16 @@ class CognitiveLoopEvidenceTests(unittest.TestCase):
         self.assertEqual(task["status"], "COMPLETED")
         self.assertEqual(task["evidence_ref"], result["execution"]["evidence_ref"])
 
+    def test_cognitive_loop_preserves_caller_provided_run_id(self):
+        store = MemoryStore()
+        loop = CognitiveLoop(store)
+
+        result = loop.run("review current state safely", run_id="api-run-123")
+
+        self.assertEqual(result["run_id"], "api-run-123")
+        self.assertEqual(result["verification"]["run_id"], "api-run-123")
+        self.assertEqual(store.state()["cognitive_trace"]["run_id"], "api-run-123")
+
     def test_cognitive_loop_does_not_complete_when_tool_fails(self):
         store = MemoryStore()
         loop = CognitiveLoop(store)
