@@ -32,7 +32,7 @@ jobs:
       BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
-      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ runner.temp }}/cloud-executor-attestation.json
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ github.workspace }}/.brain-cloud-executor-attestation.json
     steps:
       - uses: actions/checkout@v4
       - name: Fetch fresh signed executor attestation
@@ -72,7 +72,7 @@ jobs:
       BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
-      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ runner.temp }}/cloud-executor-attestation.json
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ github.workspace }}/.brain-cloud-executor-attestation.json
     runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 70
     steps:
