@@ -280,13 +280,13 @@ class BrainAI:
         for round_no in range(1, self.max_tool_rounds + 1):
             result=self._provider_respond(user_text, self._context(), instructions or self._system_instructions(), trace)
             if not result.get("ok"):
-                return BrainAIResponse(False,"","error",model=result.get("model"),tool_calls=calls,evidence=evidence,error=result.get("error"))
+                return self._with_layer_trace(BrainAIResponse(False,"","error",model=result.get("model"),tool_calls=calls,evidence=evidence,error=result.get("error")), user_text, instructions)
             evidence.append({"type":"provider","provider":result.get("provider"),"model":result.get("model"),"response_id":result.get("response_id"),"round":round_no})
             if result.get("routing") or result.get("evidence", {}).get("type") == "model_routing":
                 evidence.append({"type":"model_routing", **(result.get("routing") or result.get("evidence") or {})})
             intents=self._tool_intents(result)
             if not intents:
-                return BrainAIResponse(True,result.get("reply",""),"model",model=result.get("model"),tool_calls=calls,evidence=evidence)
+                return self._with_layer_trace(BrainAIResponse(True,result.get("reply",""),"model",model=result.get("model"),tool_calls=calls,evidence=evidence), user_text, instructions)
             for intent in intents:
                 name=intent["name"]
                 params=intent["params"]
@@ -329,8 +329,8 @@ class BrainAI:
                             "error": item.get("error"),
                         })
                 if not outcome.get("ok") and outcome.get("status") in {"WAITING_APPROVAL","WAITING_PERMISSION"}:
-                    return BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status"))
-        return BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT")
+                    return self._with_layer_trace(BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status")), user_text, instructions)
+        return self._with_layer_trace(BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT"), user_text, instructions)
 
     @staticmethod
     def _verify_tool_outcome(outcome: Dict[str, Any]) -> bool:
