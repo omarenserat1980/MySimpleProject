@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -78,8 +79,25 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
                 item.get("name"): item for item in checks
                 if isinstance(item, dict) and isinstance(item.get("name"), str)
             } if isinstance(checks, list) else {}
+            checked_at = None
+            fresh = False
+            try:
+                checked_at = datetime.fromisoformat(str(payload.get("checked_at", "")).replace("Z", "+00:00"))
+                if checked_at.tzinfo is not None:
+                    age_seconds = (datetime.now(timezone.utc) - checked_at.astimezone(timezone.utc)).total_seconds()
+                    fresh = 0 <= age_seconds <= 24 * 60 * 60
+            except (TypeError, ValueError, OverflowError):
+                pass
+            safety = payload.get("safety", {})
             valid = (
                 payload.get("status") == "VERIFIED"
+                and payload.get("source") == "live_read_only_runtime_probe"
+                and bool(payload.get("target_host"))
+                and fresh
+                and isinstance(safety, dict)
+                and safety.get("executes_missions") is False
+                and safety.get("changes_service_state") is False
+                and safety.get("stores_control_key") is False
                 and required_checks.issubset(named_checks)
                 and all(named_checks[name].get("passed") is True for name in required_checks)
                 and all(
@@ -91,6 +109,7 @@ def audit_repository(repo_root: str | Path) -> dict[str, Any]:
             evidence.append({
                 "path": relative,
                 "valid": valid,
+                "fresh_within_24h": fresh,
                 "check_count": len(checks) if isinstance(checks, list) else 0,
                 "missing_required_checks": sorted(required_checks - set(named_checks)),
             })
