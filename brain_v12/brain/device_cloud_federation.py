@@ -99,6 +99,49 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
     )
 
 
+def build_fleet_status(agent_status: dict) -> dict:
+    """Join logical fleet profiles to observed Agent Gateway heartbeats.
+
+    A heartbeat is liveness evidence, not a unique device identity proof.
+    Consequently this read-only view never marks an endpoint identity-verified
+    or eligible for execution. Cloud capacity and free entitlement are likewise
+    left unverified until provider-specific evidence is supplied.
+    """
+    agents = agent_status.get("agents", []) if isinstance(agent_status, dict) else []
+    ttl = max(5, int(agent_status.get("ttl_seconds", 15))) if isinstance(agent_status, dict) else 15
+    observed = {str(item.get("agent_id", "")): item for item in agents if isinstance(item, dict)}
+    rows = []
+    for endpoint in default_fleet():
+        heartbeat = observed.get(endpoint.endpoint_id)
+        age = heartbeat.get("age_seconds") if heartbeat else None
+        is_online = bool(heartbeat and heartbeat.get("online") and age is not None and float(age) <= ttl)
+        rows.append({
+            **endpoint.public(),
+            "observed_state": "ONLINE" if is_online else ("STALE" if heartbeat else "NOT_OBSERVED"),
+            "heartbeat_age_seconds": age,
+            "heartbeat_ttl_seconds": ttl,
+            "identity_verified": False,
+            "execution_eligible": False,
+        })
+    return {
+        "ok": True,
+        "status": "OBSERVED_NOT_EXECUTION_READY",
+        "source": "device_bridge.agent_status",
+        "fleet": rows,
+        "cloud": {
+            "status": "NOT_PROBED",
+            "capacity_verified": False,
+            "free_cost_gate_passed": False,
+            "paid_provisioning_allowed": False,
+        },
+        "notes": [
+            "Heartbeat proves recent contact only, not unique hardware identity.",
+            "No cloud resources are created by this status endpoint.",
+            "Honda is an information/companion endpoint, not a compute executor.",
+        ],
+    }
+
+
 def plan_execution(
     workload: Workload,
     endpoints: Iterable[DeviceEndpoint] | None = None,
