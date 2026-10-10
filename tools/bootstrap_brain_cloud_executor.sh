@@ -7,7 +7,11 @@ set -euo pipefail
 
 REPO="${BRAIN_GITHUB_REPOSITORY:-omarenserat1980/MySimpleProject}"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-RUNNER_DIR="${BRAIN_RUNNER_DIR:-$HOME/brain-cloud-executor}"
+RUNNER_USER="${BRAIN_RUNNER_USER:-brainrunner}"
+RUNNER_HOME="$(getent passwd "$RUNNER_USER" | cut -d: -f6)"
+[ -n "$RUNNER_HOME" ] || { echo "DEDICATED_RUNNER_USER_REQUIRED:$RUNNER_USER"; exit 35; }
+[ "$(id -un)" != "$RUNNER_USER" ] || { echo "OPERATOR_AND_RUNNER_ACCOUNTS_MUST_DIFFER"; exit 36; }
+RUNNER_DIR="${BRAIN_RUNNER_DIR:-/opt/brain-cloud-executor}"
 RUNNER_VERSION="${BRAIN_RUNNER_VERSION:-2.337.0}"
 RUNNER_ARCH="linux-x64"
 EXECUTOR_ID="${BRAIN_CLOUD_EXECUTOR_ID:-brain-cloud-$(hostname)-$(cat /etc/machine-id 2>/dev/null || echo unknown)}"
@@ -31,6 +35,9 @@ command -v gh >/dev/null || { echo "MISSING:gh"; exit 2; }
 command -v curl >/dev/null || { echo "MISSING:curl"; exit 2; }
 command -v tar >/dev/null || { echo "MISSING:tar"; exit 2; }
 command -v python3 >/dev/null || { echo "MISSING:python3"; exit 2; }
+command -v sudo >/dev/null || { echo "MISSING:sudo"; exit 2; }
+getent group kvm >/dev/null || { echo "CLOUD_EXECUTOR_KVM_GROUP_REQUIRED"; exit 37; }
+id -nG "$RUNNER_USER" | tr ' ' '\n' | grep -qx kvm || { echo "RUNNER_USER_MUST_BELONG_TO_KVM_GROUP"; exit 38; }
 gh auth status >/dev/null 2>&1 || { echo "GITHUB_AUTH_REQUIRED"; exit 3; }
 
 arch="$(uname -m)"
@@ -73,7 +80,7 @@ PY
 rm -f "$ATTESTATION_FILE"
 unset BRAIN_CLOUD_EXECUTOR_TOKEN BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64
 
-mkdir -p "$RUNNER_DIR"
+sudo install -d -o "$RUNNER_USER" -g "$RUNNER_USER" -m 0750 "$RUNNER_DIR"
 cd "$RUNNER_DIR"
 
 if [ ! -x ./run.sh ]; then
@@ -81,11 +88,12 @@ if [ ! -x ./run.sh ]; then
   curl -fsSL -o "$archive" "https://github.com/actions/runner/releases/download/v$RUNNER_VERSION/$archive"
   tar -xzf "$archive"
   rm -f "$archive"
+  sudo chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
 fi
 
 TOKEN="$(gh api --method POST -H "Accept: application/vnd.github+json" "/repos/$REPO/actions/runners/registration-token" --jq '.token')"
-export RUNNER_ALLOW_RUNASROOT=0
-./config.sh --unattended \
+# The operator obtains the short-lived token; the isolated runner account never receives gh CLI credentials.
+sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 ./config.sh --unattended \
   --url "https://github.com/$REPO" \
   --token "$TOKEN" \
   --name "$EXECUTOR_ID" \
@@ -102,4 +110,4 @@ echo "BRAIN_CLOUD_EXECUTOR_BOOTSTRAP=VERIFIED"
 echo "BRAIN_CLOUD_EXECUTOR_ID=$EXECUTOR_ID"
 echo "BRAIN_CLOUD_EXECUTOR_MODE=EPHEMERAL_ONE_JOB"
 echo "Starting one-job ephemeral runner in the foreground."
-exec ./run.sh
+exec sudo -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" RUNNER_ALLOW_RUNASROOT=0 ./run.sh
