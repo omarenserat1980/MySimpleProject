@@ -93,4 +93,4 @@ Before considering merge:
 5. Review every required CI workflow at the exact latest PR head.
 6. Separately verify Windows Server 2025 boot evidence. Attestation and KVM checks do not prove Windows booted.
 
-Until all six acceptance points are independently evidenced, keep PR #276 in draft and do not enable Windows Real Boot.
+Until all six acceptance points are independently evidenced, keep PR #278 in draft and unmerged, and do not enable Windows Real Boot.
