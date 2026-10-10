@@ -150,10 +150,10 @@ class MemoryStore:
                 normalized.add(term)
         return normalized
 
-    def recall_memories(self, query="", limit=12):
+    def recall_memories(self, query="", limit=12, candidates=None):
         """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
         limit = max(1, min(int(limit), 100))
-        rows = self.memories()
+        rows = list(candidates) if candidates is not None else self.memories()
         query_terms = self._memory_terms(query)
         if not query_terms:
             return rows[:limit]
