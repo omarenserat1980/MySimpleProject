@@ -214,8 +214,15 @@ class GoldenMissionControllerTests(unittest.TestCase):
                 if stub.calls:
                     break
             time.sleep(0.01)
+        before_stop = worker.status()
+        self.assertTrue(before_stop["running"])
+        self.assertIsNotNone(before_stop["started_at"])
+        self.assertIsNotNone(before_stop["last_tick_at"])
+        self.assertIsNone(before_stop["last_error"])
+        self.assertEqual(before_stop["mode"], "REMINDERS_ONLY")
         worker.stop(timeout=1.0)
         self.assertFalse(worker._thread.is_alive())
+        self.assertFalse(worker.status()["running"])
         self.assertGreaterEqual(stub.calls, 1)
 
     def test_email_is_explicitly_unconfigured_when_missing(self):
