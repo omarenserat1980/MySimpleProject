@@ -8,6 +8,7 @@ FORBIDDEN_TRACKED_NAMES = {
     "terraform.tfstate",
     "terraform.tfstate.backup",
     "brain.tfplan",
+    "brain-windows.tfplan",
 }
 
 FORBIDDEN_OPEN_NETWORKS = {"0.0.0.0/0", "::/0"}
