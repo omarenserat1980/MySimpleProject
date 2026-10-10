@@ -107,10 +107,10 @@ class GoldenMissionController:
 
     def start(self, mission_id: str) -> dict[str, Any]:
         mission = self.get(mission_id)
-        if mission["status"] not in {"PLANNED","RUNNING"}:
-            raise ValueError("MISSION_NOT_STARTABLE")
         if mission["required_permission"] and not mission["permission_granted"]:
             raise ValueError("MISSION_PERMISSION_REQUIRED")
+        if mission["status"] not in {"PLANNED","RUNNING"}:
+            raise ValueError("MISSION_NOT_STARTABLE")
         now = _now()
         self._update(mission_id,status="RUNNING",updated_at=_iso(now),
                      next_update_at=_iso(min(now+timedelta(minutes=mission["update_interval_minutes"]),datetime.fromisoformat(mission["due_at"]))))
