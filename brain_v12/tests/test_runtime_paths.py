@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from brain_v12.runtime_paths import configure_runtime_paths
 from brain_v12.brain.durable_task_store import DurableTaskStore
+from brain_v12.brain.evidence_store import EvidenceStore
 from brain_v12.brain.virtual_task_queue import VirtualTaskQueue
 from unittest.mock import MagicMock
 
@@ -194,6 +195,39 @@ class RuntimePathsTests(unittest.TestCase):
                 factory.assert_called_once_with(None)
             finally:
                 queue.shutdown()
+
+    def test_evidence_store_default_uses_runtime_home(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime_home = Path(temporary) / "runtime"
+            with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
+                store = EvidenceStore()
+                try:
+                    self.assertEqual(
+                        store.path,
+                        runtime_home / "brain6_artifacts" / "evidence" / "evidence.db",
+                    )
+                    self.assertTrue(store.path.is_file())
+                finally:
+                    store.close()
+
+    def test_explicit_evidence_and_task_store_paths_are_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            evidence_path = root / "custom-evidence.db"
+            task_path = root / "custom-tasks.db"
+            with patch.dict(os.environ, {
+                "BRAIN_RUNTIME_HOME": str(root / "runtime"),
+                "BRAIN_EVIDENCE_DB": str(evidence_path),
+                "BRAIN_VIRTUAL_TASK_DB": str(task_path),
+            }, clear=True):
+                evidence = EvidenceStore()
+                tasks = DurableTaskStore()
+                try:
+                    self.assertEqual(evidence.path, evidence_path)
+                    self.assertEqual(tasks.path, task_path)
+                finally:
+                    evidence.close()
+                    tasks.close()
 
 
 if __name__ == "__main__":
