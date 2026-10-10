@@ -38,6 +38,7 @@ from .ai_fabric.api import router as ai_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from .brain.software_registry import SoftwareRegistry
+from .brain.software_catalog import get_catalog, build_readiness
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
 from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
 from brain_v7.braincore_v2.code_tool_api import CodeTool
@@ -223,6 +224,18 @@ app.include_router(intelligence_router)
 app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
+
+
+@app.get("/api/software/catalog")
+def software_catalog_read(request: Request):
+    require_control_key(request)
+    return get_catalog()
+
+
+@app.get("/api/software/readiness")
+def software_catalog_readiness(request: Request):
+    require_control_key(request)
+    return build_readiness(software_registry.list())
 
 
 @app.get("/api/software/status")
