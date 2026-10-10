@@ -60,8 +60,9 @@ A replacement phone must obtain source/config from the canonical recovery path a
 - `http://127.0.0.1:8012` is a loopback endpoint and refers only to the phone on which it is running. It is valid for a device hosting its own local Brain API, not as a way for another phone to reach Redmi.
 - A non-primary agent must use an already reachable, authenticated Brain endpoint. If that endpoint is missing or unreachable, stop and diagnose networking; do not silently launch or terminate a local API as a substitute.
 - Keep each phone's local key file at `~/v12-agent/agent.key`; never copy key material between phones or place it in Git.
-- **Current backend limitation:** `DeviceBridge.authenticate` uses one server-wide configured key/hash; a per-agent credential registry is not implemented yet. A newly generated Realme key will therefore not authenticate to a remote Brain unless it matches the server-wide key. Do not copy the Redmi key to bypass this limitation.
-- Treat remote multi-device execution as BLOCKED until per-agent authentication is implemented and tested, or a deliberately shared credential policy is reviewed and approved. A local key file alone is not proof of remote authorization.
+- The backend supports an optional `BRAIN_AGENT_KEYS_JSON` registry mapping each agent ID to a unique key. When configured, it overrides legacy shared-key authentication and fails closed for missing IDs, invalid JSON, or duplicate key values. Configure it only in a local secret store such as `~/.brain_env`; never commit it or paste key values into chat.
+- Each device's local `~/v12-agent/agent.key` must match the registry entry for that device ID on the Brain host. Transfer key material only through a secure channel you control. Do not copy the Redmi key to Realme or share one key across IDs.
+- If the registry is not configured, legacy server-wide key mode remains active for compatibility. In that mode, a per-device key generated locally will not authenticate remotely unless it matches the server's configured key. Do not interpret local key creation as remote authorization.
 
 ### Evidence and release gates
 - CI success proves only the checks that actually ran. It does not prove that a physical phone is connected or that a mission completed.
