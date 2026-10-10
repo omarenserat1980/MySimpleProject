@@ -26,12 +26,53 @@ if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
-# Preserve an explicit non-paid endpoint from either supported variable.
-# Render guards above run first, so blocked paid endpoints cannot be restored here.
+
+# Resolve a stable per-device logical ID before applying defaults. Never let a
+# copied Redmi config silently register another handset as redmi3-01.
+DEVICE_MODEL="$(getprop ro.product.model 2>/dev/null || true)"
+DETECTED_AGENT_ID=""
+# Only verified hardware model codes are auto-mapped. Broad brand matching
+# is unsafe because many devices share a brand. Unknown models require both a
+# unique configured agent ID and an exact V12_DEVICE_MODEL pin in local config.
+case "$DEVICE_MODEL" in
+  *23129RN51X*) DETECTED_AGENT_ID="redmi3-01" ;;
+  *RMX3710*) DETECTED_AGENT_ID="realme-01" ;;
+esac
+if [ -n "$DETECTED_AGENT_ID" ]; then
+  if [ -n "${V12_AGENT_ID:-}" ] && [ "$V12_AGENT_ID" != "$DETECTED_AGENT_ID" ]; then
+    echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_MISMATCH model=$DEVICE_MODEL configured=$V12_AGENT_ID expected=$DETECTED_AGENT_ID" >&2
+    echo "Fix $HOME/v12-agent/agent_config.sh locally; do not copy another device's ID or key." >&2
+    exit 45
+  fi
+  export V12_AGENT_ID="$DETECTED_AGENT_ID"
+elif [ -z "${V12_AGENT_ID:-}" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_REQUIRED model=${DEVICE_MODEL:-unknown}; set a unique V12_AGENT_ID in $HOME/v12-agent/agent_config.sh" >&2
+  exit 45
+elif [ "${V12_DEVICE_MODEL:-}" != "$DEVICE_MODEL" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_MODEL_CONFIRMATION_REQUIRED detected=${DEVICE_MODEL:-unknown} configured=${V12_DEVICE_MODEL:-unset}" >&2
+  echo "Set V12_DEVICE_MODEL to this phone's exact getprop ro.product.model value in $HOME/v12-agent/agent_config.sh." >&2
+  exit 45
+fi
+
+# Preserve explicit non-paid endpoints. The default loopback endpoint is only
+# valid for the primary Redmi that hosts this local API; loopback on Realme is
+# Realme itself, not the Redmi Brain.
 export V12_BRAIN_URL="${V12_BRAIN_URL:-${BRAIN_URL:-http://127.0.0.1:8012}}"
-# Local Termux runtime must use exactly one on-device key. Clear stale values, then seed the direct-key variable from the canonical local key file.
+if [ "$V12_AGENT_ID" != "redmi3-01" ]; then
+  case "$V12_BRAIN_URL" in
+    http://localhost*|https://localhost*|http://127.*|https://127.*|http://\[::1\]*|https://\[::1\]*)
+      echo "BRAIN_RUNTIME_ERROR: REMOTE_BRAIN_URL_REQUIRED agent=$V12_AGENT_ID url=$V12_BRAIN_URL" >&2
+      echo "Set V12_BRAIN_URL to an already reachable, authenticated Brain endpoint in $HOME/v12-agent/agent_config.sh." >&2
+      echo "No Redmi settings or credentials were changed by this launcher." >&2
+      exit 46
+      ;;
+  esac
+fi
+
+# Keep a local key file for this runtime. Remote acceptance depends on the
+# server's configured authentication policy; never copy another device's key
+# just to bypass an authentication failure.
 unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
-export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
 mkdir -p "$(dirname "$V12_AGENT_KEY_FILE")"
@@ -67,7 +108,7 @@ health_ok() { "$PYTHON" -c 'import os,urllib.request; urllib.request.urlopen(os.
 auth_ok() {
   "$PYTHON" -c 'import json,os,urllib.request
 key=open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]),encoding="utf-8").read().strip()
-req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key},method="POST")
+req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key,"X-V12-Agent-Id":os.environ["V12_AGENT_ID"]},method="POST")
 with urllib.request.urlopen(req,timeout=3) as r: r.read()' >/dev/null 2>&1
 }
 auth_diagnostic() {
@@ -79,7 +120,7 @@ try:
     req = urllib.request.Request(
         base + "/api/device/heartbeat",
         data=json.dumps({"agent_id": os.environ["V12_AGENT_ID"]}).encode(),
-        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key},
+        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key, "X-V12-Agent-Id": os.environ["V12_AGENT_ID"]},
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=3) as response:

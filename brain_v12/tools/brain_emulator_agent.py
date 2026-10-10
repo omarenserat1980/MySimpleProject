@@ -23,7 +23,7 @@ def load_key():
 
 def request_json(method, path, key, payload=None):
     data=None
-    headers={"Accept":"application/json","X-V12-Agent-Key":key}
+    headers={"Accept":"application/json","X-V12-Agent-Key":key,"X-V12-Agent-Id":AGENT_ID}
     if payload is not None:
         data=json.dumps(payload, ensure_ascii=False).encode()
         headers["Content-Type"]="application/json"

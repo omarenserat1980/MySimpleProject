@@ -1,9 +1,9 @@
 """Brain Cloud ↔ Brain Termux execution bridge."""
 from __future__ import annotations
-import hashlib,hmac,os,time
+import hashlib,hmac,json,os,time
 from uuid import uuid4
 from .device_sync_adapter import DeviceTaskSyncAdapter
-AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
+AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; AGENT_KEYS_JSON_ENV="BRAIN_AGENT_KEYS_JSON"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
@@ -28,6 +28,8 @@ class DeviceBridge:
         )
 
     def configured(self):
+        if os.getenv(AGENT_KEYS_JSON_ENV, "").strip():
+            return True
         if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"):
             return True
         key_file = self._key_file()
@@ -48,12 +50,31 @@ class DeviceBridge:
             return True
         return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
+        if os.getenv(AGENT_KEYS_JSON_ENV, "").strip(): return "PER_AGENT_KEYS_JSON"
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
         return "NOT_CONFIGURED"
-    def authenticate(self,supplied):
-        if not self.enabled() or not supplied:return False
+    def authenticate(self, supplied, agent_id=None):
+        if not self.enabled() or not supplied:
+            return False
+        # A configured per-agent registry overrides legacy shared credentials.
+        # Invalid registries, duplicate key values, and missing IDs fail closed.
+        raw_registry = os.getenv(AGENT_KEYS_JSON_ENV, "").strip()
+        if raw_registry:
+            try:
+                registry = json.loads(raw_registry)
+            except (TypeError, ValueError):
+                return False
+            if not isinstance(registry, dict) or not registry:
+                return False
+            values = list(registry.values())
+            if any(not isinstance(value, str) or not value for value in values):
+                return False
+            if len(set(values)) != len(values):
+                return False
+            expected = registry.get(str(agent_id or "").strip())
+            return bool(expected) and hmac.compare_digest(supplied, expected)
         expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
