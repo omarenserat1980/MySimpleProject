@@ -26,12 +26,45 @@ if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
-# Preserve an explicit non-paid endpoint from either supported variable.
-# Render guards above run first, so blocked paid endpoints cannot be restored here.
+
+# Resolve a stable per-device logical ID before applying defaults. Never let a
+# copied Redmi config silently register another handset as redmi3-01.
+DEVICE_MODEL="$(getprop ro.product.model 2>/dev/null || true)"
+DETECTED_AGENT_ID=""
+case "$DEVICE_MODEL" in
+  *23129RN51X*|*Redmi*|*redmi*) DETECTED_AGENT_ID="redmi3-01" ;;
+  *RMX3710*|*realme*|*Realme*) DETECTED_AGENT_ID="realme-01" ;;
+esac
+if [ -n "$DETECTED_AGENT_ID" ]; then
+  if [ -n "${V12_AGENT_ID:-}" ] && [ "$V12_AGENT_ID" != "$DETECTED_AGENT_ID" ]; then
+    echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_MISMATCH model=$DEVICE_MODEL configured=$V12_AGENT_ID expected=$DETECTED_AGENT_ID" >&2
+    echo "Fix $HOME/v12-agent/agent_config.sh locally; do not copy another device's ID or key." >&2
+    exit 45
+  fi
+  export V12_AGENT_ID="$DETECTED_AGENT_ID"
+elif [ -z "${V12_AGENT_ID:-}" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_REQUIRED model=${DEVICE_MODEL:-unknown}; set a unique V12_AGENT_ID in $HOME/v12-agent/agent_config.sh" >&2
+  exit 45
+fi
+
+# Preserve explicit non-paid endpoints. The default loopback endpoint is only
+# valid for the primary Redmi that hosts this local API; loopback on Realme is
+# Realme itself, not the Redmi Brain.
 export V12_BRAIN_URL="${V12_BRAIN_URL:-${BRAIN_URL:-http://127.0.0.1:8012}}"
-# Local Termux runtime must use exactly one on-device key. Clear stale values, then seed the direct-key variable from the canonical local key file.
+if [ "$V12_AGENT_ID" != "redmi3-01" ]; then
+  case "$V12_BRAIN_URL" in
+    http://localhost*|https://localhost*|http://127.*|https://127.*|http://\[::1\]*|https://\[::1\]*)
+      echo "BRAIN_RUNTIME_ERROR: REMOTE_BRAIN_URL_REQUIRED agent=$V12_AGENT_ID url=$V12_BRAIN_URL" >&2
+      echo "Set V12_BRAIN_URL to an already reachable, authenticated Brain endpoint in $HOME/v12-agent/agent_config.sh." >&2
+      echo "No Redmi settings or credentials were changed by this launcher." >&2
+      exit 46
+      ;;
+  esac
+fi
+
+# Local Termux runtime must use exactly one on-device key. Never copy a key
+# between devices; the target Brain must explicitly authorize this agent key.
 unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
-export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
 mkdir -p "$(dirname "$V12_AGENT_KEY_FILE")"
