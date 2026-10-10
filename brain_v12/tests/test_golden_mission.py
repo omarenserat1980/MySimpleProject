@@ -189,6 +189,35 @@ class GoldenMissionControllerTests(unittest.TestCase):
         self.assertEqual(worker.tick()["checked"], 0)
         self.assertEqual(stub.calls, 1)
 
+    def test_reminder_worker_start_is_idempotent_and_stop_joins_thread(self):
+        import time
+        from brain_v12.brain.golden_mission_worker import GoldenMissionReminderWorker
+
+        class Stub:
+            def __init__(self):
+                self.calls = 0
+                self.lock = __import__("threading").Lock()
+
+            def notify_due(self):
+                with self.lock:
+                    self.calls += 1
+                return {"checked": 0, "notifications_sent": 0,
+                        "notifications_failed_or_unconfigured": 0}
+
+        stub = Stub()
+        worker = GoldenMissionReminderWorker(stub, interval_seconds=30)
+        self.assertTrue(worker.start())
+        self.assertFalse(worker.start())
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            with stub.lock:
+                if stub.calls:
+                    break
+            time.sleep(0.01)
+        worker.stop(timeout=1.0)
+        self.assertFalse(worker._thread.is_alive())
+        self.assertGreaterEqual(stub.calls, 1)
+
     def test_email_is_explicitly_unconfigured_when_missing(self):
         with patch.dict("os.environ", {}, clear=True):
             result=GoldenMissionController._send_email(self.mission,"test")
