@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/windows-cloud/estimate-cost.py --region westeurope --output windows-cloud-cost-estimate.json
+          python3 scripts/windows-cloud/estimate-cost.py --region northeurope --output windows-cloud-cost-estimate.json
 
       - name: Validate Azure OIDC configuration names without printing values
         id: config
@@ -76,7 +76,7 @@ jobs:
           set -euo pipefail
           az account show --query '{subscriptionName:name,state:state}' --output json
           image_file="$RUNNER_TEMP/windows-server-2025-images.json"
-          az vm image list --location westeurope --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2025-datacenter-g2 --all --output json > "$image_file"
+          az vm image list --location northeurope --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2025-datacenter-g2 --all --output json > "$image_file"
           python3 - "$image_file" <<'PY'
           import json, sys
           rows = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -88,17 +88,17 @@ jobs:
               try: versions.append((tuple(int(part) for part in raw.split(".")), raw))
               except (ValueError, AttributeError): pass
           if not versions:
-              raise SystemExit("WINDOWS_SERVER_2025_IMAGE_NOT_FOUND in westeurope; no deployment attempted.")
+              raise SystemExit("WINDOWS_SERVER_2025_IMAGE_NOT_FOUND in northeurope; no deployment attempted.")
           print("Windows Server 2025 image catalogue: PASS; latest listed version:", max(versions)[1])
           PY
           sku_file="$RUNNER_TEMP/windows-b2s-sku.json"
-          az vm list-skus --location westeurope --resource-type virtualMachines --size Standard_B2s --all --output json > "$sku_file"
+          az vm list-skus --location northeurope --resource-type virtualMachines --size Standard_B2s --all --output json > "$sku_file"
           python3 - "$sku_file" <<'PY'
           import json, sys
           rows = json.load(open(sys.argv[1], encoding="utf-8"))
           candidates = [x for x in rows if x.get("name") == "Standard_B2s"]
           if not candidates:
-              raise SystemExit("Standard_B2s SKU not listed in westeurope; no deployment attempted.")
+              raise SystemExit("Standard_B2s SKU not listed in northeurope; no deployment attempted.")
           row = candidates[0]
           restrictions = row.get("restrictions") or []
           caps = {c.get("name"): c.get("value") for c in row.get("capabilities", [])}
@@ -113,7 +113,7 @@ jobs:
           if restrictions:
               raise SystemExit("Standard_B2s has regional/subscription restrictions; no deployment attempted.")
           PY
-          az vm list-usage --location westeurope --output json > "$RUNNER_TEMP/azure-quota.json"
+          az vm list-usage --location northeurope --output json > "$RUNNER_TEMP/azure-quota.json"
           python3 - "$RUNNER_TEMP/azure-quota.json" <<'PY'
           import json, sys
           rows = json.load(open(sys.argv[1], encoding="utf-8"))
