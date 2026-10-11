@@ -1,4 +1,5 @@
 name: Brain Cloud Windows Runner Launch
+run-name: Verify cloud Windows runner on main
 
 on:
   push:
