@@ -8,6 +8,7 @@ EVIDENCE_ROOT="${1:-$REPO_ROOT/brain6_artifacts}"
 EXPECTED_RUN_ID="${2:-}"
 REPORT="$EVIDENCE_ROOT/golden-loop-accelerator-report.json"
 
+mkdir -p "$EVIDENCE_ROOT"
 cd "$REPO_ROOT"
 python3 -m unittest brain_v12.tests.test_golden_loop_accelerator -v
 
