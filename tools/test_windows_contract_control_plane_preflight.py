@@ -66,6 +66,8 @@ class ControlPlanePreflightTests(unittest.TestCase):
                 singleton INTEGER PRIMARY KEY, brain_id TEXT, generation INTEGER,
                 lease_id TEXT, fencing_token INTEGER, holder_id TEXT,
                 acquired_at REAL, expires_at REAL)""")
+            db.execute("""CREATE TABLE consumed_owner_approvals(
+                challenge_id TEXT PRIMARY KEY, attempt_id TEXT NOT NULL, consumed_at REAL NOT NULL)""")
             db.execute("INSERT INTO leadership VALUES(1,?,?,?,?,?,?,?)", tuple(lease.values()))
         expires = now + 500
         fields = {
@@ -107,6 +109,18 @@ class ControlPlanePreflightTests(unittest.TestCase):
         self.assertFalse(report["ok"])
         self.assertIn("OWNER_APPROVAL_ATTEMPT_MISMATCH", report["blockers"])
         self.assertFalse(report["contract_issued"])
+
+    def test_already_consumed_owner_approval_fails_closed(self):
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "INSERT INTO consumed_owner_approvals VALUES(?,?,?)",
+                ("challenge-test", ATTEMPT, time.time()),
+            )
+        with patch.dict(os.environ, self.env, clear=True):
+            report = check(self.args)
+        self.assertFalse(report["ok"])
+        self.assertIn("OWNER_APPROVAL_ALREADY_CONSUMED", report["blockers"])
+        self.assertFalse(report["owner_approval_consumed"])
 
     def test_missing_private_key_fails_closed_without_echoing_values(self):
         env = dict(self.env)
