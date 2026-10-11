@@ -49,7 +49,7 @@ except (URLError, TimeoutError, OSError, ValueError, UnicodeError):
     raise SystemExit(3)
 
 paths = sorted(spec.get("paths", {}))
-matches = [p for p in paths if any(term in p.lower() for term in ("executor", "registry", "attestation", "windows/contracts", "windows/cloud"))]
+matches = [p for p in paths if any(term in p.lower() for term in ("executor", "registry", "attestation", "fabric", "enroll", "heartbeat", "windows/contracts", "windows/cloud"))]
 print("DISCOVERY=PASS")
 print("OPENAPI_PATH_COUNT=" + str(len(paths)))
 print("RELEVANT_ROUTE_COUNT=" + str(len(matches)))
@@ -57,7 +57,7 @@ for route in matches:
     methods = sorted(str(m).upper() for m in spec.get("paths", {}).get(route, {}) if str(m).lower() in {"get","post","put","patch","delete"})
     print("ROUTE=" + ",".join(methods) + " " + route)
 if not matches:
-    print("NEXT=Executor registry is not advertised in the public OpenAPI schema; obtain the actual registry base URL from the authorized executor owner.")
+    print("NEXT=No matching executor/fabric routes advertised; confirm the Fabric base URL and registry URL with the authorized service owner.")
 else:
     print("NOTE=Route discovery is not authentication, registry enrollment, contract issuance, or boot proof.")
 PY
