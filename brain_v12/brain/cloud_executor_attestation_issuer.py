@@ -41,6 +41,13 @@ class _PostgresConnection:
         self.connection = connection
 
     def execute(self, query: str, params=()):
+        # PostgreSQL has no BEGIN IMMEDIATE. Lock the target row before checking
+        # consumed_at so concurrent consumers cannot both observe an unused nonce.
+        if query.startswith("SELECT") and (
+            "FROM issued_challenges WHERE nonce=?" in query
+            or "FROM issued_attestations WHERE nonce=?" in query
+        ):
+            query += " FOR UPDATE"
         query = query.replace("BEGIN IMMEDIATE", "BEGIN").replace("?", "%s")
         return self.connection.execute(query, params)
 
