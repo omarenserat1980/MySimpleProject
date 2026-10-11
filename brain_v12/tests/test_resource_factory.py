@@ -119,3 +119,18 @@ def test_economic_kill_switch_stops_on_loss_stale_or_unsafe():
     assert gate.kill_switch_required({"status": "PROFITABLE"}, stale=True)["stop"] is True
     assert gate.kill_switch_required({"status": "PROFITABLE"}, unsafe=True)["stop"] is True
     assert gate.kill_switch_required({"status": "PROFITABLE"})["stop"] is False
+
+
+
+def test_profit_gate_blocks_self_reported_truth_even_when_flags_claim_verified():
+    gate = ProfitGate()
+    result = gate.evaluate(
+        execution_mode="REMOTE_PROVIDER",
+        truth_level="SELF_REPORTED",
+        expected_revenue=100,
+        costs={"electricity": 0, "pool_fees": 0, "hosting": 0, "network": 0, "other": 0},
+        provider_verified=True,
+        evidence_verified=True,
+    )
+    assert result["status"] == "BLOCKED"
+    assert "TRUTH_LEVEL_NOT_VERIFIED_FOR_ECONOMICS" in result["reasons"]
