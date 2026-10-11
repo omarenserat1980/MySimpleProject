@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Brain Termux Emulator agent with heartbeat, polling and allowlisted execution."""
-import json, os, platform, subprocess, sys, time, urllib.parse, urllib.request
+import json, os, platform, subprocess, sys, time, urllib.parse, urllib.request, sysconfig
+from importlib import metadata
 from uuid import uuid4
 
 SELF_TESTS = (
@@ -42,6 +43,30 @@ def execute(task):
         return {"returncode":p.returncode,"stdout":p.stdout.strip(),"stderr":p.stderr.strip()}
     if task=="platform":
         return {"system":platform.system(),"release":platform.release(),"version":platform.version(),"machine":platform.machine()}
+    if task=="software_inventory":
+        packages=[]
+        for dist in metadata.distributions():
+            try:
+                name=dist.metadata.get("Name") or ""
+                version=dist.version or ""
+                if name:
+                    packages.append({"name":name[:160],"version":version[:100]})
+            except Exception:
+                continue
+        packages.sort(key=lambda item:(item["name"].casefold(),item["version"]))
+        limit=300
+        return {
+            "schema_version":1,
+            "scope":"python-environment-only",
+            "read_only":True,
+            "host":{"system":platform.system(),"release":platform.release(),"machine":platform.machine()},
+            "python":{"version":platform.python_version(),"implementation":platform.python_implementation(),
+                      "executable":sys.executable,"prefix":sys.prefix,"base_prefix":sys.base_prefix},
+            "paths":{key:value for key,value in sysconfig.get_paths().items() if key in {"stdlib","purelib","platlib","scripts"}},
+            "package_count":len(packages),
+            "packages_truncated":len(packages)>limit,
+            "packages":packages[:limit],
+        }
     if task=="brain_self_test":
         root=os.path.abspath(os.path.join(os.path.dirname(__file__),"..",".."))
         env=dict(os.environ); env["PYTHONPATH"]=root+os.pathsep+env.get("PYTHONPATH","")

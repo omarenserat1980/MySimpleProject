@@ -1,0 +1,77 @@
+# Brain Software Ownership & Runtime
+
+## Objective
+Give Electronic Brain a durable, evidence-backed inventory of the software, applications,
+operating systems, runtimes, services, and compute substrates it is allowed to manage.
+The first increment is intentionally an **inventory and evidence registry**, not an installer.
+
+## Implemented in this increment
+- A declarative target catalog for Brain V12, Python, SQLite, Git, .NET SDK, Windows Server 2025, QEMU, OVMF, and FFmpeg; every target is explicitly marked as a goal, not an installation claim.
+- A readiness comparison that requires both the target runtime state and a verified inventory record; it does not run probes or claim missing software is ready.
+- SQLite-backed software records with stable IDs, category, version, source, license,
+  optional install path, declared permissions, runtime state, verification state, evidence
+  reference, notes, and timestamps.
+- Protected API access in the Brain FastAPI application.
+- Registration defaults to `planned`; only `planned`, `observed`, and `unknown` may be
+  set by registration. Observed/installed/running claims require a separate evidence-bearing observation.
+- A runtime observation is accepted only for an existing record and requires a non-empty
+  evidence reference. The API cannot self-assert `verified`: a supplied URL/reference is
+  not independent proof. Records remain unverified until a trusted verifier validates the
+  evidence and updates the registry through a separately controlled path.
+- No shell execution, package installation, downloads, updates, service control, Azure
+  resource creation, or deletion is performed.
+
+## API
+All endpoints require the existing Brain control key.
+
+- `GET /api/software/catalog` — desired software catalog; not live host inventory.
+- `GET /api/software/readiness` — compares catalog targets to evidence-bearing registry records.
+- `GET /api/software/status` — counts and safety boundary.
+- `GET /api/software` — list records; optional `category` and `runtime_state` filters.
+- `GET /api/software/{software_id}` — one record.
+- `POST /api/software` — register a planned/unknown inventory item.
+- `POST /api/software/{software_id}/observation` — record state and evidence reference.
+
+Example registration body:
+
+```json
+{
+  "software_id": "python-runtime",
+  "name": "Python",
+  "category": "runtime",
+  "version": "3.x",
+  "source": "system inventory",
+  "license": "PSF",
+  "runtime_state": "planned",
+  "permissions": ["read-only"],
+  "notes": "Version must be confirmed on the target executor."
+}
+```
+
+## Target categories
+1. Operating systems and virtual machines (Windows Server 2025 target; Linux host).
+2. Runtime/toolchains (Python, .NET SDK, Git, QEMU, OVMF, FFmpeg/FFprobe).
+3. Databases and state services (SQLite and approved future databases).
+4. Applications and APIs (Brain V12 services and approved applications).
+5. Execution substrates (GitHub runner, container/sandbox, VM executor).
+6. Observability and recovery (health checks, logs, backups, restore verification).
+
+These are target-state goals, not a claim that each component is installed. The readiness endpoint remains false until each target has matching state and verification evidence.
+
+## Required next gates before execution features
+- Read-only host discovery with explicit allowlist and bounded output.
+- Software source and license validation; pinned versions and hashes.
+- Signed/traceable task requests, least-privilege identities, per-task sandbox,
+  timeouts, resource limits, network egress policy, and secret redaction.
+- Plan/diff first; explicit approval for installs, upgrades, removals, system services,
+  cloud resource changes, or spend.
+- Backup and tested rollback before mutation; SBOM and audit trail for every change.
+- Independent post-action checks and retained evidence. Action success must not be
+  confused with objective success.
+- Production rollout only after CI tests, security review, and an approved pull request.
+
+## Security and semantics
+- A software registry entry is not ownership of a software copyright or license.
+- The registry API cannot set `verified` from a caller-supplied evidence reference. A
+  future trusted verifier must validate provenance and content before marking a record verified.
+- No automatic software installation is enabled by this increment.
