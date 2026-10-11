@@ -40,6 +40,19 @@ class EmulatorTests(unittest.TestCase):
         output=e.read_process_output(result["process_id"],timeout=0.2)
         self.assertEqual(output["status"],"TIMED_OUT")
         self.assertEqual(e.process_snapshot()["processes"],[])
+    def test_stop_process_reaps_process_and_cleans_registry(self):
+        import sys
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=10),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(5)"')
+        self.assertTrue(started["ok"])
+        stopped=e.stop_process(started["process_id"])
+        self.assertEqual(stopped["status"],"STOPPED")
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        self.assertEqual(e.stop_process(started["process_id"])["status"],"PROCESS_NOT_FOUND")
+
     def test_process_roundtrip_when_explicitly_enabled(self):
         e=DesktopCommanderEmulator(self.tmp.name,policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True))
         r=e.start_process("python --version")
