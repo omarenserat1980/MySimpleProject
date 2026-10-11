@@ -34,6 +34,7 @@ jobs:
       APPROVE_APPLY: ${{ inputs.approve_apply }}
     steps:
       - name: Validate required GitHub Environment configuration before cloud changes
+        id: config
         shell: bash
         env:
           CHECK_AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -55,15 +56,24 @@ jobs:
               missing+=("$name")
             fi
           done
-          # Admin credentials are required only for an approved deployment.
-          # A preflight-only run must remain useful without provisioning secrets.
-          if [[ "${APPROVE_APPLY:-false}" == "true" ]]; then
+          # If deployment was requested but admin credentials are absent, safely
+          # downgrade this run to preflight-only rather than fail before diagnostics.
+          # State bootstrap and deploy are gated by this step's output below.
+          apply_enabled="${APPROVE_APPLY:-false}"
+          if [[ "$apply_enabled" == "true" ]]; then
+            admin_missing=()
             for name in CHECK_WINDOWS_ADMIN_USERNAME CHECK_WINDOWS_ADMIN_PASSWORD; do
               if [[ -z "${!name:-}" ]]; then
-                missing+=("$name")
+                admin_missing+=("$name")
               fi
             done
+            if (( ${#admin_missing[@]} > 0 )); then
+              echo "NOTICE: deployment requested but Windows admin secrets are missing; downgrading to preflight-only."
+              printf ' - %s\\n' "${admin_missing[@]}"
+              apply_enabled="false"
+            fi
           fi
+          echo "apply_enabled=$apply_enabled" >> "$GITHUB_OUTPUT"
           if [[ -n "${CHECK_BRAIN_TFSTATE_ACCOUNT:-}" ]]; then
             if [[ ! "$CHECK_BRAIN_TFSTATE_ACCOUNT" =~ ^[a-z0-9]{3,24}$ ]]; then
               echo "BLOCKED: BRAIN_TFSTATE_ACCOUNT must contain 3-24 lowercase letters or digits."
@@ -151,7 +161,7 @@ jobs:
         run: ./scripts/windows-cloud/register-providers.ps1
 
       - name: Bootstrap remote Terraform state
-        if: ${{ inputs.approve_apply == true }}
+        if: ${{ steps.config.outputs.apply_enabled == 'true' }}
         shell: pwsh
         run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location westeurope
 
@@ -170,12 +180,12 @@ jobs:
           & ./scripts/windows-cloud/preflight.ps1 @preflightArgs
 
       - name: Deploy and verify Windows Server 2025
-        if: ${{ inputs.approve_apply == true }}
+        if: ${{ steps.config.outputs.apply_enabled == 'true' }}
         shell: pwsh
         run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location westeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B1s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
 
       - name: Explain preflight-only run
-        if: ${{ inputs.approve_apply != true }}
+        if: ${{ steps.config.outputs.apply_enabled != 'true' }}
         shell: bash
         run: |
           echo "Preflight only. No state storage or VM resources were created."
