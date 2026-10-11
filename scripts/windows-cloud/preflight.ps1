@@ -54,7 +54,7 @@ if (-not $image) {
     Fail "Windows Server 2025 image lookup failed in $Location. Candidate SKUs tried: $($imageSkuCandidates -join ', '). Azure-listed 2025 SKUs: $availableText. Image lookup details: $errorText. Terraform SKU was not changed; no deployment was attempted."
 }
 Write-Host "Resolved Windows Server image SKU: $resolvedSku"
-if ($image -notmatch ":$resolvedSku:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
+if ($image -notmatch ":${resolvedSku}:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
 $rawSkus = az vm list-skus --location $Location --resource-type virtualMachines --size $VmSize --all --output json 2>$null
 if ($LASTEXITCODE -eq 0 -and $rawSkus) {
     $skus = $rawSkus | ConvertFrom-Json
