@@ -60,7 +60,6 @@ def main() -> int:
             key = key_path.read_text(encoding="utf-8").strip()
             if key:
                 print("local_key=FOUND_NONEMPTY")
-                print("local_key=FOUND_NONEMPTY")
                 if args.show_key_sha256:
                     print("BRAIN_AGENT_KEY_SHA256=" + hashlib.sha256(key.encode()).hexdigest())
                 else:
