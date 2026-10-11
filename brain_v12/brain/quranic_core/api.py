@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from .control_auth import require_control_key
+from ..control_auth import require_control_key
 from .engine import QuranicResearchEngine
 from .models import EvidenceLevel
 from .canonical import CanonicalQuranAdapter
