@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Electronic Brain device link agent for Windows and Android Termux.
 
-Sends measured capacity heartbeats and polls only a tiny allowlist of safe
-status tasks. It never runs arbitrary shell commands or network-supplied code.
+Sends authenticated, measured capacity heartbeats only. This agent does not poll
+or claim queued tasks, so it cannot steal work intended for another executor.
 """
 from __future__ import annotations
 
@@ -81,6 +81,7 @@ def capacity_metadata() -> dict:
         "memory_mb": max(0, int(memory_mb())),
         "disk_mb": max(0, int(disk_mb)),
         "healthy": True,
+        "enrolled": True,
         "capabilities": ["device.status", "device.info", "python.test"],
         "observation_only": True,
         "agent_version": "1.0.0",
@@ -201,13 +202,12 @@ def main() -> int:
         try:
             result = post_heartbeat(base_url, agent_id, key)
             m = result["metadata"]
-            poll_result = poll_and_run_one(base_url, agent_id, key)
             print(json.dumps({
                 "ok": True, "agent_id": agent_id, "platform": m["platform"],
                 "cpu_cores": m["cpu_cores"], "memory_mb": m["memory_mb"],
                 "disk_mb": m["disk_mb"], "http_status": result["http_status"],
                 "status": result["response"].get("status", "UNKNOWN"),
-                "poll": poll_result,
+                "poll": "DISABLED_OBSERVATION_ONLY",
             }, ensure_ascii=False), flush=True)
             success = True
         except Exception as exc:
