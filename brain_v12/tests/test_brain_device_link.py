@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform
+from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform, execute_remote_task
 
 
 class BrainDeviceLinkTests(unittest.TestCase):
@@ -17,6 +17,12 @@ class BrainDeviceLinkTests(unittest.TestCase):
     def test_android_platform_detection(self):
         with patch.dict(os.environ, {"ANDROID_ROOT": "/system", "TERMUX_VERSION": "0.118"}, clear=False):
             self.assertEqual(detect_platform(), "android")
+
+    def test_safe_remote_tasks_and_rejects_arbitrary_task(self):
+        self.assertIn("python_version", execute_remote_task("python_version"))
+        self.assertIn("platform", execute_remote_task("platform"))
+        with self.assertRaisesRegex(ValueError, "TASK_NOT_ALLOWED"):
+            execute_remote_task("run_shell_command")
 
     def test_windows_agent_id_validation_is_platform_scoped_in_main(self):
         # The agent's main() checks the ID prefix only when the host platform is
