@@ -29,6 +29,7 @@ jobs:
         run: |
           python -m py_compile \
             tools/brain_emulator_project_audit.py \
+            tools/brain_emulator_agent.py \
             brain_v12/tools/brain_emulator_agent.py \
             brain_v12/tests/test_brain_emulator_project_audit.py
       - name: Run audit tests
