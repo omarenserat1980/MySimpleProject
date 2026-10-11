@@ -1,0 +1,64 @@
+name: Brain Physical Device Launch Probe
+
+on:
+  push:
+    branches:
+      - brain-software-cloud-pool
+    paths:
+      - '.github/workflows/brain-device-launch-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-physical-device-launch-probe
+  cancel-in-progress: false
+
+jobs:
+  launch-arkan-agent:
+    # Prefer Brain's existing self-hosted Arkan runner; do not use a paid cloud host.
+    runs-on: [self-hosted, brain-internal]
+    timeout-minutes: 5
+    env:
+      BRAIN_URL: ${{ vars.BRAIN_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+      BRAIN_AGENT_ID: ${{ vars.BRAIN_WINDOWS_AGENT_ID }}
+      BRAIN_AGENT_KEY: ${{ secrets.BRAIN_AGENT_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify agent configuration without exposing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${BRAIN_AGENT_ID:-}" ]; then
+            echo "BLOCKED: configure repository variable BRAIN_WINDOWS_AGENT_ID with an enrolled ID beginning windows-executor-"
+            exit 2
+          fi
+          if [ -z "${BRAIN_AGENT_KEY:-}" ]; then
+            echo "BLOCKED: BRAIN_AGENT_KEY secret is missing; use the key already registered in Brain's device-agent registry"
+            exit 2
+          fi
+          case "$BRAIN_AGENT_ID" in
+            windows-executor-*) ;;
+            *) echo "BLOCKED: Windows agent ID must start with windows-executor-"; exit 2 ;;
+          esac
+          case "$BRAIN_URL" in
+            https://*) ;;
+            *) echo "BLOCKED: Control Plane URL must use HTTPS"; exit 2 ;;
+          esac
+          echo "AGENT_CONFIGURATION=READY"
+      - name: Launch one authenticated heartbeat from Arkan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile brain_v12/tools/brain_device_link.py
+          python3 brain_v12/tools/brain_device_link.py --once
+      - name: Report explicit launch result
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "PHYSICAL_AGENT_LAUNCH=HEARTBEAT_ACCEPTED"
+          else
+            echo "PHYSICAL_AGENT_LAUNCH=NOT_VERIFIED"
+          fi
