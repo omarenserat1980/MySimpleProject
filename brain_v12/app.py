@@ -674,6 +674,17 @@ class WindowsContractIssueRequest(BaseModel):
     attempt_id: str
 
 
+@app.get("/api/brain/windows/contracts/readiness")
+async def windows_execution_contract_readiness(request: Request):
+    """Authenticated read-only prerequisite check; never issues a contract or reveals secret values."""
+    configured = os.environ.get("BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY", "")
+    supplied = request.headers.get("X-Brain-Contract-Delivery-Key", "")
+    if not configured or not supplied or not hmac.compare_digest(configured, supplied):
+        raise HTTPException(status_code=401, detail="WINDOWS_CONTRACT_READINESS_UNAUTHORIZED")
+    from .brain.windows_contract_readiness import readiness_snapshot
+    return readiness_snapshot()
+
+
 @app.post("/api/brain/windows/contracts/issue")
 async def issue_windows_execution_contract(payload: WindowsContractIssueRequest, request: Request):
     """Issue a signed short-lived contract to the dedicated HTTPS delivery client."""
