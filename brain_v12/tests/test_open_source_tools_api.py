@@ -27,6 +27,23 @@ class OpenSourceToolsApiTests(unittest.TestCase):
             {"boot_virtualization", "local_ai", "electronics"},
         )
 
+    def test_availability_preflight_is_non_executing(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from brain_v12.brain.open_source_tools_api import router
+
+        app = FastAPI()
+        app.include_router(router)
+        response = TestClient(app).get("/api/open-source-tools/preflight/availability")
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["mode"], "path_preflight_only")
+        self.assertFalse(result["execution_enabled"])
+        self.assertFalse(result["installation_enabled"])
+        self.assertFalse(result["hardware_io_enabled"])
+        self.assertEqual(result["summary"]["checked"], 9)
+        self.assertEqual(len(result["tools"]), 9)
+
     def test_category_filter(self):
         result = open_source_tools("local_ai")
         self.assertTrue(result["tools"])
