@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Electronic Brain — Cloud Pool</title>
+<style>
+:root{--bg:#070b13;--panel:#101827;--panel2:#0c1320;--line:#243149;--text:#e8f1ff;--muted:#93a6c4;--cyan:#5ce1e6;--blue:#6e9cff;--green:#5de2a2;--amber:#ffcc73;--red:#ff7d8a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% -10%,#172f4b 0,transparent 40%),radial-gradient(ellipse at 0 100%,#12233b 0,transparent 35%),var(--bg);color:var(--text);font-family:Segoe UI,Tahoma,Arial,sans-serif;min-height:100vh}
+main{max-width:1400px;margin:auto;padding:28px 22px 48px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}.brand{display:flex;align-items:center;gap:14px}.orb{width:48px;height:48px;border:1px solid #3b8396;border-radius:15px;background:linear-gradient(135deg,#123f51,#142039);display:grid;place-items:center;color:var(--cyan);font-size:25px;box-shadow:0 0 32px #35d8e51c}
+h1{font-size:clamp(23px,3vw,34px);margin:0;letter-spacing:.2px}.sub{margin-top:5px;color:var(--muted);font-size:13px}.top-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.pill{border:1px solid var(--line);border-radius:999px;padding:8px 12px;font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:8px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px currentColor}.dot.good{background:var(--green)}.dot.bad{background:var(--red)}
+button,a.btn{border:1px solid #31506e;color:var(--text);background:#13243a;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:8px;transition:.15s}button:hover,a.btn:hover{border-color:var(--cyan);background:#173149}button.primary{background:#0e4854;border-color:#238591}button.danger{background:#3a1c2a;border-color:#713448}button:disabled{opacity:.45;cursor:not-allowed}
+.hero{padding:20px 22px;border:1px solid #2b4b66;border-radius:18px;background:linear-gradient(100deg,#122536e8,#101827f2 55%,#101a2b);margin-bottom:18px;display:flex;justify-content:space-between;gap:18px;align-items:center;flex-wrap:wrap}.hero h2{margin:0 0 7px;font-size:20px}.hero p{margin:0;color:var(--muted);font-size:13px;line-height:1.8;max-width:780px}.status-big{font-size:13px;color:var(--cyan);border:1px solid #326a78;background:#12303a;padding:9px 12px;border-radius:10px;direction:ltr}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:14px 0}.metric,.panel{border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#121c2b,#0c1320);box-shadow:0 10px 30px #00000014}.metric{padding:16px;min-height:122px}.metric-label{color:var(--muted);font-size:12px}.metric-value{font-size:clamp(20px,2.7vw,29px);font-weight:650;margin:13px 0 7px;direction:ltr;text-align:right}.metric-note{font-size:11px;color:#7186a5}.layout{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.9fr);gap:14px;align-items:start}.panel{padding:18px;margin-bottom:14px;min-width:0}.panel-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:15px}.panel h3{font-size:16px;margin:0}.panel-head small{color:var(--muted);font-size:11px}
+.table-wrap{overflow:auto;border:1px solid #202c40;border-radius:11px}table{width:100%;border-collapse:collapse;min-width:640px;font-size:12px}th,td{text-align:right;padding:12px 10px;border-bottom:1px solid #202a3b;white-space:nowrap}th{color:#9cb3d4;font-weight:600;background:#0b1320}tbody tr:last-child td{border-bottom:0}.node{font-weight:600}.muted{color:var(--muted)}.status{font-size:11px;padding:4px 8px;border-radius:20px;display:inline-flex;gap:5px;align-items:center;background:#14291f;color:var(--green);border:1px solid #24523d}.status.off{background:#2f1d23;color:var(--red);border-color:#5d303b}.status.wait{background:#30291b;color:var(--amber);border-color:#5f4d28}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:11px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}label{font-size:12px;color:#b2c3dc}input,select{width:100%;background:#080f1b;border:1px solid #30405a;color:var(--text);border-radius:9px;padding:11px 12px;font:inherit;font-size:13px;outline:none}input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #5ce1e617}.checks{display:flex;gap:9px;align-items:flex-start;color:var(--muted);font-size:12px;line-height:1.6}.checks input{width:auto;margin-top:4px;accent-color:var(--cyan)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.note{border-inline-start:3px solid var(--amber);background:#241f17;color:#cfba91;padding:10px 12px;border-radius:7px;font-size:11px;line-height:1.7;margin-top:13px}.note.safe{border-color:var(--cyan);background:#10232a;color:#b2d8df}
+.output{margin-top:12px;padding:12px;background:#070d16;border:1px solid #24344b;border-radius:10px;min-height:44px;white-space:pre-wrap;word-break:break-word;font:12px/1.7 Consolas,monospace;direction:ltr;text-align:left;color:#b6d6e4;max-height:320px;overflow:auto}.empty{padding:20px;color:var(--muted);text-align:center;font-size:12px}.lease-list{display:grid;gap:9px}.lease{border:1px solid #2a3950;border-radius:10px;padding:12px;background:#0b1421}.lease-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.lease-id{font:12px Consolas,monospace;direction:ltr;color:var(--cyan)}.lease-meta{color:var(--muted);font-size:11px;margin-top:8px;line-height:1.8}.lease .actions{margin-top:8px}.smallbtn{padding:6px 9px;font-size:11px}
+footer{margin-top:15px;color:#7184a0;font-size:11px;line-height:1.8;text-align:center}.error{color:var(--red)}.ok{color:var(--green)}
+@media(max-width:980px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}@media(max-width:520px){main{padding:18px 12px 36px}.grid{gap:8px}.metric{padding:12px;min-height:110px}.panel{padding:13px}.fields{grid-template-columns:1fr}.field.full{grid-column:auto}.hero{padding:16px}.status-big{font-size:11px}}
+</style>
+</head>
+<body>
+<main>
+<header class="top">
+  <div class="brand"><div class="orb">◈</div><div><h1>Electronic Brain <span style="color:var(--cyan)">/ Cloud Pool</span></h1><div class="sub">لوحة الموارد · مراقبة فعلية · تخصيص برمجي محدود</div></div></div>
+  <div class="top-actions"><span class="pill"><span id="liveDot" class="dot"></span><span id="connectionText">جارٍ التحقق من اتصال API</span></span><button id="refreshBtn" type="button">↻ تحديث الآن</button><a class="btn" href="/docs" target="_blank" rel="noopener">توثيق API ↗</a></div>
+</header>
+
+<section class="hero">
+  <div><h2>موارد الجهاز أولًا، بلا سحابة وهمية</h2><p>تقرأ هذه اللوحة القياسات من الخادم الذي يشغّل Electronic Brain. موارد المعالج والذاكرة والتخزين هي موارد المضيف الفعلية المرصودة؛ أما الحصص والحجوزات أدناه فهي عقود منطقية داخل عملية Brain وليست عزلًا يفرضه نظام التشغيل.</p></div>
+  <div class="status-big" id="poolStatus">WAITING_FOR_API</div>
+</section>
+
+<section class="grid">
+  <article class="metric"><div class="metric-label">عُقد مرصودة</div><div class="metric-value" id="metricNodes">—</div><div class="metric-note" id="metricOnline">بانتظار القياس</div></article>
+  <article class="metric"><div class="metric-label">أنوية CPU فعلية مرصودة</div><div class="metric-value" id="metricCpu">—</div><div class="metric-note">لا تعني عدد الأنوية المحجوزة منطقيًا</div></article>
+  <article class="metric"><div class="metric-label">الذاكرة الكلية المرصودة</div><div class="metric-value" id="metricRam">—</div><div class="metric-note">RAM فعلية للمضيف · MiB/GiB</div></article>
+  <article class="metric"><div class="metric-label">مساحة القرص الحرة</div><div class="metric-value" id="metricDisk">—</div><div class="metric-note">على مسار قياس المضيف</div></article>
+</section>
+
+<div class="layout">
+  <div>
+    <section class="panel">
+      <div class="panel-head"><h3>عُقد مجموعة الموارد</h3><small id="lastUpdated">لم تُحدَّث بعد</small></div>
+      <div class="table-wrap"><table><thead><tr><th>العقدة</th><th>الدور / النظام</th><th>CPU</th><th>RAM</th><th>القرص الحر</th><th>الحالة</th></tr></thead><tbody id="nodesBody"><tr><td colspan="6" class="empty">لم تصل بيانات بعد.</td></tr></tbody></table></div>
+      <div class="note safe">لا تظهر العقد البعيدة كمتصلة إلا إذا أبلغت الخدمة عن بيانات الجهاز/نبضة حياة صالحة. ظهور المضيف المحلي وحده لا يثبت اتصال هاتف Android أو جهاز Arkan كوكيل منفصل.</div>
+      <div id="poolOutput" class="output" aria-live="polite">بانتظار /api/cloud-pool/status</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>خطة توزيع مهمة على المجموعة</h3><small>لا يبدأ التنفيذ</small></div>
+      <form id="poolPlanForm">
+        <div class="fields">
+          <div class="field"><label for="poolTask">معرّف المهمة</label><input id="poolTask" required maxlength="128" value="brain-resource-check"></div>
+          <div class="field"><label for="poolCapability">القدرة المطلوبة</label><select id="poolCapability"><option value="python.test">python.test</option><option value="code.build">code.build</option><option value="device.status">device.status</option><option value="device.info">device.info</option></select></div>
+          <div class="field"><label for="poolCpu">CPU مطلوب (أنوية)</label><input id="poolCpu" type="number" min="0.1" max="128" step="0.1" value="0.5" required></div>
+          <div class="field"><label for="poolRam">RAM مطلوبة (MiB)</label><input id="poolRam" type="number" min="1" max="1048576" step="128" value="256" required></div>
+          <div class="field"><label for="poolDisk">قرص مطلوب (MiB)</label><input id="poolDisk" type="number" min="0" max="1048576" step="128" value="128" required></div>
+          <div class="field"><label for="poolTimeout">المهلة (ثانية)</label><input id="poolTimeout" type="number" min="1" max="86400" step="1" value="300" required></div>
+        </div>
+        <div class="actions"><button class="primary" type="submit">تحليل الخطة</button></div>
+      </form>
+      <div id="planOutput" class="output">ستظهر نتيجة POST /api/cloud-pool/plan هنا.</div>
+      <div class="note">هذه واجهة تخطيط فقط؛ النتيجة لا تعني أن مهمة قد بدأت أو أن CPU/RAM حُجزا على مستوى نظام التشغيل.</div>
+    </section>
+  </div>
+
+  <div>
+    <section class="panel">
+      <div class="panel-head"><h3>ميزانية العتاد البرمجي</h3><small>مدعومة بقياسات المضيف</small></div>
+      <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin:0 0 12px;gap:8px">
+        <article class="metric"><div class="metric-label">ميزانية CPU المنطقية</div><div class="metric-value" id="logicalCpu">—</div><div class="metric-note">50% كحد أعلى محافظ</div></article>
+        <article class="metric"><div class="metric-label">الذاكرة المنطقية المتاحة</div><div class="metric-value" id="logicalRam">—</div><div class="metric-note">حصص داخلية، وليست ذاكرة افتراضية</div></article>
+        <article class="metric"><div class="metric-label">قرص منطقي متاح</div><div class="metric-value" id="logicalDisk">—</div><div class="metric-note">سقف حسابي مبني على القرص الحر</div></article>
+        <article class="metric"><div class="metric-label">حجوزات نشطة</div><div class="metric-value" id="activeLeases">—</div><div class="metric-note">تُحفظ في ذاكرة عملية الخادم فقط</div></article>
+      </div>
+      <div id="hardwareOutput" class="output">بانتظار /api/hardware/resources</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>إدارة حصة منطقية</h3><small>يتطلب مفتاح التحكم</small></div>
+      <form id="hardwareForm">
+        <div class="fields">
+          <div class="field full"><label for="hwTask">اسم المهمة</label><input id="hwTask" required maxlength="128" value="local-compute-probe"></div>
+          <div class="field"><label for="hwCpu">CPU منطقي</label><input id="hwCpu" type="number" min="0.01" max="128" step="0.25" value="0.25" required></div>
+          <div class="field"><label for="hwRam">RAM منطقية (MiB)</label><input id="hwRam" type="number" min="1" max="1048576" step="128" value="128" required></div>
+          <div class="field full"><label for="hwDisk">قرص منطقي (MiB)</label><input id="hwDisk" type="number" min="0" max="1048576" step="128" value="0" required></div>
+          <div class="field full"><label for="controlKey">مفتاح تحكم Brain (لا يُحفظ في المتصفح)</label><input id="controlKey" type="password" autocomplete="off" placeholder="أدخل المفتاح إذا أردت التخصيص أو التحرير"></div>
+        </div>
+        <div class="checks" style="margin-top:13px"><input id="runSelfTest" type="checkbox"><label for="runSelfTest">بعد التخصيص، نفّذ اختبار SHA-256 قصيرًا ومحددًا داخل عملية الخادم. اتركه غير محدد للعرض والتخصيص فقط.</label></div>
+        <div class="actions"><button type="button" id="planHardwareBtn">فحص السعة</button><button class="primary" type="submit">تخصيص حصة منطقية</button></div>
+      </form>
+      <div id="hardwarePlanOutput" class="output">خطة العتاد تظهر هنا.</div>
+      <div class="note">التخصيص هنا حصة منطقية داخل الذاكرة؛ لا ينشئ آلة افتراضية، ولا يفرض حدًا على عمليات النظام، ولا يوفر GPU، وتضيع الحجوزات عند إعادة تشغيل عملية الخادم.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h3>الحصص الحالية</h3><small>من حالة العملية الحالية</small></div>
+      <div id="leaseList" class="lease-list"><div class="empty">لا توجد بيانات بعد.</div></div>
+    </section>
+  </div>
+</div>
+
+<footer>Electronic Brain · Device-backed Software Cloud · لا تتم مشاركة مفتاح التحكم مع خدمات خارجية. استخدم اللوحة عبر خادم موثوق وعلى جهازك المحلي فقط.</footer>
+</main>
+<script>
+(function(){
+'use strict';
+const $ = function(id){return document.getElementById(id);};
+const API = window.location.origin;
+let refreshing = false;
+function fmt(n, digits){if(n===null||n===undefined||!Number.isFinite(Number(n)))return '—';return Number(n).toLocaleString('en-US',{maximumFractionDigits:digits===undefined?1:digits});}
+function gib(mb){return mb===null||mb===undefined?'—':fmt(Number(mb)/1024,2)+' GiB';}
+function setOutput(id,value,error){const el=$(id);el.textContent=typeof value==='string'?value:JSON.stringify(value,null,2);el.classList.toggle('error',!!error);el.classList.toggle('ok',!error);}
+async function request(path, options){
+  const response = await fetch(API+path,Object.assign({cache:'no-store'},options||{}));
+  const text = await response.text();
+  let body; try{body=text?JSON.parse(text):{};}catch(_){body={detail:text};}
+  if(!response.ok){const detail=body&&body.detail?body.detail:text;throw new Error(response.status+' '+response.statusText+' — '+String(detail));}
+  return body;
+}
+function activeBadge(node){
+  if(node.online&&node.healthy)return '<span class="status"><span class="dot good"></span>متصل وسليم</span>';
+  if(node.online)return '<span class="status wait"><span class="dot"></span>متصل / صحة غير مؤكدة</span>';
+  return '<span class="status off"><span class="dot bad"></span>غير متصل</span>';
+}
+function renderNodes(data){
+  const nodes=Array.isArray(data.nodes)?data.nodes:[];
+  $('metricNodes').textContent=fmt(nodes.length,0);
+  $('metricOnline').textContent=fmt(nodes.filter(n=>n.online&&n.healthy).length,0)+' عقد سليمة ومتاحة';
+  $('poolStatus').textContent=data.status||'UNKNOWN';
+  const body=$('nodesBody');
+  if(!nodes.length){body.innerHTML='<tr><td colspan="6" class="empty">الخدمة لم تُرجع أي عقد.</td></tr>';return;}
+  body.innerHTML=nodes.map(function(n){
+    return '<tr><td class="node">'+esc(n.node_id||'unknown')+'<div class="muted">'+esc(n.source||'unknown')+'</div></td>'+
+      '<td>'+esc(n.role||'—')+'<div class="muted">'+esc(n.platform||'—')+'</div></td>'+
+      '<td>'+fmt(n.cpu_cores,2)+'</td><td>'+gib(n.memory_mb)+'</td><td>'+gib(n.disk_mb)+'</td><td>'+activeBadge(n)+'</td></tr>';
+  }).join('');
+}
+function renderHardware(data){
+  const cap=data.capacity||{},remaining=data.remaining||{},allocated=data.allocated||{};
+  $('metricCpu').textContent=fmt(cap.cpu_cores_physical_observed,0);
+  $('metricRam').textContent=gib(cap.memory_mb_physical_total_observed);
+  $('metricDisk').textContent=gib(cap.disk_mb_free_observed);
+  $('logicalCpu').textContent=fmt(remaining.cpu_cores_logical,2);
+  $('logicalRam').textContent=gib(remaining.memory_mb_logical);
+  $('logicalDisk').textContent=gib(remaining.disk_mb_logical);
+  $('activeLeases').textContent=fmt(allocated.active_leases,0);
+  const leases=Array.isArray(data.leases)?data.leases:[];
+  $('leaseList').innerHTML=leases.length?leases.map(function(l){
+    const allocated=l.status==='ALLOCATED';
+    return '<div class="lease"><div class="lease-top"><strong>'+esc(l.task_id||'مهمة')+'</strong><span class="lease-id">'+esc(l.lease_id||'')+'</span>'+
+      '<span class="status '+(allocated?'':'off')+'">'+esc(l.status||'UNKNOWN')+'</span></div>'+
+      '<div class="lease-meta">CPU منطقي: '+fmt(l.cpu_cores_logical,2)+' · RAM: '+gib(l.memory_mb_logical)+' · Disk: '+gib(l.disk_mb_logical)+'<br>نوع المورد: '+esc(l.resource_kind||'logical lease')+'</div>'+
+      '<div class="actions">'+(allocated?'<button type="button" class="smallbtn" data-test="'+esc(l.lease_id)+'">تشغيل اختبار محدود</button><button type="button" class="smallbtn danger" data-release="'+esc(l.lease_id)+'">تحرير الحصة</button>':'')+'</div></div>';
+  }).join(''):'<div class="empty">لا توجد حصص منطقية مسجلة في عملية الخادم الحالية.</div>';
+  $('leaseList').querySelectorAll('[data-test]').forEach(function(btn){btn.addEventListener('click',function(){runLeaseTest(btn.getAttribute('data-test'));});});
+  $('leaseList').querySelectorAll('[data-release]').forEach(function(btn){btn.addEventListener('click',function(){releaseLease(btn.getAttribute('data-release'));});});
+  setOutput('hardwareOutput',data,false);
+}
+function esc(value){return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+async function refresh(){
+  if(refreshing)return;refreshing=true;
+  $('refreshBtn').disabled=true;
+  try{
+    const results=await Promise.all([
+      request('/api/cloud-pool/status'),
+      request('/api/hardware/resources')
+    ]);
+    renderNodes(results[0]);renderHardware(results[1]);
+    $('liveDot').className='dot good';$('connectionText').textContent='متصل بـ '+API;
+    $('lastUpdated').textContent='آخر تحديث: '+new Date().toLocaleTimeString('ar');
+    setOutput('poolOutput',results[0],false);
+  }catch(error){
+    $('liveDot').className='dot bad';$('connectionText').textContent='تعذر الاتصال بواجهة الموارد';
+    setOutput('poolOutput','فشل تحديث البيانات: '+error.message,true);
+    setOutput('hardwareOutput','تعذر قراءة /api/hardware/resources: '+error.message,true);
+  }finally{$('refreshBtn').disabled=false;refreshing=false;}
+}
+$('refreshBtn').addEventListener('click',refresh);
+$('poolPlanForm').addEventListener('submit',async function(event){
+  event.preventDefault();
+  const body={task_id:$('poolTask').value.trim(),capability:$('poolCapability').value,cpu_cores:Number($('poolCpu').value),memory_mb:Number($('poolRam').value),disk_mb:Number($('poolDisk').value),gpu_count:0,timeout_seconds:Number($('poolTimeout').value)};
+  try{const result=await request('/api/cloud-pool/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});setOutput('planOutput',result,false);}
+  catch(error){setOutput('planOutput',error.message,true);}
+});
+$('planHardwareBtn').addEventListener('click',planHardware);
+async function planHardware(){
+  const body={task_id:$('hwTask').value.trim(),cpu_cores:Number($('hwCpu').value),memory_mb:Number($('hwRam').value),disk_mb:Number($('hwDisk').value)};
+  try{const result=await request('/api/hardware/plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});setOutput('hardwarePlanOutput',result,false);}
+  catch(error){setOutput('hardwarePlanOutput',error.message,true);}
+}
+$('hardwareForm').addEventListener('submit',async function(event){
+  event.preventDefault();
+  const key=$('controlKey').value;
+  if(!key){setOutput('hardwarePlanOutput','أدخل مفتاح التحكم لإجراء التخصيص؛ الخطة وحدها لا تحتاج إليه.',true);return;}
+  const body={task_id:$('hwTask').value.trim(),cpu_cores:Number($('hwCpu').value),memory_mb:Number($('hwRam').value),disk_mb:Number($('hwDisk').value),execute_self_test:$('runSelfTest').checked,test_rounds:1000};
+  try{
+    const result=await request('/api/hardware/allocate',{method:'POST',headers:{'Content-Type':'application/json','X-BRAIN-CONTROL-KEY':key},body:JSON.stringify(body)});
+    setOutput('hardwarePlanOutput',result,false);await refresh();
+  }catch(error){setOutput('hardwarePlanOutput',error.message,true);}
+});
+async function releaseLease(leaseId){
+  const key=$('controlKey').value;
+  if(!key){setOutput('hardwarePlanOutput','أدخل مفتاح التحكم قبل تحرير الحصة.',true);return;}
+  if(!confirm('تحرير الحصة المنطقية '+leaseId+'؟'))return;
+  try{const result=await request('/api/hardware/release',{method:'POST',headers:{'Content-Type':'application/json','X-BRAIN-CONTROL-KEY':key},body:JSON.stringify({lease_id:leaseId})});setOutput('hardwarePlanOutput',result,false);await refresh();}
+  catch(error){setOutput('hardwarePlanOutput',error.message,true);}
+}
+async function runLeaseTest(leaseId){
+  const key=$('controlKey').value;
+  if(!key){setOutput('hardwarePlanOutput','أدخل مفتاح التحكم لتشغيل الاختبار.',true);return;}
+  if(!confirm('سيعمل اختبار SHA-256 محدود داخل عملية Brain الحالية. متابعة؟'))return;
+  try{const result=await request('/api/hardware/jobs',{method:'POST',headers:{'Content-Type':'application/json','X-BRAIN-CONTROL-KEY':key},body:JSON.stringify({lease_id:leaseId,rounds:1000})});setOutput('hardwarePlanOutput',result,false);await refresh();}
+  catch(error){setOutput('hardwarePlanOutput',error.message,true);}
+}
+refresh();
+window.setInterval(refresh,10000);
+})();
+</script>
+</body>
+</html>
