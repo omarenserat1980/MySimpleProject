@@ -34,7 +34,7 @@ class WindowsContractReadinessTests(unittest.TestCase):
             }
             result = readiness_snapshot(env)
             self.assertTrue(result["ok"])
-            self.assertEqual(result["status"], "READY_FOR_ATTEMPT_BOUND_ISSUANCE")
+            self.assertEqual(result["status"], "PREFLIGHT_INPUTS_PRESENT")
             self.assertTrue(all(result["secrets"].values()))
             self.assertTrue(all(x["readable_json_object"] for x in result["files"].values()))
             rendered = json.dumps(result)
