@@ -10,6 +10,12 @@ does not connect to production, read credentials, or write to the Brain DB.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+# Ensure imports resolve from the repository root when invoked as a file.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def main() -> int:
