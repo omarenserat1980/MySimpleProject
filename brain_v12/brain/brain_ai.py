@@ -381,16 +381,43 @@ class BrainAI:
         return {"intent": intent, "outcome": self.execute_tool(intent["name"], intent["params"], approved=approved)}
 
     def execute_tool(self, name: str, params: Optional[Dict[str, Any]]=None, approved: bool=False) -> Dict[str, Any]:
-        tool=self.tools.get(name)
-        if not tool: return {"ok":False,"status":"UNKNOWN_TOOL","tool":name}
-        if tool.risk=="high" and not approved: return {"ok":False,"status":"WAITING_APPROVAL","tool":name}
+        import time
+        from ..self_healing.tool_evolution import record_invocation
+
+        tool = self.tools.get(name)
+        safe_params = params or {}
+        started = time.monotonic()
+
+        def observed(outcome, status, error=None, risk=None, permission=None):
+            # Evolution telemetry is best-effort and must never change tool semantics.
+            try:
+                record_invocation(
+                    name, status, params=safe_params,
+                    duration_ms=(time.monotonic() - started) * 1000,
+                    error=error, risk=risk or (tool.risk if tool else "low"),
+                    permission=permission if permission is not None else (tool.permission if tool else None),
+                )
+            except Exception:
+                pass
+            return outcome
+
+        if not tool:
+            return observed({"ok":False,"status":"UNKNOWN_TOOL","tool":name}, "UNKNOWN_TOOL")
+        if tool.risk=="high" and not approved:
+            return observed({"ok":False,"status":"WAITING_APPROVAL","tool":name}, "WAITING_APPROVAL")
         if tool.permission and self.cognitive is not None:
             grants=getattr(getattr(self.cognitive,"permissions",None),"grants",set())
-            if tool.permission not in grants: return {"ok":False,"status":"WAITING_PERMISSION","tool":name,"permission":tool.permission}
-        try: result=tool.handler(params or {})
-        except Exception as exc: return {"ok":False,"status":"FAILED","tool":name,"error":str(exc)[:1000]}
-        if not isinstance(result,dict): return {"ok":False,"status":"INVALID_TOOL_RESULT","tool":name}
-        return {"tool":name,"ok":True,**result}
+            if tool.permission not in grants:
+                return observed({"ok":False,"status":"WAITING_PERMISSION","tool":name,"permission":tool.permission}, "WAITING_PERMISSION")
+        try:
+            result = tool.handler(safe_params)
+        except Exception as exc:
+            return observed({"ok":False,"status":"FAILED","tool":name,"error":str(exc)[:1000]}, "FAILED", error=type(exc).__name__)
+        if not isinstance(result,dict):
+            return observed({"ok":False,"status":"INVALID_TOOL_RESULT","tool":name}, "INVALID_TOOL_RESULT")
+        outcome = {"tool":name,"ok":True,**result}
+        status = str(result.get("status") or ("FAILED" if result.get("ok") is False else "OK"))
+        return observed(outcome, status)
 
     @staticmethod
     def _system_instructions() -> str:
