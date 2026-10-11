@@ -55,9 +55,6 @@ SECRET_ENV_NAMES = [
     "BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE",
     "BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64",
     "BRAIN_CLOUD_EXECUTOR_ID",
-    "BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64",
-    "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON",
-    "BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON",
     "BRAIN_AUTHORITY_SIGNING_TOKEN",
     "BRAIN_WINDOWS_CONTROL_PLANE_URL",
     "BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY",
@@ -159,12 +156,6 @@ def audit() -> dict[str, Any]:
         blockers.append("KVM_UNAVAILABLE_OR_PERMISSION_DENIED")
     if not ovmf_ok:
         blockers.append("OVMF_FIRMWARE_MISSING")
-    if not env_presence["BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64"]:
-        blockers.append("CONTROL_PLANE_ATTESTATION_SIGNING_KEY_NOT_PRESENT_IN_LOCAL_ENV")
-    if not env_presence["BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON"]:
-        blockers.append("CONTROL_PLANE_EXECUTOR_ENROLLMENT_MAP_NOT_PRESENT_IN_LOCAL_ENV")
-    if not env_presence["BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON"]:
-        blockers.append("CONTROL_PLANE_HOST_BINDINGS_NOT_PRESENT_IN_LOCAL_ENV")
 
     return {
         "schema": "electronic-brain.project-audit.v1",
@@ -188,8 +179,18 @@ def audit() -> dict[str, Any]:
             "dev_kvm_exists": kvm.exists(),
             "dev_kvm_read_write": kvm_ok,
             "ovmf_paths": ovmf,
-            "required_host_configuration_presence_only": env_presence,
+            "local_environment_presence_only": env_presence,
             "missing_host_configuration_names": missing_required,
+            "control_plane_configuration": {
+                "status": "NOT_CHECKED_REMOTELY",
+                "required_names": [
+                    "BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64",
+                    "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON",
+                    "BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON",
+                    "BRAIN_CLOUD_EXECUTOR_REGISTRY_DB",
+                ],
+                "note": "These belong on the Control Plane; this local audit must not read or print their values.",
+            },
             "secret_values_disclosed": secret_values_disclosed,
             "blockers": blockers,
             "status": "READY_FOR_REVIEW" if not blockers else "BLOCKED",
