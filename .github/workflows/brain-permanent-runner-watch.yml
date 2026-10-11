@@ -33,9 +33,14 @@ jobs:
           # Configure BRAIN_RUNNER_WATCH_TOKEN as a repository secret with permission
           # to read self-hosted runner administration data; github.token may return 403.
           GH_TOKEN: ${{ secrets.BRAIN_RUNNER_WATCH_TOKEN || github.token }}
+          WATCH_TOKEN_CONFIGURED: ${{ secrets.BRAIN_RUNNER_WATCH_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
+          echo "BRAIN_RUNNER_WATCH_TOKEN_CONFIGURED=${WATCH_TOKEN_CONFIGURED}"
+          if [[ "${WATCH_TOKEN_CONFIGURED}" != "true" ]]; then
+            echo "RUNNER_WATCH_AUTH_HINT=Repository secret BRAIN_RUNNER_WATCH_TOKEN is absent; github.token fallback may lack runner-admin read permission."
+          fi
           mkdir -p .brain/state
           api_error=".brain/state/runner-watch-api.err"
           if ! json="$(gh api "/repos/${REPO}/actions/runners?per_page=100" 2>"${api_error}")"; then
