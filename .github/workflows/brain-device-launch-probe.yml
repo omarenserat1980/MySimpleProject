@@ -16,13 +16,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  launch-arkan-agent:
+  launch-arkan-linux-agent:
     # Prefer Brain's existing self-hosted Arkan runner; do not use a paid cloud host.
     runs-on: [self-hosted, brain-internal]
     timeout-minutes: 5
     env:
       BRAIN_URL: ${{ vars.BRAIN_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
-      BRAIN_AGENT_ID: ${{ vars.BRAIN_WINDOWS_AGENT_ID }}
+      BRAIN_AGENT_ID: ${{ vars.BRAIN_LINUX_AGENT_ID }}
       BRAIN_AGENT_KEY: ${{ secrets.BRAIN_AGENT_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${BRAIN_AGENT_ID:-}" ]; then
-            echo "BLOCKED: configure repository variable BRAIN_WINDOWS_AGENT_ID with an enrolled ID beginning windows-executor-"
+            echo "BLOCKED: configure repository variable BRAIN_WINDOWS_AGENT_ID with an enrolled ID beginning linux-executor-"
             exit 2
           fi
           if [ -z "${BRAIN_AGENT_KEY:-}" ]; then
@@ -40,14 +40,14 @@ jobs:
           fi
           case "$BRAIN_AGENT_ID" in
             windows-executor-*) ;;
-            *) echo "BLOCKED: Windows agent ID must start with windows-executor-"; exit 2 ;;
+            *) echo "BLOCKED: Linux runner agent ID must start with windows-executor-"; exit 2 ;;
           esac
           case "$BRAIN_URL" in
             https://*) ;;
             *) echo "BLOCKED: Control Plane URL must use HTTPS"; exit 2 ;;
           esac
           echo "AGENT_CONFIGURATION=READY"
-      - name: Launch one authenticated heartbeat from Arkan
+      - name: Launch one authenticated heartbeat from Arkan Linux runner Linux runner
         shell: bash
         run: |
           set -euo pipefail
