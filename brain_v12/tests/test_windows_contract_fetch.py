@@ -25,19 +25,33 @@ class ContractFetchTests(unittest.TestCase):
         })
         self.temp = tempfile.TemporaryDirectory()
         os.environ["BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"] = str(Path(self.temp.name)/"contract.json")
-        self.contract = {"schema":"brain.windows-execution-contract.v1",
-            "source_commit":"a"*40,"task_id":"windows-server-2025-real-boot",
-            "attempt_id":"github-12345-attempt-2","authority_signature":"test-signature",
-            "expires_at":9999999999}
+        self.contract = {
+            "schema":"brain.windows-execution-contract.v1","status":"VERIFIED",
+            "brain_id":"brain-test","generation":1,"fencing_token":1,
+            "lease_id":"lease-test","holder_id":"executor-test",
+            "task_id":"windows-server-2025-real-boot","attempt_id":"github-12345-attempt-2",
+            "source_commit":"a"*40,"checkpoint_source_commit":"a"*40,
+            "capability":"windows-server-2025-real-boot","executor":"windows-real-boot-qemu",
+            "authority_policy_version":"authority-policy-v1","authority_decision":"AUTHORIZED",
+            "issued_at":1.0,"expires_at":9999999999,
+            "owner_id":"owner-test","owner_challenge_id":"challenge-test",
+            "owner_scope":"windows-server-2025-real-boot",
+            "owner_approval_source_commit":"a"*40,
+            "owner_approval_task_id":"windows-server-2025-real-boot",
+            "owner_approval_attempt_id":"github-12345-attempt-2",
+            "authority_signature_algorithm":"Ed25519","authority_signature":"test-signature"
+        }
     def tearDown(self):
         self.temp.cleanup()
         for k,v in self.saved.items():
             if v is None: os.environ.pop(k,None)
             else: os.environ[k]=v
     def test_fetch_writes_bound_contract_with_restricted_permissions(self):
-        with patch.object(client.urllib.request, "urlopen",
+        with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=True) as verifier, \
+             patch.object(client.urllib.request, "urlopen",
                           return_value=FakeResponse({"issued":True,"contract":self.contract})) as mocked:
             self.assertEqual(client.main(),0)
+        verifier.assert_called_once_with(self.contract, "test-signature")
         req=mocked.call_args.args[0]
         self.assertEqual(req.full_url,"https://brain.example.invalid/api/brain/windows/contracts/issue")
         self.assertEqual(req.get_header("X-brain-contract-delivery-key"),"test-only-placeholder")
@@ -50,6 +64,21 @@ class ContractFetchTests(unittest.TestCase):
                           return_value=FakeResponse({"issued":True,"contract":bad})):
             with self.assertRaisesRegex(RuntimeError,"BRAIN_CONTRACT_RESPONSE_BINDING_MISMATCH"):
                 client.main()
+    def test_rejects_invalid_authority_signature(self):
+        with patch.object(client.urllib.request, "urlopen",
+                          return_value=FakeResponse({"issued":True,"contract":self.contract})):
+            with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=False):
+                with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_AUTHORITY_SIGNATURE_INVALID"):
+                    client.main()
+
+    def test_rejects_expired_contract(self):
+        expired = dict(self.contract, expires_at=1)
+        with patch.object(client.urllib.request, "urlopen",
+                          return_value=FakeResponse({"issued":True,"contract":expired})):
+            with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=True):
+                with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_EXPIRED"):
+                    client.main()
+
     def test_rejects_plain_http_before_network(self):
         os.environ["BRAIN_WINDOWS_CONTROL_PLANE_URL"]="http://brain.example.invalid"
         with patch.object(client.urllib.request,"urlopen") as mocked:
