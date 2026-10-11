@@ -156,7 +156,7 @@ $ambientButton.Add_Click({
     else { $window.Opacity = 1.0; $core.FontSize = 108; $ambientButton.Content = "AMBIENT MODE" }
     & $refreshAction
 })
-$window.Add_MouseLeftButtonDown({ if ($_.ButtonState -eq [System.Windows.Input.MouseButtonState]::Pressed) { try { $window.DragMove() } catch {} } })
+$titleStack.Add_MouseLeftButtonDown({ if ($_.ButtonState -eq [System.Windows.Input.MouseButtonState]::Pressed) { try { $window.DragMove() } catch {} } })
 $timer = New-Object System.Windows.Threading.DispatcherTimer; $timer.Interval = [TimeSpan]::FromSeconds(5)
 $timer.Add_Tick({
     $script:tick++
