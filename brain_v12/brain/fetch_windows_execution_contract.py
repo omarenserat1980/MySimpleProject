@@ -1,6 +1,14 @@
-"""Fetch a short-lived signed Windows execution contract from Brain Control Plane."""
+"""Fetch a short-lived signed Windows execution contract over HTTPS."""
 from __future__ import annotations
-import json, os, pathlib, re, sys, tempfile, urllib.error, urllib.request
+
+import json
+import os
+import pathlib
+import re
+import sys
+import tempfile
+import urllib.error
+import urllib.request
 
 def main() -> int:
     base = os.environ.get("BRAIN_WINDOWS_CONTROL_PLANE_URL", "").strip().rstrip("/")
@@ -32,13 +40,29 @@ def main() -> int:
         raise RuntimeError(f"BRAIN_CONTRACT_ISSUANCE_HTTP_{exc.code}") from None
     except (urllib.error.URLError, TimeoutError):
         raise RuntimeError("BRAIN_CONTRACT_CONTROL_PLANE_UNREACHABLE") from None
+    if not isinstance(payload, dict):
+        raise RuntimeError("BRAIN_CONTRACT_RESPONSE_INVALID")
     contract = payload.get("contract")
-    if payload.get("issued") is not True or not isinstance(contract, dict):
+    # Accept either a wrapped Control Plane response or the current service's
+    # direct contract object, but validate the same signed binding in both cases.
+    if contract is None and payload.get("schema") == "brain.windows-execution-contract.v1":
+        contract = payload
+    if (payload.get("issued") is not True and contract is not payload) or not isinstance(contract, dict):
         raise RuntimeError("BRAIN_CONTRACT_RESPONSE_INVALID")
     if any(contract.get(k) != v for k, v in expected.items()):
         raise RuntimeError("BRAIN_CONTRACT_RESPONSE_BINDING_MISMATCH")
     if not contract.get("authority_signature") or not contract.get("expires_at"):
         raise RuntimeError("BRAIN_CONTRACT_SIGNATURE_OR_EXPIRY_MISSING")
+    from brain_v12.brain.authority_signature import verify_contract_signature
+    if not verify_contract_signature(contract):
+        raise RuntimeError("BRAIN_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
+    try:
+        expiry = float(contract["expires_at"])
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("BRAIN_CONTRACT_EXPIRY_INVALID") from exc
+    import time
+    if expiry <= time.time():
+        raise RuntimeError("BRAIN_CONTRACT_EXPIRED")
     dest = pathlib.Path(os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE",
                                       "/run/brain/windows-execution-contract.json"))
     dest.parent.mkdir(parents=True, exist_ok=True)
