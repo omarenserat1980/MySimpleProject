@@ -29,18 +29,36 @@ if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute
 $imageSkuCandidates = @("2025-datacenter-g2")
 $image = $null
 $resolvedSku = $null
+$resolvedVersion = $null
 $imageLookupErrors = @()
 foreach ($candidateSku in $imageSkuCandidates) {
-    # Use explicit fields so diagnostics distinguish SKU/version resolution from URN parsing.
-    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version latest --query urn --output tsv --only-show-errors 2>&1
+    # Azure's image-show endpoint may reject the symbolic version "latest".
+    # Resolve a concrete version from the same region/SKU, then validate it with image show.
+    $versionsOutput = & az vm image list --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --all --query "[].version" --output tsv --only-show-errors 2>&1
+    $versionsExitCode = $LASTEXITCODE
+    $versions = @()
+    if ($versionsExitCode -eq 0 -and $versionsOutput) {
+        $versions = @($versionsOutput | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+(\.\d+){1,3}$' } | Sort-Object -Unique)
+    }
+    if ($versions.Count -eq 0) {
+        $detail = ($versionsOutput | Out-String).Trim()
+        if (-not $detail) { $detail = "no concrete versions returned (exit=$versionsExitCode)" }
+        $imageLookupErrors += "$candidateSku version-list => $detail"
+        continue
+    }
+    # Azure image versions are numeric dotted versions; choose the greatest numeric version.
+    $candidateVersions = @($versions | Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending)
+    $candidateVersion = $candidateVersions[0]
+    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --query urn --output tsv --only-show-errors 2>&1
     $showExitCode = $LASTEXITCODE
     $candidateImage = ($showOutput | Out-String).Trim()
     if ($showExitCode -eq 0 -and $candidateImage) {
         $image = $candidateImage
         $resolvedSku = $candidateSku
+        $resolvedVersion = $candidateVersion
         break
     }
-    if ($candidateImage) { $imageLookupErrors += "$candidateSku => $candidateImage" }
+    if ($candidateImage) { $imageLookupErrors += "$candidateSku version $candidateVersion => $candidateImage" }
 }
 if (-not $image) {
     $available2025 = @()
@@ -53,7 +71,7 @@ if (-not $image) {
     $errorText = if ($imageLookupErrors.Count -gt 0) { $imageLookupErrors -join " | " } else { "Azure CLI returned no detailed image lookup error." }
     Fail "Windows Server 2025 image lookup failed in $Location. Candidate SKUs tried: $($imageSkuCandidates -join ', '). Azure-listed 2025 SKUs: $availableText. Image lookup details: $errorText. Terraform SKU was not changed; no deployment was attempted."
 }
-Write-Host "Resolved Windows Server image SKU: $resolvedSku"
+Write-Host "Resolved Windows Server image SKU: $resolvedSku (validated version: $resolvedVersion)"
 if ($image -notmatch ":${resolvedSku}:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
 $rawSkus = az vm list-skus --location $Location --resource-type virtualMachines --size $VmSize --all --output json 2>$null
 if ($LASTEXITCODE -eq 0 -and $rawSkus) {
