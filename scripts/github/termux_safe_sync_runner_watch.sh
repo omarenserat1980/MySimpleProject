@@ -32,17 +32,19 @@ if [[ -n "$(git status --porcelain)" ]]; then
   printf 'WORKTREE_STASH=%s\n' "$stash_ref"
 fi
 
-git fetch "$REMOTE" "$BRANCH"
-counts="$(git rev-list --left-right --count "HEAD...$REMOTE/$BRANCH")"
+# Update the exact remote-tracking ref used by the comparison and merge below.
+# A plain `git fetch origin main` may update FETCH_HEAD without refreshing origin/main.
+git fetch "$REMOTE" "+refs/heads/$BRANCH:refs/remotes/$REMOTE/$BRANCH"
+counts="$(git rev-list --left-right --count "HEAD...refs/remotes/$REMOTE/$BRANCH")"
 read -r ahead behind <<< "$counts"
 printf 'LOCAL_ONLY_COMMITS=%s REMOTE_ONLY_COMMITS=%s\n' "$ahead" "$behind"
 
 if (( behind > 0 )); then
   if (( ahead == 0 )); then
-    git merge --ff-only "$REMOTE/$BRANCH"
+    git merge --ff-only "refs/remotes/$REMOTE/$BRANCH"
   else
     # Merge rather than rebase to preserve existing local commit identities.
-    if ! git merge --no-edit "$REMOTE/$BRANCH"; then
+    if ! git merge --no-edit "refs/remotes/$REMOTE/$BRANCH"; then
       git merge --abort || true
       printf 'BLOCKED: merge conflict. Recovery branch %s is preserved. Resolve conflicts manually; no local commits were discarded.\n' "$backup_branch" >&2
       exit 20
