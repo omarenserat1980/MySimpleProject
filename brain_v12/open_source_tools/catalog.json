@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-11",
+  "policy": {
+    "purpose": "Curated integrations for boot/virtualization, local AI, and electronic hardware design.",
+    "execution": "Catalog entries are metadata only. Do not download, install, execute, flash firmware, or provision cloud infrastructure automatically.",
+    "license": "Verify each upstream repository's current LICENSE and dependency licenses before bundling or redistribution.",
+    "security": "Pin versions and hashes; sandbox execution; require explicit approval for privileged, boot, firmware-flashing, network, or hardware-I/O actions."
+  },
+  "categories": [
+    {
+      "id": "boot_virtualization",
+      "title": "Bootloaders, firmware, and virtual machines",
+      "tools": [
+        {
+          "id": "qemu",
+          "name": "QEMU",
+          "repo": "https://github.com/qemu/qemu",
+          "license": "GPL-2.0-or-later (verify components)",
+          "platforms": [
+            "Linux",
+            "Windows",
+            "macOS"
+          ],
+          "role": "Emulate virtual machines and test OS images; primary safe path for repeatable boot evidence.",
+          "integration": "optional_subprocess_adapter",
+          "priority": "P0"
+        },
+        {
+          "id": "edk2",
+          "name": "EDK II / TianoCore",
+          "repo": "https://github.com/tianocore/edk2",
+          "license": "BSD-2-Clause and component-specific licenses",
+          "platforms": [
+            "Linux",
+            "Windows"
+          ],
+          "role": "UEFI firmware development and OVMF firmware for QEMU.",
+          "integration": "build_artifact_only",
+          "priority": "P1"
+        },
+        {
+          "id": "grub",
+          "name": "GNU GRUB",
+          "repo": "https://git.savannah.gnu.org/git/grub.git",
+          "license": "GPL-3.0-or-later with exceptions/components to verify",
+          "platforms": [
+            "Linux",
+            "Unix"
+          ],
+          "role": "Linux bootloader source and boot-menu reference.",
+          "integration": "reference_only",
+          "priority": "P1"
+        },
+        {
+          "id": "u_boot",
+          "name": "U-Boot",
+          "repo": "https://github.com/u-boot/u-boot",
+          "license": "GPL-2.0-or-later",
+          "platforms": [
+            "Linux",
+            "embedded"
+          ],
+          "role": "Bootloader for embedded boards and ARM/RISC-V systems.",
+          "integration": "reference_only",
+          "priority": "P2"
+        }
+      ]
+    },
+    {
+      "id": "local_ai",
+      "title": "Open-source AI runtimes and agents",
+      "tools": [
+        {
+          "id": "ollama",
+          "name": "Ollama",
+          "repo": "https://github.com/ollama/ollama",
+          "license": "MIT (check bundled dependencies)",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "Local model management and HTTP inference API.",
+          "integration": "http_provider",
+          "endpoint_default": "http://127.0.0.1:11434",
+          "priority": "P0"
+        },
+        {
+          "id": "llama_cpp",
+          "name": "llama.cpp",
+          "repo": "https://github.com/ggml-org/llama.cpp",
+          "license": "MIT",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS",
+            "Android via builds"
+          ],
+          "role": "CPU/GPU local inference and OpenAI-compatible llama-server.",
+          "integration": "http_provider",
+          "endpoint_default": "http://127.0.0.1:8080/v1",
+          "priority": "P0"
+        },
+        {
+          "id": "openhands",
+          "name": "OpenHands",
+          "repo": "https://github.com/All-Hands-AI/OpenHands",
+          "license": "MIT core; verify all optional components",
+          "platforms": [
+            "Linux",
+            "Windows via supported runtime/containers"
+          ],
+          "role": "Software engineering agent framework; use in a sandbox with restricted credentials.",
+          "integration": "isolated_agent",
+          "priority": "P1"
+        },
+        {
+          "id": "localharness",
+          "name": "LocalHarness",
+          "repo": "https://github.com/ahwurm/localharness",
+          "license": "MIT",
+          "platforms": [
+            "Linux",
+            "Windows via Git Bash"
+          ],
+          "role": "Model-agnostic local agent harness with tools and deny-first permissions.",
+          "integration": "isolated_agent",
+          "priority": "P2"
+        }
+      ]
+    },
+    {
+      "id": "electronics",
+      "title": "Open electronic design, embedded development, and simulation",
+      "tools": [
+        {
+          "id": "kicad",
+          "name": "KiCad",
+          "repo": "https://gitlab.com/kicad/code/kicad",
+          "license": "GPL-3.0-or-later (verify components)",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "Schematic capture, PCB layout, ERC/DRC, manufacturing outputs.",
+          "integration": "external_tool",
+          "priority": "P0"
+        },
+        {
+          "id": "freecad",
+          "name": "FreeCAD",
+          "repo": "https://github.com/FreeCAD/FreeCAD",
+          "license": "LGPL-2.1-or-later (verify components)",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "Open parametric CAD for enclosures, brackets, and mechanical parts.",
+          "integration": "external_tool",
+          "priority": "P1"
+        },
+        {
+          "id": "openocd",
+          "name": "OpenOCD",
+          "repo": "https://github.com/openocd-org/openocd",
+          "license": "GPL-2.0-or-later",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "Debug/program embedded targets via supported debug probes; hardware actions require approval.",
+          "integration": "hardware_adapter_gated",
+          "priority": "P1"
+        },
+        {
+          "id": "esptool",
+          "name": "esptool",
+          "repo": "https://github.com/espressif/esptool",
+          "license": "GPL-2.0-or-later",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "ESP-family serial bootloader utility and firmware flashing.",
+          "integration": "hardware_adapter_gated",
+          "priority": "P1"
+        },
+        {
+          "id": "avrdude",
+          "name": "AVRDUDE",
+          "repo": "https://github.com/avrdudes/avrdude",
+          "license": "GPL-2.0-or-later",
+          "platforms": [
+            "Windows",
+            "Linux",
+            "macOS"
+          ],
+          "role": "Program AVR microcontrollers using supported programmers.",
+          "integration": "hardware_adapter_gated",
+          "priority": "P2"
+        },
+        {
+          "id": "openems",
+          "name": "openEMS",
+          "repo": "https://github.com/thliebig/openEMS",
+          "license": "GPL family; verify current upstream license",
+          "platforms": [
+            "Linux",
+            "Windows via supported setup"
+          ],
+          "role": "Open-source electromagnetic field solver for RF/antenna simulations.",
+          "integration": "external_tool",
+          "priority": "P2"
+        }
+      ]
+    }
+  ]
+}
