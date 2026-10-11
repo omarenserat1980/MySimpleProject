@@ -1,8 +1,13 @@
 """Brain Control Plane service for issuing short-lived Windows real-boot contracts.
 
-The Control Plane authorizes the requested task. It does not attest that its own
-host can run QEMU/KVM; the dedicated executor must independently pass its
-signed-identity and runtime capability gates before calling the delivery API.
+Important topology rule:
+The Control Plane authorizes a run; the dedicated GitHub self-hosted executor
+proves its local QEMU/KVM capability in the workflow before requesting this
+contract. The Control Plane may run on a different host and must not require
+its own /dev/kvm, QEMU, or OVMF installation.
+
+The capability probe below is diagnostic only. Runtime capability is enforced
+by the runner-side cloud_executor_gate.py and internal_runner_preflight.py.
 """
 from __future__ import annotations
 
@@ -17,6 +22,7 @@ from .windows_execution_contract_issuer import issue_from_files
 
 
 def capability_probe() -> dict[str, Any]:
+    """Describe local host capability for diagnostics; never gate issuance on it."""
     checks = {
         "arch": platform.machine().lower() in {"x86_64", "amd64"},
         "qemu": bool(shutil.which("qemu-system-x86_64")),
@@ -32,6 +38,12 @@ def capability_probe() -> dict[str, Any]:
 
 
 def issue(request: dict[str, Any]) -> dict[str, Any]:
+    """Issue an owner-authorized contract after the runner-side capability gate.
+
+    The delivery endpoint is called by the dedicated workflow only after its
+    executor preflight has passed. This host-side function deliberately does
+    not infer executor capability from the Control Plane machine.
+    """
     required = ("source_commit", "task_id", "attempt_id")
     for key in required:
         if not str(request.get(key, "")).strip():
@@ -44,8 +56,10 @@ def issue(request: dict[str, Any]) -> dict[str, Any]:
     owner_public_key = os.environ.get("BRAIN_OWNER_APPROVAL_PUBLIC_KEY_B64", "")
     output = os.environ.get("BRAIN_WINDOWS_CONTRACT_OUTPUT", "/run/brain/windows-execution-contract.json")
 
-    # This only represents the owner-authorized capability in the contract.
-    # Actual QEMU/KVM capability is checked independently on the executor.
+    # This flag means the requested capability is owner-authorized for this
+    # contract. It is NOT evidence that this Control Plane host can run QEMU.
+    # The real executor separately enforces QEMU/KVM capability before and
+    # during the workflow; the signed contract cannot bypass those checks.
     result = issue_from_files(
         identity_file=identity,
         checkpoint_file=checkpoint,
