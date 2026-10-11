@@ -57,6 +57,7 @@ from .brain.income_lifecycle import IncomeLifecycle
 from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.device_cloud_pool import DeviceCloudPool
 from .brain.device_cloud_federation import build_fleet_status
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
@@ -93,6 +94,7 @@ from cloud.brain_fabric import list_nodes as list_fabric_nodes
 from .brain.security_middleware import apply_security_headers
 from .brain.cloud_executor_attestation_api import router as cloud_executor_attestation_router
 from .brain.open_source_tools_api import router as open_source_tools_router
+from .brain.device_cloud_pool_api import build_router as device_cloud_pool_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -150,6 +152,7 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 device_bridge=DeviceBridge(store)
+device_cloud_pool=DeviceCloudPool(device_bridge)
 
 sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
 sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
@@ -232,6 +235,7 @@ app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
 app.include_router(cloud_executor_attestation_router)
 app.include_router(open_source_tools_router)
+app.include_router(device_cloud_pool_router(device_cloud_pool))
 
 
 @app.get("/api/brain/workload")
