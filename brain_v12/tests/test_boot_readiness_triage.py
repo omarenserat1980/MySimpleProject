@@ -25,7 +25,7 @@ class BootReadinessTriageTests(unittest.TestCase):
         self.assertFalse(result["ready"])
         self.assertEqual(len(result["blockers"]), 4)
 
-    def test_all_verified_gates_ready(self):
+    def test_all_verified_gates_ready_only_with_exact_boot_status(self):
         paths = {
             "contract_gate": self.write("contract.json", {"verified": True}),
             "executor_gate": self.write("executor.json", {"verified": True}),
@@ -39,12 +39,25 @@ class BootReadinessTriageTests(unittest.TestCase):
         self.assertTrue(result["ready"])
         self.assertEqual(result["blockers"], [])
 
+    def test_generic_verified_flag_does_not_prove_windows_boot(self):
+        paths = {
+            "contract_gate": self.write("contract.json", {"verified": True}),
+            "executor_gate": self.write("executor.json", {"verified": True}),
+            "runner_watch": self.write("runner.json", {
+                "runner_online": True, "execution_probe": "PASS", "runtime_surface": "PASS"
+            }),
+            "boot_proof": self.write("boot.json", {"verified": True, "status": "INCOMPLETE"}),
+        }
+        result = triage(paths)
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["gates"]["boot_proof"]["status"], "BLOCKED")
+
     def test_runner_online_without_execution_probe_is_blocked(self):
         paths = {
             "contract_gate": self.write("contract.json", {"verified": True}),
             "executor_gate": self.write("executor.json", {"verified": True}),
             "runner_watch": self.write("runner.json", {"runner_online": True}),
-            "boot_proof": self.write("boot.json", {"verified": True}),
+            "boot_proof": self.write("boot.json", {"verified": True, "status": "WINDOWS_BOOT_VERIFIED"}),
         }
         result = triage(paths)
         self.assertFalse(result["ready"])
