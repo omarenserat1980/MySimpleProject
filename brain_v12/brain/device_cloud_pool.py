@@ -180,7 +180,7 @@ class DeviceCloudPool:
                     cpu_cores=node.cpu_cores,
                     memory_mb=node.memory_mb,
                     disk_mb=node.disk_mb,
-                    tier="USER_DEVICE",
+                    tier="LOCAL" if node.role == "compute_host" else "USER_DEVICE",
                     estimated_cost=0.0,
                     online=True,
                     healthy=True,
