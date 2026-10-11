@@ -72,4 +72,4 @@ $env:BRAIN_ADMIN_USERNAME = $env:TF_VAR_admin_username
 $env:BRAIN_ADMIN_PASSWORD = $env:TF_VAR_admin_password
 & $verify -ResourceGroup $ResourceGroup -VmName $VmName
 if ($LASTEXITCODE -ne 0) { throw "Final verification failed. Launch is not successful." }
-Write-Host "SUCCESS: Azure reports the VM running and authenticated WinRM verification passed."
+Write-Host "GUEST_RDP_READY_CLIENT_TEST_REQUIRED: Azure VM and guest RDP configuration are verified. Complete an interactive RDP sign-in from ASUS/Arkan before declaring end-to-end access successful."
