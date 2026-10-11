@@ -201,6 +201,15 @@ class MemoryStore:
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
 
+    def get_memory(self, key):
+        """Read one operational memory record without exposing the whole memory store."""
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT key,value,updated_at FROM memories WHERE key=?",
+                (key,),
+            ).fetchone()
+        return dict(row) if row else None
+
     def save_memory(self,key,value):
         with self.connect() as con:
             con.execute("""INSERT INTO memories(key,value,updated_at) VALUES(?,?,?)
