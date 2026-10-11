@@ -8,7 +8,9 @@ on:
     paths:
       - 'brain_v12/brain/device_cloud_pool.py'
       - 'brain_v12/brain/device_cloud_pool_api.py'
+      - 'brain_v12/brain/software_hardware_factory.py'
       - 'brain_v12/tests/test_device_cloud_pool.py'
+      - 'brain_v12/tests/test_software_hardware_factory.py'
       - 'brain_v12/app.py'
       - '.github/workflows/brain-device-cloud-pool.yml'
 
@@ -22,3 +24,5 @@ jobs:
           python-version: '3.12'
       - name: Test device-backed cloud pool
         run: python -m unittest brain_v12.tests.test_device_cloud_pool -v
+      - name: Test software-defined hardware leases and execution probe
+        run: python -m unittest brain_v12.tests.test_software_hardware_factory -v
