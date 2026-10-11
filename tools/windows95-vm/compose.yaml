@@ -1,0 +1,16 @@
+services:
+  windows95:
+    build: .
+    restart: unless-stopped
+    environment:
+      WIN95_RAM_MB: ${WIN95_RAM_MB:-128}
+      WIN95_DISK_GB: ${WIN95_DISK_GB:-2}
+      WIN95_BOOT_MODE: ${WIN95_BOOT_MODE:-cd}
+      WIN95_ISO_PATH: /media/windows95.iso
+      WIN95_DISK_PATH: /data/windows95.qcow2
+    volumes:
+      - ./data:/data
+      - ./media:/media:ro
+    ports:
+      # Intentionally loopback-only: do not publish an unauthenticated desktop.
+      - "127.0.0.1:6080:6080"
