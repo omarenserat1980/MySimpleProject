@@ -89,10 +89,18 @@ def verify_boot(*, evidence_path: Path, marker_path: Path, phase_path: Path,
         if control.get(field) != contract.get(field):
             reasons.append("CONTRACT_BINDING_MISMATCH:" + field)
 
-    base_gate = WindowsCompletionGate().verify(evidence) if evidence else {
-        "status": "INCOMPLETE", "verified": False, "reasons": ["EVIDENCE_UNAVAILABLE"],
-        "evidence_sha256": hashlib.sha256(b"").hexdigest(),
-    }
+    try:
+        base_gate = WindowsCompletionGate().verify(evidence) if evidence else {
+            "status": "INCOMPLETE", "verified": False, "reasons": ["EVIDENCE_UNAVAILABLE"],
+            "evidence_sha256": hashlib.sha256(b"").hexdigest(),
+        }
+    except Exception as exc:
+        # Malformed evidence must fail closed with a sanitized type-only reason.
+        base_gate = {
+            "status": "INCOMPLETE", "verified": False,
+            "reasons": ["COMPLETION_GATE_EXCEPTION:" + type(exc).__name__],
+            "evidence_sha256": hashlib.sha256(b"").hexdigest(),
+        }
     if base_gate.get("verified") is not True:
         reasons.extend("COMPLETION_GATE:" + str(x) for x in base_gate.get("reasons", []))
 
