@@ -110,16 +110,22 @@ def audit_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     if reality != "REAL":
         blockers.append("REAL_WINDOWS_EVIDENCE_REQUIRED")
         details["windows.reality"] = "Only literal REAL evidence is admissible; SIMULATED/TWIN is not real boot."
+    else:
+        passed.append("windows.reality")
 
     evidence_commit = _get(snapshot, "evidence.source_commit_sha")
     if not isinstance(source_commit, str) or evidence_commit != source_commit:
         blockers.append("EVIDENCE_SOURCE_COMMIT_MISMATCH")
         details["evidence.source_commit_sha"] = "Evidence must be bound to the exact audited repository commit."
+    else:
+        passed.append("evidence.source_commit_sha")
 
     contract_commit = _get(snapshot, "contract.source_commit_sha")
     if not isinstance(source_commit, str) or contract_commit != source_commit:
         blockers.append("CONTRACT_SOURCE_COMMIT_MISMATCH")
         details["contract.source_commit_sha"] = "The contract source commit must exactly match the audited commit."
+    else:
+        passed.append("contract.source_commit_sha")
 
     # A CI success label alone cannot substitute for the independent evidence
     # and real-guest obligations above. A status field is informational only.
@@ -131,7 +137,7 @@ def audit_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "status": "GOLDEN_LOOP_READY_FOR_CLOSURE" if ok else "GOLDEN_LOOP_BLOCKED",
         "source_commit_sha": source_commit if isinstance(source_commit, str) else None,
         "passed_count": len(passed),
-        "required_count": len(REQUIRED_TRUE) + 4,
+        "required_count": len(REQUIRED_TRUE) + 5,
         "passed": passed,
         "blockers": blockers,
         "details": details,
