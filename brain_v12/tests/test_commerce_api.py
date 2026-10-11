@@ -22,7 +22,7 @@ class CommerceApiTests(unittest.TestCase):
             s.transition(oid, "DELIVERED", "delivery-proof:smoke")
             with self.assertRaises(Exception) as ctx:
                 s.transition(oid, "REVENUE_REALIZED", {"delivery_evidence_ref": "delivery-proof:smoke", "reconciliation_ref": "reconciliation:smoke"})
-            self.assertIn("REVENUE_AUTHORITY_REQUIRED", str(ctx.exception))
+            self.assertEqual(getattr(ctx.exception, "detail", None), "REVENUE_AUTHORITY_REQUIRED")
             self.assertEqual(s.get(oid)["state"], "DELIVERED")
 
     def test_revenue_cannot_be_realized_without_verified_payment(self):
