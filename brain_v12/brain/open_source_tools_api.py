@@ -7,6 +7,8 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from brain_v12.tools.open_source_tool_preflight import inspect_tool_availability
+
 router = APIRouter(tags=["open-source-tools"])
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "open_source_tools" / "catalog.json"
 
@@ -58,3 +60,9 @@ def open_source_tool_detail(tool_id: str) -> dict[str, Any]:
                 return {"ok": True, "mode": "catalog_only", "execution_enabled": False,
                         "category": category["id"], "tool": tool}
     raise HTTPException(status_code=404, detail="OPEN_SOURCE_TOOL_NOT_FOUND")
+
+
+@router.get("/api/open-source-tools/preflight/availability")
+def open_source_tool_availability() -> dict[str, Any]:
+    """Inspect PATH for optional tools without launching or installing anything."""
+    return inspect_tool_availability()
