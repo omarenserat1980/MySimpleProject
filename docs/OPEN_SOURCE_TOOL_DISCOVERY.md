@@ -5,7 +5,9 @@ Electronic Brain exposes a read-only discovery API backed by GitHub's public rep
 ## Endpoints
 
 - `GET /api/open-source/status` — capabilities and safety defaults.
-- `GET /api/open-source/tools?q=automation&language=Python&limit=10` — discover public repositories.
+- `GET /api/open-source/tools?q=workflow&category=automation&language=Python&limit=10` — discover public repositories in a category.
+
+Supported categories: `ai`, `automation`, `programming`, `databases`, `security`, `monitoring`, `mcp`, `devops`, `data`, and `media`. The `category` parameter is optional; without it, the registry preserves general search behavior. Categories guide GitHub search terms and do not certify suitability or safety.
 
 The registry returns repositories only when GitHub supplies a recognized SPDX license identifier. A repository is a candidate, not a verified safe dependency. Results include the repository URL, license, language, stars, topics, and `security_review_required=true`.
 
@@ -20,5 +22,5 @@ The registry returns repositories only when GitHub supplies a recognized SPDX li
 ## Example
 
 ```sh
-curl 'https://YOUR-BRAIN-HOST/api/open-source/tools?q=workflow%20automation&limit=10'
+curl 'https://YOUR-BRAIN-HOST/api/open-source/tools?q=server&category=mcp&limit=10'
 ```
