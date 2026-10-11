@@ -28,10 +28,15 @@ $rdpRule = $nsgRules | Where-Object { $_.name -eq "AllowRDP" } | Select-Object -
 $winrmRule = $nsgRules | Where-Object { $_.name -eq "AllowWinRM" } | Select-Object -First 1
 if (-not $rdpRule -or [string]$rdpRule.destinationPortRange -ne "3389") { Fail "RDP_NSG_RULE_MISSING: AllowRDP TCP 3389 rule was not found." }
 if (-not $winrmRule -or [string]$winrmRule.destinationPortRange -ne "5986") { Fail "WINRM_NSG_RULE_MISSING: AllowWinRM TCP 5986 rule was not found." }
+$expectedSource = [string]$env:TF_VAR_allowed_source_ip
+if (-not $expectedSource) { Fail "EXPECTED_SOURCE_CIDR_MISSING: trusted source CIDR is not available to verification." }
 foreach ($rule in @($rdpRule,$winrmRule)) {
     $source = [string]$rule.sourceAddressPrefix
     if (-not $source -or $source -in @("*","0.0.0.0/0","Internet")) {
         Fail "OPEN_MANAGEMENT_SOURCE: rule '$($rule.name)' is not restricted to the trusted source CIDR."
+    }
+    if ($source -ne $expectedSource) {
+        Fail "MANAGEMENT_SOURCE_MISMATCH: rule '$($rule.name)' does not match the configured trusted source CIDR."
     }
 }
 
@@ -62,6 +67,9 @@ $messageText = ($guestMessage | Out-String)
 $jsonMatch = [regex]::Match($messageText, '(?s)\{.*\}')
 if (-not $jsonMatch.Success) { Fail "GUEST_EVIDENCE_PARSE_FAILED: Windows guest inspection returned no structured evidence." }
 try { $guest = $jsonMatch.Value | ConvertFrom-Json } catch { Fail "GUEST_EVIDENCE_PARSE_FAILED: Windows guest JSON was invalid." }
+if ([string]$guest.os -notmatch "Windows Server 2025" -or [string]$guest.architecture -notmatch "64") {
+    Fail "GUEST_OS_MISMATCH: guest evidence does not confirm 64-bit Windows Server 2025."
+}
 if (-not $guest.rdp_enabled -or -not $guest.termservice_running -or -not $guest.rdp_firewall_rule_enabled -or -not $guest.rdp_listener) {
     Fail "RDP_GUEST_NOT_READY: guest evidence shows Remote Desktop is not fully enabled/listening."
 }
