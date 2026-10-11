@@ -93,6 +93,28 @@ class OpenSourceToolRegistryTests(unittest.TestCase):
         status = self.registry.status()
         self.assertFalse(status["auto_install"])
         self.assertFalse(status["auto_execute"])
+        self.assertIn("mcp", [item["id"] for item in status["categories"]])
+
+    @patch("brain_v12.brain.open_source_registry.httpx.get")
+    def test_category_search_uses_category_and_preserves_safety_flags(self, get):
+        response = Mock()
+        response.json.return_value = {"items": [repo("owner/mcp-tool", "Apache-2.0")]}
+        response.raise_for_status.return_value = None
+        get.return_value = response
+
+        result = self.registry.search("server", category="mcp", limit=5)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["category"], "mcp")
+        self.assertTrue(result["tools"][0]["security_review_required"])
+        self.assertFalse(result["tools"][0]["executable"])
+        self.assertIn("model context protocol MCP server", get.call_args.kwargs["params"]["q"])
+
+    def test_unknown_category_is_rejected(self):
+        result = self.registry.search("anything", category="install-everything")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "INVALID_CATEGORY")
+        self.assertEqual(result["tools"], [])
 
 
 if __name__ == "__main__":
