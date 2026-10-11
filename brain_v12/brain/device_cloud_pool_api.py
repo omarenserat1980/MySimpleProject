@@ -42,14 +42,16 @@ class HardwareJobRequest(BaseModel):
 
 
 def build_router(pool: DeviceCloudPool) -> APIRouter:
-    router = APIRouter(prefix="/api/cloud-pool", tags=["cloud-pool"])
+    # Use explicit paths so the existing app can include one router while both
+    # /api/cloud-pool and /api/hardware remain at their documented root paths.
+    router = APIRouter(tags=["cloud-pool", "software-defined-hardware"])
     hardware = SoftwareHardwareFactory()
 
-    @router.get("/status")
+    @router.get("/api/cloud-pool/status")
     def status():
         return pool.status()
 
-    @router.post("/plan")
+    @router.post("/api/cloud-pool/plan")
     def plan(body: CloudPlanRequest):
         decision = pool.plan(
             task_id=body.task_id,
@@ -64,22 +66,15 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
         )
         return decision.to_dict()
 
-    @router.get("/unused-hardware-router-placeholder")
-    def _unused_placeholder():
-        # Compatibility placeholder removed by the hardware API extension below.
-        raise HTTPException(status_code=404, detail="NOT_FOUND")
-
-    hardware_router = APIRouter(prefix="/api/hardware", tags=["software-defined-hardware"])
-
-    @hardware_router.get("/status")
+    @router.get("/api/hardware/status")
     def hardware_status():
         return hardware.status()
 
-    @hardware_router.get("/resources")
+    @router.get("/api/hardware/resources")
     def hardware_resources():
         return hardware.resources()
 
-    @hardware_router.get("/health")
+    @router.get("/api/hardware/health")
     def hardware_health():
         state = hardware.status()
         return {
@@ -90,7 +85,7 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
             "remote_execution_proven": False,
         }
 
-    @hardware_router.post("/plan")
+    @router.post("/api/hardware/plan")
     def hardware_plan(body: HardwarePlanRequest):
         try:
             return hardware.plan(
@@ -102,7 +97,7 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    @hardware_router.post("/allocate")
+    @router.post("/api/hardware/allocate")
     def hardware_allocate(request: Request, body: HardwareAllocateRequest):
         require_control_key(request)
         try:
@@ -120,7 +115,7 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @hardware_router.post("/jobs")
+    @router.post("/api/hardware/jobs")
     def hardware_run_job(request: Request, body: HardwareJobRequest):
         require_control_key(request)
         try:
@@ -128,14 +123,14 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    @hardware_router.get("/jobs/{job_id}")
+    @router.get("/api/hardware/jobs/{job_id}")
     def hardware_job(job_id: str):
         try:
             return hardware.job(job_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    @hardware_router.post("/release")
+    @router.post("/api/hardware/release")
     def hardware_release(request: Request, body: HardwareReleaseRequest):
         require_control_key(request)
         try:
@@ -143,5 +138,4 @@ def build_router(pool: DeviceCloudPool) -> APIRouter:
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    router.include_router(hardware_router)
     return router
