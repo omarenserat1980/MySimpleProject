@@ -2,6 +2,10 @@
 
 The device-backed resource pool browser interface lives at `/cloud-pool.html`.
 
+## Run the Windows bootstrap
+
+From this checkout, start `tools/Run-CloudPool-Setup.cmd`, or run `tools/Start-ElectronicBrain-CloudPool.ps1` in PowerShell. The launcher uses the default checkout path `C:\\Brain\\extract\\MySimpleProject-brain-software-cloud-pool`, creates a local `.venv`, and checks port 8013 without stopping an existing process. It saves status evidence and logs to `C:\\Brain\\logs`. You can override the project path or test port when running the PowerShell script.
+
 ## Open it locally
 
 Start `brain_v12.app:app` from this checkout and open:
