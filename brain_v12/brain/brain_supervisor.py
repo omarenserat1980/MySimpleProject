@@ -11,6 +11,7 @@ from .brain_constitution import BrainConstitution
 from .mission import Mission
 from .evidence_store import EvidenceStore
 from .verification_core import VerificationCore
+from .asic_resource_adapter import ASICResourceAdapter
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
@@ -30,6 +31,8 @@ class BrainSupervisor:
         self.control=ControlPlane(str(self.root/"control_plane")); self.reasoner=AutonomousReasoner()
         self.execution_gateway=execution_gateway or BrainExecutionGateway(); self.resource_guard=EmergencyResourceGuard()
         self.reality=RealityCore(); self.constitution=BrainConstitution(); self.evidence=EvidenceStore(str(self.root/"evidence.db")); self.verification=VerificationCore(self.evidence,self.constitution); self.missions={}
+        # ASIC simulations and external telemetry use the supervisor's evidence journal.
+        self.asic_resources=ASICResourceAdapter(evidence=self.evidence)
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}

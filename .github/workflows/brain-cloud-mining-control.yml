@@ -58,6 +58,9 @@ jobs:
       - name: Validate cloud control plane
         run: |
           python -m pytest -q brain_v12/tests/test_cloud_mining_control_plane.py
+      - name: Validate ASIC resource integration
+        run: |
+          python -m pytest -q brain_v12/tests/test_asic_resource_adapter.py
       - name: Validate mining payout and blockchain proof gates
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_verification.py
