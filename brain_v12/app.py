@@ -43,6 +43,7 @@ from .ai_fabric import AIFabric, FabricPolicy
 from .ai_fabric.api import router as ai_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
+from .brain.open_source_registry import OpenSourceToolRegistry
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
 from brain_v7.braincore_v2.code_tool_engineering_team import CodeToolEngineeringTeam
 from brain_v7.braincore_v2.code_tool_api import CodeTool
@@ -98,6 +99,7 @@ store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); stor
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
+open_source_tool_registry=OpenSourceToolRegistry()
 model_router=ModelRouter()
 for _provider in configured_model_providers():
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
@@ -2778,6 +2780,15 @@ def code_apply(request:Request, body:CodeChanges):
 
 @app.get("/api/code/audit")
 def code_audit(): return code_workspace.snapshot()
+@app.get("/api/open-source/status")
+def open_source_tools_status():
+    return open_source_tool_registry.status()
+
+@app.get("/api/open-source/tools")
+def open_source_tools_search(q: str = "developer tools", language: str | None = None, limit: int = 10):
+    """Discover public, license-filtered repositories; never installs or executes code."""
+    return open_source_tool_registry.search(q, language, limit)
+
 @app.get("/api/tools")
 def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
 @app.post("/api/tools/execute")
