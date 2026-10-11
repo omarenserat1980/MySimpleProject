@@ -47,7 +47,18 @@ def main() -> int:
                 raise RuntimeError("BRAIN_CONTRACT_ISSUANCE_HTTP_STATUS")
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"BRAIN_CONTRACT_ISSUANCE_HTTP_{exc.code}") from None
+        # Surface only a strict machine-code allowlist from the Control Plane.
+        # Never print response bodies, URLs, headers, or arbitrary server text.
+        detail = ""
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+            candidate = body.get("detail", "") if isinstance(body, dict) else ""
+            if isinstance(candidate, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,119}", candidate):
+                detail = candidate
+        except Exception:
+            pass
+        suffix = "_" + detail if detail else ""
+        raise RuntimeError(f"BRAIN_CONTRACT_ISSUANCE_HTTP_{exc.code}{suffix}") from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise RuntimeError("BRAIN_CONTRACT_CONTROL_PLANE_UNREACHABLE") from None
 

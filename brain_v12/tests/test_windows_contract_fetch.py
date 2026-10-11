@@ -1,6 +1,6 @@
 """Focused tests for the short-lived contract fetch client; no real secrets/network."""
 from __future__ import annotations
-import json, os, tempfile, unittest
+import io, json, os, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
 from brain_v12.brain import fetch_windows_execution_contract as client
@@ -58,6 +58,26 @@ class ContractFetchTests(unittest.TestCase):
         path=Path(os.environ["BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"])
         self.assertEqual(json.loads(path.read_text()),self.contract)
         self.assertEqual(path.stat().st_mode & 0o777,0o600)
+    def test_http_409_reports_only_safe_machine_detail(self):
+        from urllib.error import HTTPError
+        error = HTTPError(
+            "https://brain.example.invalid/hidden-path", 409, "Conflict", {},
+            io.BytesIO(json.dumps({"detail":"OWNER_APPROVAL_REQUIRED"}).encode()),
+        )
+        with patch.object(client.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_ISSUANCE_HTTP_409_OWNER_APPROVAL_REQUIRED"):
+                client.main()
+
+    def test_http_error_never_echoes_arbitrary_detail(self):
+        from urllib.error import HTTPError
+        error = HTTPError(
+            "https://brain.example.invalid/hidden-path", 409, "Conflict", {},
+            io.BytesIO(json.dumps({"detail":"secret=do-not-print /etc/brain/identity.json"}).encode()),
+        )
+        with patch.object(client.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_ISSUANCE_HTTP_409$"):
+                client.main()
+
     def test_rejects_contract_bound_to_different_attempt(self):
         bad=dict(self.contract,attempt_id="wrong-attempt")
         with patch.object(client.urllib.request,"urlopen",
