@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
-"""Run a bounded Brain-authority interaction with ChatGPT.
-
-Brain owns the decision. ChatGPT reviews/executes only that decision.
-The result is returned to Brain and must be verified before the next cycle.
-"""
+"""Run a bounded Brain-authority interaction and verify the result."""
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import sys
 import urllib.request
 import urllib.error
 
@@ -21,8 +16,12 @@ def call(base: str, path: str, method: str = "GET", body: dict | None = None) ->
         headers["X-BRAIN-CONTROL-KEY"] = key
     data = json.dumps(body or {}).encode() if body is not None else None
     req = urllib.request.Request(base.rstrip("/") + path, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        return {"ok": False, "http_status": exc.code, "error": detail, "path": path}
 
 
 def main() -> int:
@@ -40,22 +39,25 @@ def main() -> int:
         "Do not mark READY without verification evidence.",
     ]
 
-    meeting = call(args.base, "/api/brain/council", "POST", {
+    meeting = call(args.base, "/api/brain/council/convene", "POST", {
         "title": args.title,
         "agenda": agenda,
     })
-    if not meeting.get("ok", True):
-        print(json.dumps({"ok": False, "stage": "COUNCIL", "result": meeting}, ensure_ascii=False))
+    if not meeting.get("ok", False):
+        print(json.dumps({"ok": False, "stage": "COUNCIL_CONVENE", "result": meeting}, ensure_ascii=False, indent=2))
         return 1
 
     meeting_id = meeting.get("meeting_id") or meeting.get("id")
     if meeting_id is None:
-        print(json.dumps({"ok": False, "stage": "COUNCIL_ID", "result": meeting}, ensure_ascii=False))
+        print(json.dumps({"ok": False, "stage": "COUNCIL_ID", "result": meeting}, ensure_ascii=False, indent=2))
         return 1
 
     execution = call(args.base, f"/api/brain/council/{int(meeting_id)}/execute", "POST", {})
-    verification = call(args.base, f"/api/brain/council/{int(meeting_id)}/verify", "POST", {})
+    if not execution.get("ok", False):
+        print(json.dumps({"ok": False, "stage": "COUNCIL_EXECUTE", "meeting_id": meeting_id, "execution": execution}, ensure_ascii=False, indent=2))
+        return 2
 
+    verification = call(args.base, f"/api/brain/council/{int(meeting_id)}/verify", "POST", {})
     result = {
         "ok": bool(verification.get("ok", False)),
         "authority": "BRAIN",
@@ -65,7 +67,7 @@ def main() -> int:
         "verification": verification,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result["ok"] else 2
+    return 0 if result["ok"] else 3
 
 
 if __name__ == "__main__":
