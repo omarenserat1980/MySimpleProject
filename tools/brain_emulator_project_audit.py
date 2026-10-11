@@ -10,6 +10,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -89,6 +90,23 @@ def run_version(command: list[str]) -> dict[str, Any]:
         return {"available": False, "reason": type(exc).__name__}
 
 
+def markdown_inventory(relative_path: str) -> dict[str, Any]:
+    path = REPO_ROOT / relative_path
+    if not path.is_file():
+        return {"exists": False, "headings": [], "checked": 0, "pending": 0, "tasks": []}
+    text = path.read_text(encoding="utf-8", errors="replace")
+    headings = [line.strip("# ").strip() for line in text.splitlines() if line.startswith("#")]
+    task_rows = re.findall(r"^\\s*- \\[([ xX])\\] (.+)$", text, flags=re.MULTILINE)
+    tasks = [{"done": mark.lower() == "x", "task": label.strip()} for mark, label in task_rows]
+    return {
+        "exists": True,
+        "headings": headings,
+        "checked": sum(1 for item in tasks if item["done"]),
+        "pending": sum(1 for item in tasks if not item["done"]),
+        "tasks": tasks,
+    }
+
+
 def audit() -> dict[str, Any]:
     key_paths = {
         path: {"exists": (REPO_ROOT / path).is_file()}
@@ -108,6 +126,14 @@ def audit() -> dict[str, Any]:
         else:
             areas[rel] = {"exists": False, "files": 0, "python_files": 0}
 
+    roadmap = markdown_inventory("PROJECT_ROADMAP.md")
+    master_spec = markdown_inventory("PROJECT_MASTER_SPEC.md")
+    workflows_dir = REPO_ROOT / ".github/workflows"
+    workflow_inventory = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for path in workflows_dir.rglob("*")
+        if path.is_file()
+    ) if workflows_dir.is_dir() else []
     tools = {name: run_version([name, "--version"]) for name in REQUIRED_BOOT_TOOLS}
     # QEMU versions can print to stderr; test existence independently from version exit code.
     for name in REQUIRED_BOOT_TOOLS:
@@ -170,6 +196,11 @@ def audit() -> dict[str, Any]:
         },
         "project_purpose": "Evidence-first autonomous automation, execution, verification, recovery, media, device, knowledge, and economic outcome platform.",
         "project_areas": areas,
+        "project_goals_and_roadmap": {
+            "master_spec": master_spec,
+            "roadmap": roadmap,
+            "workflow_inventory": workflow_inventory,
+        },
         "key_paths": key_paths,
         "boot_path": {
             "workflow_present": boot_workflow,
