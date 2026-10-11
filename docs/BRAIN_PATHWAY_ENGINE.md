@@ -1,6 +1,6 @@
 # Brain Pathway Engine
 
-The pathway engine is a fail-closed decision layer for common Brain workflows. It
+The pathway engine is a fail-closed decision layer for common Brain workflows. `BrainSupervisor.evaluate_pathway(...)` exposes it through the main supervisor and records each evaluation, next gate, and blocker list in the supervisor event trace. It
 selects the first missing/unverified gate and emits stable blocker codes plus a
 next action. It is evidence evaluation only: it does not run commands, deploy,
 publish, restore disks, mint contracts, or change permissions.
