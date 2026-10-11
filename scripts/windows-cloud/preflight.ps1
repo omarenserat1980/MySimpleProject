@@ -95,8 +95,156 @@ try { $skus = @($rawSkus | ConvertFrom-Json) } catch { Fail "Azure SKU metadata 
 $eligible = @($skus | Where-Object { $_.name -eq $VmSize -and $_.restrictions.Count -eq 0 })
 if ($eligible.Count -eq 0) {
     $familyPattern = $null
-    if ($VmSize -match '^(Standard_[A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)$') {
-        $familyPattern = '^' + [regex]::Escape($Matches[1]) + '\d+' + [regex]::Escape($Matches[3]) + '_v' + [regex]::Escape($Matches[4]) + '$'
+    $maxCandidateCores = 0
+    if ($VmSize -match '^(Standard_[A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)
+    if ($familyPattern) {
+        $allSkusRaw = az vm list-skus --location $Location --resource-type virtualMachines --all --output json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $allSkusRaw) {
+            try {
+                $allSkus = @($allSkusRaw | ConvertFrom-Json)
+                $candidates = @($allSkus | Where-Object {
+                    $_.name -match $familyPattern -and $_.restrictions.Count -eq 0
+                } | ForEach-Object {
+                    $item = $_
+                    $coreCapability = @($item.capabilities | Where-Object { $_.name -eq 'vCPUs' } | Select-Object -First 1)
+                    if ($coreCapability.Count -gt 0) {
+                        [pscustomobject]@{ Name = $item.name; Cores = [int]$coreCapability[0].value }
+                    }
+                } | Where-Object { $_ -and $_.Cores -le $maxCandidateCores } | Sort-Object Cores, Name | Select-Object -First 10)
+            } catch { $candidates = @() }
+        }
+    }
+    $candidateText = if ($candidates.Count -gt 0) {
+        ($candidates | ForEach-Object { "$($_.Name) ($($_.Cores) vCPU)" }) -join ', '
+    } else {
+        "none verified in the same VM family; inspect Azure SKU restrictions and quota"
+    }
+    Fail "Requested Azure VM size $VmSize is restricted or unavailable in $Location. Eligible same-family candidates with at most $maxCandidateCores vCPUs: $candidateText. No automatic SKU/region change was made; deployment is blocked pending explicit selection."
+}
+Write-Host "AZURE_VM_SKU_RESTRICTIONS=PASS"
+Write-Host "Preflight passed identity, secret presence, provider and image checks."
+Write-Host "Subscription: $($account.name) ($($account.id)); region: $Location; requested size: $VmSize"
+# Derive the exact quota family from the requested SKU. Never accidentally
+# check Standard BS Family for a Dsv5 VM (or report a pass on the wrong family).
+$requiredCores = 0
+$quotaFamilyValue = $null
+if ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $skuVersion = $Matches[4]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "v$skuVersion" + "Family"
+    $requiredCores = [int]$Matches[2]
+} elseif ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "Family"
+    $requiredCores = [int]$Matches[2]
+} else {
+    Fail "Cannot derive an exact Azure quota family for VM size $VmSize; refusing to report quota readiness."
+}
+Write-Host "REQUESTED_VM_QUOTA_FAMILY=$quotaFamilyValue"
+$quotaRaw = az vm list-usage --location $Location --output json --only-show-errors 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $quotaRaw) {
+    Fail "Azure quota query returned no usable data. Quota remains unverified; no deployment is authorized."
+}
+try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { Fail "Azure quota response was not valid JSON; refusing to report quota readiness." }
+$totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "^Total Regional vCPUs$" } | Select-Object -First 1)
+$familyQuota = @($quotas | Where-Object {
+    $_.name.value -ieq $quotaFamilyValue -or
+    ($_.name.localizedValue -replace '[^A-Za-z0-9]', '') -ieq ($quotaFamilyValue -replace '[^A-Za-z0-9]', '')
+} | Select-Object -First 1)
+if ($totalQuota.Count -eq 0 -or $familyQuota.Count -eq 0) {
+    $foundFamilies = @($quotas | Where-Object { $_.name.value -match 'Family' } | ForEach-Object { $_.name.value } | Where-Object { $_ })
+    Fail "Could not identify both regional and exact $quotaFamilyValue quota records in $Location. RegionalFound=$($totalQuota.Count); RequestedFamilyFound=$($familyQuota.Count); returned family records=$($foundFamilies -join ', '). Quota is unverified; no deployment is authorized."
+}
+foreach ($quota in @($totalQuota[0], $familyQuota[0])) {
+    if ($null -eq $quota.limit -or $null -eq $quota.currentValue) {
+        Fail "Azure quota record $($quota.name.value) lacks limit/current values; quota is unverified."
+    }
+    $available = [int]$quota.limit - [int]$quota.currentValue
+    if ($available -lt $requiredCores) {
+        Fail "Insufficient Azure quota in $Location for $($VmSize): available=$available, required=$requiredCores, quota=$($quota.name.localizedValue). Request quota or select an eligible SKU before applying."
+    }
+    Write-Host "Quota $($quota.name.localizedValue): current=$($quota.currentValue), limit=$($quota.limit), needed=$requiredCores."
+}
+Write-Host "A SKU listing does not guarantee live capacity; Azure may still reject a deployment."
+
+) {
+        $maxCandidateCores = [int]$Matches[2]
+        $familyPattern = '^' + [regex]::Escape($Matches[1]) + '\d+' + [regex]::Escape($Matches[3]) + '_v' + [regex]::Escape($Matches[4]) + '
+    if ($familyPattern) {
+        $allSkusRaw = az vm list-skus --location $Location --resource-type virtualMachines --all --output json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $allSkusRaw) {
+            try {
+                $allSkus = @($allSkusRaw | ConvertFrom-Json)
+                $candidates = @($allSkus | Where-Object {
+                    $_.name -match $familyPattern -and $_.restrictions.Count -eq 0
+                } | ForEach-Object {
+                    $item = $_
+                    $coreCapability = @($item.capabilities | Where-Object { $_.name -eq 'vCPUs' } | Select-Object -First 1)
+                    if ($coreCapability.Count -gt 0) {
+                        [pscustomobject]@{ Name = $item.name; Cores = [int]$coreCapability[0].value }
+                    }
+                } | Where-Object { $_ -and $_.Cores -le 4 } | Sort-Object Cores, Name | Select-Object -First 10)
+            } catch { $candidates = @() }
+        }
+    }
+    $candidateText = if ($candidates.Count -gt 0) {
+        ($candidates | ForEach-Object { "$($_.Name) ($($_.Cores) vCPU)" }) -join ', '
+    } else {
+        "none verified in the same VM family; inspect Azure SKU restrictions and quota"
+    }
+    Fail "Requested Azure VM size $VmSize is restricted or unavailable in $Location. Eligible same-family candidates with at most 4 vCPUs: $candidateText. No automatic SKU/region change was made; deployment is blocked pending explicit selection."
+}
+Write-Host "AZURE_VM_SKU_RESTRICTIONS=PASS"
+Write-Host "Preflight passed identity, secret presence, provider and image checks."
+Write-Host "Subscription: $($account.name) ($($account.id)); region: $Location; requested size: $VmSize"
+# Derive the exact quota family from the requested SKU. Never accidentally
+# check Standard BS Family for a Dsv5 VM (or report a pass on the wrong family).
+$requiredCores = 0
+$quotaFamilyValue = $null
+if ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $skuVersion = $Matches[4]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "v$skuVersion" + "Family"
+    $requiredCores = [int]$Matches[2]
+} elseif ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "Family"
+    $requiredCores = [int]$Matches[2]
+} else {
+    Fail "Cannot derive an exact Azure quota family for VM size $VmSize; refusing to report quota readiness."
+}
+Write-Host "REQUESTED_VM_QUOTA_FAMILY=$quotaFamilyValue"
+$quotaRaw = az vm list-usage --location $Location --output json --only-show-errors 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $quotaRaw) {
+    Fail "Azure quota query returned no usable data. Quota remains unverified; no deployment is authorized."
+}
+try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { Fail "Azure quota response was not valid JSON; refusing to report quota readiness." }
+$totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "^Total Regional vCPUs$" } | Select-Object -First 1)
+$familyQuota = @($quotas | Where-Object {
+    $_.name.value -ieq $quotaFamilyValue -or
+    ($_.name.localizedValue -replace '[^A-Za-z0-9]', '') -ieq ($quotaFamilyValue -replace '[^A-Za-z0-9]', '')
+} | Select-Object -First 1)
+if ($totalQuota.Count -eq 0 -or $familyQuota.Count -eq 0) {
+    $foundFamilies = @($quotas | Where-Object { $_.name.value -match 'Family' } | ForEach-Object { $_.name.value } | Where-Object { $_ })
+    Fail "Could not identify both regional and exact $quotaFamilyValue quota records in $Location. RegionalFound=$($totalQuota.Count); RequestedFamilyFound=$($familyQuota.Count); returned family records=$($foundFamilies -join ', '). Quota is unverified; no deployment is authorized."
+}
+foreach ($quota in @($totalQuota[0], $familyQuota[0])) {
+    if ($null -eq $quota.limit -or $null -eq $quota.currentValue) {
+        Fail "Azure quota record $($quota.name.value) lacks limit/current values; quota is unverified."
+    }
+    $available = [int]$quota.limit - [int]$quota.currentValue
+    if ($available -lt $requiredCores) {
+        Fail "Insufficient Azure quota in $Location for $($VmSize): available=$available, required=$requiredCores, quota=$($quota.name.localizedValue). Request quota or select an eligible SKU before applying."
+    }
+    Write-Host "Quota $($quota.name.localizedValue): current=$($quota.currentValue), limit=$($quota.limit), needed=$requiredCores."
+}
+Write-Host "A SKU listing does not guarantee live capacity; Azure may still reject a deployment."
+
+
     }
     $candidates = @()
     if ($familyPattern) {
