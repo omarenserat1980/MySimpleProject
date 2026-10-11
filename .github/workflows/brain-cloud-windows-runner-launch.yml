@@ -3,6 +3,7 @@ name: Brain Cloud Windows Runner Launch
 on:
   push:
     branches:
+      - main
       - ops/launch-cloud-windows-runner
     paths:
       - .github/workflows/brain-cloud-windows-runner-launch.yml
