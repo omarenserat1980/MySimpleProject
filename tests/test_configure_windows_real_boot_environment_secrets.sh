@@ -12,7 +12,7 @@ python3 - "$tmp/attestation" "$tmp/authority" <<'PY'
 import base64, pathlib, sys
 value = base64.b64encode(bytes(range(32))).decode()
 for path in sys.argv[1:]:
-    pathlib.Path(path).write_text(value + "\\n", encoding="utf-8")
+    pathlib.Path(path).write_text(value + "\n", encoding="utf-8")
 PY
 printf '%s\n' 'contract-delivery-key-with-at-least-32-chars' > "$tmp/delivery"
 chmod 600 "$tmp/registry" "$tmp/token" "$tmp/attestation" "$tmp/authority" "$tmp/delivery"
