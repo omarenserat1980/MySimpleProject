@@ -19,6 +19,16 @@ python -m brain_v12.tools.open_source_tool_hub --category electronics
 
 The CLI validates catalog shape and prints metadata only. It deliberately does not install or execute upstream code.
 
+## Brain API
+
+When the Brain FastAPI service is running, the catalog is exposed read-only:
+
+- `GET /api/open-source-tools` — list all tools and categories.
+- `GET /api/open-source-tools?category=local_ai` — filter by category.
+- `GET /api/open-source-tools/qemu` — inspect one tool by stable id.
+
+The API explicitly returns `mode: catalog_only` and `execution_enabled: false`. It does not install or execute catalog entries.
+
 ## Integration plan
 
 - **P0 — metadata + provider discovery:** catalog, endpoint checks, health/status reporting.
