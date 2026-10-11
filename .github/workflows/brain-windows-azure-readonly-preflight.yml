@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/brain-windows-azure-readonly-preflight.yml
       - scripts/windows-cloud/preflight.ps1
+      - scripts/windows-cloud/deploy.ps1
       - scripts/windows-cloud/**
   workflow_dispatch:
 
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   azure-readonly-preflight:
-    name: Azure OIDC and Windows Server 2025 capacity preflight (no provisioning)
+    name: Azure OIDC and Windows Server 2025 deployment-default preflight (no provisioning)
     runs-on: ubuntu-latest
     environment: brain-windows-production
     timeout-minutes: 20
@@ -100,16 +101,26 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify active subscription and run read-only Windows preflight
+      - name: Verify active subscription and run deployment-default preflight
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $deploy = Get-Content ./scripts/windows-cloud/deploy.ps1 -Raw
+          $locationMatch = [regex]::Match($deploy, '(?m)^\s*\[string\]\$Location\s*=\s*"([^"]+)"')
+          $sizeMatch = [regex]::Match($deploy, '(?m)^\s*\[string\]\$VmSize\s*=\s*"([^"]+)"')
+          if (-not $locationMatch.Success -or -not $sizeMatch.Success) {
+            throw "Could not extract deployment defaults; refusing to report unrelated capacity."
+          }
+          $location = $locationMatch.Groups[1].Value
+          $size = $sizeMatch.Groups[1].Value
           $account = az account show --output json | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0 -or -not $account.id) { throw "Azure OIDC account verification failed." }
           if ($account.id -ne $env:ARM_SUBSCRIPTION_ID) { throw "Azure subscription mismatch." }
           Write-Host "AZURE_OIDC_LOGIN=PASS"
           Write-Host "AZURE_SUBSCRIPTION_MATCH=PASS"
-          ./scripts/windows-cloud/preflight.ps1 -Location westeurope -VmSize Standard_B1s -AllowMissingAdminCredentials
+          Write-Host "DEPLOYMENT_DEFAULT_LOCATION=$location"
+          Write-Host "DEPLOYMENT_DEFAULT_VM_SIZE=$size"
+          ./scripts/windows-cloud/preflight.ps1 -Location $location -VmSize $size -AllowMissingAdminCredentials
           Write-Host "AZURE_WINDOWS_2025_READONLY_PREFLIGHT=PASS"
           Write-Host "AZURE_RESOURCE_CREATION=NOT_ATTEMPTED"
           Write-Host "WINDOWS_SERVER_2025_BOOT=NOT_VERIFIED"
