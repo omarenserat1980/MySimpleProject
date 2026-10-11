@@ -33,6 +33,36 @@ jobs:
       BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
       APPROVE_APPLY: ${{ inputs.approve_apply }}
     steps:
+      - name: Validate required GitHub Environment configuration before cloud changes
+        shell: bash
+        env:
+          CHECK_AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          CHECK_AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CHECK_AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          CHECK_WINDOWS_ADMIN_USERNAME: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+          CHECK_WINDOWS_ADMIN_PASSWORD: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            CHECK_AZURE_CLIENT_ID \
+            CHECK_AZURE_TENANT_ID \
+            CHECK_AZURE_SUBSCRIPTION_ID \
+            CHECK_WINDOWS_ADMIN_USERNAME \
+            CHECK_WINDOWS_ADMIN_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
+            printf ' - %s\\n' "${missing[@]}"
+            echo "Add the matching AZURE_* environment variables and BRAIN_WINDOWS_ADMIN_* environment secrets, then rerun."
+            echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
+            exit 2
+          fi
+          echo "Required environment configuration is present; values were not printed."
+
       - name: Checkout
         uses: actions/checkout@v4
 
