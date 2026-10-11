@@ -186,11 +186,11 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or os.getenv("RENDER_GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME") or os.getenv("RENDER_GIT_BRANCH") or "unknown"
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_SLUG") or "unknown"
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
+RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
@@ -1816,7 +1816,7 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
+    expected = os.getenv("GITHUB_SHA") or os.getenv("RENDER_GIT_COMMIT", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
