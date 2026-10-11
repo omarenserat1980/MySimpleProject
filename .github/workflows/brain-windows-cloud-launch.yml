@@ -56,7 +56,7 @@ jobs:
           done
           if (( ${#missing[@]} > 0 )); then
             echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
-            printf ' - %s\\n' "${missing[@]}"
+            printf ' - %s\n' "${missing[@]}"
             echo "Add the matching AZURE_* environment variables and BRAIN_WINDOWS_ADMIN_* environment secrets, then rerun."
             echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
             exit 2
