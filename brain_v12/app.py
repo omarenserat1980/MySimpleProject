@@ -2785,9 +2785,12 @@ def open_source_tools_status():
     return open_source_tool_registry.status()
 
 @app.get("/api/open-source/tools")
-def open_source_tools_search(q: str = "developer tools", language: str | None = None, limit: int = 10):
-    """Discover public, license-filtered repositories; never installs or executes code."""
-    return open_source_tool_registry.search(q, language, limit)
+def open_source_tools_search(
+    q: str = "developer tools", language: str | None = None, limit: int = 10,
+    category: str | None = None,
+):
+    """Discover categorized public repositories; never installs or executes code."""
+    return open_source_tool_registry.search(q, language, limit, category)
 
 @app.get("/api/tools")
 def tools_catalog(): return {"ok":True,"tools":cognitive.tool_catalog()}
