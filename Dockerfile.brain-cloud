@@ -17,7 +17,8 @@ RUN python3 -m venv /opt/venv && \
 
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV PYTHONPATH="/opt/brain"
-ENV BRAIN_INTERNAL_RUNNER_FLAG=1
+# Do not set BRAIN_INTERNAL_RUNNER_FLAG in the image. Trusted runner identity
+# must be injected out-of-band by the authorized host/service configuration.
 ENV BRAIN_RUNTIME_ROOT=/var/lib/brain/runtime
 
 RUN mkdir -p /var/lib/brain/runtime
