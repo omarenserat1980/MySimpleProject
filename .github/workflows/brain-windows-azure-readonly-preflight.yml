@@ -124,3 +124,15 @@ jobs:
           Write-Host "AZURE_WINDOWS_2025_READONLY_PREFLIGHT=PASS"
           Write-Host "AZURE_RESOURCE_CREATION=NOT_ATTEMPTED"
           Write-Host "WINDOWS_SERVER_2025_BOOT=NOT_VERIFIED"
+
+      - name: Discover eligible VM SKUs across approved candidate regions (read-only)
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $account = az account show --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $account.id) { throw "Azure OIDC session unavailable; SKU discovery cannot run." }
+          if ($account.id -ne $env:ARM_SUBSCRIPTION_ID) { throw "Azure subscription mismatch; refusing discovery." }
+          ./scripts/windows-cloud/discover-eligible-vm-skus.ps1
+          Write-Host "AZURE_RESOURCE_CREATION=NOT_ATTEMPTED"
+          Write-Host "WINDOWS_SERVER_2025_BOOT=NOT_VERIFIED"
