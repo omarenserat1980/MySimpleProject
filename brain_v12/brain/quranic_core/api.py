@@ -11,6 +11,7 @@ from .graph import EvidenceGraph
 from .publication import PublicationGate
 from .knowledge import KnowledgeOpportunityEngine
 from .research_packet import ResearchPacketBuilder
+from .memory_guidance import principles as memory_principles, review_memory
 
 class EvidenceIn(BaseModel):
     level: EvidenceLevel
@@ -19,6 +20,9 @@ class EvidenceIn(BaseModel):
     citation: str | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     metadata: dict = Field(default_factory=dict)
+
+class MemoryReviewIn(BaseModel):
+    memory_text: str = Field(min_length=1, max_length=12000)
 
 class ResearchIn(BaseModel):
     question: str = Field(min_length=1)
@@ -39,6 +43,22 @@ def build_router(engine=None):
     knowledge=KnowledgeOpportunityEngine()
     packets=ResearchPacketBuilder(publication)
     router=APIRouter(prefix="/api/quranic-core",tags=["quranic-core"])
+
+    @router.get("/memory-guidance")
+    def quranic_memory_guidance():
+        """Return source-linked, read-only principles for reviewing Brain memory."""
+        return {
+            "ok": True,
+            "status": "READ_ONLY_GUIDANCE",
+            "count": len(memory_principles()),
+            "principles": memory_principles(),
+            "memory_mutated": False,
+        }
+
+    @router.post("/memory-guidance/review")
+    def quranic_memory_review(body: MemoryReviewIn):
+        """Suggest review lenses for one memory; never writes to operational memory."""
+        return review_memory(body.memory_text)
 
     @router.get("/health")
     def health():
