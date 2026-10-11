@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${BRAIN_AGENT_ID:-}" ]; then
-            echo "BLOCKED: configure repository variable BRAIN_WINDOWS_AGENT_ID with an enrolled ID beginning linux-executor-"
+            echo "BLOCKED: configure repository variable BRAIN_LINUX_AGENT_ID with an enrolled ID beginning linux-executor-"
             exit 2
           fi
           if [ -z "${BRAIN_AGENT_KEY:-}" ]; then
@@ -39,15 +39,15 @@ jobs:
             exit 2
           fi
           case "$BRAIN_AGENT_ID" in
-            windows-executor-*) ;;
-            *) echo "BLOCKED: Linux runner agent ID must start with windows-executor-"; exit 2 ;;
+            linux-executor-*) ;;
+            *) echo "BLOCKED: Linux runner agent ID must start with linux-executor-"; exit 2 ;;
           esac
           case "$BRAIN_URL" in
             https://*) ;;
             *) echo "BLOCKED: Control Plane URL must use HTTPS"; exit 2 ;;
           esac
           echo "AGENT_CONFIGURATION=READY"
-      - name: Launch one authenticated heartbeat from Arkan Linux runner Linux runner
+      - name: Launch one authenticated heartbeat from Arkan Linux runner
         shell: bash
         run: |
           set -euo pipefail
