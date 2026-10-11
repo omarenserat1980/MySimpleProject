@@ -60,9 +60,11 @@ def main() -> int:
             key = key_path.read_text(encoding="utf-8").strip()
             if key:
                 print("local_key=FOUND_NONEMPTY")
-                print(f"local_key_sha256={hashlib.sha256(key.encode()).hexdigest()}")
+                print("local_key=FOUND_NONEMPTY")
                 if args.show_key_sha256:
                     print("BRAIN_AGENT_KEY_SHA256=" + hashlib.sha256(key.encode()).hexdigest())
+                else:
+                    print("local_key_sha256=HIDDEN (use --show-key-sha256 only when needed)")
             else:
                 print("local_key=EMPTY")
         except OSError as exc:
