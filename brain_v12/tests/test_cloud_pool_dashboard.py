@@ -72,7 +72,7 @@ def test_cloud_pool_plan_is_preview_not_execution():
             json={
                 "task_id": "ci-resource-plan",
                 "capability": "python.test",
-                "cpu_cores": 0.5,
+                "cpu_cores": 0.25,
                 "memory_mb": 256,
                 "disk_mb": 128,
                 "gpu_count": 0,
