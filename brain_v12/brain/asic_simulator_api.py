@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/asic-sim", tags=["ASIC Simulator"])
 
 class ASICRunRequest(BaseModel):
     netlist: dict
-    vectors: list[dict] = Field(min_length=1, max_length=10000)
+    vectors: list[dict] = Field(min_items=1, max_items=10000)
     max_cycles: int = Field(default=10000, ge=1, le=10000)
 
 
