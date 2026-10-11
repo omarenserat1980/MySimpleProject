@@ -13,6 +13,7 @@ import os
 import platform
 import shutil
 import socket
+import subprocess
 import sys
 import time
 import urllib.error
@@ -67,7 +68,6 @@ def capacity_metadata() -> dict:
     try:
         model = ""
         if kind == "android":
-            import subprocess
             model = subprocess.run(
                 ["getprop", "ro.product.model"], capture_output=True,
                 text=True, timeout=2, check=False,
