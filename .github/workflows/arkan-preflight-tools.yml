@@ -8,6 +8,10 @@ on:
       - "tools/summarize_arkan_preflight.py"
       - "tools/test_summarize_arkan_preflight.py"
       - "tools/arkan_hyperv_root_cause_gate.py"
+      - "tools/test_windows_contract_workflow.py"
+      - "brain_v12/brain/windows_real_boot_closed_loop_gate.py"
+      - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - ".github/workflows/brain-windows-real-boot.yml"
       - ".github/workflows/arkan-preflight-tools.yml"
   push:
     branches:
@@ -18,6 +22,10 @@ on:
       - "tools/summarize_arkan_preflight.py"
       - "tools/test_summarize_arkan_preflight.py"
       - "tools/arkan_hyperv_root_cause_gate.py"
+      - "tools/test_windows_contract_workflow.py"
+      - "brain_v12/brain/windows_real_boot_closed_loop_gate.py"
+      - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - ".github/workflows/brain-windows-real-boot.yml"
       - ".github/workflows/arkan-preflight-tools.yml"
   workflow_dispatch:
 
@@ -41,12 +49,12 @@ jobs:
         run: bash -n tools/run_arkan_windows_real_boot_diagnostic_wsl.sh
 
       - name: Compile Python tools
-        run: python -m py_compile tools/summarize_arkan_preflight.py tools/test_summarize_arkan_preflight.py tools/arkan_hyperv_root_cause_gate.py
+        run: python -m py_compile tools/summarize_arkan_preflight.py tools/test_summarize_arkan_preflight.py tools/arkan_hyperv_root_cause_gate.py tools/test_windows_contract_workflow.py
 
       - name: Run summarizer regression tests
         run: python -m unittest -v tools/test_summarize_arkan_preflight.py
 
-      - name: Test root-cause gate against synthetic virtualization blocker
+      - name: Test contract workflow wiring\n        run: python -m unittest -v tools/test_windows_contract_workflow.py\n\n      - name: Test root-cause gate against synthetic virtualization blocker
         shell: bash
         run: |
           set -euo pipefail
