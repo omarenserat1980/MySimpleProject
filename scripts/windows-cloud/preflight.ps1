@@ -49,7 +49,7 @@ foreach ($candidateSku in $imageSkuCandidates) {
     # Azure image versions are numeric dotted versions; choose the greatest numeric version.
     $candidateVersions = @($versions | Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending)
     $candidateVersion = $candidateVersions[0]
-    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --query urn --output tsv --only-show-errors 2>&1
+    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --query "[publisher, offer, sku, version] | join(':', @)" --output tsv --only-show-errors 2>&1
     $showExitCode = $LASTEXITCODE
     $candidateImage = ($showOutput | Out-String).Trim()
     if ($showExitCode -eq 0 -and $candidateImage) {
@@ -58,7 +58,8 @@ foreach ($candidateSku in $imageSkuCandidates) {
         $resolvedVersion = $candidateVersion
         break
     }
-    if ($candidateImage) { $imageLookupErrors += "$candidateSku version $candidateVersion => $candidateImage" }
+    $detail = if ($candidateImage) { $candidateImage } else { "empty image URN output (exit=$showExitCode)" }
+    $imageLookupErrors += "$candidateSku version $candidateVersion => $detail"
 }
 if (-not $image) {
     $available2025 = @()
