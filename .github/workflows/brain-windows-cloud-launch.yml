@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+      cost_reviewed:
+        description: "Confirm the cost estimate and subscription free-benefit eligibility were reviewed in a prior preflight run"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +37,7 @@ jobs:
       TF_VAR_allowed_source_ip: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
       BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
       APPROVE_APPLY: ${{ inputs.approve_apply }}
+      COST_REVIEWED: ${{ inputs.cost_reviewed }}
     steps:
       - name: Validate required GitHub Environment configuration before cloud changes
         id: config
@@ -59,6 +65,11 @@ jobs:
           # Explicitly approved deployment must fail closed if admin credentials
           # are missing. Never silently downgrade an approved launch to preflight.
           apply_enabled="${APPROVE_APPLY:-false}"
+          cost_reviewed="${COST_REVIEWED:-false}"
+          if [[ "$apply_enabled" == "true" && "$cost_reviewed" != "true" ]]; then
+            echo "BLOCKED_COST_REVIEW: review the cost-preflight artifact and confirm subscription-specific free benefits before apply."
+            exit 2
+          fi
           if [[ "$apply_enabled" == "true" ]]; then
             admin_missing=()
             for name in CHECK_WINDOWS_ADMIN_USERNAME CHECK_WINDOWS_ADMIN_PASSWORD; do
@@ -172,7 +183,7 @@ jobs:
           # rather than treating the strings as positional arguments.
           $preflightArgs = @{
             Location = "westeurope"
-            VmSize = "Standard_B1s"
+            VmSize = "Standard_B2s"
           }
           if ($env:APPROVE_APPLY -ne "true") {
             $preflightArgs["AllowMissingAdminCredentials"] = $true
@@ -182,7 +193,7 @@ jobs:
       - name: Deploy and verify Windows Server 2025
         if: ${{ steps.config.outputs.apply_enabled == 'true' }}
         shell: pwsh
-        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location westeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B1s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location westeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B2s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
 
       - name: Explain preflight-only run
         if: ${{ steps.config.outputs.apply_enabled != 'true' }}
