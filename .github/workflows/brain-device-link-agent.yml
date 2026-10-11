@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - brain-device-link-agent
+      - brain-software-cloud-pool
   pull_request:
     paths:
       - 'brain_v12/tools/brain_device_link.py'
+      - 'brain_v12/tools/brain_device_bridge_doctor.py'
       - 'brain_v12/tests/test_brain_device_link.py'
+      - 'brain_v12/tools/brain_device_bridge_doctor.py'
       - '.github/workflows/brain-device-link-agent.yml'
 
 jobs:
