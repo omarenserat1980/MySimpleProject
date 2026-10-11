@@ -26,9 +26,8 @@ GATES = (
 def _read(path: str | None) -> tuple[dict[str, Any] | None, str | None]:
     if not path:
         return None, "EVIDENCE_PATH_NOT_CONFIGURED"
-    p = Path(path)
     try:
-        obj = json.loads(p.read_text(encoding="utf-8-sig"))
+        obj = json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except FileNotFoundError:
         return None, "EVIDENCE_FILE_MISSING"
     except (OSError, json.JSONDecodeError):
@@ -44,13 +43,15 @@ def triage(paths: dict[str, str | None]) -> dict[str, Any]:
     for name, arg, code, action in GATES:
         report, error = _read(paths.get(arg))
         passed = error is None and report is not None and report.get("verified") is True
-        # Runner watcher reports may use explicit PASS fields rather than verified.
         if name == "runner" and report is not None:
             passed = passed or (
                 report.get("runner_online") is True
                 and report.get("execution_probe") == "PASS"
                 and report.get("runtime_surface") == "PASS"
             )
+        if name == "boot_proof" and report is not None:
+            # A generic verified=true is insufficient; require the proof tool's exact terminal status.
+            passed = passed and report.get("status") == "WINDOWS_BOOT_VERIFIED"
         if passed:
             gates[name] = {"status": "VERIFIED"}
         else:
@@ -69,7 +70,7 @@ def triage(paths: dict[str, str | None]) -> dict[str, Any]:
         "ready": not blockers,
         "gates": gates,
         "blockers": blockers,
-        "policy": "Missing or invalid evidence is BLOCKED; no gate is inferred from another gate.",
+        "policy": "Missing or invalid evidence is BLOCKED; boot proof requires WINDOWS_BOOT_VERIFIED.",
     }
 
 
@@ -87,7 +88,7 @@ def main() -> int:
         "runner_watch": args.runner_watch,
         "boot_proof": args.boot_proof,
     })
-    Path(args.output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+    Path(args.output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["ready"] else 2
 
