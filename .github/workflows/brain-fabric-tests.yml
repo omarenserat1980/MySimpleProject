@@ -45,3 +45,6 @@ jobs:
           brain_v12/integration/test_idempotency_gate.py
           brain_v12/integration/test_durable_idempotency.py
           brain_v12/integration/test_durable_recovery.py
+
+          brain_v12/tests/test_open_source_tool_hub.py
+          brain_v12/tests/test_open_source_tools_api.py
