@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "tool/live-control-plane-readonly-check-20261011"
+      - "main"
     paths:
       - ".github/workflows/brain-control-plane-readonly-preflight.yml"
       - "tools/windows_control_plane_api_preflight.py"
