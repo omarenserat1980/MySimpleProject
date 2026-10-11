@@ -54,7 +54,10 @@ jobs:
       - name: Run summarizer regression tests
         run: python -m unittest -v tools/test_summarize_arkan_preflight.py
 
-      - name: Test contract workflow wiring\n        run: python -m unittest -v tools/test_windows_contract_workflow.py\n\n      - name: Test root-cause gate against synthetic virtualization blocker
+      - name: Test contract workflow wiring
+        run: python -m unittest -v tools/test_windows_contract_workflow.py
+
+      - name: Test root-cause gate against synthetic virtualization blocker
         shell: bash
         run: |
           set -euo pipefail
