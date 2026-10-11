@@ -1,0 +1,75 @@
+name: Brain ChatGPT Simulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - brain/android-habitat-v1
+    paths:
+      - "brain_v12/**"
+      - ".github/workflows/brain-chatgpt-simulator.yml"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-chatgpt-simulator-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  simulate:
+    name: Run Brain–ChatGPT decision cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Start Brain API
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 > brain-api.log 2>&1 &
+          echo $! > brain-api.pid
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8012/api/system/readiness > readiness.json; then
+              echo "Brain readiness endpoint responded."
+              cat readiness.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Brain API did not become ready."
+          cat brain-api.log
+          exit 1
+
+      - name: Execute Brain–ChatGPT simulator
+        env:
+          V12_BRAIN_URL: http://127.0.0.1:8012
+          BRAIN_CONTROL_KEY: ${{ secrets.BRAIN_CONTROL_KEY }}
+        run: |
+          set -o pipefail
+          python brain_v12/tools/brain_chatgpt_loop.py --base http://127.0.0.1:8012 2>&1 | tee brain-chatgpt-result.json
+
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-chatgpt-simulator-evidence
+          path: |
+            brain-api.log
+            readiness.json
+            brain-chatgpt-result.json
+          if-no-files-found: ignore
+          retention-days: 14
