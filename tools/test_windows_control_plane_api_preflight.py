@@ -1,8 +1,12 @@
+import contextlib
+import io
 import json
+import os
 import unittest
 import urllib.error
+from unittest.mock import patch
 
-from tools.windows_control_plane_api_preflight import inspect_openapi, ISSUE_PATH
+from tools.windows_control_plane_api_preflight import inspect_openapi, ISSUE_PATH, main, DEFAULT_CONTROL_PLANE_URL
 
 
 class FakeResponse:
@@ -15,6 +19,15 @@ class FakeResponse:
 
 
 class ControlPlaneApiPreflightTests(unittest.TestCase):
+    def test_main_uses_public_https_default_when_env_is_unset(self):
+        expected = {"ok": True, "status": "READ_ONLY_API_READY"}
+        with patch.dict(os.environ, {}, clear=True), patch("tools.windows_control_plane_api_preflight.inspect_openapi", return_value=expected) as probe:
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(main(), 0)
+        probe.assert_called_once_with(DEFAULT_CONTROL_PLANE_URL)
+        self.assertEqual(json.loads(output.getvalue()), expected)
+
     def test_reads_openapi_and_never_calls_issuance(self):
         seen = []
         def opener(request, timeout):

@@ -29,7 +29,7 @@ jobs:
       - name: Probe deployed Control Plane using GET only
         shell: bash
         env:
-          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
         run: |
           set +e
           python tools/windows_control_plane_api_preflight.py | tee control-plane-readonly-preflight.json

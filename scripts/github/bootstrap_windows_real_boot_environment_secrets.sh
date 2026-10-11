@@ -15,7 +15,7 @@ gh auth status >/dev/null 2>&1 || die "Authenticate with gh auth login first."
 gh repo view "$REPO" --json nameWithOwner >/dev/null 2>&1 || die "Repository access unavailable."
 printf 'Repository: %s\nEnvironment: %s\n' "$REPO" "$ENVIRONMENT"
 printf '%s\n' 'This tool will not generate or invent trusted credentials.'
-printf '%s\n' 'Obtain every value from the authorized Control Plane/executor owner.'
+printf '%s\n' 'Obtain every credential/key from the authorized Control Plane/executor owner. The public Control Plane URL has a reviewed HTTPS fallback and is not prompted as a secret.'
 printf '%s\n' 'Values are not echoed or written to disk; each is sent to gh via stdin.'
 printf '%s\n' 'Press Ctrl-C to stop. Existing secrets not entered here are not modified.'
 
@@ -24,7 +24,6 @@ names=(
   BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED
   BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED
   BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED
-  BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED
   BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED
 )
 
@@ -36,7 +35,7 @@ validate() {
       printf 'Rejected placeholder/local value for %s.\n' "$name" >&2; return 1 ;;
   esac
   case "$name" in
-    BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED|BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED)
+    BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED)
       printf '%s' "$value" | python3 -c 'import sys; from urllib.parse import urlsplit
 try:
  u=urlsplit(sys.stdin.read().strip()); ok=u.scheme=="https" and bool(u.hostname) and not u.username and not u.password
