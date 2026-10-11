@@ -4,14 +4,15 @@ This matrix is checked against `.github/workflows/brain-windows-real-boot.yml` o
 
 ## Required GitHub Environment secrets
 
-Create all six as secrets in the protected `windows-real-boot` Environment. The workflow preflight blocks if any is empty.
+Create the five credential/key secrets below in the protected `windows-real-boot` Environment. The public Control Plane URL is resolved from an optional Environment secret/variable or the known deployed Free service URL. The workflow still blocks if required credentials are missing.
 
 1. `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED` — HTTPS registry base URL.
 2. `BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED` — authorized executor registry credential.
 3. `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED` — trusted Ed25519 attestation issuer public key.
 4. `BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED` — authority public key for signed execution-contract verification.
-5. `BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED` — HTTPS Brain Control Plane base URL.
-6. `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED` — high-entropy delivery key shared with the Control Plane.
+5. `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED` — high-entropy delivery key shared with the Control Plane.
+
+Optional override: Environment variable `BRAIN_WINDOWS_CONTROL_PLANE_URL` can supply the public HTTPS base URL. If neither secret nor variable is configured, the workflow uses `https://brain-control-plane-main.onrender.com` and validates reachability; missing/unreachable service still blocks execution.
 
 Do not create repository-level copies or placeholders. The workflow maps these Environment secrets into job variables; host environment variables cannot override job-level values with the same name.
 
