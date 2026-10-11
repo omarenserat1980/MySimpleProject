@@ -47,21 +47,28 @@ jobs:
           for name in \
             CHECK_AZURE_CLIENT_ID \
             CHECK_AZURE_TENANT_ID \
-            CHECK_AZURE_SUBSCRIPTION_ID \
-            CHECK_WINDOWS_ADMIN_USERNAME \
-            CHECK_WINDOWS_ADMIN_PASSWORD; do
+            CHECK_AZURE_SUBSCRIPTION_ID; do
             if [[ -z "${!name:-}" ]]; then
               missing+=("$name")
             fi
           done
+          # Admin credentials are required only for an approved deployment.
+          # A preflight-only run must remain useful without provisioning secrets.
+          if [[ "${APPROVE_APPLY:-false}" == "true" ]]; then
+            for name in CHECK_WINDOWS_ADMIN_USERNAME CHECK_WINDOWS_ADMIN_PASSWORD; do
+              if [[ -z "${!name:-}" ]]; then
+                missing+=("$name")
+              fi
+            done
+          fi
           if (( ${#missing[@]} > 0 )); then
             echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
             printf ' - %s\n' "${missing[@]}"
-            echo "Add the matching AZURE_* environment variables and BRAIN_WINDOWS_ADMIN_* environment secrets, then rerun."
+            echo "Azure variables are always required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
             echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
             exit 2
           fi
-          echo "Required environment configuration is present; values were not printed."
+          echo "Required environment configuration for this run is present; values were not printed."
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -121,7 +128,12 @@ jobs:
 
       - name: Preflight (no VM changes)
         shell: pwsh
-        run: ./scripts/windows-cloud/preflight.ps1 -Location westeurope -VmSize Standard_B1s
+        run: |
+          $preflightArgs = @("-Location", "westeurope", "-VmSize", "Standard_B1s")
+          if ($env:APPROVE_APPLY -ne "true") {
+            $preflightArgs += "-AllowMissingAdminCredentials"
+          }
+          & ./scripts/windows-cloud/preflight.ps1 @preflightArgs
 
       - name: Deploy and verify Windows Server 2025
         if: ${{ inputs.approve_apply == true }}
