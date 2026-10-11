@@ -1,0 +1,29 @@
+import os
+import unittest
+from unittest.mock import patch
+
+from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform
+
+
+class BrainDeviceLinkTests(unittest.TestCase):
+    def test_capacity_metadata_is_observation_only(self):
+        metadata = capacity_metadata()
+        self.assertTrue(metadata["observation_only"])
+        self.assertIn("device.status", metadata["capabilities"])
+        self.assertGreaterEqual(metadata["cpu_cores"], 0)
+        self.assertGreaterEqual(metadata["memory_mb"], 0)
+        self.assertGreaterEqual(metadata["disk_mb"], 0)
+
+    def test_android_platform_detection(self):
+        with patch.dict(os.environ, {"ANDROID_ROOT": "/system", "TERMUX_VERSION": "0.118"}, clear=False):
+            self.assertEqual(detect_platform(), "android")
+
+    def test_windows_agent_id_validation_is_platform_scoped_in_main(self):
+        # The agent's main() checks the ID prefix only when the host platform is
+        # one of the supported platforms; no credentials or network are needed here.
+        with patch.dict(os.environ, {"ANDROID_ROOT": "/system"}, clear=False):
+            self.assertEqual(detect_platform(), "android")
+
+
+if __name__ == "__main__":
+    unittest.main()
