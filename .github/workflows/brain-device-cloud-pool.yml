@@ -1,0 +1,24 @@
+name: Brain Device Cloud Pool CI
+
+on:
+  push:
+    branches:
+      - brain-software-cloud-pool
+  pull_request:
+    paths:
+      - 'brain_v12/brain/device_cloud_pool.py'
+      - 'brain_v12/brain/device_cloud_pool_api.py'
+      - 'brain_v12/tests/test_device_cloud_pool.py'
+      - 'brain_v12/app.py'
+      - '.github/workflows/brain-device-cloud-pool.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test device-backed cloud pool
+        run: python -m unittest brain_v12.tests.test_device_cloud_pool -v
