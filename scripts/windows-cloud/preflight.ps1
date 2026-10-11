@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Location = "westeurope",
+    [string]$Location = "northeurope",
     [string]$VmSize = "Standard_B2s",
     [switch]$AllowMissingAdminCredentials
 )
