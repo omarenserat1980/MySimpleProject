@@ -151,11 +151,31 @@ class DesktopCommanderEmulator:
             self._process_started.pop(process_id,None)
 
     def stop_process(self,process_id:str)->dict[str,Any]:
-        with self._lock: proc=self._processes.get(process_id)
+        """Stop a sandbox process and reap it so it cannot leak in the emulator registry."""
+        with self._lock:
+            proc=self._processes.get(process_id)
         if proc is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
-        proc.terminate()
-        self._audit("stop_process",{"process_id":process_id,"reality":"SIMULATED"})
-        return {"ok":True,"status":"STOP_REQUESTED","process_id":process_id,"reality":"SIMULATED"}
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=1.0)
+            # Drain captured output after the process has exited; bounded before returning.
+            output,_=proc.communicate(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            output,_=proc.communicate()
+        finally:
+            self._forget_process(process_id)
+        text_output=output or ""
+        self._audit("stop_process",{"process_id":process_id,"returncode":proc.returncode,
+                                    "reality":"SIMULATED","output_truncated":len(text_output)>self.policy.max_output_bytes})
+        return {"ok":True,"status":"STOPPED","process_id":process_id,"returncode":proc.returncode,
+                "output":text_output[:self.policy.max_output_bytes],
+                "truncated":len(text_output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
 
     def process_snapshot(self)->dict[str,Any]:
         with self._lock:
