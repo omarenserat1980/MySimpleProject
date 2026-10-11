@@ -59,6 +59,18 @@ def main() -> int:
     if not contract.get("authority_signature") or not contract.get("expires_at"):
         raise RuntimeError("BRAIN_CONTRACT_SIGNATURE_OR_EXPIRY_MISSING")
 
+    # Reject invalid signatures and expired contracts before persisting the file.
+    from brain_v12.brain.authority_signature import verify_contract_signature
+    if not verify_contract_signature(contract):
+        raise RuntimeError("BRAIN_CONTRACT_AUTHORITY_SIGNATURE_INVALID")
+    try:
+        expires_at = float(contract["expires_at"])
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("BRAIN_CONTRACT_EXPIRY_INVALID") from exc
+    import time
+    if expires_at <= time.time():
+        raise RuntimeError("BRAIN_CONTRACT_EXPIRED")
+
     destination = pathlib.Path(os.environ.get(
         "BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE",
         "/run/brain/windows-execution-contract.json",
