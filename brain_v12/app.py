@@ -879,11 +879,23 @@ async def brain_hub_issues(owner:str="",repo:str="",state:str="open"):
 
 @app.get("/api/cinema/status")
 async def cinema_status():
-    """Human-facing cinema control/status; GitHub Actions stays behind Brain."""
+    """Human-facing cinema status; public-repo reads can work without a token."""
     full=_github_repo()
+    try:
+        headers = _github_headers()
+    except HTTPException as exc:
+        # This endpoint only reads Actions metadata. For this known public repo,
+        # GitHub allows unauthenticated reads; do not require a secret just to
+        # render status. Other configured repositories remain fail-closed.
+        if exc.status_code != 503 or exc.detail != "GITHUB_TOKEN_NOT_CONFIGURED" or full != "omarenserat1980/MySimpleProject":
+            raise
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
     async with httpx.AsyncClient(timeout=20) as client:
         r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",
-                           headers=_github_headers(),
+                           headers=headers,
                            params={"per_page":50})
     if r.status_code>=400:
         raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
