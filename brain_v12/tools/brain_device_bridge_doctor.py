@@ -93,7 +93,12 @@ def main() -> int:
             print(str(payload)[:2000])
 
     print("\nNo credentials were transmitted; no task was created; no server settings were changed.")
-    print("If server configured=false, configure BRAIN_AGENT_KEY_SHA256 in the Render service using the local_key_sha256 above; never paste the raw key into chat.")
+    if args.show_key_sha256:
+        print("The server source supports BRAIN_AGENT_KEY_SHA256; configure it only in the intended Render service if you have verified the local key belongs to that service.")
+        print("Never paste the raw key or its digest into chat, logs, issues, or a public repository.")
+    else:
+        print("If the intended server reports configured=false, its credential is not configured. The source supports BRAIN_AGENT_KEY_SHA256; rerun with --show-key-sha256 only when you are ready to configure it securely in the intended Render service.")
+    print("This diagnostic does not configure credentials or prove the local key matches the server.")
     return 0
 
 
