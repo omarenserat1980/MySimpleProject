@@ -84,6 +84,7 @@ class ResourceFactory:
                 self._history[resource.resource_id].extend(["FAILED", "DIAGNOSED", "QUARANTINED"])
                 raise RuntimeError("RESOURCE_EVIDENCE_INTEGRITY_FAILED")
             resource.evidence_ref = evidence["evidence_id"]
+            self.adapter.check_health(resource.resource_id)
             self._history[resource.resource_id].append("VERIFIED")
             self._states[resource.resource_id] = "AVAILABLE"
             self._history[resource.resource_id].append("AVAILABLE")
