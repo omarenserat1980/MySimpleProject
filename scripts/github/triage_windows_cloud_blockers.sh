@@ -43,4 +43,15 @@ if grep -q 'CLOUD_STATUS_NODES_COUNT=0' "$tmp/readiness.out"; then
 fi
 printf '%s\n' 'FINAL=NOT_VERIFIED'
 printf '%s\n' 'NOTE=This triage is read-only. It does not provision a VM, create credentials, issue contracts, or prove guest boot.'
-[[ "$readiness_rc" -eq 0 && "$discovery_rc" -eq 0 ]]
+if [[ "$readiness_rc" -ne 0 || "$discovery_rc" -ne 0 ]]; then
+  printf '%s\n' 'TRIAGE_EXIT=DIAGNOSTIC_ERROR'
+  exit 3
+fi
+if grep -q 'CLOUD_READINESS_READY=false' "$tmp/readiness.out" ||
+   grep -q 'SECRETS_READINESS_OK=false' "$tmp/readiness.out" ||
+   grep -q 'CLOUD_STATUS_VERIFIED=false' "$tmp/readiness.out"; then
+  printf '%s\n' 'TRIAGE_EXIT=BLOCKED_READINESS'
+  exit 4
+fi
+printf '%s\n' 'TRIAGE_EXIT=READINESS_CHECKS_PASS_BUT_BOOT_NOT_PROVEN'
+exit 0
