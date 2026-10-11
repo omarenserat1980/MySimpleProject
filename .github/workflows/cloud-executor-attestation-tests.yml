@@ -34,6 +34,8 @@ on:
       - "brain_v12/brain/cloud_executor_gate.py"
       - "brain_v12/tests/test_cloud_executor_attestation.py"
       - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_postgres.py"
+      - "requirements.txt"
       - "brain_v12/tests/test_cloud_executor_gate.py"
       - "tools/bootstrap_brain_cloud_executor.sh"
       - "brain_v12/tests/test_cloud_runner_isolation_contract.py"
@@ -55,7 +57,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-      - name: Install cryptography
+      - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check "cryptography>=42" "fastapi>=0.110" "psycopg[binary]>=3.2,<4"
       - name: Run signed attestation, issuer, replay and gate tests
         run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_attestation_postgres brain_v12.tests.test_cloud_executor_attestation_api brain_v12.tests.test_cloud_executor_gate brain_v12.tests.test_cloud_runner_isolation_contract brain_v12.tests.test_cloud_executor_bootstrap_security
