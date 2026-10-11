@@ -26,55 +26,53 @@ if (-not $env:TF_VAR_allowed_source_ip -or $env:TF_VAR_allowed_source_ip -eq "0.
 if ($env:TF_VAR_allowed_source_ip -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|[12]\d|3[0-2])$') { Fail "TF_VAR_allowed_source_ip must be an IPv4 CIDR." }
 $compute = (az provider show --namespace Microsoft.Compute --query registrationState --output tsv 2>$null | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute is not Registered. Run bootstrap-state.ps1 -RegisterProviders and wait for registration." }
-$imageSkuCandidates = @("2025-datacenter-g2")
+$imageSkuCandidates = @("2025-datacenter-g2", "2025-datacenter", "2025-datacenter-core-g2", "2025-datacenter-core")
 $image = $null
 $resolvedSku = $null
 $resolvedVersion = $null
 $imageLookupErrors = @()
 foreach ($candidateSku in $imageSkuCandidates) {
-    # Azure's image-show endpoint may reject the symbolic version "latest".
-    # Resolve a concrete version from the same region/SKU, then validate it with image show.
-    $versionsOutput = & az vm image list --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --all --query "[].version" --output tsv --only-show-errors 2>&1
-    $versionsExitCode = $LASTEXITCODE
-    $versions = @()
-    if ($versionsExitCode -eq 0 -and $versionsOutput) {
-        $versions = @($versionsOutput | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match '^\d+(\.\d+){1,3}$' } | Sort-Object -Unique)
-    }
-    if ($versions.Count -eq 0) {
-        $detail = ($versionsOutput | Out-String).Trim()
-        if (-not $detail) { $detail = "no concrete versions returned (exit=$versionsExitCode)" }
-        $imageLookupErrors += "$candidateSku version-list => $detail"
-        continue
-    }
-    # Azure image versions are numeric dotted versions; choose the greatest numeric version.
-    $candidateVersions = @($versions | Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending)
-    $candidateVersion = $candidateVersions[0]
-    # Avoid JMESPath join(): some Azure CLI/image responses expose missing fields as null,
-    # which makes join() throw before we can report the actual lookup result.
-    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --output json --only-show-errors 2>&1
-    $showExitCode = $LASTEXITCODE
-    $candidateImage = ""
-    if ($showExitCode -eq 0 -and $showOutput) {
-        try {
-            $imageObject = ($showOutput | Out-String) | ConvertFrom-Json -ErrorAction Stop
-            if ($imageObject.publisher -and $imageObject.offer -and $imageObject.sku -and $imageObject.version) {
-                $candidateImage = "$($imageObject.publisher):$($imageObject.offer):$($imageObject.sku):$($imageObject.version)"
-            } else {
-                $imageLookupErrors += "$candidateSku version $candidateVersion => image response missing publisher/offer/sku/version fields"
-            }
-        } catch {
-            $detail = ($showOutput | Out-String).Trim()
-            $imageLookupErrors += "$candidateSku version $candidateVersion => could not parse image JSON: $detail"
+    # Query the regional image catalogue as JSON; some CLI/API combinations return no
+    # rows from the version-only JMESPath query even while listing the SKU itself.
+    $catalogOutput = & az vm image list --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --all --output json --only-show-errors 2>&1
+    $catalogExitCode = $LASTEXITCODE
+    $catalog = @()
+    if ($catalogExitCode -eq 0 -and $catalogOutput) {
+        try { $catalog = @(($catalogOutput | Out-String | ConvertFrom-Json)) }
+        catch {
+            $imageLookupErrors += "$candidateSku catalogue JSON parse failed: $($_.Exception.Message)"
+            continue
         }
     }
-    if ($showExitCode -eq 0 -and $candidateImage) {
-        $image = $candidateImage
-        $resolvedSku = $candidateSku
-        $resolvedVersion = $candidateVersion
-        break
+    $versions = @($catalog | Where-Object { $_.sku -eq $candidateSku -and $_.version -match '^\d+(\.\d+){1,3}$' } | Select-Object -ExpandProperty version -Unique)
+    if ($versions.Count -eq 0) {
+        $detail = ($catalogOutput | Out-String).Trim()
+        if (-not $detail) { $detail = "no catalogue entries returned (exit=$catalogExitCode)" }
+        $imageLookupErrors += "$candidateSku catalogue => $detail"
+        continue
     }
-    $detail = if ($candidateImage) { $candidateImage } else { "empty image URN output (exit=$showExitCode)" }
-    $imageLookupErrors += "$candidateSku version $candidateVersion => $detail"
+    # Use the catalogue row itself as the authoritative image reference.
+    # Avoid `az vm image show --query urn`: some Azure CLI/API versions return null
+    # for that derived property even though the catalogue entry is valid.
+    $candidateEntries = @($catalog | Where-Object {
+        $_.sku -eq $candidateSku -and $_.publisher -eq "MicrosoftWindowsServer" -and
+        $_.offer -eq "WindowsServer" -and $_.version -match '^\d+(\.\d+){1,3}$'
+    } | Sort-Object { try { [version]$_.version } catch { [version]'0.0' } } -Descending)
+    foreach ($entry in $candidateEntries) {
+        $candidateVersion = [string]$entry.version
+        $candidateImage = [string]$entry.urn
+        if (-not $candidateImage -and $entry.publisher -and $entry.offer -and $entry.sku -and $entry.version) {
+            $candidateImage = "$($entry.publisher):$($entry.offer):$($entry.sku):$($entry.version)"
+        }
+        if ($candidateImage -match '^MicrosoftWindowsServer:WindowsServer:[^:]+:\d+(\.\d+){1,3}$') {
+            $image = $candidateImage
+            $resolvedSku = [string]$entry.sku
+            $resolvedVersion = $candidateVersion
+            break
+        }
+        $imageLookupErrors += "$candidateSku version $candidateVersion => catalogue row missing a valid URN and required fields"
+    }
+    if ($image) { break }
 }
 if (-not $image) {
     $available2025 = @()
