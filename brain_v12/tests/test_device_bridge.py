@@ -82,6 +82,25 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "TASK_NOT_ALLOWED")
 
+    def test_audit_tasks_are_allowlisted_and_report_diagnostic_completion(self):
+        for task_name in ("brain_project_audit", "windows_cloud_boot_preflight"):
+            with self.subTest(task=task_name):
+                queued = self.bridge.enqueue(task_name)
+                self.assertTrue(queued["ok"])
+                task = queued["task"]
+                polled = self.bridge.poll("brain-emulator-test")
+                self.assertEqual(polled["task"]["task"], task_name)
+                report = {
+                    "returncode": 2,
+                    "status": "BLOCKED",
+                    "boot_path": {"blockers": ["KVM_UNAVAILABLE_OR_PERMISSION_DENIED"]},
+                    "project_areas": {"brain_v12/brain": {"exists": True}},
+                }
+                self.assertTrue(self.bridge.report(task["task_id"], "brain-emulator-test", True, report)["ok"])
+                verified = self.bridge.verify_result(task["task_id"])
+                self.assertTrue(verified["verified"])
+                self.assertEqual(verified["status"], "VERIFIED")
+
     def test_requeues_stale_claim(self):
         result = self.bridge.requeue_stale(5)
         self.assertEqual(result["requeued"], 0)
