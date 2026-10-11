@@ -3,7 +3,7 @@
 # Run in PowerShell on Arkan. Writes a sanitized JSON report to the current directory.
 $ErrorActionPreference = 'Continue'
 $report = [ordered]@{
-  schema = 'brain.arkan.windows-real-boot-diagnostic.v1'
+  schema = 'brain.arkan.windows-real-boot-diagnostic.v2'
   generated_utc = [DateTime]::UtcNow.ToString('o')
   machine = $env:COMPUTERNAME
   checks = [ordered]@{}
@@ -11,16 +11,42 @@ $report = [ordered]@{
 }
 function Add-Check([string]$Name, $Value) { $report.checks[$Name] = $Value }
 function Safe-Command([string]$Name, [scriptblock]$Block) {
-  try { return & $Block } catch { $report.warnings += "$Name : $($_.Exception.GetType().Name)"; return $null }
+  $oldPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Stop'
+    return & $Block
+  } catch {
+    $err = $_
+    $id = [string]$err.FullyQualifiedErrorId
+    $category = [string]$err.CategoryInfo.Category
+    $type = [string]$err.Exception.GetType().Name
+    # Capture error classification only; never include exception text or environment data.
+    $report.warnings += "$Name : type=$type; category=$category; id=$id"
+    return $null
+  } finally {
+    $ErrorActionPreference = $oldPreference
+  }
 }
 
 Add-Check 'os' (Safe-Command 'os' { Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture })
+Add-Check 'identity' (Safe-Command 'identity' {
+  $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+  [ordered]@{
+    User = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+    IsAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  }
+})
 Add-Check 'hardware' (Safe-Command 'hardware' { Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model, @{N='RAM_GiB';E={[math]::Round($_.TotalPhysicalMemory/1GB,2)}}, NumberOfLogicalProcessors })
-Add-Check 'cpu_virtualization' (Safe-Command 'cpu_virtualization' { Get-CimInstance Win32_Processor | Select-Object Name, VirtualizationFirmwareEnabled, VMMonitorModeExtensions, SecondLevelAddressTranslationExtensions })
+Add-Check 'cpu_virtualization' (Safe-Command 'cpu_virtualization' { @(Get-CimInstance Win32_Processor | Select-Object Name, VirtualizationFirmwareEnabled, VMMonitorModeExtensions, SecondLevelAddressTranslationExtensions) })
+Add-Check 'hyperv_module' (Safe-Command 'hyperv_module' {
+  @(Get-Module -ListAvailable -Name Hyper-V | Select-Object Name, Version, Path)
+})
 Add-Check 'hyperv_feature' (Safe-Command 'hyperv_feature' {
   if (Get-Command Get-WindowsOptionalFeature -ErrorAction SilentlyContinue) {
     Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All | Select-Object FeatureName, State
-  } else { 'Get-WindowsOptionalFeature unavailable (possibly not Windows client)' }
+  } elseif (Get-Command Get-WindowsFeature -ErrorAction SilentlyContinue) {
+    Get-WindowsFeature -Name Hyper-V | Select-Object Name, InstallState
+  } else { 'No supported Windows feature query command available in this shell' }
 })
 Add-Check 'hyperv_commands' (Safe-Command 'hyperv_commands' {
   [ordered]@{
