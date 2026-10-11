@@ -154,9 +154,14 @@ jobs:
       - name: Preflight (no VM changes)
         shell: pwsh
         run: |
-          $preflightArgs = @("-Location", "westeurope", "-VmSize", "Standard_B1s")
+          # Use hashtable splatting so PowerShell passes named parameters,
+          # rather than treating the strings as positional arguments.
+          $preflightArgs = @{
+            Location = "westeurope"
+            VmSize = "Standard_B1s"
+          }
           if ($env:APPROVE_APPLY -ne "true") {
-            $preflightArgs += "-AllowMissingAdminCredentials"
+            $preflightArgs["AllowMissingAdminCredentials"] = $true
           }
           & ./scripts/windows-cloud/preflight.ps1 @preflightArgs
 
