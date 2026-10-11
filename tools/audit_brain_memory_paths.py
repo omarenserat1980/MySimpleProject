@@ -16,6 +16,7 @@ SEARCH_ROOTS = (ROOT / "brain_v12", ROOT / "docs")
 PATTERNS = {
     "memory_store": re.compile(r"MemoryStore|class\s+.*Memory|memory\.read|memory\.write", re.I),
     "sqlite_paths": re.compile(r"sqlite3|\.db\b|\.sqlite\b|connect\(", re.I),
+    "runtime_path_config": re.compile(r"configure_runtime_paths|BRAIN_RUNTIME_HOME|BRAIN_DB|BRAIN_SYNC_QUEUE", re.I),
     "api_routes": re.compile(r"@(?:app|router)\.(?:get|post|put|patch|delete)\([^\n]*(?:memory|learn|chat|quran|قرآن)", re.I),
     "quran_references": re.compile(r"qur['’]?an|quran|قرآن|آية|آيات|سورة|سور", re.I),
 }
@@ -44,6 +45,7 @@ def main():
         "findings": [],
         "limitations": [
             "Static text scan only; it does not prove a route is mounted or exercised at runtime.",
+            "Runtime path matches identify configuration references, not proof that production uses a specific path.",
             "Quran-related references are reported for human review; no religious text is generated or altered.",
         ],
     }
