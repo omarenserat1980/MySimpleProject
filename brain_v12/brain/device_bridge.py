@@ -148,8 +148,7 @@ class DeviceBridge:
             verified=bool(item.get("ok") and result.get("opened") is True if task in ("open_app","open_url") else item.get("ok"))
         elif task in ("brain_project_audit", "windows_cloud_boot_preflight"):
             verified=bool(
-                item.get("ok")
-                and result.get("status") in ("BLOCKED", "READY_FOR_REVIEW")
+                result.get("status") in ("BLOCKED", "READY_FOR_REVIEW")
                 and isinstance(result.get("boot_path"), dict)
                 and isinstance(result.get("project_areas"), dict)
             )
