@@ -31,7 +31,7 @@ class ResourceFactory:
         *,
         prefix: str = "ASIC-SIM",
         hashrate: float = 1.0,
-        hashrate_unit: str = "TH",
+        hashrate_unit: str = "H",
         power_watts: float = 0.0,
         power_cost: float = 0.0,
     ) -> dict[str, Any]:
