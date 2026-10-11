@@ -95,27 +95,48 @@ if ($LASTEXITCODE -eq 0 -and $rawSkus) {
 } else { Write-Warning "Could not read SKU metadata; Azure quota and live capacity remain unverified." }
 Write-Host "Preflight passed identity, secret presence, provider and image checks."
 Write-Host "Subscription: $($account.name) ($($account.id)); region: $Location; requested size: $VmSize"
-$match = [regex]::Match($VmSize, '^Standard_[A-Za-z]+(\d+)')
-$requiredCores = if ($match.Success) { [int]$match.Groups[1].Value } else { 0 }
-$quotaRaw = az vm list-usage --location $Location --output json --only-show-errors 2>$null
-if ($LASTEXITCODE -eq 0 -and $quotaRaw) {
-    try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { $quotas = @() }
-    $totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "Total Regional vCPUs" } | Select-Object -First 1)
-    $familyQuota = @($quotas | Where-Object { $_.name.value -match "standard(B|BS)Family" -or $_.name.localizedValue -match "BS.?Family|B.?Family" } | Select-Object -First 1)
-    foreach ($quota in @($totalQuota + $familyQuota)) {
-        if ($quota.Count -gt 0 -and $null -ne $quota[0].limit -and $null -ne $quota[0].currentValue) {
-            $available = [int]$quota[0].limit - [int]$quota[0].currentValue
-            if ($requiredCores -gt 0 -and $available -lt $requiredCores) {
-                Fail "Insufficient Azure quota in $Location for ${VmSize}: available=$available, required=$requiredCores, quota=$($quota[0].name.localizedValue). Request quota or select an eligible smaller SKU before applying."
-            }
-            Write-Host "Quota $($quota[0].name.localizedValue): current=$($quota[0].currentValue), limit=$($quota[0].limit), needed=$requiredCores."
-        }
-    }
-    if ($totalQuota.Count -eq 0 -or $familyQuota.Count -eq 0) {
-        Write-Warning "Azure returned quota data but one or more relevant regional/family quotas were not identifiable; review portal quotas before apply."
-    }
+# Derive the exact quota family from the requested SKU. Never accidentally
+# check Standard BS Family for a Dsv5 VM (or report a pass on the wrong family).
+$requiredCores = 0
+$quotaFamilyValue = $null
+if ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $skuVersion = $Matches[4]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "v$skuVersion" + "Family"
+    $requiredCores = [int]$Matches[2]
+} elseif ($VmSize -match '^Standard_([A-Za-z]+?)(\d+)([A-Za-z]*)$') {
+    $skuPrefix = $Matches[1]
+    $skuSuffix = $Matches[3]
+    $quotaFamilyValue = "standard$skuPrefix$skuSuffix" + "Family"
+    $requiredCores = [int]$Matches[2]
 } else {
-    Write-Warning "Azure quota query returned no usable data. Quota remains unverified; review portal quotas before authorizing apply."
+    Fail "Cannot derive an exact Azure quota family for VM size $VmSize; refusing to report quota readiness."
+}
+Write-Host "REQUESTED_VM_QUOTA_FAMILY=$quotaFamilyValue"
+$quotaRaw = az vm list-usage --location $Location --output json --only-show-errors 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $quotaRaw) {
+    Fail "Azure quota query returned no usable data. Quota remains unverified; no deployment is authorized."
+}
+try { $quotas = @($quotaRaw | ConvertFrom-Json) } catch { Fail "Azure quota response was not valid JSON; refusing to report quota readiness." }
+$totalQuota = @($quotas | Where-Object { $_.name.value -eq "cores" -or $_.name.localizedValue -match "^Total Regional vCPUs$" } | Select-Object -First 1)
+$familyQuota = @($quotas | Where-Object {
+    $_.name.value -ieq $quotaFamilyValue -or
+    ($_.name.localizedValue -replace '[^A-Za-z0-9]', '') -ieq ($quotaFamilyValue -replace '[^A-Za-z0-9]', '')
+} | Select-Object -First 1)
+if ($totalQuota.Count -eq 0 -or $familyQuota.Count -eq 0) {
+    $foundFamilies = @($quotas | Where-Object { $_.name.value -match 'Family' } | ForEach-Object { $_.name.value } | Where-Object { $_ })
+    Fail "Could not identify both regional and exact $quotaFamilyValue quota records in $Location. RegionalFound=$($totalQuota.Count); RequestedFamilyFound=$($familyQuota.Count); returned family records=$($foundFamilies -join ', '). Quota is unverified; no deployment is authorized."
+}
+foreach ($quota in @($totalQuota[0], $familyQuota[0])) {
+    if ($null -eq $quota.limit -or $null -eq $quota.currentValue) {
+        Fail "Azure quota record $($quota.name.value) lacks limit/current values; quota is unverified."
+    }
+    $available = [int]$quota.limit - [int]$quota.currentValue
+    if ($available -lt $requiredCores) {
+        Fail "Insufficient Azure quota in $Location for $($VmSize): available=$available, required=$requiredCores, quota=$($quota.name.localizedValue). Request quota or select an eligible SKU before applying."
+    }
+    Write-Host "Quota $($quota.name.localizedValue): current=$($quota.currentValue), limit=$($quota.limit), needed=$requiredCores."
 }
 Write-Host "A SKU listing does not guarantee live capacity; Azure may still reject a deployment."
 
