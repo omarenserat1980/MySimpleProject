@@ -116,10 +116,11 @@
   }
   async function sendMessage(message) {
     if(busy||!message.trim())return;
-    busy=true;$("sendBtn").disabled=true;setStep(0);appendMessage("user",message);
-    const typing=document.createElement("div");typing.className="typing";typing.textContent="العقل يعالج الطلب…";typing.id="typing";$("messages").appendChild(typing);
+    busy=true;$("sendBtn").disabled=true;
     try {
       if(!sessionId)await newSession();
+      setStep(0);appendMessage("user",message);
+      const typing=document.createElement("div");typing.className="typing";typing.textContent="العقل يعالج الطلب…";typing.id="typing";$("messages").appendChild(typing);
       setStep(1);
       const clientId=(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():("msg-"+Date.now()+"-"+Math.random().toString(16).slice(2));
       setStep(2);
