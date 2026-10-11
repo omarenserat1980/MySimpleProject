@@ -116,69 +116,9 @@ def post_heartbeat(base_url: str, agent_id: str, key: str, timeout: float = 12) 
         raise RuntimeError("heartbeat network error: " + str(exc.reason)) from None
 
 
-
-REMOTE_TASKS = {"status", "python_version", "platform"}
-
-
-def execute_remote_task(name: str) -> dict:
-    """Execute a fixed, read-only task; never interpret task parameters as code."""
-    if name == "status":
-        return {"status": "READY", "agent_version": "1.0.0", "metadata": capacity_metadata()}
-    if name == "python_version":
-        return {"python_version": platform.python_version(), "executable": sys.executable}
-    if name == "platform":
-        return {"platform": detect_platform(), "release": platform.release(), "machine": platform.machine()}
-    raise ValueError("TASK_NOT_ALLOWED")
-
-
-def request_json(base_url: str, path: str, agent_id: str, key: str, method: str = "GET", payload: dict | None = None) -> dict:
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    headers = {
-        "Accept": "application/json",
-        "X-V12-Agent-Key": key,
-        "X-V12-Agent-Id": agent_id,
-        "User-Agent": "ElectronicBrain-DeviceLink/1.0.0",
-    }
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(base_url.rstrip("/") + path, data=data, method=method, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=12) as response:
-            raw = response.read(65536).decode("utf-8", errors="replace")
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(2048).decode("utf-8", errors="replace")
-        raise RuntimeError("HTTP " + str(exc.code) + ": " + detail) from None
-    except urllib.error.URLError as exc:
-        raise RuntimeError("network error: " + str(exc.reason)) from None
-
-
-def poll_and_run_one(base_url: str, agent_id: str, key: str) -> dict:
-    from urllib.parse import quote
-    polled = request_json(
-        base_url, "/api/device/poll?agent_id=" + quote(agent_id, safe=""), agent_id, key
-    )
-    task = polled.get("task")
-    if not isinstance(task, dict):
-        return {"status": polled.get("status", "IDLE"), "task": None}
-    task_id = str(task.get("task_id", ""))
-    name = str(task.get("task", ""))
-    try:
-        if name not in REMOTE_TASKS:
-            raise ValueError("TASK_NOT_ALLOWED")
-        result = execute_remote_task(name)
-        report = {"task_id": task_id, "agent_id": agent_id, "ok": True, "result": result, "error": ""}
-    except Exception as exc:
-        report = {"task_id": task_id, "agent_id": agent_id, "ok": False, "result": {}, "error": str(exc)[:500]}
-    report_response = request_json(
-        base_url, "/api/device/report", agent_id, key, method="POST", payload=report
-    )
-    return {"status": report_response.get("status", "REPORTED"), "task": name, "ok": report["ok"]}
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--once", action="store_true", help="send one heartbeat, poll once, and exit")
+    parser.add_argument("--once", action="store_true", help="send one authenticated capacity heartbeat and exit")
     parser.add_argument("--interval", type=int, default=10, help="heartbeat interval seconds (minimum 5)")
     args = parser.parse_args()
     base_url = os.getenv("BRAIN_URL", "https://brain-control-plane-main.onrender.com").strip()
