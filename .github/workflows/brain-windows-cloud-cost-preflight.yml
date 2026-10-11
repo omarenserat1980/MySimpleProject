@@ -38,19 +38,19 @@ jobs:
         id: config
         shell: bash
         env:
-          CHECK_AZURE_CLIENT_ID: \${{ vars.AZURE_CLIENT_ID }}
-          CHECK_AZURE_TENANT_ID: \${{ vars.AZURE_TENANT_ID }}
-          CHECK_AZURE_SUBSCRIPTION_ID: \${{ vars.AZURE_SUBSCRIPTION_ID }}
-          CHECK_ALLOWED_SOURCE_IP: \${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+          CHECK_AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          CHECK_AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CHECK_AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          CHECK_ALLOWED_SOURCE_IP: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
         run: |
           set -euo pipefail
           missing=()
           for name in CHECK_AZURE_CLIENT_ID CHECK_AZURE_TENANT_ID CHECK_AZURE_SUBSCRIPTION_ID CHECK_ALLOWED_SOURCE_IP; do
-            if [[ -z "\${!name:-}" ]]; then missing+=("$name"); fi
+            if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
           done
-          if (( \${#missing[@]} > 0 )); then
+          if (( ${#missing[@]} > 0 )); then
             echo "AZURE_READINESS=BLOCKED_MISSING_ENVIRONMENT_CONFIGURATION"
-            printf 'Missing configuration name: %s\n' "\${missing[@]}"
+            printf 'Missing configuration name: %s\n' "${missing[@]}"
             echo "No Azure login or resource change was attempted."
             exit 2
           fi
@@ -66,9 +66,9 @@ jobs:
       - name: Azure OIDC login (read-only checks only)
         uses: azure/login@v2
         with:
-          client-id: \${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: \${{ vars.AZURE_TENANT_ID }}
-          subscription-id: \${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Inspect subscription, image, SKU restrictions, and regional quota (read-only)
         shell: bash
@@ -79,15 +79,14 @@ jobs:
           az vm image list --location westeurope --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2025-datacenter-g2 --all --output json > "$image_file"
           python3 - "$image_file" <<'PY'
           import json, sys
-          from packaging.version import Version, InvalidVersion
           rows = json.load(open(sys.argv[1], encoding="utf-8"))
           versions = []
           for row in rows:
               if row.get("publisher") != "MicrosoftWindowsServer" or row.get("offer") != "WindowsServer" or row.get("sku") != "2025-datacenter-g2":
                   continue
               raw = row.get("version", "")
-              try: versions.append((Version(raw), raw))
-              except InvalidVersion: pass
+              try: versions.append((tuple(int(part) for part in raw.split(".")), raw))
+              except (ValueError, AttributeError): pass
           if not versions:
               raise SystemExit("WINDOWS_SERVER_2025_IMAGE_NOT_FOUND in westeurope; no deployment attempted.")
           print("Windows Server 2025 image catalogue: PASS; latest listed version:", max(versions)[1])
@@ -134,6 +133,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: brain-windows-cloud-cost-readiness-\${{ github.run_id }}
+          name: brain-windows-cloud-cost-readiness-${{ github.run_id }}
           if-no-files-found: warn
           path: windows-cloud-cost-estimate.json
