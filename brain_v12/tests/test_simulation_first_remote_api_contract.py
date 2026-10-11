@@ -44,7 +44,7 @@ class TestSimulationFirstRemoteAPIContract(unittest.TestCase):
 
     def test_simulation_root_is_configurable_and_isolated(self):
         self.assertIn('BRAIN_ARKAN_SIM_ROOT', self.source)
-        self.assertIn('".brain", "virtual", "arkan"', self.source)
+        self.assertIn('os.path.join(RUNTIME_STATE_ROOT, "virtual", "arkan")', self.source)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
