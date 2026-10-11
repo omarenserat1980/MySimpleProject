@@ -49,9 +49,24 @@ foreach ($candidateSku in $imageSkuCandidates) {
     # Azure image versions are numeric dotted versions; choose the greatest numeric version.
     $candidateVersions = @($versions | Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending)
     $candidateVersion = $candidateVersions[0]
-    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --query "[publisher, offer, sku, version] | join(':', @)" --output tsv --only-show-errors 2>&1
+    # Avoid JMESPath join(): some Azure CLI/image responses expose missing fields as null,
+    # which makes join() throw before we can report the actual lookup result.
+    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --output json --only-show-errors 2>&1
     $showExitCode = $LASTEXITCODE
-    $candidateImage = ($showOutput | Out-String).Trim()
+    $candidateImage = ""
+    if ($showExitCode -eq 0 -and $showOutput) {
+        try {
+            $imageObject = ($showOutput | Out-String) | ConvertFrom-Json -ErrorAction Stop
+            if ($imageObject.publisher -and $imageObject.offer -and $imageObject.sku -and $imageObject.version) {
+                $candidateImage = "$($imageObject.publisher):$($imageObject.offer):$($imageObject.sku):$($imageObject.version)"
+            } else {
+                $imageLookupErrors += "$candidateSku version $candidateVersion => image response missing publisher/offer/sku/version fields"
+            }
+        } catch {
+            $detail = ($showOutput | Out-String).Trim()
+            $imageLookupErrors += "$candidateSku version $candidateVersion => could not parse image JSON: $detail"
+        }
+    }
     if ($showExitCode -eq 0 -and $candidateImage) {
         $image = $candidateImage
         $resolvedSku = $candidateSku
