@@ -81,7 +81,6 @@ def capacity_metadata() -> dict:
         "memory_mb": max(0, int(memory_mb())),
         "disk_mb": max(0, int(disk_mb)),
         "healthy": True,
-        "enrolled": True,
         "capabilities": ["device.status", "device.info", "python.test"],
         "observation_only": True,
         "agent_version": "1.0.0",
