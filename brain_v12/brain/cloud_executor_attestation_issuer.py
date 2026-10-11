@@ -14,6 +14,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -24,6 +25,14 @@ CHALLENGE_TTL_SECONDS = 60
 
 def _is_postgres(db_path: str) -> bool:
     return db_path.startswith(("postgres://", "postgresql://"))
+
+
+def _postgres_tls_configured(db_path: str) -> bool:
+    try:
+        values = parse_qs(urlsplit(db_path).query).get("sslmode", [])
+        return bool(values and values[-1].lower() in {"require", "verify-ca", "verify-full"})
+    except ValueError:
+        return False
 
 
 def _database_error_types():
@@ -66,6 +75,8 @@ def _connect(db_path: str):
     if not db_path:
         raise ValueError("CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_INVALID")
     if _is_postgres(db_path):
+        if not _postgres_tls_configured(db_path):
+            raise ValueError("CLOUD_EXECUTOR_POSTGRES_TLS_REQUIRED")
         try:
             import psycopg
             db = psycopg.connect(db_path, connect_timeout=5, autocommit=True)
