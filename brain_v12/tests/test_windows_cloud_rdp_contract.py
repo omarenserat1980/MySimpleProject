@@ -24,9 +24,10 @@ def test_guest_enables_rdp_with_restricted_firewall_rule():
 
 def test_final_verification_requires_rdp_and_winrm():
     script = read("scripts/windows-cloud/verify.ps1")
-    assert "-Port 3389" in script
-    assert "-Port 5986" in script
-    assert "RDP_TCP_FAILED" in script
+    assert 'destinationPortRange -ne "3389"' in script
+    assert 'destinationPortRange -ne "5986"' in script
+    assert "Get-NetTCPConnection -State Listen -LocalPort 3389" in script
+    assert "GUEST_RDP_READY_CLIENT_TEST_REQUIRED" in script
 
 
 def test_cloud_apply_requires_explicit_cost_review_and_suitable_default():
