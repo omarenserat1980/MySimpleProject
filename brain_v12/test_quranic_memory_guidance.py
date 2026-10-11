@@ -75,3 +75,56 @@ def test_memory_evidence_rejects_invalid_confidence(tmp_path):
     store.init()
     with pytest.raises(ValueError, match="OUT_OF_RANGE"):
         store.add_memory_evidence("k", "claim", "source", 1.1)
+
+
+def test_authenticated_endpoint_reviews_actual_stored_memory_and_evidence(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from brain_v12.brain.memory import MemoryStore
+    from brain_v12.brain.quranic_core.api import build_router
+
+    store = MemoryStore(str(tmp_path / "brain.db"))
+    store.init()
+    store.save_memory("review-key", "هذا دليل يحتاج تحقق من المصدر")
+    store.add_memory_evidence(
+        "review-key", "Source was checked.", "test fixture", 0.9,
+        observed_at="2026-10-11T04:00:00Z",
+    )
+    app = FastAPI()
+    app.include_router(build_router(memory_store=store))
+    monkeypatch.setenv("BRAIN_CONTROL_KEY", "test-control-secret")
+
+    response = TestClient(app).post(
+        "/api/quranic-core/memory-guidance/review-stored",
+        headers={"X-Brain-Control-Key": "test-control-secret"},
+        json={"memory_key": "review-key"},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["memory_key"] == "review-key"
+    assert result["memory_updated_at"]
+    assert result["evidence"][0]["source"] == "test fixture"
+    assert result["evidence"][0]["confidence"] == 0.9
+    assert result["memory_mutated"] is False
+    assert "evidence_and_verification" in result["matched_review_lenses"]
+
+
+def test_stored_memory_review_rejects_missing_control_key(tmp_path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from brain_v12.brain.memory import MemoryStore
+    from brain_v12.brain.quranic_core.api import build_router
+
+    store = MemoryStore(str(tmp_path / "brain.db"))
+    store.init()
+    store.save_memory("private-key", "Sensitive memory with source details.")
+    app = FastAPI()
+    app.include_router(build_router(memory_store=store))
+    monkeypatch.setenv("BRAIN_CONTROL_KEY", "test-control-secret")
+
+    response = TestClient(app).post(
+        "/api/quranic-core/memory-guidance/review-stored",
+        json={"memory_key": "private-key"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CONTROL_PLANE_AUTH_REQUIRED"
