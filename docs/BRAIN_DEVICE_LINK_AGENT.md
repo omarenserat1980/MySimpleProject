@@ -1,11 +1,11 @@
 # Electronic Brain Device Link Agent
 
-This tool lets an owner-operated Windows computer or Android Termux device establish an outbound, authenticated connection to Electronic Brain and report measured capacity. It uses HTTPS and the existing `POST /api/device/heartbeat` endpoint. It is heartbeat-only: it does not poll or claim queued tasks. It is heartbeat-only: it does not poll or claim queued tasks.
+This tool lets an owner-operated Windows computer or Android Termux device establish an outbound, authenticated connection to Electronic Brain and report measured capacity. It uses HTTPS and the existing `POST /api/device/heartbeat` endpoint. It is heartbeat-only: it does not poll or claim queued tasks.
 
 ## Security boundary
 
-- Observation-only: reports CPU count, total RAM when measurable, free disk, platform, and device model. Authenticated heartbeats include `enrolled=true`, which is required by the Android capacity adapter. Authenticated heartbeats include `enrolled=true`, which is required by the Android capacity adapter.
-- Polls Brain for a strict allowlist of read-only tasks (`status`, `python_version`, `platform`). It rejects every other task; it never runs shell commands, interprets task parameters as code, reads arbitrary files, or uploads personal files.
+- Observation-only: reports CPU count, total RAM when measurable, free disk, platform, and device model. The server marks an agent enrolled only after its key and ID authenticate successfully.
+- Does not poll or claim tasks. It never runs shell commands, interprets task parameters as code, reads arbitrary files, or uploads personal files.
 - Never put a real key in Git, chat, screenshots, or shell history.
 - The server must already have the agent ID/key enrolled in `BRAIN_AGENT_KEYS_JSON` (or an existing supported auth mode). A made-up key will correctly receive HTTP 401.
 - Use a unique key per device. Revoke it from the server registry to disconnect that device.
