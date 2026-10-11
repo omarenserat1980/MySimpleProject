@@ -77,6 +77,22 @@ class TestBrainAI(unittest.TestCase):
         self.assertEqual(result.model, "router-model")
         self.assertTrue(any(x.get("type") == "model_routing" for x in result.evidence))
 
+
+    def test_context_uses_latest_twelve_memories(self):
+        class OrderedMemory:
+            def memories(self):
+                return [
+                    {"key": f"memory-{i}", "value": str(i)}
+                    for i in range(20, 0, -1)
+                ]
+
+        ai = BrainAI(FakeProvider(), OrderedMemory(), None)
+        context = ai._context()
+        self.assertIn("memory-20", context)
+        self.assertIn("memory-9", context)
+        self.assertNotIn("memory-8", context)
+        self.assertNotIn("memory-1", context)
+
     def test_status_exposes_brain_layer(self):
         data = self.ai.status()
         self.assertEqual(data["name"], "Brain AI")
