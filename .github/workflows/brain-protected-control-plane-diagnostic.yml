@@ -22,7 +22,7 @@ jobs:
 
       - name: Classify the protected Control Plane URL
         env:
-          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
