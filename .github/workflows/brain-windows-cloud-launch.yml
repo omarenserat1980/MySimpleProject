@@ -56,9 +56,8 @@ jobs:
               missing+=("$name")
             fi
           done
-          # If deployment was requested but admin credentials are absent, safely
-          # downgrade this run to preflight-only rather than fail before diagnostics.
-          # State bootstrap and deploy are gated by this step's output below.
+          # Explicitly approved deployment must fail closed if admin credentials
+          # are missing. Never silently downgrade an approved launch to preflight.
           apply_enabled="${APPROVE_APPLY:-false}"
           if [[ "$apply_enabled" == "true" ]]; then
             admin_missing=()
@@ -68,9 +67,10 @@ jobs:
               fi
             done
             if (( ${#admin_missing[@]} > 0 )); then
-              echo "NOTICE: deployment requested but Windows admin secrets are missing; downgrading to preflight-only."
+              echo "BLOCKED_CONFIGURATION: approved deployment is missing required Windows administrator secrets."
               printf ' - %s\\n' "${admin_missing[@]}"
-              apply_enabled="false"
+              echo "Next action: add the missing secrets to GitHub Environment brain-windows-production."
+              exit 2
             fi
           fi
           echo "apply_enabled=$apply_enabled" >> "$GITHUB_OUTPUT"
