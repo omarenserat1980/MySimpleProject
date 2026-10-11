@@ -105,7 +105,7 @@ for _provider in _configured_ai_providers:
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
     ai.register(
         _provider.name,
-        ["text","chat","reasoning","coding","vision","creative","summarization"],
+        ["text","chat","reasoning","coding","creative","summarization"],
         handler=lambda payload, _p=_provider: _p.respond(
             str(payload.get("user_text", payload.get("message", ""))),
             context=str(payload.get("context", "")),
