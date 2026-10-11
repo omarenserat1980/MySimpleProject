@@ -51,3 +51,11 @@ def test_quranic_core_router_exposes_read_only_guidance():
     assert review.status_code == 200
     assert review.json()["memory_mutated"] is False
     assert "evidence_and_verification" in review.json()["matched_review_lenses"]
+
+
+def test_unrelated_text_returns_no_match_without_mutation():
+    result = review_memory("ملاحظة عادية بلا كلمات مراجعة محددة")
+    assert result["ok"] is True
+    assert result["status"] == "NO_EXPLICIT_KEYWORD_MATCH"
+    assert result["matches"] == []
+    assert result["memory_mutated"] is False
