@@ -13,6 +13,7 @@ class BrainDeviceLinkTests(unittest.TestCase):
     def test_capacity_metadata_is_observation_only(self):
         metadata = capacity_metadata()
         self.assertTrue(metadata["observation_only"])
+        self.assertTrue(metadata["enrolled"])
         self.assertIn("device.status", metadata["capabilities"])
         self.assertGreaterEqual(metadata["cpu_cores"], 0)
         self.assertGreaterEqual(metadata["memory_mb"], 0)
