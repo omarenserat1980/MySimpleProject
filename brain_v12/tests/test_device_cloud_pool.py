@@ -40,8 +40,14 @@ class DeviceCloudPoolTests(unittest.TestCase):
         }])
         pool = DeviceCloudPool(bridge)
         self.assertEqual(pool.status()["status"], "REMOTE_NODE_OBSERVED")
-        ids = {item.executor_id for item in pool.capacities()}
+        capacities = pool.capacities()
+        ids = {item.executor_id for item in capacities}
         self.assertIn("android-executor-redmi3-01", ids)
+        tiers = {item.executor_id: item.tier for item in capacities}
+        self.assertEqual(tiers["android-executor-redmi3-01"], "USER_DEVICE")
+        self.assertEqual(tiers["test-host"] if "test-host" in tiers else next(
+            item.tier for item in capacities if item.is_local
+        ), "LOCAL")
 
     def test_live_windows_executor_joins_pool_from_heartbeat_metadata(self):
         import time
@@ -88,6 +94,30 @@ class DeviceCloudPoolTests(unittest.TestCase):
             arkan = next(n for n in pool.nodes() if n.node_id == "windows-executor-arkan")
             self.assertFalse(arkan.online)
             self.assertNotIn("windows-executor-arkan", {x.executor_id for x in pool.capacities()})
+
+    def test_remote_user_device_is_preferred_over_local_host(self):
+        from brain_v12.brain.portable_resource_orchestrator import (
+            ExecutorCapacity, PortableResourceOrchestrator, ResourceDemand, ScheduleRequest,
+        )
+        local = ExecutorCapacity(
+            executor_id="local", capabilities=frozenset({"python.test"}),
+            cpu_cores=4, memory_mb=4096, disk_mb=10000, tier="LOCAL",
+            is_local=True, permissions=frozenset({"python.test"}),
+        )
+        remote = ExecutorCapacity(
+            executor_id="remote-android", capabilities=frozenset({"python.test"}),
+            cpu_cores=4, memory_mb=4096, disk_mb=10000, tier="USER_DEVICE",
+            is_local=False, permissions=frozenset({"python.test"}),
+        )
+        decision = PortableResourceOrchestrator().plan(
+            ScheduleRequest(
+                task_id="prefer-remote", capability="python.test",
+                demand=ResourceDemand(cpu_cores=0.1, memory_mb=64, disk_mb=64),
+            ),
+            [local, remote],
+        )
+        self.assertEqual(decision.status, "PLANNED")
+        self.assertEqual(decision.executor_id, "remote-android")
 
     def test_plan_is_zero_cost_and_fail_closed_for_missing_capability(self):
         pool = DeviceCloudPool(FakeBridge([]))
