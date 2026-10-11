@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   provision:
-    runs-on: [self-hosted, brain-internal]
+    runs-on: ubuntu-latest
     environment: brain-windows-production
     timeout-minutes: 90
     env:
