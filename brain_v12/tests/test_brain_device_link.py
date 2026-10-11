@@ -3,9 +3,13 @@ import unittest
 from unittest.mock import patch
 
 from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform, execute_remote_task
+from brain_v12.tools.brain_device_bridge_doctor import DEFAULT_URL as DEVICE_DOCTOR_DEFAULT_URL
 
 
 class BrainDeviceLinkTests(unittest.TestCase):
+    def test_device_doctor_defaults_to_current_brain_control_plane(self):
+        self.assertEqual(DEVICE_DOCTOR_DEFAULT_URL, "https://brain-control-plane-main.onrender.com")
+
     def test_capacity_metadata_is_observation_only(self):
         metadata = capacity_metadata()
         self.assertTrue(metadata["observation_only"])
