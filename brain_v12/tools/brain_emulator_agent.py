@@ -47,6 +47,21 @@ def execute(task):
         env=dict(os.environ); env["PYTHONPATH"]=root+os.pathsep+env.get("PYTHONPATH","")
         p=subprocess.run([sys.executable,"-m","unittest",*SELF_TESTS,"-v"],cwd=root,env=env,capture_output=True,text=True,timeout=180)
         return {"returncode":p.returncode,"stdout":p.stdout,"stderr":p.stderr,"tests":SELF_TESTS}
+    if task in {"brain_project_audit","windows_cloud_boot_preflight"}:
+        root=os.path.abspath(os.path.join(os.path.dirname(__file__),"..",".."))
+        audit=os.path.join(root,"tools","brain_emulator_project_audit.py")
+        if not os.path.isfile(audit):
+            raise RuntimeError("BRAIN_PROJECT_AUDIT_TOOL_MISSING")
+        env=dict(os.environ); env["PYTHONPATH"]=root+os.pathsep+env.get("PYTHONPATH","")
+        p=subprocess.run([sys.executable,audit,"--json"],cwd=root,env=env,capture_output=True,text=True,timeout=120)
+        try:
+            report=json.loads(p.stdout)
+        except json.JSONDecodeError:
+            return {"returncode":p.returncode,"status":"AUDIT_OUTPUT_INVALID","stdout":p.stdout[-12000:],"stderr":p.stderr[-4000:]}
+        return {"returncode":p.returncode,"status":report.get("boot_path",{}).get("status","UNKNOWN"),
+                "host":report.get("host",{}),"project_areas":report.get("project_areas",{}),
+                "key_paths":report.get("key_paths",{}),"boot_path":report.get("boot_path",{}),
+                "acceptance_rule":report.get("acceptance_rule",{}),"stderr":p.stderr[-4000:]}
     raise ValueError("TASK_NOT_ALLOWED")
 
 def main():
