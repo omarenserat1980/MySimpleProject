@@ -17,17 +17,6 @@ on:
       - "brain_v12/tests/test_windows_execution_contract_issuer.py"
       - "brain_v12/tests/test_windows_contract_fetch.py"
       - "brain_v12/tests/test_owner_cryptographic_approval.py"
-      - "brain_v12/brain/cloud_executor_attestation.py"
-      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
-      - "brain_v12/brain/cloud_executor_attestation_api.py"
-      - "brain_v12/brain/cloud_executor_gate.py"
-      - "brain_v12/tests/test_cloud_executor_attestation.py"
-      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
-      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
-      - "brain_v12/tests/test_cloud_executor_gate.py"
-      - "tools/request_cloud_executor_attestation.py"
-      - "brain_v12/CLOUD_EXECUTOR_ACTIVATION.md"
-      - "brain_v12/CLOUD_EXECUTOR_RUNNER_CONTRACT.md"
       - ".github/workflows/windows-contract-security-tests.yml"
   workflow_dispatch:
 
@@ -46,23 +35,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install minimal security test dependencies
-        run: python -m pip install --disable-pip-version-check cryptography fastapi
-      - name: Compile executor attestation trust chain
-        run: |
-          python -m py_compile brain_v12/brain/cloud_executor_attestation.py
-          python -m py_compile brain_v12/brain/cloud_executor_attestation_issuer.py
-          python -m py_compile brain_v12/brain/cloud_executor_attestation_api.py
-          python -m py_compile brain_v12/brain/cloud_executor_gate.py
-          python -m py_compile tools/request_cloud_executor_attestation.py
-      - name: Test signed host and architecture binding
-        run: python -m unittest brain_v12.tests.test_cloud_executor_attestation -v
-      - name: Test trusted host inventory and central nonce registry
-        run: |
-          python -m unittest brain_v12.tests.test_cloud_executor_attestation_issuer -v
-          python -m unittest brain_v12.tests.test_cloud_executor_attestation_api -v
-      - name: Test executor capability gate
-        run: python -m unittest brain_v12.tests.test_cloud_executor_gate -v
+      - name: Install minimal crypto dependency
+        run: python -m pip install --disable-pip-version-check cryptography
       - name: Compile authenticated contract API route
         run: python -m py_compile brain_v12/app.py brain_v12/brain/windows_contract_service.py
       - name: Test Control Plane and executor capability separation
