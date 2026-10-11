@@ -11,6 +11,31 @@ Let Electronic Brain evaluate a hosted physical Bitcoin ASIC offer without askin
 - With a budget of USD 0, an offer must explicitly provide a genuine trial whose rewards are withdrawable to an external wallet, with no deposit, activation fee, recurring charge, paid upgrade, referral unlock, or withdrawal fee.
 - A provider's own dashboard balance is not proof of a payout. Verify an on-chain transaction or a pool payout independently before treating any amount as revenue.
 
+## Brain resource adapter
+
+`brain_v12/brain/asic_resource_adapter.py` connects ASIC entries to the existing Brain capability registry, task engine, health probes, evidence store, and mining economics engine. It supports three isolated execution modes:
+
+- `SIMULATOR`: deterministic arithmetic estimates from supplied hashrate and duration. It does not perform SHA-256 mining, contact a pool, represent a physical device, or produce revenue.
+- `REMOTE_PROVIDER`: an externally hosted resource record. Registration alone does not establish provider identity or service availability.
+- `PHYSICAL_DEVICE`: a user-supplied physical-device record. Brain does not discover or connect to a device automatically.
+
+For economics, `power_cost` is the supplied electricity rate in JOD/kWh. The caller can override it when calling `analyze_economics`; neither value is fetched from a utility or provider.
+
+Remote/physical telemetry can be recorded as untrusted evidence supplied by a caller. Hash verification proves only that the local evidence payload has not changed; the release gate remains blocked pending independent provider/device identity attestation. The adapter does not make network calls, provision hosting, execute mining, or request wallet material. Economic results use supplied inputs and remain unverified estimates.
+
+Example (simulation only):
+
+```python
+from brain_v12.brain.asic_resource_adapter import ASICResource, ASICResourceAdapter
+
+brain = ASICResourceAdapter()
+brain.register(ASICResource(
+    "simulator-01", execution_mode="SIMULATOR", hashrate=100,
+    hashrate_unit="TH", power_watts=3000,
+))
+report = brain.simulate("simulator-01", duration_seconds=60)
+```
+
 ## Preflight
 
 Prepare a JSON file from a candidate provider's published terms. Do not include passwords, API tokens, seed phrases, private keys, or account recovery data.
