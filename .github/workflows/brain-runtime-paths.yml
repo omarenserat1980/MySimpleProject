@@ -64,6 +64,7 @@ jobs:
           source_root="$temp_root/readonly-source"
           log_file="$temp_root/uvicorn.log"
           health_file="$temp_root/health.json"
+          readiness_file="$temp_root/readiness.json"
           port=18012
           cleanup() {
             if [ -n "${server_pid:-}" ]; then
@@ -78,7 +79,7 @@ jobs:
           git archive HEAD | tar -x -C "$source_root"
           chmod -R a-w "$source_root"
           cd "$source_root"
-          BRAIN_RUNTIME_HOME="$temp_root/brain-runtime" PYTHONPATH="$source_root" PYTHONDONTWRITEBYTECODE=1 python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port "$port" --log-level info >"$log_file" 2>&1 &
+          BRAIN_RUNTIME_HOME="$temp_root/brain-runtime" BRAIN_LIVE_INCOME_SEARCH_ENABLED=false BRAIN_WORKFORCE_ENABLED=false PYTHONPATH="$source_root" PYTHONDONTWRITEBYTECODE=1 python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port "$port" --log-level info >"$log_file" 2>&1 &
           server_pid=$!
           for attempt in $(seq 1 30); do
             if curl --silent --show-error --fail "http://127.0.0.1:$port/health" >"$health_file"; then
@@ -96,4 +97,6 @@ jobs:
             exit 1
           fi
           python -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d.get("ok") is True and d.get("status") == "healthy", d; print("BRAIN_API_HEALTH_OK_READ_ONLY_SOURCE")' "$health_file"
+          curl --silent --show-error --fail "http://127.0.0.1:$port/api/system/readiness" >"$readiness_file"
+          python -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d.get("ok") is True and d.get("status") == "READY" and d.get("passed") == d.get("total"), d; print("BRAIN_API_READINESS_OK_READ_ONLY_SOURCE")' "$readiness_file"
           test -d "$temp_root/brain-runtime/media/engine"
