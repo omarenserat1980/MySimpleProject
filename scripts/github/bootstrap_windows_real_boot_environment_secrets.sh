@@ -37,16 +37,11 @@ validate() {
   esac
   case "$name" in
     BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED|BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED)
-      python3 - "$value" <<'PY'
-import sys
-from urllib.parse import urlsplit
+      printf '%s' "$value" | python3 -c 'import sys; from urllib.parse import urlsplit
 try:
-    u = urlsplit(sys.argv[1].strip())
-    ok = u.scheme == "https" and bool(u.hostname) and not u.username and not u.password
-except Exception:
-    ok = False
-raise SystemExit(0 if ok else 1)
-PY
+ u=urlsplit(sys.stdin.read().strip()); ok=u.scheme=="https" and bool(u.hostname) and not u.username and not u.password
+except Exception: ok=False
+raise SystemExit(0 if ok else 1)'
       ;;
     BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED|BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED)
       printf '%s' "$value" | python3 -c 'import base64,sys; s=sys.stdin.read().strip(); b=base64.b64decode(s,validate=True); sys.exit(0 if len(b)>=32 else 1)' ;;
