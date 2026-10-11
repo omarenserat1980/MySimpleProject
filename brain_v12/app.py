@@ -100,8 +100,18 @@ brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
 model_router=ModelRouter()
-for _provider in configured_model_providers():
+_configured_ai_providers = configured_model_providers()
+for _provider in _configured_ai_providers:
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
+    ai.register(
+        _provider.name,
+        ["text","chat","reasoning","coding","vision","creative","summarization"],
+        handler=lambda payload, _p=_provider: _p.respond(
+            str(payload.get("user_text", payload.get("message", ""))),
+            context=str(payload.get("context", "")),
+            instructions=str(payload.get("instructions", "")),
+        ),
+    )
 brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
 fabric=AIFabric(FabricPolicy(
     free_first=os.getenv("BRAIN_AI_FREE_FIRST","1")=="1",
