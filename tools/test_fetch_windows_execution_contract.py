@@ -14,6 +14,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+# Import the target module explicitly so unittest.mock can patch its verifier.
+import brain_v12.brain.authority_signature
 from brain_v12.brain import fetch_windows_execution_contract as fetcher
 
 COMMIT = "a" * 40
