@@ -6,15 +6,15 @@ param(
     [switch]$RegisterProviders
 )
 $ErrorActionPreference = "Stop"
-function Invoke-AzJson([string[]]$Args) {
+function Invoke-AzJson([string[]]$AzArguments) {
     # Azure CLI can emit WARNING/INFO text on the same stream as JSON. Keep
     # the exit-code check, then parse only the JSON object rather than feeding
     # the diagnostic prefix to ConvertFrom-Json.
-    $raw = & az @Args --only-show-errors 2>&1
+    $raw = & az @AzArguments --only-show-errors 2>&1
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         $diagnostic = ($raw | Out-String).Trim()
-        throw "Azure CLI failed (exit $exitCode): az $($Args -join ' '). $diagnostic"
+        throw "Azure CLI failed (exit $exitCode): az $($AzArguments -join ' '). $diagnostic"
     }
     $text = ($raw | ForEach-Object { "$_" }) -join "`n"
     $text = $text.Trim()
@@ -23,13 +23,13 @@ function Invoke-AzJson([string[]]$Args) {
     $start = $text.IndexOf('{')
     $end = $text.LastIndexOf('}')
     if ($start -lt 0 -or $end -lt $start) {
-        throw "Azure CLI returned no JSON object for: az $($Args -join ' '). Check Azure CLI output and authentication."
+        throw "Azure CLI returned no JSON object for: az $($AzArguments -join ' '). Check Azure CLI output and authentication."
     }
     $jsonText = $text.Substring($start, $end - $start + 1)
     try {
         return ($jsonText | ConvertFrom-Json -ErrorAction Stop)
     } catch {
-        throw "Azure CLI returned malformed JSON for: az $($Args -join ' '). $($_.Exception.Message)"
+        throw "Azure CLI returned malformed JSON for: az $($AzArguments -join ' '). $($_.Exception.Message)"
     }
 }
 if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "Azure CLI is required." }
