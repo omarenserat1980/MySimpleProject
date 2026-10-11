@@ -2,7 +2,7 @@ name: quranic-core-ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/quranic-memory-paths-safe-integration-20261011]
     paths:
       - "brain_v12/brain/quranic_core/**"
       - "brain_v12/test_quranic_*.py"
@@ -11,6 +11,8 @@ on:
     paths:
       - "brain_v12/brain/quranic_core/**"
       - "brain_v12/test_quranic_*.py"
+      - "tools/verify_quranic_memory_paths.py"
+      - ".github/workflows/quranic-core-ci.yml"
 
 concurrency:
   group: quranic-core-${{ github.ref }}
