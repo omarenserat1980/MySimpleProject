@@ -121,12 +121,13 @@ def audit() -> dict[str, Any]:
     boot_workflow = (REPO_ROOT / ".github/workflows/brain-windows-real-boot.yml").is_file()
     adapter = (REPO_ROOT / "brain_v12/brain/windows_real_boot_qemu_adapter.py").is_file()
     provider_factory = (REPO_ROOT / "brain_v12/brain/windows_cloud_provider_factory.py").is_file()
-    if not env_presence.get("BRAIN_WINDOWS_CLOUD_PROVIDER", False):
-        provider_configuration = "NOT_CONFIGURED"
-    elif os.environ.get("BRAIN_WINDOWS_CLOUD_PROVIDER", "").strip().lower() not in {"terraform", "opennebula"}:
+    selected_provider = os.environ.get("BRAIN_WINDOWS_CLOUD_PROVIDER", "").strip().lower()
+    if not selected_provider:
+        provider_configuration = "NOT_SET_QEMU_PATH_MAY_BE_USED"
+    elif selected_provider not in {"terraform", "opennebula"}:
         provider_configuration = "UNSUPPORTED_PROVIDER"
     else:
-        provider_configuration = os.environ.get("BRAIN_WINDOWS_CLOUD_PROVIDER", "").strip().lower()
+        provider_configuration = selected_provider
 
     missing_required = [name for name in [
         "BRAIN_CLOUD_EXECUTOR_ID",
@@ -146,8 +147,8 @@ def audit() -> dict[str, Any]:
         blockers.append("QEMU_REAL_BOOT_ADAPTER_MISSING")
     if not provider_factory:
         blockers.append("WINDOWS_CLOUD_PROVIDER_FACTORY_MISSING")
-    if provider_configuration == "NOT_CONFIGURED":
-        blockers.append("CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED")
+    if provider_configuration == "UNSUPPORTED_PROVIDER":
+        blockers.append("WINDOWS_CLOUD_PROVIDER_UNSUPPORTED")
     if missing_required:
         blockers.append("CLOUD_EXECUTOR_HOST_CONFIGURATION_MISSING")
     if missing_tools:
@@ -175,12 +176,14 @@ def audit() -> dict[str, Any]:
             "qemu_adapter_present": adapter,
             "provider_factory_present": provider_factory,
             "provider_configuration": provider_configuration,
+            "provider_required_for_qemu_boot": False,
             "tools": tools,
             "dev_kvm_exists": kvm.exists(),
             "dev_kvm_read_write": kvm_ok,
             "ovmf_paths": ovmf,
             "local_environment_presence_only": env_presence,
             "missing_host_configuration_names": missing_required,
+            "attestation_file_exists": bool(os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE")) and Path(os.environ.get("BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE", "")).is_file(),
             "control_plane_configuration": {
                 "status": "NOT_CHECKED_REMOTELY",
                 "required_names": [
