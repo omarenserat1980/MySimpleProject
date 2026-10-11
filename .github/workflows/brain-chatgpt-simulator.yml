@@ -36,33 +36,32 @@ jobs:
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
 
-      - name: Start Brain API
+      - name: Start Brain and execute simulator
         shell: bash
         run: |
           set -euo pipefail
-          # A one-run random key keeps the ephemeral CI control plane authenticated
-          # without requiring a long-lived repository secret.
-          export BRAIN_CONTROL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
-          echo "BRAIN_CONTROL_KEY=$BRAIN_CONTROL_KEY" >> "$GITHUB_ENV"
+          set +x
+          CONTROL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "::add-mask::$CONTROL_KEY"
+          export BRAIN_CONTROL_KEY="$CONTROL_KEY"
+          export V12_BRAIN_URL="http://127.0.0.1:8012"
           python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 > brain-api.log 2>&1 &
           echo $! > brain-api.pid
+          ready=false
           for i in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:8012/api/system/readiness > readiness.json; then
               echo "Brain readiness endpoint responded."
               cat readiness.json
-              exit 0
+              ready=true
+              break
             fi
             sleep 2
           done
-          echo "Brain API did not become ready."
-          cat brain-api.log
-          exit 1
-
-      - name: Execute Brain–ChatGPT simulator
-        env:
-          V12_BRAIN_URL: http://127.0.0.1:8012
-        run: |
-          set -o pipefail
+          if [ "$ready" != true ]; then
+            echo "Brain API did not become ready."
+            cat brain-api.log
+            exit 1
+          fi
           python brain_v12/tools/brain_chatgpt_loop.py --base http://127.0.0.1:8012 2>&1 | tee brain-chatgpt-result.json
 
       - name: Upload execution evidence
