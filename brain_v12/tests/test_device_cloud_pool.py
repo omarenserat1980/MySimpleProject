@@ -74,6 +74,32 @@ class DeviceCloudPoolTests(unittest.TestCase):
         self.assertEqual(arkan["cpu_cores"], 8)
         self.assertIn("windows-executor-arkan", {x.executor_id for x in pool.capacities()})
 
+
+    def test_live_linux_runner_executor_joins_pool_from_heartbeat_metadata(self):
+        import time
+        class FakeRecord:
+            deleted = False
+            value = {"metadata": {
+                "platform": "linux", "cpu_cores": 4, "memory_mb": 2048,
+                "disk_mb": 8000, "healthy": True,
+                "capabilities": ["python.test", "device.status"],
+            }}
+        class FakeStore:
+            def get(self, key):
+                return FakeRecord() if key.endswith("linux-executor-arkan") else None
+        class LinuxBridge(FakeBridge):
+            store = type("S", (), {"device_agents": lambda self: [{
+                "agent_id": "linux-executor-arkan", "last_seen": time.time()
+            }]})()
+            sync_adapter = type("A", (), {"store": FakeStore()})()
+        pool = DeviceCloudPool(LinuxBridge([]))
+        status = pool.status()
+        arkan = next(n for n in status["nodes"] if n["node_id"] == "linux-executor-arkan")
+        self.assertEqual(arkan["role"], "linux_executor")
+        self.assertEqual(arkan["platform"], "linux")
+        self.assertTrue(arkan["online"])
+        self.assertIn("linux-executor-arkan", {x.executor_id for x in pool.capacities()})
+
     def test_stale_windows_executor_is_not_schedulable(self):
         class FakeRecord:
             deleted = False
