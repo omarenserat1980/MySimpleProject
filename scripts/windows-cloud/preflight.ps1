@@ -26,7 +26,7 @@ if (-not $env:TF_VAR_allowed_source_ip -or $env:TF_VAR_allowed_source_ip -eq "0.
 if ($env:TF_VAR_allowed_source_ip -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|[12]\d|3[0-2])$') { Fail "TF_VAR_allowed_source_ip must be an IPv4 CIDR." }
 $compute = (az provider show --namespace Microsoft.Compute --query registrationState --output tsv 2>$null | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute is not Registered. Run bootstrap-state.ps1 -RegisterProviders and wait for registration." }
-$imageSkuCandidates = @("2025-datacenter-g2", "2025-datacenter", "2025-datacenter-azure-edition")
+$imageSkuCandidates = @("2025-datacenter-g2")
 $image = $null
 $resolvedSku = $null
 foreach ($candidateSku in $imageSkuCandidates) {
