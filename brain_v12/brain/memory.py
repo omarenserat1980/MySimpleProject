@@ -24,6 +24,18 @@ class MemoryStore:
               value TEXT NOT NULL,
               updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS memory_evidence(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              memory_key TEXT NOT NULL,
+              claim TEXT NOT NULL,
+              source TEXT NOT NULL,
+              confidence REAL NOT NULL CHECK(confidence >= 0.0 AND confidence <= 1.0),
+              observed_at TEXT,
+              recorded_at TEXT NOT NULL,
+              metadata TEXT NOT NULL DEFAULT '{}'
+            );
+            CREATE INDEX IF NOT EXISTS idx_memory_evidence_key_id
+              ON memory_evidence(memory_key, id);
             CREATE TABLE IF NOT EXISTS goals(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               text TEXT NOT NULL,
@@ -189,12 +201,88 @@ class MemoryStore:
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
 
+    def get_memory(self, key):
+        """Read one operational memory record without exposing the whole memory store."""
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT key,value,updated_at FROM memories WHERE key=?",
+                (key,),
+            ).fetchone()
+        return dict(row) if row else None
+
     def save_memory(self,key,value):
         with self.connect() as con:
             con.execute("""INSERT INTO memories(key,value,updated_at) VALUES(?,?,?)
                            ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at""",(key,value,now()))
             con.commit()
         self.event("MEMORY_UPDATED",{"key":key})
+
+    def add_memory_evidence(self, memory_key, claim, source, confidence, observed_at=None, metadata=None):
+        """Append a source-attributed claim; existing memory values remain untouched."""
+        if not str(memory_key).strip() or not str(claim).strip() or not str(source).strip():
+            raise ValueError("MEMORY_EVIDENCE_FIELDS_REQUIRED")
+        confidence = float(confidence)
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("MEMORY_EVIDENCE_CONFIDENCE_OUT_OF_RANGE")
+        recorded_at = now()
+        payload = json.dumps(metadata or {}, ensure_ascii=False, sort_keys=True)
+        with self.connect() as con:
+            cur = con.execute(
+                """INSERT INTO memory_evidence
+                   (memory_key,claim,source,confidence,observed_at,recorded_at,metadata)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (str(memory_key).strip(), str(claim).strip(), str(source).strip(),
+                 confidence, observed_at, recorded_at, payload),
+            )
+            evidence_id = cur.lastrowid
+            con.commit()
+        self.event("MEMORY_EVIDENCE_RECORDED", {
+            "id": evidence_id, "memory_key": str(memory_key).strip(),
+            "source": str(source).strip(), "confidence": confidence,
+        })
+        return {
+            "id": evidence_id, "memory_key": str(memory_key).strip(),
+            "claim": str(claim).strip(), "source": str(source).strip(),
+            "confidence": confidence, "observed_at": observed_at,
+            "recorded_at": recorded_at, "metadata": metadata or {},
+        }
+
+    def memory_evidence(self, memory_key):
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT id,memory_key,claim,source,confidence,observed_at,recorded_at,metadata
+                   FROM memory_evidence WHERE memory_key=? ORDER BY id ASC""",
+                (memory_key,),
+            ).fetchall()
+        items = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["metadata"] = json.loads(item["metadata"] or "{}")
+            except (TypeError, ValueError):
+                item["metadata"] = {}
+            items.append(item)
+        return items
+
+    def memory_evidence_conflicts(self, memory_key):
+        """Flag differing claims under one key for review, without deciding which is true."""
+        items = self.memory_evidence(memory_key)
+        normalized = {}
+        for item in items:
+            claim_key = " ".join(str(item["claim"]).casefold().split())
+            normalized.setdefault(claim_key, []).append(item)
+        if len(normalized) < 2:
+            return {"status": "NO_CONFLICT_DETECTED", "groups": [], "evidence_count": len(items)}
+        groups = [
+            {"claim": entries[0]["claim"], "evidence": entries}
+            for entries in normalized.values()
+        ]
+        return {
+            "status": "POTENTIAL_CONFLICT",
+            "groups": groups,
+            "evidence_count": len(items),
+            "message": "Different claims share a memory key; human/source verification is required.",
+        }
 
     def goals(self):
         with self.connect() as con:
