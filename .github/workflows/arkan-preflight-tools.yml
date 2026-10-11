@@ -20,6 +20,7 @@ on:
   push:
     branches:
       - "tool/windows-real-boot-preflight-20261011"
+      - "tool/control-plane-preflight-hardening-20261011"
     paths:
       - "tools/arkan_windows_real_boot_diagnostic.ps1"
       - "tools/run_arkan_windows_real_boot_diagnostic_wsl.sh"
