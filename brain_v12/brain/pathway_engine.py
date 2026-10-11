@@ -110,7 +110,15 @@ def evaluate_pathway(pathway_id: str, evidence: dict[str, Any], expected_run_id:
     blockers = []
     next_gate = None
     for gate_id, action in spec["gates"]:
-        ok, reason = _valid_evidence(evidence.get(gate_id), gate_id, expected_run_id)
+        item = evidence.get(gate_id)
+        ok, reason = _valid_evidence(item, gate_id, expected_run_id)
+        # For real boot, prevent a green gate assembled from evidence belonging
+        # to different workflow attempts. Every gate must name the requested run.
+        if pathway_id == "windows_real_boot" and expected_run_id and isinstance(item, dict) and ok:
+            if not item.get("run_id"):
+                ok, reason = False, "WORKFLOW_RUN_ID_MISSING"
+            elif item.get("run_id") != expected_run_id:
+                ok, reason = False, "WORKFLOW_RUN_MISMATCH"
         row = {"gate": gate_id, "status": "VERIFIED" if ok else "BLOCKED", "reason": reason}
         gates.append(row)
         if not ok:
