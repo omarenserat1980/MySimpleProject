@@ -51,6 +51,22 @@ jobs:
   attestation-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: brain_test
+          POSTGRES_USER: brain_test
+          POSTGRES_PASSWORD: brain_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U brain_test -d brain_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      BRAIN_TEST_POSTGRES_URL: postgresql://brain_test:brain_test_pw@localhost:5432/brain_test?sslmode=require
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -59,6 +75,19 @@ jobs:
           cache: "pip"
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check "cryptography>=42" "fastapi>=0.110" "psycopg[binary]>=3.2,<4"
+      - name: Enable TLS on disposable PostgreSQL test service
+        run: |
+          container_id="$(docker ps --filter ancestor=postgres:16 --format '{{.ID}}' | head -n1)"
+          test -n "$container_id"
+          docker exec "$container_id" bash -lc 'openssl req -new -x509 -days 1 -nodes -text -out /var/lib/postgresql/data/server.crt -keyout /var/lib/postgresql/data/server.key -subj "/CN=localhost" && chown postgres:postgres /var/lib/postgresql/data/server.crt /var/lib/postgresql/data/server.key && chmod 600 /var/lib/postgresql/data/server.key'
+          docker exec "$container_id" psql -U brain_test -d brain_test -c "ALTER SYSTEM SET ssl = on"
+          docker exec "$container_id" psql -U brain_test -d brain_test -c "SELECT pg_reload_conf()"
+          for attempt in $(seq 1 10); do
+            if docker exec "$container_id" psql "host=localhost dbname=brain_test user=brain_test password=brain_test_pw sslmode=require" -c "SELECT 1" >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "PostgreSQL TLS readiness check failed" >&2
+          exit 1
       - name: Run signed attestation, issuer, replay and gate tests
         run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_attestation_postgres brain_v12.tests.test_cloud_executor_attestation_api brain_v12.tests.test_cloud_executor_gate brain_v12.tests.test_cloud_runner_isolation_contract brain_v12.tests.test_cloud_executor_bootstrap_security
       - name: Validate shell scripts
