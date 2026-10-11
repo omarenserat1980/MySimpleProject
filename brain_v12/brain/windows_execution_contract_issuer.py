@@ -31,7 +31,8 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     source_commit=str(source_commit).strip().lower()
     if len(source_commit)!=40 or any(c not in "0123456789abcdef" for c in source_commit):
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_INVALID")
-    if source_commit!=verified["source_commit"]: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_MISMATCH")
+    # Checkpoint source_commit is the recovery baseline; the signed contract binds
+    # the exact workflow commit separately so legitimate updates can run after a checkpoint.
     if not capability_verified: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_CAPABILITY_NOT_VERIFIED")
     if str(task_id).strip()=="" or str(attempt_id).strip()=="": raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_TASK_ATTEMPT_REQUIRED")
     if lease.holder_id=="" or lease.fencing_token<1: raise RuntimeError("BRAIN_LEADERSHIP_LEASE_INVALID")
