@@ -2002,7 +2002,11 @@ def device_heartbeat(request: Request, body: dict | None = None):
     agent_id = header_agent_id or body_agent_id or "android-termux-v12"
     if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", ""), agent_id):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
-    return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
+    # Only the authenticated control plane can mark an agent as enrolled.
+    # Never trust a client-supplied metadata flag for scheduler admission.
+    metadata = dict((body or {}).get("metadata") or {})
+    metadata["enrolled"] = True
+    return device_bridge.heartbeat(agent_id, metadata)
 
 
 @app.get("/api/device/poll")
