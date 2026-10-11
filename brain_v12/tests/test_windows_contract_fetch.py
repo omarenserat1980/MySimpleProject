@@ -35,7 +35,8 @@ class ContractFetchTests(unittest.TestCase):
             if v is None: os.environ.pop(k,None)
             else: os.environ[k]=v
     def test_fetch_writes_bound_contract_with_restricted_permissions(self):
-        with patch.object(client.urllib.request, "urlopen",
+        with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=True), \
+             patch.object(client.urllib.request, "urlopen",
                           return_value=FakeResponse({"issued":True,"contract":self.contract})) as mocked:
             self.assertEqual(client.main(),0)
         req=mocked.call_args.args[0]
@@ -50,6 +51,21 @@ class ContractFetchTests(unittest.TestCase):
                           return_value=FakeResponse({"issued":True,"contract":bad})):
             with self.assertRaisesRegex(RuntimeError,"BRAIN_CONTRACT_RESPONSE_BINDING_MISMATCH"):
                 client.main()
+    def test_rejects_invalid_authority_signature(self):
+        with patch.object(client.urllib.request, "urlopen",
+                          return_value=FakeResponse({"issued":True,"contract":self.contract})):
+            with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=False):
+                with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_AUTHORITY_SIGNATURE_INVALID"):
+                    client.main()
+
+    def test_rejects_expired_contract(self):
+        expired = dict(self.contract, expires_at=1)
+        with patch.object(client.urllib.request, "urlopen",
+                          return_value=FakeResponse({"issued":True,"contract":expired})):
+            with patch("brain_v12.brain.authority_signature.verify_contract_signature", return_value=True):
+                with self.assertRaisesRegex(RuntimeError, "BRAIN_CONTRACT_EXPIRED"):
+                    client.main()
+
     def test_rejects_plain_http_before_network(self):
         os.environ["BRAIN_WINDOWS_CONTROL_PLANE_URL"]="http://brain.example.invalid"
         with patch.object(client.urllib.request,"urlopen") as mocked:
