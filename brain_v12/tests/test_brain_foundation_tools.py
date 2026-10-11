@@ -39,6 +39,33 @@ class BrainFoundationToolsTests(unittest.TestCase):
         self.assertFalse(result["windows_boot_verified"])
         self.assertFalse(result["cloud_resources_changed"])
 
+    def test_runner_preflight_accepts_workflow_contract_path_variable(self):
+        result = inspect_capabilities(
+            environ={
+                "BRAIN_CLOUD_EXECUTOR_REGISTRY_URL": "https://registry.example.invalid",
+                "BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE": "/run/brain/contract.json",
+            },
+            system="Linux",
+            machine="x86_64",
+            exists=lambda _: True,
+            which=lambda _: "/usr/bin/fake",
+        )
+        contract_check = next(item for item in result["checks"] if item["name"] == "execution_contract_path")
+        self.assertTrue(contract_check["ok"])
+        self.assertEqual(contract_check["detail"], "PRESENT")
+        self.assertFalse(result["windows_boot_verified"])
+
+    def test_runner_preflight_keeps_legacy_contract_path_compatibility(self):
+        result = inspect_capabilities(
+            environ={"WINDOWS_EXECUTION_CONTRACT_FILE": "/run/brain/legacy-contract.json"},
+            system="Linux",
+            machine="x86_64",
+            exists=lambda _: True,
+            which=lambda _: "/usr/bin/fake",
+        )
+        contract_check = next(item for item in result["checks"] if item["name"] == "execution_contract_path")
+        self.assertTrue(contract_check["ok"])
+
     def test_checkpoint_hash_verification(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
