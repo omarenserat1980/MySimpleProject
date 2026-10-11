@@ -50,6 +50,17 @@ resource "azurerm_network_security_group" "brain" {
     destination_port_range = "5986"
     source_address_prefix  = var.allowed_source_ip
   }
+
+  security_rule {
+    name                   = "AllowRDP"
+    priority               = 110
+    direction              = "Inbound"
+    access                 = "Allow"
+    protocol               = "Tcp"
+    source_port_range      = "*"
+    destination_port_range = "3389"
+    source_address_prefix  = var.allowed_source_ip
+  }
 }
 
 resource "azurerm_network_interface" "brain" {

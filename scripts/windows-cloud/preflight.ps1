@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Location = "westeurope",
-    [string]$VmSize = "Standard_B1s",
+    [string]$Location = "northeurope",
+    [string]$VmSize = "Standard_B2s",
     [switch]$AllowMissingAdminCredentials
 )
 $ErrorActionPreference = "Stop"
