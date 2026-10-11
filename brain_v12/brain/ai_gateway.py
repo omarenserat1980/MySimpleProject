@@ -14,4 +14,13 @@ class AIGateway:
         if not item: return {"ok":False,"error":"PROVIDER_NOT_REGISTERED"}
         if modality not in item["modalities"]: return {"ok":False,"error":"MODALITY_NOT_SUPPORTED"}
         if not item["handler"]: return {"ok":False,"error":"PROVIDER_NOT_CONFIGURED"}
-        return {"ok":True,"result":item["handler"](payload)}
+        try:
+            result=item["handler"](payload)
+        except Exception as exc:
+            return {"ok":False,"error":"PROVIDER_INVOCATION_FAILED","provider":provider,"detail":str(exc)[:500]}
+        if isinstance(result,dict) and result.get("ok") is False:
+            failure={"ok":False,"error":result.get("error","PROVIDER_FAILED"),"provider":provider}
+            if "status_code" in result: failure["status_code"]=result["status_code"]
+            if "detail" in result: failure["detail"]=str(result["detail"])[:1000]
+            return failure
+        return {"ok":True,"provider":provider,"result":result}
