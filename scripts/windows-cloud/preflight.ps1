@@ -88,11 +88,42 @@ if (-not $image) {
 Write-Host "Resolved Windows Server image SKU: $resolvedSku (validated version: $resolvedVersion)"
 if ($image -notmatch ":${resolvedSku}:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
 $rawSkus = az vm list-skus --location $Location --resource-type virtualMachines --size $VmSize --all --output json 2>$null
-if ($LASTEXITCODE -eq 0 -and $rawSkus) {
-    $skus = $rawSkus | ConvertFrom-Json
-    $eligible = @($skus | Where-Object { $_.name -eq $VmSize -and $_.restrictions.Count -eq 0 })
-    if ($eligible.Count -eq 0) { Write-Warning "$VmSize may be restricted or unavailable in $Location. Review SKU restrictions; no automatic region/size change will be made." }
-} else { Write-Warning "Could not read SKU metadata; Azure quota and live capacity remain unverified." }
+if ($LASTEXITCODE -ne 0 -or -not $rawSkus) {
+    Fail "Could not verify Azure SKU restrictions for $VmSize in $Location. SKU availability is unverified; no deployment is authorized."
+}
+try { $skus = @($rawSkus | ConvertFrom-Json) } catch { Fail "Azure SKU metadata was not valid JSON; no deployment is authorized." }
+$eligible = @($skus | Where-Object { $_.name -eq $VmSize -and $_.restrictions.Count -eq 0 })
+if ($eligible.Count -eq 0) {
+    $familyPattern = $null
+    if ($VmSize -match '^(Standard_[A-Za-z]+?)(\d+)([A-Za-z]*)_v(\d+)$') {
+        $familyPattern = '^' + [regex]::Escape($Matches[1]) + '\d+' + [regex]::Escape($Matches[3]) + '_v' + [regex]::Escape($Matches[4]) + '$'
+    }
+    $candidates = @()
+    if ($familyPattern) {
+        $allSkusRaw = az vm list-skus --location $Location --resource-type virtualMachines --all --output json 2>$null
+        if ($LASTEXITCODE -eq 0 -and $allSkusRaw) {
+            try {
+                $allSkus = @($allSkusRaw | ConvertFrom-Json)
+                $candidates = @($allSkus | Where-Object {
+                    $_.name -match $familyPattern -and $_.restrictions.Count -eq 0
+                } | ForEach-Object {
+                    $item = $_
+                    $coreCapability = @($item.capabilities | Where-Object { $_.name -eq 'vCPUs' } | Select-Object -First 1)
+                    if ($coreCapability.Count -gt 0) {
+                        [pscustomobject]@{ Name = $item.name; Cores = [int]$coreCapability[0].value }
+                    }
+                } | Where-Object { $_ -and $_.Cores -le 4 } | Sort-Object Cores, Name | Select-Object -First 10)
+            } catch { $candidates = @() }
+        }
+    }
+    $candidateText = if ($candidates.Count -gt 0) {
+        ($candidates | ForEach-Object { "$($_.Name) ($($_.Cores) vCPU)" }) -join ', '
+    } else {
+        "none verified in the same VM family; inspect Azure SKU restrictions and quota"
+    }
+    Fail "Requested Azure VM size $VmSize is restricted or unavailable in $Location. Eligible same-family candidates with at most 4 vCPUs: $candidateText. No automatic SKU/region change was made; deployment is blocked pending explicit selection."
+}
+Write-Host "AZURE_VM_SKU_RESTRICTIONS=PASS"
 Write-Host "Preflight passed identity, secret presence, provider and image checks."
 Write-Host "Subscription: $($account.name) ($($account.id)); region: $Location; requested size: $VmSize"
 # Derive the exact quota family from the requested SKU. Never accidentally
