@@ -29,26 +29,32 @@ if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute
 $imageSkuCandidates = @("2025-datacenter-g2")
 $image = $null
 $resolvedSku = $null
+$imageLookupErrors = @()
 foreach ($candidateSku in $imageSkuCandidates) {
-    $candidateImage = az vm image show --location $Location --urn "MicrosoftWindowsServer:WindowsServer:$candidateSku:latest" --query urn --output tsv --only-show-errors 2>$null
-    if ($LASTEXITCODE -eq 0 -and $candidateImage) {
+    # Use explicit fields so diagnostics distinguish SKU/version resolution from URN parsing.
+    $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version latest --query urn --output tsv --only-show-errors 2>&1
+    $showExitCode = $LASTEXITCODE
+    $candidateImage = ($showOutput | Out-String).Trim()
+    if ($showExitCode -eq 0 -and $candidateImage) {
         $image = $candidateImage
         $resolvedSku = $candidateSku
         break
     }
+    if ($candidateImage) { $imageLookupErrors += "$candidateSku => $candidateImage" }
 }
 if (-not $image) {
     $available2025 = @()
-    $rawImages = az vm image list --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --all --output json --only-show-errors 2>$null
-    if ($LASTEXITCODE -eq 0 -and $rawImages) {
-        try {
-            $available2025 = @($rawImages | ConvertFrom-Json | Where-Object { $_.sku -match "2025" } | ForEach-Object { $_.sku } | Sort-Object -Unique)
-        } catch { $available2025 = @() }
+    $rawImages = & az vm image list --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --all --query "[?contains(sku, '2025')].sku" --output tsv --only-show-errors 2>&1
+    $listExitCode = $LASTEXITCODE
+    if ($listExitCode -eq 0 -and $rawImages) {
+        $available2025 = @($rawImages | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match "2025" } | Sort-Object -Unique)
     }
-    $availableText = if ($available2025.Count -gt 0) { $available2025 -join ", " } else { "none returned by Azure CLI" }
-    Fail "No known Windows Server 2025 image SKU resolved in $Location. Candidate SKUs tried: $($imageSkuCandidates -join ', '). Azure-listed 2025 SKUs: $availableText. No automatic region change or deployment was attempted."
+    $availableText = if ($available2025.Count -gt 0) { $available2025 -join ", " } else { "none returned by Azure CLI (list exit=$listExitCode)" }
+    $errorText = if ($imageLookupErrors.Count -gt 0) { $imageLookupErrors -join " | " } else { "Azure CLI returned no detailed image lookup error." }
+    Fail "Windows Server 2025 image lookup failed in $Location. Candidate SKUs tried: $($imageSkuCandidates -join ', '). Azure-listed 2025 SKUs: $availableText. Image lookup details: $errorText. Terraform SKU was not changed; no deployment was attempted."
 }
 Write-Host "Resolved Windows Server image SKU: $resolvedSku"
+if ($image -notmatch ":$resolvedSku:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
 $rawSkus = az vm list-skus --location $Location --resource-type virtualMachines --size $VmSize --all --output json 2>$null
 if ($LASTEXITCODE -eq 0 -and $rawSkus) {
     $skus = $rawSkus | ConvertFrom-Json
