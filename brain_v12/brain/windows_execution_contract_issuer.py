@@ -46,7 +46,8 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     require_authorized(decision)
     now=time.time() if now is None else float(now)
     if expires_seconds<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_EXPIRY_TOO_SHORT")
-    contract_expires_at=min(now+int(expires_seconds),owner.expires_at)
+    if lease.expires_at-now<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_LEADERSHIP_LEASE_EXPIRY_TOO_SOON")
+    contract_expires_at=min(now+int(expires_seconds),owner.expires_at,lease.expires_at)
     if contract_expires_at-now<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_APPROVAL_EXPIRY_TOO_SOON")
     c={"schema":SCHEMA,"status":"VERIFIED","capability":CAPABILITY,"executor":EXECUTOR,
        "authority_policy_version":POLICY,"authority_decision":"AUTHORIZED",
