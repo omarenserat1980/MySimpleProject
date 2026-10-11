@@ -79,10 +79,12 @@
     }
     try {
       const data=await api("/api/brain-ai/status");
-      const providers=data.providers || data.model_providers || [];
-      const configured=data.configured===true || data.model_configured===true || (Array.isArray(providers)&&providers.length>0);
+      const provider=data.provider || {};
+      const router=data.model_router || {};
+      const bridge=data.chatgpt_bridge || {};
+      const configured=provider.configured===true || provider.available===true || router.enabled===true;
       setPill("modelPill",configured?"مهيأ بحسب API":"غير مثبت",configured?"ok":"bad");
-      $("modelValue").textContent="الحالة كما أعادها الخادم: "+JSON.stringify({configured:data.configured??null,providers:Array.isArray(providers)?providers.map(p=>typeof p==="string"?p:(p.name||p.id||"provider")):providers});
+      $("modelValue").textContent="الحالة كما أعادها الخادم: "+JSON.stringify({provider,model_router:router,chatgpt_bridge:bridge});
     } catch(e) {setPill("modelPill","تعذّر الفحص","bad");$("modelValue").textContent=e.message;}
   }
   async function loadSessions() {
