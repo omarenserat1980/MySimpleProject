@@ -6,15 +6,15 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/capture"
 
-printf '%s' 'https://brain-control-plane.example.invalid' > "$tmp/registry"
-printf '%s' 'executor-token-with-at-least-32-characters' > "$tmp/token"
+printf '%s\n' 'https://brain-control-plane.example.invalid' > "$tmp/registry"
+printf '%s\n' 'executor-token-with-at-least-32-characters' > "$tmp/token"
 python3 - "$tmp/attestation" "$tmp/authority" <<'PY'
 import base64, pathlib, sys
 value = base64.b64encode(bytes(range(32))).decode()
 for path in sys.argv[1:]:
-    pathlib.Path(path).write_text(value, encoding="utf-8")
+    pathlib.Path(path).write_text(value + "\\n", encoding="utf-8")
 PY
-printf '%s' 'contract-delivery-key-with-at-least-32-chars' > "$tmp/delivery"
+printf '%s\n' 'contract-delivery-key-with-at-least-32-chars' > "$tmp/delivery"
 chmod 600 "$tmp/registry" "$tmp/token" "$tmp/attestation" "$tmp/authority" "$tmp/delivery"
 
 cat > "$tmp/bin/gh" <<'MOCK'
@@ -58,6 +58,8 @@ env "${common_env[@]}" bash "$TOOL" > "$tmp/output"
 grep -Fq 'INPUT_VALIDATION=PASS' "$tmp/output"
 grep -Fq 'RESULT=SETUP_REQUESTS_COMPLETE' "$tmp/output"
 test "$(wc -l < "$tmp/capture/digests" | tr -d ' ')" = "5"
+expected_token_digest="$(printf '%s' 'executor-token-with-at-least-32-characters' | sha256sum | cut -d ' ' -f1)"
+grep -Fq "BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED $expected_token_digest" "$tmp/capture/digests"
 if grep -Eq 'executor-token-with|contract-delivery-key-with|https://brain-control-plane.example.invalid' "$tmp/output"; then
   echo "FAIL: output disclosed a fixture value" >&2
   exit 1
