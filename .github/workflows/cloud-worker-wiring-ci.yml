@@ -5,11 +5,15 @@ on:
     paths:
       - "tools/diagnose_cloud_worker_wiring.py"
       - "tools/test_diagnose_cloud_worker_wiring.py"
+      - "tools/verify_cloud_worker_attestation_contract.py"
+      - "tools/test_verify_cloud_worker_attestation_contract.py"
       - ".github/workflows/cloud-worker-wiring-ci.yml"
   pull_request:
     paths:
       - "tools/diagnose_cloud_worker_wiring.py"
       - "tools/test_diagnose_cloud_worker_wiring.py"
+      - "tools/verify_cloud_worker_attestation_contract.py"
+      - "tools/test_verify_cloud_worker_attestation_contract.py"
       - ".github/workflows/cloud-worker-wiring-ci.yml"
   workflow_dispatch:
 permissions:
@@ -22,7 +26,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Unit-test read-only diagnostic
-        run: python -m unittest tools/test_diagnose_cloud_worker_wiring.py -v
-      - name: Compile diagnostic
-        run: python -m py_compile tools/diagnose_cloud_worker_wiring.py
+      - name: Unit-test read-only diagnostics
+        run: |
+          python -m unittest tools/test_diagnose_cloud_worker_wiring.py -v
+          python -m unittest tools/test_verify_cloud_worker_attestation_contract.py -v
+      - name: Compile diagnostics
+        run: |
+          python -m py_compile tools/diagnose_cloud_worker_wiring.py
+          python -m py_compile tools/verify_cloud_worker_attestation_contract.py
