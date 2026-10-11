@@ -1,0 +1,165 @@
+name: Brain Windows Real-Boot Dependency Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - brain/windows-real-boot-dependency-gate
+    paths:
+      - .github/workflows/brain-windows-real-boot-dependency-gate.yml
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-gate:
+    name: Secret-safe credentials and Control Plane reachability gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment:
+      name: windows-real-boot
+    env:
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+      BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required secret presence and safe formats
+        id: credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import os
+          import sys
+          from urllib.parse import urlsplit
+
+          failures = []
+          def emit(name, ok, detail):
+              print(f"{name}={'PASS' if ok else 'BLOCKED'}:{detail}")
+              if not ok:
+                  failures.append(name)
+
+          def valid_https(value):
+              try:
+                  parsed = urlsplit(value)
+                  return parsed.scheme == "https" and bool(parsed.hostname) and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+              except Exception:
+                  return False
+
+          def valid_public_key(value):
+              try:
+                  return len(base64.b64decode(value, validate=True)) >= 32
+              except Exception:
+                  return False
+
+          specs = [
+              ("EXECUTOR_REGISTRY_URL", "BRAIN_CLOUD_EXECUTOR_REGISTRY_URL", valid_https),
+              ("EXECUTOR_TOKEN", "BRAIN_CLOUD_EXECUTOR_TOKEN", lambda v: len(v) >= 32),
+              ("EXECUTOR_ATTESTATION_PUBLIC_KEY", "BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64", valid_public_key),
+              ("AUTHORITY_PUBLIC_KEY", "BRAIN_AUTHORITY_PUBLIC_KEY_B64", valid_public_key),
+              ("CONTROL_PLANE_URL", "BRAIN_WINDOWS_CONTROL_PLANE_URL", valid_https),
+              ("CONTRACT_DELIVERY_KEY", "BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY", lambda v: len(v) >= 32),
+          ]
+          for label, env_name, validator in specs:
+              value = os.environ.get(env_name, "").strip()
+              ok = bool(value) and not any(x in value.upper() for x in ("PLACEHOLDER", "REPLACE_ME", "CHANGEME", "YOUR_TOKEN", "EXAMPLE.COM", "LOCALHOST"))
+              if ok:
+                  ok = validator(value)
+              emit(label, ok, "configured_and_format_valid" if ok else "missing_or_invalid")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"passed={'true' if not failures else 'false'}\n")
+          if failures:
+              print("DEPENDENCY_GATE=BLOCKED")
+              print("BLOCKER_COUNT=" + str(len(failures)))
+              sys.exit(2)
+          print("DEPENDENCY_SECRET_FORMAT_GATE=PASS")
+          PY
+
+      - name: Probe Control Plane HTTPS routes without disclosing response bodies
+        id: reachability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlsplit
+          from urllib.request import Request, urlopen
+
+          base = os.environ.get("BRAIN_WINDOWS_CONTROL_PLANE_URL", "").strip()
+          try:
+              parsed = urlsplit(base)
+              valid = parsed.scheme == "https" and bool(parsed.hostname) and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment
+          except Exception:
+              valid = False
+          if not valid:
+              print("CONTROL_PLANE_NETWORK_GATE=BLOCKED")
+              print("CONTROL_PLANE_NETWORK_REASON=URL_MISSING_OR_INVALID")
+              sys.exit(2)
+
+          failures = []
+          for route, label in (
+              ("/api/brain/windows/cloud/secrets/readiness", "GUEST_SECRET_READINESS"),
+              ("/api/brain/windows/cloud/status", "WINDOWS_CLOUD_STATUS"),
+          ):
+              url = base.rstrip("/") + route
+              status = 0
+              payload = None
+              try:
+                  req = Request(url, headers={"Accept": "application/json", "User-Agent": "ElectronicBrain-Dependency-Gate/1.0"}, method="GET")
+                  with urlopen(req, timeout=12) as response:
+                      status = response.status
+                      raw = response.read(262145)
+                      if len(raw) <= 262144:
+                          payload = json.loads(raw.decode("utf-8"))
+              except HTTPError as exc:
+                  status = exc.code
+              except (URLError, TimeoutError, OSError, ValueError, UnicodeError):
+                  status = 0
+              except Exception:
+                  status = 0
+
+              valid_response = status == 200 and isinstance(payload, dict)
+              print(f"{label}_HTTP_STATUS={status if status else 'NO_RESPONSE'}")
+              print(f"{label}_JSON_RESPONSE={'VALID' if valid_response else 'INVALID_OR_UNAVAILABLE'}")
+              if label == "GUEST_SECRET_READINESS" and valid_response:
+                  ready = payload.get("ok") is True and payload.get("status") == "READY"
+                  print(f"{label}_APPLICATION_GATE={'READY' if ready else 'NOT_READY'}")
+                  if not ready:
+                      failures.append(label + "_NOT_READY")
+              elif not valid_response:
+                  failures.append(label + "_UNREACHABLE")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"passed={'true' if not failures else 'false'}\n")
+          if failures:
+              print("CONTROL_PLANE_NETWORK_GATE=BLOCKED")
+              print("BLOCKER_COUNT=" + str(len(failures)))
+              sys.exit(2)
+          print("CONTROL_PLANE_NETWORK_GATE=PASS")
+          print("CONTRACT_ISSUANCE=NOT_ATTEMPTED")
+          print("WINDOWS_BOOT_VERIFIED=false")
+          PY
+
+      - name: Publish fail-closed summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Windows real-boot dependency gate"
+            echo
+            echo "- This workflow never prints secret values."
+            echo "- Secret presence/format and HTTPS route reachability are separate gates."
+            echo "- Contract issuance is deliberately not attempted by this diagnostic."
+            echo "- A passing result is not Windows boot evidence."
+            echo "- Final boot status remains NOT VERIFIED until same-run guest evidence is independently validated."
+          } >> "$GITHUB_STEP_SUMMARY"
