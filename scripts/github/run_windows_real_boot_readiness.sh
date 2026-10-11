@@ -29,7 +29,6 @@ required=(
   BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED
   BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED
   BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED
-  BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED
   BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED
 )
 missing=0
@@ -42,6 +41,7 @@ for name in "${required[@]}"; do
   fi
 done
 printf 'SECRET_NAME_MISSING_COUNT=%s\n' "$missing"
+printf 'CONTROL_PLANE_URL_SOURCE=secret_or_environment_variable_or_known_public_default\n'
 printf '%s\n' 'NOTE: presence does not prove that a secret value is correct or authorized.'
 
 before="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId // 0')"
