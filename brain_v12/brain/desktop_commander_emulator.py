@@ -27,6 +27,7 @@ class DesktopCommanderEmulator:
         self.root.mkdir(parents=True,exist_ok=True)
         self._lock=threading.RLock()
         self._processes:dict[str,subprocess.Popen[str]]={}
+        self._process_started:dict[str,float]={}
         self._audit_path=self.root/".brain"/"audit.jsonl"
         self._audit_path.parent.mkdir(parents=True,exist_ok=True)
 
@@ -43,7 +44,12 @@ class DesktopCommanderEmulator:
 
     def info(self)->dict[str,Any]:
         return {"ok":True,"schema":SCHEMA,"node_id":self.node_id,"platform":"BRAIN-VIRTUAL-DESKTOP",
-                "capabilities":["filesystem","process","heartbeat","audit"],"sandbox":str(self.root)}
+                "reality":"SIMULATED","execution_scope":"LOCAL_SANDBOX_ONLY",
+                "capabilities":["filesystem","process","heartbeat","audit"],
+                "policy":{"allow_shell":self.policy.allow_shell,
+                          "command_timeout_seconds":self.policy.command_timeout_seconds,
+                          "max_output_bytes":self.policy.max_output_bytes},
+                "sandbox":str(self.root)}
 
     def heartbeat(self,metadata:dict[str,Any]|None=None)->dict[str,Any]:
         r={"ok":True,"node_id":self.node_id,"ts":time.time(),"state":"ONLINE","metadata":metadata or {}}
@@ -82,39 +88,98 @@ class DesktopCommanderEmulator:
     def start_process(self, command:str, *, cwd:str=".", env:dict[str,str]|None=None)->dict[str,Any]:
         if not self.policy.allow_shell: return {"ok":False,"status":"SHELL_DISABLED"}
         work=self._safe(cwd)
+        if not work.is_dir(): return {"ok":False,"status":"WORKING_DIRECTORY_NOT_FOUND"}
+        if self.policy.command_timeout_seconds <= 0:
+            return {"ok":False,"status":"INVALID_COMMAND_TIMEOUT"}
         args=shlex.split(command)
         if not args: return {"ok":False,"status":"COMMAND_REQUIRED"}
-        proc=subprocess.Popen(args,cwd=work,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                              env={**os.environ,**(env or {})})
+        clean_env={}
+        for key,value in (env or {}).items():
+            if not isinstance(key,str) or not isinstance(value,str) or "=" in key or chr(0) in key or chr(0) in value:
+                return {"ok":False,"status":"INVALID_ENVIRONMENT"}
+            clean_env[key]=value
+        try:
+            proc=subprocess.Popen(args,cwd=work,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                                  env={**os.environ,**clean_env})
+        except OSError as exc:
+            return {"ok":False,"status":"PROCESS_START_FAILED","error_type":type(exc).__name__}
         pid=uuid.uuid4().hex
-        with self._lock:self._processes[pid]=proc
-        self._audit("start_process",{"process_id":pid,"command":args,"cwd":cwd})
-        return {"ok":True,"process_id":pid,"pid":proc.pid,"status":"RUNNING"}
+        with self._lock:
+            self._processes[pid]=proc
+            self._process_started[pid]=time.monotonic()
+        self._audit("start_process",{"process_id":pid,"command":args,"cwd":cwd,
+                                     "reality":"SIMULATED","timeout_seconds":self.policy.command_timeout_seconds})
+        return {"ok":True,"process_id":pid,"pid":proc.pid,"status":"RUNNING","reality":"SIMULATED"}
 
     def read_process_output(self,process_id:str,timeout:float=0.2)->dict[str,Any]:
         with self._lock: proc=self._processes.get(process_id)
         if proc is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
+        with self._lock:
+            started=self._process_started.get(process_id,time.monotonic())
+        remaining=self.policy.command_timeout_seconds-(time.monotonic()-started)
+        if remaining <= 0:
+            proc.kill()
+            out,_=proc.communicate()
+            self._forget_process(process_id)
+            self._audit("process_timeout",{"process_id":process_id,"timeout_seconds":self.policy.command_timeout_seconds})
+            output=out or ""
+            return {"ok":False,"status":"TIMED_OUT","process_id":process_id,
+                    "returncode":proc.returncode,"output":output[:self.policy.max_output_bytes],
+                    "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
         try:
-            out,_=proc.communicate(timeout=max(0.0,timeout))
-            status="COMPLETED"
+            out,_=proc.communicate(timeout=min(max(0.0,timeout),remaining))
         except subprocess.TimeoutExpired:
-            return {"ok":True,"status":"RUNNING","process_id":process_id}
-        finally:
-            if proc.poll() is not None:
-                with self._lock:self._processes.pop(process_id,None)
-        return {"ok":True,"status":status,"process_id":process_id,"returncode":proc.returncode,
-                "output":(out or "")[:self.policy.max_output_bytes]}
+            if time.monotonic()-started >= self.policy.command_timeout_seconds:
+                proc.kill()
+                out,_=proc.communicate()
+                self._forget_process(process_id)
+                self._audit("process_timeout",{"process_id":process_id,"timeout_seconds":self.policy.command_timeout_seconds})
+                output=out or ""
+                return {"ok":False,"status":"TIMED_OUT","process_id":process_id,
+                        "returncode":proc.returncode,"output":output[:self.policy.max_output_bytes],
+                        "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
+            return {"ok":True,"status":"RUNNING","process_id":process_id,"reality":"SIMULATED"}
+        self._forget_process(process_id)
+        output=out or ""
+        return {"ok":True,"status":"COMPLETED","process_id":process_id,"returncode":proc.returncode,
+                "output":output[:self.policy.max_output_bytes],
+                "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
+
+    def _forget_process(self,process_id:str)->None:
+        with self._lock:
+            self._processes.pop(process_id,None)
+            self._process_started.pop(process_id,None)
 
     def stop_process(self,process_id:str)->dict[str,Any]:
-        with self._lock: proc=self._processes.get(process_id)
+        """Stop a sandbox process and reap it so it cannot leak in the emulator registry."""
+        with self._lock:
+            proc=self._processes.get(process_id)
         if proc is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
-        proc.terminate()
-        self._audit("stop_process",{"process_id":process_id})
-        return {"ok":True,"status":"STOP_REQUESTED","process_id":process_id}
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=1.0)
+            # Drain captured output after the process has exited; bounded before returning.
+            output,_=proc.communicate(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            output,_=proc.communicate()
+        finally:
+            self._forget_process(process_id)
+        text_output=output or ""
+        self._audit("stop_process",{"process_id":process_id,"returncode":proc.returncode,
+                                    "reality":"SIMULATED","output_truncated":len(text_output)>self.policy.max_output_bytes})
+        return {"ok":True,"status":"STOPPED","process_id":process_id,"returncode":proc.returncode,
+                "output":text_output[:self.policy.max_output_bytes],
+                "truncated":len(text_output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
 
     def process_snapshot(self)->dict[str,Any]:
         with self._lock:
-            return {"ok":True,"processes":[{"process_id":k,"pid":v.pid,"running":v.poll() is None} for k,v in self._processes.items()]}
+            return {"ok":True,"reality":"SIMULATED","processes":[{"process_id":k,"pid":v.pid,"running":v.poll() is None} for k,v in self._processes.items()]}
 
     def audit(self,limit:int=100)->dict[str,Any]:
         if not self._audit_path.exists():return {"ok":True,"records":[]}

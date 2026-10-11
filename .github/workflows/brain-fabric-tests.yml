@@ -26,6 +26,7 @@ jobs:
           brain_v12/test_windows_completion_gate.py
           brain_v12/tests/test_windows_real_boot_closed_loop_gate.py
           brain_v12/tests/test_windows_real_boot_qemu_adapter.py
+          brain_v12/tests/test_desktop_commander_emulator.py
           brain_v12/tests/test_secret_broker.py
           cloud/test_brain_fabric.py
           cloud/test_brain_node_security.py
