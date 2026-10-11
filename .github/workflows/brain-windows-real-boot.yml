@@ -508,6 +508,20 @@ jobs:
           print("EVIDENCE_SHA256="+r["evidence_sha256"])
           PY
 
+      - name: Run dedicated Windows boot proof verifier
+        run: |
+          set -euo pipefail
+          python3 brain_v12/tools/windows_boot_proof.py \
+            --evidence windows-combined-evidence.json \
+            --marker /tmp/windows-boot-marker \
+            --phase windows-boot-phase.txt \
+            --contract-gate windows-execution-contract-gate.json \
+            --executor-gate cloud-executor-gate.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --output windows-boot-proof.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-boot-proof.json
+          grep -q '"verified": true' windows-boot-proof.json
+
       - name: Upload immutable Windows evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -522,6 +536,7 @@ jobs:
             windows-boot-evidence.json
             windows-combined-evidence.json
             windows-completion-gate.json
+            windows-boot-proof.json
             proof-iso-toc.txt
             proof-iso-autounattend.txt
             proof-iso-setupcomplete.txt
@@ -539,5 +554,9 @@ jobs:
           grep -q '"verified": true' windows-execution-contract-gate.json
           test -f windows-completion-gate.json
           grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          test -f windows-boot-proof.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-boot-proof.json
+          grep -q '"verified": true' windows-boot-proof.json
+          echo "BRAIN_WINDOWS_BOOT_PROOF=VERIFIED"
           echo "BRAIN_WINDOWS_REAL_BOOT_CLOSED_LOOP=VERIFIED"
           echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"
