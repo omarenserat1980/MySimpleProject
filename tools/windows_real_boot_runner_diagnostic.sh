@@ -40,9 +40,9 @@ for name in \
 done
 
 printf 'failures=%d\n' "$failures" | tee -a "$report"
+printf 'contract_issued=false\nboot_verified=false\nsystem_state_changed=false\n' | tee -a "$report"
 if (( failures )); then
   printf 'result=BLOCKED_NO_SIDE_EFFECTS\n' | tee -a "$report"
   exit 2
 fi
 printf 'result=RUNNER_READY_FOR_CONTRACT_GATE_ONLY\n' | tee -a "$report"
-printf 'contract_issued=false\nboot_verified=false\nsystem_state_changed=false\n' | tee -a "$report"
