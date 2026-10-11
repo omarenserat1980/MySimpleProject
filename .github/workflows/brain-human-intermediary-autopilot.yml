@@ -69,8 +69,6 @@ jobs:
           PY
       - name: Commit only monotonic state/report changes
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           repo="${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is not set}"
@@ -83,7 +81,7 @@ jobs:
             echo "BRAIN_INTERMEDIARY_STATE=UNCHANGED"
           else
             git -C "$repo" commit -m "brain: persist human intermediary continuation state"
-            git -C "$repo" -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push
+            git -C "$repo" push
           fi
       - name: Upload prediction evidence
         if: always()
