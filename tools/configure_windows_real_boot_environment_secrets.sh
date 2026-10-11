@@ -88,8 +88,8 @@ for name in "${names[@]}"; do
     printf 'SECRET_ACTION=%s:PRESERVED_ALREADY_EXISTS\n' "$name"
     continue
   fi
-  # Send the value through stdin; never place it in a command-line argument or log.
-  if gh secret set "$name" --repo "$repo" --env "$environment" < "${source_files[$name]}" >/dev/null; then
+  # Trim a normal trailing newline before piping; values never enter argv or logs.
+  if python3 -c 'import pathlib,sys; sys.stdout.write(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8").strip())' "${source_files[$name]}" | gh secret set "$name" --repo "$repo" --env "$environment" >/dev/null; then
     printf 'SECRET_ACTION=%s:SET_REQUEST_SUCCEEDED\n' "$name"
   else
     printf 'SECRET_ACTION=%s:FAILED\n' "$name"
