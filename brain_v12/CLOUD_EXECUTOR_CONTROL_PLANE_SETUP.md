@@ -4,14 +4,14 @@ This runbook configures the issuer **on the Brain control-plane host**, not on A
 
 ## 1. Deploy the central API
 
-Deploy the branch containing `brain_v12/brain/cloud_executor_attestation_api.py` and mount `cloud_executor_attestation_router` in `brain_v12/app.py`. Expose the API only through a trusted HTTPS endpoint. Keep one authoritative Brain API/database for all executor requests; all hosts must consume against the same durable SQLite database on the Brain control-plane host. Do not copy the registry database to runners or use isolated local copies.
+Deploy the branch containing `brain_v12/brain/cloud_executor_attestation_api.py` and mount `cloud_executor_attestation_router` in `brain_v12/app.py`. Expose the API only through a trusted HTTPS endpoint. Keep one authoritative Brain API/database for all executor requests; all hosts must consume against the same durable registry. The registry supports a local SQLite path for single-host development and a PostgreSQL URL (with provider-required TLS) for shared durable deployments. Do not copy SQLite registry files to runners or use isolated local copies.
 
 Set:
-- `BRAIN_CLOUD_EXECUTOR_REGISTRY_DB` to a durable control-plane database path (or deliberately use the Brain `BRAIN_DB`).
+- `BRAIN_CLOUD_EXECUTOR_REGISTRY_DB` to a durable control-plane database path (or deliberately use the Brain `BRAIN_DB`). For PostgreSQL, use the provider's TLS-enabled connection URL; do not commit it to the repository. The Render Free web service must not use its local filesystem as the production nonce registry.
 - `BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64` from a protected secret manager or a root-controlled systemd `EnvironmentFile`.
 - `BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON` to a JSON object mapping each enrolled executor ID to the SHA-256 hex digest of that executor's high-entropy bearer token.
 
-The API rejects unknown executor IDs and compares token digests in constant time. It does not accept a general Brain control key as a substitute for per-executor enrollment.
+The API rejects unknown executor IDs and compares token digests in constant time. It does not accept a general Brain control key as a substitute for per-executor enrollment. PostgreSQL integration coverage is opt-in via `BRAIN_TEST_POSTGRES_URL`; run it against a disposable test database before enabling the real-boot workflow.
 
 ## 2. Create the signing key on the control-plane host
 

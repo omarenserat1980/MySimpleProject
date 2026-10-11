@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from brain_v12.brain.cloud_executor_attestation import verify_attestation
-from brain_v12.brain.cloud_executor_attestation_issuer import create_challenge, issue_attestation, consume_issued_attestation
+from brain_v12.brain.cloud_executor_attestation_issuer import create_challenge, issue_attestation, consume_issued_attestation, _connect
 
 
 class CloudExecutorAttestationIssuerTests(unittest.TestCase):
@@ -35,6 +35,16 @@ class CloudExecutorAttestationIssuerTests(unittest.TestCase):
 
     def issue(self, **kwargs):
         return issue_attestation(expected_hostname=self.hostname, expected_architecture="x86_64", **kwargs)
+
+    def test_postgres_registry_requires_tls(self):
+        with self.assertRaisesRegex(ValueError, "POSTGRES_TLS_REQUIRED"):
+            _connect("postgresql://user:pass@localhost/brain")
+
+    def test_postgres_registry_accepts_tls_mode_without_connecting(self):
+        from brain_v12.brain.cloud_executor_attestation_issuer import _postgres_tls_configured
+        self.assertTrue(_postgres_tls_configured("postgresql://user:pass@localhost/brain?sslmode=require"))
+        self.assertTrue(_postgres_tls_configured("postgresql://user:pass@localhost/brain?sslmode=verify-full"))
+        self.assertFalse(_postgres_tls_configured("postgresql://user:pass@localhost/brain?sslmode=disable"))
 
     def test_issues_and_verifies_single_use_challenge(self):
         challenge = self.challenge(authenticated_executor_id="cloud-test-01", challenge_db_path=self.db, now=self.now)

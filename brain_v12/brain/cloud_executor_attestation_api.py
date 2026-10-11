@@ -22,8 +22,10 @@ class ConsumeRequest(ExecutorRequest):
     nonce: str = Field(min_length=32, max_length=256)
 
 def _registry_db() -> str:
-    path = os.environ.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_DB", os.environ.get("BRAIN_DB", "/var/lib/brain/cloud-executor-registry.sqlite3"))
-    if Path(path).is_symlink():
+    path = os.environ.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_DB", os.environ.get("BRAIN_DB", "/var/lib/brain/cloud-executor-registry.sqlite3")).strip()
+    if path.startswith(("postgres://", "postgresql://")):
+        return path
+    if not path or Path(path).is_symlink():
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_REGISTRY_PATH_INVALID")
     if not Path(path).parent.is_dir():
         raise HTTPException(status_code=503, detail="CLOUD_EXECUTOR_REGISTRY_PARENT_MISSING")
