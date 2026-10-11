@@ -36,10 +36,6 @@ class CloudExecutorPostgresRegistryTests(unittest.TestCase):
             format=serialization.PrivateFormat.Raw,
             encryption_algorithm=serialization.NoEncryption(),
         )).decode("ascii")
-        public_b64 = base64.b64encode(private.public_key().public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        )).decode("ascii")
         env = {
             "BRAIN_CLOUD_EXECUTOR_REGISTRY_DB": os.environ["BRAIN_TEST_POSTGRES_URL"],
             "BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON": json.dumps({
