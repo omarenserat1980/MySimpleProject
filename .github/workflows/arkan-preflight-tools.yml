@@ -20,11 +20,14 @@ on:
       - "brain_v12/tests/test_windows_contract_fetch.py"
       - ".github/workflows/brain-windows-real-boot.yml"
       - ".github/workflows/arkan-preflight-tools.yml"
+      - ".github/workflows/brain-control-plane-readonly-preflight.yml"
   push:
     branches:
       - "tool/windows-real-boot-preflight-20261011"
+      - "tool/live-control-plane-readonly-check-20261011"
       - "tool/windows-control-plane-preflight-v2-20261011"
     paths:
+      - ".github/workflows/brain-control-plane-readonly-preflight.yml"
       - "tools/windows_control_plane_api_preflight.py"
       - "tools/test_windows_control_plane_api_preflight.py"
       - "tools/arkan_windows_real_boot_diagnostic.ps1"
