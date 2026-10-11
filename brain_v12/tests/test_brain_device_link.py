@@ -2,7 +2,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform, execute_remote_task
+from pathlib import Path
+
+from brain_v12.tools.brain_device_link import capacity_metadata, detect_platform
 from brain_v12.tools.brain_device_bridge_doctor import DEFAULT_URL as DEVICE_DOCTOR_DEFAULT_URL
 
 
@@ -23,11 +25,14 @@ class BrainDeviceLinkTests(unittest.TestCase):
         with patch.dict(os.environ, {"ANDROID_ROOT": "/system", "TERMUX_VERSION": "0.118"}, clear=False):
             self.assertEqual(detect_platform(), "android")
 
-    def test_safe_remote_tasks_and_rejects_arbitrary_task(self):
-        self.assertIn("python_version", execute_remote_task("python_version"))
-        self.assertIn("platform", execute_remote_task("platform"))
-        with self.assertRaisesRegex(ValueError, "TASK_NOT_ALLOWED"):
-            execute_remote_task("run_shell_command")
+    def test_agent_is_heartbeat_only_and_does_not_poll_or_execute_tasks(self):
+        source = Path("brain_v12/tools/brain_device_link.py").read_text(encoding="utf-8")
+        self.assertIn('"/api/device/heartbeat"', source)
+        self.assertIn('"poll": "DISABLED_OBSERVATION_ONLY"', source)
+        self.assertNotIn("def execute_remote_task(", source)
+        self.assertNotIn("def poll_and_run_one(", source)
+        self.assertNotIn('"/api/device/poll', source)
+        self.assertNotIn('"/api/device/report', source)
 
     def test_windows_agent_id_validation_is_platform_scoped_in_main(self):
         # The agent's main() checks the ID prefix only when the host platform is
