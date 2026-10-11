@@ -24,6 +24,8 @@ on:
       - "tool/windows-real-boot-preflight-20261011"
       - "tool/control-plane-preflight-hardening-20261011"
     paths:
+      - "tools/windows_control_plane_api_preflight.py"
+      - "tools/test_windows_control_plane_api_preflight.py"
       - "tools/arkan_windows_real_boot_diagnostic.ps1"
       - "tools/run_arkan_windows_real_boot_diagnostic_wsl.sh"
       - "tools/summarize_arkan_preflight.py"
