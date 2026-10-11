@@ -1,0 +1,25 @@
+name: Brain-first Execution Routing CI
+
+on:
+  push:
+    branches:
+      - brain-software-cloud-pool
+  pull_request:
+    paths:
+      - 'brain_v12/tools/brain_execution_priority.py'
+      - 'brain_v12/tests/test_brain_execution_priority.py'
+      - 'docs/BRAIN_FIRST_EXECUTION_ROUTING.md'
+      - '.github/workflows/brain-first-execution-routing.yml'
+
+jobs:
+  test-routing-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Brain-first router
+        run: python -m py_compile brain_v12/tools/brain_execution_priority.py
+      - name: Test Brain-first priority and quota guard
+        run: python -m unittest brain_v12.tests.test_brain_execution_priority -v
