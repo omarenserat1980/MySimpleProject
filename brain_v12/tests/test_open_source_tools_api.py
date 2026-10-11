@@ -7,7 +7,17 @@ from brain_v12.brain.open_source_tools_api import open_source_tool_detail, open_
 
 class OpenSourceToolsApiTests(unittest.TestCase):
     def test_list_is_catalog_only_and_contains_expected_categories(self):
-        result = open_source_tools()
+        # Call the HTTP route through FastAPI's TestClient so Query defaults
+        # are resolved as they are in production requests.
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from brain_v12.brain.open_source_tools_api import router
+
+        app = FastAPI()
+        app.include_router(router)
+        response = TestClient(app).get("/api/open-source-tools")
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
         self.assertTrue(result["ok"])
         self.assertFalse(result["execution_enabled"])
         self.assertEqual(result["mode"], "catalog_only")
