@@ -47,8 +47,7 @@ def main() -> int:
     hv_module = checks.get("hyperv_module")
     if hv_module == []:
         blockers.append(("P1", "HYPERV_POWERSHELL_MODULE_MISSING: check Windows edition and Hyper-V feature/management tools after firmware virtualization is available."))
-    feature = checks.get("hyperv_feature")
-    feature_text = json.dumps(feature, ensure_ascii=False).lower()
+    feature_text = json.dumps(checks.get("hyperv_feature"), ensure_ascii=False).lower().replace(" ", "")
     if any(token in feature_text for token in ('"state":"disabled"', '"installstate":"available"', '"installstate":"removed"')):
         blockers.append(("P1", "HYPERV_FEATURE_NOT_ENABLED: inspect Windows Hyper-V feature state; do not enable it until firmware virtualization is confirmed."))
     warnings = checks.get("warnings") if isinstance(checks.get("warnings"), list) else report.get("warnings", [])
@@ -58,11 +57,9 @@ def main() -> int:
     ]
     if hyperv_warning:
         blockers.append(("P1", "GET_VMHOST_QUERY_FAILED: inspect the sanitized category and FullyQualifiedErrorId in report warnings; do not infer boot success."))
-    host = checks.get("hyperv_host")
-    if host is None and not hyperv_warning:
+    if checks.get("hyperv_host") is None and not hyperv_warning:
         blockers.append(("P2", "HYPERV_HOST_UNKNOWN: the report does not establish that the host query succeeded."))
-    vms = checks.get("vms")
-    if vms == []:
+    if checks.get("vms") == []:
         blockers.append(("P2", "NO_VM_INVENTORY: no VM was returned, or enumeration returned an empty list; verify after Hyper-V host access works."))
 
     print("ARKAN ROOT-CAUSE GATE")
