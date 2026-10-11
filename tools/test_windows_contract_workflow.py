@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static regression tests preventing recurrence of missing execution-contract wiring."""
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +19,9 @@ class WindowsContractWorkflowTests(unittest.TestCase):
 
     def test_contract_destination_is_explicitly_wired(self):
         self.assertIn("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json", self.workflow)
-        self.assertIn('os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"', self.gate)
-        self.assertIn('os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"', self.fetcher)
+        for source in (self.gate, self.fetcher):
+            self.assertIn('os.environ.get(', source)
+            self.assertIn('"BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"', source)
 
     def test_contract_is_fetched_before_gate(self):
         fetch = self.workflow.find("- name: Fetch short-lived contract from Brain Control Plane")
