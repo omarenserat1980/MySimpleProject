@@ -174,7 +174,7 @@ jobs:
       - name: Bootstrap remote Terraform state
         if: ${{ steps.config.outputs.apply_enabled == 'true' }}
         shell: pwsh
-        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location westeurope
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location northeurope
 
       - name: Preflight (no VM changes)
         shell: pwsh
@@ -182,7 +182,7 @@ jobs:
           # Use hashtable splatting so PowerShell passes named parameters,
           # rather than treating the strings as positional arguments.
           $preflightArgs = @{
-            Location = "westeurope"
+            Location = "northeurope"
             VmSize = "Standard_B2s"
           }
           if ($env:APPROVE_APPLY -ne "true") {
@@ -193,7 +193,7 @@ jobs:
       - name: Deploy and verify Windows Server 2025
         if: ${{ steps.config.outputs.apply_enabled == 'true' }}
         shell: pwsh
-        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location westeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B2s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location northeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B2s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
 
       - name: Explain preflight-only run
         if: ${{ steps.config.outputs.apply_enabled != 'true' }}
