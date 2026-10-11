@@ -89,7 +89,7 @@ jobs:
           echo "PostgreSQL TLS readiness check failed" >&2
           exit 1
       - name: Run signed attestation, issuer, replay and gate tests
-        run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_attestation_postgres brain_v12.tests.test_cloud_executor_attestation_api brain_v12.tests.test_cloud_executor_gate brain_v12.tests.test_cloud_runner_isolation_contract brain_v12.tests.test_cloud_executor_bootstrap_security
+        run: python -m unittest -v brain_v12.tests.test_cloud_executor_attestation brain_v12.tests.test_cloud_executor_attestation_issuer brain_v12.tests.test_cloud_executor_attestation_postgres brain_v12.tests.test_cloud_executor_attestation_api brain_v12.tests.test_cloud_executor_gate brain_v12.tests.test_cloud_runner_isolation_contract brain_v12.tests.test_cloud_executor_bootstrap_security brain_v12.tests.test_cloud_executor_attestation_client
       - name: Validate shell scripts
         run: bash -n tools/bootstrap_brain_cloud_executor.sh tools/install_brain_executor_trust_anchor.sh
       - name: Compile attestation modules and client
