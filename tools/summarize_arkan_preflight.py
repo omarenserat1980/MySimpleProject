@@ -13,7 +13,9 @@ from typing import Any
 
 KEYS = (
     "os",
+    "identity",
     "hardware",
+    "hyperv_module",
     "cpu_virtualization",
     "hyperv_feature",
     "hyperv_commands",
@@ -62,20 +64,26 @@ def main() -> int:
 
     print("\nINTERPRETATION")
     hv_cmds = checks.get("hyperv_commands")
+    identity = checks.get("identity")
+    if isinstance(identity, dict) and identity.get("IsAdministrator") is False:
+        print("- Current Windows PowerShell session is not elevated; Hyper-V host inspection may be denied.")
+    hv_module = checks.get("hyperv_module")
+    if isinstance(hv_module, list) and not hv_module:
+        print("- Hyper-V PowerShell module is not discoverable in this session.")
+    hv_cmds = checks.get("hyperv_commands")
     if isinstance(hv_cmds, dict) and not hv_cmds.get("GetVMHost", False):
-        print("- Get-VMHost cmdlet is unavailable; check Hyper-V PowerShell module/feature.")
-    elif any("hyperv_host" in str(w).lower() or "getvmhost" in str(w).lower() for w in warnings):
-        print("- Hyper-V host query raised a warning; inspect the hyperv_host result and warning text.")
+        print("- Get-VMHost cmdlet is unavailable; inspect the Hyper-V module/feature state.")
+    if any("hyperv_host" in str(w).lower() or "getvmhost" in str(w).lower() for w in warnings):
+        print("- Hyper-V host query raised a classified warning; use its category and error ID above.")
     if checks.get("vms") == []:
         print("- No VMs were returned by Get-VM, or the query could not enumerate them.")
     virt = checks.get("cpu_virtualization")
-    if isinstance(virt, list) and virt:
-        rows = virt
-        if all(isinstance(row, dict) for row in rows):
-            if any(row.get("VirtualizationFirmwareEnabled") is False for row in rows):
-                print("- CPU virtualization firmware flag is false; verify BIOS/UEFI virtualization.")
-            elif any(row.get("VirtualizationFirmwareEnabled") is True for row in rows):
-                print("- CPU virtualization firmware flag reports enabled.")
+    rows = virt if isinstance(virt, list) else ([virt] if isinstance(virt, dict) else [])
+    if rows and all(isinstance(row, dict) for row in rows):
+        if any(row.get("VirtualizationFirmwareEnabled") is False for row in rows):
+            print("- CPU virtualization firmware flag is false; verify BIOS/UEFI virtualization.")
+        elif any(row.get("VirtualizationFirmwareEnabled") is True for row in rows):
+            print("- CPU virtualization firmware flag reports enabled.")
     print("- This report is diagnostic only; it does not prove Windows Server 2025 booted.")
     return 0
 
