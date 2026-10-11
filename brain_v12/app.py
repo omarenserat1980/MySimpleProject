@@ -93,6 +93,7 @@ from cloud.brain_fabric import list_nodes as list_fabric_nodes
 from .brain.security_middleware import apply_security_headers
 from .brain.cloud_executor_attestation_api import router as cloud_executor_attestation_router
 from .brain.open_source_tools_api import router as open_source_tools_router
+from .brain.asic_simulator_api import router as asic_simulator_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -232,6 +233,7 @@ app.include_router(commercial_dashboard_router())
 app.include_router(quranic_core_router())
 app.include_router(cloud_executor_attestation_router)
 app.include_router(open_source_tools_router)
+app.include_router(asic_simulator_router)
 
 
 @app.get("/api/brain/workload")
