@@ -6,6 +6,9 @@ on:
       - brain-software-cloud-pool
     paths:
       - '.github/workflows/brain-device-launch-probe.yml'
+      - 'brain_v12/tools/brain_device_link.py'
+      - 'brain_v12/brain/device_cloud_pool.py'
+      - 'brain_v12/brain/device_cloud_pool_api.py'
   workflow_dispatch:
 
 permissions:
