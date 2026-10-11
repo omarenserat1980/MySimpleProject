@@ -197,6 +197,7 @@ def main() -> int:
         return 2
     interval = max(5, args.interval)
     while True:
+        success = False
         try:
             result = post_heartbeat(base_url, agent_id, key)
             m = result["metadata"]
@@ -208,10 +209,11 @@ def main() -> int:
                 "status": result["response"].get("status", "UNKNOWN"),
                 "poll": poll_result,
             }, ensure_ascii=False), flush=True)
+            success = True
         except Exception as exc:
             print(json.dumps({"ok": False, "agent_id": agent_id, "error": str(exc)}, ensure_ascii=False), file=sys.stderr, flush=True)
         if args.once:
-            return 0
+            return 0 if success else 1
         time.sleep(interval)
 
 
