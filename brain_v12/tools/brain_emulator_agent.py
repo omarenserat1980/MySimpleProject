@@ -60,6 +60,7 @@ def execute(task):
             return {"returncode":p.returncode,"status":"AUDIT_OUTPUT_INVALID","stdout":p.stdout[-12000:],"stderr":p.stderr[-4000:]}
         return {"returncode":p.returncode,"status":report.get("boot_path",{}).get("status","UNKNOWN"),
                 "host":report.get("host",{}),"project_areas":report.get("project_areas",{}),
+                "project_goals_and_roadmap":report.get("project_goals_and_roadmap",{}),
                 "key_paths":report.get("key_paths",{}),"boot_path":report.get("boot_path",{}),
                 "acceptance_rule":report.get("acceptance_rule",{}),"stderr":p.stderr[-4000:]}
     raise ValueError("TASK_NOT_ALLOWED")
