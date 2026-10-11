@@ -69,11 +69,53 @@ for route, label in routes:
                     print(f"{label}_{key.upper()}_COUNT={len(value)}")
                 elif isinstance(value, int) and not isinstance(value, bool):
                     print(f"{label}_{key.upper()}_COUNT={value}")
+                # Missing item names are configuration identifiers, not values.
+                if key == "missing" and isinstance(value, list):
+                    safe_items = []
+                    for item in value[:30]:
+                        if isinstance(item, str):
+                            safe = "".join(ch for ch in item[:120] if ch.isalnum() or ch in "_-.:/")
+                            if safe:
+                                safe_items.append(safe)
+                        elif isinstance(item, dict):
+                            name = item.get("name") or item.get("key") or item.get("id") or item.get("code")
+                            if isinstance(name, str):
+                                safe = "".join(ch for ch in name[:120] if ch.isalnum() or ch in "_-.:/")
+                                if safe:
+                                    safe_items.append(safe)
+                    if safe_items:
+                        print(f"{label}_MISSING_ITEMS={','.join(safe_items)}")
+                if key == "checks":
+                    entries = list(value.items()) if isinstance(value, dict) else list(enumerate(value)) if isinstance(value, list) else []
+                    for check_key, check in entries[:30]:
+                        if isinstance(check, dict):
+                            name = check.get("name") or check.get("key") or check.get("id") or check.get("code") or str(check_key)
+                            safe_name = "".join(ch for ch in str(name)[:80] if ch.isalnum() or ch in "_-.:/")
+                            state_parts = []
+                            for field in ("ok", "ready", "configured", "passed", "status", "reason"):
+                                field_value = check.get(field)
+                                if isinstance(field_value, bool):
+                                    state_parts.append(f"{field}={str(field_value).lower()}")
+                                elif isinstance(field_value, str):
+                                    safe_value = "".join(ch for ch in field_value[:80] if ch.isalnum() or ch in "_-.:/ ")
+                                    state_parts.append(f"{field}={safe_value}")
+                            if state_parts:
+                                print(f"{label}_CHECK_{safe_name}=" + ";".join(state_parts))
+                        elif isinstance(check, bool):
+                            print(f"{label}_CHECK_{check_key}={str(check).lower()}")
             for key in ("executor", "provider_readiness", "capability", "policy"):
                 value = obj.get(key)
                 if isinstance(value, dict):
                     nested_keys = sorted(str(k) for k in value.keys())
                     print(f"{label}_{key.upper()}_KEYS={','.join(nested_keys[:25]) or '(none)'}")
+                    for field in ("ready", "ok", "verified", "configured"):
+                        if isinstance(value.get(field), bool):
+                            print(f"{label}_{key.upper()}_{field.upper()}={str(value[field]).lower()}")
+                    for field in ("status", "reason", "provider"):
+                        item = value.get(field)
+                        if isinstance(item, str):
+                            safe = "".join(ch for ch in item[:100] if ch.isalnum() or ch in "_-.:/ ")
+                            print(f"{label}_{key.upper()}_{field.upper()}={safe or '(empty)'}")
         else:
             print(f"{label}_JSON=VALID_NON_OBJECT")
     except (ValueError, UnicodeError):
