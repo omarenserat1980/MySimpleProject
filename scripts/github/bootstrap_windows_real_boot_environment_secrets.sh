@@ -52,25 +52,35 @@ raise SystemExit(0 if ok else 1)'
 
 for name in "${names[@]}"; do
   printf '\n%s\n' "$name"
-  printf 'Enter the REAL authorized value (hidden; blank skips): '
-  IFS= read -r -s value || exit 130
-  printf '\n'
-  if [[ -z "$value" ]]; then
-    printf 'SKIPPED: %s\n' "$name"
-    continue
-  fi
-  if ! validate "$name" "$value"; then
+  attempts=0
+  while :; do
+    printf 'Enter the REAL authorized value (hidden; blank skips): '
+    IFS= read -r -s value || exit 130
+    printf '\n'
+    if [[ -z "$value" ]]; then
+      printf 'SKIPPED: %s\n' "$name"
+      unset value
+      break
+    fi
+    if validate "$name" "$value"; then
+      # gh reads the secret from stdin; never pass secret material as a CLI argument.
+      if printf '%s' "$value" | gh secret set "$name" --repo "$REPO" --env "$ENVIRONMENT"; then
+        printf 'STAGED: %s (value not displayed)\n' "$name"
+        unset value
+        break
+      else
+        unset value
+        die "GitHub rejected secret write for $name. Check environment permissions."
+      fi
+    fi
     unset value
-    die "Value validation failed for $name; secret was not changed."
-  fi
-  # gh reads the secret from stdin; never pass secret material as a CLI argument.
-  if printf '%s' "$value" | gh secret set "$name" --repo "$REPO" --env "$ENVIRONMENT"; then
-    printf 'STAGED: %s (value not displayed)\n' "$name"
-  else
-    unset value
-    die "GitHub rejected secret write for $name. Check environment permissions."
-  fi
-  unset value
+    attempts=$((attempts + 1))
+    printf 'INVALID_FORMAT: %s was not changed. Check the required format and retry, or press Enter to skip.\n' "$name" >&2
+    if (( attempts >= 3 )); then
+      printf 'SKIPPED_AFTER_THREE_INVALID_ATTEMPTS: %s\n' "$name"
+      break
+    fi
+  done
 done
 
 printf '\nSecret names visible to the authenticated CLI (values are never retrievable):\n'
