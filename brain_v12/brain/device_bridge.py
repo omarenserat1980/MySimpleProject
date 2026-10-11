@@ -7,7 +7,8 @@ AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; 
 
 class DeviceBridge:
     ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
-                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{},"brain_runtime_launch":{}}
+                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{},"brain_runtime_launch":{},
+                    "brain_project_audit":{},"windows_cloud_boot_preflight":{}}
     TASK_CAPABILITIES = {
         "internet_download": "internet_download",
         "open_url": "open_url",
@@ -145,6 +146,12 @@ class DeviceBridge:
             evidence=result.get("result") or result; verified=bool(result.get("ok") and evidence.get("status")=="VERIFIED_COMPLETED" and evidence.get("final"))
         elif task in self.TASK_CAPABILITIES:
             verified=bool(item.get("ok") and result.get("opened") is True if task in ("open_app","open_url") else item.get("ok"))
+        elif task in ("brain_project_audit", "windows_cloud_boot_preflight"):
+            verified=bool(
+                result.get("status") in ("BLOCKED", "READY_FOR_REVIEW")
+                and isinstance(result.get("boot_path"), dict)
+                and isinstance(result.get("project_areas"), dict)
+            )
         else: verified=bool(item.get("ok"))
         return {"ok":verified,"verified":verified,"status":"VERIFIED" if verified else "VERIFICATION_FAILED","task_id":item["task_id"],"result":result}
     def wait_result(self,task_id,timeout=20):
