@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from ..control_auth import require_control_key
 from .engine import QuranicResearchEngine
 from .models import EvidenceLevel
 from .canonical import CanonicalQuranAdapter
@@ -11,6 +12,7 @@ from .graph import EvidenceGraph
 from .publication import PublicationGate
 from .knowledge import KnowledgeOpportunityEngine
 from .research_packet import ResearchPacketBuilder
+from .memory_guidance import principles as memory_principles, review_memory
 
 class EvidenceIn(BaseModel):
     level: EvidenceLevel
@@ -20,6 +22,20 @@ class EvidenceIn(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     metadata: dict = Field(default_factory=dict)
 
+class MemoryReviewIn(BaseModel):
+    memory_text: str = Field(min_length=1, max_length=12000)
+
+class StoredMemoryReviewIn(BaseModel):
+    memory_key: str = Field(min_length=1, max_length=512)
+
+class MemoryEvidenceIn(BaseModel):
+    memory_key: str = Field(min_length=1, max_length=512)
+    claim: str = Field(min_length=1, max_length=12000)
+    source: str = Field(min_length=1, max_length=2048)
+    confidence: float = Field(ge=0.0, le=1.0)
+    observed_at: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
 class ResearchIn(BaseModel):
     question: str = Field(min_length=1)
     finding: str = Field(min_length=1)
@@ -27,7 +43,7 @@ class ResearchIn(BaseModel):
     limitations: list[str] = Field(default_factory=list)
     alternatives: list[str] = Field(default_factory=list)
 
-def build_router(engine=None):
+def build_router(engine=None, memory_store=None):
     engine=engine or QuranicResearchEngine()
     canonical=CanonicalQuranAdapter()
     tafsir=TafsirAdapter(canonical)
@@ -39,6 +55,22 @@ def build_router(engine=None):
     knowledge=KnowledgeOpportunityEngine()
     packets=ResearchPacketBuilder(publication)
     router=APIRouter(prefix="/api/quranic-core",tags=["quranic-core"])
+
+    @router.get("/memory-guidance")
+    def quranic_memory_guidance():
+        """Return source-linked, read-only principles for reviewing Brain memory."""
+        return {
+            "ok": True,
+            "status": "READ_ONLY_GUIDANCE",
+            "count": len(memory_principles()),
+            "principles": memory_principles(),
+            "memory_mutated": False,
+        }
+
+    @router.post("/memory-guidance/review")
+    def quranic_memory_review(body: MemoryReviewIn):
+        """Suggest review lenses for one memory; never writes to operational memory."""
+        return review_memory(body.memory_text)
 
     @router.get("/health")
     def health():
@@ -88,6 +120,58 @@ def build_router(engine=None):
         records=[engine.make_evidence(i.level,i.source,i.claim,i.citation,i.confidence,i.metadata) for i in body.evidence]
         finding=engine.research(body.question,records,body.finding,body.limitations,body.alternatives)
         return knowledge.generate(finding)
+
+    @router.post("/memory-guidance/review-stored")
+    def review_stored_memory(request: Request, body: StoredMemoryReviewIn):
+        require_control_key(request)
+        if memory_store is None:
+            raise HTTPException(status_code=503, detail="MEMORY_STORE_NOT_CONFIGURED")
+        record = memory_store.get_memory(body.memory_key)
+        if record is None:
+            raise HTTPException(status_code=404, detail="MEMORY_KEY_NOT_FOUND")
+        review = review_memory(record["value"])
+        evidence = memory_store.memory_evidence(body.memory_key)
+        conflicts = memory_store.memory_evidence_conflicts(body.memory_key)
+        return {
+            **review,
+            "memory_key": body.memory_key,
+            "memory_updated_at": record["updated_at"],
+            "evidence": evidence,
+            "potential_conflicts": conflicts,
+            "memory_mutated": False,
+        }
+
+    @router.post("/memory-guidance/evidence")
+    def record_memory_evidence(request: Request, body: MemoryEvidenceIn):
+        require_control_key(request)
+        if memory_store is None:
+            raise HTTPException(status_code=503, detail="MEMORY_STORE_NOT_CONFIGURED")
+        if memory_store.get_memory(body.memory_key) is None:
+            raise HTTPException(status_code=404, detail="MEMORY_KEY_NOT_FOUND")
+        item = memory_store.add_memory_evidence(
+            body.memory_key, body.claim, body.source, body.confidence,
+            observed_at=body.observed_at, metadata=body.metadata,
+        )
+        return {
+            "ok": True,
+            "evidence": item,
+            "potential_conflicts": memory_store.memory_evidence_conflicts(body.memory_key),
+            "memory_mutated": False,
+        }
+
+    @router.get("/memory-guidance/evidence")
+    def get_memory_evidence(request: Request, memory_key: str):
+        require_control_key(request)
+        if memory_store is None:
+            raise HTTPException(status_code=503, detail="MEMORY_STORE_NOT_CONFIGURED")
+        if memory_store.get_memory(memory_key) is None:
+            raise HTTPException(status_code=404, detail="MEMORY_KEY_NOT_FOUND")
+        return {
+            "ok": True,
+            "memory_key": memory_key,
+            "evidence": memory_store.memory_evidence(memory_key),
+            "potential_conflicts": memory_store.memory_evidence_conflicts(memory_key),
+        }
 
     @router.get("/sources/status")
     def sources_status():

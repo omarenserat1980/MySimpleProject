@@ -228,7 +228,7 @@ app.include_router(marketing_router)
 app.include_router(intelligence_router)
 app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
-app.include_router(quranic_core_router())
+app.include_router(quranic_core_router(memory_store=store))
 app.include_router(cloud_executor_attestation_router)
 
 
