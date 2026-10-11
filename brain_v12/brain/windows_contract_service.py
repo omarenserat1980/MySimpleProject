@@ -56,10 +56,9 @@ def issue(request: dict[str, Any]) -> dict[str, Any]:
     owner_public_key = os.environ.get("BRAIN_OWNER_APPROVAL_PUBLIC_KEY_B64", "")
     output = os.environ.get("BRAIN_WINDOWS_CONTRACT_OUTPUT", "/run/brain/windows-execution-contract.json")
 
-    # This flag means the requested capability is owner-authorized for this
-    # contract. It is NOT evidence that this Control Plane host can run QEMU.
-    # The real executor separately enforces QEMU/KVM capability before and
-    # during the workflow; the signed contract cannot bypass those checks.
+    # This records owner authorization only; it is NOT evidence that this
+    # Control Plane host can run QEMU/KVM. The executor enforces QEMU/KVM
+    # capability independently before and during the workflow.
     result = issue_from_files(
         identity_file=identity,
         checkpoint_file=checkpoint,
