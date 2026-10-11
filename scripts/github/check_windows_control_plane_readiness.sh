@@ -54,6 +54,26 @@ for route, label in routes:
             keys = sorted(str(k) for k in obj.keys())
             print(f"{label}_JSON=VALID")
             print(f"{label}_TOP_LEVEL_KEYS={','.join(keys[:40]) or '(none)'}")
+            # Emit only an allowlist of non-secret scalar health fields and counts.
+            for key in ("ready", "ok", "verified"):
+                if isinstance(obj.get(key), bool):
+                    print(f"{label}_{key.upper()}={str(obj[key]).lower()}")
+            for key in ("status", "reason"):
+                value = obj.get(key)
+                if isinstance(value, str):
+                    safe = "".join(ch for ch in value[:100] if ch.isalnum() or ch in " _-.:/")
+                    print(f"{label}_{key.upper()}={safe or '(empty)'}")
+            for key in ("missing", "nodes", "rejected", "checks"):
+                value = obj.get(key)
+                if isinstance(value, (list, dict)):
+                    print(f"{label}_{key.upper()}_COUNT={len(value)}")
+                elif isinstance(value, int) and not isinstance(value, bool):
+                    print(f"{label}_{key.upper()}_COUNT={value}")
+            for key in ("executor", "provider_readiness", "capability", "policy"):
+                value = obj.get(key)
+                if isinstance(value, dict):
+                    nested_keys = sorted(str(k) for k in value.keys())
+                    print(f"{label}_{key.upper()}_KEYS={','.join(nested_keys[:25]) or '(none)'}")
         else:
             print(f"{label}_JSON=VALID_NON_OBJECT")
     except (ValueError, UnicodeError):
