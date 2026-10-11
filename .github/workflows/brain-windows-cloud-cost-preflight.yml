@@ -1,0 +1,139 @@
+name: BRAIN Windows Cloud Cost and Readiness Preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-windows-cloud-cost-preflight.yml"
+      - "scripts/windows-cloud/estimate-cost.py"
+      - "brain_v12/cloud/windows_terraform/**"
+      - "scripts/windows-cloud/preflight.ps1"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: brain-windows-cloud-cost-preflight
+  cancel-in-progress: false
+
+jobs:
+  read_only_preflight:
+    runs-on: ubuntu-latest
+    environment: brain-windows-production
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Estimate Windows VM compute prices (public retail API; no Azure login)
+        id: pricing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/windows-cloud/estimate-cost.py --region westeurope --output windows-cloud-cost-estimate.json
+
+      - name: Validate Azure OIDC configuration names without printing values
+        id: config
+        shell: bash
+        env:
+          CHECK_AZURE_CLIENT_ID: \${{ vars.AZURE_CLIENT_ID }}
+          CHECK_AZURE_TENANT_ID: \${{ vars.AZURE_TENANT_ID }}
+          CHECK_AZURE_SUBSCRIPTION_ID: \${{ vars.AZURE_SUBSCRIPTION_ID }}
+          CHECK_ALLOWED_SOURCE_IP: \${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in CHECK_AZURE_CLIENT_ID CHECK_AZURE_TENANT_ID CHECK_AZURE_SUBSCRIPTION_ID CHECK_ALLOWED_SOURCE_IP; do
+            if [[ -z "\${!name:-}" ]]; then missing+=("$name"); fi
+          done
+          if (( \${#missing[@]} > 0 )); then
+            echo "AZURE_READINESS=BLOCKED_MISSING_ENVIRONMENT_CONFIGURATION"
+            printf 'Missing configuration name: %s\n' "\${missing[@]}"
+            echo "No Azure login or resource change was attempted."
+            exit 2
+          fi
+          python3 - <<'PY'
+          import ipaddress, os
+          value = os.environ["CHECK_ALLOWED_SOURCE_IP"].strip()
+          network = ipaddress.ip_network(value, strict=False)
+          if network.version != 4 or network.prefixlen == 0:
+              raise SystemExit("BRAIN_ALLOWED_SOURCE_IP must be a narrow IPv4 CIDR; public-wide access is forbidden.")
+          print("Azure OIDC configuration is present; allowed management CIDR format is valid. Values withheld.")
+          PY
+
+      - name: Azure OIDC login (read-only checks only)
+        uses: azure/login@v2
+        with:
+          client-id: \${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: \${{ vars.AZURE_TENANT_ID }}
+          subscription-id: \${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Inspect subscription, image, SKU restrictions, and regional quota (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          az account show --query '{subscriptionName:name,state:state}' --output json
+          image_file="$RUNNER_TEMP/windows-server-2025-images.json"
+          az vm image list --location westeurope --publisher MicrosoftWindowsServer --offer WindowsServer --sku 2025-datacenter-g2 --all --output json > "$image_file"
+          python3 - "$image_file" <<'PY'
+          import json, sys
+          from packaging.version import Version, InvalidVersion
+          rows = json.load(open(sys.argv[1], encoding="utf-8"))
+          versions = []
+          for row in rows:
+              if row.get("publisher") != "MicrosoftWindowsServer" or row.get("offer") != "WindowsServer" or row.get("sku") != "2025-datacenter-g2":
+                  continue
+              raw = row.get("version", "")
+              try: versions.append((Version(raw), raw))
+              except InvalidVersion: pass
+          if not versions:
+              raise SystemExit("WINDOWS_SERVER_2025_IMAGE_NOT_FOUND in westeurope; no deployment attempted.")
+          print("Windows Server 2025 image catalogue: PASS; latest listed version:", max(versions)[1])
+          PY
+          sku_file="$RUNNER_TEMP/windows-b2s-sku.json"
+          az vm list-skus --location westeurope --resource-type virtualMachines --size Standard_B2s --all --output json > "$sku_file"
+          python3 - "$sku_file" <<'PY'
+          import json, sys
+          rows = json.load(open(sys.argv[1], encoding="utf-8"))
+          candidates = [x for x in rows if x.get("name") == "Standard_B2s"]
+          if not candidates:
+              raise SystemExit("Standard_B2s SKU not listed in westeurope; no deployment attempted.")
+          row = candidates[0]
+          restrictions = row.get("restrictions") or []
+          caps = {c.get("name"): c.get("value") for c in row.get("capabilities", [])}
+          print(json.dumps({
+              "sku": row.get("name"),
+              "restriction_count": len(restrictions),
+              "restrictions": restrictions,
+              "vCPUs": caps.get("vCPUs"),
+              "MemoryGB": caps.get("MemoryGB"),
+              "note": "SKU listing is not a guarantee of live capacity or trial eligibility."
+          }, indent=2))
+          if restrictions:
+              raise SystemExit("Standard_B2s has regional/subscription restrictions; no deployment attempted.")
+          PY
+          az vm list-usage --location westeurope --output json > "$RUNNER_TEMP/azure-quota.json"
+          python3 - "$RUNNER_TEMP/azure-quota.json" <<'PY'
+          import json, sys
+          rows = json.load(open(sys.argv[1], encoding="utf-8"))
+          selected = []
+          for row in rows:
+              name = row.get("name", {})
+              text = f"{name.get('value','')} {name.get('localizedValue','')}".lower()
+              if "total regional vcpus" in text or "standardbsfamily" in text or "standard b family" in text:
+                  selected.append({"quota": name.get("localizedValue") or name.get("value"), "current": row.get("currentValue"), "limit": row.get("limit")})
+          print(json.dumps({"regional_quota_observations": selected}, indent=2))
+          if not selected:
+              print("QUOTA_REVIEW_REQUIRED: no matching regional/family quota rows identified.")
+          PY
+          echo "No Azure resources were created, updated, or deleted."
+
+      - name: Upload cost and readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-windows-cloud-cost-readiness-\${{ github.run_id }}
+          if-no-files-found: warn
+          path: windows-cloud-cost-estimate.json
