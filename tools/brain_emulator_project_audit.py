@@ -96,7 +96,7 @@ def markdown_inventory(relative_path: str) -> dict[str, Any]:
         return {"exists": False, "headings": [], "checked": 0, "pending": 0, "tasks": []}
     text = path.read_text(encoding="utf-8", errors="replace")
     headings = [line.strip("# ").strip() for line in text.splitlines() if line.startswith("#")]
-    task_rows = re.findall(r"^\\s*- \\[([ xX])\\] (.+)$", text, flags=re.MULTILINE)
+    task_rows = re.findall(r"^\s*- \[([ xX])\] (.+)$", text, flags=re.MULTILINE)
     tasks = [{"done": mark.lower() == "x", "task": label.strip()} for mark, label in task_rows]
     return {
         "exists": True,
