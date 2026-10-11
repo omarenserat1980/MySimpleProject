@@ -43,7 +43,7 @@ jobs:
           BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
           BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
           BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
-          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
           BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
         run: |
           set -euo pipefail
@@ -53,7 +53,6 @@ jobs:
             BRAIN_CLOUD_EXECUTOR_TOKEN \
             BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64 \
             BRAIN_AUTHORITY_PUBLIC_KEY_B64 \
-            BRAIN_WINDOWS_CONTROL_PLANE_URL \
             BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY; do
             if [ -z "${!name:-}" ]; then
               printf 'BLOCKED: required protected environment secret is empty: %s\n' "$name"
@@ -68,7 +67,7 @@ jobs:
 
       - name: Classify Control Plane endpoint without disclosure
         env:
-          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
         run: |
           set -euo pipefail
           # Never echo the endpoint: it may contain internal routing information.
@@ -122,7 +121,7 @@ jobs:
 
       - name: Fetch short-lived contract from Brain Control Plane
         env:
-          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
           BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
         run: |
           set -euo pipefail
