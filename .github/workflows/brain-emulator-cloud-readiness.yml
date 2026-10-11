@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/brain_emulator_project_audit.py"
+      - "tools/brain_emulator_agent.py"
       - "tools/install_windows_boot_prerequisites.sh"
       - "brain_v12/tools/brain_emulator_agent.py"
       - "brain_v12/tests/test_brain_emulator_project_audit.py"
