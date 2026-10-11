@@ -2,8 +2,7 @@
 param(
     [string]$ResourceGroup = "brain-windows-rg",
     [string]$VmName = "brain-windows-2025",
-    [int]$TimeoutSeconds = 600,
-    [switch]$SkipAuthenticatedWinRM
+    [int]$TimeoutSeconds = 600
 )
 $ErrorActionPreference = "Stop"
 function Fail([string]$Message) { throw $Message }
@@ -15,32 +14,59 @@ do {
     Start-Sleep -Seconds 10
 } while ((Get-Date) -lt $deadline)
 if (-not $vm) { Fail "VM_NOT_FOUND: Azure does not report $VmName in $ResourceGroup." }
+if ([string]$vm.provisioningState -ne "Succeeded") { Fail "VM_PROVISIONING_NOT_SUCCEEDED: Azure reports '$($vm.provisioningState)'." }
 if ([string]$vm.powerState -ne "VM running") { Fail "VM_NOT_RUNNING: Azure reports '$($vm.powerState)'." }
 $ip = [string]$vm.publicIps
 if (-not $ip) { Fail "NO_PUBLIC_IP: VM is running but has no public IP to test." }
 
-$rdp = Test-NetConnection -ComputerName $ip -Port 3389 -InformationLevel Quiet -WarningAction SilentlyContinue
-if (-not $rdp) { Fail "RDP_TCP_FAILED: $($ip):3389 is unreachable. Check the RDP NSG rule, guest RDP setting, firewall, and allowed source IP." }
-$winrm = Test-NetConnection -ComputerName $ip -Port 5986 -InformationLevel Quiet -WarningAction SilentlyContinue
-if (-not $winrm) { Fail "WINRM_TCP_FAILED: $($ip):5986 is unreachable. Check NSG, guest firewall, listener and allowed source IP." }
+# Do not probe restricted management ports from the hosted GitHub runner:
+# its egress IP is not the user's ASUS/Arkan IP. Verify NSG policy instead.
+$nsgRaw = az network nsg rule list --resource-group $ResourceGroup --nsg-name "$VmName-nsg" --output json 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $nsgRaw) { Fail "NSG_RULES_NOT_READABLE: unable to inspect the VM network security group." }
+$nsgRules = @($nsgRaw | ConvertFrom-Json)
+$rdpRule = $nsgRules | Where-Object { $_.name -eq "AllowRDP" } | Select-Object -First 1
+$winrmRule = $nsgRules | Where-Object { $_.name -eq "AllowWinRM" } | Select-Object -First 1
+if (-not $rdpRule -or [string]$rdpRule.destinationPortRange -ne "3389") { Fail "RDP_NSG_RULE_MISSING: AllowRDP TCP 3389 rule was not found." }
+if (-not $winrmRule -or [string]$winrmRule.destinationPortRange -ne "5986") { Fail "WINRM_NSG_RULE_MISSING: AllowWinRM TCP 5986 rule was not found." }
+foreach ($rule in @($rdpRule,$winrmRule)) {
+    $source = [string]$rule.sourceAddressPrefix
+    if (-not $source -or $source -in @("*","0.0.0.0/0","Internet")) {
+        Fail "OPEN_MANAGEMENT_SOURCE: rule '$($rule.name)' is not restricted to the trusted source CIDR."
+    }
+}
 
-$guest = $null
-if (-not $SkipAuthenticatedWinRM) {
-    $user = $env:BRAIN_ADMIN_USERNAME
-    $password = $env:BRAIN_ADMIN_PASSWORD
-    if (-not $user -or -not $password) { Fail "WINRM_AUTH_NOT_TESTED: supply BRAIN_ADMIN_USERNAME and BRAIN_ADMIN_PASSWORD securely." }
-    $secure = ConvertTo-SecureString $password -AsPlainText -Force
-    $credential = [pscredential]::new($user,$secure)
-    $session = $null
-    try {
-        $options = New-PSSessionOption -SkipCACheck -SkipCNCheck -OperationTimeout 30000
-        $session = New-PSSession -ComputerName $ip -Port 5986 -UseSSL -Authentication Negotiate -Credential $credential -SessionOption $options -ErrorAction Stop
-        $guest = Invoke-Command -Session $session -ScriptBlock {
-            $os = Get-CimInstance Win32_OperatingSystem
-            [pscustomobject]@{ computer=$env:COMPUTERNAME; os=$os.Caption; lastBoot=$os.LastBootUpTime.ToString("o") }
-        } -ErrorAction Stop
-    } catch { Fail "WINRM_AUTH_FAILED: TCP is reachable but authenticated remote command failed. $($_.Exception.Message)" }
-    finally { if ($session) { Remove-PSSession $session -ErrorAction SilentlyContinue } }
+$guestScript = @'
+$os = Get-CimInstance Win32_OperatingSystem
+$rdpSetting = (Get-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name fDenyTSConnections).fDenyTSConnections
+$term = Get-Service -Name TermService -ErrorAction SilentlyContinue
+$rdpRule = Get-NetFirewallRule -DisplayName "Electronic Brain RDP" -ErrorAction SilentlyContinue | Where-Object { $_.Enabled -eq "True" -and $_.Direction -eq "Inbound" -and $_.Action -eq "Allow" } | Select-Object -First 1
+$rdpPort = Get-NetTCPConnection -State Listen -LocalPort 3389 -ErrorAction SilentlyContinue | Select-Object -First 1
+$winrmRule = Get-NetFirewallRule -DisplayName "Electronic Brain WinRM HTTPS" -ErrorAction SilentlyContinue | Where-Object { $_.Enabled -eq "True" -and $_.Direction -eq "Inbound" -and $_.Action -eq "Allow" } | Select-Object -First 1
+$httpsListener = Get-ChildItem WSMan:\Localhost\Listener | Where-Object { try { (Get-Item "$($_.PSPath)\Transport" -ErrorAction Stop).Value -eq "HTTPS" } catch { $false } } | Select-Object -First 1
+[ordered]@{
+  computer = $env:COMPUTERNAME
+  os = $os.Caption
+  architecture = $os.OSArchitecture
+  last_boot_utc = $os.LastBootUpTime.ToUniversalTime().ToString("o")
+  rdp_enabled = ($rdpSetting -eq 0)
+  termservice_running = ([string]$term.Status -eq "Running")
+  rdp_firewall_rule_enabled = [bool]$rdpRule
+  rdp_listener = [bool]$rdpPort
+  winrm_https_firewall_rule_enabled = [bool]$winrmRule
+  winrm_https_listener = [bool]$httpsListener
+} | ConvertTo-Json -Compress
+'@
+$guestMessage = az vm run-command invoke --resource-group $ResourceGroup --name $VmName --command-id RunPowerShellScript --scripts $guestScript --query "value[0].message" --output tsv 2>&1
+if ($LASTEXITCODE -ne 0 -or -not $guestMessage) { Fail "AZURE_GUEST_INSPECTION_FAILED: Azure Run Command could not inspect the Windows guest." }
+$messageText = ($guestMessage | Out-String)
+$jsonMatch = [regex]::Match($messageText, '(?s)\{.*\}')
+if (-not $jsonMatch.Success) { Fail "GUEST_EVIDENCE_PARSE_FAILED: Windows guest inspection returned no structured evidence." }
+try { $guest = $jsonMatch.Value | ConvertFrom-Json } catch { Fail "GUEST_EVIDENCE_PARSE_FAILED: Windows guest JSON was invalid." }
+if (-not $guest.rdp_enabled -or -not $guest.termservice_running -or -not $guest.rdp_firewall_rule_enabled -or -not $guest.rdp_listener) {
+    Fail "RDP_GUEST_NOT_READY: guest evidence shows Remote Desktop is not fully enabled/listening."
+}
+if (-not $guest.winrm_https_firewall_rule_enabled -or -not $guest.winrm_https_listener) {
+    Fail "WINRM_GUEST_NOT_READY: guest evidence shows HTTPS WinRM is not fully configured."
 }
 [ordered]@{
     verified_at_utc = [DateTime]::UtcNow.ToString("o")
@@ -51,9 +77,9 @@ if (-not $SkipAuthenticatedWinRM) {
     provisioning_state = $vm.provisioningState
     power_state = $vm.powerState
     public_ip = $ip
-    rdp_tcp_3389 = [bool]$rdp
-    winrm_tcp_5986 = [bool]$winrm
-    authenticated_winrm = [bool](-not $SkipAuthenticatedWinRM)
+    nsg_rdp_tcp_3389_restricted = $true
+    nsg_winrm_tcp_5986_restricted = $true
     guest = $guest
-    result = if ($SkipAuthenticatedWinRM) { "PARTIAL_TCP_ONLY" } else { "PASS" }
+    result = "GUEST_RDP_READY_CLIENT_TEST_REQUIRED"
+    note = "Guest and Azure network policy are verified. A successful interactive RDP sign-in from ASUS/Arkan must be tested from that client; this hosted runner cannot prove that client path."
 } | ConvertTo-Json -Depth 8
