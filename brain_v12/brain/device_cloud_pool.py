@@ -106,6 +106,8 @@ def _remote_nodes(device_bridge: Any) -> list[CloudNode]:
     """Observe enrolled Windows executors only when their recent heartbeat reports capacity."""
     import time
     nodes: list[CloudNode] = []
+    if not hasattr(device_bridge, "store") or not hasattr(device_bridge, "sync_adapter"):
+        return nodes
     now = time.time()
     ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
     for item in device_bridge.store.device_agents():
