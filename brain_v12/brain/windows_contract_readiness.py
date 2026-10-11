@@ -53,7 +53,7 @@ def readiness_snapshot(environ: dict[str, str] | None = None) -> dict[str, Any]:
     ok = all(checks.values())
     return {
         "ok": ok,
-        "status": "READY_FOR_ATTEMPT_BOUND_ISSUANCE" if ok else "BLOCKED",
+        "status": "PREFLIGHT_INPUTS_PRESENT" if ok else "BLOCKED",
         "scope": "read-only-presence-and-file-format-check; does-not-issue-contract",
         "secrets": secrets,
         "files": files,
