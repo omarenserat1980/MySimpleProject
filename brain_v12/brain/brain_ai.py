@@ -235,7 +235,7 @@ class BrainAI:
     def _context(self) -> str:
         parts=[]
         if self.memory_store is not None:
-            try: parts.append("[BRAIN_MEMORY]\n"+str(self.memory_store.memories()[-12:]))
+            try: parts.append("[BRAIN_MEMORY]\n"+str(self.memory_store.memories()[:12]))
             except Exception: parts.append("[BRAIN_MEMORY]\nUNAVAILABLE")
         if self.cognitive is not None:
             try: parts.append("[BRAIN_STATE]\n"+str(self.cognitive.store.state()))
