@@ -1,5 +1,9 @@
 [CmdletBinding()]
-param([string]$Location = "westeurope", [string]$VmSize = "Standard_B1s")
+param(
+    [string]$Location = "westeurope",
+    [string]$VmSize = "Standard_B1s",
+    [switch]$AllowMissingAdminCredentials
+)
 $ErrorActionPreference = "Stop"
 function Fail([string]$Message) { throw $Message }
 foreach ($tool in @("az","terraform")) {
@@ -11,7 +15,13 @@ $account = $raw | ConvertFrom-Json
 if (-not $account.id) { Fail "Azure CLI has no active subscription." }
 if ($env:ARM_SUBSCRIPTION_ID -and $env:ARM_SUBSCRIPTION_ID -ne $account.id) { Fail "Active subscription does not match ARM_SUBSCRIPTION_ID." }
 if (-not $env:ARM_CLIENT_ID -or -not $env:ARM_TENANT_ID -or -not $env:ARM_SUBSCRIPTION_ID) { Fail "OIDC configuration incomplete: set ARM_CLIENT_ID, ARM_TENANT_ID and ARM_SUBSCRIPTION_ID as GitHub Actions variables." }
-if (-not $env:TF_VAR_admin_username -or -not $env:TF_VAR_admin_password) { Fail "Missing BRAIN_WINDOWS_ADMIN_USERNAME / BRAIN_WINDOWS_ADMIN_PASSWORD secrets. Values are never printed." }
+if (-not $env:TF_VAR_admin_username -or -not $env:TF_VAR_admin_password) {
+    if ($AllowMissingAdminCredentials) {
+        Write-Host "Admin credentials are absent; allowed because this is preflight-only. Deployment remains blocked until both secrets are configured."
+    } else {
+        Fail "Missing BRAIN_WINDOWS_ADMIN_USERNAME / BRAIN_WINDOWS_ADMIN_PASSWORD secrets. Values are never printed."
+    }
+}
 if (-not $env:TF_VAR_allowed_source_ip -or $env:TF_VAR_allowed_source_ip -eq "0.0.0.0/0") { Fail "Set a trusted TF_VAR_allowed_source_ip CIDR. Public-wide management access is forbidden." }
 if ($env:TF_VAR_allowed_source_ip -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|[12]\d|3[0-2])$') { Fail "TF_VAR_allowed_source_ip must be an IPv4 CIDR." }
 $compute = (az provider show --namespace Microsoft.Compute --query registrationState --output tsv 2>$null | Out-String).Trim()
