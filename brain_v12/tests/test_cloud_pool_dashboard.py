@@ -128,11 +128,14 @@ class CloudPoolDashboardTests(unittest.TestCase):
         web = Path(__file__).resolve().parents[1] / "web"
         dashboard_path = web / "cloud-pool.html"
         index_path = web / "index.html"
+        app_path = Path(__file__).resolve().parents[1] / "app.py"
     
         assert dashboard_path.is_file()
         assert index_path.is_file()
+        assert app_path.is_file()
         dashboard = dashboard_path.read_text(encoding="utf-8")
         index = index_path.read_text(encoding="utf-8")
+        app_source = app_path.read_text(encoding="utf-8")
     
         for route in (
             "/api/cloud-pool/status",
@@ -145,4 +148,6 @@ class CloudPoolDashboardTests(unittest.TestCase):
             assert route in dashboard
         assert "/cloud-pool.html" in index
         assert "not OS-enforced" in dashboard or "نظام التشغيل" in dashboard
+        assert "app.include_router(device_cloud_pool_router(device_cloud_pool))" in app_source
+        assert 'app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")' in app_source
     
