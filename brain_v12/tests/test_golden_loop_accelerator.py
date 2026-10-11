@@ -32,6 +32,13 @@ class GoldenLoopAcceleratorTests(unittest.TestCase):
         base = {"boot_verified": True, "caption": "Windows Server 2025 Datacenter"}
         self.assertFalse(passed("boot", base))
         self.assertTrue(passed("boot", {**base, "boot_time": "2026-10-11T08:00:00Z"}))
+        self.assertTrue(passed("boot", {
+            "status": "WINDOWS_BOOT_VERIFIED",
+            "guest": {
+                "os": "Windows Server 2025", "os_caption": "Microsoft Windows Server 2025 Datacenter",
+                "boot_verified": True, "boot_time": "2026-10-11T08:00:00Z"
+            }
+        }))
         self.assertFalse(passed("boot", {
             "boot_verified": True, "caption": "Windows 11", "boot_time": "2026-10-11T08:00:00Z"
         }))
