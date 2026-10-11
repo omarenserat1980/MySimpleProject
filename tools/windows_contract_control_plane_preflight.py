@@ -16,6 +16,11 @@ import sys
 import time
 from pathlib import Path
 
+# Support direct execution as `python3 tools/windows_contract_control_plane_preflight.py`.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 TASK_ID = "windows-server-2025-real-boot"
 SCOPE = "windows-server-2025-real-boot"
 
@@ -120,6 +125,18 @@ def check(args) -> dict:
             approval, public_key, source_commit=args.source_commit.lower(),
             task_id=args.task_id, attempt_id=args.attempt_id,
         )
+        # Check the one-time challenge ledger read-only; never consume an approval here.
+        db = Path(args.leadership_db)
+        uri = "file:" + str(db.resolve()) + "?mode=ro"
+        with sqlite3.connect(uri, uri=True, timeout=3) as conn:
+            table = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='consumed_owner_approvals'"
+            ).fetchone()
+            if table and conn.execute(
+                "SELECT 1 FROM consumed_owner_approvals WHERE challenge_id=?",
+                (owner.challenge_id,),
+            ).fetchone():
+                raise RuntimeError("OWNER_APPROVAL_ALREADY_CONSUMED")
         if owner.scope != SCOPE:
             raise RuntimeError("OWNER_APPROVAL_SCOPE_MISMATCH")
         if owner.expires_at <= time.time() + 60:
