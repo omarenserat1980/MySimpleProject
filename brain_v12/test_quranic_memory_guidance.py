@@ -28,3 +28,26 @@ def test_uncertainty_and_counterevidence_are_detected_without_mutation():
     assert "uncertainty_and_doubt" in result["matched_review_lenses"]
     assert "humility_and_counterevidence" in result["matched_review_lenses"]
     assert result["memory_mutated"] is False
+
+
+def test_quranic_core_router_exposes_read_only_guidance():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from brain_v12.brain.quranic_core.api import build_router
+
+    app = FastAPI()
+    app.include_router(build_router())
+    client = TestClient(app)
+
+    guidance = client.get("/api/quranic-core/memory-guidance")
+    assert guidance.status_code == 200
+    assert guidance.json()["memory_mutated"] is False
+    assert guidance.json()["count"] > 0
+
+    review = client.post(
+        "/api/quranic-core/memory-guidance/review",
+        json={"memory_text": "هذا دليل يحتاج تحقق من المصدر"},
+    )
+    assert review.status_code == 200
+    assert review.json()["memory_mutated"] is False
+    assert "evidence_and_verification" in review.json()["matched_review_lenses"]
