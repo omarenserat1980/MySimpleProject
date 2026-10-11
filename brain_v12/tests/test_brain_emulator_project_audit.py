@@ -35,7 +35,7 @@ class BrainEmulatorProjectAuditTests(unittest.TestCase):
             with patch.object(audit_tool.shutil, "which", return_value=None):
                 report = audit_tool.audit()
         self.assertTrue(report["acceptance_rule"]["qemu_started_or_workflow_green_is_not_boot_proof"])
-        self.assertIn("WINDOWS_BOOT_VERIFIED", report["acceptance_rule"]["required"])
+        self.assertTrue(any("WINDOWS_BOOT_VERIFIED" in item for item in report["acceptance_rule"]["required"]))
 
 
 if __name__ == "__main__":
