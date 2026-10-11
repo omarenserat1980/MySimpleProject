@@ -5,7 +5,7 @@ param(
     [string]$Location = "northeurope",
     [string]$ResourceGroup = "brain-windows-rg",
     [string]$VmName = "brain-windows-2025",
-    [string]$VmSize = "Standard_D4s_v5",
+    [string]$VmSize = "Standard_B2s",
     [string]$AllowedSourceIp = "212.34.20.123/32",
     [string]$StateResourceGroup = "brain-tfstate-rg",
     [string]$StateContainer = "tfstate"
