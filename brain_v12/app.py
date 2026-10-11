@@ -2981,7 +2981,7 @@ def brain_liveness():
 # Simulation-first remote fabric. All routes operate on the virtual twin unless a
 # separately configured, independently validated real-device probe is supplied.
 from .brain.arkan_failover_gateway import ArkanFailoverGateway
-_arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(ROOT, ".brain", "virtual", "arkan"))
+_arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(RUNTIME_STATE_ROOT, "virtual", "arkan"))
 arkan_remote_fabric = ArkanFailoverGateway(_arkan_virtual_root)
 from .brain.background_work_coordinator import BackgroundWorkCoordinator
 
@@ -3000,7 +3000,7 @@ def _background_simulation_readiness():
 background_work = BackgroundWorkCoordinator(
     max_workers=int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, os.cpu_count() or 2)))),
     max_pending=int(os.getenv("BRAIN_BACKGROUND_MAX_PENDING", "64")),
-    db_path=os.getenv("BRAIN_BACKGROUND_DB", os.path.join(ROOT, ".brain", "state", "background_work.sqlite3")),
+    db_path=os.getenv("BRAIN_BACKGROUND_DB", os.path.join(RUNTIME_STATE_ROOT, "state", "background_work.sqlite3")),
     handlers={
         "simulation_health": _background_simulation_health,
         "simulation_inventory": _background_simulation_inventory,
