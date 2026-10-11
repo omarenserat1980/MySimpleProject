@@ -68,6 +68,27 @@ class DeviceCloudPoolTests(unittest.TestCase):
         self.assertEqual(arkan["cpu_cores"], 8)
         self.assertIn("windows-executor-arkan", {x.executor_id for x in pool.capacities()})
 
+    def test_stale_windows_executor_is_not_schedulable(self):
+        class FakeRecord:
+            deleted = False
+            value = {"metadata": {
+                "platform": "windows", "cpu_cores": 8, "memory_mb": 3600,
+                "disk_mb": 12000, "healthy": True, "capabilities": ["python.test"],
+            }}
+        class FakeStore:
+            def get(self, key):
+                return FakeRecord()
+        class StaleBridge(FakeBridge):
+            store = type("S", (), {"device_agents": lambda self: [{
+                "agent_id": "windows-executor-arkan", "last_seen": 1
+            }]})()
+            sync_adapter = type("A", (), {"store": FakeStore()})()
+        with patch.dict(os.environ, {"TERMUX_AGENT_TTL_SECONDS": "5"}):
+            pool = DeviceCloudPool(StaleBridge([]))
+            arkan = next(n for n in pool.nodes() if n.node_id == "windows-executor-arkan")
+            self.assertFalse(arkan.online)
+            self.assertNotIn("windows-executor-arkan", {x.executor_id for x in pool.capacities()})
+
     def test_plan_is_zero_cost_and_fail_closed_for_missing_capability(self):
         pool = DeviceCloudPool(FakeBridge([]))
         decision = pool.plan(task_id="t1", capability="media.render")
