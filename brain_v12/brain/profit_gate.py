@@ -60,6 +60,8 @@ class ProfitGate:
             reasons.append("SIMULATION_IS_NOT_REVENUE")
         if not provider_verified:
             reasons.append("PROVIDER_NOT_VERIFIED")
+        if truth not in {"DEVICE_ATTESTED", "EXTERNALLY_VERIFIED", "FINANCIALLY_SETTLED"}:
+            reasons.append("TRUTH_LEVEL_NOT_VERIFIED_FOR_ECONOMICS")
         if not evidence_verified:
             reasons.append("INSUFFICIENT_VERIFIED_EVIDENCE")
         if revenue is None or not self._valid_number(revenue):
