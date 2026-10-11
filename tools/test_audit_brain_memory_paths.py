@@ -20,6 +20,12 @@ class AuditPatternTests(unittest.TestCase):
     def test_sqlite_pattern_matches(self):
         self.assertRegex("sqlite3.connect('brain.db')", AUDIT.PATTERNS["sqlite_paths"])
 
+    def test_runtime_path_pattern_matches_database_configuration(self):
+        self.assertRegex("os.getenv(\"BRAIN_DB\")", AUDIT.PATTERNS["runtime_path_config"])
+
+    def test_runtime_path_pattern_matches_path_initializer(self):
+        self.assertRegex("configure_runtime_paths()", AUDIT.PATTERNS["runtime_path_config"])
+
     def test_api_route_pattern_matches_memory_route(self):
         self.assertRegex('@router.post("/api/memory/write")', AUDIT.PATTERNS["api_routes"])
 
