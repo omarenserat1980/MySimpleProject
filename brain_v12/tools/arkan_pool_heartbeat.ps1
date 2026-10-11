@@ -13,7 +13,7 @@ while ($true) {
   $memoryMb = [int][math]::Floor([double]$os.TotalVisibleMemorySize / 1024)
   $metadata = @{ platform = "windows"; hostname = $env:COMPUTERNAME; cpu_cores = [double]$cpu; memory_mb = $memoryMb; disk_mb = (Get-FreeDiskMb); healthy = $true; capabilities = @("device.status", "device.info", "python.test"); observation_only = $true }
   $body = @{ agent_id = $env:BRAIN_AGENT_ID; metadata = $metadata } | ConvertTo-Json -Depth 6
-  $headers = @{ "X-Brain-Agent-Key" = $env:BRAIN_AGENT_KEY; "X-Brain-Agent-Id" = $env:BRAIN_AGENT_ID }
+  $headers = @{ "X-V12-Agent-Key" = $env:BRAIN_AGENT_KEY; "X-V12-Agent-Id" = $env:BRAIN_AGENT_ID }
   Invoke-RestMethod -Method Post -Uri "$($env:BRAIN_URL.TrimEnd('/'))/api/device/heartbeat" -Headers $headers -ContentType "application/json" -Body $body | Out-Null
   Start-Sleep -Seconds 10
 }
