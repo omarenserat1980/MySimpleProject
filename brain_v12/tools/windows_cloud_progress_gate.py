@@ -116,6 +116,13 @@ def summarize(base_url: str, results: dict[str, dict[str, Any]], repo_root: Path
             "action": "No VM is registered. Do not claim boot; complete provider and enrollment prerequisites first.",
         })
 
+    # The four readiness endpoints do not attest boot from the installed disk.
+    # Always keep this independent proof obligation open; never infer real boot.
+    blockers.append({
+        "code": "REAL_WINDOWS_BOOT_EVIDENCE_NOT_CHECKED",
+        "action": "After guest enrollment, collect trusted installed-disk boot evidence and pass the Golden Loop Closure Auditor.",
+    })
+
     return {
         "tool": "BRAIN_WINDOWS_CLOUD_PROGRESS_GATE",
         "mode": "READ_ONLY",
