@@ -29,8 +29,16 @@ def inspect_capabilities(environ=None, system=None, machine=None, exists=None, w
         add("binary:" + binary, available, "PASS" if available else "MISSING_BINARY")
     registry = bool(str(env.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_URL", "")).strip())
     add("executor_registry_url", registry, "PRESENT" if registry else "BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED_MISSING")
-    contract = bool(str(env.get("WINDOWS_EXECUTION_CONTRACT_FILE", "")).strip())
-    add("execution_contract_path", contract, "PRESENT" if contract else "WINDOWS_EXECUTION_CONTRACT_FILE_REQUIRED")
+
+    # The real-boot workflow and contract fetcher use the BRAIN_-prefixed name.
+    # Accept the legacy name as a compatibility fallback for older callers.
+    contract_path = str(
+        env.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE", "")
+        or env.get("WINDOWS_EXECUTION_CONTRACT_FILE", "")
+    ).strip()
+    contract = bool(contract_path)
+    add("execution_contract_path", contract,
+        "PRESENT" if contract else "WINDOWS_EXECUTION_CONTRACT_FILE_REQUIRED")
 
     missing = [item for item in checks if not item["ok"]]
     return {
