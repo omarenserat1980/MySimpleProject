@@ -23,37 +23,44 @@ jobs:
     # Prefer Brain's existing self-hosted Arkan runner; do not use a paid cloud host.
     runs-on: [self-hosted, brain-internal]
     timeout-minutes: 5
-    env:
-      BRAIN_URL: ${{ vars.BRAIN_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
-      BRAIN_AGENT_ID: ${{ vars.BRAIN_LINUX_AGENT_ID }}
-      BRAIN_AGENT_KEY: ${{ secrets.BRAIN_AGENT_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify agent configuration without exposing credentials
+      - name: Resolve configuration and send one authenticated heartbeat
         shell: bash
+        env:
+          # Keep repository-provided values separate so empty settings do not
+          # shadow credentials intentionally configured in the self-hosted runner.
+          BRAIN_GITHUB_URL: ${{ vars.BRAIN_CONTROL_PLANE_URL }}
+          BRAIN_GITHUB_AGENT_ID: ${{ vars.BRAIN_LINUX_AGENT_ID }}
+          BRAIN_GITHUB_AGENT_KEY: ${{ secrets.BRAIN_AGENT_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${BRAIN_AGENT_ID:-}" ]; then
-            echo "BLOCKED: configure repository variable BRAIN_LINUX_AGENT_ID with an enrolled ID beginning linux-executor-"
+          resolved_url="${BRAIN_GITHUB_URL:-${BRAIN_URL:-https://brain-control-plane-main.onrender.com}}"
+          resolved_id="${BRAIN_GITHUB_AGENT_ID:-${BRAIN_AGENT_ID:-}}"
+          resolved_key="${BRAIN_GITHUB_AGENT_KEY:-${BRAIN_AGENT_KEY:-}}"
+          if [ -z "$resolved_id" ]; then
+            echo "BLOCKED: no BRAIN_LINUX_AGENT_ID repository variable or BRAIN_AGENT_ID configured on the Arkan runner"
             exit 2
           fi
-          if [ -z "${BRAIN_AGENT_KEY:-}" ]; then
-            echo "BLOCKED: BRAIN_AGENT_KEY secret is missing; use the key already registered in Brain's device-agent registry"
+          if [ -z "$resolved_key" ]; then
+            echo "BLOCKED: no BRAIN_AGENT_KEY repository secret or runner-level BRAIN_AGENT_KEY is configured"
             exit 2
           fi
-          case "$BRAIN_AGENT_ID" in
+          case "$resolved_id" in
             linux-executor-*) ;;
             *) echo "BLOCKED: Linux runner agent ID must start with linux-executor-"; exit 2 ;;
           esac
-          case "$BRAIN_URL" in
+          case "$resolved_url" in
             https://*) ;;
             *) echo "BLOCKED: Control Plane URL must use HTTPS"; exit 2 ;;
           esac
+          export BRAIN_URL="$resolved_url"
+          export BRAIN_AGENT_ID="$resolved_id"
+          export BRAIN_AGENT_KEY="$resolved_key"
           echo "AGENT_CONFIGURATION=READY"
-      - name: Launch one authenticated heartbeat from Arkan Linux runner
-        shell: bash
-        run: |
-          set -euo pipefail
+          echo "AGENT_ID_SOURCE=${BRAIN_GITHUB_AGENT_ID:+repository_variable}"
+          if [ -z "${BRAIN_GITHUB_AGENT_ID:-}" ]; then echo "AGENT_ID_SOURCE=runner_environment"; fi
+          if [ -n "${BRAIN_GITHUB_AGENT_KEY:-}" ]; then echo "AGENT_KEY_SOURCE=repository_secret"; else echo "AGENT_KEY_SOURCE=runner_environment"; fi
           python3 -m py_compile brain_v12/tools/brain_device_link.py
           python3 brain_v12/tools/brain_device_link.py --once
       - name: Report explicit launch result
