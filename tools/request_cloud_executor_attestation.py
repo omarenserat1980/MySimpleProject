@@ -14,6 +14,18 @@ def post(base: str, path: str, token: str, payload: dict) -> dict:
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             result = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        # Preserve only the server's fixed error code, never response bodies that
+        # might contain sensitive deployment details or credentials.
+        code = "UNKNOWN"
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+            candidate = body.get("detail") if isinstance(body, dict) else None
+            if isinstance(candidate, str) and candidate.replace("_", "").isalnum():
+                code = candidate[:100]
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            pass
+        raise RuntimeError(f"CLOUD_EXECUTOR_HTTP_{exc.code}:{code}") from exc
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_REQUEST_FAILED") from exc
     if not isinstance(result, dict):
