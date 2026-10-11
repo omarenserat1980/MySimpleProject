@@ -102,6 +102,39 @@ def local_host_node(*, node_id: str | None = None) -> CloudNode:
     )
 
 
+def _remote_nodes(device_bridge: Any) -> list[CloudNode]:
+    """Observe enrolled Windows executors only when their recent heartbeat reports capacity."""
+    import time
+    nodes: list[CloudNode] = []
+    now = time.time()
+    ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
+    for item in device_bridge.store.device_agents():
+        agent_id = str(item.get("agent_id", ""))
+        if not agent_id.startswith("windows-executor-"):
+            continue
+        try:
+            age = max(0.0, now - float(item.get("last_seen", 0)))
+        except (TypeError, ValueError):
+            age = float("inf")
+        record = device_bridge.sync_adapter.store.get(f"device/agent/{agent_id}")
+        value = record.value if record and not record.deleted else {}
+        metadata = value.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+        nodes.append(CloudNode(
+            node_id=agent_id, role="windows_executor",
+            platform=str(metadata.get("platform", "windows")),
+            online=age <= ttl, healthy=age <= ttl and bool(metadata.get("healthy", True)),
+            cpu_cores=max(0.0, float(metadata.get("cpu_cores", 0) or 0)),
+            memory_mb=max(0, int(metadata.get("memory_mb", 0) or 0)),
+            disk_mb=max(0, int(metadata.get("disk_mb", 0) or 0)),
+            source="windows_agent_heartbeat", observed=True,
+            capabilities=tuple(str(x) for x in metadata.get("capabilities", [])),
+            metadata={**metadata, "heartbeat_age_seconds": round(age, 2)},
+        ))
+    return nodes
+
+
 def _android_nodes(device_bridge: Any) -> list[CloudNode]:
     nodes: list[CloudNode] = []
     for item in device_bridge.executor_capacities():
@@ -131,7 +164,7 @@ class DeviceCloudPool:
         self.device_bridge = device_bridge
 
     def nodes(self) -> list[CloudNode]:
-        return [local_host_node(), *_android_nodes(self.device_bridge)]
+        return [local_host_node(), *_android_nodes(self.device_bridge), *_remote_nodes(self.device_bridge)]
 
     def capacities(self) -> list[ExecutorCapacity]:
         capacities: list[ExecutorCapacity] = []
@@ -159,14 +192,14 @@ class DeviceCloudPool:
 
     def status(self) -> dict[str, Any]:
         nodes = self.nodes()
-        android_seen = any(n.role == "android_agent" for n in nodes)
+        remote_seen = any(n.role in {"android_agent", "windows_executor"} and n.online and n.healthy for n in nodes)
         return {
             "ok": True,
             "pool_id": "brain-device-cloud",
             "status": (
-                "TWO_NODE_OBSERVED"
-                if android_seen
-                else "HOST_ONLY_ANDROID_NOT_OBSERVED"
+                "REMOTE_NODE_OBSERVED"
+                if remote_seen
+                else "HOST_ONLY_REMOTE_NODE_NOT_OBSERVED"
             ),
             "nodes": [n.public() for n in nodes],
             "capacity_nodes": len(self.capacities()),
