@@ -40,6 +40,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A one-run random key keeps the ephemeral CI control plane authenticated
+          # without requiring a long-lived repository secret.
+          export BRAIN_CONTROL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          echo "BRAIN_CONTROL_KEY=$BRAIN_CONTROL_KEY" >> "$GITHUB_ENV"
           python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port 8012 > brain-api.log 2>&1 &
           echo $! > brain-api.pid
           for i in $(seq 1 30); do
@@ -57,7 +61,6 @@ jobs:
       - name: Execute Brain–ChatGPT simulator
         env:
           V12_BRAIN_URL: http://127.0.0.1:8012
-          BRAIN_CONTROL_KEY: ${{ secrets.BRAIN_CONTROL_KEY }}
         run: |
           set -o pipefail
           python brain_v12/tools/brain_chatgpt_loop.py --base http://127.0.0.1:8012 2>&1 | tee brain-chatgpt-result.json
