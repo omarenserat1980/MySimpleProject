@@ -112,7 +112,7 @@ def _remote_nodes(device_bridge: Any) -> list[CloudNode]:
     ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
     for item in device_bridge.store.device_agents():
         agent_id = str(item.get("agent_id", ""))
-        if not agent_id.startswith("windows-executor-"):
+        if not (agent_id.startswith("windows-executor-") or agent_id.startswith("linux-executor-")):
             continue
         try:
             age = max(0.0, now - float(item.get("last_seen", 0)))
@@ -123,9 +123,10 @@ def _remote_nodes(device_bridge: Any) -> list[CloudNode]:
         metadata = value.get("metadata", {})
         if not isinstance(metadata, dict):
             metadata = {}
+        role = "windows_executor" if agent_id.startswith("windows-executor-") else "linux_executor"
         nodes.append(CloudNode(
-            node_id=agent_id, role="windows_executor",
-            platform=str(metadata.get("platform", "windows")),
+            node_id=agent_id, role=role,
+            platform=str(metadata.get("platform", "windows" if role == "windows_executor" else "linux")),
             online=age <= ttl, healthy=age <= ttl and bool(metadata.get("healthy", True)),
             cpu_cores=max(0.0, float(metadata.get("cpu_cores", 0) or 0)),
             memory_mb=max(0, int(metadata.get("memory_mb", 0) or 0)),
@@ -194,7 +195,7 @@ class DeviceCloudPool:
 
     def status(self) -> dict[str, Any]:
         nodes = self.nodes()
-        remote_seen = any(n.role in {"android_agent", "windows_executor"} and n.online and n.healthy for n in nodes)
+        remote_seen = any(n.role in {"android_agent", "windows_executor", "linux_executor"} and n.online and n.healthy for n in nodes)
         return {
             "ok": True,
             "pool_id": "brain-device-cloud",
