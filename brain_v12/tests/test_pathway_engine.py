@@ -4,7 +4,17 @@ from brain_v12.brain.pathway_engine import evaluate_pathway
 
 
 def ev(**kwargs):
-    return {"verified": True, "evidence_id": "ev-1", "source": "test", "observed_at": "2026-10-11T00:00:00Z", **kwargs}
+    return {
+        "verified": True,
+        "evidence_id": "ev-1",
+        "source": "test",
+        "observed_at": "2026-10-11T00:00:00Z",
+        "evidence_sha256": "a" * 64,
+        "verifier_id": "unit-test-verifier",
+        "verification_method": "unit-test",
+        "verification_ref": "test://evidence/ev-1",
+        **kwargs,
+    }
 
 
 class PathwayEngineTests(unittest.TestCase):
@@ -18,6 +28,22 @@ class PathwayEngineTests(unittest.TestCase):
         result = evaluate_pathway("code_delivery", {key: ev() for key in ids})
         self.assertTrue(result["ready"])
         self.assertEqual(result["blockers"], [])
+
+    def test_evidence_requires_sha256_digest(self):
+        item = ev()
+        item.pop("evidence_sha256")
+        result = evaluate_pathway("code_delivery", {"source_snapshot": item})
+        self.assertEqual(result["gates"][0]["reason"], "EVIDENCE_HASH_MISSING")
+
+    def test_evidence_rejects_malformed_sha256_digest(self):
+        result = evaluate_pathway("code_delivery", {"source_snapshot": ev(evidence_sha256="not-a-digest")})
+        self.assertEqual(result["gates"][0]["reason"], "EVIDENCE_HASH_INVALID")
+
+    def test_evidence_requires_verification_provenance(self):
+        item = ev()
+        item.pop("verifier_id")
+        result = evaluate_pathway("code_delivery", {"source_snapshot": item})
+        self.assertEqual(result["gates"][0]["reason"], "EVIDENCE_VERIFICATION_PROVENANCE_INCOMPLETE")
 
     def test_windows_contract_requires_real_signature_validation(self):
         result = evaluate_pathway("windows_real_boot", {"signed_contract": ev(signature_valid=False)})

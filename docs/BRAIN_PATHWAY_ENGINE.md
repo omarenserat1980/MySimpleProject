@@ -16,8 +16,14 @@ publish, restore disks, mint contracts, or change permissions.
 ## Evidence format
 
 Pass a JSON object keyed by gate ID. Each gate requires `verified: true`,
-non-empty `evidence_id`, `source`, and `observed_at`. Specialized gates
-require additional explicit fields; for example Windows guest boot requires
+non-empty `evidence_id`, `source`, and `observed_at`, a 64-character
+hexadecimal `evidence_sha256`, and non-empty `verifier_id`,
+`verification_method`, and `verification_ref`. These fields make the digest
+and verification provenance explicit, but the planner does not itself hash the
+underlying artifact, authenticate the verifier, or validate a digital signature.
+Those checks must be performed by the trusted evidence producer/verifier; a
+caller-supplied `verified: true` or digest is not independent proof.
+Specialized gates require additional explicit fields; for example Windows guest boot requires
 `os_name: "Windows Server 2025"` and `boot_source: "installed_disk"`.
 The Windows pathway can also take `--expected-run-id`; the same-run binding
 must match it. A READY result means all declared evidence gates were satisfied,

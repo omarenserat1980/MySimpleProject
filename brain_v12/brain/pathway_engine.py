@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -78,6 +79,14 @@ def _valid_evidence(item: Any, gate_id: str, expected_run_id: str | None) -> tup
     for field in ("evidence_id", "source", "observed_at"):
         if not isinstance(item.get(field), str) or not item[field].strip():
             return False, "EVIDENCE_PROVENANCE_INCOMPLETE"
+    digest = item.get("evidence_sha256")
+    if not isinstance(digest, str):
+        return False, "EVIDENCE_HASH_MISSING"
+    if re.fullmatch(r"[0-9a-fA-F]{64}", digest) is None:
+        return False, "EVIDENCE_HASH_INVALID"
+    for field in ("verifier_id", "verification_method", "verification_ref"):
+        if not isinstance(item.get(field), str) or not item[field].strip():
+            return False, "EVIDENCE_VERIFICATION_PROVENANCE_INCOMPLETE"
     if gate_id == "signed_contract" and item.get("signature_valid") is not True:
         return False, "CONTRACT_SIGNATURE_NOT_VERIFIED"
     if gate_id == "trusted_executor" and not all(item.get(k) is True for k in ("attestation_valid", "authority_valid", "capability_valid")):
