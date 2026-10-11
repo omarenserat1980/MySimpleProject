@@ -15,7 +15,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_URL = "https://electronic-brain-v12-gwwg.onrender.com"
+DEFAULT_URL = "https://brain-control-plane-main.onrender.com"
 DEFAULT_AGENT_ID = "redmi3-01"
 
 
