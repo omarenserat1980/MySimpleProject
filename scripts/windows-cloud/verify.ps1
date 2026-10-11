@@ -18,8 +18,12 @@ if (-not $vm) { Fail "VM_NOT_FOUND: Azure does not report $VmName in $ResourceGr
 if ([string]$vm.powerState -ne "VM running") { Fail "VM_NOT_RUNNING: Azure reports '$($vm.powerState)'." }
 $ip = [string]$vm.publicIps
 if (-not $ip) { Fail "NO_PUBLIC_IP: VM is running but has no public IP to test." }
-$tcp = Test-NetConnection -ComputerName $ip -Port 5986 -InformationLevel Quiet -WarningAction SilentlyContinue
-if (-not $tcp) { Fail "WINRM_TCP_FAILED: $($ip):5986 is unreachable. Check NSG, guest firewall, listener and allowed source IP." }
+
+$rdp = Test-NetConnection -ComputerName $ip -Port 3389 -InformationLevel Quiet -WarningAction SilentlyContinue
+if (-not $rdp) { Fail "RDP_TCP_FAILED: $($ip):3389 is unreachable. Check the RDP NSG rule, guest RDP setting, firewall, and allowed source IP." }
+$winrm = Test-NetConnection -ComputerName $ip -Port 5986 -InformationLevel Quiet -WarningAction SilentlyContinue
+if (-not $winrm) { Fail "WINRM_TCP_FAILED: $($ip):5986 is unreachable. Check NSG, guest firewall, listener and allowed source IP." }
+
 $guest = $null
 if (-not $SkipAuthenticatedWinRM) {
     $user = $env:BRAIN_ADMIN_USERNAME
@@ -47,7 +51,8 @@ if (-not $SkipAuthenticatedWinRM) {
     provisioning_state = $vm.provisioningState
     power_state = $vm.powerState
     public_ip = $ip
-    winrm_tcp_5986 = [bool]$tcp
+    rdp_tcp_3389 = [bool]$rdp
+    winrm_tcp_5986 = [bool]$winrm
     authenticated_winrm = [bool](-not $SkipAuthenticatedWinRM)
     guest = $guest
     result = if ($SkipAuthenticatedWinRM) { "PARTIAL_TCP_ONLY" } else { "PASS" }
