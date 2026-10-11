@@ -25,7 +25,8 @@ class BrainChatSimulatorContractTests(unittest.TestCase):
             self.assertIn(endpoint, self.html)
         self.assertIn('prefix="/api/brain-chat"', self.chat_api)
         self.assertIn('@r.post("/sessions/{session_id}/messages")', self.chat_api)
-        self.assertIn('app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")', self.app.replace(" ", ""))
+        compact_app = self.app.replace(" ", "").replace("'", '"')
+        self.assertIn('app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")', compact_app)
 
     def test_messages_use_safe_unapproved_mode(self):
         self.assertIn("approved:false", self.html)
