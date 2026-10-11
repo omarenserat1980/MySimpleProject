@@ -57,14 +57,31 @@ def passed(kind: str, data: dict[str, Any]) -> bool:
             and runtime in {"PASS", "SUCCESS", "VERIFIED"}
         )
     if kind == "executor":
-        return data.get("verified") is True and bool(data.get("executor_id") or data.get("executor") or data.get("host"))
+        return data.get("verified") is True and bool(
+            data.get("executor_id") or data.get("executor") or data.get("host")
+            or data.get("executor_host") or data.get("hostname")
+        )
     if kind == "contract":
         status = str(data.get("status", data.get("result", ""))).upper()
         return data.get("verified") is True or status in {"VERIFIED", "VALID", "CONTRACT_VERIFIED"}
     if kind == "boot":
-        marker = data.get("boot_verified") is True or data.get("WINDOWS_BOOT_VERIFIED") is True
-        os_name = str(data.get("caption", data.get("os_caption", data.get("operating_system", "")))).lower()
-        return marker and "windows server 2025" in os_name and bool(data.get("boot_time") or data.get("last_boot_up_time"))
+        guest = data.get("guest") if isinstance(data.get("guest"), dict) else {}
+        marker = (
+            data.get("boot_verified") is True
+            or data.get("WINDOWS_BOOT_VERIFIED") is True
+            or guest.get("boot_verified") is True
+            or data.get("status") == "WINDOWS_BOOT_VERIFIED"
+        )
+        os_name = str(
+            data.get("caption")
+            or data.get("os_caption")
+            or data.get("operating_system")
+            or guest.get("os_caption")
+            or guest.get("os")
+            or ""
+        ).lower()
+        boot_time = data.get("boot_time") or data.get("last_boot_up_time") or guest.get("boot_time")
+        return marker and "windows server 2025" in os_name and bool(boot_time)
     if kind == "completion":
         status = str(data.get("status", "")).upper()
         return status == "WINDOWS_BOOT_VERIFIED" and not data.get("reasons")
