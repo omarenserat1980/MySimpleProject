@@ -145,6 +145,34 @@ class DeviceCloudPoolTests(unittest.TestCase):
         self.assertEqual(decision.status, "PLANNED")
         self.assertEqual(decision.executor_id, "remote-android")
 
+    def test_remote_executor_with_missing_cpu_or_memory_is_not_schedulable(self):
+        import time
+
+        class FakeRecord:
+            deleted = False
+            value = {"metadata": {
+                "platform": "windows", "cpu_cores": 0, "memory_mb": 0,
+                "disk_mb": 12000, "healthy": True,
+                "capabilities": ["python.test"],
+            }}
+
+        class FakeStore:
+            def get(self, key):
+                return FakeRecord() if key.endswith("windows-executor-arkan") else None
+
+        class IncompleteBridge(FakeBridge):
+            store = type("S", (), {"device_agents": lambda self: [{
+                "agent_id": "windows-executor-arkan", "last_seen": time.time()
+            }]})()
+            sync_adapter = type("A", (), {"store": FakeStore()})()
+
+        pool = DeviceCloudPool(IncompleteBridge([]))
+        # Preserve visibility for diagnosis, but do not advertise usable capacity.
+        node = next(n for n in pool.nodes() if n.node_id == "windows-executor-arkan")
+        self.assertTrue(node.online)
+        self.assertEqual(node.cpu_cores, 0)
+        self.assertNotIn("windows-executor-arkan", {x.executor_id for x in pool.capacities()})
+
     def test_plan_is_zero_cost_and_fail_closed_for_missing_capability(self):
         pool = DeviceCloudPool(FakeBridge([]))
         decision = pool.plan(task_id="t1", capability="media.render")
