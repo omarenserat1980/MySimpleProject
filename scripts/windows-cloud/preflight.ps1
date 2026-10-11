@@ -26,8 +26,8 @@ if (-not $env:TF_VAR_allowed_source_ip -or $env:TF_VAR_allowed_source_ip -eq "0.
 if ($env:TF_VAR_allowed_source_ip -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|[12]\d|3[0-2])$') { Fail "TF_VAR_allowed_source_ip must be an IPv4 CIDR." }
 $compute = (az provider show --namespace Microsoft.Compute --query registrationState --output tsv 2>$null | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute is not Registered. Run bootstrap-state.ps1 -RegisterProviders and wait for registration." }
-$image = az vm image show --location $Location --urn MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition:latest --query urn --output tsv 2>$null
-if ($LASTEXITCODE -ne 0 -or -not $image) { Fail "Windows Server 2025 Marketplace image is not resolvable in $Location." }
+$image = az vm image show --location $Location --urn MicrosoftWindowsServer:WindowsServer:2025-datacenter-g2:latest --query urn --output tsv 2>$null
+if ($LASTEXITCODE -ne 0 -or -not $image) { Fail "Windows Server 2025 Datacenter Gen2 Marketplace image is not resolvable in $Location. Verify the available MicrosoftWindowsServer:WindowsServer SKUs for this subscription and region." }
 $rawSkus = az vm list-skus --location $Location --resource-type virtualMachines --size $VmSize --all --output json 2>$null
 if ($LASTEXITCODE -eq 0 -and $rawSkus) {
     $skus = $rawSkus | ConvertFrom-Json
