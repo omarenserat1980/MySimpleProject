@@ -128,11 +128,16 @@ class CloudPoolDashboardTests(unittest.TestCase):
         web = Path(__file__).resolve().parents[1] / "web"
         dashboard_path = web / "cloud-pool.html"
         index_path = web / "index.html"
+        repo_root = Path(__file__).resolve().parents[2]
+        bootstrap_path = repo_root / "tools" / "Start-ElectronicBrain-CloudPool.ps1"
+        launcher_path = repo_root / "tools" / "Run-CloudPool-Setup.cmd"
         app_path = Path(__file__).resolve().parents[1] / "app.py"
     
         assert dashboard_path.is_file()
         assert index_path.is_file()
         assert app_path.is_file()
+        assert bootstrap_path.is_file()
+        assert launcher_path.is_file()
         dashboard = dashboard_path.read_text(encoding="utf-8")
         index = index_path.read_text(encoding="utf-8")
         app_source = app_path.read_text(encoding="utf-8")
