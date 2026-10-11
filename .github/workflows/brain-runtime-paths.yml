@@ -5,6 +5,7 @@ on:
     paths:
       - "brain_v12/runtime_paths.py"
       - "brain_v12/app.py"
+      - "brain_v12/brain/asic_simulator_api.py"
       - "brain_v12/media_engine.py"
       - "brain_v12/tests/test_runtime_paths.py"
       - "brain_v12/brain/evidence_store.py"
@@ -24,6 +25,7 @@ on:
     paths:
       - "brain_v12/runtime_paths.py"
       - "brain_v12/app.py"
+      - "brain_v12/brain/asic_simulator_api.py"
       - "brain_v12/media_engine.py"
       - "brain_v12/tests/test_runtime_paths.py"
       - "brain_v12/brain/evidence_store.py"
