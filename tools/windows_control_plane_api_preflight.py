@@ -15,6 +15,8 @@ from urllib.parse import urlsplit
 
 ISSUE_PATH = "/api/brain/windows/contracts/issue"
 
+DEFAULT_CONTROL_PLANE_URL = "https://brain-control-plane-main.onrender.com"
+
 
 def inspect_openapi(base_url: str, opener=None) -> dict:
     base = (base_url or "").strip().rstrip("/")
@@ -59,7 +61,7 @@ def inspect_openapi(base_url: str, opener=None) -> dict:
 
 
 def main() -> int:
-    report = inspect_openapi(os.environ.get("BRAIN_WINDOWS_CONTROL_PLANE_URL", ""))
+    report = inspect_openapi(os.environ.get("BRAIN_WINDOWS_CONTROL_PLANE_URL", DEFAULT_CONTROL_PLANE_URL))
     print(json.dumps(report, sort_keys=True))
     return 0 if report["ok"] else 2
 
