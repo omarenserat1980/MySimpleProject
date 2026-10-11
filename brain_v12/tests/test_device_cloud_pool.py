@@ -39,7 +39,7 @@ class DeviceCloudPoolTests(unittest.TestCase):
             "metadata": {"platform": "android"},
         }])
         pool = DeviceCloudPool(bridge)
-        self.assertEqual(pool.status()["status"], "TWO_NODE_OBSERVED")
+        self.assertEqual(pool.status()["status"], "REMOTE_NODE_OBSERVED")
         ids = {item.executor_id for item in pool.capacities()}
         self.assertIn("android-executor-redmi3-01", ids)
 
