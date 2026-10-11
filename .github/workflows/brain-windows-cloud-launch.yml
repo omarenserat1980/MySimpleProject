@@ -75,7 +75,7 @@ jobs:
           if (( ${#missing[@]} > 0 )); then
             echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
             printf ' - %s\n' "${missing[@]}"
-            echo "Azure variables are always required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
+            echo "Azure variables and BRAIN_ALLOWED_SOURCE_IP are required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
             echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
             exit 2
           fi
