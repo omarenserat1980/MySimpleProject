@@ -34,6 +34,18 @@ class PathwayEngineTests(unittest.TestCase):
         }, expected_run_id="run-1")
         self.assertEqual(result["gates"][5]["reason"], "WORKFLOW_RUN_MISMATCH")
 
+    def test_windows_gates_reject_evidence_from_another_run(self):
+        result = evaluate_pathway("windows_real_boot", {
+            "signed_contract": ev(signature_valid=True, run_id="run-old")
+        }, expected_run_id="run-current")
+        self.assertEqual(result["gates"][0]["reason"], "WORKFLOW_RUN_MISMATCH")
+
+    def test_windows_gates_require_run_id_when_expected(self):
+        result = evaluate_pathway("windows_real_boot", {
+            "signed_contract": ev(signature_valid=True)
+        }, expected_run_id="run-current")
+        self.assertEqual(result["gates"][0]["reason"], "WORKFLOW_RUN_ID_MISSING")
+
     def test_trusted_executor_requires_full_trust_chain(self):
         result = evaluate_pathway("windows_real_boot", {"trusted_executor": ev(attestation_valid=True)})
         self.assertEqual(result["gates"][1]["reason"], "EXECUTOR_TRUST_CHAIN_INCOMPLETE")
