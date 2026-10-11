@@ -174,6 +174,11 @@ class DeviceCloudPool:
         for node in self.nodes():
             if not node.online or not node.healthy:
                 continue
+            # Fail closed when essential capacity measurements are missing.
+            # Keep the node visible in status(), but never schedule work onto
+            # a host whose CPU or memory measurement is zero/unavailable.
+            if node.cpu_cores <= 0 or node.memory_mb <= 0:
+                continue
             capacities.append(
                 ExecutorCapacity(
                     executor_id=node.node_id,
