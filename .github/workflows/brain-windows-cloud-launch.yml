@@ -29,7 +29,7 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       TF_VAR_admin_username: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
       TF_VAR_admin_password: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
-      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_allowed_source_ip: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
       BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
       APPROVE_APPLY: ${{ inputs.approve_apply }}
     steps:
@@ -41,13 +41,16 @@ jobs:
           CHECK_AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           CHECK_WINDOWS_ADMIN_USERNAME: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
           CHECK_WINDOWS_ADMIN_PASSWORD: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+          CHECK_ALLOWED_SOURCE_IP: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+          CHECK_BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
         run: |
           set -euo pipefail
           missing=()
           for name in \
             CHECK_AZURE_CLIENT_ID \
             CHECK_AZURE_TENANT_ID \
-            CHECK_AZURE_SUBSCRIPTION_ID; do
+            CHECK_AZURE_SUBSCRIPTION_ID \
+            CHECK_ALLOWED_SOURCE_IP; do
             if [[ -z "${!name:-}" ]]; then
               missing+=("$name")
             fi
@@ -61,13 +64,35 @@ jobs:
               fi
             done
           fi
+          if [[ -n "${CHECK_BRAIN_TFSTATE_ACCOUNT:-}" ]]; then
+            if [[ ! "$CHECK_BRAIN_TFSTATE_ACCOUNT" =~ ^[a-z0-9]{3,24}$ ]]; then
+              echo "BLOCKED: BRAIN_TFSTATE_ACCOUNT must contain 3-24 lowercase letters or digits."
+              exit 2
+            fi
+          else
+            echo "Terraform state account: deterministic subscription-derived fallback will be used."
+          fi
           if (( ${#missing[@]} > 0 )); then
             echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
             printf ' - %s\n' "${missing[@]}"
-            echo "Azure variables are always required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
+            echo "Azure variables and BRAIN_ALLOWED_SOURCE_IP are required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
             echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
             exit 2
           fi
+          python3 - <<'PY'
+          import ipaddress, os, sys
+          value = os.environ.get("CHECK_ALLOWED_SOURCE_IP", "").strip()
+          try:
+              network = ipaddress.ip_network(value, strict=False)
+              if network.version != 4 or network.prefixlen > 32:
+                  raise ValueError("IPv4 CIDR required")
+              if network.prefixlen == 0:
+                  raise ValueError("public-wide access is forbidden")
+          except ValueError:
+              print("BLOCKED: BRAIN_ALLOWED_SOURCE_IP must be a valid, narrow IPv4 CIDR; 0.0.0.0/0 is forbidden.")
+              sys.exit(2)
+          print("Allowed management source CIDR: valid; value withheld.")
+          PY
           echo "Required environment configuration for this run is present; values were not printed."
 
       - name: Checkout
