@@ -51,18 +51,26 @@ foreach ($candidateSku in $imageSkuCandidates) {
         $imageLookupErrors += "$candidateSku catalogue => $detail"
         continue
     }
-    $candidateVersions = @($versions | Sort-Object { try { [version]$_ } catch { [version]'0.0' } } -Descending)
-    foreach ($candidateVersion in $candidateVersions) {
-        $showOutput = & az vm image show --location $Location --publisher MicrosoftWindowsServer --offer WindowsServer --sku $candidateSku --version $candidateVersion --query urn --output tsv --only-show-errors 2>&1
-        $showExitCode = $LASTEXITCODE
-        $candidateImage = ($showOutput | Out-String).Trim()
-        if ($showExitCode -eq 0 -and $candidateImage -match '^MicrosoftWindowsServer:WindowsServer:[^:]+:\d+(\.\d+){1,3}$') {
+    # Use the catalogue row itself as the authoritative image reference.
+    # Avoid `az vm image show --query urn`: some Azure CLI/API versions return null
+    # for that derived property even though the catalogue entry is valid.
+    $candidateEntries = @($catalog | Where-Object {
+        $_.sku -eq $candidateSku -and $_.publisher -eq "MicrosoftWindowsServer" -and
+        $_.offer -eq "WindowsServer" -and $_.version -match '^\d+(\.\d+){1,3}$'
+    } | Sort-Object { try { [version]$_.version } catch { [version]'0.0' } } -Descending)
+    foreach ($entry in $candidateEntries) {
+        $candidateVersion = [string]$entry.version
+        $candidateImage = [string]$entry.urn
+        if (-not $candidateImage -and $entry.publisher -and $entry.offer -and $entry.sku -and $entry.version) {
+            $candidateImage = "$($entry.publisher):$($entry.offer):$($entry.sku):$($entry.version)"
+        }
+        if ($candidateImage -match '^MicrosoftWindowsServer:WindowsServer:[^:]+:\d+(\.\d+){1,3}$') {
             $image = $candidateImage
-            $resolvedSku = $candidateSku
+            $resolvedSku = [string]$entry.sku
             $resolvedVersion = $candidateVersion
             break
         }
-        if ($candidateImage) { $imageLookupErrors += "$candidateSku version $candidateVersion => $candidateImage" }
+        $imageLookupErrors += "$candidateSku version $candidateVersion => catalogue row missing a valid URN and required fields"
     }
     if ($image) { break }
 }
