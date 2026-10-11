@@ -22,6 +22,19 @@ OPEN_SOURCE_SPDX_IDS = frozenset({
     "OSL-3.0", "PostgreSQL", "Unlicense", "WTFPL", "Zlib",
 })
 _LANGUAGE_RE = re.compile(r"^[A-Za-z0-9_+#.-]{1,40}$")
+_CATEGORY_RE = re.compile(r"^[a-z][a-z0-9-]{1,30}$")
+CATEGORY_QUERIES = {
+    "ai": "artificial intelligence machine learning LLM inference",
+    "automation": "workflow automation orchestration",
+    "programming": "developer tools code editor compiler debugger",
+    "databases": "database SQL NoSQL vector database",
+    "security": "cybersecurity static analysis vulnerability scanner",
+    "monitoring": "observability monitoring metrics logging tracing",
+    "mcp": "model context protocol MCP server",
+    "devops": "CI CD deployment infrastructure as code",
+    "data": "data engineering ETL analytics data pipeline",
+    "media": "audio video image processing media tools",
+}
 
 
 class OpenSourceToolRegistry:
@@ -30,7 +43,7 @@ class OpenSourceToolRegistry:
     def __init__(self, ttl_seconds: int = 300, timeout_seconds: float = 10.0) -> None:
         self.ttl_seconds = max(30, int(ttl_seconds))
         self.timeout_seconds = max(2.0, float(timeout_seconds))
-        self._cache: dict[tuple[str, str, int], tuple[float, dict[str, Any]]] = {}
+        self._cache: dict[tuple[str, str, str, int], tuple[float, dict[str, Any]]] = {}
         self._lock = threading.Lock()
 
     @staticmethod
@@ -83,15 +96,20 @@ class OpenSourceToolRegistry:
             "provider": "GitHub public repository search API",
             "license_filter": "recognized SPDX identifiers only",
             "recognized_license_count": len(OPEN_SOURCE_SPDX_IDS),
+            "categories": [{"id": key, "query": value} for key, value in CATEGORY_QUERIES.items()],
             "cache_ttl_seconds": self.ttl_seconds,
             "auto_install": False,
             "auto_execute": False,
         }
 
     def search(
-        self, query: str = "developer tools", language: str | None = None, limit: int = 10
+        self, query: str = "developer tools", language: str | None = None, limit: int = 10,
+        category: str | None = None,
     ) -> dict[str, Any]:
         clean_query = self._clean_query(query)
+        clean_category = str(category or "").strip().lower()
+        if clean_category and (not _CATEGORY_RE.fullmatch(clean_category) or clean_category not in CATEGORY_QUERIES):
+            return {"ok": False, "status": "INVALID_CATEGORY", "categories": sorted(CATEGORY_QUERIES), "tools": []}
         try:
             clean_language = self._clean_language(language)
         except ValueError:
@@ -101,7 +119,7 @@ class OpenSourceToolRegistry:
         except (TypeError, ValueError):
             clean_limit = 10
 
-        cache_key = (clean_query.casefold(), (clean_language or "").casefold(), clean_limit)
+        cache_key = (clean_category, clean_query.casefold(), (clean_language or "").casefold(), clean_limit)
         now = time.monotonic()
         with self._lock:
             cached = self._cache.get(cache_key)
@@ -110,7 +128,8 @@ class OpenSourceToolRegistry:
                 result["cached"] = True
                 return result
 
-        api_query = f"{clean_query} in:name,description,readme"
+        search_terms = f"{CATEGORY_QUERIES[clean_category]} {clean_query}" if clean_category else clean_query
+        api_query = f"{search_terms} in:name,description,readme"
         if clean_language:
             api_query += f" language:{clean_language}"
         params = {
@@ -150,6 +169,7 @@ class OpenSourceToolRegistry:
                 "ok": True,
                 "status": "COMPLETED",
                 "query": clean_query,
+                "category": clean_category or None,
                 "language": clean_language,
                 "count": len(tools),
                 "tools": tools,
