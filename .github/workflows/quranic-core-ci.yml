@@ -28,4 +28,4 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest fastapi pydantic httpx
       - name: Run Quranic Core tests
-        run: python -m pytest brain_v12/test_quranic_core.py brain_v12/test_quranic_core_adapters.py brain_v12/test_quranic_orchestrator.py brain_v12/test_quranic_provenance.py brain_v12/test_quranic_graph_publication.py brain_v12/test_quranic_research_packet.py -q
+        run: python -m pytest brain_v12/test_quranic_core.py brain_v12/test_quranic_core_adapters.py brain_v12/test_quranic_orchestrator.py brain_v12/test_quranic_provenance.py brain_v12/test_quranic_graph_publication.py brain_v12/test_quranic_research_packet.py brain_v12/test_quranic_memory_guidance.py -q
