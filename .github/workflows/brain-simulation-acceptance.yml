@@ -57,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: brain-simulation-acceptance-\${{ github.run_id }}
+          name: brain-simulation-acceptance-${{ github.run_id }}
           path: evidence/brain-simulation-acceptance.json
           if-no-files-found: warn
           retention-days: 30
