@@ -146,10 +146,14 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Bootstrap remote Terraform state and Azure providers
+      - name: Register required Azure resource providers (no infrastructure resources)
+        shell: pwsh
+        run: ./scripts/windows-cloud/register-providers.ps1
+
+      - name: Bootstrap remote Terraform state
         if: ${{ inputs.approve_apply == true }}
         shell: pwsh
-        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location westeurope -RegisterProviders
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location westeurope
 
       - name: Preflight (no VM changes)
         shell: pwsh
