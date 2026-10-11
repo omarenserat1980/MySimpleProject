@@ -20,18 +20,15 @@ The Control Plane must expose the Brain API over HTTPS, reachable from the dedic
 
 In repository Settings → Environments, create `windows-real-boot` and configure **Required reviewers** so the repository owner must approve the deployment. Save and verify the protection rules before any manual dispatch. A workflow's `environment:` reference does not itself enable reviewer protection. Restrict deployment branches to the reviewed boot workflow branch and/or `main`, according to the repository's release policy.
 
-Create **all six environment secrets only** in `windows-real-boot`. The workflow's secret preflight fails closed if any value is empty:
+Create these **environment secrets only** in `windows-real-boot`:
 
-- `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED`: HTTPS base URL for the trusted executor registry.
-- `BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED`: authorized registry credential.
-- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED`: trusted Ed25519 attestation issuer public key.
-- `BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED`: authority public key used to verify the signed execution contract.
-- `BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED`: HTTPS base URL of the deployed Brain Control Plane, without credentials embedded in the URL.
+- `BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED`: base URL of the real HTTPS Control Plane (no credentials embedded in the URL).
 - `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED`: high-entropy delivery key shared by the Control Plane endpoint and GitHub Actions.
+- `BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED`: authority public key used by the runner-side contract gate to verify the signed contract.
 
-Do not create repository-level copies of these protected secret names or use placeholders. The workflow maps Environment secrets to job variables and does not fall back to unprotected repository secrets. Confirm presence without printing values; GitHub does not reveal stored secret values after saving.
+Do not create repository-level copies of these protected secret names. Remove any old repository-level `BRAIN_WINDOWS_CONTROL_PLANE_URL`, `BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY`, or `BRAIN_AUTHORITY_PUBLIC_KEY_B64` secrets if they were configured for this workflow; the workflow must not fall back to unprotected repository secrets.
 
-Never put the authority private key, owner approval signing key, human approval token, raw owner approval, or executor enrollment credentials in repository files or workflow logs. The runner receives only the short-lived signed contract and public verification material. Rotate the delivery key if it may have been exposed.
+Never put the authority private key, owner approval signing key, human approval token, or raw owner approval in GitHub secrets. The runner receives only the short-lived signed contract and public verification key. Rotate the delivery key if it may have been exposed.
 
 ### 3. Verify the runner
 
@@ -40,22 +37,6 @@ The selected runner must be the authorized Brain-owned Linux x64 self-hosted run
 `brain-internal`, `qemu`, `windows-real-boot`, `brain-cloud-executor`
 
 It must already have `qemu-system-x86_64`, `qemu-img`, `xorriso`, `wimlib-imagex`, `mkfs.vfat`, `mcopy`, OVMF firmware, and readable/writable `/dev/kvm`. This workflow does not install host packages automatically.
-
-
-### 4. Provision the signed cloud-executor attestation (host-side)
-
-The cloud-executor gate requires more than runner labels and installed binaries. Before the runner is eligible, provision these variables through the trusted runner service/host configuration, never in workflow YAML and never by a job step:
-
-- `BRAIN_CLOUD_EXECUTOR=1`
-- `BRAIN_CLOUD_EXECUTOR_ID`: stable ID for this authorized executor
-- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE`: path to a fresh signed attestation document on the host
-- `BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64`: out-of-band trusted Ed25519 issuer public key
-- `BRAIN_CLOUD_EXECUTOR_REGISTRY_URL`: HTTPS base URL for the central Brain executor registry
-- `BRAIN_CLOUD_EXECUTOR_TOKEN`: host-provisioned registry credential
-
-The attestation must use schema `brain.cloud-executor-attestation.v2`, match the current hostname and `x86_64` architecture, target audience `brain-cloud-executor`, have a valid issuer signature, and expire within the verifier's five-minute maximum validity window. The central registry must atomically consume the attestation nonce at `POST /api/cloud-executor/attestation/consume`; repeated nonces must be rejected. The gate also actually starts QEMU with `-accel kvm` to probe KVM initialization.
-
-Do not mint a production signing key in CI, fabricate an attestation, echo tokens, or bypass the registry. If these host-side values or the trusted registry are unavailable, the gate must fail closed and real boot must remain blocked. Verify only the presence and successful gate result; do not publish secret values in logs or artifacts.
 
 ## Manual dispatch
 
