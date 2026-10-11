@@ -123,7 +123,9 @@ def _tier_rank(executor: ExecutorCapacity) -> int:
     # resources. Paid capacity is only considered after explicit opt-in.
     if executor.tier in {"BRAIN_OWNED", "FREE_CI", "FREE_CLOUD", "FREE_DIVERSE"}:
         return 0 if not executor.is_local else 2
-    if executor.tier in {"USER_DEVICE", "LOCAL"}:
+    if executor.tier == "USER_DEVICE":
+        return 1 if not executor.is_local else 3
+    if executor.tier == "LOCAL":
         return 3
     if executor.tier in {"PAID_EXTERNAL", "PAID_CLOUD"}:
         return 4
