@@ -73,5 +73,14 @@ class OwnedEmulatorChatBridgeTests(unittest.TestCase):
         self.assertEqual(result["status"], "SIMULATION_NOT_VERIFIED")
 
 
+    @patch.dict("os.environ", {"BRAIN_BRIDGE_ALLOWED_GITHUB_LOGINS": "omarenserat1980"})
+    @patch("brain_v12.brain.owned_emulator_chat_bridge.run_once", return_value=[{"ok": False, "state": "PROCESSED"}])
+    def test_one_shot_returns_failure_when_status_is_not_verified(self, mocked_run_once):
+        from brain_v12.brain.owned_emulator_chat_bridge import main
+
+        self.assertEqual(main(["--once"]), 1)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
