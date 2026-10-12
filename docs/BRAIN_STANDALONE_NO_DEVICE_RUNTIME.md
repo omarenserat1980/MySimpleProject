@@ -2,8 +2,7 @@
 
 ## Objective
 
-Run the Brain API without Arkan/Windows/Hyper-V, Redmi, Realme, device agents,
-hardware discovery, emulators, or a GitHub fetch during startup.
+Run the Brain API without depending on physical computers/phones/wearables (including Arkan, Redmi, Realme, Windows/Hyper-V hosts), hardware discovery, or a GitHub fetch during startup. **This does not remove Brain-owned virtual hardware, virtual machines, simulated blades, virtual workers, emulators, or software gateways. Those remain first-class Brain capabilities.**
 
 ## Entry point
 
@@ -15,15 +14,17 @@ persistent runtime home (default `~/.brain/runtime`), and directly starts
 - Default bind: `127.0.0.1:8012` (local-only by default).
 - Override the bind address with `BRAIN_HOST`; override the port with `PORT`.
 - Override persistent state with `BRAIN_RUNTIME_HOME`.
-- No device ID, device key, Termux agent, emulator, Windows VM, or GitHub
-  source synchronization is required by this launcher.
+- No physical-device ID/key, Termux agent, physical Windows host, or GitHub
+  source synchronization is required by this launcher. Brain-owned virtual
+  machines, blades, workers and emulators remain available as software assets.
 - GitHub Actions is verification only, not the runtime authority.
 
 ## Important verification boundary
 
-This launcher establishes a separate no-device startup path; it does not by
-itself prove that every Brain capability is available offline or that the
-complete application has no transitive optional integration dependency.
+This launcher establishes a separate no-physical-device startup path; it does not
+remove or disable Brain-owned virtual hardware. It also does not by itself prove
+that every Brain capability is available offline or that the complete application
+has no transitive optional integration dependency.
 Capabilities that genuinely require external services (for example model APIs,
 publishing, or remote cloud execution) may remain unavailable while the core
 API and local-state functions run. Those integrations must fail as optional
