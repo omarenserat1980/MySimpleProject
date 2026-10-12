@@ -1,10 +1,15 @@
 import hashlib
 import tempfile
 import unittest
+import urllib.error
+import urllib.request
 from pathlib import Path
 from unittest.mock import patch
 
-from brain_v12.tools.windows_official_media_download import download_official_media
+from brain_v12.tools.windows_official_media_download import (
+    SafeRedirectHandler,
+    download_official_media,
+)
 
 
 class FakeResponse:
@@ -53,10 +58,33 @@ class WindowsOfficialMediaDownloadTests(unittest.TestCase):
                 download_official_media("https://example.invalid/server.iso", dest, "a" * 64)
             self.assertFalse(dest.exists())
 
+    def test_redirect_handler_rejects_untrusted_redirects(self):
+        handler = SafeRedirectHandler()
+        request = urllib.request.Request("https://go.microsoft.com/fwlink?id=1")
+        for target in ("http://download.microsoft.com/file.iso",
+                       "https://microsoft.com.attacker.invalid/file.iso",
+                       "https://example.invalid/file.iso"):
+            with self.subTest(target=target):
+                with self.assertRaises(urllib.error.HTTPError):
+                    handler.redirect_request(request, None, 302, "Found", {}, target)
+
+    def test_redirect_handler_accepts_microsoft_https_subdomain(self):
+        handler = SafeRedirectHandler()
+        request = urllib.request.Request("https://go.microsoft.com/fwlink?id=1")
+        redirected = handler.redirect_request(
+            request, None, 302, "Found", {}, "https://download.microsoft.com/file.iso"
+        )
+        self.assertIsNotNone(redirected)
+        self.assertEqual(redirected.full_url, "https://download.microsoft.com/file.iso")
+
     def test_requires_trusted_checksum(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
-                download_official_media("https://download.microsoft.com/server.iso", Path(tmp) / "server.iso", "unknown")
+                download_official_media(
+                    "https://download.microsoft.com/server.iso",
+                    Path(tmp) / "server.iso",
+                    "unknown",
+                )
 
     def test_download_promotes_only_after_checksum_match(self):
         body = b"official-media-sample"
@@ -64,8 +92,10 @@ class WindowsOfficialMediaDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "server.iso"
             response = FakeResponse(body)
-            with patch("brain_v12.tools.windows_official_media_download.urllib.request.build_opener",
-                       return_value=FakeOpener(response)):
+            with patch(
+                "brain_v12.tools.windows_official_media_download.urllib.request.build_opener",
+                return_value=FakeOpener(response),
+            ):
                 report = download_official_media("https://go.microsoft.com/fwlink?id=1", dest, digest)
             self.assertEqual(report["status"], "OFFICIAL_MEDIA_VERIFIED")
             self.assertEqual(dest.read_bytes(), body)
@@ -76,8 +106,10 @@ class WindowsOfficialMediaDownloadTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / "server.iso"
             response = FakeResponse(body)
-            with patch("brain_v12.tools.windows_official_media_download.urllib.request.build_opener",
-                       return_value=FakeOpener(response)):
+            with patch(
+                "brain_v12.tools.windows_official_media_download.urllib.request.build_opener",
+                return_value=FakeOpener(response),
+            ):
                 with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
                     download_official_media("https://go.microsoft.com/fwlink?id=1", dest, "0" * 64)
             self.assertFalse(dest.exists())
