@@ -18,6 +18,18 @@ class ControlPlaneTests(unittest.TestCase):
             j=cp.create("publish",["publish"])
             self.assertEqual(cp.can_run(j,external=True),(False,"external_action_requires_policy_gate"))
 
+    def test_repeated_claim_with_stale_job_does_not_consume_second_attempt(self):
+        with tempfile.TemporaryDirectory() as d:
+            worker_a=ControlPlane(d)
+            worker_b=ControlPlane(d)
+            queued=worker_a.create("build",["compile"],max_attempts=3,budget=3)
+            first=worker_a.start_attempt(queued)
+            second=worker_b.start_attempt(queued)
+            self.assertEqual(first["status"],"running")
+            self.assertEqual(second["status"],"running")
+            self.assertEqual(second["attempts"],1)
+            self.assertEqual(second["lease_id"],first["lease_id"])
+            self.assertEqual(worker_b.load(queued["job_id"])["attempts"],1)
     def test_load_reads_latest_persisted_job_snapshot(self):
         with tempfile.TemporaryDirectory() as d:
             cp=ControlPlane(d)
