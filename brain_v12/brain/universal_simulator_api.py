@@ -207,6 +207,33 @@ def _append_audit(record: dict[str, Any]) -> None:
         stream.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def _parse_analysis(raw: Any) -> dict[str, Any] | None:
+    """Accept only a JSON object from the provider; never mark malformed output complete."""
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    candidate = raw.strip()
+    try:
+        parsed = json.loads(candidate)
+    except json.JSONDecodeError:
+        start, end = candidate.find("{"), candidate.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            parsed = json.loads(candidate[start:end + 1])
+        except json.JSONDecodeError:
+            return None
+    required = {
+        "root_cause_hypotheses", "evidence", "confidence", "recommended_actions",
+        "required_tools", "proposed_files", "proposed_scripts", "test_plan",
+        "rollback_plan", "risk_level", "requires_human_approval",
+    }
+    if not isinstance(parsed, dict) or not required.issubset(parsed):
+        return None
+    if not isinstance(parsed.get("requires_human_approval"), bool):
+        return None
+    return parsed
+
+
 def analyze_error(body: dict[str, Any]) -> dict[str, Any]:
     simulator_id = str(body.get("simulator_id", body.get("source", ""))).strip().lower()
     message = str(body.get("error_message", body.get("message", body.get("error", "")))).strip()
@@ -274,18 +301,32 @@ def analyze_error(body: dict[str, Any]) -> dict[str, Any]:
             "report": safe_report,
         }
     else:
-        result = {
-            "ok": True,
-            "status": "AI_ANALYSIS_COMPLETED",
-            "incident_id": incident_id,
-            "provider": provider_result.get("provider", "openai"),
-            "model": provider_result.get("model"),
-            "response_id": provider_result.get("response_id"),
-            "analysis": provider_result.get("reply", ""),
-            "repair_executed": False,
-            "next_step": "Validate the proposal and run authorized tests in an isolated workspace.",
-            "report": safe_report,
-        }
+        parsed_analysis = _parse_analysis(provider_result.get("reply", ""))
+        if parsed_analysis is None:
+            result = {
+                "ok": False,
+                "status": "AI_RESPONSE_INVALID",
+                "incident_id": incident_id,
+                "provider": provider_result.get("provider", "openai"),
+                "model": provider_result.get("model"),
+                "response_id": provider_result.get("response_id"),
+                "raw_response": _redact(str(provider_result.get("reply", "")))[:3000],
+                "repair_executed": False,
+                "report": safe_report,
+            }
+        else:
+            result = {
+                "ok": True,
+                "status": "AI_ANALYSIS_COMPLETED",
+                "incident_id": incident_id,
+                "provider": provider_result.get("provider", "openai"),
+                "model": provider_result.get("model"),
+                "response_id": provider_result.get("response_id"),
+                "analysis": parsed_analysis,
+                "repair_executed": False,
+                "next_step": "Validate the proposal and run authorized tests in an isolated workspace.",
+                "report": safe_report,
+            }
     _append_audit({"created_at": _utc_now(), **result})
     return result
 
