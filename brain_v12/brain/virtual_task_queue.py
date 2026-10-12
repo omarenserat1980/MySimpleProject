@@ -102,18 +102,42 @@ class VirtualTaskQueue:
         self.pool.submit(self._execute,task_id,blade)
 
     def _execute(self,task_id,blade):
-        task=self.tasks[task_id]
+        # Capture the ownership token once. Recovery may assign a new token while
+        # this worker is still unwinding; stale workers must not publish results
+        # or release the replacement worker's resource reservation.
+        with self.lock:
+            task=self.tasks.get(task_id)
+            if task is None or task.status!="RUNNING" or not task.lease_id:
+                return
+            lease_id=task.lease_id
+            program=list(task.program)
         try:
-            result=blade.execute(task.program)
+            result=blade.execute(program)
             with self.lock:
+                task=self.tasks.get(task_id)
+                if task is None or task.status!="RUNNING" or task.lease_id!=lease_id:
+                    return
+                persisted=self.store.finish(task_id,True,result,lease_id)
+                if persisted is None:
+                    return
                 task.result=result; task.status="COMPLETED"; task.lease_expires_at=None; task.finished_at=time()
-                self.store.finish(task_id,True,result)
         except Exception as exc:
             with self.lock:
-                task.result={"ok":False,"error":str(exc)}; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
-                self.store.finish(task_id,False,task.result)
+                task=self.tasks.get(task_id)
+                if task is None or task.status!="RUNNING" or task.lease_id!=lease_id:
+                    return
+                failure={"ok":False,"error":str(exc)}
+                persisted=self.store.finish(task_id,False,failure,lease_id)
+                if persisted is None:
+                    return
+                task.result=failure; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
         finally:
-            self.resources.release(task_id); self.pump()
+            with self.lock:
+                task=self.tasks.get(task_id)
+                still_owner=task is not None and task.lease_id==lease_id
+                if still_owner:
+                    self.resources.release(task_id)
+            self.pump()
 
     def heartbeat(self,task_id,lease_id):
         with self.lock:

@@ -43,9 +43,49 @@ class VirtualTaskQueueTests(unittest.TestCase):
         self.assertIsNotNone(self.wait(first.task_id))
         self.assertIsNotNone(self.wait(second.task_id))
 
-if __name__=="__main__":
-    unittest.main()
+    def test_stale_worker_cannot_overwrite_recovered_task(self):
+        from threading import Event, Lock
+        old_started = Event()
+        release_old = Event()
+        calls_lock = Lock()
+        calls = {"count": 0}
 
+        def controlled_execute(program):
+            with calls_lock:
+                calls["count"] += 1
+                call_number = calls["count"]
+            if call_number == 1:
+                old_started.set()
+                if not release_old.wait(2):
+                    raise TimeoutError("test did not release stale worker")
+                return {"ok": True, "result": {"output": ["old"]}}
+            return {"ok": True, "result": {"output": ["new"]}}
+
+        self.blade.execute = controlled_execute
+        task = self.queue.submit([("HALT",)], task_id="lease-fence")
+        self.assertTrue(old_started.wait(1), "first worker did not start")
+        with self.queue.store.lock:
+            self.queue.store.db.execute(
+                "UPDATE tasks SET lease_expires_at=? WHERE task_id=?",
+                (time.time() - 1, task.task_id),
+            )
+            self.queue.store.db.commit()
+
+        self.assertEqual(self.queue.recover_expired(), [task.task_id])
+        replacement = self.wait(task.task_id)
+        self.assertEqual(replacement.status, "COMPLETED")
+        self.assertEqual(replacement.result["result"]["output"], ["new"])
+
+        release_old.set()
+        deadline = time.time() + 1
+        while time.time() < deadline:
+            if calls["count"] >= 2:
+                time.sleep(0.02)
+                break
+            time.sleep(0.01)
+        final = self.queue.get(task.task_id)
+        self.assertEqual(final.status, "COMPLETED")
+        self.assertEqual(final.result["result"]["output"], ["new"])
 
     def test_emergency_backpressure_holds_background_work(self):
         self.queue.workload_controller = WorkloadController()
@@ -62,3 +102,7 @@ if __name__=="__main__":
     def test_priority_is_persisted(self):
         task=self.queue.submit([("HALT",)], task_id="high-priority", priority="HIGH")
         self.assertEqual(task.priority, "HIGH")
+
+if __name__=="__main__":
+    unittest.main()
+
