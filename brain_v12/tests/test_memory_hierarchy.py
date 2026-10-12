@@ -40,7 +40,7 @@ class MemoryHierarchyTests(unittest.TestCase):
         ram = VirtualRAM(8)
         ram.write(7, 255)
         snapshot = ram.snapshot()
-        self.assertEqual(set(snapshot), {"size", "nonzero"})
+        self.assertEqual(set(snapshot), {"size", "nonzero", "ecc_enabled"})
         restored = VirtualRAM(8)
         restored.restore(snapshot)
         self.assertEqual(restored.read(7), 255)
