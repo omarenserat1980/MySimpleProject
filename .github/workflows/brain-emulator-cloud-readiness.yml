@@ -10,6 +10,7 @@ on:
       - "brain_v12/brain/device_bridge.py"
       - "brain_v12/tests/test_device_bridge.py"
       - "brain_v12/tests/test_brain_emulator_project_audit.py"
+      - "brain_v12/tests/test_brain_termux_emulator_runtime.py"
       - "docs/BRAIN_EMULATOR_WINDOWS_CLOUD_BOOT.md"
       - ".github/workflows/brain-emulator-cloud-readiness.yml"
   workflow_dispatch:
@@ -34,9 +35,10 @@ jobs:
             tools/brain_emulator_project_audit.py \
             tools/brain_emulator_agent.py \
             brain_v12/tools/brain_emulator_agent.py \
-            brain_v12/tests/test_brain_emulator_project_audit.py
+            brain_v12/tests/test_brain_emulator_project_audit.py \\
+            brain_v12/tests/test_brain_termux_emulator_runtime.py
       - name: Run audit and device bridge tests
-        run: PYTHONPATH=. python -m unittest brain_v12.tests.test_brain_emulator_project_audit brain_v12.tests.test_device_bridge -v
+        run: PYTHONPATH=. python -m unittest brain_v12.tests.test_brain_emulator_project_audit brain_v12.tests.test_device_bridge brain_v12.tests.test_brain_termux_emulator_runtime -v
       - name: Validate installer shell syntax
         run: bash -n tools/install_windows_boot_prerequisites.sh
       - name: Generate read-only project and host audit
