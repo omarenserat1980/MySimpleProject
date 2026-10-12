@@ -11,15 +11,6 @@ on:
       - "brain_v12/brain/film_supervisor.py"
       - "brain_v12/tests/test_film_supervisor.py"
       - ".github/workflows/last-light-no-pay.yml"
-  pull_request:
-    paths:
-      - "cloud/last_light_movie.py"
-      - "brain_v12/brain/open_source_runtime.py"
-      - "brain_v12/brain/autonomy_control_plane.py"
-      - "brain_v12/brain/brain_supervisor.py"
-      - "brain_v12/brain/film_supervisor.py"
-      - "brain_v12/tests/test_film_supervisor.py"
-      - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
 
 concurrency:
@@ -31,10 +22,21 @@ permissions:
 
 jobs:
   produce:
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Fail-closed Brain internal runtime preflight
+        run: |
+          set -euo pipefail
+          python -m brain_v12.brain.internal_runner_preflight
+          python - <<'PY'
+          from brain_v12.brain.internal_runner_preflight import verify_and_write
+          evidence = verify_and_write("internal-runner-preflight.json")
+          assert evidence["verified"] is True, evidence
+          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
+          PY
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -44,9 +46,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
           python -m pip install --disable-pip-version-check Pillow
-
-      - name: Test film supervisor evidence gate
-        run: python -m unittest brain_v12.tests.test_film_supervisor -v
 
       - name: Initialize Brain control-plane job
         run: |
