@@ -1,6 +1,6 @@
 # Golden Acceptance Gate
 
-The `GoldenAcceptanceGate` is a verification layer, not a second task orchestrator. It reuses `EvidenceStore` and requires a complete, attempt-scoped evidence bundle before returning `GOLDEN_LOOP_VERIFIED`.
+The `GoldenAcceptanceGate` is a verification layer, not a second task orchestrator. It reuses `EvidenceStore` and requires a complete, attempt-scoped evidence bundle before returning `GOLDEN_LOOP_VERIFIED`. Every `BrainSupervisor.transition(..., phase="deliver", status="completed")` call now requires explicit golden acceptance criteria; direct legacy delivery calls without the contract are blocked and recorded. The `deliver_if_golden(...)` helper delegates to that same guarded transition path.
 
 ## Acceptance requirements
 
@@ -15,7 +15,7 @@ The `GoldenAcceptanceGate` is a verification layer, not a second task orchestrat
 
 ## Scope and limitations
 
-This gate does not execute work, create executor attestations, prove a VM boot, or establish a remote identity. `REMOTE_EXECUTION_VERIFIED` is only a requested reality label here; callers must ensure the underlying evidence was produced by an actually authorized and attested backend. The gate's result is only as trustworthy as the evidence producers and authorization path.
+The simulation harness can create synthetic verifier-labelled evidence only for `SIMULATED` smoke tests; that is a test fixture, not an independently operated verifier. This gate does not execute work, create executor attestations, prove a VM boot, or establish a remote identity. `REMOTE_EXECUTION_VERIFIED` is only a requested reality label here; callers must ensure the underlying evidence was produced by an actually authorized and attested backend. The gate's result is only as trustworthy as the evidence producers and authorization path.
 
 ## Focused tests
 
