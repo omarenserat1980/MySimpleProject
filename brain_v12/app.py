@@ -1968,12 +1968,23 @@ def device_software_node_indicators(request: Request):
     fleet = build_fleet_status(device_bridge.agent_status(), read_arkan_runtime_status())
     indicators = indicators_for_fleet(fleet)
     aggregate = aggregate_indicator_payloads(indicators)
+    rows = fleet.get("fleet", []) if isinstance(fleet, dict) else []
+    selected_count = sum(
+        1 for row in rows
+        if isinstance(row, dict)
+        and row.get("indicator_selected") is True
+        and row.get("role") in {"virtual_computer", "virtual_phone"}
+        and row.get("reality") == "SIMULATED"
+        and row.get("physical_device_required") is not True
+    )
+    processed_count = len(indicators)
+    unprocessed_count = max(0, selected_count - processed_count)
     return JSONResponse({
         "ok": True,
         "source": "canonical_indicators",
         "software_only": True,
-        "processed_count": len(indicators),
-        "unprocessed_count": 0,
+        "processed_count": processed_count,
+        "unprocessed_count": unprocessed_count,
         "indicators": indicators,
         "aggregate": aggregate,
         "native_windows_server_2025_boot_verified": False,
