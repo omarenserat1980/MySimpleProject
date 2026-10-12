@@ -9,6 +9,16 @@ on:
       - "brain_v12/brain/autonomy_control_plane.py"
       - "brain_v12/brain/brain_supervisor.py"
       - "brain_v12/brain/film_supervisor.py"
+      - "brain_v12/tests/test_film_supervisor.py"
+      - ".github/workflows/last-light-no-pay.yml"
+  pull_request:
+    paths:
+      - "cloud/last_light_movie.py"
+      - "brain_v12/brain/open_source_runtime.py"
+      - "brain_v12/brain/autonomy_control_plane.py"
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/film_supervisor.py"
+      - "brain_v12/tests/test_film_supervisor.py"
       - ".github/workflows/last-light-no-pay.yml"
   workflow_dispatch:
 
@@ -34,6 +44,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
           python -m pip install --disable-pip-version-check Pillow
+
+      - name: Test film supervisor evidence gate
+        run: python -m unittest brain_v12.tests.test_film_supervisor -v
 
       - name: Initialize Brain control-plane job
         run: |
