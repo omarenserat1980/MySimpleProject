@@ -1,26 +1,26 @@
 # Platform Foundation Architecture — V2
 
 ## Boundary
-platform_foundation/ is the independent software foundation. It is not Brain and must not import Brain.
+`platform_foundation/` is the independent software foundation. It is not Brain and must not import Brain.
 
-## Initial layers
+## Verified base layers (phase 4-3)
 1. Core Runtime
-2. Configuration
-3. State
-4. Execution
-5. Audit/Evidence
-6. Health
+2. State
+3. Job execution
+4. Audit/Evidence
+5. Health reporting
 
-## Initial contracts
-Each foundation component must expose explicit inputs, outputs, state, failure behavior, recovery behavior and tests.
+## Phase 4-4 security/failure/recovery layer
+- **Security:** explicit actor/action grants; protected jobs deny by default; grants are in-memory and auditable only through the caller's surrounding evidence.
+- **Failure:** conservative classification, retryability metadata, and no implicit retries.
+- **Recovery:** integrity-checked JSON-compatible state checkpoints and evidence-backed restore/rejection events.
+- **State isolation:** deep copies at set/get/snapshot/restore boundaries.
 
 ## Planned expansion
-Configuration -> State -> Jobs/Workers -> API -> Events -> Security/Identity -> Storage -> Observability -> Recovery -> Plugin/Agent runtime.
+Persistent configuration and storage -> identity and durable authorization -> API -> events -> worker isolation -> observability -> durable recovery -> plugin/agent runtime.
 
-Only the smallest verified slice is built initially.
+## Integration boundary
+Brain integration occurs only through explicit adapters after the platform gates pass. Brain must not become the foundation's hidden dependency.
 
-## Brain integration
-After the platform gate, Brain is connected through explicit adapters. Brain does not become the foundation's hidden dependency.
-
-## Failure boundary
-A foundation failure must be observable and must not be converted into synthetic success.
+## Failure and recovery limits
+A foundation failure must be observable and must not be converted into synthetic success. Current checkpoints are process-local memory objects; they do not survive process restart and must not be described as backups. No automatic retry or destructive recovery is performed.
