@@ -120,7 +120,7 @@ def build_fleet_status(
     arkan_identity_verified = (
         virtual_status.get("exists") is True
         and virtual_status.get("device_id") == "arkan-virtual-01"
-        and virtual_status.get("host_dependencies_for_identity") is False
+        and virtual_status.get("identity_independent_of_host") is True
     )
     runtime_status = virtual_status.get("runtime_status", {})
     booted = (
