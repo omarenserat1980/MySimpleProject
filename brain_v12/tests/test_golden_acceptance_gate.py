@@ -1,11 +1,22 @@
+import base64
 import tempfile
+import time
 import unittest
+import uuid
 from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from brain_v12.brain.evidence_store import EvidenceStore
 from brain_v12.brain.golden_acceptance_gate import (
     AcceptanceCriterion,
     GoldenAcceptanceGate,
+)
+from brain_v12.brain.signed_golden_verifier import (
+    AUDIENCE as VERIFIER_AUDIENCE,
+    SCHEMA as VERIFIER_SCHEMA,
+    signing_payload,
 )
 
 
@@ -150,6 +161,89 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
                 self.assertEqual(result.status, "GOLDEN_LOOP_VERIFIED")
             finally:
                 reopened.close()
+
+    def _add_signed_real_bundle(self):
+        private_key = Ed25519PrivateKey.generate()
+        public_key_b64 = base64.b64encode(private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )).decode("ascii")
+        first = self.store.append(
+            "task-1", "artifact_verified",
+            {"artifact": "artifact.bin", "reality_level": "REAL"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        second = self.store.append(
+            "task-1", "runtime_check_passed",
+            {"checks_passed": 3, "reality_level": "REAL"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        now = time.time()
+        attestation = {
+            "schema": VERIFIER_SCHEMA,
+            "audience": VERIFIER_AUDIENCE,
+            "verifier_id": "verifier-prod-01",
+            "task_id": "task-1",
+            "mission_id": "mission-1",
+            "attempt": 2,
+            "reality_level": "REAL",
+            "verified": True,
+            "evidence_ids": [first["evidence_id"], second["evidence_id"]],
+            "criterion_ids": ["artifact-exists", "runtime-check"],
+            "issued_at": now,
+            "expires_at": now + 120,
+            "nonce": uuid.uuid4().hex,
+        }
+        attestation["signature"] = base64.b64encode(
+            private_key.sign(signing_payload(attestation))
+        ).decode("ascii")
+        self.store.append(
+            "task-1", "independent_verification",
+            {
+                "verified": True,
+                "reality_level": "REAL",
+                "verified_evidence_ids": [first["evidence_id"], second["evidence_id"]],
+                "criterion_ids": ["artifact-exists", "runtime-check"],
+                "attestation": attestation,
+            },
+            producer="verifier-prod-01", mission_id="mission-1", attempt=2,
+        )
+        self.gate = GoldenAcceptanceGate(
+            self.store, verifier_public_key_b64=public_key_b64
+        )
+
+    def test_real_acceptance_requires_valid_signed_verifier(self):
+        self._add_signed_real_bundle()
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="REAL",
+        )
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.status, "GOLDEN_LOOP_VERIFIED")
+
+    def test_real_acceptance_rejects_replayed_verifier_nonce(self):
+        self._add_signed_real_bundle()
+        first = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="REAL",
+        )
+        second = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="REAL",
+        )
+        self.assertTrue(first.accepted)
+        self.assertFalse(second.accepted)
+        self.assertTrue(any("GOLDEN_VERIFIER_REPLAY_DETECTED" in reason for reason in second.reasons))
+
+    def test_real_acceptance_without_trust_anchor_fails_closed(self):
+        self._add_signed_real_bundle()
+        self.gate = GoldenAcceptanceGate(self.store)
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="REAL",
+        )
+        self.assertFalse(result.accepted)
+        self.assertIn("SIGNED_INDEPENDENT_ATTESTATION_REQUIRED", result.reasons)
 
     def test_empty_criteria_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_REQUIRED"):
