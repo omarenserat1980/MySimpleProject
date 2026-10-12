@@ -45,3 +45,30 @@ python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/v
 ```
 
 A passing simulator test establishes software simulation readiness only, not native guest OS boot. Fleet integration tests also verify that an ASUS/physical host ID cannot be marked as the canonical Arkan identity.
+
+
+## Windows Server 2025 real guest: admission gate
+
+The canonical Arkan identity is a software identity; it is not a hypervisor. A real Windows kernel must run on an authorized execution host with QEMU/KVM, UEFI firmware, available CPU/RAM/disk, legitimate Microsoft installation media, and the short-lived signed Brain execution contract.
+
+Before downloading installation media, the real-boot workflow runs `brain_v12/tools/arkan_windows_server_2025_preflight.py`. It fails closed unless all of these checks pass:
+
+- Canonical identity is exactly `arkan-virtual-01`.
+- Host is Linux x86-64 with at least 2 logical CPUs, 4 GiB total RAM, and 3 GiB currently available RAM.
+- At least 25 GiB of workspace disk space is free.
+- `/dev/kvm` is readable/writable; QEMU, qemu-img, OVMF, and ISO/WIM/FAT utilities are present.
+- The signed execution-contract gate has already verified the current run's contract.
+
+The gate is read-only. It does not download media, create a disk, start QEMU, or mark Windows as booted. It writes `arkan-windows-server-2025-readiness.json` into the run evidence. A ready result means only that an authorized boot attempt may proceed; acceptance still requires guest-generated evidence and the independent completion/proof gates.
+
+Run locally on an eligible, authorized runner after contract verification:
+
+```bash
+python3 brain_v12/tools/arkan_windows_server_2025_preflight.py \
+  --workspace "$PWD" \
+  --contract-gate windows-execution-contract-gate.json \
+  --output arkan-windows-server-2025-readiness.json
+python3 -m unittest brain_v12.tests.test_arkan_windows_server_2025_preflight -v
+```
+
+A modeled 128-vCPU/1-TiB profile does not satisfy these host checks. The previously constrained ASUS host (about 3.6 GiB total RAM) does not meet the new minimum and must not be silently used as the execution backend. Use a separately authorized, adequately sized execution host; no paid cloud resource is provisioned by this change.
