@@ -40,6 +40,9 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
             gross_revenue_jod_per_day=1.0,
         ))
         self.assertEqual(result["mode"], "DRY_RUN")
+        self.assertEqual(result["status"], "BLOCKED_REVENUE_UNVERIFIED")
+        self.assertEqual(result["profit_gate"]["status"], "BLOCKED_REVENUE_UNVERIFIED")
+        self.assertFalse(result["profit_gate"]["execution_authorized"])
         self.assertFalse(result["real_mining_started"])
         self.assertFalse(result["spend_authorized"])
         self.assertEqual(result["verified_revenue_jod"], 0.0)
