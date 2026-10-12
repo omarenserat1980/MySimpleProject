@@ -286,7 +286,7 @@ def brain_council_convene(request: Request, body: dict | None = None):
 
 @app.post("/api/brain/council/{meeting_id}/device-presence")
 def brain_council_device_presence(request: Request, meeting_id: int):
-    """Record fresh Arkan/fallback Brain Agent presence for the council."""
+    """Record legacy physical-agent diagnostics; this is not Arkan identity or execution routing."""
     require_control_key(request)
     return brain_council.verify_device_presence(meeting_id)
 
