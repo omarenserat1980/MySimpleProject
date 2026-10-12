@@ -83,6 +83,7 @@ class BrainSupervisor:
             if not golden_criteria:
                 phase="blocked"; status="blocked"
                 details={"completion_gate":"GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED","reasons":["GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED"]}
+                self._event(job["job_id"],"golden_acceptance_gate",{"accepted":False,"status":"GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED","reasons":["GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED"]})
             else:
                 try:
                     golden_result=self.golden_gate.evaluate(
