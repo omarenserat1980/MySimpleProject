@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from .cpu import VirtualCPU
 from .memory import VirtualRAM
 from .bus import VirtualBus
@@ -78,7 +78,20 @@ class VirtualComputer:
 
     def hardware_manifest(self):
         """Describe existing devices and their declared fidelity; allocates no host resources."""
-        return MachineManifest(self.name, 1, synthetic_baseline_profiles()).describe()
+        profiles = []
+        for profile in synthetic_baseline_profiles():
+            parameters = dict(profile.parameters)
+            if profile.category == "memory":
+                parameters["default_capacity_bytes"] = self.ram.size
+            elif profile.category == "storage":
+                parameters["default_capacity_bytes"] = self.storage.capacity
+            elif profile.category == "gpu":
+                parameters["default_width"] = self.gpu.width
+                parameters["default_height"] = self.gpu.height
+            elif profile.category == "network":
+                parameters["mac"] = self.nic.mac
+            profiles.append(replace(profile, parameters=parameters))
+        return MachineManifest(self.name, 1, tuple(profiles)).describe()
 
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
