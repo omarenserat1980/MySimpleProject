@@ -12,6 +12,17 @@ The first server-fabric increment provides deterministic server workload profile
 - `admit_server_workload()` checks a profile against observed capacity and safety reserves. It does not reserve resources or start a VM.
 - `validate_server_release()` recognizes Windows Server 2025 as a target identifier without claiming media, licensing, installation, or boot verification. A requested 2023 label is rejected as unverified pending authoritative product/media confirmation.
 
+## API integration
+
+The existing `/api/virtual-hardware` router now exposes the server fabric without introducing a second management plane:
+
+- `GET /api/virtual-hardware/server-fabric/profiles`: read-only declarative profile catalog.
+- `GET /api/virtual-hardware/server-fabric/backends`: authenticated host/backend capability discovery.
+- `GET /api/virtual-hardware/server-fabric/host-capacity`: authenticated host capacity observation.
+- `POST /api/virtual-hardware/server-fabric/admission`: authenticated capacity preflight using a `profile_id` and optional safety-budget fields.
+
+The admission endpoint is planning-only. It does not reserve CPU/memory/disk, create a VM, start a service, enable external networking, or prove a backend can boot a guest. Backend presence checks are discovery hints; a backend-specific launch and guest-health gate is still required.
+
 ## Fidelity labels
 
 - `SIMULATED`: deterministic model only.
