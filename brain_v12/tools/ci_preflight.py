@@ -28,10 +28,10 @@ def require_routes(application,routes:Iterable[str])->None:
 def main()->int:
     require_files(("brain_v12/app.py","brain_v12/Dockerfile","brain_v12/requirements.txt","brain_v12/tools/ci_preflight.py"))
     require_dirs(("brain_v12/brain","brain_v12/movie_summary_factory","brain_v7"))
-    os.environ.setdefault("BRAIN_DB","/tmp/brain-v12-preflight.db")
-    os.environ.setdefault("BRAIN_LIVE_INCOME_SEARCH_ENABLED","false")
-    os.environ.setdefault("BRAIN_WORKFORCE_ENABLED","false")
-    os.environ.setdefault("BRAIN_V14_VERSION","14.0")
+    os.environ["BRAIN_DB"] = "/tmp/brain-v12-preflight.db"
+    os.environ["BRAIN_LIVE_INCOME_SEARCH_ENABLED"] = "false"
+    os.environ["BRAIN_WORKFORCE_ENABLED"] = "false"
+    os.environ["BRAIN_V14_VERSION"] = "14.0"
     compile_tree()
     application=import_application()
     require_routes(application,("/health","/api/system/readiness","/api/system/diagnostics","/api/deploy/verify"))
