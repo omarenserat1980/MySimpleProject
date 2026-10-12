@@ -21,6 +21,7 @@ from .os_image import OSImage, windows_server_2025_image
 from .windows_server import WindowsServerVM
 from .device_catalog import COMPONENT_CLASSES, DEVICE_FAMILIES, get_device_family, list_component_classes, list_device_families, validate_catalog
 from .mining_hardware import ASICProfile, DEFAULT_ASIC_PROFILES, MiningFaults, MinerState, VirtualASICMiner
+from .mining_farm import VirtualMiningFarm
 from .extended_devices import (
     VirtualTPM, VirtualUSBController, VirtualSerialConsole, VirtualWatchdog, VirtualRNG,
     VirtualModem, VirtualBMC, VirtualIOMMU, VirtualRAID, VirtualBattery,
@@ -36,7 +37,7 @@ __all__ = [
     "MotherboardProfile", "get_gpu_profile", "get_nic_profile", "get_motherboard_profile",
     "PowerThermalModel", "OSImage", "windows_server_2025_image", "WindowsServerVM",
     "COMPONENT_CLASSES", "DEVICE_FAMILIES", "get_device_family", "list_component_classes", "list_device_families", "validate_catalog",
-    "ASICProfile", "DEFAULT_ASIC_PROFILES", "MiningFaults", "MinerState", "VirtualASICMiner",
+    "ASICProfile", "DEFAULT_ASIC_PROFILES", "MiningFaults", "MinerState", "VirtualASICMiner", "VirtualMiningFarm",
     "VirtualTPM", "VirtualUSBController", "VirtualSerialConsole", "VirtualWatchdog", "VirtualRNG",
     "VirtualModem", "VirtualBMC", "VirtualIOMMU", "VirtualRAID", "VirtualBattery",
     "VirtualInputDevice", "VirtualAudioDevice", "VirtualSensorHub", "VirtualPeripheralFabric",
