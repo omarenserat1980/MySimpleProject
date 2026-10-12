@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   diagnose:
-    runs-on: [self-hosted, Windows, brain-internal]
+    runs-on: [self-hosted, windows, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 5
     steps:
       - name: Collect read-only Arkan evidence
