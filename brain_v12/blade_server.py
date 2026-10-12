@@ -29,9 +29,9 @@ class BladeChassis:
     def __init__(self,name="BRAIN-CHASSIS-01"):
         self.name=name; self.blades={}
 
-    def create_blade(self,capabilities=None,ram_size=65536):
+    def create_blade(self,capabilities=None,ram_size=65536,cpu_profile_id=None,storage_profile_id=None,ram_profile_id=None,cache_enabled=False,memory_channels=1,memory_channel_width_bits=64):
         blade_id=f"blade-{uuid4().hex[:12]}"
-        computer=VirtualComputer(blade_id,ram_size=ram_size)
+        computer=VirtualComputer(blade_id,ram_size=ram_size,cpu_profile_id=cpu_profile_id,storage_profile_id=storage_profile_id,ram_profile_id=ram_profile_id,cache_enabled=cache_enabled,memory_channels=memory_channels,memory_channel_width_bits=memory_channel_width_bits)
         blade=BladeServer(blade_id,computer,capabilities=set(capabilities or {"cpu","ram","storage","network","gpu"}))
         self.blades[blade_id]=blade
         return blade

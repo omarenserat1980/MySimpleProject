@@ -11,6 +11,19 @@ on:
       - 'brain_v12/runtime_paths.py'
       - 'brain_v12/media_engine.py'
       - 'brain_v12/tests/test_runtime_paths.py'
+      - 'brain_v12/virtual_hardware/**'
+      - 'brain_v12/tests/test_hardware_profiles.py'
+      - 'brain_v12/tests/test_cpu_profiles.py'
+      - 'brain_v12/tests/test_storage_profiles.py'
+      - 'brain_v12/tests/test_memory_hierarchy.py'
+      - 'brain_v12/tests/test_peripheral_profiles.py'
+      - 'brain_v12/tests/test_machine_manifest.py'
+      - 'docs/BRAIN_MACHINE_MANIFEST_POWER_THERMAL_API.md'
+      - 'docs/BRAIN_GPU_NIC_INTERCONNECT_FIDELITY.md'
+      - 'docs/BRAIN_MEMORY_HIERARCHY_AND_FIDELITY.md'
+      - 'docs/BRAIN_STORAGE_PROFILES_AND_FIDELITY.md'
+      - 'docs/BRAIN_CPU_PROFILES_AND_FIDELITY.md'
+      - 'docs/BRAIN_VIRTUAL_HARDWARE_PROFILES.md'
       - 'brain_v12/tools/brain_standalone_launcher.sh'
       - 'brain_v12/tests/test_standalone_launcher.py'
       - 'docs/BRAIN_STANDALONE_NO_DEVICE_RUNTIME.md'
@@ -42,6 +55,9 @@ on:
       - 'brain_v12/runtime_paths.py'
       - 'brain_v12/media_engine.py'
       - 'brain_v12/tests/test_runtime_paths.py'
+      - 'brain_v12/virtual_hardware/**'
+      - 'brain_v12/tests/test_hardware_profiles.py'
+      - 'docs/BRAIN_VIRTUAL_HARDWARE_PROFILES.md'
       - 'brain_v12/tests/test_brain_ai*.py'
       - 'brain_v12/tests/test_film_supervisor_golden_gate.py'
       - 'brain_v12/tests/test_windows_server_network_contract.py'
@@ -70,6 +86,18 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Test writable runtime paths and non-destructive migration
         run: python -m unittest brain_v12.tests.test_runtime_paths -v
+      - name: Test virtual hardware profiles and declared fidelity
+        run: python -m unittest brain_v12.tests.test_hardware_profiles -v
+      - name: Test CPU profiles, flags, and unsupported instruction reporting
+        run: python -m unittest brain_v12.tests.test_cpu_profiles -v
+      - name: Test SSD profiles, durability, queues, and fault injection
+        run: python -m unittest brain_v12.tests.test_storage_profiles -v
+      - name: Test sparse RAM, DRAM profiles, and cache hierarchy
+        run: python -m unittest brain_v12.tests.test_memory_hierarchy -v
+      - name: Test GPU NIC and interconnect profiles
+        run: python -m unittest brain_v12.tests.test_peripheral_profiles -v
+      - name: Test machine manifest power thermal and recovery APIs
+        run: python -m unittest brain_v12.tests.test_machine_manifest -v
       - name: Test standalone runtime has no device bootstrap dependency
         run: python -m unittest brain_v12.tests.test_standalone_launcher -v
       - name: Test owned-emulator Chat bridge
