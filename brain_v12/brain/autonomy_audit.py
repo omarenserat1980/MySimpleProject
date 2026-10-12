@@ -47,7 +47,7 @@ def _runner_for_job(job_text: str) -> tuple[str, str | None]:
     # A local reusable-workflow call delegates execution to the called
     # workflow's job definitions; it is not itself a runner-bearing job.
     for line in job_text.splitlines():
-        delegated = re.match(r"^\\s{4}uses:\\s*['\\\"]?\\./\\.github/workflows/([^'\\\"\\s]+)", line)
+        delegated = re.match(r"^\s{4}uses:\s*['\"]?\./\.github/workflows/([^'\"\s]+)", line)
         if delegated:
             return "delegated_workflow", delegated.group(1)
     return "missing", None
