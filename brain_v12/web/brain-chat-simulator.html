@@ -46,7 +46,7 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  let sessionId = null, busy = false, sessionTitle = "محادثة جديدة";
+  let sessionId = null, busy = false, sessionTitle = "محادثة جديدة", bootstrapStarted = false;
   const api = async (path, options={}) => {
     const response = await fetch(path, {cache:"no-store", ...options, headers:{"Accept":"application/json","Content-Type":"application/json",...(options.headers||{})}});
     const body = await response.json().catch(() => ({}));
@@ -56,11 +56,16 @@
   const setPill = (pillId, text, state="") => { const el=$(pillId); el.textContent=text; el.className="pill"+(state?" "+state:""); };
   const setStep = index => document.querySelectorAll(".step").forEach((el,i)=>el.classList.toggle("active",i===index));
   const escapeText = text => String(text ?? "");
+  // Keep the requested Arabic marker consistent for assistant messages and history.
+  const withAinEnding = text => {
+    const value = escapeText(text).trimEnd();
+    return value.endsWith("ع") ? value : value + " ع";
+  };
   function appendMessage(role, text, meta="") {
     $("welcome").style.display = "none";
     const item=document.createElement("div"); item.className="message "+(role==="user"?"user":"assistant");
     const avatar=document.createElement("div"); avatar.className="avatar"; avatar.textContent=role==="user"?"أنت":"✦";
-    const body=document.createElement("div"); body.className="content"; body.textContent=escapeText(text);
+    const body=document.createElement("div"); body.className="content"; body.textContent=role==="assistant"?withAinEnding(text):escapeText(text);
     if(meta){const m=document.createElement("div");m.className="meta";m.textContent=meta;body.appendChild(m);}
     item.append(avatar,body);$("messages").appendChild(item);$("chatArea").scrollTop=$("chatArea").scrollHeight;
   }
@@ -92,7 +97,16 @@
       const data=await api("/api/brain-chat/sessions");
       const root=$("sessions");root.replaceChildren();
       const list=Array.isArray(data.sessions)?data.sessions:[];
-      if(!list.length){const note=document.createElement("div");note.className="sideNote";note.textContent="لا توجد محادثات محفوظة بعد.";root.appendChild(note);return;}
+      if(!list.length){
+        const note=document.createElement("div");note.className="sideNote";note.textContent="لا توجد محادثات محفوظة بعد.";root.appendChild(note);
+        // Start one initial conversation for a fresh install, without repeated bootstrap loops.
+        if(!bootstrapStarted && !sessionId){
+          bootstrapStarted=true;
+          try { await newSession(); await sendMessage("ع"); }
+          catch(e) { appendMessage("assistant","تعذّر بدء المحادثة الأولى تلقائيًا: "+e.message); }
+        }
+        return;
+      }
       for(const session of list.slice().reverse().slice(0,30)){
         const b=document.createElement("button");b.className="sessionBtn"+(session.id===sessionId?" active":"");b.textContent=session.title||"محادثة";
         b.addEventListener("click",()=>openSession(session.id));root.appendChild(b);
