@@ -12,6 +12,7 @@ from .mission import Mission
 from .evidence_store import EvidenceStore
 from .verification_core import VerificationCore
 from .golden_acceptance_gate import AcceptanceCriterion, GoldenAcceptanceGate
+from .golden_acceptance_gate import AcceptanceCriterion, GoldenAcceptanceGate
 from .asic_resource_adapter import ASICResourceAdapter
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
@@ -57,6 +58,44 @@ class BrainSupervisor:
             "mission_id": result.mission_id,
             "attempt": result.attempt,
             "reality_level": result.reality_level,
+            "evidence_ids": list(result.evidence_ids),
+            "criterion_results": list(result.criterion_results),
+            "reasons": list(result.reasons),
+        }
+        self._event(mission_id, "golden_acceptance_gate", result_data)
+        if not result.accepted:
+            return self.transition(
+                job, "blocked", status="blocked",
+                details={**(details or {}), "golden_acceptance": result_data},
+                enforce_authority=False,
+            )
+        # Keep the pre-existing runtime-evidence gate in force as well.
+        return self.transition(
+            job, "deliver", status="completed",
+            details={**(details or {}), "golden_acceptance": result_data},
+            enforce_authority=False,
+            required_evidence_kind=criteria[0].required_kind,
+        )
+
+    def deliver_if_golden(self, job, criteria, *, expected_reality="SIMULATED", details=None):
+        """Deliver only when golden and existing runtime evidence gates both pass.
+
+        This method extends the single BrainSupervisor. Evidence producer labels
+        are not cryptographic remote attestation and cannot independently prove
+        remote executor identity or a real VM boot.
+        """
+        criteria = tuple(criteria)
+        mission_id = job["job_id"]
+        mission = self.missions.get(mission_id)
+        result = self.golden_gate.evaluate(
+            mission_id, criteria, mission_id=mission_id,
+            attempt=mission.attempts if mission else None,
+            expected_reality=expected_reality,
+        )
+        result_data = {
+            "accepted": result.accepted, "status": result.status,
+            "task_id": result.task_id, "mission_id": result.mission_id,
+            "attempt": result.attempt, "reality_level": result.reality_level,
             "evidence_ids": list(result.evidence_ids),
             "criterion_results": list(result.criterion_results),
             "reasons": list(result.reasons),
