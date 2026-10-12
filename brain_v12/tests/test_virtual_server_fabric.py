@@ -19,6 +19,17 @@ class VirtualServerFabricTests(unittest.TestCase):
         self.assertTrue(all(p["validation"]["ok"] for p in first))
         self.assertTrue(all(not p["external_network_default"] for p in first))
 
+    def test_arkan_software_node_is_high_capacity_but_simulated_only(self):
+        profile = get_server_profile("brain-arkan-software-node-v1")
+        described = profile.describe()
+        self.assertEqual(profile.vcpus, 128)
+        self.assertEqual(profile.memory_mib, 1024 * 1024)  # 1 TiB modeled RAM
+        self.assertEqual(profile.disk_gib, 100 * 1024)  # 100 TiB modeled virtual disk
+        self.assertEqual(profile.fidelity, "SIMULATED")
+        self.assertEqual(profile.execution_mode, "SIMULATED_WORKFLOW")
+        self.assertEqual(described["capacity_semantics"], "VIRTUAL_CONFIGURATION_NOT_HOST_CAPACITY")
+        self.assertTrue(profile.validate()["ok"])
+
     def test_unknown_profile_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "UNKNOWN_SERVER_PROFILE"):
             get_server_profile("made-up-server")
