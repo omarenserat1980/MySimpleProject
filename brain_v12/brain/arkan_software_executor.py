@@ -165,12 +165,12 @@ class ArkanSoftwareExecutor:
         self._stop.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=max(1.0, self.maintenance_interval * 2))
+        # This service accepts only bounded symbolic workloads; drain worker threads
+        # before closing SQLite so a finishing task cannot write through a closed DB.
+        self.queue.pool.shutdown(wait=True, cancel_futures=False)
         try:
-            self._persist_state("STOPPING")
+            self._persist_state("STOPPED")
         finally:
-            # This service accepts only bounded symbolic workloads; drain worker threads
-            # before closing SQLite so a finishing task cannot write through a closed DB.
-            self.queue.pool.shutdown(wait=True, cancel_futures=False)
             self.queue.store.close()
 
 
