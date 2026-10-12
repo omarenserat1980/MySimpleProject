@@ -32,11 +32,22 @@ def test_internal_runtime_never_uses_github_hosted_runner():
     assert '"github_hosted_runtime":false' in text
 
 
-def test_supervisor_does_not_dispatch_github_hosted_runtime():
+def test_supervisor_keeps_task_dispatch_on_brain_owned_runtime():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
+    dispatch = text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
     assert "brain-github-cloud.yml/dispatches" not in text
-    assert "runs-on: ubuntu-latest" not in text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
-    assert "brain-internal" in text
+    assert "self-hosted" in dispatch
+    assert "brain-internal" in dispatch
+    assert "internal_runner_preflight" in dispatch
+
+
+def test_supervisor_simulation_and_verification_use_hosted_runner():
+    text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
+    health = text.split("health_and_recovery:", 1)[1].split("self_heal:", 1)[0]
+    verify = text.split("verify:", 1)[1]
+    for job in (health, verify):
+        assert "runs-on: ubuntu-latest" in job
+        assert "internal_runner_preflight" not in job
 
 
 RUNTIME_WORKFLOWS = (
@@ -50,12 +61,25 @@ RUNTIME_WORKFLOWS = (
 )
 
 
-def test_runtime_workloads_are_brain_owned():
-    for workflow in RUNTIME_WORKFLOWS:
+def test_remaining_runtime_workloads_are_brain_owned():
+    # These still perform internal task execution or bounded autonomous repair.
+    # Migrate them separately; hosted-runner simulation jobs are classified above.
+    remaining = tuple(
+        workflow for workflow in RUNTIME_WORKFLOWS
+        if workflow.name not in {"brain-local-cinema-smoke.yml", "brain-supervisor.yml"}
+    )
+    for workflow in remaining:
         text = workflow.read_text(encoding="utf-8")
         assert "runs-on: ubuntu-latest" not in text, workflow
         assert "brain-internal" in text, workflow
         assert "internal_runner_preflight" in text, workflow
+
+
+def test_local_cinema_smoke_is_hardware_independent():
+    text = Path(".github/workflows/brain-local-cinema-smoke.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "internal_runner_preflight" not in text
+    assert "BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED" in text
 
 
 def test_canonical_internal_runtime_modules_exist():
