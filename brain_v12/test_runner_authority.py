@@ -22,14 +22,19 @@ def test_windows_real_boot_has_fail_closed_preflight():
 
 
 
-def test_internal_runtime_never_uses_github_hosted_runner():
+def test_allowlisted_software_runtime_uses_hosted_runner():
     text = INTERNAL_RUNTIME_WORKFLOW.read_text(encoding="utf-8")
-    assert "runs-on: ubuntu-latest" not in text
-    assert "self-hosted" in text
-    assert "brain-internal" in text
-    assert "BRAIN_INTERNAL_RUNNER_FLAG" in text
-    assert "internal_runner_preflight" in text
-    assert '"github_hosted_runtime":false' in text
+    assert "runs-on: ubuntu-latest" in text
+    assert "BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE" in text
+    assert "BRAIN_PHYSICAL_HARDWARE_REQUIRED=false" in text
+    assert "internal_runner_preflight" not in text
+    assert "BRAIN_INTERNAL_RUNNER_FLAG" not in text
+    assert "contents: write" not in text
+    runner = Path("brain_v12/ci/brain_runner.py").read_text(encoding="utf-8")
+    assert "TASKS = {" in runner
+    assert "REJECTED_TASK" in runner
+    assert "if command is None" in runner
+    assert '"github_hosted_runtime": True' in text
 
 
 def test_supervisor_keeps_task_dispatch_on_brain_owned_runtime():
@@ -51,9 +56,8 @@ def test_supervisor_simulation_and_verification_use_hosted_runner():
 
 
 RUNTIME_WORKFLOWS = (
-    Path(".github/workflows/brain-github-cloud.yml"),
-    Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-continuous-self-healing.yml"),
+    Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-supervisor.yml"),
 )
 
