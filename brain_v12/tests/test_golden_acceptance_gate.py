@@ -245,6 +245,17 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
         self.assertFalse(result.accepted)
         self.assertIn("SIGNED_INDEPENDENT_ATTESTATION_REQUIRED", result.reasons)
 
+    def test_real_acceptance_requires_mission_and_attempt_scope(self):
+        with self.assertRaisesRegex(ValueError, "REAL_ACCEPTANCE_MISSION_ID_REQUIRED"):
+            self.gate.evaluate(
+                "task-1", self.criteria, attempt=2, expected_reality="REAL",
+            )
+        with self.assertRaisesRegex(ValueError, "REAL_ACCEPTANCE_ATTEMPT_REQUIRED"):
+            self.gate.evaluate(
+                "task-1", self.criteria, mission_id="mission-1",
+                expected_reality="REAL",
+            )
+
     def test_empty_criteria_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_REQUIRED"):
             self.gate.evaluate("task-1", [])
