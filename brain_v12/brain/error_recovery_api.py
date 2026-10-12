@@ -127,7 +127,7 @@ def report_error(request: Request, body: dict):
             "repair_policy": "PROPOSE_AND_VERIFY; NO_UNGUARDED_EXECUTION",
         }
         with path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(report, ensure_ascii=False) + "\\n")
+            stream.write(json.dumps(report, ensure_ascii=False) + "\n")
     forwarding = _forward(report)
     # Use the shared provider and repair analysis service for every configured simulator.
     # The analysis endpoint only proposes repairs; it never executes generated code.
