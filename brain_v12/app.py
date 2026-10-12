@@ -2134,6 +2134,49 @@ def brain_windows_qemu_inspect(request:Request, body:dict):
     return backend.inspect()
 
 
+@app.post("/api/brain/datacenter/provision")
+def brain_datacenter_provision(request: Request, body: dict):
+    """Provision a bounded number of in-process Brain CPU blades for queued tasks."""
+    require_control_key(request)
+    try:
+        count = int(body.get("count", 1))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="INVALID_BLADE_COUNT")
+    if count < 1 or count > 4:
+        raise HTTPException(status_code=400, detail="BLADE_COUNT_OUT_OF_RANGE")
+
+    capabilities = body.get("capabilities") or ["cpu"]
+    allowed = {"cpu", "ram", "storage", "network", "gpu"}
+    if not isinstance(capabilities, list) or not capabilities:
+        raise HTTPException(status_code=400, detail="INVALID_CAPABILITIES")
+    normalized = sorted({str(item).strip().lower() for item in capabilities})
+    if not set(normalized).issubset(allowed):
+        raise HTTPException(status_code=400, detail="UNSUPPORTED_CAPABILITY")
+
+    eligible = [
+        blade for blade in brain_datacenter.chassis.blades.values()
+        if blade.state == "ONLINE" and set(normalized).issubset(blade.capabilities)
+    ]
+    missing = max(0, count - len(eligible))
+    provision = (
+        brain_datacenter.provision(missing, normalized)
+        if missing
+        else {"ok": True, "status": "ALREADY_READY", "count": 0, "blades": []}
+    )
+    eligible_after = [
+        blade for blade in brain_datacenter.chassis.blades.values()
+        if blade.state == "ONLINE" and set(normalized).issubset(blade.capabilities)
+    ]
+    return {
+        "ok": len(eligible_after) >= count,
+        "status": "READY" if len(eligible_after) >= count else "CAPACITY_NOT_READY",
+        "requested_count": count,
+        "eligible_online": len(eligible_after),
+        "provision": provision,
+        "resources": brain_datacenter.resources(),
+    }
+
+
 @app.post("/api/brain/tasks/submit")
 def brain_task_submit(request:Request, body:dict):
     require_control_key(request)
