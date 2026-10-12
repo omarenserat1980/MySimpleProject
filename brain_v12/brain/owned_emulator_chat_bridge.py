@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -43,7 +43,7 @@ class BridgeConfig:
         if not self.repository or "/" not in self.repository:
             raise ValueError("INVALID_REPOSITORY")
         parsed = urllib.parse.urlparse(self.status_url)
-        if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1"
                 or parsed.port != 8012 or parsed.path != "/api/remote-fabric/status"
                 or parsed.query or parsed.fragment or parsed.username or parsed.password):
             raise ValueError("STATUS_URL_MUST_BE_LOOPBACK_BRAIN_STATUS_ENDPOINT")
@@ -92,21 +92,25 @@ def is_authorized_status_task(issue: dict[str, Any], config: BridgeConfig) -> bo
 
 def fetch_status(config: BridgeConfig) -> dict[str, Any]:
     config.validate()
-    request = urllib.request.Request(
-        config.status_url,
-        headers={"Accept": "application/json", "User-Agent": "ElectronicBrain-OwnedEmulatorBridge/1"},
-        method="GET",
-    )
+    # Use a direct loopback HTTPConnection: no proxy environment, redirect handling,
+    # configurable host, or URL path can move this request away from Brain.
+    connection = http.client.HTTPConnection("127.0.0.1", 8012, timeout=config.request_timeout)
     try:
-        with urllib.request.urlopen(request, timeout=config.request_timeout) as response:
-            http_status = int(response.status)
-            raw = response.read(65537)
-    except urllib.error.HTTPError as exc:
-        return {"ok": False, "http_status": int(exc.code), "status": "HTTP_ERROR"}
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        reason = getattr(exc, "reason", None)
-        label = "TIMEOUT" if isinstance(exc, TimeoutError) or isinstance(reason, TimeoutError) else "CONNECTION_ERROR"
-        return {"ok": False, "http_status": None, "status": label}
+        connection.request(
+            "GET", "/api/remote-fabric/status",
+            headers={"Accept": "application/json", "User-Agent": "ElectronicBrain-OwnedEmulatorBridge/1"},
+        )
+        response = connection.getresponse()
+        http_status = int(response.status)
+        if http_status != 200:
+            return {"ok": False, "http_status": http_status, "status": "HTTP_ERROR"}
+        raw = response.read(65537)
+    except (TimeoutError, socket.timeout):
+        return {"ok": False, "http_status": None, "status": "TIMEOUT"}
+    except (OSError, http.client.HTTPException):
+        return {"ok": False, "http_status": None, "status": "CONNECTION_ERROR"}
+    finally:
+        connection.close()
 
     if len(raw) > 65536:
         return {"ok": False, "http_status": http_status, "status": "RESPONSE_TOO_LARGE"}
@@ -137,7 +141,6 @@ def fetch_status(config: BridgeConfig) -> dict[str, Any]:
     if not safe["verified_simulation"]:
         safe["status"] = "SIMULATION_NOT_VERIFIED"
     return safe
-
 
 def _read_processed(state_path: Path) -> set[int]:
     try:
