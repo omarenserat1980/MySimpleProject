@@ -95,6 +95,14 @@ class FilmSupervisor:
                     AcceptanceCriterion("artifact-exists","artifact_verified"),
                     AcceptanceCriterion("runtime-check","runtime_check_passed"),
                 )
+                manifest={
+                    "title":"آخر ضوء في المدينة",
+                    "status":"ARTIFACT_READY_PENDING_GOLDEN_ACCEPTANCE",
+                    "renderer":"Python/Pillow + FFmpeg",
+                    "control_plane":"brain_supervisor",
+                    "attempts":attempt,
+                    "verified":False,
+                }
                 final=supervisor.deliver_if_golden(
                     job,criteria,expected_reality="SIMULATED",
                     details={"attempts":attempt,"independent_verification":independent_details},
