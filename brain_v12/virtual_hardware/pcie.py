@@ -104,7 +104,7 @@ class VirtualPCIeEndpoint:
         if value < 0 or value >= (1 << (8 * width)):
             raise ValueError("VPCIE_CONFIG_VALUE_INVALID")
         # Keep ID, class, header, and BAR registers read-only in this baseline.
-        if offset >= 0x10 or offset < 4 or (offset < 0x10 and offset + width > 4):
+        if offset < 4 or offset + width > 8:
             raise PermissionError("VPCIE_CONFIG_REGISTER_READ_ONLY")
         raw = bytearray(self.command.to_bytes(2, "little") + self.status.to_bytes(2, "little"))
         start = offset - 4
