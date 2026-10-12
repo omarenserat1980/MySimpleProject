@@ -1,8 +1,8 @@
-name: Brain Permanent Runner System Watch
+name: Brain Legacy Hardware Runner Retirement Watch
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "23 6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: brain-permanent-runner-watch
+  group: brain-legacy-runner-retirement-watch
   cancel-in-progress: true
 
 env:
@@ -26,6 +26,7 @@ jobs:
       runner_id: ${{ steps.inspect.outputs.runner_id }}
       runner_name: ${{ steps.inspect.outputs.runner_name }}
       runner_busy: ${{ steps.inspect.outputs.runner_busy }}
+      runner_status: ${{ steps.inspect.outputs.runner_status }}
     steps:
       - name: Inspect registration, labels and online state
         id: inspect
@@ -97,48 +98,11 @@ jobs:
           echo "runner_id=${id}" >> "$GITHUB_OUTPUT"
           echo "runner_name=${name}" >> "$GITHUB_OUTPUT"
           echo "runner_busy=${busy}" >> "$GITHUB_OUTPUT"
-
-  probe:
-    name: Prove Job Execution Capability
-    needs: detect
-    # Scheduled runs must remain observation-only; the manual dispatch is the
-    # explicit execution probe and cannot consume the internal runner every 5 minutes.
-    if: github.event_name == 'workflow_dispatch' && needs.detect.outputs.runner_online == 'true'
-    concurrency:
-      group: brain-internal-execution-probe
-      cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
-    timeout-minutes: 5
-    steps:
-      - name: Prove runner can execute
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "RUNNER_EXECUTION_PROBE=PASS"
-          echo "RUNNER_NAME=${RUNNER_NAME}"
-          echo "RUNNER_OS=${RUNNER_OS}"
-          echo "RUNNER_ARCH=${RUNNER_ARCH}"
-          test -n "${RUNNER_NAME}"
-          test -n "${RUNNER_OS}"
-          test -n "${RUNNER_ARCH}"
-
-      - name: Verify required runtime surface
-        shell: bash
-        run: |
-          set -euo pipefail
-          for cmd in python gh; do
-            command -v "$cmd" >/dev/null || {
-              echo "RUNNER_RUNTIME_MISSING=$cmd"
-              exit 20
-            }
-          done
-          python --version
-          gh --version | head -n1
-          echo "RUNNER_RUNTIME_SURFACE=PASS"
+          echo "runner_status=${status}" >> "$GITHUB_OUTPUT"
 
   evidence:
     name: Evidence and Health Gate
-    needs: [detect, probe]
+    needs: detect
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -150,42 +114,38 @@ jobs:
           DETECT_ONLINE: ${{ needs.detect.outputs.runner_online }}
           RUNNER_ID: ${{ needs.detect.outputs.runner_id }}
           RUNNER_NAME: ${{ needs.detect.outputs.runner_name }}
-          PROBE_RESULT: ${{ needs.probe.result }}
+          RUNNER_STATUS: ${{ needs.detect.outputs.runner_status }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .brain/state
-          if [ "${DETECT_ONLINE}" = "true" ] && [ "${PROBE_RESULT}" = "success" ]; then
-            health="VERIFIED"
-          elif [ "${DETECT_ONLINE}" = "true" ]; then
-            health="ONLINE_BUT_EXECUTION_UNVERIFIED"
-          else
-            health="NOT_VERIFIED"
-          fi
+          # The legacy physical runner is not used by the software-only Brain.
+          # This workflow observes registration only; it never schedules work on that runner.
+          health="HARDWARE_EXECUTION_DISABLED_BY_POLICY"
+
 
           cat > .brain/state/runner-health.json <<EOF
           {
             "health": "${health}",
+            "hardware_execution_policy": "DISABLED_BY_SOFTWARE_ONLY_POLICY",
+            "registration_observation": "${RUNNER_STATUS}",
             "online": ${DETECT_ONLINE:-false},
             "runner_id": "${RUNNER_ID}",
             "runner_name": "${RUNNER_NAME}",
-            "execution_probe": "${PROBE_RESULT}",
-            "rule": "Installed + Registered + Online + Job-Capable + Verified",
-            "next_action": "CHECK_RUNNER_TOKEN_AND_REGISTRATION"
+            "execution_probe": "NOT_RUN_BY_POLICY",
+            "brain_core_requires_this_runner": false,
+            "rule": "Legacy runner registration is observational only; core software tasks use GitHub-hosted runners",
+            "next_action": "NO_HARDWARE_ACTION_REQUIRED"
           }
           EOF
 
           cat .brain/state/runner-health.json
 
-          if [ "${health}" = "NOT_VERIFIED" ]; then
-            echo "::warning::Brain internal runner is not verified; inspect runner-watch.json status, token permissions, registration, WSL/service/network."
-          elif [ "${health}" = "ONLINE_BUT_EXECUTION_UNVERIFIED" ]; then
-            echo "::warning::Runner is online but failed the execution proof."
-          else
-            echo "RUNNER_HEALTH=VERIFIED"
-          fi
+          echo "HARDWARE_EXECUTION_POLICY=DISABLED_BY_SOFTWARE_ONLY_POLICY"
+          echo "LEGACY_RUNNER_REGISTRATION_STATUS=${RUNNER_STATUS}"
+          echo "BRAIN_CORE_HARDWARE_DEPENDENCY=NONE"
 
-      - name: Upload permanent watch evidence
+      - name: Upload hardware retirement evidence
         uses: actions/upload-artifact@v4
         with:
           name: brain-runner-health-${{ github.run_id }}
