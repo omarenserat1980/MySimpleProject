@@ -1,0 +1,70 @@
+name: Brain Azure Emulator Acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/azure_emulator/**"
+      - "brain_v12/tests/test_azure_emulator*.py"
+      - "brain_v12/tests/test_azure_handoff*.py"
+      - "brain_v12/tests/test_real_azure_adapter.py"
+      - ".github/workflows/brain-azure-emulator-acceptance.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/azure_emulator/**"
+      - "brain_v12/tests/test_azure_emulator*.py"
+      - "brain_v12/tests/test_azure_handoff*.py"
+      - "brain_v12/tests/test_real_azure_adapter.py"
+      - ".github/workflows/brain-azure-emulator-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-azure-emulator-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  emulator-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+      - name: Run Azure emulator acceptance suite
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_azure_emulator.py \
+            brain_v12/tests/test_azure_emulator_acceptance.py \
+            brain_v12/tests/test_azure_emulator_windows_provider.py \
+            brain_v12/tests/test_azure_handoff.py \
+            brain_v12/tests/test_azure_handoff_ledger.py \
+            brain_v12/tests/test_real_azure_adapter.py
+      - name: Run emulator launch and validate evidence provenance
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m brain_v12.azure_emulator.launch
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = json.loads(Path(".brain/state/azure-emulator-evidence.json").read_text())
+          assert evidence["ok"] is True, evidence
+          assert evidence["evidence"]["provenance"] == "SIMULATED", evidence
+          assert evidence["evidence"]["provider"] == "brain-emulated-azure", evidence
+          print(json.dumps({"ok": True, "provenance": evidence["evidence"]["provenance"],
+                            "provider": evidence["evidence"]["provider"]}, sort_keys=True))
+          PY
