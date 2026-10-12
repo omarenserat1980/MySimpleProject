@@ -183,20 +183,21 @@ class VirtualPCIeFabric:
 
     def config_read(self, name: str, offset: int, width: int = 4) -> dict:
         endpoint = self._get(name)
-        value = endpoint.config_read(offset, width)
-        record = self._record("CONFIG_READ", endpoint, offset=offset, width=width, value=value)
+        record = self._record("CONFIG_READ", endpoint, offset=offset, width=width)
         if record["status"] != "SUCCESS":
             return {"ok": False, **record, "value": None}
+        value = endpoint.config_read(offset, width)
+        record["value"] = value
         self.stats["config_reads"] += 1
         self.stats["bytes_read"] += width
         return {"ok": True, **record}
 
     def config_write(self, name: str, offset: int, value: int, width: int = 4) -> dict:
         endpoint = self._get(name)
-        endpoint.config_write(offset, value, width)
         record = self._record("CONFIG_WRITE", endpoint, offset=offset, width=width, value=value)
         if record["status"] != "SUCCESS":
             return {"ok": False, **record}
+        endpoint.config_write(offset, value, width)
         self.stats["config_writes"] += 1
         self.stats["bytes_written"] += width
         return {"ok": True, **record}
@@ -204,10 +205,11 @@ class VirtualPCIeFabric:
     def mmio_read(self, name: str, bar_index: int, offset: int, width: int = 4) -> dict:
         endpoint = self._get(name)
         bar = self._bar(endpoint, bar_index)
-        value = bar.read(offset, width)
-        record = self._record("MEMORY_READ", endpoint, offset=offset, width=width, value=value)
+        record = self._record("MEMORY_READ", endpoint, offset=offset, width=width)
         if record["status"] != "SUCCESS":
             return {"ok": False, **record, "value": None}
+        value = bar.read(offset, width)
+        record["value"] = value
         self.stats["mmio_reads"] += 1
         self.stats["bytes_read"] += width
         return {"ok": True, **record}
@@ -215,14 +217,11 @@ class VirtualPCIeFabric:
     def mmio_write(self, name: str, bar_index: int, offset: int, value: int, width: int = 4) -> dict:
         endpoint = self._get(name)
         bar = self._bar(endpoint, bar_index)
-        # Apply injected transport faults before mutating device state.
-        if self.next_fault is not None:
-            record = self._record("MEMORY_WRITE", endpoint, offset=offset, width=width, value=value)
-            if record["status"] != "SUCCESS":
-                return {"ok": False, **record}
+        # Failed completions must not mutate endpoint MMIO state.
+        record = self._record("MEMORY_WRITE", endpoint, offset=offset, width=width, value=value)
+        if record["status"] != "SUCCESS":
+            return {"ok": False, **record}
         bar.write(offset, value, width)
-        if self.next_fault is None:
-            record = self._record("MEMORY_WRITE", endpoint, offset=offset, width=width, value=value)
         self.stats["mmio_writes"] += 1
         self.stats["bytes_written"] += width
         return {"ok": True, **record}
