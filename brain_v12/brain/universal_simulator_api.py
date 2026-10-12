@@ -114,7 +114,7 @@ def _redact(value: Any) -> Any:
     if isinstance(value, str):
         text = value[:6000]
         text = re.sub(
-            r"(?i)(token|password|secret|api[_-]?key|authorization|cookie)\s*[:=]\s*([^\s,;]+)",
+            r"(?i)(token|password|secret|api[_-]?key|authorization|cookie)\s*[:=]\s*(?:bearer\s+)?([^\s,;]+)",
             r"\1=[REDACTED]",
             text,
         )
