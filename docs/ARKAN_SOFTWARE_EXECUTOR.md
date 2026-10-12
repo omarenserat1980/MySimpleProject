@@ -65,3 +65,18 @@ The automated tests verify:
 This is a persistent local software executor implementation, not proof of a
 currently deployed 24/7 service. Deployment, process supervision, backups, and
 external availability must be verified separately.
+
+## Authenticated Brain API
+
+The FastAPI application mounts the authenticated router at \`/api/arkan/software-executor\`.
+Requests must provide the repository's configured Brain control key, using the
+existing \`X-BRAIN-CONTROL-KEY\` authentication mechanism.
+
+- \`GET /api/arkan/software-executor/status\` — node, queue, and heartbeat state.
+- \`POST /api/arkan/software-executor/tasks\` — enqueue a bounded task, e.g.
+  \`{"task_type":"cpu_smoke","idempotency_key":"smoke-001"}\`.
+- \`GET /api/arkan/software-executor/tasks/{task_id}\` — retrieve task status/result.
+
+Task types are restricted to \`cpu_smoke\` and \`self_test\`; unapproved types
+receive HTTP 422. The API worker is process-local and closes gracefully during
+FastAPI shutdown, while SQLite state remains available for the next process.
