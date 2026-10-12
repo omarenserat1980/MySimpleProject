@@ -73,6 +73,15 @@ def test_remaining_runtime_workloads_are_brain_owned():
         assert "internal_runner_preflight" in text, workflow
 
 
+def test_brain_iso_qemu_verification_uses_hosted_runner():
+    text = Path(".github/workflows/brain-boot-iso.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "self-hosted" not in text
+    assert "BRAIN_INTERNAL_RUNNER_FLAG" not in text
+    assert "qemu-system-x86" in text
+    assert "Boot ISO with QEMU" in text
+
+
 def test_120_minute_cinema_uses_hosted_software_runners():
     text = Path(".github/workflows/brain-120-minute-cinema.yml").read_text(encoding="utf-8")
     assert text.count("runs-on: ubuntu-latest") == 2
