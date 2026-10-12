@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from brain_v12.virtual_hardware.computer import VirtualComputer
 from brain_v12.virtual_hardware.extended_devices import (
     VirtualBattery, VirtualInputDevice, VirtualModem, VirtualPeripheralFabric,
     VirtualRAID, VirtualRNG, VirtualTPM, VirtualUSBController, VirtualWatchdog,
@@ -18,6 +19,15 @@ class ExtendedVirtualDeviceTests(unittest.TestCase):
         self.assertGreaterEqual(len(inventory["devices"]), 12)
         self.assertIn("hardware-backed TPM keys", inventory["not_emulated"])
         self.assertFalse(fabric.status()["physical_hardware_used"])
+
+    def test_virtual_computer_exposes_extended_fabric_in_status_and_manifest(self):
+        computer = VirtualComputer("peripheral-integrated", ram_size=1024)
+        status = computer.status()
+        self.assertFalse(status["peripherals"]["physical_hardware_used"])
+        self.assertTrue(status["peripherals"]["inventory"]["devices"]["modem"]["present"])
+        manifest = computer.hardware_manifest()
+        self.assertIn("peripherals", manifest["validation"]["categories"])
+        self.assertTrue(computer.validate_configuration()["ok"])
 
     def test_tpm_measurement_is_deterministic_and_not_hardware_attestation(self):
         a, b = VirtualTPM(), VirtualTPM()
