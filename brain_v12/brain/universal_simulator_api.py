@@ -142,8 +142,56 @@ def _save_registry(data: dict[str, Any]) -> None:
     temp.replace(path)
 
 
+def _discover_repository_components() -> list[dict[str, Any]]:
+    """Find additional simulator-like modules without claiming they are live adapters."""
+    roots = [
+        _ROOT / "brain_v12" / "brain",
+        _ROOT / "brain_v12" / "virtual_hardware",
+        _ROOT / "brain_v12" / "media",
+        _ROOT / "brain_v12" / "movie_summary_factory",
+        _ROOT / "brain_v7" / "braincore_v2",
+        _ROOT / "cloud",
+    ]
+    terms = (
+        "simulator", "adapter", "renderer", "render", "azure", "termux",
+        "powershell", "github", "desktop", "virtual", "hardware", "executor",
+        "gateway", "provider", "media", "youtube", "workflow", "worker",
+        "runtime", "device", "agent", "factory", "cloud", "self_heal",
+    )
+    candidates: list[dict[str, Any]] = []
+    known_paths = {
+        path for definition in _SIMULATOR_CATALOG.values()
+        for path in definition["evidence_paths"]
+    }
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*.py"):
+            if any(part in {"__pycache__", "tests", ".venv", "venv"} for part in path.parts):
+                continue
+            relative = path.relative_to(_ROOT).as_posix()
+            if relative in known_paths or not any(term in path.stem.lower() for term in terms):
+                continue
+            slug = re.sub(r"[^a-z0-9-]+", "-", relative.lower().replace("/", "-").replace("_", "-")).strip("-")
+            simulator_id = ("component-" + slug)[:80]
+            candidates.append({
+                "simulator_id": simulator_id,
+                "name": path.stem.replace("_", " ").title(),
+                "kind": "repository_component_candidate",
+                "capabilities": ["diagnostics_candidate", "error_reporting_candidate"],
+                "evidence_paths": [relative],
+                "discovery_status": "DISCOVERED",
+                "registration_status": "DISCOVERED",
+                "execution_mode": "UNVERIFIED",
+                "connection_status": "NOT_CONFIGURED",
+                "adapter_status": "NOT_IMPLEMENTED",
+                "last_seen": None,
+            })
+    return candidates
+
+
 def discover_simulators() -> list[dict[str, Any]]:
-    """Return catalog entries annotated with repository evidence and honest status."""
+    """Return catalog entries and auto-discovered candidates with honest status."""
     registered = _load_registry()
     results: list[dict[str, Any]] = []
     for simulator_id, definition in _SIMULATOR_CATALOG.items():
@@ -151,7 +199,7 @@ def discover_simulators() -> list[dict[str, Any]]:
         saved = registered.get(simulator_id, {})
         results.append({
             "simulator_id": simulator_id,
-            "name": definition["name"],
+            "name": saved.get("name", definition["name"]),
             "kind": definition["kind"],
             "capabilities": list(definition["capabilities"]),
             "evidence_paths": evidence,
@@ -162,8 +210,12 @@ def discover_simulators() -> list[dict[str, Any]]:
             "adapter_status": saved.get("adapter_status", "PARTIAL"),
             "last_seen": saved.get("last_seen"),
         })
+    known_ids = {item["simulator_id"] for item in results}
+    for candidate in _discover_repository_components():
+        if candidate["simulator_id"] not in known_ids:
+            results.append(candidate)
     for simulator_id, saved in registered.items():
-        if simulator_id not in _SIMULATOR_CATALOG and isinstance(saved, dict):
+        if simulator_id not in known_ids and isinstance(saved, dict):
             results.append({"simulator_id": simulator_id, **saved, "discovery_status": "REGISTERED_CUSTOM"})
     return sorted(results, key=lambda item: item["simulator_id"])
 
