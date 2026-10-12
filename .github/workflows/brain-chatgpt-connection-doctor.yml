@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+  pull_request:
+    paths:
+      - "brain_v12/tools/brain_chatgpt_connection_doctor.py"
+      - "brain_v12/tests/test_brain_chatgpt_connection_doctor.py"
+      - ".github/workflows/brain-chatgpt-connection-doctor.yml"
   push:
     branches: [main]
     paths:
@@ -49,7 +54,7 @@ jobs:
           if [ "${SEND_TEST_MESSAGE}" = "true" ]; then
             args+=(--send-test-message)
           fi
-          python brain_v12/tools/brain_chatgpt_connection_doctor.py "${args[@]}"
+          python -m brain_v12.tools.brain_chatgpt_connection_doctor "${args[@]}"
           rc=$?
           set -e
           echo "doctor_exit_code=$rc" >> "$GITHUB_OUTPUT"
