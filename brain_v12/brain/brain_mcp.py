@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
@@ -119,6 +120,12 @@ def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIR
         if key:
             device_key = "chatgpt-widget:" + key
             with chat_sessions.connect() as con:
+                # Enforce uniqueness in SQLite as well as in the widget. Two
+                # overlapping iframe requests must not create two sessions.
+                con.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_chatgpt_widget_cycle_key "
+                    "ON chat_sessions(device_id) WHERE device_id LIKE 'chatgpt-widget:%'"
+                )
                 row = con.execute(
                     "SELECT id FROM chat_sessions WHERE device_id=? ORDER BY created_at LIMIT 1",
                     (device_key,),
@@ -127,7 +134,20 @@ def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIR
                 session = chat_sessions.get(row["id"])
                 if session:
                     return {"ok": True, "session": session, "idempotent_replay": True}
-            session = chat_sessions.create(title, device_id=device_key)
+            try:
+                session = chat_sessions.create(title, device_id=device_key)
+            except sqlite3.IntegrityError:
+                # Another request won the race after our initial lookup.
+                with chat_sessions.connect() as con:
+                    row = con.execute(
+                        "SELECT id FROM chat_sessions WHERE device_id=?", (device_key,)
+                    ).fetchone()
+                if not row:
+                    raise
+                session = chat_sessions.get(row["id"])
+                if not session:
+                    raise RuntimeError("CHAT_SESSION_IDEMPOTENCY_RECOVERY_FAILED")
+                return {"ok": True, "session": session, "idempotent_replay": True}
         else:
             session = chat_sessions.create(title)
         return {"ok": True, "session": session, "idempotent_replay": False}
