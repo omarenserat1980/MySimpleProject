@@ -7,6 +7,16 @@ from brain_v12.brain.brain_council import BrainCouncil
 
 
 class BrainCouncilArkanIdentityTests(unittest.TestCase):
+    def test_legacy_host_profile_has_distinct_simulated_identity(self):
+        from brain_v12.brain.arkan_device_emulator import ArkanProfile
+        from brain_v12.virtual_hardware.arkan_provisioner import ARKAN_ID
+
+        profile = ArkanProfile()
+        self.assertEqual(profile.device_id, "arkan-host-sim-asus-vivobook")
+        self.assertNotEqual(profile.device_id, ARKAN_ID)
+        self.assertNotIn("self-hosted", profile.labels)
+        self.assertNotIn("windows-real-boot", profile.labels)
+
     def test_physical_arkan_heartbeat_is_diagnostic_not_executor(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = Path(tmp) / "council.sqlite"
