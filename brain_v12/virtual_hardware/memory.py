@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .memory_profiles import CacheHierarchy, MemoryTimingModel, get_memory_profile
+from .ecc_memory import VirtualECCMemoryController
 
 
 class _SparseCellArray:
@@ -41,13 +42,15 @@ class VirtualRAM:
     def __init__(self, size: int = 65536, profile_id: str | None = None,
                  channels: int = 1, channel_width_bits: int = 64,
                  configured_cas_latency_cycles: int | None = None,
-                 cache_enabled: bool = False, cache_levels=None):
+                 cache_enabled: bool = False, cache_levels=None, ecc_enabled: bool = False):
         if size <= 0:
             raise ValueError("RAM_SIZE_MUST_BE_POSITIVE")
         self.size = int(size)
         self.profile_id = profile_id
         self.profile = get_memory_profile(profile_id) if profile_id else None
         self._cells: dict[int, int] = {}
+        self.ecc_enabled = bool(ecc_enabled)
+        self.ecc_controller = VirtualECCMemoryController() if self.ecc_enabled else None
         self._data = _SparseCellArray(self)
         self.timing_model = (MemoryTimingModel(self.profile, channels, channel_width_bits,
                                                configured_cas_latency_cycles)
@@ -92,11 +95,15 @@ class VirtualRAM:
             raise RuntimeError("RAM_INJECTED_WRITE_ERROR")
         if kind == "bit_flip" and operation == "read" and (fault["address"] is None or fault["address"] == address):
             self._next_fault = None
-            value = self._cells.get(address, 0) ^ 1
-            if value:
-                self._cells[address] = value
+            if self.ecc_controller is not None:
+                # Flip a data bit in the SECDED-encoded word; the read path should correct it.
+                self.ecc_controller.inject_bit_flip(address, 2)
             else:
-                self._cells.pop(address, None)
+                value = self._cells.get(address, 0) ^ 1
+                if value:
+                    self._cells[address] = value
+                else:
+                    self._cells.pop(address, None)
             self.fault_stats["bit_flips"] += 1
 
     def _record_access(self, address: int, operation: str):
@@ -117,6 +124,12 @@ class VirtualRAM:
         self._check(address)
         self._consume_fault("read", address)
         self._record_access(address, "read")
+        if self.ecc_controller is not None:
+            result = self.ecc_controller.read_word(address)
+            if not result["ok"]:
+                self.fault_stats["read_errors"] += 1
+                raise RuntimeError("RAM_ECC_UNCORRECTABLE")
+            return result["data"]
         return self._cells.get(address, 0)
 
     def write(self, address: int, value: int) -> None:
@@ -124,14 +137,19 @@ class VirtualRAM:
         self._consume_fault("write", address)
         self._record_access(address, "write")
         value = int(value)
+        if self.ecc_controller is not None:
+            self.ecc_controller.write_word(address, value)
         if value == 0:
             self._cells.pop(address, None)
         else:
             self._cells[address] = value
 
     def snapshot(self) -> dict:
-        return {"size": self.size,
-                "nonzero": {str(i): v for i, v in sorted(self._cells.items())}}
+        snapshot = {"size": self.size, "nonzero": {str(i): v for i, v in sorted(self._cells.items())},
+                    "ecc_enabled": self.ecc_enabled}
+        if self.ecc_controller is not None:
+            snapshot["ecc"] = self.ecc_controller.snapshot()
+        return snapshot
 
     def restore(self, snapshot: dict) -> None:
         if int(snapshot.get("size", self.size)) != self.size:
@@ -143,7 +161,17 @@ class VirtualRAM:
             value = int(value)
             if value:
                 restored[address] = value
+        snapshot_ecc_enabled = bool(snapshot.get("ecc_enabled", False))
+        if snapshot_ecc_enabled != self.ecc_enabled:
+            raise ValueError("RAM_ECC_MODE_MISMATCH")
         self._cells = restored
+        if self.ecc_controller is not None:
+            if snapshot.get("ecc"):
+                self.ecc_controller.restore(snapshot["ecc"])
+            else:
+                self.ecc_controller = VirtualECCMemoryController()
+                for address, value in restored.items():
+                    self.ecc_controller.write_word(address, value)
         self._next_fault = None
 
     def status(self) -> dict:
@@ -153,6 +181,8 @@ class VirtualRAM:
             "free_cells": self.size - self.used_cells,
             "capacity_unit": "addressable_cells",
             "profile_id": self.profile_id,
+            "ecc_enabled": self.ecc_enabled,
+            "ecc": self.ecc_controller.status() if self.ecc_controller is not None else None,
             "host_payload_bytes_estimate": self.host_payload_bytes_estimate,
             "host_rss_measured": False,
             "fault_stats": dict(self.fault_stats),

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .peripheral_profiles import get_motherboard_profile
+from .pcie import VirtualPCIeFabric
 
 
 class VirtualBus:
@@ -19,6 +20,9 @@ class VirtualBus:
         self._next_fault = None
         self.stats = {"dma_transfers": 0, "dma_bytes": 0, "interrupts": 0,
                       "device_resets": 0, "hotplug_events": 0}
+        generation = self.profile.pcie_generation if self.profile else 4
+        lanes = self.profile.total_pcie_lanes if self.profile else 24
+        self.pcie = VirtualPCIeFabric(generation=generation, lane_count=lanes)
 
     def _requirements(self, name, device) -> dict:
         req = getattr(device, "bus_requirements", None)
@@ -55,6 +59,9 @@ class VirtualBus:
             if used + ports > self.profile.sata_ports:
                 raise RuntimeError(f"BUS_SATA_PORT_CONFLICT:{name}")
             allocation["sata_ports"] = ports
+        if name not in {"cpu", "ram"}:
+            # Endpoint IDs and BARs are software-model metadata, never host MMIO mappings.
+            self.pcie.attach_endpoint(name)
         self.devices[name] = device
         self.device_topology[name] = allocation
         self.stats["hotplug_events"] += 1
@@ -65,6 +72,8 @@ class VirtualBus:
             return {"ok": False, "status": "DEVICE_NOT_ATTACHED", "device": name}
         self.devices.pop(name)
         self.device_topology.pop(name, None)
+        if name in self.pcie.endpoints:
+            self.pcie.detach_endpoint(name)
         self.stats["hotplug_events"] += 1
         return {"ok": True, "status": "DETACHED", "device": name, "virtual_hotplug": True}
 
@@ -136,6 +145,20 @@ class VirtualBus:
         return [{"name": name, "topology": dict(self.device_topology.get(name, {}))}
                 for name in sorted(self.devices)]
 
+    def config_read(self, device: str, offset: int, width: int = 4) -> dict:
+        """Read modeled PCI configuration space for an enumerated peripheral."""
+        return self.pcie.config_read(device, offset, width)
+
+    def config_write(self, device: str, offset: int, value: int, width: int = 4) -> dict:
+        """Write the modeled writable PCI command/status registers."""
+        return self.pcie.config_write(device, offset, value, width)
+
+    def mmio_read(self, device: str, bar_index: int, offset: int, width: int = 4) -> dict:
+        return self.pcie.mmio_read(device, bar_index, offset, width)
+
+    def mmio_write(self, device: str, bar_index: int, offset: int, value: int, width: int = 4) -> dict:
+        return self.pcie.mmio_write(device, bar_index, offset, value, width)
+
     def validate_topology(self) -> dict:
         lanes = sum(int(item["lanes"]) for item in self.device_topology.values())
         sata_ports = sum(int(item["sata_ports"]) for item in self.device_topology.values())
@@ -156,7 +179,7 @@ class VirtualBus:
         return {"profile_id": self.profile_id, "devices": self.enumerate_devices(),
                 "topology_validation": self.validate_topology(), "interrupts": list(self.interrupts),
                 "dma": {"transfers": self.stats["dma_transfers"], "bytes": self.stats["dma_bytes"]},
-                "stats": dict(self.stats), "physical_hardware_used": False}
+                "stats": dict(self.stats), "pcie": self.pcie.status(), "physical_hardware_used": False}
 
     def device_names(self):
         return sorted(self.devices)

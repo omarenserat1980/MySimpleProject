@@ -1,0 +1,97 @@
+name: Brain Extended Virtual Hardware
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/virtual_hardware/extended_devices.py"
+      - "brain_v12/virtual_hardware/pcie.py"
+      - "brain_v12/virtual_hardware/ecc_memory.py"
+      - "brain_v12/virtual_hardware/device_catalog.py"
+      - "brain_v12/tests/test_device_catalog.py"
+      - "brain_v12/virtual_hardware/network_hardware.py"
+      - "brain_v12/virtual_hardware/software_hardware_nodes.py"
+      - "brain_v12/tests/test_software_hardware_nodes.py"
+      - "docs/BRAIN_SOFTWARE_HARDWARE_NODE_INVENTORY.md"
+      - "brain_v12/tests/test_network_hardware.py"
+      - "docs/BRAIN_VIRTUAL_NETWORK_HARDWARE.md"
+      - "brain_v12/virtual_hardware/mining_hardware.py"
+      - "brain_v12/virtual_hardware/mining_farm.py"
+      - "brain_v12/virtual_hardware/network_hardware.py"
+      - "brain_v12/tests/test_network_hardware.py"
+      - "docs/BRAIN_VIRTUAL_NETWORK_HARDWARE.md"
+      - "brain_v12/tests/test_mining_farm.py"
+      - "brain_v12/tests/test_mining_hardware.py"
+      - "docs/BRAIN_VIRTUAL_BITCOIN_MINING_HARDWARE.md"
+      - "brain_v12/tests/test_ecc_memory.py"
+      - "brain_v12/virtual_hardware/bus.py"
+      - "brain_v12/virtual_hardware/computer.py"
+      - "brain_v12/tests/test_virtual_pcie.py"
+      - "brain_v12/virtual_hardware/__init__.py"
+      - "brain_v12/virtual_hardware/network_hardware.py"
+      - "brain_v12/tests/test_network_hardware.py"
+      - "docs/BRAIN_VIRTUAL_NETWORK_HARDWARE.md"
+      - "brain_v12/tests/test_extended_virtual_devices.py"
+      - "docs/BRAIN_EXTENDED_VIRTUAL_PERIPHERAL_FABRIC.md"
+      - "docs/BRAIN_VIRTUAL_HARDWARE_DEVICE_CATALOG.md"
+      - ".github/workflows/brain-extended-virtual-hardware.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/virtual_hardware/extended_devices.py"
+      - "brain_v12/virtual_hardware/__init__.py"
+      - "brain_v12/virtual_hardware/device_catalog.py"
+      - "brain_v12/tests/test_device_catalog.py"
+      - "brain_v12/tests/test_extended_virtual_devices.py"
+      - "docs/BRAIN_EXTENDED_VIRTUAL_PERIPHERAL_FABRIC.md"
+      - "docs/BRAIN_VIRTUAL_HARDWARE_DEVICE_CATALOG.md"
+      - ".github/workflows/brain-extended-virtual-hardware.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-extended-virtual-hardware-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  focused-tests:
+    name: Software-only peripheral and catalog tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run focused tests
+        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory brain_v12.tests.test_device_catalog brain_v12.tests.test_mining_hardware brain_v12.tests.test_mining_farm brain_v12.tests.test_network_hardware brain_v12.tests.test_software_hardware_nodes -v
+      - name: Import and inventory smoke test
+        run: |
+          python - <<'PY'
+          from brain_v12.virtual_hardware import (
+              VirtualECCMemoryController, VirtualPCIeFabric, VirtualPeripheralFabric,
+              list_device_families, list_component_classes, validate_catalog,
+          )
+          inventory = VirtualPeripheralFabric().inventory()
+          assert inventory["mode"] == "SIMULATED"
+          assert inventory["host_hardware_required"] is False
+          assert inventory["external_network_enabled"] is False
+          assert len(inventory["devices"]) >= 12
+          catalog = validate_catalog()
+          assert catalog["ok"], catalog
+          assert catalog["family_count"] >= 18
+          assert catalog["component_class_count"] >= 30
+          assert len(list_device_families()) == catalog["family_count"]
+          assert len(list_component_classes()) == catalog["component_class_count"]
+          pcie = VirtualPCIeFabric()
+          pcie.attach_endpoint("smoke-device")
+          assert pcie.config_read("smoke-device", 0, 2)["value"] == 0xB12A
+          ecc = VirtualECCMemoryController()
+          ecc.write_word(0, 0x1234)
+          assert ecc.read_word(0)["data"] == 0x1234
+          print("catalog_families=", catalog["family_count"], "component_classes=", catalog["component_class_count"])
+          print("peripheral_devices=", len(inventory["devices"]), "pcie_endpoints=", pcie.status()["endpoint_count"], "ecc_scheme=", ecc.status()["scheme"])
+          PY

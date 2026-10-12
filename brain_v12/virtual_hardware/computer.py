@@ -19,6 +19,7 @@ from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
 from .bootloader import VirtualBootloader
+from .extended_devices import VirtualPeripheralFabric
 from ..brain.self_trust_boot_gate import BootGateEvidence, evaluate
 
 @dataclass
@@ -33,6 +34,7 @@ class VirtualComputer:
     storage_profile_id: str | None = None
     ram_profile_id: str | None = None
     cache_enabled: bool = False
+    ecc_enabled: bool = False
     memory_channels: int = 1
     memory_channel_width_bits: int = 64
     configured_cas_latency_cycles: int | None = None
@@ -46,7 +48,7 @@ class VirtualComputer:
         self.ram=VirtualRAM(self.ram_size, profile_id=self.ram_profile_id, channels=self.memory_channels,
                             channel_width_bits=self.memory_channel_width_bits,
                             configured_cas_latency_cycles=self.configured_cas_latency_cycles,
-                            cache_enabled=self.cache_enabled)
+                            cache_enabled=self.cache_enabled, ecc_enabled=self.ecc_enabled)
         self.bus=VirtualBus(profile_id=self.motherboard_profile_id)
         self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
         self.nic=VirtualNIC(profile_id=self.nic_profile_id, external_network_enabled=self.external_network_enabled)
@@ -64,6 +66,8 @@ class VirtualComputer:
         self.boot_record=None
         self.power_thermal=PowerThermalModel()
         self._checkpoint_resume=False
+        # Extended peripherals are software-only; they never bind host devices.
+        self.peripherals = VirtualPeripheralFabric()
 
     def validate_configuration(self) -> dict:
         manifest = self.hardware_manifest()
@@ -82,6 +86,7 @@ class VirtualComputer:
             "machine_id": self.name, "cpu_profile_id": self.cpu_profile_id or "brain-educational-8-register",
             "ram_size_cells": self.ram.size, "ram_profile_id": self.ram_profile_id,
             "memory_channels": self.memory_channels, "memory_channel_width_bits": self.memory_channel_width_bits,
+            "ecc_enabled": self.ecc_enabled,
             "configured_cas_latency_cycles": self.configured_cas_latency_cycles, "cache_enabled": self.cache_enabled,
             "storage_profile_id": self.storage_profile_id, "storage_capacity_bytes": self.storage.capacity,
             "gpu_profile_id": self.gpu_profile_id, "gpu_width": self.gpu.width, "gpu_height": self.gpu.height,
@@ -371,16 +376,23 @@ class VirtualComputer:
                 topology = self.bus.validate_topology()
                 profiles.append(HardwareProfile(
                     "brain-bus-topology-" + self.motherboard_profile_id, "bus",
-                    "Brain PCIe lane allocator and DMA/interrupt event model", FidelityLevel.TIMING_MODEL,
+                    "Brain PCIe transaction-level fabric and topology model", FidelityLevel.TIMING_MODEL,
                     {"motherboard_profile_id": self.motherboard_profile_id,
                      "pcie_lanes_allocated": topology["pcie_lanes_allocated"],
                      "pcie_lanes_total": topology["pcie_lanes_total"],
                      "sata_ports_allocated": topology["sata_ports_allocated"],
-                     "topology_valid": topology["ok"], "electrical_fidelity": False},
+                     "topology_valid": topology["ok"], "electrical_fidelity": False,
+                     "pcie_generation": self.bus.pcie.generation,
+                     "pcie_endpoint_count": self.bus.pcie.status()["endpoint_count"],
+                     "pcie_transactions_recorded": self.bus.pcie.status()["stats"]["completions"],
+                     "pcie_protocol_fidelity": "transaction_level_functional"},
                     ("device enumeration", "lane allocation and generation negotiation",
+                     "configuration-space reads/writes", "BAR discovery and sparse MMIO",
+                     "bounded transaction trace", "deterministic completion fault injection",
                      "topology validation", "DMA transfer accounting", "interrupt routing",
                      "virtual reset and hot-plug"),
-                    ("PCIe TLP/DLLP protocol", "electrical signaling", "real IOMMU", "hardware-compatible hot-plug"),
+                    ("bit-accurate TLP/DLLP encoding", "electrical signaling", "cycle-accurate link replay",
+                     "hardware IOMMU enforcement", "hardware-compatible hot-plug"),
                     (SpecificationSource(ProvenanceKind.DERIVED, get_motherboard_profile(self.motherboard_profile_id).source_url,
                      "Derived topology profile; no commercial motherboard is emulated."),),
                     ("test_topology_lane_budget_and_dma_accounting",
@@ -427,6 +439,22 @@ class VirtualComputer:
                 (SpecificationSource(ProvenanceKind.DERIVED, board.source_url,
                  "PCIe generation reference only; topology is synthetic, not a real motherboard specification."),),
                 ("test_topology_lane_budget_and_dma_accounting", "test_topology_conflict_rejected_before_boot"),
+            ))
+        if self.ecc_enabled:
+            ecc_status = self.ram.ecc_controller.status()
+            profiles.append(HardwareProfile(
+                "brain-memory-secdec-ecc-v1", "memory_integrity", "Brain SECDED ECC memory path",
+                FidelityLevel.FUNCTIONAL,
+                {"scheme": "SECDED", "word_bits": 64, "check_bits_per_word": 8,
+                 "integrated_with_virtual_ram": True, "logical_words": ecc_status["logical_words"]},
+                ("encode on RAM write", "single-bit correction on RAM read",
+                 "double-bit error detection", "deterministic bit-flip injection", "ECC state snapshot/restore"),
+                ("DDR ECC signaling", "physical DIMM/controller behavior", "burst-error guarantees",
+                 "cycle-accurate ECC timing"),
+                (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                     "brain://virtual-hardware/secdec-ecc-v1",
+                                     "Functional SECDED implementation; no physical memory bus is emulated."),),
+                ("test_ecc_ram_path_corrects_single_bit_fault", "test_ecc_ram_path_rejects_mode_mismatch"),
             ))
         profiles.append(HardwareProfile(
             "brain-virtual-firmware-v1", "firmware", "Brain deterministic virtual firmware and bootloader",
@@ -485,7 +513,25 @@ class VirtualComputer:
             units={"ambient_c": "degC", "thermal_capacity_j_per_c": "J/degC",
                    "cooling_w_per_c": "W/degC", "throttle_c": "degC", "shutdown_c": "degC"},
         ))
-        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal")
+        profiles.append(HardwareProfile(
+            "brain-extended-peripherals-v1", "peripherals", "Brain software-only extended peripheral fabric",
+            FidelityLevel.FUNCTIONAL,
+            {"device_families": list(self.peripherals.inventory()["devices"]),
+             "external_network_enabled": False, "host_hardware_required": False},
+            ("TPM-like measurements", "USB port enumeration", "serial console", "watchdog state machine",
+             "deterministic test RNG", "isolated modem state machine", "BMC telemetry", "software IOMMU allow-list",
+             "logical RAID health", "SECDED single-bit correction/double-bit detection", "battery estimates", "input events", "audio frame accounting", "sensor estimates"),
+            ("hardware-backed TPM attestation", "cryptographic entropy", "physical cellular radio",
+             "physical IOMMU enforcement", "persistent RAID data/rebuild", "physical USB/audio/input"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/extended-peripherals-v1",
+                                 "Software-only state models; no physical device or vendor firmware is executed."),),
+            ("test_inventory_is_broad_and_explicitly_software_only",
+             "test_modem_never_transmits_externally", "test_iommu_allow_list_blocks_unmapped_regions"),
+        ))
+        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal", "peripherals")
+        if self.ecc_enabled:
+            required = (*required, "memory_integrity")
         return MachineManifest(self.name, 2, tuple(profiles), required_categories=required).describe()
 
     def status(self):
@@ -499,6 +545,6 @@ class VirtualComputer:
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status(),
                 "storage_telemetry":self.storage.smart_telemetry(),
-                "power_thermal":self.power_thermal.status(),
+                "power_thermal":self.power_thermal.status(),"peripherals":self.peripherals.status(),
                 "machine_manifest_validation":self.hardware_manifest()["validation"],
                 "configuration_validation":self.validate_configuration()}
