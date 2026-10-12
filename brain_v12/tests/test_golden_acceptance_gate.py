@@ -1,0 +1,112 @@
+import unittest
+
+from brain_v12.brain.evidence_store import EvidenceStore
+from brain_v12.brain.golden_acceptance_gate import (
+    AcceptanceCriterion,
+    GoldenAcceptanceGate,
+)
+
+
+class GoldenAcceptanceGateTests(unittest.TestCase):
+    def setUp(self):
+        self.store = EvidenceStore(":memory:")
+        self.gate = GoldenAcceptanceGate(self.store)
+        self.criteria = (
+            AcceptanceCriterion("artifact-exists", "artifact_verified"),
+            AcceptanceCriterion("runtime-check", "runtime_check_passed"),
+        )
+
+    def tearDown(self):
+        self.store.close()
+
+    def _add_valid_bundle(self, *, reality="SIMULATED", verifier="independent-verifier"):
+        first = self.store.append(
+            "task-1", "artifact_verified",
+            {"artifact": "artifact.bin", "reality_level": reality},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        second = self.store.append(
+            "task-1", "runtime_check_passed",
+            {"checks_passed": 3, "reality_level": reality},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        self.store.append(
+            "task-1", "independent_verification",
+            {
+                "verified": True,
+                "reality_level": reality,
+                "verified_evidence_ids": [first["evidence_id"], second["evidence_id"]],
+                "criterion_ids": ["artifact-exists", "runtime-check"],
+            },
+            producer=verifier, mission_id="mission-1", attempt=2,
+        )
+        return first, second
+
+    def test_accepts_only_complete_hash_valid_same_attempt_bundle(self):
+        first, second = self._add_valid_bundle()
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="SIMULATED",
+        )
+        self.assertTrue(result.accepted)
+        self.assertEqual(result.status, "GOLDEN_LOOP_VERIFIED")
+        self.assertEqual(set(result.evidence_ids), {first["evidence_id"], second["evidence_id"]})
+
+    def test_missing_independent_verification_fails_closed(self):
+        self.store.append(
+            "task-1", "artifact_verified", {"reality_level": "SIMULATED"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        self.store.append(
+            "task-1", "runtime_check_passed", {"reality_level": "SIMULATED"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.status, "INDEPENDENT_VERIFICATION_MISSING")
+
+    def test_executor_cannot_verify_its_own_evidence(self):
+        self._add_valid_bundle(verifier="executor-A")
+        result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
+        self.assertFalse(result.accepted)
+        self.assertIn("INDEPENDENT_VERIFICATION_MISSING", result.reasons)
+
+    def test_simulation_cannot_satisfy_real_execution_gate(self):
+        self._add_valid_bundle(reality="SIMULATED")
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+            expected_reality="REMOTE_EXECUTION_VERIFIED",
+        )
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.status, "REALITY_LEVEL_MISMATCH")
+
+    def test_evidence_from_another_attempt_is_not_accepted(self):
+        self._add_valid_bundle()
+        result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=3)
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.status, "INDEPENDENT_VERIFICATION_MISSING")
+        self.assertTrue(any(reason.endswith("ACCEPTANCE_EVIDENCE_MISSING") for reason in result.reasons))
+
+    def test_ci_evidence_does_not_satisfy_runtime_criterion(self):
+        self.store.append(
+            "task-1", "ci", {"reality_level": "SIMULATED"},
+            producer="github-actions", mission_id="mission-1", attempt=2,
+        )
+        result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
+        self.assertFalse(result.accepted)
+        self.assertTrue(any(reason.endswith("ACCEPTANCE_EVIDENCE_MISSING") for reason in result.reasons))
+
+    def test_empty_criteria_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_REQUIRED"):
+            self.gate.evaluate("task-1", [])
+
+    def test_duplicate_criterion_ids_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_CRITERION_ID"):
+            self.gate.evaluate("task-1", [
+                AcceptanceCriterion("same", "a"),
+                AcceptanceCriterion("same", "b"),
+            ])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
