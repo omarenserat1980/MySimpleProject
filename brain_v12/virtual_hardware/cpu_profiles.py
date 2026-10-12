@@ -1,7 +1,8 @@
 """Selectable CPU reference profiles with explicit emulation-fidelity boundaries.
 
 Real processor entries are reference configurations, not claims that this interpreter
-implements their complete ISA or reproduces their microarchitecture.
+implements their complete ISA or reproduces their microarchitecture. The
+`not_simulated` metadata value is an intentional fidelity boundary, not a TODO.
 """
 from __future__ import annotations
 
