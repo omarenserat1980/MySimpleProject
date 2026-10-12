@@ -56,6 +56,22 @@ class EmulatorTests(unittest.TestCase):
         self.assertEqual(result["status"],"TIMED_OUT")
         self.assertTrue(any(row["action"]=="process_timeout" for row in e.audit()["records"]))
 
+    def test_watchdog_preserves_natural_completion_without_output_polling(self):
+        import sys, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=1.0),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "print(42)"')
+        self.assertTrue(started["ok"])
+        deadline=time.monotonic()+2
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        result=e.read_process_output(started["process_id"])
+        self.assertEqual(result["status"],"COMPLETED")
+        self.assertIn("42",result["output"])
+
     def test_stop_process_reaps_process_and_cleans_registry(self):
         import sys
         e=DesktopCommanderEmulator(
