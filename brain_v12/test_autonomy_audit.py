@@ -30,9 +30,10 @@ class AutonomyAuditTests(unittest.TestCase):
     def test_unknown_runner_is_counted_conservatively(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            dynamic_runner = "${{ vars.CUSTOM_RUNNER }}"
             (root / "dynamic.yml").write_text(
                 "name: Dynamic\non:\n  workflow_dispatch:\njobs:\n"
-                "  check:\n    runs-on: \${{ vars.CUSTOM_RUNNER }}\n    steps:\n      - run: echo ok\n",
+                "  check:\n    runs-on: " + dynamic_runner + "\n    steps:\n      - run: echo ok\n",
                 encoding="utf-8",
             )
             result = calculate_audit(root)
