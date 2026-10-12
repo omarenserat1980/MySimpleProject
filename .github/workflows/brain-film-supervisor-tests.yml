@@ -1,0 +1,43 @@
+name: Brain Film Supervisor - Evidence Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/film_supervisor.py"
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/verification_core.py"
+      - "brain_v12/brain/evidence_store.py"
+      - "brain_v12/tests/test_film_supervisor.py"
+      - ".github/workflows/brain-film-supervisor-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/film_supervisor.py"
+      - "brain_v12/brain/brain_supervisor.py"
+      - "brain_v12/brain/verification_core.py"
+      - "brain_v12/brain/evidence_store.py"
+      - "brain_v12/tests/test_film_supervisor.py"
+      - ".github/workflows/brain-film-supervisor-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          python -m pip install --disable-pip-version-check Pillow
+      - name: Run evidence-gate regression tests
+        run: python -m unittest brain_v12.tests.test_film_supervisor -v
+      - name: Compile supervisor modules
+        run: python -m py_compile brain_v12/brain/film_supervisor.py brain_v12/brain/brain_supervisor.py brain_v12/brain/verification_core.py brain_v12/brain/evidence_store.py
