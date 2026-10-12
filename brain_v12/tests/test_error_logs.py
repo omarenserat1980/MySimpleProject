@@ -45,3 +45,13 @@ def test_filters_by_severity_and_ignores_corrupt_lines(tmp_path):
     events = store.list(severity="ERROR")
     assert len(events) == 1
     assert events[0]["category"] == "two"
+
+def test_default_store_uses_writable_runtime_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("BRAIN_RUNTIME_HOME", str(tmp_path / "brain-runtime"))
+    monkeypatch.delenv("BRAIN_ERROR_LOG_PATH", raising=False)
+    store = BrainErrorLogStore()
+    assert store.path == tmp_path / "brain-runtime" / "logs" / "errors.jsonl"
+    event = store.record(category="runtime_path_test", message="writable")
+    assert store.path.is_file()
+    assert store.get(event["event_id"])["message"] == "writable"
+
