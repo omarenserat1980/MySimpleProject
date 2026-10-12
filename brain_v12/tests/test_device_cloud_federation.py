@@ -10,28 +10,29 @@ class DeviceCloudFederationTests(unittest.TestCase):
         fleet = default_fleet()
         self.assertEqual(
             [item.endpoint_id for item in fleet],
-            ["arkan-virtual-01", "phone-virtual-01", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
+            ["arkan-virtual-01", "phone-virtual-01"],
         )
         self.assertTrue(all(not item.online for item in fleet))
         self.assertTrue(all(not item.identity_verified for item in fleet))
 
     def test_unverified_devices_do_not_receive_work(self):
         plan = plan_execution(Workload.BUILD_TEST)
-        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_EXECUTOR")
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
         self.assertIsNone(plan.target)
 
     def test_cloud_fallback_requires_both_capacity_and_free_gate(self):
         self.assertEqual(
             plan_execution(Workload.AI_INFERENCE, cloud_capacity_verified=True).status,
-            "BLOCKED_NO_VERIFIED_EXECUTOR",
+            "BLOCKED_NO_VERIFIED_SOFTWARE_NODE",
         )
         plan = plan_execution(
             Workload.AI_INFERENCE,
             cloud_capacity_verified=True,
             free_cost_gate_passed=True,
         )
-        self.assertEqual(plan.status, "CLOUD_TARGET_VERIFIED")
-        self.assertEqual(plan.target, "brain-cloud-free-pool")
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
+        self.assertIsNone(plan.target)
+        self.assertIn("cloud_fallback_disabled_in_software_only_mode", plan.reasons)
 
     def test_verified_online_host_can_receive_allowed_work(self):
         host = DeviceEndpoint(
@@ -44,8 +45,8 @@ class DeviceCloudFederationTests(unittest.TestCase):
             allowed_workloads=(Workload.BUILD_TEST,),
         )
         plan = plan_execution(Workload.BUILD_TEST, [host])
-        self.assertEqual(plan.status, "LOCAL_TARGET_VERIFIED")
-        self.assertEqual(plan.target, "arkan-host-asus-vivobook")
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
+        self.assertIsNone(plan.target)
 
     def test_arkan_virtual_runtime_is_ready_only_with_live_simulator_and_task_evidence(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
@@ -134,6 +135,20 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertFalse(row["execution_eligible"])
         self.assertNotEqual(row["observed_state"], "SIMULATION_READY")
 
+    def test_physical_host_cannot_receive_work_in_software_only_mode(self):
+        host = DeviceEndpoint(
+            endpoint_id="arkan-host-asus-vivobook",
+            display_name="Physical Arkan host",
+            role=EndpointRole.COMPUTE_HOST,
+            platform="windows",
+            identity_verified=True,
+            online=True,
+            allowed_workloads=(Workload.BUILD_TEST,),
+        )
+        plan = plan_execution(Workload.BUILD_TEST, [host])
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
+        self.assertIsNone(plan.target)
+
     def test_vehicle_endpoint_is_not_a_compute_executor(self):
         car = DeviceEndpoint(
             endpoint_id="honda-enp1-2023",
@@ -158,11 +173,11 @@ class DeviceCloudFederationTests(unittest.TestCase):
             allowed_workloads=(Workload.CAR_COMPANION,),
         )
         plan = plan_execution(Workload.CAR_COMPANION, [car])
-        self.assertEqual(plan.status, "LOCAL_TARGET_VERIFIED")
-        self.assertEqual(plan.target, "honda-enp1-2023")
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
+        self.assertIsNone(plan.target)
 
 
-    def test_fleet_status_reports_live_heartbeat_without_claiming_identity(self):
+    def test_fleet_status_indicators_only_include_software_nodes(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
         result = build_fleet_status({
             "ttl_seconds": 15,
@@ -184,10 +199,9 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(result["active_software_node"]["display_name"], "Arkan virtual computer")
         self.assertEqual(result["active_software_node"]["indicator_state"], "NOT_PROVISIONED")
         self.assertFalse(result["active_software_node"]["physical_device_required"])
-        self.assertEqual(rows["redmi3-01"]["observed_state"], "ONLINE")
-        self.assertFalse(rows["redmi3-01"]["identity_verified"])
-        self.assertFalse(rows["redmi3-01"]["execution_eligible"])
-        self.assertEqual(rows["realme-pending-identity"]["observed_state"], "STALE")
+        self.assertNotIn("redmi3-01", rows)
+        self.assertNotIn("realme-pending-identity", rows)
+        self.assertNotIn("honda-enp1-2023", rows)
         self.assertEqual(rows["arkan-virtual-01"]["observed_state"], "NOT_PROVISIONED")
         self.assertEqual(rows["arkan-virtual-01"]["role"], "virtual_computer")
         self.assertEqual(rows["arkan-virtual-01"]["platform"], "brain-simulator")
