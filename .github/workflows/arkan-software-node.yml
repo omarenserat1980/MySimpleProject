@@ -1,0 +1,62 @@
+name: Arkan Software-Only Node
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/virtual_hardware/computer.py"
+      - "brain_v12/tools/arkan_software_node_smoke.py"
+      - "brain_v12/tests/test_arkan_provisioner.py"
+      - ".github/workflows/arkan-software-node.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/virtual_hardware/computer.py"
+      - "brain_v12/tools/arkan_software_node_smoke.py"
+      - "brain_v12/tests/test_arkan_provisioner.py"
+      - ".github/workflows/arkan-software-node.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  software-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test canonical software Arkan identity
+        run: python -m unittest brain_v12.tests.test_arkan_provisioner -v
+      - name: Compile software node
+        run: python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/tools/arkan_software_node_smoke.py
+      - name: Run software-only Arkan workload
+        run: python -m brain_v12.tools.arkan_software_node_smoke --output arkan-software-node-report.json
+      - name: Enforce honest simulation-only status
+        run: |
+          python - <<'PY'
+          import json
+          report=json.load(open("arkan-software-node-report.json",encoding="utf-8"))
+          assert report["status"] == "SIMULATION_READY", report
+          assert report["node"]["id"] == "arkan-virtual-01", report
+          assert report["node"]["physical_host_required"] is False, report
+          assert report["node"]["desktop_commander_required"] is False, report
+          assert report["smoke_test"]["status"] == "PASS", report
+          assert report["windows_server_2025"]["installation_status"] == "NOT_INSTALLED", report
+          assert report["windows_server_2025"]["boot_status"] == "NOT_VERIFIED", report
+          assert report["windows_server_2025"]["native_os_boot_verified"] is False, report
+          assert report["host_resources_allocated"] is False, report
+          print("ARKAN_SOFTWARE_NODE=SIMULATION_READY")
+          print("PHYSICAL_HOST_DEPENDENCY=NONE_FOR_SIMULATOR")
+          print("NATIVE_WINDOWS_BOOT=NOT_VERIFIED")
+          PY
+      - name: Upload software node evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkan-software-node-evidence-${{ github.run_id }}
+          if-no-files-found: error
+          path: arkan-software-node-report.json
