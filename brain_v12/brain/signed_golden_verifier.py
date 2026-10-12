@@ -92,7 +92,14 @@ def verify_signed_verification(
         raise ValueError("GOLDEN_VERIFIER_NOT_YET_VALID")
     if expires_at <= current:
         raise ValueError("GOLDEN_VERIFIER_EXPIRED")
-    if expires_at <= issued_at or expires_at - issued_at > MAX_VALIDITY_SECONDS:
+    if (
+        expires_at <= issued_at
+        or expires_at - issued_at > MAX_VALIDITY_SECONDS
+        or expires_at - current > MAX_VALIDITY_SECONDS
+    ):
+        # Bound both the signed lifetime and the remaining acceptance window.
+        # This prevents the allowed clock-skew grace from extending effective
+        # validity beyond five minutes from the verifier's current clock.
         raise ValueError("GOLDEN_VERIFIER_VALIDITY_INVALID")
     nonce = attestation["nonce"]
     if not isinstance(nonce, str) or len(nonce.strip()) < 16:
