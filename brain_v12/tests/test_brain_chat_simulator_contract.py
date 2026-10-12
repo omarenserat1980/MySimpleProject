@@ -34,7 +34,7 @@ class BrainChatSimulatorContractTests(unittest.TestCase):
         self.assertIn("لا تشغّل أوامر نظام", self.html)
 
     def test_dynamic_messages_are_inserted_as_text_not_html(self):
-        self.assertIn("body.textContent=escapeText(text)", self.html)
+        self.assertIn('body.textContent=role==="assistant"?withAinEnding(text):escapeText(text)', self.html)
         self.assertNotIn("body.innerHTML", self.html)
 
     def test_live_status_is_read_from_api_not_hardcoded_as_connected(self):
