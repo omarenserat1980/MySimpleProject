@@ -5,6 +5,7 @@ from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
 from .storage_profiles import get_storage_profile
 from .memory_profiles import get_memory_profile, CacheHierarchy
+from .peripheral_profiles import (get_gpu_profile, get_nic_profile, get_motherboard_profile)
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -31,6 +32,10 @@ class VirtualComputer:
     memory_channels: int = 1
     memory_channel_width_bits: int = 64
     configured_cas_latency_cycles: int | None = None
+    gpu_profile_id: str | None = None
+    nic_profile_id: str | None = None
+    motherboard_profile_id: str | None = None
+    external_network_enabled: bool = False
 
     def __post_init__(self):
         self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
@@ -38,10 +43,12 @@ class VirtualComputer:
                             channel_width_bits=self.memory_channel_width_bits,
                             configured_cas_latency_cycles=self.configured_cas_latency_cycles,
                             cache_enabled=self.cache_enabled)
-        self.bus=VirtualBus()
+        self.bus=VirtualBus(profile_id=self.motherboard_profile_id)
         self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
-        self.nic=VirtualNIC()
-        self.gpu=VirtualGPU(self.gpu_width,self.gpu_height)
+        self.nic=VirtualNIC(profile_id=self.nic_profile_id, external_network_enabled=self.external_network_enabled)
+        self.gpu=VirtualGPU(self.gpu_width,self.gpu_height,profile_id=self.gpu_profile_id)
+        self.nic.attach_bus(self.bus)
+        self.gpu.attach_bus(self.bus)
         self.firmware=VirtualFirmware()
         self.kernel=VirtualKernel()
         self.filesystem=VirtualFilesystem(self.storage)
