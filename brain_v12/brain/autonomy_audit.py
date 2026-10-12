@@ -44,6 +44,12 @@ def _runner_for_job(job_text: str) -> tuple[str, str | None]:
         if "${{" in value:
             return "dynamic_unresolved", value
         return "unknown", value
+    # A local reusable-workflow call delegates execution to the called
+    # workflow's job definitions; it is not itself a runner-bearing job.
+    for line in job_text.splitlines():
+        delegated = re.match(r"^\\s{4}uses:\\s*['\\\"]?\\./\\.github/workflows/([^'\\\"\\s]+)", line)
+        if delegated:
+            return "delegated_workflow", delegated.group(1)
     return "missing", None
 
 
@@ -80,7 +86,9 @@ def calculate_audit(workflow_root: str | Path = WORKFLOW_ROOT) -> dict[str, Any]
         raise FileNotFoundError(f"WORKFLOW_ROOT_NOT_FOUND:{root}")
     files = sorted(p for p in root.rglob("*.yml") if p.is_file())
     files += sorted(p for p in root.rglob("*.yaml") if p.is_file())
-    jobs = [job for path in files for job in _jobs_in_workflow(path)]
+    discovered = [job for path in files for job in _jobs_in_workflow(path)]
+    delegated_jobs = [job for job in discovered if job["runner_class"] == "delegated_workflow"]
+    jobs = [job for job in discovered if job["runner_class"] != "delegated_workflow"]
     if not jobs:
         raise RuntimeError("NO_WORKFLOW_JOBS_DISCOVERED")
 
@@ -99,6 +107,8 @@ def calculate_audit(workflow_root: str | Path = WORKFLOW_ROOT) -> dict[str, Any]
         "method": "static workflow/job inventory; hosted runner share only",
         "workflow_count": len(files),
         "job_count": len(jobs),
+        "delegated_reusable_workflow_calls": delegated_jobs,
+        "delegated_reusable_workflow_call_count": len(delegated_jobs),
         "all_workflows": summarize(jobs),
         "software_scope_excluding_explicit_hardware_verification": summarize(software_jobs),
         "hardware_specific_workflows_excluded_from_software_scope": sorted(HARDWARE_SPECIFIC_WORKFLOWS),
