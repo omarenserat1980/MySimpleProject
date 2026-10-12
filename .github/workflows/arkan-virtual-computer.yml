@@ -11,6 +11,7 @@ on:
       - "brain_v12/app.py"
       - "brain_v12/tests/test_arkan_provisioner.py"
       - "brain_v12/tests/test_device_cloud_federation.py"
+      - "brain_v12/tests/test_arkan_council_routing.py"
       - "docs/ARKAN_VIRTUAL_COMPUTER.md"
       - ".github/workflows/arkan-virtual-computer.yml"
   push:
@@ -44,6 +45,8 @@ jobs:
         run: python -m unittest brain_v12.tests.test_arkan_provisioner -v
       - name: Run fleet identity regression tests
         run: python -m unittest brain_v12.tests.test_device_cloud_federation -v
+      - name: Run council routing regression tests
+        run: python -m unittest brain_v12.tests.test_arkan_council_routing -v
       - name: Verify honest OS boot contract
         run: |
           grep -q "SIMULATION_READY" brain_v12/virtual_hardware/arkan_provisioner.py
