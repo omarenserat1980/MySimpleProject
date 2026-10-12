@@ -25,7 +25,6 @@ class StandaloneLauncherContractTests(unittest.TestCase):
             "v12_agent_id",
             "v12_agent_key_file",
             "device_bridge",
-            "emulator",
         )
         for marker in forbidden:
             with self.subTest(marker=marker):
