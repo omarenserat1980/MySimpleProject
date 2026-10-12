@@ -17,11 +17,12 @@ class CompletionEvidenceGateTests(unittest.TestCase):
         out=s.transition(job,"deliver",status="completed")
         self.assertEqual(out["status"],"blocked")
 
-    def test_runtime_evidence_allows_completion(self):
+    def test_runtime_evidence_alone_does_not_allow_completion(self):
         s=self.make(); job=s.create("runtime")
         s.observe(job["job_id"],"settings_opened",True,source="android-executor")
         out=s.transition(job,"deliver",status="completed",required_evidence_kind="settings_opened")
-        self.assertEqual(out["status"],"completed")
+        self.assertEqual(out["status"],"blocked")
+        self.assertEqual(out["details"]["completion_gate"],"GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED")
 
     def test_required_kind_is_enforced(self):
         s=self.make(); job=s.create("wrong kind")
