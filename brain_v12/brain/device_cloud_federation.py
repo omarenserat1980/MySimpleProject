@@ -64,7 +64,12 @@ class ExecutionPlan:
 
 
 def default_fleet() -> tuple[DeviceEndpoint, ...]:
-    """Return logical profiles, not claims that devices are currently online."""
+    """Return only canonical Brain software nodes as active fleet targets.
+
+    Physical device and vehicle profiles are intentionally excluded from the
+    active execution fleet. Their historical identifiers may remain in audit
+    records, but cannot drive software-only status indicators or task routing.
+    """
     return (
         DeviceEndpoint(
             endpoint_id="arkan-virtual-01",
@@ -87,30 +92,6 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
                 "Software-only phone profile; not a physical Android handset and not a claim "
                 "that Android OS or an emulator process is currently running."
             ),
-        ),
-        DeviceEndpoint(
-            endpoint_id="redmi3-01",
-            display_name="Redmi Android agent",
-            role=EndpointRole.ANDROID_AGENT,
-            platform="android-termux",
-            allowed_workloads=(Workload.SYNC_BACKUP,),
-            notes="Android missions require fresh authenticated agent evidence.",
-        ),
-        DeviceEndpoint(
-            endpoint_id="realme-pending-identity",
-            display_name="Realme Android endpoint (identity pending)",
-            role=EndpointRole.ANDROID_AGENT,
-            platform="android",
-            allowed_workloads=(Workload.SYNC_BACKUP,),
-            notes="Placeholder only; bind the actual agent ID and model after discovery.",
-        ),
-        DeviceEndpoint(
-            endpoint_id="honda-enp1-2023",
-            display_name="Honda e:NP1 2023 / Honda CONNECT",
-            role=EndpointRole.VEHICLE_CLIENT,
-            platform="vehicle-infotainment",
-            allowed_workloads=(Workload.CAR_COMPANION, Workload.SYNC_BACKUP),
-            notes="Companion/information only; never route vehicle control or safety functions.",
         ),
     )
 
@@ -264,44 +245,41 @@ def plan_execution(
     cloud_capacity_verified: bool = False,
     free_cost_gate_passed: bool = False,
 ) -> ExecutionPlan:
-    """Select a verified local endpoint or a verified free cloud executor.
+    """Plan work only on verified Brain software nodes.
 
-    A cloud route requires both fresh capacity evidence and a passed free-cost
-    gate. The Honda endpoint is never an execution target for compute workloads.
-    This is a planning contract; it does not perform the selected work.
+    Physical hosts, Android agents, vehicle clients, and cloud fallback are
+    not valid targets in the default software-only execution mode. The
+    supplied endpoint list is treated as untrusted input and filtered by role.
+    This function does not execute the selected work.
     """
-    endpoints = tuple(default_fleet() if endpoints is None else endpoints)
+    candidates = tuple(default_fleet() if endpoints is None else endpoints)
+    allowed_roles = {EndpointRole.VIRTUAL_COMPUTER, EndpointRole.VIRTUAL_PHONE}
 
-    for endpoint in endpoints:
-        if endpoint.role == EndpointRole.VEHICLE_CLIENT and workload != Workload.CAR_COMPANION:
+    for endpoint in candidates:
+        if endpoint.role not in allowed_roles:
             continue
         if workload not in endpoint.allowed_workloads:
             continue
-        if not endpoint.identity_verified:
-            continue
-        if not endpoint.online:
+        if not endpoint.identity_verified or not endpoint.online:
             continue
         return ExecutionPlan(
-            status="LOCAL_TARGET_VERIFIED",
+            status="SOFTWARE_NODE_VERIFIED",
             target=endpoint.endpoint_id,
             workload=workload.value,
-            reasons=("identity_verified", "fresh_online_evidence", "workload_allowed"),
+            reasons=("canonical_software_node", "identity_verified", "fresh_online_evidence", "workload_allowed"),
         )
 
+    reasons = [
+        "no_online_identity_verified_software_node",
+        "physical_and_external_targets_disabled",
+    ]
     if cloud_capacity_verified and free_cost_gate_passed:
-        return ExecutionPlan(
-            status="CLOUD_TARGET_VERIFIED",
-            target="brain-cloud-free-pool",
-            workload=workload.value,
-            reasons=("cloud_capacity_verified", "free_cost_gate_passed"),
-        )
-
+        reasons.append("cloud_fallback_disabled_in_software_only_mode")
+    else:
+        reasons.append("cloud_fallback_not_authorized_by_software_only_policy")
     return ExecutionPlan(
-        status="BLOCKED_NO_VERIFIED_EXECUTOR",
+        status="BLOCKED_NO_VERIFIED_SOFTWARE_NODE",
         target=None,
         workload=workload.value,
-        reasons=(
-            "no_online_identity_verified_endpoint",
-            "cloud_fallback_requires_verified_capacity_and_free_cost_gate",
-        ),
+        reasons=tuple(reasons),
     )
