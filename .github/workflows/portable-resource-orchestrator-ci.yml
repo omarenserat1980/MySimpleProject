@@ -16,6 +16,9 @@ on:
       - "brain_v12/brain/asic_resource_adapter.py"
       - "brain_v12/brain/asic_hardware_simulator.py"
       - "brain_v12/brain/mining_engine.py"
+      - "brain_v12/brain/bitcoin_mining_intelligence_api.py"
+      - "brain_v12/tests/test_mining_engine.py"
+      - "brain_v12/tests/test_bitcoin_mining_intelligence_api.py"
       - "brain_v12/brain/capability_registry.py"
       - "brain_v12/brain/health_probe.py"
       - "brain_v12/brain/task_engine.py"
@@ -55,10 +58,23 @@ jobs:
             brain_v12/brain/run_evidence_store.py \
             brain_v12/brain/android_executor_adapter.py \
             brain_v12/brain/asic_resource_adapter.py \
-            brain_v12/brain/asic_hardware_simulator.py
+            brain_v12/brain/asic_hardware_simulator.py \
+            brain_v12/brain/mining_engine.py \
+            brain_v12/brain/bitcoin_mining_intelligence_api.py
 
       - name: Install ASIC test runner
         run: python -m pip install pytest
+
+      - name: Install API test dependencies
+        run: python -m pip install fastapi pydantic
+
+      - name: Run mining economics and profit-gate tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_mining_engine \
+            brain_v12.tests.test_bitcoin_mining_intelligence_api -v
 
       - name: Run ASIC simulator regression tests
         env:
