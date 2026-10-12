@@ -12,7 +12,6 @@ import hmac
 import json
 import os
 import threading
-import tempfile
 import time
 from pathlib import Path
 from typing import Protocol
@@ -41,143 +40,27 @@ class DisabledPaymentProvider:
         raise RuntimeError("PAYMENT_PROVIDER_NOT_CONFIGURED")
 
 
-class PaymentEventJournal:
-    """Durable payment-event state machine for crash recovery."""
-    def __init__(self, path: str):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock = threading.RLock()
-
-    def _read(self) -> dict:
-        if not self.path.exists():
-            return {}
-        try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise RuntimeError("PAYMENT_EVENT_JOURNAL_UNREADABLE") from exc
-
-    def _write(self, data: dict) -> None:
-        payload = json.dumps(data, indent=2)
-        fd, tmp_name = tempfile.mkstemp(
-            prefix=self.path.name + ".",
-            suffix=".tmp",
-            dir=str(self.path.parent),
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(tmp_name, self.path)
-            try:
-                dir_fd = os.open(self.path.parent, os.O_RDONLY)
-                try:
-                    os.fsync(dir_fd)
-                finally:
-                    os.close(dir_fd)
-            except OSError:
-                pass
-        except OSError as exc:
-            try:
-                os.unlink(tmp_name)
-            except OSError:
-                pass
-            raise RuntimeError("PAYMENT_EVENT_JOURNAL_WRITE_FAILED") from exc
-
-    def get(self, event_id: str) -> dict | None:
-        with self.lock:
-            return self._read().get(event_id)
-
-    def begin(self, payload: "WebhookEnvelope") -> dict:
-        fingerprint = hashlib.sha256(
-            json.dumps(_model_dump_compat(payload), sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        with self.lock:
-            data = self._read()
-            existing = data.get(payload.event_id)
-            if existing:
-                if existing.get("fingerprint") != fingerprint:
-                    raise RuntimeError("PAYMENT_EVENT_ID_CONFLICT")
-                return existing
-            record = {
-                "state": "AUTHENTICATED",
-                "fingerprint": fingerprint,
-                "order_id": payload.order_id,
-                "provider": payload.provider,
-                "payment_reference": payload.payment_reference,
-                "created_at": int(time.time()),
-            }
-            data[payload.event_id] = record
-            self._write(data)
-            return record
-
-    def mark(self, event_id: str, state: str) -> None:
-        with self.lock:
-            data = self._read()
-            record = data.get(event_id)
-            if not record:
-                raise RuntimeError("PAYMENT_EVENT_JOURNAL_ENTRY_MISSING")
-            record["state"] = state
-            record["updated_at"] = int(time.time())
-            data[event_id] = record
-            self._write(data)
-
-
 class WebhookStore:
     def __init__(self, path: str):
         self.path = Path(path)
-        self.lock = threading.RLock()
+        self.lock = threading.Lock()
     def _read(self) -> dict:
         if not self.path.exists():
             return {}
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise RuntimeError("WEBHOOK_REPLAY_STORE_UNREADABLE") from exc
+        except (OSError, ValueError):
+            return {}
     def seen(self, event_id: str) -> bool:
         with self.lock:
             return event_id in self._read()
-    def record(self, event_id: str, payment_reference: str | None = None, order_id: str | None = None) -> None:
+    def record(self, event_id: str) -> None:
         with self.lock:
             data = self._read()
-            data[event_id] = {
-                "seen_at": int(time.time()),
-                "payment_reference": payment_reference,
-                "order_id": order_id,
-            }
-            payload = json.dumps(data, indent=2)
-            fd, tmp_name = tempfile.mkstemp(
-                prefix=self.path.name + ".",
-                suffix=".tmp",
-                dir=str(self.path.parent),
-            )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(tmp_name, self.path)
-                try:
-                    dir_fd = os.open(self.path.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(dir_fd)
-                    finally:
-                        os.close(dir_fd)
-                except OSError:
-                    pass
-            except OSError as exc:
-                try:
-                    os.unlink(tmp_name)
-                except OSError:
-                    pass
-                raise RuntimeError("WEBHOOK_REPLAY_STORE_WRITE_FAILED") from exc
-
-    def payment_seen(self, payment_reference: str) -> bool:
-        with self.lock:
-            return any(
-                isinstance(v, dict) and v.get("payment_reference") == payment_reference
-                for v in self._read().values()
-            )
+            data[event_id] = {"seen_at": int(time.time())}
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp.replace(self.path)
 
 
 class WebhookEnvelope(BaseModel):
@@ -191,18 +74,6 @@ class WebhookEnvelope(BaseModel):
     timestamp: int
 
 
-def _model_dump_compat(model: BaseModel) -> dict:
-    """Serialize models under both Pydantic v1 and v2."""
-    dump = getattr(model, "model_dump", None)
-    return dump() if callable(dump) else model.dict()
-
-
-def _model_validate_json_compat(model_type: type[BaseModel], raw: bytes) -> BaseModel:
-    """Parse JSON under both Pydantic v1 and v2."""
-    validate_json = getattr(model_type, "model_validate_json", None)
-    return validate_json(raw) if callable(validate_json) else model_type.parse_raw(raw)
-
-
 def signature(secret: str, timestamp: int, raw_body: bytes) -> str:
     payload = f"{timestamp}.".encode() + raw_body
     return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
@@ -211,7 +82,6 @@ def signature(secret: str, timestamp: int, raw_body: bytes) -> str:
 def router(data_path: str, replay_path: str | None = None) -> APIRouter:
     store = CommerceStore(data_path)
     replay = WebhookStore(replay_path or data_path + ".webhooks.json")
-    journal = PaymentEventJournal(data_path + ".payment-events.json")
     api = APIRouter(prefix="/api/payments", tags=["payments"])
 
     @api.post("/intent")
@@ -243,88 +113,35 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = _model_validate_json_compat(WebhookEnvelope, raw)
+            if hasattr(WebhookEnvelope, "model_validate_json"):
+                payload = WebhookEnvelope.model_validate_json(raw)
+            else:
+                payload = WebhookEnvelope.parse_raw(raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
-        with replay.lock:
-            journal_entry = journal.get(payload.event_id)
-            if journal_entry and journal_entry.get("state") == "COMMERCE_COMMITTED":
-                # Recovery is valid only when the durable commerce commit matches
-                # this authenticated payment. The journal state alone is insufficient.
-                recovered_order = store.get(payload.order_id)
-                if not recovered_order:
-                    raise HTTPException(404, "ORDER_NOT_FOUND")
-                recovered_payment = recovered_order.get("payment", {})
-                recovered_authority = recovered_order.get("revenue_authority", {})
-                if recovered_order.get("state") != "PAYMENT_VERIFIED":
-                    raise HTTPException(409, "JOURNAL_COMMERCE_STATE_MISMATCH")
-                if recovered_payment.get("transaction_id") != payload.payment_reference:
-                    raise HTTPException(409, "JOURNAL_PAYMENT_REFERENCE_MISMATCH")
-                if recovered_authority.get("provider") != payload.provider:
-                    raise HTTPException(409, "JOURNAL_PROVIDER_MISMATCH")
-                if recovered_authority.get("event_id") != payload.event_id:
-                    raise HTTPException(409, "JOURNAL_EVENT_ID_MISMATCH")
-                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-                journal.mark(payload.event_id, "COMPLETED")
-                return {"ok": True, "verified": True, "idempotent": True,
-                        "order_id": payload.order_id, "state": "PAYMENT_VERIFIED",
-                        "payment_reference": payload.payment_reference}
-            if journal_entry and journal_entry.get("state") == "COMPLETED":
-                raise HTTPException(409, "WEBHOOK_REPLAY")
-            if replay.seen(payload.event_id):
-                raise HTTPException(409, "WEBHOOK_REPLAY")
-            if replay.payment_seen(payload.payment_reference):
-                raise HTTPException(409, "PAYMENT_REFERENCE_REPLAY")
-            configured_provider = os.getenv("BRAIN_PAYMENT_PROVIDER", "").strip()
-            if not configured_provider:
-                raise HTTPException(503, "PAYMENT_PROVIDER_NOT_CONFIGURED")
-            if payload.provider != configured_provider:
-                raise HTTPException(409, "PAYMENT_PROVIDER_MISMATCH")
-            if payload.event_type != "payment.verified":
-                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-                return {"ok": True, "ignored": True, "event_id": payload.event_id}
-            order = store.get(payload.order_id)
-            if not order:
-                raise HTTPException(404, "ORDER_NOT_FOUND")
-            if payload.currency.upper() != "USD":
-                raise HTTPException(409, "CURRENCY_MISMATCH")
-            expected_amount = float(order["product"]["price_usd"])
-            if abs(payload.amount_usd - expected_amount) > 0.000001:
-                raise HTTPException(409, "AMOUNT_MISMATCH")
-            journal_entry = journal.begin(payload)
-            if journal_entry.get("state") == "COMMERCE_COMMITTED":
-                replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-                journal.mark(payload.event_id, "COMPLETED")
-                return {"ok": True, "verified": True, "idempotent": True,
-                        "order_id": payload.order_id, "state": "PAYMENT_VERIFIED",
-                        "payment_reference": payload.payment_reference}
-
-            if order.get("state") == "PAYMENT_VERIFIED":
-                existing_tx = str(order.get("payment", {}).get("transaction_id", "")).strip()
-                existing_provider = str(order.get("revenue_authority", {}).get("provider", "")).strip()
-                existing_event = str(order.get("revenue_authority", {}).get("event_id", "")).strip()
-                if existing_tx == payload.payment_reference and existing_provider == payload.provider:
-                    # Same payment may be retried with a new delivery event id by the
-                    # provider; preserve the original authoritative event identity.
-                    replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-                    return {"ok": True, "verified": True, "idempotent": True,
-                            "order_id": order["order_id"], "state": order["state"],
-                            "payment_reference": payload.payment_reference,
-                            "authoritative_event_id": existing_event}
-                raise HTTPException(409, "PAYMENT_REFERENCE_ORDER_CONFLICT")
-            if order.get("state") != "PAYMENT_PENDING":
-                raise HTTPException(409, "INVALID_PAYMENT_STATE")
-            order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
+        if replay.seen(payload.event_id):
+            raise HTTPException(409, "WEBHOOK_REPLAY")
+        if payload.event_type != "payment.verified":
+            replay.record(payload.event_id)
+            return {"ok": True, "ignored": True, "event_id": payload.event_id}
+        order = store.get(payload.order_id)
+        if not order:
+            raise HTTPException(404, "ORDER_NOT_FOUND")
+        if payload.currency.upper() != "USD":
+            raise HTTPException(409, "CURRENCY_MISMATCH")
+        expected_amount = float(order["product"]["price_usd"])
+        if abs(payload.amount_usd - expected_amount) > 0.000001:
+            raise HTTPException(409, "AMOUNT_MISMATCH")
+        if order.get("state") != "PAYMENT_PENDING":
+            raise HTTPException(409, "INVALID_PAYMENT_STATE")
+        order = store.transition(payload.order_id, "PAYMENT_VERIFIED", {
             "transaction_id": payload.payment_reference,
             "evidence_ref": f"payment-webhook:{payload.provider}:{payload.event_id}",
             "provider": payload.provider,
             "event_id": payload.event_id,
             "verified_at": int(time.time()),
-            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
-            })
-            journal.mark(payload.event_id, "COMMERCE_COMMITTED")
-            replay.record(payload.event_id, payload.payment_reference, payload.order_id)
-            journal.mark(payload.event_id, "COMPLETED")
-            return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
+        })
+        replay.record(payload.event_id)
+        return {"ok": True, "verified": True, "order_id": order["order_id"], "state": order["state"], "payment_reference": payload.payment_reference}
 
     return api
