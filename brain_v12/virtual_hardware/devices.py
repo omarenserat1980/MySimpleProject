@@ -244,6 +244,7 @@ class VirtualNIC:
         self.tx = []
         self.tx_pending = []
         self.bus = None
+        self._next_fault = None
         self._rx_since_interrupt = 0
         self._tx_since_interrupt = 0
         self.stats = {"rx_packets": 0, "tx_packets": 0, "rx_bytes": 0, "tx_bytes": 0,
@@ -259,6 +260,28 @@ class VirtualNIC:
         self.bus = bus
         return {"ok": True, "bus_attached": True}
 
+    def inject_fault(self, fault: str) -> dict:
+        if fault not in {"packet_loss", "link_down", "device_reset"}:
+            raise ValueError(f"VNIC_UNKNOWN_FAULT:{fault}")
+        self._next_fault = fault
+        return {"ok": True, "fault": fault, "deterministic": True}
+
+    def _consume_fault(self, operation: str):
+        fault = self._next_fault
+        if fault is None:
+            return None
+        self._next_fault = None
+        if fault == "packet_loss":
+            self.stats[f"{operation}_drops"] += 1
+            return {"ok": False, "status": "PACKET_DROPPED", "fault": fault, "physical_network_used": False}
+        if fault == "link_down":
+            self.link_up = False
+            raise RuntimeError("VNIC_LINK_DOWN")
+        if fault == "device_reset":
+            self.reset()
+            raise RuntimeError("VNIC_INJECTED_DEVICE_RESET")
+        return None
+
     def _latency_us(self, size_bytes: int, outstanding: int) -> float:
         speed = self.profile.link_speed_bits_per_second if self.profile else 1_000_000_000
         base = self.profile.modeled_base_latency_us if self.profile else 10.0
@@ -266,6 +289,9 @@ class VirtualNIC:
 
     def send(self, payload: bytes):
         packet = bytes(payload)
+        fault_result = self._consume_fault("tx")
+        if fault_result:
+            return fault_result
         if not self.profile:
             self.tx.append(packet)
             return {"ok": True, "bytes": len(packet)}
@@ -303,6 +329,9 @@ class VirtualNIC:
 
     def inject(self, payload: bytes):
         packet = bytes(payload)
+        fault_result = self._consume_fault("rx")
+        if fault_result:
+            return fault_result
         if not self.profile:
             self.rx.append(packet)
             return {"ok": True, "bytes": len(packet)}
@@ -334,6 +363,7 @@ class VirtualNIC:
         self.tx_pending.clear()
         self._rx_since_interrupt = 0
         self._tx_since_interrupt = 0
+        self._next_fault = None
         self.link_up = True
         return {"ok": True, "reset": True, "external_network_enabled": self.external_network_enabled}
 
@@ -363,6 +393,7 @@ class VirtualGPU:
         self.command_queue_depth = max(1, int(command_queue_depth))
         self.command_queue = []
         self.completed_commands = 0
+        self._next_fault = None
         self.bus = None
         self.stats = {"vram_bytes_transferred": 0, "synthetic_operations": 0, "commands_submitted": 0}
         self.framebuffer = [0] * (width * height)
@@ -377,6 +408,29 @@ class VirtualGPU:
         self.bus = bus
         return {"ok": True, "bus_attached": True}
 
+    def inject_fault(self, fault: str) -> dict:
+        if fault not in {"transfer_timeout", "device_reset", "queue_full"}:
+            raise ValueError(f"GPU_UNKNOWN_FAULT:{fault}")
+        self._next_fault = fault
+        return {"ok": True, "fault": fault, "deterministic": True}
+
+    def _consume_fault(self, operation: str):
+        fault = self._next_fault
+        if fault is None:
+            return
+        if fault == "transfer_timeout" and operation != "transfer":
+            return
+        if fault == "queue_full" and operation != "compute":
+            return
+        self._next_fault = None
+        if fault == "transfer_timeout" and operation == "transfer":
+            raise TimeoutError("GPU_INJECTED_TRANSFER_TIMEOUT")
+        if fault == "queue_full" and operation == "compute":
+            raise RuntimeError("GPU_COMMAND_QUEUE_FULL")
+        if fault == "device_reset":
+            self.reset()
+            raise RuntimeError("GPU_INJECTED_DEVICE_RESET")
+
     def clear(self, value: int = 0):
         self.framebuffer = [int(value)] * (self.width * self.height)
 
@@ -386,6 +440,7 @@ class VirtualGPU:
         self.framebuffer[y * self.width + x] = int(value)
 
     def transfer_to_vram(self, size_bytes: int) -> dict:
+        self._consume_fault("transfer")
         if size_bytes < 0 or self.vram_bytes_used + size_bytes > self.logical_vram_capacity_bytes:
             raise RuntimeError("GPU_VRAM_CAPACITY_EXCEEDED")
         bandwidth = self.profile.vram_bandwidth_bytes_per_second if self.profile else 1_000_000_000
@@ -407,6 +462,7 @@ class VirtualGPU:
         return {"ok": True, "released_bytes": released, "logical_vram_bytes_used": self.vram_bytes_used}
 
     def submit_compute(self, operations: int, precision: str = "fp32") -> dict:
+        self._consume_fault("compute")
         if operations < 0:
             raise ValueError("GPU_OPERATION_COUNT_NEGATIVE")
         if len(self.command_queue) >= self.command_queue_depth:
@@ -435,6 +491,7 @@ class VirtualGPU:
 
     def reset(self):
         self.command_queue.clear()
+        self._next_fault = None
         self.vram_bytes_used = 0
         self.completed_commands = 0
         self.framebuffer = [0] * (self.width * self.height)

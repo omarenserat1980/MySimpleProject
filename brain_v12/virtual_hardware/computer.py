@@ -130,9 +130,27 @@ class VirtualComputer:
         return self.power_off()
 
     def advance_thermal(self, load_fraction: float, dt_seconds: float, power_watts: float | None = None) -> dict:
-        if self.power_thermal.shutdown_required:
+        if self.power_thermal.shutdown_required and load_fraction > 0:
             return {"ok": False, "status": "THERMAL_SHUTDOWN_REQUIRED", **self.power_thermal.status()}
-        return {"ok": True, **self.power_thermal.update(load_fraction, dt_seconds, power_watts)}
+        result = self.power_thermal.update(load_fraction, dt_seconds, power_watts)
+        return {"ok": not self.power_thermal.shutdown_required,
+                "status": "THERMAL_SHUTDOWN_REQUIRED" if self.power_thermal.shutdown_required else "OK", **result}
+
+    def inject_fault(self, component: str, fault: str, address: int | None = None) -> dict:
+        component = component.lower()
+        if component in {"ram", "memory"}:
+            return self.ram.inject_fault(fault, address=address)
+        if component == "storage":
+            return self.storage.inject_fault(fault)
+        if component in {"nic", "network"}:
+            return self.nic.inject_fault(fault)
+        if component == "gpu":
+            return self.gpu.inject_fault(fault)
+        if component in {"bus", "interconnect"}:
+            return self.bus.inject_fault(fault)
+        if component in {"power", "thermal"}:
+            return self.power_thermal.inject_fault(fault)
+        raise ValueError(f"BRAIN_UNKNOWN_FAULT_COMPONENT:{component}")
 
     def run_benchmark(self, program, max_cycles: int = 10000) -> dict:
         result = self.execute(program, max_cycles)

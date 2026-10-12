@@ -5,6 +5,8 @@ import unittest
 from brain_v12.virtual_hardware.computer import VirtualComputer
 from brain_v12.virtual_hardware.power_thermal import PowerThermalModel
 from brain_v12.virtual_hardware.api import router
+from brain_v12.virtual_hardware.memory import VirtualRAM
+from brain_v12.virtual_hardware.devices import VirtualNIC, VirtualGPU
 
 
 class MachineManifestTests(unittest.TestCase):
@@ -109,6 +111,51 @@ class MachineManifestTests(unittest.TestCase):
         model.inject_fault("power_interruption")
         self.assertTrue(model.update(0.0, 1.0)["power_interrupted"])
 
+    def test_ram_fault_injection_read_write_and_bit_flip(self):
+        ram = VirtualRAM(16)
+        ram.write(3, 10)
+        ram.inject_fault("bit_flip", address=3)
+        self.assertEqual(ram.read(3), 11)
+        ram.inject_fault("read_error")
+        with self.assertRaisesRegex(RuntimeError, "RAM_INJECTED_READ_ERROR"):
+            ram.read(3)
+        ram.inject_fault("write_error")
+        with self.assertRaisesRegex(RuntimeError, "RAM_INJECTED_WRITE_ERROR"):
+            ram.write(3, 12)
+        self.assertEqual(ram.status()["fault_stats"], {"read_errors": 1, "write_errors": 1, "bit_flips": 1})
+
+    def test_nic_and_gpu_fault_injection_are_deterministic(self):
+        nic = VirtualNIC(profile_id="intel-i225-v")
+        nic.inject_fault("packet_loss")
+        dropped = nic.send(b"lost")
+        self.assertFalse(dropped["ok"])
+        self.assertEqual(dropped["status"], "PACKET_DROPPED")
+        nic.inject_fault("link_down")
+        with self.assertRaisesRegex(RuntimeError, "VNIC_LINK_DOWN"):
+            nic.send(b"no-link")
+        nic.reset()
+        self.assertTrue(nic.status()["link_up"])
+        gpu = VirtualGPU(profile_id="nvidia-tesla-t4")
+        gpu.inject_fault("transfer_timeout")
+        with self.assertRaisesRegex(TimeoutError, "GPU_INJECTED_TRANSFER_TIMEOUT"):
+            gpu.transfer_to_vram(4)
+
+    def test_computer_fault_dispatch_and_thermal_shutdown_recovery(self):
+        machine = VirtualComputer("fault-dispatch", ram_size=16)
+        machine.ram.write(1, 4)
+        machine.inject_fault("ram", "bit_flip", address=1)
+        self.assertEqual(machine.ram.read(1), 5)
+        machine.inject_fault("storage", "timeout")
+        with self.assertRaisesRegex(TimeoutError, "VSTORAGE_INJECTED_TIMEOUT"):
+            machine.storage.read("/not-found")
+        thermal = PowerThermalModel(ambient_c=20, thermal_capacity_j_per_c=1, cooling_w_per_c=1,
+                                    throttle_c=30, shutdown_c=40, idle_power_watts=0, peak_power_watts=100)
+        hot = thermal.update(1.0, 2.0, power_watts=100)
+        self.assertTrue(hot["shutdown_required_estimate"])
+        cool = thermal.update(0.0, 10.0, power_watts=0)
+        self.assertFalse(cool["shutdown_required_estimate"])
+        self.assertLess(cool["temperature_c_estimate"], 30)
+
     def test_existing_api_router_exposes_machine_lifecycle(self):
         routes = {(route.path, tuple(sorted(route.methods or []))) for route in router.routes}
         self.assertTrue(any(path.endswith("/profiles") and "GET" in methods for path, methods in routes))
@@ -118,6 +165,7 @@ class MachineManifestTests(unittest.TestCase):
         self.assertTrue(any(path.endswith("/checkpoint") and "POST" in methods for path, methods in routes))
         self.assertTrue(any(path.endswith("/restore") and "POST" in methods for path, methods in routes))
         self.assertTrue(any(path.endswith("/shutdown") and "POST" in methods for path, methods in routes))
+        self.assertTrue(any(path.endswith("/faults") and "POST" in methods for path, methods in routes))
 
 
 if __name__ == "__main__":
