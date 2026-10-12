@@ -54,7 +54,7 @@ def assert_runtime_contract() -> dict:
         supervisor_text = supervisor_path.read_text(encoding="utf-8")
         for job_name, next_job in (("health_and_recovery", "self_heal"), ("verify", None)):
             start = supervisor_text.find(f"  {job_name}:")
-            end = supervisor_text.find(f"\\n  {next_job}:", start) if next_job else len(supervisor_text)
+            end = supervisor_text.find(f"\n  {next_job}:", start) if next_job else len(supervisor_text)
             if start < 0 or end < 0:
                 failures.append(f"SUPERVISOR_JOB_MISSING:{job_name}")
                 continue
@@ -64,7 +64,7 @@ def assert_runtime_contract() -> dict:
             if "internal_runner_preflight" in job_text:
                 failures.append(f"SIMULATION_JOB_REQUIRES_INTERNAL_HARDWARE:{job_name}")
         dispatch_start = supervisor_text.find("  dispatch_internal_task:")
-        dispatch_end = supervisor_text.find("\\n  health_and_recovery:", dispatch_start)
+        dispatch_end = supervisor_text.find("\n  health_and_recovery:", dispatch_start)
         dispatch = supervisor_text[dispatch_start:dispatch_end] if dispatch_start >= 0 and dispatch_end >= 0 else ""
         if "self-hosted" not in dispatch or "internal_runner_preflight" not in dispatch:
             failures.append("INTERNAL_TASK_DISPATCH_GUARD_MISSING")
