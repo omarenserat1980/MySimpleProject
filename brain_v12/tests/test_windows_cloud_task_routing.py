@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
+from brain_v12.brain.execution_policy import WINDOWS_CLOUD_NATIVE
 from brain_v12.brain.internal_task_runtime import InternalTaskRuntime
 
 
@@ -31,10 +32,10 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
 
     def test_windows_task_requires_explicit_cloud_executor(self):
         with self.assertRaisesRegex(
-            RuntimeError, "WINDOWS_REAL_BOOT_REQUIRES_EXPLICIT_WINDOWS_CLOUD"
+            RuntimeError, "WINDOWS_CLOUD_NATIVE_REQUIRES_NATIVE_CLOUD_EXECUTOR"
         ):
             self.gateway.authorize_task(
-                "windows-server-2025-real-boot",
+                "windows-server-2025-cloud-native",
                 {"executor": "brain-internal"},
             )
 
@@ -43,7 +44,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
             RuntimeError, "WINDOWS_CLOUD_RUNTIME_EVIDENCE_REQUIRED"
         ):
             self.gateway.authorize_task(
-                "windows-server-2025-real-boot",
+                "windows-server-2025-cloud-native",
                 {"executor": "windows-server-2025-cloud"},
             )
 
@@ -52,7 +53,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
         node["last_heartbeat"] = 800.0
         with self.assertRaisesRegex(RuntimeError, "WINDOWS_CLOUD_HEARTBEAT_STALE"):
             self.gateway.authorize_task(
-                "windows-server-2025-real-boot",
+                "windows-server-2025-cloud-native",
                 {
                     "executor": "windows-server-2025-cloud",
                     "vm": self.vm,
@@ -70,7 +71,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
         runtime.enqueue(
             "windows-task",
             ["echo", "must-not-run-locally"],
-            capability="windows-server-2025-real-boot",
+            capability="windows-server-2025-cloud-native",
             metadata={
                 "executor": "windows-server-2025-cloud",
                 "vm": self.vm,

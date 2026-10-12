@@ -5,6 +5,7 @@ on:
     paths:
       - "cloud/web/**"
       - "platform.html"
+      - "brain-cloud.html"
       - "games-store.html"
       - "games-success.html"
       - "games/**"
@@ -50,6 +51,7 @@ jobs:
           mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
           cp platform.html _site/platform.html
+          cp brain-cloud.html _site/brain-cloud.html
           cp games-store.html _site/games-store.html
           cp games-success.html _site/games-success.html
           mkdir -p _site/games
@@ -97,7 +99,7 @@ jobs:
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
               encoding="utf-8")
           required = [
-              "_site/index.html", "_site/platform.html", "_site/games-store.html", "_site/games-success.html", "_site/games-api-config.js",
+              "_site/index.html", "_site/platform.html", "_site/brain-cloud.html", "_site/games-store.html", "_site/games-success.html", "_site/games-api-config.js",
               "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html", "_site/brain-api-config.js", "_site/brain-api-bridge.js",
               "_site/movies.html", "_site/cinema.html",
               "_site/brain-chat/index.html", "_site/brain-chat/config.js",
@@ -149,6 +151,7 @@ jobs:
         run: |
           test -f _site/index.html
           test -f _site/platform.html
+          test -f _site/brain-cloud.html
           test -f _site/games-store.html
           test -f _site/games-success.html
           test -f _site/games-api-config.js

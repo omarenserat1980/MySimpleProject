@@ -5,8 +5,10 @@ requires verification evidence, and never declares success from intent alone.
 """
 from __future__ import annotations
 
+import os
 import time
 import uuid
+from pathlib import Path
 from dataclasses import dataclass, asdict
 
 from .brain_supervisor import BrainSupervisor
@@ -30,7 +32,12 @@ class SuccessGoal:
 class SuccessBot:
     """Deterministic, auditable goal execution facade over BrainSupervisor."""
 
-    def __init__(self, root="brain6_artifacts/success_bot", max_cycles=5):
+    def __init__(self, root=None, max_cycles=5):
+        if root is None:
+            root = os.getenv("BRAIN_SUCCESS_BOT_ROOT")
+        if root is None:
+            runtime_home = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
+            root = runtime_home / "brain6_artifacts" / "success_bot"
         self.supervisor = BrainSupervisor(root=root, max_cycles=max_cycles)
         self.goals: dict[str, SuccessGoal] = {}
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -68,20 +69,43 @@ class CommerceStore:
     def __init__(self, path: str):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def _read(self) -> dict:
         if not self.path.exists():
             return {}
         try:
             return json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("COMMERCE_STORE_UNREADABLE") from exc
 
     def _write(self, data: dict) -> None:
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(self.path)
+        payload = json.dumps(data, ensure_ascii=False, indent=2)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=self.path.name + ".",
+            suffix=".tmp",
+            dir=str(self.path.parent),
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, self.path)
+            try:
+                dir_fd = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except OSError:
+                pass
+        except OSError as exc:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise RuntimeError("COMMERCE_STORE_WRITE_FAILED") from exc
 
     def list(self) -> list[dict]:
         with self.lock:
@@ -149,6 +173,21 @@ class CommerceStore:
                     "evidence_ref": payment_evidence_ref,
                 }
                 order["payment"] = {"status": "VERIFIED", **payment_record}
+                # Only a cryptographically authenticated provider webhook may
+                # establish independent commercial authority for revenue.
+                if evidence_ref.get("independent_verification") == "SIGNED_PROVIDER_WEBHOOK":
+                    provider = str(evidence_ref.get("provider", "")).strip()
+                    event_id = str(evidence_ref.get("event_id", "")).strip()
+                    if not provider or not event_id:
+                        raise HTTPException(status_code=400, detail="PROVIDER_AND_EVENT_ID_REQUIRED")
+                    order["revenue_authority"] = {
+                        "status": "INDEPENDENTLY_VERIFIED",
+                        "order_id": order_id,
+                        "payment_transaction_id": transaction_id,
+                        "provider": provider,
+                        "event_id": event_id,
+                        "evidence_ref": payment_evidence_ref,
+                    }
                 order["invoice"] = {"status": "READY", "order_id": order["order_id"], "amount_usd": order["product"]["price_usd"], "payment_evidence_ref": payment_evidence_ref, "transaction_id": transaction_id}
             elif target == "REVENUE_REALIZED":
                 if not isinstance(evidence_ref, dict):

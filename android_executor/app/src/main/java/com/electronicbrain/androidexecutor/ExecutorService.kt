@@ -1,5 +1,6 @@
 package com.electronicbrain.androidexecutor
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
+import android.os.StatFs
 import java.io.File
 import java.io.FileInputStream
 import java.net.HttpURLConnection
@@ -49,7 +51,7 @@ class ExecutorService : Service() {
 
     private fun loop() {
         val prefs = getSharedPreferences("executor", MODE_PRIVATE)
-        val agentId = prefs.getString("agent_id", "android-executor-redmi3-01") ?: "android-executor-redmi3-01"
+        val agentId = prefs.getString("agent_id", "android-executor-ralmi-01") ?: "android-executor-ralmi-01"
         val key = prefs.getString("agent_key", "") ?: ""
         val baseUrl = prefs.getString("brain_base_url", DEFAULT_BASE_URL)?.trimEnd('/') ?: DEFAULT_BASE_URL
         if (key.isBlank()) {
@@ -62,6 +64,18 @@ class ExecutorService : Service() {
         var backoffMs = POLL_MS
         while (running) {
             try {
+                // Android Executor is the local runtime bootstrap authority. If the
+                // API is down, start the Termux runtime through the supported bridge
+                // instead of requiring the user to open Termux manually.
+                if (!health(baseUrl)) {
+                    updateNotification("BOOTSTRAPPING: Brain Runtime")
+                    val bootstrap = TermuxBridge.runBrainRuntimeBootstrap(this)
+                    if (bootstrap.exitCode != 0 || bootstrap.errorCode != 0) {
+                        throw IllegalStateException("RUNTIME_BOOTSTRAP_FAILED: " + (bootstrap.errorMessage.ifBlank { bootstrap.stderr }).take(160))
+                    }
+                    Thread.sleep(1500L)
+                    if (!health(baseUrl)) throw IllegalStateException("RUNTIME_BOOTSTRAP_NO_HEALTH")
+                }
                 // Keep Brain's device registry fresh even when no task is queued.
                 heartbeat(baseUrl, agentId, key)
                 requestLiveAndroidTestOnce(baseUrl, agentId, key, prefs)
@@ -90,6 +104,20 @@ class ExecutorService : Service() {
     }
 
 
+    private fun health(baseUrl: String): Boolean {
+        return try {
+            val c = URL(baseUrl + "/health").openConnection() as HttpURLConnection
+            c.requestMethod = "GET"
+            c.connectTimeout = 2500
+            c.readTimeout = 2500
+            val code = c.responseCode
+            c.disconnect()
+            code in 200..299
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun heartbeat(baseUrl: String, agentId: String, key: String) {
         val c = URL(baseUrl + "/api/device/heartbeat").openConnection() as HttpURLConnection
         c.requestMethod = "POST"
@@ -99,7 +127,33 @@ class ExecutorService : Service() {
         c.setRequestProperty("X-V12-Agent-Key", key)
         c.setRequestProperty("X-V12-Agent-Id", agentId)
         c.setRequestProperty("Content-Type", "application/json")
-        val metadata = JSONObject().put("client", "ElectronicBrain-AndroidExecutor").put("model", Build.MODEL).put("sdk", Build.VERSION.SDK_INT).put("executor_agent_id", agentId)
+        // Enrollment is explicit: this heartbeat is only sent after the user taps START EXECUTOR.
+        // Advertise only capabilities the current client can safely prove; do not imply shell/build support.
+        val memory = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        memory.getMemoryInfo(memoryInfo)
+        val storage = StatFs(filesDir.absolutePath)
+        val cpuCores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+        val totalMemoryMb = (memoryInfo.totalMem / (1024L * 1024L)).coerceAtLeast(1L)
+        val availableMemoryMb = (memoryInfo.availMem / (1024L * 1024L)).coerceAtLeast(1L)
+        val availableDiskMb = (storage.availableBytes / (1024L * 1024L)).coerceAtLeast(1L)
+        val metadata = JSONObject()
+            .put("client", "ElectronicBrain-AndroidExecutor")
+            .put("model", Build.MODEL)
+            .put("sdk", Build.VERSION.SDK_INT)
+            .put("android_version", Build.VERSION.RELEASE)
+            .put("executor_agent_id", agentId)
+            .put("enrolled", true)
+            .put("enrollment_version", "1")
+            .put("healthy", availableMemoryMb >= 128L && availableDiskMb >= 128L)
+            .put("cpu_cores", cpuCores)
+            .put("memory_mb", availableMemoryMb)
+            .put("total_memory_mb", totalMemoryMb)
+            .put("disk_mb", availableDiskMb)
+            .put("gpu_count", 0)
+            .put("capabilities", org.json.JSONArray().put("device.status").put("device.info"))
+            .put("permissions", org.json.JSONArray().put("device"))
+            .put("host_id", agentId)
         c.outputStream.use { it.write(JSONObject().put("agent_id", agentId).put("metadata", metadata).toString().toByteArray(StandardCharsets.UTF_8)) }
         val code = c.responseCode
         if (code !in 200..299) throw IllegalStateException("HEARTBEAT_HTTP_$code")
@@ -276,6 +330,15 @@ class ExecutorService : Service() {
                 "verify_media" -> {
                     val file = safePath(params.optString("path", ""))
                     ok(JSONObject(FFmpegEngine(this).probeMedia(file)))
+                }
+                "brain_runtime_launch" -> {
+                    val result = TermuxBridge.runBrainRuntimeBootstrap(this)
+                    ok(JSONObject()
+                        .put("exit_code", result.exitCode)
+                        .put("error_code", result.errorCode)
+                        .put("stdout", result.stdout.take(4000))
+                        .put("stderr", result.stderr.take(4000))
+                        .put("error", result.errorMessage))
                 }
                 "termux_probe" -> {
                     val installed = TermuxBridge.isInstalled(this)

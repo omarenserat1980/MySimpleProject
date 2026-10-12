@@ -66,37 +66,16 @@ class ExecutionFabric:
 
     def execute(self, task_id: str, argv: list[str], capability: str,
                 timeout: int | None = None) -> dict[str, Any]:
-        worker = self.resolve(capability)
-        lease_id = uuid.uuid4().hex
-        self.leases[lease_id] = {
-            "task_id": task_id, "worker_id": worker.worker_id,
-            "capability": capability, "state": "RUNNING",
-            "started_at": time.time(),
-        }
-        try:
-            result = worker.executor(argv, capability, timeout)
-            state = "COMPLETED" if result.get("ok") else "FAILED"
-            self.leases[lease_id].update(
-                state=state, finished_at=time.time(), result=result
-            )
-            return {
-                "ok": result.get("ok", False),
-                "task_id": task_id,
-                "lease_id": lease_id,
-                "worker_id": worker.worker_id,
-                "worker_kind": worker.kind,
-                "capability": capability,
-                "result": result,
-            }
-        except Exception as exc:
-            self.leases[lease_id].update(
-                state="FAILED", finished_at=time.time(),
-                error=f"{type(exc).__name__}:{exc}",
-            )
-            return {
-                "ok": False, "task_id": task_id, "lease_id": lease_id,
-                "worker_id": worker.worker_id, "error": self.leases[lease_id]["error"],
-            }
+        """Reject the legacy direct-worker execution path.
+
+        Consequential execution must enter through InternalTaskRuntime so the
+        canonical gateway, execution contract, idempotency, leadership/fencing
+        checks, and evidence path remain in control. Direct worker invocation
+        is intentionally fail-closed rather than treated as trusted execution.
+        """
+        raise RuntimeError(
+            "DIRECT_WORKER_EXECUTION_FORBIDDEN_USE_INTERNAL_TASK_RUNTIME"
+        )
 
     def recover(self) -> dict[str, Any]:
         active = [

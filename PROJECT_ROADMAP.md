@@ -43,6 +43,8 @@
 - [x] Keep paid executors disabled unless commercial mode explicitly enables them
 
 ## Phase 3 — Brain Cloud execution
+- [x] Add policy-only portable resource scheduler and configurable local-host resource budget (implementation branch; CI validation pending)
+- [ ] Add durable portable run/evidence index and executor request/result schema
 - [x] Free GitHub-hosted Linux runner
 - [x] Python runtime
 - [x] FFmpeg/FFprobe installation

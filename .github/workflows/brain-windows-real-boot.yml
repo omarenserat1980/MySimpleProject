@@ -1,14 +1,6 @@
 name: Brain Windows Real Boot Evidence
 
 on:
-  push:
-    paths:
-      - ".github/workflows/brain-windows-real-boot.yml"
-      - "brain_v12/windows_boot_evidence.ps1"
-      - "brain_v12/windows_setupcomplete.cmd"
-      - "brain_v12/brain/windows_completion_gate.py"
-      - "brain_v12/brain/windows_runtime_contract.py"
-      - "brain_v12/WINDOWS_RUNTIME.md"
   workflow_dispatch:
     inputs:
       iso_url:
@@ -25,19 +17,69 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: brain-windows-real-boot-single-flight
+  cancel-in-progress: false
+
 jobs:
   real_windows_boot:
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    environment:
+      name: windows-real-boot
+    env:
+      BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
+      BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ github.workspace }}/.brain-cloud-executor-attestation.json
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Brain-owned runner and VM toolchain
+      - name: Preflight all protected Windows boot secrets
         env:
-          BRAIN_INTERNAL_RUNNER_FLAG: "1"
+          BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
         run: |
           set -euo pipefail
-          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
+          missing=0
+          for name in \
+            BRAIN_CLOUD_EXECUTOR_REGISTRY_URL \
+            BRAIN_CLOUD_EXECUTOR_TOKEN \
+            BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64 \
+            BRAIN_AUTHORITY_PUBLIC_KEY_B64 \
+            BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY; do
+            if [ -z "${!name:-}" ]; then
+              printf 'BLOCKED: required protected environment secret is empty: %s\n' "$name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "WINDOWS_REAL_BOOT_SECRET_PREFLIGHT=BLOCKED"
+            exit 2
+          fi
+          echo "WINDOWS_REAL_BOOT_SECRET_PREFLIGHT=PASS"
+
+      - name: Classify Control Plane endpoint without disclosure
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+        run: |
+          set -euo pipefail
+          # Never echo the endpoint: it may contain internal routing information.
+          python3 brain_v12/tools/brain_deployment_dependency_audit.py
+          echo "WINDOWS_CONTROL_PLANE_ENDPOINT_PREFLIGHT=PASS"
+
+      - name: Verify Brain-owned runner and VM toolchain
+        run: |
+          set -euo pipefail
+          # This identity must be injected by the preconfigured runner service,
+          # never by workflow YAML; otherwise any runner could self-attest.
+          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1" || { echo 'BLOCKED: BRAIN_INTERNAL_RUNNER_FLAG must be configured by the runner host'; exit 2; }
           test "${{ runner.os }}" = "Linux"
           test "${{ runner.arch }}" = "X64"
           for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy; do
@@ -51,6 +93,48 @@ jobs:
           print(json.dumps(r, indent=2, sort_keys=True))
           PY
           echo "BRAIN_INTERNAL_RUNNER=VERIFIED"
+          echo "BRAIN_BOOT_RUNNER_NAME=${RUNNER_NAME:-unknown}"
+          # Request a new single-use signed attestation on the exact runner that will boot Windows.
+          trap 'rm -f "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"' EXIT
+          test -n "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_TOKEN:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}" || { echo "BLOCKED: BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED is missing from windows-real-boot environment"; exit 2; }
+          python3 tools/request_cloud_executor_attestation.py --output "$BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE"
+          python3 brain_v12/brain/cloud_executor_gate.py --output cloud-executor-gate.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open("cloud-executor-gate.json", encoding="utf-8"))
+          assert e.get("verified") is True, e
+          assert e.get("evidence_ref"), e
+          print("SAME_JOB_CLOUD_EXECUTOR_GATE=VERIFIED")
+          print("SAME_JOB_CLOUD_EXECUTOR_EVIDENCE_REF="+e["evidence_ref"])
+          PY
+
+      - name: Preflight Brain execution contract destination
+        run: |
+          set -euo pipefail
+          CONTRACT_FILE="$BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE"
+          CONTRACT_DIR="$(dirname "$CONTRACT_FILE")"
+          mkdir -p "$CONTRACT_DIR"
+          test -w "$CONTRACT_DIR" || { echo "BLOCKED: contract destination is not writable."; exit 2; }
+          echo "WINDOWS_EXECUTION_CONTRACT_DESTINATION=READY"
+
+      - name: Fetch short-lived contract from Brain Control Plane
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/fetch_windows_execution_contract.py
+
+      - name: Verify Brain closed-loop execution contract
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/windows_real_boot_closed_loop_gate.py \
+            --path "$BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE" \
+            --output windows-execution-contract-gate.json
+          grep -q '"verified": true' windows-execution-contract-gate.json
+          echo "WINDOWS_EXECUTION_CONTRACT=VERIFIED"
 
       - name: Install real VM tooling
         run: |
@@ -60,9 +144,20 @@ jobs:
 
       - name: Download and validate Microsoft media
         env:
-          ISO_URL: ${{ inputs.iso_url || 'https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us' }}
+          ISO_URL_INPUT: ${{ inputs.iso_url }}
         run: |
           set -euo pipefail
+          DEFAULT_ISO_URL='https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us'
+          ISO_URL="${ISO_URL_INPUT:-$DEFAULT_ISO_URL}"
+          if [[ -z "${ISO_URL//[[:space:]]/}" ]]; then
+            echo "BLOCKED: ISO_URL is empty."
+            exit 2
+          fi
+          case "$ISO_URL" in
+            https://*) ;;
+            *) echo "BLOCKED: ISO_URL must use HTTPS."; exit 2 ;;
+          esac
+          echo "ISO_URL_VALIDATION=PASS"
           curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2025.iso
           test -s windows-server-2025.iso
           xorriso -indev windows-server-2025.iso -toc 2>&1 | tee iso-toc.txt
@@ -75,25 +170,40 @@ jobs:
           sudo mkdir -p /mnt/ws
           sudo mount -o loop,ro windows-server-2025.iso /mnt/ws
           trap 'sudo umount /mnt/ws || true' EXIT
-          test -f /mnt/ws/sources/install.wim
-          wimlib-imagex info /mnt/ws/sources/install.wim | tee wim-info.txt
-          grep -Eq 'Windows Server 2025|SERVERSTANDARD' wim-info.txt
+          image_file=""
+          if [ -f /mnt/ws/sources/install.wim ]; then
+            image_file=/mnt/ws/sources/install.wim
+          elif [ -f /mnt/ws/sources/install.esd ]; then
+            image_file=/mnt/ws/sources/install.esd
+          else
+            echo "BLOCKED: neither sources/install.wim nor sources/install.esd exists"
+            find /mnt/ws/sources -maxdepth 1 -type f -printf '%f\\n' | sort | tee windows-sources-files.txt
+            exit 2
+          fi
+          printf 'IMAGE_FILE=%s\\n' "$image_file" | tee windows-image-file.txt
+          wimlib-imagex info "$image_file" | tee wim-info.txt
+          grep -Eiq 'Windows Server 2025|SERVERSTANDARD|SERVERDATACENTER' wim-info.txt
+          # Prefer Datacenter when available; accept Core/non-Core product names.
           image_index="$(
             awk '
               /^Index:/ {idx=$2}
-              /^Name:[[:space:]]+Windows Server 2025 SERVERDATACENTER$/ {print idx; exit}
+              tolower($0) ~ /^name:[[:space:]]*windows server 2025.*serverdatacenter/ {print idx; exit}
             ' wim-info.txt
           )"
           if [ -z "$image_index" ]; then
             image_index="$(
               awk '
                 /^Index:/ {idx=$2}
-                /^Name:[[:space:]]+Windows Server 2025 SERVERSTANDARD$/ {print idx; exit}
+                tolower($0) ~ /^name:[[:space:]]*windows server 2025.*serverstandard/ {print idx; exit}
               ' wim-info.txt
             )"
           fi
-          test -n "$image_index"
-          printf 'IMAGE_INDEX=%s\n' "$image_index" | tee windows-image-index.txt
+          if [ -z "$image_index" ]; then
+            echo "BLOCKED: no supported Windows Server 2025 Datacenter/Standard image was found"
+            grep -E '^(Index|Name):' wim-info.txt || true
+            exit 2
+          fi
+          printf 'IMAGE_INDEX=%s\\n' "$image_index" | tee windows-image-index.txt
           echo "Selected Windows Server 2025 image index: $image_index"
 
       - name: Build evidence-enabled unattended media
@@ -118,7 +228,25 @@ jobs:
           # FirstLogonCommands only fires after a real user logon. Create a
           # one-shot, runner-generated Administrator password so the evidence
           # agent cannot stall at the Server OOBE/login boundary.
-          BRAIN_AUTOPASS="$(openssl rand -hex 24)"
+          # Windows local-account complexity normally requires upper, lower,
+          # numeric and non-alphanumeric characters. Generate XML-safe characters
+          # and never print the password into logs.
+          BRAIN_AUTOPASS="$(python3 - <<'PY'
+          import secrets, string
+          rng = secrets.SystemRandom()
+          symbols = "!@#%+=_-"
+          alphabet = string.ascii_letters + string.digits + symbols
+          chars = [
+              rng.choice(string.ascii_lowercase),
+              rng.choice(string.ascii_uppercase),
+              rng.choice(string.digits),
+              rng.choice(symbols),
+          ]
+          chars.extend(rng.choice(alphabet) for _ in range(28))
+          rng.shuffle(chars)
+          print("".join(chars))
+          PY
+          )"
           export BRAIN_AUTOPASS
 
           cat > /tmp/brain-ws-oem/Autounattend.xml <<XML
@@ -207,6 +335,24 @@ jobs:
           assert "AutoLogon" in xml
           assert "Administrator" in xml
           assert "brain-windows-evidence.ps1" in xml
+          ns={"u":"urn:schemas-microsoft-com:unattend"}
+          root=ET.parse(p).getroot()
+          passwords=[
+              (node.text or "")
+              for node in (
+                  root.findall(".//u:AdministratorPassword/u:Value", ns)
+                  + root.findall(".//u:AutoLogon/u:Password/u:Value", ns)
+              )
+          ]
+          assert len(passwords)==2 and passwords[0]==passwords[1], "ADMIN_PASSWORD_MISMATCH"
+          password=passwords[0]
+          assert len(password)>=14, "ADMIN_PASSWORD_TOO_SHORT"
+          assert any(c.islower() for c in password), "ADMIN_PASSWORD_MISSING_LOWERCASE"
+          assert any(c.isupper() for c in password), "ADMIN_PASSWORD_MISSING_UPPERCASE"
+          assert any(c.isdigit() for c in password), "ADMIN_PASSWORD_MISSING_DIGIT"
+          assert any(c in "!@#%+=_-" for c in password), "ADMIN_PASSWORD_MISSING_SYMBOL"
+          assert not any(c in password for c in '&<>"'), "ADMIN_PASSWORD_NOT_XML_SAFE"
+          print("AUTOUNATTEND_PASSWORD_POLICY=PASS")
           print("AUTOUNATTEND_PREFLIGHT=PASS")
           PY
           xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
@@ -222,76 +368,127 @@ jobs:
           truncate -s 64M windows-evidence.img
           mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
           cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
-          if [ -e /dev/kvm ]; then
-            echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
-          else
-            echo 'QEMU_ACCEL=tcg' | tee qemu-accel.txt
-          fi
+          # Do not silently downgrade a real-boot run to software emulation.
+          test -c /dev/kvm || { echo 'BLOCKED: /dev/kvm is not a character device'; exit 2; }
+          test -r /dev/kvm && test -w /dev/kvm || { echo 'BLOCKED: /dev/kvm is not readable and writable'; exit 2; }
+          echo 'QEMU_ACCEL=kvm' | tee qemu-accel.txt
 
-      - name: Boot and install Windows Server 2025
+      - name: Boot and install Windows Server 2025 through Brain Gateway
         env:
           BOOT_TIMEOUT: ${{ inputs.timeout_minutes || '55' }}
         shell: bash
         run: |
           set -euo pipefail
-          timeout "$BOOT_TIMEOUT"m qemu-system-x86_64 \
-            -machine q35,accel=kvm:tcg -cpu max -m 4G -smp 2 \
-            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
-            -device ich9-ahci,id=sata \
-            -drive file=windows-server-2025.qcow2,format=qcow2,if=none,id=osdisk \
-            -device ide-hd,bus=sata.2,drive=osdisk \
-            -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
-            -device ide-hd,bus=sata.3,drive=evidence \
-            -nic user,model=e1000 \
-            -drive file=brain-windows-server-2025-proof.iso,media=cdrom,if=none,id=installmedia,readonly=on \
-            -device ide-cd,bus=sata.1,drive=installmedia \
-            -boot once=d,menu=off \
-            -display none -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
-            > qemu-console.log 2>&1 &
-          QPID=$!
-          deadline=$((SECONDS + BOOT_TIMEOUT*60))
-          found=0
-          boot_source="unknown"
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            if mcopy -i windows-evidence.img ::WINDOWS_BOOT_VERIFIED /tmp/windows-boot-marker 2>/dev/null; then
-              found=1
-              boot_source="windows-installed-disk"
-              echo "WINDOWS_BOOT_EVIDENCE_MARKER=FOUND"
-              echo "WINDOWS_BOOT_SOURCE=$boot_source"
-              break
-            fi
-            if ! kill -0 "$QPID" 2>/dev/null; then
-              echo "QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE"
-              break
-            fi
-            sleep 5
-          done
-          if [ "$found" -ne 1 ]; then
-            tail -200 qemu-console.log || true
-            tail -200 qemu-serial.log || true
-            exit 1
-          fi
           python3 - <<'PY'
-          import json,socket,time
+          import json, os, pathlib, socket, subprocess, time
+          from brain_v12.brain.execution_gateway import BrainExecutionGateway
+          from brain_v12.brain.windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
+
+          timeout_minutes=int(os.environ.get("BOOT_TIMEOUT","55"))
+          contract_path=os.environ.get("BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE") or "/run/brain/windows-execution-contract.json"
+
+          decision=BrainExecutionGateway().authorize_task(
+              "windows-server-2025-real-boot",
+              {"executor":"windows-real-boot-qemu","contract_path":contract_path},
+          )
+          assert decision.verified is True, decision
+          print("BRAIN_EXECUTION_GATEWAY=VERIFIED")
+          print("BRAIN_EXECUTION_EXECUTOR="+decision.executor)
+
+          adapter=WindowsRealBootQemuAdapter()
+          proc,meta=adapter.start(
+              os_disk="windows-server-2025.qcow2",
+              evidence_disk="windows-evidence.img",
+              proof_iso="brain-windows-server-2025-proof.iso",
+              ovmf_vars="OVMF_VARS.fd",
+              contract_path=contract_path,
+              qmp_socket="qmp.sock",
+              serial_log="qemu-serial.log",
+              cwd=".",
+          )
+          print("BRAIN_QEMU_ADAPTER=STARTED")
+          print("BRAIN_QEMU_PID="+str(proc.pid))
+          print("BRAIN_CONTRACT_SHA256="+meta["contract_sha256"])
+
+          deadline=time.time()+timeout_minutes*60
+          found=False
+          while time.time()<deadline:
+              marker=subprocess.run(
+                  ["mcopy","-i","windows-evidence.img","::WINDOWS_BOOT_VERIFIED","/tmp/windows-boot-marker"],
+                  stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False,
+              )
+              if marker.returncode==0:
+                  found=True
+                  break
+              if proc.poll() is not None:
+                  print("QEMU_EXITED_BEFORE_WINDOWS_EVIDENCE")
+                  break
+              time.sleep(5)
+
+          if not found:
+              for name in ("qemu-console.log","qemu-serial.log"):
+                  p=pathlib.Path(name)
+                  if p.exists():
+                      print("===== "+name+" =====")
+                      print(p.read_text(errors="replace")[-12000:])
+              proc.kill(); proc.wait()
+              raise SystemExit("WINDOWS_BOOT_EVIDENCE_NOT_FOUND")
+
+          print("WINDOWS_BOOT_EVIDENCE_MARKER=FOUND")
+          print("WINDOWS_BOOT_SOURCE=windows-installed-disk")
+
           s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
-          s.connect("qmp.sock")
-          for o in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
-              s.sendall((json.dumps(o)+"\r\n").encode()); time.sleep(.5)
-          s.close()
+          try:
+              s.connect("qmp.sock")
+              for command in ({"execute":"qmp_capabilities"},{"execute":"system_powerdown"}):
+                  s.sendall((json.dumps(command)+"\r\n").encode())
+                  time.sleep(.5)
+          finally:
+              s.close()
+
+          time.sleep(15)
+          pathlib.Path("windows-boot-phase.txt").write_text(
+              "BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\n"
+              "BOOT_SOURCE=windows-installed-disk\n"
+              "QEMU_PID="+str(proc.pid)+"\n"
+              "CONTRACT_SHA256="+meta["contract_sha256"]+"\n",
+              encoding="utf-8",
+          )
+          if proc.poll() is None:
+              proc.terminate()
+              try: proc.wait(timeout=15)
+              except subprocess.TimeoutExpired:
+                  proc.kill(); proc.wait()
+          elif proc.returncode not in (0,None):
+              raise SystemExit("QEMU_FAILED_AFTER_VERIFIED_BOOT:"+str(proc.returncode))
+          print("BRAIN_QEMU_SUPERVISED_BOOT=VERIFIED")
           PY
-          sleep 15
-          printf 'BOOT_PHASE=WINDOWS_INSTALLED_AND_BOOTED_FROM_DISK\nBOOT_SOURCE=%s\n' "$boot_source" | tee windows-boot-phase.txt
-          kill "$QPID" 2>/dev/null || true
-          wait "$QPID" 2>/dev/null || true
 
       - name: Read guest evidence and apply independent completion gate
         run: |
           set -euo pipefail
           mcopy -i windows-evidence.img ::windows-boot-evidence.json windows-boot-evidence.json
           python3 - <<'PY'
-          import json,pathlib
+          import json,pathlib,os
           e=json.loads(pathlib.Path("windows-boot-evidence.json").read_text(encoding="utf-8-sig"))
+          contract_gate=json.loads(pathlib.Path("windows-execution-contract-gate.json").read_text(encoding="utf-8"))
+          assert contract_gate["verified"] is True, contract_gate
+          executor_gate=json.loads(pathlib.Path("cloud-executor-gate.json").read_text(encoding="utf-8"))
+          assert executor_gate.get("verified") is True, executor_gate
+          executor_id=executor_gate.get("executor_id","").strip()
+          hostname=(executor_gate.get("checks",{}).get("hostname",{}).get("value") or "").strip()
+          evidence_ref=(executor_gate.get("evidence_ref") or "").strip()
+          assert executor_id and hostname and evidence_ref, executor_gate
+          e["executor"]={
+              "verified":True,
+              "executor_id":executor_id,
+              "hostname":hostname,
+              "evidence_ref":evidence_ref,
+              "runner_name":os.environ.get("RUNNER_NAME","").strip(),
+              "workflow_run_id":os.environ.get("GITHUB_RUN_ID","").strip(),
+          }
+          assert e["executor"]["runner_name"] and e["executor"]["workflow_run_id"], e["executor"]
+          e["control"]=contract_gate["contract"]
           assert e["status"]=="WINDOWS_BOOT_VERIFIED", e
           assert e["guest"]["os"]=="Windows Server 2025", e
           assert e["guest"]["architecture"]=="AMD64", e
@@ -319,6 +516,20 @@ jobs:
           print("EVIDENCE_SHA256="+r["evidence_sha256"])
           PY
 
+      - name: Run dedicated Windows boot proof verifier
+        run: |
+          set -euo pipefail
+          python3 brain_v12/tools/windows_boot_proof.py \
+            --evidence windows-combined-evidence.json \
+            --marker /tmp/windows-boot-marker \
+            --phase windows-boot-phase.txt \
+            --contract-gate windows-execution-contract-gate.json \
+            --executor-gate cloud-executor-gate.json \
+            --run-id "$GITHUB_RUN_ID" \
+            --output windows-boot-proof.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-boot-proof.json
+          grep -q '"verified": true' windows-boot-proof.json
+
       - name: Upload immutable Windows evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -333,17 +544,27 @@ jobs:
             windows-boot-evidence.json
             windows-combined-evidence.json
             windows-completion-gate.json
+            windows-boot-proof.json
             proof-iso-toc.txt
             proof-iso-autounattend.txt
             proof-iso-setupcomplete.txt
             qemu-accel.txt
             windows-boot-phase.txt
+            windows-execution-contract-gate.json
+            cloud-executor-gate.json
             qemu-console.log
             qemu-serial.log
 
       - name: Final Windows evidence gate
         run: |
           set -euo pipefail
+          test -f windows-execution-contract-gate.json
+          grep -q '"verified": true' windows-execution-contract-gate.json
           test -f windows-completion-gate.json
           grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-completion-gate.json
+          test -f windows-boot-proof.json
+          grep -q '"status": "WINDOWS_BOOT_VERIFIED"' windows-boot-proof.json
+          grep -q '"verified": true' windows-boot-proof.json
+          echo "BRAIN_WINDOWS_BOOT_PROOF=VERIFIED"
+          echo "BRAIN_WINDOWS_REAL_BOOT_CLOSED_LOOP=VERIFIED"
           echo "BRAIN_WINDOWS_REAL_BOOT_CONTRACT=VERIFIED"

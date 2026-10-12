@@ -14,6 +14,9 @@ WINDOWS_REAL_BOOT = "windows-server-2025-real-boot"
 BRAIN_INTERNAL = "brain-internal"
 GITHUB_CI = "github-ci"
 WINDOWS_CLOUD = "windows-server-2025-cloud"
+WINDOWS_CLOUD_NATIVE = "windows-server-2025-cloud-native"
+WINDOWS_REAL_BOOT_QEMU = "windows-server-2025-real-boot-qemu"
+WINDOWS_NATIVE_EXECUTOR = "windows-native-agent"
 
 
 @dataclass(frozen=True)
@@ -28,13 +31,19 @@ def default_executors() -> tuple[Executor, ...]:
     return (
         Executor(
             name=BRAIN_INTERNAL,
-            capabilities=frozenset({"brain-internal-execution", WINDOWS_REAL_BOOT}),
+            capabilities=frozenset({"brain-internal-execution", "qemu"}),
             priority=0,
             external=False,
         ),
         Executor(
+            name=WINDOWS_NATIVE_EXECUTOR,
+            capabilities=frozenset({WINDOWS_NATIVE_EXECUTOR}),
+            priority=40,
+            external=True,
+        ),
+        Executor(
             name=WINDOWS_CLOUD,
-            capabilities=frozenset({WINDOWS_CLOUD, WINDOWS_REAL_BOOT}),
+            capabilities=frozenset({WINDOWS_CLOUD, WINDOWS_CLOUD_NATIVE}),
             priority=50,
             external=True,
         ),
@@ -54,10 +63,9 @@ def choose_executor(executors: Iterable[Executor], capability: str) -> Executor:
 
     selected = sorted(candidates, key=lambda e: (e.priority, e.name))[0]
 
-    # Real runtime capabilities may use an explicitly configured cloud provider,
-    # but must never silently fall back to GitHub CI.
-
-    if capability == WINDOWS_REAL_BOOT and selected.external:
+    # Runtime capabilities must use an explicitly trusted runtime adapter.
+    # GitHub CI is evidence/control-plane only and is never an implicit fallback.
+    if capability in {WINDOWS_REAL_BOOT, WINDOWS_NATIVE_EXECUTOR} and selected.name == GITHUB_CI:
         raise RuntimeError("EXTERNAL_EXECUTOR_FORBIDDEN")
 
     return selected

@@ -1,0 +1,61 @@
+name: Windows Real-Boot Runner Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tools/windows_real_boot_runner_diagnostic.sh"
+      - ".github/workflows/windows-real-boot-runner-diagnostic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-real-boot-runner-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose-runner:
+    environment:
+      name: windows-real-boot
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
+    timeout-minutes: 8
+    env:
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate diagnostic script
+        run: bash -n tools/windows_real_boot_runner_diagnostic.sh
+
+      - name: Run read-only runner diagnostic
+        id: diagnostic
+        continue-on-error: true
+        run: |
+          set +e
+          bash tools/windows_real_boot_runner_diagnostic.sh windows-real-boot-runner-diagnostic.txt
+          rc=$?
+          echo "diagnostic_exit_code=$rc" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
+      - name: Upload sanitized runner diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-real-boot-runner-diagnostic
+          path: windows-real-boot-runner-diagnostic.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Preserve fail-closed status
+        if: always() && steps.diagnostic.outcome != 'success'
+        run: |
+          echo "RUNNER_DIAGNOSTIC=BLOCKED"
+          echo "No contract was issued and no boot was attempted."
+          exit 2
