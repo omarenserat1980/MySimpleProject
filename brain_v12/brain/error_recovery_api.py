@@ -25,8 +25,8 @@ from .control_auth import require_control_key
 router = APIRouter(tags=["brain-error-recovery"])
 _LOCK = threading.Lock()
 _SECRET_PATTERNS = [
-    re.compile(r"(?i)(token|password|secret|api[_-]?key|authorization)\\s*[:=]\\s*([^\\s,;]+)"),
-    re.compile(r"(?i)bearer\\s+[A-Za-z0-9._~+/-]+=*"),
+    re.compile(r"(?i)(token|password|secret|api[_-]?key|authorization)\s*[:=]\s*([^\s,;]+)"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/-]+=*"),
 ]
 
 
