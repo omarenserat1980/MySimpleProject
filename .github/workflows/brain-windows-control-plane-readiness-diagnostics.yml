@@ -1,0 +1,44 @@
+name: Brain Windows Control Plane Readiness Diagnostics
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/github/check_windows_control_plane_readiness.sh
+      - .github/workflows/brain-windows-control-plane-readiness-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    name: Validate diagnostic script syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax
+        run: bash -n scripts/github/check_windows_control_plane_readiness.sh
+      - name: Python embedded-source compile
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/github/check_windows_control_plane_readiness.sh").read_text()
+          marker = "python3 - \"$BASE_URL\" <<'PY'\n"
+          if source.count(marker) != 1 or not source.endswith("PY\n"):
+              raise SystemExit("Embedded Python heredoc structure invalid")
+          body = source.split(marker, 1)[1].rsplit("\nPY\n", 1)[0]
+          compile(body, "check_windows_control_plane_readiness.sh::<embedded-python>", "exec")
+          print("EMBEDDED_PYTHON_SYNTAX=PASS")
+          PY
+
+  live-readiness:
+    name: Read-only public Control Plane readiness probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe endpoints without printing response bodies or secrets
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: https://brain-control-plane-main.onrender.com
+        run: bash scripts/github/check_windows_control_plane_readiness.sh
