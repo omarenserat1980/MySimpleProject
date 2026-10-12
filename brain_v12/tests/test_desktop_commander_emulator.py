@@ -85,6 +85,24 @@ class EmulatorTests(unittest.TestCase):
         self.assertEqual(e.process_snapshot()["processes"],[])
         self.assertEqual(e.stop_process(started["process_id"])["status"],"PROCESS_NOT_FOUND")
 
+    def test_watchdog_kills_descendant_holding_output_pipe(self):
+        import sys, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.2),
+        )
+        child="import time; time.sleep(5)"
+        parent="import subprocess,sys; subprocess.Popen([sys.executable,'-c',sys.argv[1]])"
+        command=f'"{sys.executable}" -c "{parent}" "{child}"'
+        started=e.start_process(command)
+        self.assertTrue(started["ok"])
+        deadline=time.monotonic()+1.5
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        result=e.read_process_output(started["process_id"])
+        self.assertEqual(result["status"],"TIMED_OUT")
+
     def test_stop_racing_watchdog_leaves_no_registered_process(self):
         import sys, threading, time
         e=DesktopCommanderEmulator(
