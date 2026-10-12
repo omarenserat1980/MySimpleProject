@@ -4,7 +4,7 @@ import pathlib
 import unittest
 from unittest.mock import patch
 
-MODULE_PATH = pathlib.Path(__file__).resolve().parents[1] / "brain_emulator_agent" / "v12_agent.py"
+MODULE_PATH = pathlib.Path(__file__).resolve().parents[2] / "brain_emulator_agent" / "v12_agent.py"
 
 
 class BrainTermuxEmulatorRuntimeTests(unittest.TestCase):
