@@ -56,8 +56,9 @@ class AutonomyAuditTests(unittest.TestCase):
             )
             result = calculate_audit(root)
             self.assertEqual(result["all_workflows"]["runner_independence_percent"], 50.0)
-            self.assertEqual(result["software_scope_excluding_explicit_hardware_verification"]["runner_independence_percent"], 100.0)
+            self.assertEqual(result["software_scope_excluding_explicit_hardware_dependencies"]["runner_independence_percent"], 100.0)
             self.assertEqual(result["self_hosted_jobs"][0]["workflow"], "brain-windows-real-boot.yml")
+            self.assertIn("setup-exe-cloud-stage.yml", result["hardware_specific_workflows_excluded_from_software_scope"])
 
 
     def test_local_reusable_workflow_calls_are_delegated_not_missing_runners(self):
