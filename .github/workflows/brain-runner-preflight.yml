@@ -1,44 +1,51 @@
-name: BRAIN Arkan Runner Preflight
+name: BRAIN Hosted Windows Toolchain Preflight
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/brain-runner-preflight.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: brain-arkan-runner-preflight
+  group: brain-hosted-windows-toolchain-preflight
   cancel-in-progress: true
 
 jobs:
   preflight:
-    runs-on: [self-hosted, brain-internal]
+    runs-on: windows-latest
     timeout-minutes: 10
-    defaults:
-      run:
-        shell: cmd
     steps:
-      - name: Runner identity
+      - name: Verify GitHub-hosted Windows identity
+        shell: pwsh
         run: |
-          echo RUNNER_OK
-          echo HOST=%COMPUTERNAME%
-          echo USER=%USERNAME%
-          ver
+          $ErrorActionPreference = "Stop"
+          if ($env:RUNNER_ENVIRONMENT -ne "github-hosted") { throw "HOSTED_RUNNER_REQUIRED" }
+          Write-Host "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SOFTWARE"
+          Write-Host "RUNNER_OS=$env:RUNNER_OS"
+          Write-Host "RUNNER_ARCH=$env:RUNNER_ARCH"
+          Write-Host "RUNNER_ENVIRONMENT=$env:RUNNER_ENVIRONMENT"
 
-      - name: Workspace health
+      - name: Verify Azure CLI availability without credentials
+        shell: pwsh
         run: |
-          if not exist "C:\actions-runner\actions-runner\_work" exit /b 1
-          echo RUNNER_ROOT_OK
-          echo WORKDIR_OK
+          $ErrorActionPreference = "Stop"
+          $az = Get-Command az -ErrorAction Stop
+          az version --output json
+          Write-Host "AZURE_CLI_TOOLCHAIN=AVAILABLE"
+          Write-Host "AZURE_AUTHENTICATION=NOT_ATTEMPTED"
 
-      - name: Azure CLI session check
-        run: |
-          az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
-          if errorlevel 1 exit /b 1
-          echo AZURE_SESSION_OK
+      - name: Verify Terraform toolchain
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
 
-      - name: Terraform availability
+      - name: Verify Terraform availability
+        shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           terraform version
-          if errorlevel 1 exit /b 1
-          echo TERRAFORM_OK
+          Write-Host "TERRAFORM_TOOLCHAIN=AVAILABLE"
+          Write-Host "BRAIN_HARDWARE_DEPENDENCY=NONE"
