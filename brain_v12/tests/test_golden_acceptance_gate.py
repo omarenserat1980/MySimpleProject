@@ -92,8 +92,14 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
         self.assertTrue(any(reason.endswith("ACCEPTANCE_EVIDENCE_MISSING") for reason in result.reasons))
 
     def test_ci_evidence_does_not_satisfy_runtime_criterion(self):
+        # CI must not satisfy a runtime criterion even if it labels the record
+        # with the expected runtime evidence kind.
         self.store.append(
-            "task-1", "ci", {"reality_level": "SIMULATED"},
+            "task-1", "artifact_verified", {"reality_level": "SIMULATED"},
+            producer="github-actions", mission_id="mission-1", attempt=2,
+        )
+        self.store.append(
+            "task-1", "runtime_check_passed", {"reality_level": "SIMULATED"},
             producer="github-actions", mission_id="mission-1", attempt=2,
         )
         result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
