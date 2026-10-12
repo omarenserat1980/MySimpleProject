@@ -7,6 +7,8 @@ on:
       - "brain_v12/virtual_hardware/**"
       - "brain_v12/test_cpu_emulation.py"
       - "brain_v12/CPU_EMULATION_FIDELITY.md"
+      - "brain_v12/test_cpu_emulation.py"
+      - "brain_v12/CPU_EMULATION_FIDELITY.md"
       - ".github/workflows/brain-virtual-computer.yml"
   push:
     paths:
@@ -15,8 +17,6 @@ on:
       - "brain_v12/brain/virtual_datacenter.py"
       - "brain_v12/test_blade_server.py"
       - "brain_v12/test_windows_server_vm.py"
-      - "brain_v12/test_cpu_emulation.py"
-      - "brain_v12/CPU_EMULATION_FIDELITY.md"
       - "brain_v12/WINDOWS_SERVER_2025_ARCHITECTURE.md"
       - "brain_v12/WINDOWS_SERVER_2025_RUNBOOK.md"
       - "brain_v12/virtual_hardware/windows_server_backend.py"
@@ -61,7 +61,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install test dependencies
+      - name: Install CPU test dependency
         run: python -m pip install "cryptography>=42"
       - name: Compile virtual hardware
         run: |
