@@ -1,11 +1,15 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
+import base64
+import hashlib
+import json
 from .cpu import VirtualCPU
 from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
 from .storage_profiles import get_storage_profile
 from .memory_profiles import get_memory_profile, CacheHierarchy
 from .peripheral_profiles import (get_gpu_profile, get_nic_profile, get_motherboard_profile)
+from .power_thermal import PowerThermalModel
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -34,7 +38,7 @@ class VirtualComputer:
     configured_cas_latency_cycles: int | None = None
     gpu_profile_id: str | None = None
     nic_profile_id: str | None = None
-    motherboard_profile_id: str | None = None
+    motherboard_profile_id: str | None = "brain-pcie-gen4-x24"
     external_network_enabled: bool = False
 
     def __post_init__(self):
@@ -58,6 +62,8 @@ class VirtualComputer:
         self.powered=False
         self.boot_count=0
         self.boot_record=None
+        self.power_thermal=PowerThermalModel()
+        self._checkpoint_resume=False
 
     def power_on(self, boot_evidence: BootGateEvidence | None = None):
         if boot_evidence is not None:
