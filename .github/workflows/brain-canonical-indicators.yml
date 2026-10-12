@@ -1,0 +1,92 @@
+name: Brain Canonical Software Indicators
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/canonical_indicators.py"
+      - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/tests/test_canonical_indicators.py"
+      - "brain_v12/tests/test_device_cloud_federation.py"
+      - ".github/workflows/brain-canonical-indicators.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/canonical_indicators.py"
+      - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/tests/test_canonical_indicators.py"
+      - "brain_v12/tests/test_device_cloud_federation.py"
+      - ".github/workflows/brain-canonical-indicators.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-canonical-indicators-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canonical-indicator-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Compile indicator and fleet modules
+        run: |
+          python -m py_compile \
+            brain_v12/brain/canonical_indicators.py \
+            brain_v12/brain/device_cloud_federation.py \
+            brain_v12/tests/test_canonical_indicators.py \
+            brain_v12/tests/test_device_cloud_federation.py
+
+      - name: Run canonical indicator and software-only fleet tests
+        run: |
+          python -m unittest -v \
+            brain_v12.tests.test_canonical_indicators \
+            brain_v12.tests.test_device_cloud_federation
+
+      - name: Write verified gate evidence
+        if: success()
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          report = {
+              "schema": "brain.canonical-indicators-gate.v1",
+              "status": "PASS",
+              "commit": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "verified_at": datetime.now(timezone.utc).isoformat(),
+              "tests": [
+                  "brain_v12.tests.test_canonical_indicators",
+                  "brain_v12.tests.test_device_cloud_federation"
+              ],
+              "scope": "software-only indicator contracts and fleet routing",
+              "native_windows_server_2025_boot_verified": False
+          }
+          with open("canonical-indicators-gate.json", "w", encoding="utf-8") as f:
+              json.dump(report, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+
+      - name: Upload gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-indicators-gate
+          path: canonical-indicators-gate.json
+          if-no-files-found: warn
+          retention-days: 30
