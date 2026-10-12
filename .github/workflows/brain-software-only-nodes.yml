@@ -1,0 +1,51 @@
+name: Brain Software-Only Node Verification
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/worker_registry.py"
+      - "brain_v12/brain/workload_router.py"
+      - "brain_v12/brain/workload_controller.py"
+      - "brain_v12/test_worker_registry.py"
+      - "brain_v12/docs/SOFTWARE_ONLY_NODES.md"
+      - ".github/workflows/brain-software-only-nodes.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/worker_registry.py"
+      - "brain_v12/brain/workload_router.py"
+      - "brain_v12/brain/workload_controller.py"
+      - "brain_v12/test_worker_registry.py"
+      - "brain_v12/docs/SOFTWARE_ONLY_NODES.md"
+      - ".github/workflows/brain-software-only-nodes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-software-only-nodes-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  software-node-contract:
+    name: Software node contract (hardware-independent)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: .
+      BRAIN_ENABLE_DEVICE_WORKERS: "0"
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile relevant modules
+        run: python -m py_compile brain_v12/brain/worker_registry.py brain_v12/brain/workload_router.py brain_v12/brain/workload_controller.py
+      - name: Run software-only node tests
+        run: python -m pytest -q brain_v12/test_worker_registry.py
