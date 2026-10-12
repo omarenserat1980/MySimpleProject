@@ -45,15 +45,17 @@ repository. Follow GitHub's current Linux x64 instructions. Keep the temporary
 registration token private; do not paste it into chat, commit it, or save it in the
 repository.
 
-When prompted for labels, use these custom labels:
+The Windows real-boot workflow requires **all seven** labels. GitHub automatically
+supplies the standard labels `self-hosted`, `linux`, and `x64`. Add these four
+custom labels exactly:
 
 ```text
-brain-internal,qemu,windows-real-boot
+brain-internal,qemu,windows-real-boot,brain-cloud-executor
 ```
 
-GitHub automatically supplies the standard `self-hosted`, `linux`, and `x64`
-labels for a Linux runner. The workflow requires all six labels, so spelling matters.
-Use a dedicated runner and do not run untrusted pull-request code on it.
+Do not omit `brain-cloud-executor`: the workflow's `runs-on` selector requires it
+in addition to the three custom labels previously documented. Use a dedicated,
+trusted runner and do not run untrusted pull-request code on it.
 
 ## 4. Start the runner with the explicit local opt-in
 
@@ -95,14 +97,26 @@ sudo systemctl status <EXACT_RUNNER_SERVICE_NAME> --no-pager
 Only do this for the dedicated, trusted runner you intend Brain to use. Do not put the
 flag in repository secrets or workflow `env:` blocks.
 
-## 5. Verify and rerun
+## 5. Verify protected real-boot prerequisites
+
+The runner labels alone do not authorize a Windows boot. Before dispatching the
+`Brain Windows Real Boot Evidence` workflow, the protected GitHub Environment
+`windows-real-boot` must have the five required secrets documented in
+[`WINDOWS_REAL_BOOT_SECRET_MATRIX.md`](WINDOWS_REAL_BOOT_SECRET_MATRIX.md).
+The Brain Control Plane must be deployed and configured, the executor must be enrolled,
+the host trust anchor must be installed through an independent trusted channel, and
+the host must pass its Linux x86-64, QEMU/OVMF, and usable `/dev/kvm` preflight.
+Never create placeholders, bypass contract checks, or put private keys/tokens in Git.
+
+## 6. Verify and rerun
 
 1. Confirm the runner is **Online** in GitHub → Settings → Actions → Runners.
 2. Run `bash brain_v12/tools/prepare_brain_internal_runner_wsl.sh` and confirm
    `RESULT: TOOLS_READY`.
-3. Trigger the production workflow only after the runner has the required labels.
-4. Check the run log for `BRAIN_INTERNAL_RUNNER=VERIFIED`, then confirm the independent
-   artifact gate and uploaded MP4/manifest artifacts.
+3. Confirm the runner has all seven labels listed above.
+4. Trigger the production workflow only after the protected prerequisites are verified.
+5. Check the run log for `BRAIN_INTERNAL_RUNNER=VERIFIED`, then confirm the independent
+   artifact gate and guest-generated boot evidence from the same workflow run.
 
 If the job remains queued, the runner is offline or its labels do not match. If preflight
 fails, use the reported missing binaries or reasons; do not bypass the gate.
@@ -110,7 +124,7 @@ fails, use the reported missing binaries or reasons; do not bypass the gate.
 ## Important limits
 
 - WSL/tool readiness is not proof of the FastAPI API on port 8012; check that separately.
-- This script does not register a runner, create a GitHub token, change Windows settings,
+- This setup guide does not register a runner, create a GitHub token, change Windows settings,
   boot a Windows Server VM, or launch a production job.
 - A successful unit-test workflow on GitHub-hosted Ubuntu validates code, not Arkan's
   internal execution environment.
