@@ -34,8 +34,18 @@ class BrainChatSimulatorContractTests(unittest.TestCase):
         self.assertIn("لا تشغّل أوامر نظام", self.html)
 
     def test_dynamic_messages_are_inserted_as_text_not_html(self):
-        self.assertIn("body.textContent=escapeText(text)", self.html)
+        self.assertIn('body.textContent=role==="assistant"?withAinEnding(text):escapeText(text)', self.html)
         self.assertNotIn("body.innerHTML", self.html)
+
+    def test_first_empty_install_starts_chat_with_ain(self):
+        self.assertIn('await sendMessage("ع")', self.html)
+        self.assertIn("if(!bootstrapStarted && !sessionId)", self.html)
+        self.assertIn("bootstrapStarted = false", self.html)
+
+    def test_every_assistant_message_ends_with_ain_in_ui_and_history(self):
+        self.assertIn("const withAinEnding = text =>", self.html)
+        self.assertIn('value.endsWith("ع") ? value : value + " ع"', self.html)
+        self.assertIn('role==="assistant"?withAinEnding(text):escapeText(text)', self.html)
 
     def test_live_status_is_read_from_api_not_hardcoded_as_connected(self):
         self.assertIn('api("/health")', self.html)
