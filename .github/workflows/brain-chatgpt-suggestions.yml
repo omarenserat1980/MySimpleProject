@@ -1,0 +1,42 @@
+name: Brain ChatGPT Suggestions Engine Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/suggestions_engine.py"
+      - "brain_v12/tests/test_suggestions_engine.py"
+      - "brain_v12/brain/error_logs.py"
+      - ".github/workflows/brain-chatgpt-suggestions.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/suggestions_engine.py"
+      - "brain_v12/tests/test_suggestions_engine.py"
+      - "brain_v12/brain/error_logs.py"
+      - ".github/workflows/brain-chatgpt-suggestions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-chatgpt-suggestions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suggestions-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install focused test dependencies
+        run: python -m pip install --disable-pip-version-check pytest fastapi httpx pydantic
+      - name: Compile suggestions engine and tests
+        run: python -m compileall -q brain_v12/brain/suggestions_engine.py brain_v12/tests/test_suggestions_engine.py
+      - name: Run suggestions lifecycle/provider tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest brain_v12/tests/test_suggestions_engine.py -q
