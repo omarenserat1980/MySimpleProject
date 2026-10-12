@@ -1,0 +1,80 @@
+name: Arkan Persistent Software Executor
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/arkan_software_executor.py"
+      - "brain_v12/brain/arkan_software_executor_api.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_arkan_software_executor_api.py"
+      - "brain_v12/brain/virtual_task_queue.py"
+      - "brain_v12/brain/durable_task_store.py"
+      - "brain_v12/tests/test_arkan_software_executor.py"
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/virtual_hardware/computer.py"
+      - "brain_v12/blade_server.py"
+      - "docs/ARKAN_SOFTWARE_EXECUTOR.md"
+      - "deploy/arkan-software-node.service.example"
+      - ".github/workflows/arkan-software-executor.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/arkan_software_executor.py"
+      - "brain_v12/brain/arkan_software_executor_api.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_arkan_software_executor_api.py"
+      - "brain_v12/brain/virtual_task_queue.py"
+      - "brain_v12/brain/durable_task_store.py"
+      - "brain_v12/tests/test_arkan_software_executor.py"
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/virtual_hardware/computer.py"
+      - "brain_v12/blade_server.py"
+      - "docs/ARKAN_SOFTWARE_EXECUTOR.md"
+      - "deploy/arkan-software-node.service.example"
+      - ".github/workflows/arkan-software-executor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  durable-software-executor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install API test dependency
+        run: python -m pip install "fastapi>=0.110,<1"
+      - name: Compile executor and application integration
+        run: python -m py_compile brain_v12/brain/arkan_software_executor.py brain_v12/brain/arkan_software_executor_api.py brain_v12/app.py
+      - name: Test persistence, idempotency, and restart recovery
+        run: python -m unittest brain_v12.tests.test_arkan_software_executor brain_v12.tests.test_arkan_software_executor_api brain_v12.tests.test_arkan_provisioner -v
+      - name: Execute bounded software-only task
+        run: |
+          mkdir -p evidence
+          python -m brain_v12.brain.arkan_software_executor submit --root "$RUNNER_TEMP/arkan-software-node" --task-type cpu_smoke --idempotency-key ci-${{ github.run_id }} > evidence/arkan-software-executor-submit.json
+          python -m brain_v12.brain.arkan_software_executor status --root "$RUNNER_TEMP/arkan-software-node" > evidence/arkan-software-executor-status.json
+          python - <<'PY'
+          import json
+          report=json.load(open("evidence/arkan-software-executor-status.json",encoding="utf-8"))
+          assert report["node"]["id"] == "arkan-virtual-01", report
+          assert report["runtime_mode"] == "PROCESS_LOCAL", report
+          assert report["reality"] == "SIMULATED", report
+          assert report["physical_host_required"] is False, report
+          assert report["windows_server_2025"]["native_os_boot_verified"] is False, report
+          assert report["queue"]["counts"].get("COMPLETED", 0) >= 1, report
+          print("ARKAN_DURABLE_QUEUE=PASS")
+          print("RESTART_RECOVERY=TESTED")
+          print("NATIVE_WINDOWS_BOOT=NOT_VERIFIED")
+          PY
+      - name: Upload executor evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkan-persistent-executor-evidence-${{ github.run_id }}
+          path: evidence/*.json
+          if-no-files-found: error
+          retention-days: 30

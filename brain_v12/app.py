@@ -78,6 +78,7 @@ from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .virtual_hardware.api import router as virtual_hardware_router, read_arkan_runtime_status
+from .brain.arkan_software_executor_api import router as arkan_software_executor_router, close_executor_for_shutdown
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .brain.quranic_core.api import build_router as quranic_core_router
@@ -202,6 +203,7 @@ RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "un
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(virtual_hardware_router)
+app.include_router(arkan_software_executor_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
 from .brain_git.api import router as brain_git_router
@@ -3031,6 +3033,7 @@ def background_work_startup():
 @app.on_event("shutdown")
 def background_work_shutdown():
     background_work.shutdown(wait=True)
+    close_executor_for_shutdown()
 
 @app.get("/api/background-work/status")
 def background_work_status(request: Request):
