@@ -96,3 +96,14 @@ assert bus.mmio_read("gpu0", 0, 0)["value"] == 0x1234
 Focused tests: `python -m unittest brain_v12.tests.test_virtual_pcie -v`.
 
 The transaction-level PCIe addition increases functional device-bus fidelity, but it is not cycle-accurate or electrical emulation and must not be interpreted as a single overall hardware-emulation percentage.
+
+
+## SECDED ECC memory words
+
+Module: `brain_v12/virtual_hardware/ecc_memory.py`
+
+The peripheral fabric now includes a sparse 64-bit word ECC controller. It encodes 64 data bits with seven Hamming check bits and one overall parity bit, corrects single-bit errors, detects double-bit errors without silently returning corrupted data, and supports deterministic encoded-bit fault injection plus snapshot/restore of its own modeled state.
+
+This is a functional ECC algorithm model, not a claim that the controller is wired into every `VirtualRAM.read/write` operation or that DDR ECC signaling, DIMM layout, controller firmware, or a physical memory bus is emulated. The ordinary `VirtualRAM` remains its own sparse addressable-cell abstraction.
+
+Focused tests: `python -m unittest brain_v12.tests.test_ecc_memory -v`.
