@@ -30,7 +30,7 @@ class UniversalSimulatorApiTests(unittest.TestCase):
     def test_redacts_secrets_from_values_and_keys(self):
         value = api._redact({
             "api_key": "secret-value",
-            "log": "Authorization: Bearer authsecret abc123 Bearer xyz987 token=token-value",
+            "log": "Authorization: abc123 Bearer xyz987 token=token-value; Authorization: Bearer authsecret",
         })
         rendered = json.dumps(value)
         self.assertNotIn("secret-value", rendered)
@@ -87,6 +87,9 @@ class UniversalSimulatorApiTests(unittest.TestCase):
             audit = (Path(tmp) / "audit.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(audit), 1)
             self.assertEqual(json.loads(audit[0])["status"], "AI_ANALYSIS_COMPLETED")
+
+    def test_invalid_structured_analysis_is_rejected(self):
+        self.assertIsNone(api._parse_analysis("not-json"))
 
     def test_invalid_simulator_id_rejected(self):
         with self.assertRaises(HTTPException):
