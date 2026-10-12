@@ -79,10 +79,13 @@ def test_failed_run_rolls_back_all_mutable_simulation_state():
         ],
         "outputs": ["out"],
     })
+    # Start from non-empty state so rollback must restore existing history,
+    # not merely return the simulator to its constructor defaults.
+    sim.step({"d": 1})
     before = (dict(sim.state), dict(sim.previous_values), sim.total_toggles, sim.total_cycles)
 
     with pytest.raises(ASICSimulationError, match="SIGNAL_MUST_BE_0_OR_1"):
-        sim.run([{"d": 1}, {"d": "invalid"}])
+        sim.run([{"d": 0}, {"d": "invalid"}])
 
     after = (dict(sim.state), dict(sim.previous_values), sim.total_toggles, sim.total_cycles)
     assert after == before
