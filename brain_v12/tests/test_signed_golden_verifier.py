@@ -114,5 +114,13 @@ class SignedGoldenVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "GOLDEN_VERIFIER_TIME_INVALID"):
             self.verify(document)
 
+    def test_clock_skew_cannot_extend_effective_validity_past_five_minutes(self):
+        document = self.signed(
+            issued_at=self.now + 50,
+            expires_at=self.now + 340,
+        )
+        with self.assertRaisesRegex(ValueError, "GOLDEN_VERIFIER_VALIDITY_INVALID"):
+            self.verify(document)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
