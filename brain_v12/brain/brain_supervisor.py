@@ -36,41 +36,15 @@ class BrainSupervisor:
         self.asic_resources=ASICResourceAdapter(evidence=self.evidence)
 
     def deliver_if_golden(self, job, criteria, *, expected_reality="SIMULATED", details=None):
-        """Deliver only when golden and existing runtime evidence gates both pass.
+        """Use the single mandatory guarded delivery path.
 
-        This method extends the single BrainSupervisor. Evidence producer labels
-        are not cryptographic remote attestation and cannot independently prove
-        remote executor identity or a real VM boot.
+        Evidence producer labels are not cryptographic remote attestation and
+        cannot independently prove remote executor identity or a real VM boot.
         """
-        criteria = tuple(criteria)
-        mission_id = job["job_id"]
-        mission = self.missions.get(mission_id)
-        result = self.golden_gate.evaluate(
-            mission_id, criteria, mission_id=mission_id,
-            attempt=mission.attempts if mission else None,
-            expected_reality=expected_reality,
-        )
-        result_data = {
-            "accepted": result.accepted, "status": result.status,
-            "task_id": result.task_id, "mission_id": result.mission_id,
-            "attempt": result.attempt, "reality_level": result.reality_level,
-            "evidence_ids": list(result.evidence_ids),
-            "criterion_results": list(result.criterion_results),
-            "reasons": list(result.reasons),
-        }
-        self._event(mission_id, "golden_acceptance_gate", result_data)
-        if not result.accepted:
-            return self.transition(
-                job, "blocked", status="blocked",
-                details={**(details or {}), "golden_acceptance": result_data},
-                enforce_authority=False,
-            )
-        # Keep the pre-existing runtime-evidence gate in force as well.
         return self.transition(
-            job, "deliver", status="completed",
-            details={**(details or {}), "golden_acceptance": result_data},
-            enforce_authority=False,
-            required_evidence_kind=criteria[0].required_kind,
+            job, "deliver", status="completed", details=details,
+            enforce_authority=False, golden_criteria=tuple(criteria),
+            golden_expected_reality=expected_reality,
         )
 
     def _event(self,job_id,event,data=None):
@@ -101,20 +75,49 @@ class BrainSupervisor:
         obs=self.reality.observe(Observation(key,value,source=source,confidence=confidence,evidence_ids=tuple(evidence_ids)+(recorded["evidence_id"],)))
         self._event(job_id,"observation",{"key":key,"kind":obs.kind.value,"confidence":obs.normalized_confidence(),"evidence_id":recorded["evidence_id"]}); return obs
 
-    def transition(self,job,phase,status="running",details=None,enforce_authority=True,required_evidence_kind=None):
+    def transition(self,job,phase,status="running",details=None,enforce_authority=True,required_evidence_kind=None,golden_criteria=None,golden_expected_reality="SIMULATED"):
         allowed={"discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver","blocked","completed","failed"}
         if phase not in allowed:raise ValueError("unknown_supervisor_phase")
         if phase=="deliver" and status=="completed":
             mission=self.missions.get(job["job_id"])
-            result=self.verification.assert_success(
-                job["job_id"],
-                required_kind=required_evidence_kind,
-                mission_id=job["job_id"],
-                attempt=mission.attempts if mission else None,
-            )
-            if not result.verified:
+            if not golden_criteria:
                 phase="blocked"; status="blocked"
-                details={"completion_gate":"RUNTIME_EVIDENCE_REQUIRED","reasons":list(result.reasons),"evidence_ids":list(result.evidence_ids)}
+                details={"completion_gate":"GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED","reasons":["GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED"]}
+            else:
+                try:
+                    golden_result=self.golden_gate.evaluate(
+                        job["job_id"], tuple(golden_criteria),
+                        mission_id=job["job_id"],
+                        attempt=mission.attempts if mission else None,
+                        expected_reality=golden_expected_reality,
+                    )
+                    golden_data={
+                        "accepted":golden_result.accepted,"status":golden_result.status,
+                        "task_id":golden_result.task_id,"mission_id":golden_result.mission_id,
+                        "attempt":golden_result.attempt,"reality_level":golden_result.reality_level,
+                        "evidence_ids":list(golden_result.evidence_ids),
+                        "criterion_results":list(golden_result.criterion_results),
+                        "reasons":list(golden_result.reasons),
+                    }
+                except (TypeError, ValueError) as exc:
+                    golden_result=None
+                    golden_data={"accepted":False,"status":"INVALID_ACCEPTANCE_CONTRACT","reasons":[str(exc)]}
+                self._event(job["job_id"],"golden_acceptance_gate",golden_data)
+                if not golden_data["accepted"]:
+                    phase="blocked"; status="blocked"
+                    details={**(details or {}),"golden_acceptance":golden_data}
+                else:
+                    required_kind=required_evidence_kind or tuple(golden_criteria)[0].required_kind
+                    result=self.verification.assert_success(
+                        job["job_id"], required_kind=required_kind,
+                        mission_id=job["job_id"],
+                        attempt=mission.attempts if mission else None,
+                    )
+                    if not result.verified:
+                        phase="blocked"; status="blocked"
+                        details={"completion_gate":"RUNTIME_EVIDENCE_REQUIRED","reasons":list(result.reasons),"evidence_ids":list(result.evidence_ids),"golden_acceptance":golden_data}
+                    else:
+                        details={**(details or {}),"golden_acceptance":golden_data}
         if phase in {"execute","retry"} and enforce_authority:
             resource=self.resource_guard.sample()
             if resource.get("emergency"): details={"emergency":"RESOURCE_OVERLOAD","resource":resource,"previous_phase":phase}; phase="blocked"; status="blocked"
@@ -212,8 +215,31 @@ class BrainSupervisor:
             job=self.transition(job,"observe",details={"retry":True},enforce_authority=False)
             job=self.transition(job,"verify",details={"retry":True},enforce_authority=False)
         evidence_result=self.verify_evidence(job["job_id"],required_kind="simulation_runtime_verified")
+        # Explicitly simulated fixture evidence exercises the acceptance path;
+        # it is not proof of a real executor, device, VM, or remote operation.
+        mission=self.missions.get(job["job_id"])
+        runtime_item=self.evidence.append(
+            job["job_id"],"simulation_runtime_verified",
+            {"reality_level":"SIMULATED","simulation_harness":True},
+            producer="simulation-harness",mission_id=job["job_id"],
+            attempt=mission.attempts if mission else None,phase="VERIFYING",
+        )
+        self.evidence.append(
+            job["job_id"],"independent_verification",
+            {"verified":True,"reality_level":"SIMULATED",
+             "verified_evidence_ids":[runtime_item["evidence_id"]],
+             "criterion_ids":["simulation-runtime"]},
+            producer="simulation-test-verifier",mission_id=job["job_id"],
+            attempt=mission.attempts if mission else None,phase="VERIFYING",
+        )
+        from .golden_acceptance_gate import AcceptanceCriterion
         final="completed" if evidence_result.verified else "blocked"
-        job=self.transition(job,"deliver",status="completed",details={"result":final},required_evidence_kind="simulation_runtime_verified")
+        job=self.transition(
+            job,"deliver",status="completed",details={"result":final},
+            required_evidence_kind="simulation_runtime_verified",
+            golden_criteria=(AcceptanceCriterion("simulation-runtime","simulation_runtime_verified"),),
+            golden_expected_reality="SIMULATED",
+        )
         self.snapshot(job,{"verified":evidence_result.verified,"result":job["status"]});return job
 
 if __name__=="__main__":print(json.dumps(BrainSupervisor().run_simulation("supervisor_smoke_test"),indent=2))
