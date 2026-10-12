@@ -6,6 +6,7 @@ from brain_v12.virtual_hardware.devices import VirtualStorage
 from brain_v12.virtual_hardware.storage_profiles import get_storage_profile, list_storage_profiles
 from brain_v12.virtual_hardware.computer import VirtualComputer
 from brain_v12.blade_server import BladeChassis
+from brain_v12.virtual_hardware.storage_benchmark import run_storage_workload_benchmark
 
 
 class StorageProfileTests(unittest.TestCase):
@@ -96,6 +97,16 @@ class StorageProfileTests(unittest.TestCase):
         self.assertEqual(after["trim_ops"], 1)
         self.assertEqual(after["host_disk_allocation_bytes"], 0)
         self.assertFalse(after["smart_protocol_implemented"])
+
+    def test_storage_workload_benchmark_is_reproducible_and_not_physical(self):
+        first = run_storage_workload_benchmark("samsung-870-evo-1tb", operations=8)
+        second = run_storage_workload_benchmark("samsung-870-evo-1tb", operations=8)
+        self.assertEqual(first, second)
+        self.assertEqual(first["total_bytes"], 8 * 4096)
+        self.assertGreater(first["estimated_iops"], 0)
+        self.assertIsNone(first["elapsed_host_seconds"])
+        self.assertFalse(first["physical_device_measurement"])
+        self.assertLessEqual(first["estimated_iops"], first["vendor_random_write_iops_qd1"])
 
     def test_fault_injection_is_deterministic_and_recoverable(self):
         disk = VirtualStorage(profile_id="samsung-990-pro-1tb")
