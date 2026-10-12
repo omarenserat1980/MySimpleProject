@@ -23,6 +23,7 @@ from .device_catalog import COMPONENT_CLASSES, DEVICE_FAMILIES, get_device_famil
 from .mining_hardware import ASICProfile, DEFAULT_ASIC_PROFILES, MiningFaults, MinerState, VirtualASICMiner
 from .mining_farm import VirtualMiningFarm
 from .network_hardware import NETWORK_DEVICE_KINDS, NetworkDevice, NetworkLink, VirtualNetworkFabric
+from .software_hardware_nodes import SoftwareHardwareNode, SoftwareHardwareNodeFabric
 from .extended_devices import (
     VirtualTPM, VirtualUSBController, VirtualSerialConsole, VirtualWatchdog, VirtualRNG,
     VirtualModem, VirtualBMC, VirtualIOMMU, VirtualRAID, VirtualBattery,
@@ -39,7 +40,7 @@ __all__ = [
     "PowerThermalModel", "OSImage", "windows_server_2025_image", "WindowsServerVM",
     "COMPONENT_CLASSES", "DEVICE_FAMILIES", "get_device_family", "list_component_classes", "list_device_families", "validate_catalog",
     "ASICProfile", "DEFAULT_ASIC_PROFILES", "MiningFaults", "MinerState", "VirtualASICMiner", "VirtualMiningFarm",
-    "NETWORK_DEVICE_KINDS", "NetworkDevice", "NetworkLink", "VirtualNetworkFabric",
+    "NETWORK_DEVICE_KINDS", "NetworkDevice", "NetworkLink", "VirtualNetworkFabric", "SoftwareHardwareNode", "SoftwareHardwareNodeFabric",
     "VirtualTPM", "VirtualUSBController", "VirtualSerialConsole", "VirtualWatchdog", "VirtualRNG",
     "VirtualModem", "VirtualBMC", "VirtualIOMMU", "VirtualRAID", "VirtualBattery",
     "VirtualInputDevice", "VirtualAudioDevice", "VirtualSensorHub", "VirtualPeripheralFabric",
