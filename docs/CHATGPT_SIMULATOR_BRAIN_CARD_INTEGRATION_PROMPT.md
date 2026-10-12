@@ -81,3 +81,9 @@ First inspect the current repository and the actual states of PRs #500, #501, #5
 ## Definition of done
 
 The ChatGPT simulator demonstrably reads the canonical Brain Card, verifies real registered Brain paths before processing, blocks safely when checks fail, carries traceable evidence into suggestions, and passes automated tests for chat, errors, suggestions, and tool dispatch. Documentation alone is not completion.
+
+## Implementation status (2026-10-12)
+
+An initial implementation now guards browser chat-session ingress plus direct `/api/brain-ai/chat` and `/api/brain-ai/tool` ingress with a shared Brain Card preflight module. It checks live in-process route registration and software-plane policy before model/tool calls and records traceable sanitized evidence.
+
+No existing machine-readable canonical Brain Card registry was found during repository inspection, so the implementation currently uses a versioned in-process route/service snapshot as an adapter—not a claim that the full central Brain Card, remote ChatGPT handoff, GitHub simulator runtime, error gateway, or Suggestions Engine is connected. Those remaining integrations and CI verification are still required.
