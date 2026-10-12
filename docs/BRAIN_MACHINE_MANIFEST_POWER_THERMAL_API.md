@@ -22,9 +22,9 @@ The FastAPI router is registered at `/api/virtual-hardware`:
 - `POST /machines` — create and validate a virtual machine
 - `GET /machines` and `GET /machines/{id}` — list/status
 - `GET /machines/{id}/manifest` — versioned manifest
-- `POST /machines/{id}/boot`, `/workloads`, `/benchmark`, `/thermal/advance`, `/checkpoint`, `/restore`, `/shutdown` — lifecycle operations
+- `POST /machines/{id}/boot`, `/workloads`, `/benchmark`, `/thermal/advance`, `/faults`, `/checkpoint`, `/restore`, `/shutdown` — lifecycle and fault-injection operations
 
-Mutating/status routes require the existing Brain control-key authentication. The machine registry is process-local, so callers must persist checkpoint objects externally for restart recovery. Benchmark output never claims physical CPU/GPU performance; it reports deterministic emulator work counts and explicitly omits host elapsed time.
+Mutating/status routes require the existing Brain control-key authentication. Fault injection is deterministic and component-scoped: RAM read/write/bit-flip faults; storage timeout/reset/power loss; NIC packet loss/link-down/reset; GPU transfer timeout/reset/queue saturation; bus DMA timeout/interrupt loss/device reset; and thermal cooling/sensor/power interruption. Checkpoints do not preserve pending one-shot fault injections. The machine registry is process-local, so callers must persist checkpoint objects externally for restart recovery. Benchmark output never claims physical CPU/GPU performance; it reports deterministic emulator work counts and explicitly omits host elapsed time.
 
 ## Verification
 
