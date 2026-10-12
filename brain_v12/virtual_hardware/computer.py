@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from .cpu import VirtualCPU
 from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
+from .storage_profiles import get_storage_profile
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -19,16 +20,17 @@ class VirtualComputer:
     """Software-defined computer with an optional Brain self-trust boot gate."""
     name: str
     ram_size: int = 65536
-    storage_size: int = 1024*1024
+    storage_size: int | None = None
     gpu_width: int = 320
     gpu_height: int = 200
     cpu_profile_id: str | None = None
+    storage_profile_id: str | None = None
 
     def __post_init__(self):
         self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
         self.ram=VirtualRAM(self.ram_size)
         self.bus=VirtualBus()
-        self.storage=VirtualStorage(self.storage_size)
+        self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
         self.nic=VirtualNIC()
         self.gpu=VirtualGPU(self.gpu_width,self.gpu_height)
         self.firmware=VirtualFirmware()
@@ -96,7 +98,30 @@ class VirtualComputer:
                 parameters["default_height"] = self.gpu.height
             elif profile.category == "network":
                 parameters["mac"] = self.nic.mac
-            if profile.category == "cpu" and self.cpu_profile_id:
+            if profile.category == "storage" and self.storage_profile_id:
+                selected_storage = get_storage_profile(self.storage_profile_id)
+                storage_description = selected_storage.describe()
+                profiles.append(HardwareProfile(
+                    selected_storage.profile_id, "storage", selected_storage.model, FidelityLevel.TIMING_MODEL,
+                    {"interface": selected_storage.interface, "logical_capacity_bytes": self.storage.capacity,
+                     "reference_capacity_bytes": selected_storage.capacity_bytes,
+                     "block_size_bytes": selected_storage.block_size_bytes,
+                     "max_queue_depth_model": selected_storage.max_queue_depth,
+                     "sequential_read_bytes_per_second_vendor_max": selected_storage.sequential_read_bytes_per_second,
+                     "sequential_write_bytes_per_second_vendor_max": selected_storage.sequential_write_bytes_per_second,
+                     "endurance_tbw_reference": selected_storage.endurance_tbw,
+                     "host_disk_allocation_bytes": 0},
+                    ("logical capacity and quota", "deterministic modeled queue depth",
+                     "estimated latency from published throughput/IOPS points", "flush/restart durability state",
+                     "logical TRIM", "SMART-style modeled counters"),
+                    tuple(storage_description["unsupported_features"]),
+                    (SpecificationSource(ProvenanceKind.VENDOR_DOCUMENTATION, selected_storage.source_url,
+                     "Published vendor maxima are references, not simulated or measured results."),),
+                    ("test_documented_profiles_have_vendor_sources_and_explicit_fidelity",
+                     "test_queue_depth_and_estimated_latency_are_deterministic",
+                     "test_write_back_flush_and_restart_recovery"),
+                ))
+            elif profile.category == "cpu" and self.cpu_profile_id:
                 selected = get_cpu_profile(self.cpu_profile_id)
                 source_kind = (ProvenanceKind.SYNTHETIC_BASELINE if selected.vendor == "Electronic Brain"
                                else ProvenanceKind.VENDOR_DOCUMENTATION)
