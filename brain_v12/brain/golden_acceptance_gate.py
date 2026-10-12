@@ -60,7 +60,10 @@ class GoldenAcceptanceGate:
         attempt: int | None = None,
         expected_reality: str = "SIMULATED",
     ) -> GoldenGateResult:
-        criteria = tuple(criteria)
+        try:
+            criteria = tuple(criteria)
+        except TypeError as exc:
+            raise ValueError("ACCEPTANCE_CRITERIA_INVALID") from exc
         if not isinstance(task_id, str) or not task_id.strip():
             raise ValueError("TASK_ID_REQUIRED")
         if not criteria:
