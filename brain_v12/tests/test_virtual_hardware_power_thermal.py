@@ -76,6 +76,23 @@ class PowerThermalTests(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "FAULT_NOT_ACTIVE"):
             ctl.recover("missing")
 
+    def test_dynamics_adapts_existing_machine_without_parallel_topology(self):
+        from types import SimpleNamespace
+        from brain_v12.virtual_hardware.power_thermal import VirtualHardwareDynamics
+        machine = SimpleNamespace(name="test-machine", devices={
+            "cpu0": SimpleNamespace(device_type="cpu")}, state=SimpleNamespace(value="RUNNING"))
+        dynamics = VirtualHardwareDynamics(machine, fault_controller=FaultController(enabled=True))
+        dynamics.configure_device("cpu0")
+        dynamics.set_workload("cpu0", 0.8)
+        reading = dynamics.advance(1)
+        self.assertIn("cpu0", reading["readings"])
+        fault = dynamics.inject_fault("device_reset", target="cpu0", event_id="reset-1",
+                                      queued_task_ids=["queued-1"])
+        self.assertEqual(fault["simulated_effect"], "DEVICE_RESET_MODEL_REINITIALIZED")
+        self.assertEqual(dynamics.evidence_report()["preserved_queue_ids"], ["queued-1"])
+        dynamics.recover_fault("reset-1", recovery_evidence={"reset_check": "passed"})
+        self.assertTrue(dynamics.evidence_report()["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()
