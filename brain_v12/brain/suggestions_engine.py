@@ -104,6 +104,32 @@ class BrainSuggestionsEngine:
             items = [x for x in items if x["payload"].get("severity", "").upper() == severity.upper()]
         return items
 
+    def summary(self) -> dict[str, Any]:
+        items = self.list(limit=500)
+        counts = {}
+        for item in items:
+            counts[item["status"]] = counts.get(item["status"], 0) + 1
+        unresolved = [
+            item for item in items
+            if item["status"] not in TERMINAL
+            and item["payload"].get("severity", "").upper() in {"CRITICAL", "HIGH"}
+        ]
+        verified = counts.get("VERIFIED", 0)
+        completed = verified + counts.get("FAILED", 0) + counts.get("ROLLED_BACK", 0)
+        return {
+            "total_recent": len(items),
+            "by_status": counts,
+            "critical_unresolved": len([
+                item for item in unresolved
+                if item["payload"].get("severity", "").upper() == "CRITICAL"
+            ]),
+            "high_or_critical_unresolved": len(unresolved),
+            "verified_count": verified,
+            "failed_count": counts.get("FAILED", 0),
+            "rollback_count": counts.get("ROLLED_BACK", 0),
+            "verification_success_rate": (verified / completed) if completed else None,
+        }
+
     def analyze(self, *, incident_id: str | None = None, limit: int = 10) -> dict[str, Any]:
         events = []
         if incident_id:
