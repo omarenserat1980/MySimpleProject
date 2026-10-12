@@ -25,7 +25,7 @@ class BrainGitServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             s=BrainGitService(Path(d))
             s.create_repository("proof")
-            for unsafe in ("../escaped.txt", "/tmp/escaped.txt", ".git/config", "folder\\\\escaped.txt"):
+            for unsafe in ("../escaped.txt", "/tmp/escaped.txt", ".git/config", "folder\\\\escaped.txt", "."):
                 with self.subTest(path=unsafe):
                     with self.assertRaises(BrainGitError):
                         s.commit_files("proof", {unsafe: "must not be written"}, "reject unsafe path")
