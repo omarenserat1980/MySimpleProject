@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from brain_v12.virtual_hardware.ecc_memory import VirtualECCMemoryController
+from brain_v12.virtual_hardware.memory import VirtualRAM
+from brain_v12.virtual_hardware.computer import VirtualComputer
 
 
 class VirtualECCMemoryTests(unittest.TestCase):
@@ -47,6 +49,29 @@ class VirtualECCMemoryTests(unittest.TestCase):
         self.assertEqual(result["status"], "ECC_UNCORRECTABLE")
         self.assertIsNone(result["data"])
         self.assertEqual(ecc.status()["stats"]["detected_double_bit_errors"], 1)
+
+    def test_ecc_is_integrated_into_virtual_ram_read_write_and_recovery(self):
+        ram = VirtualRAM(size=16, ecc_enabled=True)
+        ram.write(3, 0x123456789)
+        ram.inject_fault("bit_flip", address=3)
+        self.assertEqual(ram.read(3), 0x123456789)
+        self.assertEqual(ram.status()["ecc"]["stats"]["corrected_single_bit_errors"], 1)
+        snapshot = ram.snapshot()
+        restored = VirtualRAM(size=16, ecc_enabled=True)
+        restored.restore(snapshot)
+        self.assertEqual(restored.read(3), 0x123456789)
+
+    def test_ecc_enabled_machine_declares_integrity_category(self):
+        machine = VirtualComputer("ecc-machine", ram_size=32, ecc_enabled=True)
+        manifest = machine.hardware_manifest()
+        self.assertTrue(manifest["validation"]["ok"])
+        self.assertIn("memory_integrity", manifest["validation"]["categories"])
+        self.assertTrue(machine.status()["ram"]["ecc_enabled"])
+
+    def test_ecc_ram_restore_rejects_different_ecc_mode(self):
+        plain = VirtualRAM(size=8)
+        with self.assertRaisesRegex(ValueError, "RAM_ECC_MODE_MISMATCH"):
+            VirtualRAM(size=8, ecc_enabled=True).restore(plain.snapshot())
 
     def test_invalid_addresses_and_words_are_rejected(self):
         ecc = VirtualECCMemoryController()
