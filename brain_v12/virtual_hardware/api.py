@@ -11,6 +11,8 @@ from .cpu_profiles import list_cpu_profiles
 from .storage_profiles import list_storage_profiles
 from .memory_profiles import list_memory_profiles
 from .peripheral_profiles import GPU_PROFILES, NIC_PROFILES, MOTHERBOARD_PROFILES
+from .server_fabric import (admit_server_workload, discover_backends, get_server_profile,
+                            list_server_profiles, observe_host_capacity)
 
 
 router = APIRouter(prefix="/api/virtual-hardware", tags=["virtual-hardware"])
@@ -175,6 +177,48 @@ def inject_virtual_machine_fault(machine_id: str, request: Request, body: dict):
                                                int(body["address"]) if body.get("address") is not None else None)}
     except (KeyError, ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail={"code": "FAULT_INJECTION_REJECTED", "error": str(exc)}) from exc
+
+
+@router.get("/server-fabric/profiles")
+def list_virtual_server_profiles():
+    """Read-only server profile catalog; profiles do not allocate host resources."""
+    return {"ok": True, "profiles": list_server_profiles(),
+            "fidelity": "SIMULATED", "host_resources_allocated": False}
+
+
+@router.get("/server-fabric/backends")
+def inspect_server_backends(request: Request):
+    _authorized(request)
+    return {"ok": True, **discover_backends()}
+
+
+@router.get("/server-fabric/host-capacity")
+def inspect_server_host_capacity(request: Request):
+    _authorized(request)
+    return {"ok": True, "host_capacity": observe_host_capacity().describe(),
+            "resources_reserved": False, "vm_started": False}
+
+
+@router.post("/server-fabric/admission")
+def check_server_workload_admission(request: Request, body: dict):
+    _authorized(request)
+    profile_id = body.get("profile_id")
+    if not isinstance(profile_id, str) or not profile_id.strip():
+        raise HTTPException(status_code=422, detail="PROFILE_ID_REQUIRED")
+    try:
+        profile = get_server_profile(profile_id)
+        host = observe_host_capacity()
+        result = admit_server_workload(
+            profile, host,
+            memory_reserve_mib=int(body.get("memory_reserve_mib", 256)),
+            disk_reserve_bytes=int(body.get("disk_reserve_bytes", 1024 * 1024 * 1024)),
+            max_cpu_fraction=float(body.get("max_cpu_fraction", 0.75)),
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "SERVER_ADMISSION_REJECTED",
+                                                     "error": str(exc)}) from exc
+    return {"ok": result["ok"], "admission": result,
+            "resources_reserved": False, "vm_started": False}
 
 
 @router.post("/machines/{machine_id}/shutdown")
