@@ -54,7 +54,7 @@ def assert_runtime_contract() -> dict:
             failures.append("BRAIN_SOFTWARE_RUNTIME_REQUIRES_INTERNAL_RUNNER")
         if "BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE" not in cloud_text:
             failures.append("BRAIN_SOFTWARE_RUNTIME_MODE_MISSING")
-        if "github_hosted_runtime\\\": True" not in cloud_text:
+        if '"github_hosted_runtime": True' not in cloud_text:
             failures.append("BRAIN_SOFTWARE_RUNTIME_EVIDENCE_MARKER_MISSING")
         if "contents: write" in cloud_text:
             failures.append("BRAIN_SOFTWARE_RUNTIME_HAS_WRITE_PERMISSION")
