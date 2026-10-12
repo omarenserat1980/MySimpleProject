@@ -21,6 +21,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 
 from .control_auth import require_control_key
+from .universal_simulator_api import analyze_error, discover_simulators
 
 router = APIRouter(tags=["brain-error-recovery"])
 _LOCK = threading.Lock()
@@ -94,6 +95,7 @@ def report_error(request: Request, body: dict):
     require_control_key(request)
     source = str(body.get("source", "")).strip().lower()
     allowed = {"termux-brain", "desktop-commander-brain", "azure-brain", "github-brain", "brain-runtime"}
+    allowed.update(item["simulator_id"] for item in discover_simulators())
     if source not in allowed:
         raise HTTPException(status_code=422, detail={"error": "INVALID_ERROR_SOURCE", "allowed": sorted(allowed)})
     message = str(body.get("message", body.get("error", ""))).strip()
@@ -127,8 +129,27 @@ def report_error(request: Request, body: dict):
         with path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(report, ensure_ascii=False) + "\\n")
     forwarding = _forward(report)
+    # Use the shared provider and repair analysis service for every configured simulator.
+    # The analysis endpoint only proposes repairs; it never executes generated code.
+    ai_analysis = analyze_error({
+        "simulator_id": source,
+        "source_component": context.get("component", ""),
+        "timestamp": report["created_at"],
+        "error_type": context.get("error_type", "ReportedError"),
+        "error_message": safe_message,
+        "stack_trace": context.get("stack_trace", ""),
+        "operation": context.get("operation", ""),
+        "environment": context.get("environment", ""),
+        "logs": context.get("logs", ""),
+        "expected_behavior": context.get("expected_behavior", ""),
+        "actual_behavior": context.get("actual_behavior", ""),
+        "context": context,
+        "severity": report["severity"],
+    })
     return {"ok": True, "status": "RECEIVED", "incident_id": report["incident_id"],
-            "fingerprint": fingerprint, "severity": report["severity"], "simulator": forwarding}
+            "fingerprint": fingerprint, "severity": report["severity"], "simulator": forwarding,
+            "chatgpt_analysis": {"status": ai_analysis.get("status"), "incident_id": ai_analysis.get("incident_id"),
+                                 "provider": ai_analysis.get("provider"), "repair_executed": False}}
 
 
 @router.get("/api/errors/recent")
