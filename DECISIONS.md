@@ -1,105 +1,44 @@
 # Electronic Brain — Decisions
 
 ## D-001 — GitHub is the source of truth
-Decision: Keep the primary project state in the GitHub repository.
+Keep primary project state in GitHub; code, workflow definitions, commits, and Actions evidence must be inspectable and reproducible.
 
-Reason: Code, workflow definitions, commits, and Actions evidence are inspectable and reproducible.
+## D-002 — No paid Render dependency
+Do not make Render a required runtime dependency. Keep a free/no-card path and portability.
 
-## D-002 — No Render dependency
-Decision: Do not make Render a required runtime dependency.
-
-Reason: The project direction requires a free/no-card path and the Brain must remain portable.
-
-## D-003 — GitHub-hosted Linux as the free cloud control plane
-Decision: Use GitHub Actions runners for bounded cloud execution.
-
-Constraint: Runners are ephemeral. Persistent state must not depend on local runner disk.
+## D-003 — GitHub-hosted Linux for bounded cloud execution
+Use GitHub Actions runners for bounded execution. Runners are ephemeral; persistent state must not depend on runner disk.
 
 ## D-004 — Evidence before success
-Decision: A workflow being green is not sufficient evidence of a completed product artifact.
-
-Reason: The Brain must distinguish orchestration success from verified output.
+A green workflow is not sufficient evidence of a completed product artifact.
 
 ## D-005 — Bounded self-healing
-Decision: Autonomous repair uses explicit failure classes and bounded cycles.
-
-Reason: Prevent infinite loops, uncontrolled changes, and repeated damage.
+Autonomous repair uses explicit failure classes and bounded cycles.
 
 ## D-006 — External side effects require authorization
-Decision: Publishing, financial movement, withdrawals, and similar external actions remain permission-gated.
+Publishing, financial movement, withdrawals, and similar external actions remain permission-gated.
 
 ## D-007 — Free/open-source media first
-Decision: Prefer local/open-source rendering, FFmpeg, Pillow, and free runtime components.
+Prefer local/open-source rendering, FFmpeg, Pillow, and free runtime components.
 
 ## D-008 — Module-safe CI execution
-Decision: Python package modules that import brain_v12 should run with python -m ... in CI.
+Run Python package modules importing brain_v12 with `python -m ...` in CI.
 
-Reason: Direct file execution can remove the repository root from sys.path and produce false dependency failures.
+## D-009 — Preserve legacy requirements
+Retain and migrate legacy requirements rather than silently deleting them.
 
-## D-009 — Legacy ideas are preserved
-Decision: Existing legacy requirements and prior architectural ideas should be retained and migrated rather than silently deleted.
-
-## D-010 — Pytest is the canonical Brain test runner
-Decision: Use pytest for the Brain test suite in GitHub Actions.
-
-Reason: The repository tests use pytest-style test functions; unittest discovery does not reliably collect them. CI must execute the actual test files and fail when the suite cannot run.
+## D-010 — Pytest is canonical
+Use pytest for Brain tests and fail CI when the suite cannot run.
 
 ## D-011 — Runtime synchronization is explicit and convergent
-Decision: Brain runtime replicas use stable record identity, monotonic revisions, idempotent event IDs, optimistic concurrency, durable tombstones, replayable events, and deterministic state digests.
-
-Reason: Cloud, device/emulator, and worker state must converge without silent overwrites or duplicate side effects.
-
-Constraint: Runtime synchronization is separate from Git source synchronization; external side effects remain behind existing authorization gates.
-
+Use stable record identity, monotonic revisions, idempotent event IDs, optimistic concurrency, durable tombstones, replayable events, and deterministic state digests.
 
 ## D-012 — Autonomous Company Mode
+Brain may autonomously perform reversible, evidence-verifiable, legally non-binding work. Contracts, funds, withdrawals, legal filings, protected credentials, and destructive actions remain gated. Technical autonomy never implies legal authority.
 
-Decision: Brain operates as an autonomous company operating system by default for all actions that are technically reversible, evidence-verifiable, and legally non-binding.
+## D-013 — Software-only execution is mandatory
+Decision: Brain's execution registry accepts software workers only. Physical-device, Android, Termux, and hardware worker registration is rejected. The legacy adapter-enable flag cannot override this policy.
 
-Autonomous scope includes:
-- inspect, plan, code, test, repair, verify, package, deploy, monitor, document, benchmark, optimize, and roll back;
-- select among Brain-owned and free/open-source executors;
-- discover and normalize business opportunities;
-- prepare offers, product artifacts, customer-support drafts, delivery packages, and commercial analyses;
-- continuously maintain evidence, audit trails, recovery points, and health state.
+Reason: Brain must not depend on Arkan, phones, user-owned PCs, Hyper-V, or self-hosted physical runners for core operation. Virtual CPU, memory, storage, network, power, and thermal behavior must be labeled simulated unless independently calibrated.
 
-Hard gates remain for actions that can create an external legal, financial, identity, or irreversible obligation:
-- signing or accepting contracts;
-- creating personal guarantees or debt;
-- moving company or personal funds;
-- initiating withdrawals or payments;
-- submitting legally binding filings;
-- making regulated representations;
-- disclosing protected credentials or secrets;
-- irreversible deletion or destructive infrastructure actions unless a pre-authorized recovery policy explicitly permits them.
-
-These gates are fail-closed and must never be bypassed by prompt, retry, fallback provider, or autonomous repair.
-
-Autonomy tiers remain:
-BRAIN_OWNED -> FREE_DIVERSE -> PAID_EXTERNAL.
-
-Commercial truth remains evidence-first:
-OFFER -> CUSTOMER -> CONTRACT -> DELIVERY -> PAYMENT_VERIFIED -> REVENUE_REALIZED -> COSTS -> PROFIT_VERIFIED.
-
-Decision authority:
-Brain may make internal technical and operational decisions within declared policy. External authority must be evidenced separately; technical autonomy never implies legal authority.
-
-Objective:
-Minimize routine human intervention while maximizing Brain's independent capability, recovery, auditability, and lawful commercial execution.
-
-
-## 2026-10-04 — Marketing Launch Evaluation Gate
-- BRAIN AI Marketing must be evaluated from four independent perspectives: ordinary customer, marketing practitioner, marketing manager, and marketing-agency/company owner.
-- A separate customer-UX test validates signup, login, free-trial eligibility, service selection, order creation, and order-status clarity.
-- Reviewers must score evidence, clarity, trust, value proposition, usability, commercial readiness, and transparency.
-- A visual/demo impression is not sufficient for commercial launch.
-- No claim of COMMERCIAL_READY is permitted until the public API, persistent customer state, trial enforcement, service execution path, and payment path are each verified in production-like conditions.
-- Reviewer feedback becomes improvement input; no reviewer score is fabricated or inferred as an external opinion.
-
-
-## D-013 — Software nodes are the default execution resources
-Decision: The existing worker registry defaults to software workers. Physical-device adapters are disabled unless explicitly enabled with `BRAIN_ENABLE_DEVICE_WORKERS=1`.
-
-Reason: Brain Core startup and compatible software workloads must not depend on a particular phone, PC, Termux installation, or self-hosted physical runner.
-
-Constraints: This is an incremental migration. A registered node or passing CI job is not proof that every workload is hardware-independent. Specialized workflows remain separately gated until migrated and verified. Simulated resources must never be represented as real hardware or unlimited compute.
+Constraint: Software-only does not imply unlimited compute or prove that every external workflow is hardware-independent. A task still needs executor output and independent evidence gates.
