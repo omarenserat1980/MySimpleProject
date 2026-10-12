@@ -13,7 +13,7 @@ _SAFE_DETAIL = re.compile(r"^[A-Z0-9_]{1,100}$")
 
 def _safe_http_error(exc: urllib.error.HTTPError) -> RuntimeError:
     """Return a non-secret diagnostic suitable for CI logs."""
-    detail = ""
+    detail = "UNKNOWN"
     try:
         body = exc.read(16_384).decode("utf-8")
         payload = json.loads(body)
