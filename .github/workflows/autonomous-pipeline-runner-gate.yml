@@ -1,4 +1,4 @@
-name: Autonomous Pipeline Runner Gate
+name: Autonomous Pipeline Hosted Runner Gate
 
 on:
   workflow_dispatch:
@@ -11,47 +11,36 @@ permissions:
 
 jobs:
   runner-gate:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Runner identity
+      - name: Verify hosted runner identity
         shell: bash
         run: |
           set -euo pipefail
-          echo "RUNNER_NAME=$RUNNER_NAME"
-          echo "RUNNER_OS=$RUNNER_OS"
-          echo "RUNNER_ARCH=$RUNNER_ARCH"
-          echo "RUNNER_GATE=START"
-
-      - name: Runtime gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$RUNNER_NAME" = "linux-runner-01"
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
           test "$RUNNER_OS" = "Linux"
           test "$RUNNER_ARCH" = "X64"
           command -v bash
           command -v python3
           python3 --version
-          test -d "$HOME"
-          echo "RUNTIME_GATE=PASS"
+          echo "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SOFTWARE"
+          echo "AUTONOMOUS_PIPELINE_RUNNER_GATE=PASS"
 
-      - name: Evidence
+      - name: Upload gate evidence
         shell: bash
         run: |
           set -euo pipefail
           printf '%s\n' \
-            "runner_name=$RUNNER_NAME" \
+            "runner_environment=$RUNNER_ENVIRONMENT" \
             "runner_os=$RUNNER_OS" \
             "runner_arch=$RUNNER_ARCH" \
-            "runtime_gate=PASS" \
+            "hardware_dependency=NONE" \
             "autonomous_pipeline_runner_gate=PASS" \
             > runner-gate-evidence.txt
           cat runner-gate-evidence.txt
-
-      - name: Upload gate evidence
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: autonomous-pipeline-runner-gate
+          name: autonomous-pipeline-hosted-runner-gate
           path: runner-gate-evidence.txt
           if-no-files-found: error
