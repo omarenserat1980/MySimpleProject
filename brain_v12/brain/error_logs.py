@@ -40,7 +40,7 @@ class BrainErrorLogStore:
     """Append-only JSONL log store with safe, bounded read operations."""
 
     def __init__(self, path: str | Path | None = None):
-        default = Path(os.getenv("BRAIN_ERROR_LOG_PATH", str(Path(__file__).resolve().parents[2] / ".brain" / "logs" / "errors.jsonl")))
+        default = Path(os.getenv("BRAIN_ERROR_LOG_PATH") or (Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser() / "logs" / "errors.jsonl"))
         self.path = Path(path or default).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
