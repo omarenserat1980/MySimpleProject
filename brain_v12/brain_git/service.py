@@ -79,7 +79,25 @@ class BrainGitService:
                 else:
                     self._run(["checkout","-B",branch],cwd=work)
             for rel,content in files.items():
-                p=work/rel; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(content,encoding="utf-8")
+                if not isinstance(rel, str) or not rel or chr(0) in rel or chr(92) in rel:
+                    raise BrainGitError("INVALID_REPOSITORY_PATH")
+                candidate=Path(rel)
+                if candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+                    raise BrainGitError("INVALID_REPOSITORY_PATH")
+                if candidate.parts and candidate.parts[0].lower()==".git":
+                    raise BrainGitError("RESERVED_REPOSITORY_PATH")
+                p=work/candidate
+                root=work.resolve()
+                try:
+                    p.resolve().relative_to(root)
+                except ValueError:
+                    raise BrainGitError("REPOSITORY_PATH_ESCAPE")
+                p.parent.mkdir(parents=True,exist_ok=True)
+                try:
+                    p.resolve().relative_to(root)
+                except ValueError:
+                    raise BrainGitError("REPOSITORY_PATH_ESCAPE")
+                p.write_text(content,encoding="utf-8")
             self._run(["add","--all"],cwd=work)
             env=dict(os.environ, GIT_AUTHOR_NAME=author_name,GIT_AUTHOR_EMAIL=author_email,GIT_COMMITTER_NAME=author_name,GIT_COMMITTER_EMAIL=author_email)
             p=subprocess.run(["git","commit","-m",message],cwd=work,text=True,capture_output=True,env=env)
