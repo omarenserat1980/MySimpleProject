@@ -20,9 +20,11 @@ on:
       - "brain_v12/virtual_hardware/arkan_provisioner.py"
       - "brain_v12/virtual_hardware/api.py"
       - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/brain/brain_council.py"
       - "brain_v12/app.py"
       - "brain_v12/tests/test_arkan_provisioner.py"
       - "brain_v12/tests/test_device_cloud_federation.py"
+      - "brain_v12/tests/test_arkan_council_routing.py"
       - "docs/ARKAN_VIRTUAL_COMPUTER.md"
       - ".github/workflows/arkan-virtual-computer.yml"
   workflow_dispatch:
