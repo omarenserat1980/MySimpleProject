@@ -5,6 +5,8 @@ on:
     paths:
       - "brain_v12/virtual_hardware/extended_devices.py"
       - "brain_v12/virtual_hardware/pcie.py"
+      - "brain_v12/virtual_hardware/ecc_memory.py"
+      - "brain_v12/tests/test_ecc_memory.py"
       - "brain_v12/virtual_hardware/bus.py"
       - "brain_v12/virtual_hardware/computer.py"
       - "brain_v12/tests/test_virtual_pcie.py"
@@ -42,11 +44,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run focused tests
-        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie -v
+        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory -v
       - name: Import and inventory smoke test
         run: |
           python - <<'PY'
-          from brain_v12.virtual_hardware import VirtualPCIeFabric, VirtualPeripheralFabric
+          from brain_v12.virtual_hardware import VirtualECCMemoryController, VirtualPCIeFabric, VirtualPeripheralFabric
           inventory = VirtualPeripheralFabric().inventory()
           assert inventory["mode"] == "SIMULATED"
           assert inventory["host_hardware_required"] is False
@@ -55,5 +57,8 @@ jobs:
           pcie = VirtualPCIeFabric()
           pcie.attach_endpoint("smoke-device")
           assert pcie.config_read("smoke-device", 0, 2)["value"] == 0xB12A
-          print("inventory_devices=", len(inventory["devices"]), "pcie_endpoints=", pcie.status()["endpoint_count"])
+          ecc = VirtualECCMemoryController()
+          ecc.write_word(0, 0x1234)
+          assert ecc.read_word(0)["data"] == 0x1234
+          print("inventory_devices=", len(inventory["devices"]), "pcie_endpoints=", pcie.status()["endpoint_count"], "ecc_scheme=", ecc.status()["scheme"])
           PY
