@@ -15,7 +15,7 @@ Each profile records modeled behaviors, unsupported features, provenance, and co
 ## Current model boundaries
 
 - CPU: 8-register educational ISA (`MOVI`, `ADD`, `SUB`, `LOAD`, `STORE`, `JMP`, `JZ`, `OUT`, `HALT`); not x86-64 or AArch64.
-- RAM: integer-valued addressable cells with bounds checking and snapshot/restore. This is not a DDR4/DDR5 timing or ECC model.
+- RAM: integer-valued addressable cells with bounds checking and snapshot/restore; values are not restricted to 8-bit bytes, so capacity is reported in cells, not guaranteed byte-accurate RAM. This is not a DDR4/DDR5 timing or ECC model.
 - Bus: deterministic device registry and recorded interrupt events; not PCIe transaction or electrical signaling emulation.
 - Storage: bounded in-memory byte objects; not NVMe controller timing, physical SSD behavior, or power-loss durability.
 - Network: packet buffers; not a complete Ethernet PHY/MAC or wire-time model.
