@@ -89,6 +89,14 @@ def provision_arkan(
     if not active.powered:
         active.power_on()
 
+    # A bounded symbolic workload proves simulator task execution only.
+    smoke_test = active.execute(
+        [("MOVI", 0, 1), ("OUT", 0), ("HALT",)],
+        max_cycles=10,
+    )
+    if smoke_test.get("output") != [1] or not smoke_test.get("halted"):
+        raise RuntimeError("ARKAN_SIMULATOR_SMOKE_TEST_FAILED")
+
     previous = read_arkan_record(target)
     now = _utc_now()
     record: dict[str, Any] = {
@@ -108,6 +116,14 @@ def provision_arkan(
         "hardware_manifest": active.hardware_manifest(),
         "configuration_fingerprint": active.configuration_fingerprint(),
         "runtime_status": active.status(),
+        "task_execution_evidence": {
+            "status": "PASS",
+            "workload": "bounded_symbolic_cpu_smoke",
+            "output_expected": [1],
+            "output_observed": smoke_test.get("output"),
+            "cycles": smoke_test.get("cycles"),
+            "fidelity": "SIMULATED",
+        },
         "os_target": {
             "product": "Windows Server",
             "version": "2025",
