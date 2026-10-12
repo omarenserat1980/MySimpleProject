@@ -101,7 +101,7 @@ try {
     $outputMounted = Mount-DiskImage -ImagePath $output -StorageType ISO -Access ReadOnly -PassThru
     $outputVolume = $outputMounted | Get-Volume | Where-Object DriveLetter | Select-Object -First 1
     if (-not $outputVolume) { throw "Rebuilt ISO has no accessible drive letter." }
-    $outputRoot = "$($outputVolume.DriveLetter):\\"
+    $outputRoot = "$($outputVolume.DriveLetter):\"
     foreach ($relative in @("efi\\boot\\bootx64.efi", "sources\\boot.wim", "boot\\etfsboot.com", "efi\\microsoft\\boot\\efisys.bin")) {
         if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $relative) -PathType Leaf)) {
             throw "Rebuilt ISO is missing required boot/setup file: $relative"
