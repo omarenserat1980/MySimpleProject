@@ -11,7 +11,7 @@ from .brain_constitution import BrainConstitution
 from .mission import Mission
 from .evidence_store import EvidenceStore
 from .verification_core import VerificationCore
-from .golden_acceptance_gate import AcceptanceCriterion, GoldenAcceptanceGate
+from .golden_acceptance_gate import GoldenAcceptanceGate
 from .asic_resource_adapter import ASICResourceAdapter
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
