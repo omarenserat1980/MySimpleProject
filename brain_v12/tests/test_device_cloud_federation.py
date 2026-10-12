@@ -160,7 +160,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
             allowed_workloads=(Workload.CAR_COMPANION, Workload.BUILD_TEST),
         )
         plan = plan_execution(Workload.BUILD_TEST, [car])
-        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_EXECUTOR")
+        self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
 
     def test_car_companion_is_allowed_only_as_a_limited_client(self):
         car = DeviceEndpoint(
