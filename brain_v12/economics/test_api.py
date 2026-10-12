@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
-from economics.api import router
 from fastapi import FastAPI
+
+from brain_v12.economics.api import router
 
 app = FastAPI()
 app.include_router(router)
