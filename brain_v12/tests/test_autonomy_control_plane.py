@@ -1,6 +1,14 @@
 import json, tempfile, unittest
 from pathlib import Path
 from brain_v12.brain.autonomy_control_plane import ControlPlane
+import multiprocessing
+
+
+def _claim_from_process(root, stale_job, start_event, results):
+    worker = ControlPlane(root)
+    start_event.wait(timeout=10)
+    results.put(worker.start_attempt(stale_job))
+
 
 class ControlPlaneTests(unittest.TestCase):
     def test_checkpoint_resume(self):
@@ -30,6 +38,31 @@ class ControlPlaneTests(unittest.TestCase):
             self.assertEqual(second["attempts"],1)
             self.assertEqual(second["lease_id"],first["lease_id"])
             self.assertEqual(worker_b.load(queued["job_id"])["attempts"],1)
+
+    def test_separate_processes_cannot_claim_same_stale_job_twice(self):
+        # Both independent processes receive the same stale "ready" snapshot.
+        # The filesystem lock must ensure only one attempt/lease is created.
+        with tempfile.TemporaryDirectory() as d:
+            cp = ControlPlane(d)
+            stale_job = cp.create("build", ["compile"], max_attempts=3, budget=3)
+            context = multiprocessing.get_context("spawn")
+            start_event = context.Event()
+            results = context.Queue()
+            workers = [
+                context.Process(target=_claim_from_process, args=(d, stale_job, start_event, results))
+                for _ in range(2)
+            ]
+            for worker in workers:
+                worker.start()
+            start_event.set()
+            claimed = [results.get(timeout=15) for _ in workers]
+            for worker in workers:
+                worker.join(timeout=15)
+                self.assertEqual(worker.exitcode, 0)
+            self.assertTrue(all(job["status"] == "running" for job in claimed))
+            self.assertEqual({job["attempts"] for job in claimed}, {1})
+            self.assertEqual(len({job["lease_id"] for job in claimed}), 1)
+            self.assertEqual(cp.load(stale_job["job_id"])["attempts"], 1)
     def test_load_reads_latest_persisted_job_snapshot(self):
         with tempfile.TemporaryDirectory() as d:
             cp=ControlPlane(d)
