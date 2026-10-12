@@ -50,3 +50,14 @@ Perceive → Understand → Memory → Goal → Plan → Decide → Act → Obse
 - لا يُسمح لـBrain بإعلان الإكمال الموضوعي دون دليل غير فارغ وشرط تحقق صريح.
 - `brain-github-supervisor.yml` يستدعي `brain-github-cloud.yml` مباشرة كـReusable Workflow.
 - Evidence الناتج يجب أن يحتوي على عقدة التحقق وسجل المهمة قبل اعتباره صالحًا.
+
+## CI Repair Sprint (Pilot Service)
+
+Electronic Brain includes a **draft, owner-reviewed pilot service package** for diagnosing one bounded GitHub Actions / Python CI failure. The package is documentation only; it is not a published service listing or evidence of customer demand, completed external work, or revenue.
+
+- [Service page draft](examples/ci-repair-sprint/SERVICE_PAGE.md)
+- [Customer intake template](examples/ci-repair-sprint/INTAKE_TEMPLATE.md)
+- [Delivery checklist](examples/ci-repair-sprint/README.md)
+- [Illustrative sample report](examples/ci-repair-sprint/SAMPLE_REPORT.md)
+
+The proposed USD 49–99 pilot price is indicative only and must be agreed before any work starts. Do not share secrets in logs. Record revenue only after independently verified payment.

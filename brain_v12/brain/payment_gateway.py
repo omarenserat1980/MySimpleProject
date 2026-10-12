@@ -90,7 +90,7 @@ class PaymentEventJournal:
 
     def begin(self, payload: "WebhookEnvelope") -> dict:
         fingerprint = hashlib.sha256(
-            json.dumps(payload.model_dump(), sort_keys=True).encode("utf-8")
+            json.dumps(_model_dump_compat(payload), sort_keys=True).encode("utf-8")
         ).hexdigest()
         with self.lock:
             data = self._read()
@@ -191,6 +191,18 @@ class WebhookEnvelope(BaseModel):
     timestamp: int
 
 
+def _model_dump_compat(model: BaseModel) -> dict:
+    """Serialize models under both Pydantic v1 and v2."""
+    dump = getattr(model, "model_dump", None)
+    return dump() if callable(dump) else model.dict()
+
+
+def _model_validate_json_compat(model_type: type[BaseModel], raw: bytes) -> BaseModel:
+    """Parse JSON under both Pydantic v1 and v2."""
+    validate_json = getattr(model_type, "model_validate_json", None)
+    return validate_json(raw) if callable(validate_json) else model_type.parse_raw(raw)
+
+
 def signature(secret: str, timestamp: int, raw_body: bytes) -> str:
     payload = f"{timestamp}.".encode() + raw_body
     return hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
@@ -231,7 +243,7 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
         if not hmac.compare_digest(supplied, expected):
             raise HTTPException(401, "INVALID_WEBHOOK_SIGNATURE")
         try:
-            payload = WebhookEnvelope.model_validate_json(raw)
+            payload = _model_validate_json_compat(WebhookEnvelope, raw)
         except Exception:
             raise HTTPException(400, "INVALID_WEBHOOK_PAYLOAD")
         with replay.lock:

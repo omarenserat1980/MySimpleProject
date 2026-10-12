@@ -17,14 +17,62 @@ else
   ROOT="$SOURCE_ROOT"
 fi
 cd "$ROOT"
+# Keep the established development database when running the isolated runtime
+# worktree. Never silently create a fresh empty DB in the runtime checkout.
+if [ -z "${BRAIN_DB:-}" ] && [ -s "$SOURCE_ROOT/brain_v12/brain_v12.db" ]; then
+  export BRAIN_DB="$SOURCE_ROOT/brain_v12/brain_v12.db"
+fi
 if [ -f "$HOME/.brain_env" ]; then . "$HOME/.brain_env"; fi
 if [ -f "$HOME/v12-agent/agent_config.sh" ]; then . "$HOME/v12-agent/agent_config.sh"; fi
 if [[ "${BRAIN_URL:-}" == *render.com* ]]; then unset BRAIN_URL; fi
 if [[ "${V12_BRAIN_URL:-}" == *render.com* ]]; then unset V12_BRAIN_URL; fi
-export V12_BRAIN_URL="${BRAIN_URL:-http://127.0.0.1:8012}"
-# Local Termux runtime must use exactly one on-device key. Clear stale values, then seed the direct-key variable from the canonical local key file.
+
+# Resolve a stable per-device logical ID before applying defaults. Never let a
+# copied Redmi config silently register another handset as redmi3-01.
+DEVICE_MODEL="$(getprop ro.product.model 2>/dev/null || true)"
+DETECTED_AGENT_ID=""
+# Only verified hardware model codes are auto-mapped. Broad brand matching
+# is unsafe because many devices share a brand. Unknown models require both a
+# unique configured agent ID and an exact V12_DEVICE_MODEL pin in local config.
+case "$DEVICE_MODEL" in
+  *23129RN51X*) DETECTED_AGENT_ID="redmi3-01" ;;
+  *RMX3710*) DETECTED_AGENT_ID="realme-01" ;;
+esac
+if [ -n "$DETECTED_AGENT_ID" ]; then
+  if [ -n "${V12_AGENT_ID:-}" ] && [ "$V12_AGENT_ID" != "$DETECTED_AGENT_ID" ]; then
+    echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_MISMATCH model=$DEVICE_MODEL configured=$V12_AGENT_ID expected=$DETECTED_AGENT_ID" >&2
+    echo "Fix $HOME/v12-agent/agent_config.sh locally; do not copy another device's ID or key." >&2
+    exit 45
+  fi
+  export V12_AGENT_ID="$DETECTED_AGENT_ID"
+elif [ -z "${V12_AGENT_ID:-}" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_ID_REQUIRED model=${DEVICE_MODEL:-unknown}; set a unique V12_AGENT_ID in $HOME/v12-agent/agent_config.sh" >&2
+  exit 45
+elif [ "${V12_DEVICE_MODEL:-}" != "$DEVICE_MODEL" ]; then
+  echo "BRAIN_RUNTIME_ERROR: DEVICE_MODEL_CONFIRMATION_REQUIRED detected=${DEVICE_MODEL:-unknown} configured=${V12_DEVICE_MODEL:-unset}" >&2
+  echo "Set V12_DEVICE_MODEL to this phone's exact getprop ro.product.model value in $HOME/v12-agent/agent_config.sh." >&2
+  exit 45
+fi
+
+# Preserve explicit non-paid endpoints. The default loopback endpoint is only
+# valid for the primary Redmi that hosts this local API; loopback on Realme is
+# Realme itself, not the Redmi Brain.
+export V12_BRAIN_URL="${V12_BRAIN_URL:-${BRAIN_URL:-http://127.0.0.1:8012}}"
+if [ "$V12_AGENT_ID" != "redmi3-01" ]; then
+  case "$V12_BRAIN_URL" in
+    http://localhost*|https://localhost*|http://127.*|https://127.*|http://\[::1\]*|https://\[::1\]*)
+      echo "BRAIN_RUNTIME_ERROR: REMOTE_BRAIN_URL_REQUIRED agent=$V12_AGENT_ID url=$V12_BRAIN_URL" >&2
+      echo "Set V12_BRAIN_URL to an already reachable, authenticated Brain endpoint in $HOME/v12-agent/agent_config.sh." >&2
+      echo "No Redmi settings or credentials were changed by this launcher." >&2
+      exit 46
+      ;;
+  esac
+fi
+
+# Keep a local key file for this runtime. Remote acceptance depends on the
+# server's configured authentication policy; never copy another device's key
+# just to bypass an authentication failure.
 unset BRAIN_AGENT_KEY BRAIN_AGENT_KEY_SHA256 BRAIN_EMULATOR_KEY
-export V12_AGENT_ID="${V12_AGENT_ID:-redmi3-01}"
 export V12_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE:-$HOME/v12-agent/agent.key}"
 export BRAIN_AGENT_KEY_FILE="${V12_AGENT_KEY_FILE}"
 mkdir -p "$(dirname "$V12_AGENT_KEY_FILE")"
@@ -42,6 +90,8 @@ export PYTHONPATH="$ROOT:${PYTHONPATH:-}"
 PYTHON="${V12_PYTHON_EXECUTABLE:-$(command -v python3 || command -v python)}"
 if [ -z "$PYTHON" ]; then echo "BRAIN_RUNTIME_ERROR: PYTHON_NOT_FOUND" >&2; exit 42; fi
 mkdir -p "$ROOT/.brain/state"
+RUNTIME_COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+API_COMMIT_MARKER="$ROOT/.brain/state/api-runtime-commit"
 status_snapshot() {
   "$PYTHON" - <<'PY'
 import json, os, urllib.request
@@ -58,8 +108,40 @@ health_ok() { "$PYTHON" -c 'import os,urllib.request; urllib.request.urlopen(os.
 auth_ok() {
   "$PYTHON" -c 'import json,os,urllib.request
 key=open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]),encoding="utf-8").read().strip()
-req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key},method="POST")
+req=urllib.request.Request(os.environ["V12_BRAIN_URL"]+"/api/device/heartbeat",data=json.dumps({"agent_id":os.environ["V12_AGENT_ID"]}).encode(),headers={"Content-Type":"application/json","X-V12-Agent-Key":key,"X-V12-Agent-Id":os.environ["V12_AGENT_ID"]},method="POST")
 with urllib.request.urlopen(req,timeout=3) as r: r.read()' >/dev/null 2>&1
+}
+auth_diagnostic() {
+  "$PYTHON" - <<'PY'
+import json, os, socket, urllib.error, urllib.request
+base = os.environ["V12_BRAIN_URL"]
+try:
+    key = open(os.path.expanduser(os.environ["V12_AGENT_KEY_FILE"]), encoding="utf-8").read().strip()
+    req = urllib.request.Request(
+        base + "/api/device/heartbeat",
+        data=json.dumps({"agent_id": os.environ["V12_AGENT_ID"]}).encode(),
+        headers={"Content-Type": "application/json", "X-V12-Agent-Key": key, "X-V12-Agent-Id": os.environ["V12_AGENT_ID"]},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=3) as response:
+        response.read()
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=AUTH_OK")
+except urllib.error.HTTPError as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=HTTP_" + str(exc.code))
+except urllib.error.URLError as exc:
+    reason = exc.reason
+    if isinstance(reason, (socket.timeout, TimeoutError)):
+        status = "TIMEOUT"
+    elif isinstance(reason, ConnectionRefusedError):
+        status = "CONNECTION_REFUSED"
+    else:
+        status = "NETWORK_ERROR"
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=" + status)
+except (OSError, ValueError) as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=LOCAL_CONFIG_ERROR type=" + type(exc).__name__)
+except Exception as exc:
+    print("JET_BRAIN_AUTH_DIAGNOSTIC status=UNEXPECTED_ERROR type=" + type(exc).__name__)
+PY
 }
 start_api() {
   echo "JET_BRAIN_API starting url=$V12_BRAIN_URL" >&2
@@ -80,18 +162,64 @@ start_api() {
     exit 43
   fi
   if ! health_ok; then echo "BRAIN_RUNTIME_ERROR: API_START_FAILED pid=$API_PID" >&2; exit 43; fi
-  echo "JET_BRAIN_API ready pid=$API_PID" >&2
+  printf "%s\n" "$RUNTIME_COMMIT" > "$API_COMMIT_MARKER"
+  echo "JET_BRAIN_API ready pid=$API_PID runtime_commit=$RUNTIME_COMMIT" >&2
 }
-if health_ok; then
-  if auth_ok; then echo "JET_BRAIN_API already_ready_and_authenticated url=$V12_BRAIN_URL" >&2
+is_local_api() {
+  "$PYTHON" -c 'import ipaddress,os,urllib.parse
+host=(urllib.parse.urlparse(os.environ["V12_BRAIN_URL"]).hostname or "").lower()
+if host == "localhost": raise SystemExit(0)
+try: raise SystemExit(0 if ipaddress.ip_address(host).is_loopback else 1)
+except ValueError: raise SystemExit(1)' 
+}
+if is_local_api; then
+  if health_ok; then
+    if auth_ok; then
+      # A healthy API may still have old Python modules loaded even when its
+      # working directory is unchanged. Compare the commit recorded at the
+      # last successful launch with the currently converged runtime commit.
+      API_PID_ACTIVE=""
+      API_CWD=""
+      for candidate_pid in $(pgrep -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true); do
+        candidate_cwd="$(readlink "/proc/$candidate_pid/cwd" 2>/dev/null || true)"
+        if [ -n "$candidate_cwd" ]; then
+          API_PID_ACTIVE="$candidate_pid"
+          API_CWD="$candidate_cwd"
+          break
+        fi
+      done
+      RECORDED_COMMIT="$(cat "$API_COMMIT_MARKER" 2>/dev/null || true)"
+      if [ "$RECORDED_COMMIT" != "$RUNTIME_COMMIT" ] || [ "$API_CWD" != "$ROOT" ]; then
+        echo "JET_BRAIN_API restart_for_runtime_convergence old_commit=${RECORDED_COMMIT:-unknown} new_commit=$RUNTIME_COMMIT old_root=${API_CWD:-unknown} new_root=$ROOT" >&2
+        pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+        sleep 1
+        start_api
+      else
+        echo "JET_BRAIN_API already_running_from_converged_root pid=$API_PID_ACTIVE runtime_commit=$RUNTIME_COMMIT" >&2
+      fi
+    else
+      echo "JET_BRAIN_API local_auth_failed_restart_once" >&2
+      pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
+      sleep 1
+      start_api
+    fi
   else
-    echo "JET_BRAIN_API stale_auth_restart" >&2
-    pkill -f '[u]vicorn brain_v12.app:app --host 127.0.0.1 --port 8012' 2>/dev/null || true
-    sleep 1
     start_api
   fi
-else start_api; fi
-if ! auth_ok; then echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2; exit 44; fi
+else
+  # A remote endpoint must never trigger launch/kill of the local API process.
+  if ! health_ok; then
+    auth_diagnostic >&2 || true
+    echo "BRAIN_RUNTIME_ERROR: REMOTE_API_UNREACHABLE url=$V12_BRAIN_URL" >&2
+    exit 43
+  fi
+  echo "JET_BRAIN_API remote_endpoint_reachable url=$V12_BRAIN_URL" >&2
+fi
+if ! auth_ok; then
+  auth_diagnostic >&2 || true
+  echo "BRAIN_RUNTIME_ERROR: API_AUTH_FAILED" >&2
+  exit 44
+fi
 
 seed_bootstrap_task() {
   if [ -z "${BRAIN_CONTROL_KEY:-}" ]; then

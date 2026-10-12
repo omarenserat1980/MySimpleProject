@@ -1,0 +1,147 @@
+name: Brain Cloud Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Type DEPLOY to deploy to the already-provisioned host"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloud-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm_deploy == 'DEPLOY' && github.repository == 'omarenserat1980/MySimpleProject' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout deployment source
+        uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.BRAIN_CLOUD_SSH_KNOWN_HOSTS }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          for name in HOST USER KEY KNOWN_HOSTS REMOTE_DIR; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing deployment configuration::$name is not configured."
+              exit 1
+            fi
+          done
+          if [[ ! "$REMOTE_DIR" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::BRAIN_CLOUD_REMOTE_DIR must be an absolute path using only letters, digits, dot, underscore, slash, or hyphen."
+            exit 1
+          fi
+          if [[ "$REMOTE_DIR" == *"/../"* || "$REMOTE_DIR" == */.. ]]; then
+            echo "::error::BRAIN_CLOUD_REMOTE_DIR must not contain parent-directory traversal."
+            exit 1
+          fi
+          echo "DEPLOYMENT_CONFIGURATION=READY"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.BRAIN_CLOUD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.BRAIN_CLOUD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\\n' "$SSH_PRIVATE_KEY" > ~/.ssh/brain_cloud_key
+          chmod 600 ~/.ssh/brain_cloud_key
+          printf '%s\\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/brain_cloud_key >/dev/null
+          echo "SSH_KEY_AND_PINNED_HOST_KEY=VALID"
+
+      - name: Preflight existing host before copying files
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/brain_cloud_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$USER@$HOST" "REMOTE_DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          test -d "$REMOTE_DIR" || { echo "Remote directory does not exist"; exit 1; }
+          test -f "$REMOTE_DIR/.env" || { echo "Remote .env file is missing"; exit 1; }
+          grep -Eq '^BRAIN_CONTROL_TOKEN=.{32,}$' "$REMOTE_DIR/.env" || {
+            echo "BRAIN_CONTROL_TOKEN missing or too short"
+            exit 1
+          }
+          command -v docker >/dev/null || { echo "Docker is not installed"; exit 1; }
+          docker compose version >/dev/null || { echo "Docker Compose plugin is unavailable"; exit 1; }
+          command -v curl >/dev/null || { echo "curl is not installed"; exit 1; }
+          command -v python3 >/dev/null || { echo "Python 3 is not installed"; exit 1; }
+          echo "REMOTE_HOST_PREFLIGHT=PASS"
+          REMOTE
+
+      - name: Copy production Compose file to host
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          scp -i "$HOME/.ssh/brain_cloud_key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 cloud/docker-compose.production.yml "$USER@$HOST:$REMOTE_DIR/docker-compose.production.yml"
+          echo "PRODUCTION_COMPOSE_SYNC=PASS"
+
+      - name: Deploy existing host
+        env:
+          HOST: ${{ secrets.BRAIN_CLOUD_SSH_HOST }}
+          USER: ${{ secrets.BRAIN_CLOUD_SSH_USER }}
+          REMOTE_DIR: ${{ vars.BRAIN_CLOUD_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          ssh -i "$HOME/.ssh/brain_cloud_key" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$USER@$HOST" "REMOTE_DIR='$REMOTE_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$REMOTE_DIR"
+          test -f docker-compose.production.yml
+          test -f .env
+          grep -Eq '^BRAIN_CONTROL_TOKEN=.{32,}$' .env || {
+            echo "BRAIN_CONTROL_TOKEN missing or too short"
+            exit 1
+          }
+          docker compose -f docker-compose.production.yml pull
+          docker compose -f docker-compose.production.yml up -d --remove-orphans
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/healthz >/tmp/brain-health.json &&
+               curl --fail --silent http://127.0.0.1:8000/readyz >/tmp/brain-ready.json; then
+              if python3 -c 'import json; h=json.load(open("/tmp/brain-health.json")); r=json.load(open("/tmp/brain-ready.json")); assert h.get("status") == "ok", h; assert r.get("ready") is True, r'; then
+                echo "BRAIN_CLOUD_PRODUCTION_SMOKE=PASS"
+                healthy=1
+                break
+              fi
+            fi
+            sleep 2
+          done
+          if [ "$healthy" -ne 1 ]; then
+            docker compose -f docker-compose.production.yml ps
+            docker compose -f docker-compose.production.yml logs --tail=100
+            exit 1
+          fi
+          docker compose -f docker-compose.production.yml ps
+          REMOTE
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/brain_cloud_key

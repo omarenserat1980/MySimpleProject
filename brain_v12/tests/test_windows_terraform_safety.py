@@ -25,16 +25,25 @@ def test_rejects_open_network(tmp_path: Path) -> None:
 def test_rejects_state_and_plan(tmp_path: Path) -> None:
     (tmp_path / "terraform.tfstate").write_text("{}", encoding="utf-8")
     (tmp_path / "brain.tfplan").write_bytes(b"opaque")
+    (tmp_path / "brain-windows.tfplan").write_bytes(b"opaque")
     result = inspect_windows_terraform_root(tmp_path)
     assert result["safe"] is False
     assert any("terraform.tfstate" in x for x in result["violations"])
     assert any("brain.tfplan" in x for x in result["violations"])
+    assert any("brain-windows.tfplan" in x for x in result["violations"])
 
 
 def test_allows_runtime_plan_artifact(tmp_path: Path) -> None:
     (tmp_path / "brain.tfplan").write_bytes(b"opaque")
     result = inspect_windows_terraform_root(tmp_path, allow_runtime_plan=True)
     assert result["safe"] is True
+
+
+def test_runtime_plan_allowance_does_not_allow_alternate_plan_name(tmp_path: Path) -> None:
+    (tmp_path / "brain-windows.tfplan").write_bytes(b"opaque")
+    result = inspect_windows_terraform_root(tmp_path, allow_runtime_plan=True)
+    assert result["safe"] is False
+    assert any("brain-windows.tfplan" in x for x in result["violations"])
 
 
 def test_rejects_inline_password(tmp_path: Path) -> None:

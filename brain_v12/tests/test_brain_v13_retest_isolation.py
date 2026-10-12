@@ -37,7 +37,7 @@ class RetestEvidenceIsolationTests(unittest.TestCase):
         self.assertGreater(mission.attempts,first_attempt)
         completed=s.transition(job,"deliver",status="completed",required_evidence_kind="runtime_ok",enforce_authority=False)
         self.assertEqual(completed["status"],"blocked")
-        self.assertEqual(completed["details"]["completion_gate"],"RUNTIME_EVIDENCE_REQUIRED")
+        self.assertEqual(completed["details"]["completion_gate"],"GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED")
 
     def test_retest_requires_new_execution_attempt(self):
         s=BrainSupervisor(root=tempfile.mkdtemp(prefix="brain-retest-exec-"),max_cycles=3)

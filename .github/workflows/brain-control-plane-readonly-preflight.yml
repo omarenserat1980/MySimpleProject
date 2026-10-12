@@ -1,0 +1,46 @@
+name: Brain Control Plane Read-only Live Preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "tool/live-control-plane-readonly-check-20261011"
+      - "main"
+    paths:
+      - ".github/workflows/brain-control-plane-readonly-preflight.yml"
+      - "tools/windows_control_plane_api_preflight.py"
+
+permissions:
+  contents: read
+
+jobs:
+  readonly-control-plane-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Probe deployed Control Plane using GET only
+        shell: bash
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+        run: |
+          set +e
+          python tools/windows_control_plane_api_preflight.py | tee control-plane-readonly-preflight.json
+          rc=${PIPESTATUS[0]}
+          echo "PREFLIGHT_EXIT_CODE=$rc"
+          exit "$rc"
+
+      - name: Upload sanitized preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-control-plane-readonly-preflight
+          path: control-plane-readonly-preflight.json
+          if-no-files-found: ignore
