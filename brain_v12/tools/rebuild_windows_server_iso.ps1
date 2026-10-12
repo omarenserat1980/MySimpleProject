@@ -10,6 +10,40 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+function ConvertTo-WindowsCommandLineArgument {
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Argument)
+    if ($Argument.Length -gt 0 -and $Argument -notmatch '[\s"]') { return $Argument }
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.Append('"')
+    $backslashes = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashes++
+            continue
+        }
+        if ($character -eq '"') {
+            if ($backslashes -gt 0) {
+                [void]$builder.Append(('\' * (($backslashes * 2) + 1)))
+            } else {
+                [void]$builder.Append('\')
+            }
+            [void]$builder.Append('"')
+            $backslashes = 0
+            continue
+        }
+        if ($backslashes -gt 0) {
+            [void]$builder.Append(('\' * $backslashes))
+            $backslashes = 0
+        }
+        [void]$builder.Append($character)
+    }
+    if ($backslashes -gt 0) {
+        [void]$builder.Append(('\' * ($backslashes * 2)))
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
 $source = (Resolve-Path -LiteralPath $SourceIso).Path
 $output = [System.IO.Path]::GetFullPath($OutputIso)
 $work = [System.IO.Path]::GetFullPath($Workspace)
@@ -49,9 +83,15 @@ try {
     if (-not (Test-Path -LiteralPath $biosBoot -PathType Leaf)) { throw "BIOS boot image missing; refusing to guess boot flags." }
     if (-not (Test-Path -LiteralPath $uefiBoot -PathType Leaf)) { throw "UEFI boot image missing; refusing to guess boot flags." }
     $bootData = '-bootdata:2#p0,e,b"' + $biosBoot + '"#pEF,e,b"' + $uefiBoot + '"'
-    $arguments = @("-m", "-o", "-u2", "-udfver102", $bootData, ('"' + $files + '"'), ('"' + $output + '"'))
+    # Start-Process joins ArgumentList into one Windows command line. Quote each
+    # argument using Windows CRT rules so spaces and the nested quotes required by
+    # oscdimg's -bootdata value survive intact under Windows PowerShell 5.1.
+    $arguments = @("-m", "-o", "-u2", "-udfver102", $bootData, $files, $output)
+    $argumentLine = (($arguments | ForEach-Object {
+        ConvertTo-WindowsCommandLineArgument -Argument ([string]$_)
+    }) -join " ")
     $started = Get-Date
-    $process = Start-Process -FilePath $oscdimg -ArgumentList ($arguments -join " ") -Wait -PassThru -NoNewWindow -RedirectStandardOutput $log -RedirectStandardError ($log + ".err")
+    $process = Start-Process -FilePath $oscdimg -ArgumentList $argumentLine -Wait -PassThru -NoNewWindow -RedirectStandardOutput $log -RedirectStandardError ($log + ".err")
     if ($process.ExitCode -ne 0) { throw "oscdimg failed with exit code $($process.ExitCode)." }
     if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw "oscdimg returned success but output ISO is missing." }
     $manifest = [ordered]@{
