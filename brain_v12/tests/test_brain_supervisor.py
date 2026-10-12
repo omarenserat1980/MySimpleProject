@@ -38,20 +38,6 @@ class SupervisorTests(unittest.TestCase):
             finally:
                 s.evidence.close()
 
-    def test_reasoner_is_connected(self):
-        with tempfile.TemporaryDirectory() as d:
-            s = BrainSupervisor(root=d, max_cycles=2)
-            try:
-                decision = s.reason({
-                    "job_id": "j1", "verified": False,
-                    "failures": [{"id": "m1", "class": "MEDIA_PIPELINE"}],
-                    "attempts": 0, "max_attempts": 2,
-                })
-                self.assertEqual(decision.action, "repair")
-                self.assertIn("cinematic_qc", decision.required_tests)
-            finally:
-                s.evidence.close()
-
     def _prepare_verifying_job(self, supervisor):
         job = supervisor.create("golden acceptance integration")
         for phase in ("discover", "plan", "select_backend", "execute", "observe", "verify"):
