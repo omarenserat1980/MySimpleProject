@@ -89,7 +89,7 @@ class MachineManifestTests(unittest.TestCase):
                                       peak_power_watts=100)
             hot1 = model.update(1.0, 30.0, power_watts=100)
             hot2 = model.update(1.0, 10.0, power_watts=100)
-            cool = model.update(0.0, 60.0, power_watts=0)
+            cool = model.update(0.0, 120.0, power_watts=0)
             return hot1, hot2, cool
         first = run()
         second = run()
