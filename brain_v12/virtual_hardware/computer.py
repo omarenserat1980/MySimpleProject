@@ -18,9 +18,10 @@ class VirtualComputer:
     storage_size: int = 1024*1024
     gpu_width: int = 320
     gpu_height: int = 200
+    cpu_profile: str = "brainvm-baseline"
 
     def __post_init__(self):
-        self.cpu=VirtualCPU()
+        self.cpu=VirtualCPU(profile_name=self.cpu_profile)
         self.ram=VirtualRAM(self.ram_size)
         self.bus=VirtualBus()
         self.storage=VirtualStorage(self.storage_size)
@@ -81,7 +82,8 @@ class VirtualComputer:
                 "bootloader":self.bootloader.VERSION,
                 "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
-                "cpu":{"pc":self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted},
+                "cpu":{"pc":self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,
+                       "profile":self.cpu.profile_name,"fidelity":self.cpu.fidelity_metadata()},
                 "ram":{"size":self.ram.size},"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":{"mac":self.nic.mac},"gpu":{"width":self.gpu.width,"height":self.gpu.height}}
