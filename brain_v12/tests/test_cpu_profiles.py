@@ -4,6 +4,8 @@ import unittest
 
 from brain_v12.virtual_hardware.cpu_profiles import get_cpu_profile, list_cpu_profiles
 from brain_v12.virtual_hardware.x86_64 import X86_64CPU, X86UnsupportedInstruction
+from brain_v12.virtual_hardware.computer import VirtualComputer
+from brain_v12.blade_server import BladeChassis, BladeScheduler
 
 
 class CPUProfileTests(unittest.TestCase):
@@ -78,6 +80,28 @@ class CPUProfileTests(unittest.TestCase):
         cpu = X86_64CPU()
         with self.assertRaisesRegex(RuntimeError, "X86_BAD_REGISTER"):
             cpu.step([("MOVI", "CR0", 1)])
+
+    def test_virtual_computer_selects_cpu_profile_and_reports_manifest(self):
+        computer = VirtualComputer("profiled", ram_size=64, cpu_profile_id="intel-core-i7-6700")
+        computer.power_on()
+        result = computer.execute([("MOVI", "RAX", 9), ("HLT",)])
+        self.assertEqual(result["registers"]["RAX"], 9)
+        manifest = computer.hardware_manifest()
+        cpu_profile = next(item for item in manifest["components"] if item["category"] == "cpu")
+        self.assertEqual(cpu_profile["profile_id"], "intel-core-i7-6700")
+        self.assertEqual(cpu_profile["fidelity"], "functional")
+        self.assertIn("binary x86 instruction-byte decoding", cpu_profile["unsupported_features"])
+        self.assertEqual(computer.status()["cpu"]["profile_id"], "intel-core-i7-6700")
+
+    def test_profiled_cpu_runs_through_existing_blade_scheduler(self):
+        chassis = BladeChassis("cpu-profile-test")
+        blade = chassis.create_blade(cpu_profile_id="amd-ryzen-5-5600")
+        blade.power_on()
+        scheduler = BladeScheduler(chassis)
+        result = scheduler.dispatch([("MOVI", "RAX", 17), ("HLT",)])
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["result"]["result"]["registers"]["RAX"], 17)
+        self.assertEqual(result["result"]["result"]["profile"]["profile_id"], "amd-ryzen-5-5600")
 
     def test_interrupts_are_reported_as_queued_not_falsely_delivered(self):
         cpu = X86_64CPU()
