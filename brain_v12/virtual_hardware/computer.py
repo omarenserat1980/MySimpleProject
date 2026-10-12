@@ -19,6 +19,7 @@ from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
 from .bootloader import VirtualBootloader
+from .extended_devices import VirtualPeripheralFabric
 from ..brain.self_trust_boot_gate import BootGateEvidence, evaluate
 
 @dataclass
@@ -64,6 +65,8 @@ class VirtualComputer:
         self.boot_record=None
         self.power_thermal=PowerThermalModel()
         self._checkpoint_resume=False
+        # Extended peripherals are software-only; they never bind host devices.
+        self.peripherals = VirtualPeripheralFabric()
 
     def validate_configuration(self) -> dict:
         manifest = self.hardware_manifest()
@@ -485,7 +488,23 @@ class VirtualComputer:
             units={"ambient_c": "degC", "thermal_capacity_j_per_c": "J/degC",
                    "cooling_w_per_c": "W/degC", "throttle_c": "degC", "shutdown_c": "degC"},
         ))
-        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal")
+        profiles.append(HardwareProfile(
+            "brain-extended-peripherals-v1", "peripherals", "Brain software-only extended peripheral fabric",
+            FidelityLevel.FUNCTIONAL,
+            {"device_families": list(self.peripherals.inventory()["devices"]),
+             "external_network_enabled": False, "host_hardware_required": False},
+            ("TPM-like measurements", "USB port enumeration", "serial console", "watchdog state machine",
+             "deterministic test RNG", "isolated modem state machine", "BMC telemetry", "software IOMMU allow-list",
+             "logical RAID health", "battery estimates", "input events", "audio frame accounting", "sensor estimates"),
+            ("hardware-backed TPM attestation", "cryptographic entropy", "physical cellular radio",
+             "physical IOMMU enforcement", "persistent RAID data/rebuild", "physical USB/audio/input"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/extended-peripherals-v1",
+                                 "Software-only state models; no physical device or vendor firmware is executed."),),
+            ("test_inventory_is_broad_and_explicitly_software_only",
+             "test_modem_never_transmits_externally", "test_iommu_allow_list_blocks_unmapped_regions"),
+        ))
+        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal", "peripherals")
         return MachineManifest(self.name, 2, tuple(profiles), required_categories=required).describe()
 
     def status(self):
@@ -499,6 +518,6 @@ class VirtualComputer:
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status(),
                 "storage_telemetry":self.storage.smart_telemetry(),
-                "power_thermal":self.power_thermal.status(),
+                "power_thermal":self.power_thermal.status(),"peripherals":self.peripherals.status(),
                 "machine_manifest_validation":self.hardware_manifest()["validation"],
                 "configuration_validation":self.validate_configuration()}
