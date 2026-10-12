@@ -63,113 +63,65 @@ class ExecutionPlan:
 
 
 def default_fleet() -> tuple[DeviceEndpoint, ...]:
-    """Return logical profiles, not claims that devices are currently online."""
+    """Return software-node profiles only; profiles are not proof of liveness."""
     return (
         DeviceEndpoint(
-            endpoint_id="arkan-virtual-01",
-            display_name="Arkan virtual computer",
+            endpoint_id="brain-control-plane-main",
+            display_name="Brain Control Plane API",
+            role=EndpointRole.COMPUTE_HOST,
+            platform="render-fastapi",
+            allowed_workloads=(Workload.AI_INFERENCE, Workload.BUILD_TEST),
+            notes="Serving this request proves API responsiveness only, not worker execution.",
+        ),
+        DeviceEndpoint(
+            endpoint_id="arkan-software-executor",
+            display_name="Arkan Software Executor",
             role=EndpointRole.VIRTUAL_COMPUTER,
-            platform="brain-simulator",
-            allowed_workloads=(Workload.VIRTUAL_SIMULATION,),
-            notes=(
-                "Canonical software-defined identity. Simulator provisioning and a supported "
-                "task must be verified before execution; never alias this identity to a physical host."
-            ),
+            platform="python-software-worker",
+            allowed_workloads=(Workload.VIRTUAL_SIMULATION, Workload.BUILD_TEST),
+            notes="Software-only worker; require authenticated status and actual task-result evidence.",
         ),
         DeviceEndpoint(
-            endpoint_id="redmi3-01",
-            display_name="Redmi Android agent",
-            role=EndpointRole.ANDROID_AGENT,
-            platform="android-termux",
-            allowed_workloads=(Workload.SYNC_BACKUP,),
-            notes="Android missions require fresh authenticated agent evidence.",
-        ),
-        DeviceEndpoint(
-            endpoint_id="realme-pending-identity",
-            display_name="Realme Android endpoint (identity pending)",
-            role=EndpointRole.ANDROID_AGENT,
-            platform="android",
-            allowed_workloads=(Workload.SYNC_BACKUP,),
-            notes="Placeholder only; bind the actual agent ID and model after discovery.",
-        ),
-        DeviceEndpoint(
-            endpoint_id="honda-enp1-2023",
-            display_name="Honda e:NP1 2023 / Honda CONNECT",
-            role=EndpointRole.VEHICLE_CLIENT,
-            platform="vehicle-infotainment",
-            allowed_workloads=(Workload.CAR_COMPANION, Workload.SYNC_BACKUP),
-            notes="Companion/information only; never route vehicle control or safety functions.",
+            endpoint_id="github-actions-runner",
+            display_name="GitHub Actions Hosted Runner",
+            role=EndpointRole.COMPUTE_HOST,
+            platform="github-hosted-runner",
+            allowed_workloads=(Workload.BUILD_TEST,),
+            notes="Ephemeral software runner; require a fresh workflow-run result.",
         ),
     )
 
 
 def build_fleet_status(
-    agent_status: dict,
+    agent_status: dict | None = None,
     virtual_computer_status: dict | None = None,
 ) -> dict:
-    """Join agent heartbeats with live evidence from the software Arkan simulator.
-
-    Device heartbeats alone never verify identity. Arkan's eligibility is based
-    only on its canonical persisted ID, an in-process simulator boot, and a
-    passing bounded symbolic task; it grants simulation capability only.
-    """
-    agents = agent_status.get("agents", []) if isinstance(agent_status, dict) else []
-    ttl = max(5, int(agent_status.get("ttl_seconds", 15))) if isinstance(agent_status, dict) else 15
-    observed = {str(item.get("agent_id", "")): item for item in agents if isinstance(item, dict)}
-    virtual_status = virtual_computer_status if isinstance(virtual_computer_status, dict) else {}
-    arkan_identity_verified = (
-        virtual_status.get("exists") is True
-        and virtual_status.get("device_id") == "arkan-virtual-01"
-        and virtual_status.get("identity_independent_of_host") is True
-    )
-    runtime_status = virtual_status.get("runtime_status", {})
-    booted = (
-        virtual_status.get("runtime_loaded") is True
-        and virtual_status.get("simulator_booted") is True
-        and isinstance(runtime_status, dict)
-        and runtime_status.get("powered") is True
-    )
-    task_evidence = virtual_status.get("task_execution_evidence", {})
-    task_passed = isinstance(task_evidence, dict) and task_evidence.get("status") == "PASS"
-    arkan_ready = arkan_identity_verified and booted and task_passed
-
+    """Report software-node indicators only; legacy hardware inputs are ignored."""
     rows = []
     for endpoint in default_fleet():
-        if endpoint.endpoint_id == "arkan-virtual-01":
-            if arkan_ready:
-                observed_state = "SIMULATION_READY"
-            elif virtual_status.get("exists") is True:
-                observed_state = "CONFIGURED_NOT_RUNNING" if not booted else "DEGRADED"
-            else:
-                observed_state = "NOT_PROVISIONED"
-            rows.append({
-                **endpoint.public(),
-                "observed_state": observed_state,
-                "heartbeat_age_seconds": None,
-                "heartbeat_ttl_seconds": None,
-                "identity_verified": arkan_identity_verified,
-                "execution_eligible": arkan_ready,
-                "readiness": "SIMULATION_READY" if arkan_ready else observed_state,
-                "native_os_boot_verified": False,
-                "supported_execution": ["bounded_symbolic_virtual_simulation"] if arkan_ready else [],
-            })
-            continue
-
-        heartbeat = observed.get(endpoint.endpoint_id)
-        age = heartbeat.get("age_seconds") if heartbeat else None
-        is_online = bool(heartbeat and heartbeat.get("online") and age is not None and float(age) <= ttl)
+        if endpoint.endpoint_id == "brain-control-plane-main":
+            state, evidence = "SERVING_STATUS_REQUEST", "current_http_request"
+        elif endpoint.endpoint_id == "arkan-software-executor":
+            state, evidence = "NOT_PROBED", "authenticated_executor_status_required"
+        else:
+            state, evidence = "NO_FRESH_RUN_EVIDENCE", "github_workflow_run_required"
         rows.append({
             **endpoint.public(),
-            "observed_state": "ONLINE" if is_online else ("STALE" if heartbeat else "NOT_OBSERVED"),
-            "heartbeat_age_seconds": age,
-            "heartbeat_ttl_seconds": ttl,
-            "identity_verified": False,
+            "observed_state": state,
+            "readiness": state,
+            "status_evidence": evidence,
+            "heartbeat_age_seconds": None,
+            "heartbeat_ttl_seconds": None,
+            "identity_verified": endpoint.endpoint_id == "brain-control-plane-main",
             "execution_eligible": False,
         })
     return {
         "ok": True,
-        "status": "OBSERVED_NOT_EXECUTION_READY",
-        "source": "device_bridge.agent_status+arkan_virtual_runtime",
+        "mode": "software-only",
+        "status": "SOFTWARE_NODES_ONLY",
+        "source": "software_node_status",
+        "hardware_indicators_enabled": False,
+        "hardware_nodes": [],
         "fleet": rows,
         "cloud": {
             "status": "NOT_PROBED",
@@ -178,9 +130,9 @@ def build_fleet_status(
             "paid_provisioning_allowed": False,
         },
         "notes": [
-            "Heartbeat proves recent contact only, not unique hardware identity.",
-            "No cloud resources are created by this status endpoint.",
-            "Honda is an information/companion endpoint, not a compute executor.",
+            "Physical hardware, Android, Termux, vehicle and host indicators are excluded.",
+            "A software-node profile is not proof of a running worker.",
+            "Execution eligibility remains false until an actual task result is independently verified.",
         ],
     }
 
