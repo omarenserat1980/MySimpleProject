@@ -236,7 +236,9 @@ class VirtualNIC:
         if self.queue_depth < 1:
             raise ValueError("VNIC_QUEUE_DEPTH_INVALID")
         self.interrupt_moderation_packets = max(1, int(interrupt_moderation_packets))
-        self.external_network_enabled = bool(external_network_enabled)
+        if external_network_enabled:
+            raise RuntimeError("VNIC_EXTERNAL_NETWORK_ADAPTER_NOT_IMPLEMENTED")
+        self.external_network_enabled = False
         self.link_up = True
         self.rx = []
         self.tx = []
