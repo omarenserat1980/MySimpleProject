@@ -2,7 +2,7 @@
 # Device-independent Electronic Brain runtime entrypoint.
 # This starts Brain from the checked-out source and persistent runtime state.
 # It intentionally does not inspect hardware, require an agent ID/key, contact
-# GitHub to synchronize source, or start/require any emulator or remote device.
+# GitHub to synchronize source, or provision any external worker.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
