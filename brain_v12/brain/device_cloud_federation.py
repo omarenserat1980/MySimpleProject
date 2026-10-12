@@ -13,6 +13,9 @@ from typing import Iterable
 
 
 class EndpointRole(str, Enum):
+    SOFTWARE_WORKER = "software_worker"
+    CONTROL_PLANE = "control_plane"
+    CI_RUNNER = "ci_runner"
     COMPUTE_HOST = "compute_host"
     VIRTUAL_COMPUTER = "virtual_computer"
     ANDROID_AGENT = "android_agent"
@@ -68,7 +71,7 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
         DeviceEndpoint(
             endpoint_id="brain-control-plane-main",
             display_name="Brain Control Plane API",
-            role=EndpointRole.COMPUTE_HOST,
+            role=EndpointRole.CONTROL_PLANE,
             platform="render-fastapi",
             allowed_workloads=(Workload.AI_INFERENCE, Workload.BUILD_TEST),
             notes="Serving this request proves API responsiveness only, not worker execution.",
@@ -76,7 +79,7 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
         DeviceEndpoint(
             endpoint_id="arkan-software-executor",
             display_name="Arkan Software Executor",
-            role=EndpointRole.VIRTUAL_COMPUTER,
+            role=EndpointRole.SOFTWARE_WORKER,
             platform="python-software-worker",
             allowed_workloads=(Workload.VIRTUAL_SIMULATION, Workload.BUILD_TEST),
             notes="Software-only worker; require authenticated status and actual task-result evidence.",
@@ -84,7 +87,7 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
         DeviceEndpoint(
             endpoint_id="github-actions-runner",
             display_name="GitHub Actions Hosted Runner",
-            role=EndpointRole.COMPUTE_HOST,
+            role=EndpointRole.CI_RUNNER,
             platform="github-hosted-runner",
             allowed_workloads=(Workload.BUILD_TEST,),
             notes="Ephemeral software runner; require a fresh workflow-run result.",
@@ -153,7 +156,7 @@ def plan_execution(
     endpoints = tuple(default_fleet() if endpoints is None else endpoints)
 
     for endpoint in endpoints:
-        if endpoint.role == EndpointRole.VEHICLE_CLIENT and workload != Workload.CAR_COMPANION:
+        if endpoint.role not in {EndpointRole.SOFTWARE_WORKER, EndpointRole.CI_RUNNER}:
             continue
         if workload not in endpoint.allowed_workloads:
             continue
