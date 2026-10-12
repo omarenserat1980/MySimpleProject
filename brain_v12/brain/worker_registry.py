@@ -1,8 +1,7 @@
-"""Software-first worker registry for Brain routing.
+"""Software-only worker registry for Brain routing.
 
-Software workers are the default execution resources. Physical-device agents are
-an explicitly enabled compatibility adapter and never a startup requirement.
-Availability is reported only from a valid lease or a fresh device heartbeat.
+Only software workers may be registered or routed. Physical-device and Termux
+agents are intentionally disabled; the legacy constructor flag is ignored.
 """
 from __future__ import annotations
 from dataclasses import dataclass, asdict
@@ -28,19 +27,23 @@ class WorkerRegistry:
         *,
         include_device_adapters: bool = False,
     ):
-        self.device_bridge = device_bridge
+        # Compatibility arguments remain accepted but are never activated.
+        self.device_bridge = None
         self.ttl_seconds = max(5, int(ttl_seconds))
-        self.include_device_adapters = bool(include_device_adapters)
+        self.include_device_adapters = False
         self._workers = {}
 
     def register(self, worker_id, kind, capabilities=(), lease_seconds=30, now=None):
         worker_id = str(worker_id).strip()
         if not worker_id:
             raise ValueError("WORKER_ID_REQUIRED")
+        kind = str(kind).strip().lower()
+        if kind in {"device", "physical", "termux", "android", "hardware"}:
+            raise ValueError("PHYSICAL_DEVICE_WORKERS_DISABLED")
         now = time.time() if now is None else float(now)
         lease = max(5, int(lease_seconds))
         rec = WorkerRecord(
-            worker_id, str(kind), frozenset(str(c) for c in capabilities),
+            worker_id, kind, frozenset(str(c) for c in capabilities),
             True, now, now + lease,
         )
         self._workers[worker_id] = rec
@@ -56,37 +59,25 @@ class WorkerRegistry:
         return self.register(worker_id, kind, caps, lease_seconds, now)
 
     def _device_workers(self, now):
-        if not self.include_device_adapters or not self.device_bridge:
-            return []
-        out = []
-        try:
-            agents = self.device_bridge.agent_status().get("agents", [])
-        except Exception:
-            # An optional adapter failure must never break the software registry.
-            return out
-        for item in agents:
-            if item.get("online") and item.get("agent_id"):
-                out.append(WorkerTarget(
-                    str(item["agent_id"]), "device",
-                    frozenset({"device", "termux"}), True,
-                ))
-        return out
+        # Deliberately no hardware/Termux discovery in software-only mode.
+        return []
 
     def targets(self, now=None):
         now = time.time() if now is None else float(now)
-        out = []
-        for rec in self._workers.values():
-            online = rec.online and rec.lease_until >= now
-            out.append(WorkerTarget(rec.worker_id, rec.kind, rec.capabilities, online))
-        out.extend(self._device_workers(now))
-        return out
+        return [
+            WorkerTarget(
+                rec.worker_id, rec.kind, rec.capabilities,
+                rec.online and rec.lease_until >= now,
+            )
+            for rec in self._workers.values()
+        ]
 
     def snapshot(self, now=None):
         now = time.time() if now is None else float(now)
         return {
             "ok": True,
-            "mode": "software-first",
-            "device_adapters_enabled": self.include_device_adapters,
+            "mode": "software-only",
+            "device_adapters_enabled": False,
             "workers": [
                 {
                     "worker_id": w.worker_id,
@@ -98,7 +89,7 @@ class WorkerRegistry:
                 }
                 for w in self._workers.values()
             ],
-            "device_workers": [asdict(x) for x in self._device_records(now)],
+            "device_workers": [],
             "targets": [
                 {
                     "worker_id": x.worker_id,
@@ -111,10 +102,7 @@ class WorkerRegistry:
         }
 
     def _device_records(self, now):
-        return [
-            WorkerRecord(x.worker_id, x.kind, x.capabilities, x.online, now, now + self.ttl_seconds)
-            for x in self._device_workers(now)
-        ]
+        return []
 
     def unregister(self, worker_id):
         self._workers.pop(worker_id, None)
