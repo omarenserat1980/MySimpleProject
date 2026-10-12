@@ -24,3 +24,26 @@ def test_revenue_endpoint_requires_proof():
         "proof_ref": ""
     })
     assert r.status_code == 422
+
+
+def test_revenue_endpoint_does_not_claim_payment_verified():
+    r = client.post("/api/economics/revenue/verify", json={
+        "evidence_id": "e-1", "opportunity_id": "opp-1", "amount": 20,
+        "currency": "USD", "received_at": "2026-10-08T01:00:00Z",
+        "proof_ref": "receipt://reference-only"
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "EVIDENCE_FORMAT_VALIDATED_NOT_PAYMENT_VERIFIED"
+    assert body["revenue_claimed"] is False
+    assert body["side_effects"] is False
+    assert "no independent" in body["verification_scope"]
+
+
+def test_revenue_endpoint_rejects_blank_evidence_identity():
+    r = client.post("/api/economics/revenue/verify", json={
+        "evidence_id": " ", "opportunity_id": "opp-1", "amount": 20,
+        "currency": "USD", "received_at": "2026-10-08T01:00:00Z",
+        "proof_ref": "receipt://reference-only"
+    })
+    assert r.status_code == 422
