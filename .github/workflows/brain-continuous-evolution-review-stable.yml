@@ -22,7 +22,7 @@ permissions:
 # GitHub permits one running and one pending run for this group; a newer
 # pending run replaces the older pending run, so the queue stays bounded.
 concurrency:
-  group: brain-continuous-evolution-stable
+  group: brain-continuous-evolution-stable-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
