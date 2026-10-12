@@ -102,13 +102,13 @@ try {
     $outputVolume = $outputMounted | Get-Volume | Where-Object DriveLetter | Select-Object -First 1
     if (-not $outputVolume) { throw "Rebuilt ISO has no accessible drive letter." }
     $outputRoot = "$($outputVolume.DriveLetter):\"
-    foreach ($relative in @("efi\\boot\\bootx64.efi", "sources\\boot.wim", "boot\\etfsboot.com", "efi\\microsoft\\boot\\efisys.bin")) {
+    foreach ($relative in @("efi\boot\bootx64.efi", "sources\boot.wim", "boot\etfsboot.com", "efi\microsoft\boot\efisys.bin")) {
         if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $relative) -PathType Leaf)) {
             throw "Rebuilt ISO is missing required boot/setup file: $relative"
         }
     }
-    if (-not ((Test-Path -LiteralPath (Join-Path $outputRoot "sources\\install.wim") -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $outputRoot "sources\\install.esd") -PathType Leaf))) {
-        throw "Rebuilt ISO is missing sources\\install.wim and sources\\install.esd."
+    if (-not ((Test-Path -LiteralPath (Join-Path $outputRoot "sources\install.wim") -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $outputRoot "sources\install.esd") -PathType Leaf))) {
+        throw "Rebuilt ISO is missing sources\install.wim and sources\install.esd."
     }
     Dismount-DiskImage -ImagePath $output -ErrorAction Stop | Out-Null
     $outputMounted = $null
