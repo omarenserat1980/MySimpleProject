@@ -28,6 +28,9 @@ class DesktopCommanderEmulator:
         self._lock=threading.RLock()
         self._processes:dict[str,subprocess.Popen[str]]={}
         self._process_started:dict[str,float]={}
+        self._process_locks:dict[str,threading.RLock]={}
+        self._process_timers:dict[str,threading.Timer]={}
+        self._process_results:dict[str,dict[str,Any]]={}
         self._audit_path=self.root/".brain"/"audit.jsonl"
         self._audit_path.parent.mkdir(parents=True,exist_ok=True)
 
@@ -107,48 +110,79 @@ class DesktopCommanderEmulator:
         with self._lock:
             self._processes[pid]=proc
             self._process_started[pid]=time.monotonic()
+            self._process_locks[pid]=threading.RLock()
+            timer=threading.Timer(self.policy.command_timeout_seconds,self._expire_process,args=(pid,))
+            timer.daemon=True
+            self._process_timers[pid]=timer
+            timer.start()
         self._audit("start_process",{"process_id":pid,"command":args,"cwd":cwd,
                                      "reality":"SIMULATED","timeout_seconds":self.policy.command_timeout_seconds})
         return {"ok":True,"process_id":pid,"pid":proc.pid,"status":"RUNNING","reality":"SIMULATED"}
 
-    def read_process_output(self,process_id:str,timeout:float=0.2)->dict[str,Any]:
-        with self._lock: proc=self._processes.get(process_id)
-        if proc is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
+    def _expire_process(self,process_id:str)->None:
+        """Enforce the deadline even when no client polls for process output."""
         with self._lock:
-            started=self._process_started.get(process_id,time.monotonic())
-        remaining=self.policy.command_timeout_seconds-(time.monotonic()-started)
-        if remaining <= 0:
-            proc.kill()
-            out,_=proc.communicate()
-            self._forget_process(process_id)
-            self._audit("process_timeout",{"process_id":process_id,"timeout_seconds":self.policy.command_timeout_seconds})
-            output=out or ""
-            return {"ok":False,"status":"TIMED_OUT","process_id":process_id,
-                    "returncode":proc.returncode,"output":output[:self.policy.max_output_bytes],
-                    "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
-        try:
-            out,_=proc.communicate(timeout=min(max(0.0,timeout),remaining))
-        except subprocess.TimeoutExpired:
-            if time.monotonic()-started >= self.policy.command_timeout_seconds:
+            process_lock=self._process_locks.get(process_id)
+        if process_lock is None:
+            return
+        with process_lock:
+            with self._lock:
+                proc=self._processes.get(process_id)
+                started=self._process_started.get(process_id)
+            if proc is None or started is None:
+                return
+            if proc.poll() is None:
                 proc.kill()
-                out,_=proc.communicate()
-                self._forget_process(process_id)
-                self._audit("process_timeout",{"process_id":process_id,"timeout_seconds":self.policy.command_timeout_seconds})
-                output=out or ""
-                return {"ok":False,"status":"TIMED_OUT","process_id":process_id,
-                        "returncode":proc.returncode,"output":output[:self.policy.max_output_bytes],
-                        "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
-            return {"ok":True,"status":"RUNNING","process_id":process_id,"reality":"SIMULATED"}
-        self._forget_process(process_id)
-        output=out or ""
-        return {"ok":True,"status":"COMPLETED","process_id":process_id,"returncode":proc.returncode,
-                "output":output[:self.policy.max_output_bytes],
-                "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
+            output,_=proc.communicate()
+            text_output=output or ""
+            result={"ok":False,"status":"TIMED_OUT","process_id":process_id,
+                    "returncode":proc.returncode,"output":text_output[:self.policy.max_output_bytes],
+                    "truncated":len(text_output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
+            self._forget_process(process_id)
+            with self._lock:
+                self._process_results[process_id]=result
+            self._audit("process_timeout",{"process_id":process_id,
+                                           "timeout_seconds":self.policy.command_timeout_seconds,
+                                           "enforced_by_watchdog":True})
+
+    def read_process_output(self,process_id:str,timeout:float=0.2)->dict[str,Any]:
+        with self._lock:
+            proc=self._processes.get(process_id)
+            process_lock=self._process_locks.get(process_id)
+            if proc is None:
+                return self._process_results.pop(process_id,{"ok":False,"status":"PROCESS_NOT_FOUND"})
+        with process_lock:
+            with self._lock:
+                if self._processes.get(process_id) is not proc:
+                    return self._process_results.pop(process_id,{"ok":False,"status":"PROCESS_NOT_FOUND"})
+                started=self._process_started[process_id]
+            remaining=self.policy.command_timeout_seconds-(time.monotonic()-started)
+            if remaining <= 0:
+                self._expire_process(process_id)
+                with self._lock:
+                    return self._process_results.pop(process_id,{"ok":False,"status":"PROCESS_NOT_FOUND"})
+            try:
+                out,_=proc.communicate(timeout=min(max(0.0,timeout),remaining))
+            except subprocess.TimeoutExpired:
+                if time.monotonic()-started >= self.policy.command_timeout_seconds:
+                    self._expire_process(process_id)
+                    with self._lock:
+                        return self._process_results.pop(process_id,{"ok":False,"status":"PROCESS_NOT_FOUND"})
+                return {"ok":True,"status":"RUNNING","process_id":process_id,"reality":"SIMULATED"}
+            self._forget_process(process_id)
+            output=out or ""
+            return {"ok":True,"status":"COMPLETED","process_id":process_id,"returncode":proc.returncode,
+                    "output":output[:self.policy.max_output_bytes],
+                    "truncated":len(output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
 
     def _forget_process(self,process_id:str)->None:
         with self._lock:
             self._processes.pop(process_id,None)
             self._process_started.pop(process_id,None)
+            self._process_locks.pop(process_id,None)
+            timer=self._process_timers.pop(process_id,None)
+            if timer is not None and timer is not threading.current_thread():
+                timer.cancel()
 
     def stop_process(self,process_id:str)->dict[str,Any]:
         """Stop a sandbox process and reap it so it cannot leak in the emulator registry."""
