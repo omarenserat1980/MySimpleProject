@@ -6,12 +6,14 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from .app import app as brain_app
-from .app import brain_ai, device_bridge, store
+from .app import brain_ai, chat_session_store, device_bridge, store
 from .brain.brain_mcp import build_mcp_router
 
 
-# Wrapper entrypoint: preserves the existing Brain app and adds /mcp.
-brain_app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+# Wrapper entrypoint: preserve the existing Brain app and add MCP Apps resources.
+brain_app.include_router(
+    build_mcp_router(brain_ai, device_bridge, store, chat_sessions=chat_session_store)
+)
 
 
 @brain_app.middleware("http")
