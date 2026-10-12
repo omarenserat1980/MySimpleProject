@@ -103,19 +103,58 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
     )
 
 
-def build_fleet_status(agent_status: dict) -> dict:
-    """Join logical fleet profiles to observed Agent Gateway heartbeats.
+def build_fleet_status(
+    agent_status: dict,
+    virtual_computer_status: dict | None = None,
+) -> dict:
+    """Join agent heartbeats with live evidence from the software Arkan simulator.
 
-    A heartbeat is liveness evidence, not a unique device identity proof.
-    Consequently this read-only view never marks an endpoint identity-verified
-    or eligible for execution. Cloud capacity and free entitlement are likewise
-    left unverified until provider-specific evidence is supplied.
+    Device heartbeats alone never verify identity. Arkan's eligibility is based
+    only on its canonical persisted ID, an in-process simulator boot, and a
+    passing bounded symbolic task; it grants simulation capability only.
     """
     agents = agent_status.get("agents", []) if isinstance(agent_status, dict) else []
     ttl = max(5, int(agent_status.get("ttl_seconds", 15))) if isinstance(agent_status, dict) else 15
     observed = {str(item.get("agent_id", "")): item for item in agents if isinstance(item, dict)}
+    virtual_status = virtual_computer_status if isinstance(virtual_computer_status, dict) else {}
+    arkan_identity_verified = (
+        virtual_status.get("exists") is True
+        and virtual_status.get("device_id") == "arkan-virtual-01"
+        and virtual_status.get("host_dependencies_for_identity") is False
+    )
+    runtime_status = virtual_status.get("runtime_status", {})
+    booted = (
+        virtual_status.get("runtime_loaded") is True
+        and virtual_status.get("simulator_booted") is True
+        and isinstance(runtime_status, dict)
+        and runtime_status.get("powered") is True
+    )
+    task_evidence = virtual_status.get("task_execution_evidence", {})
+    task_passed = isinstance(task_evidence, dict) and task_evidence.get("status") == "PASS"
+    arkan_ready = arkan_identity_verified and booted and task_passed
+
     rows = []
     for endpoint in default_fleet():
+        if endpoint.endpoint_id == "arkan-virtual-01":
+            if arkan_ready:
+                observed_state = "SIMULATION_READY"
+            elif virtual_status.get("exists") is True:
+                observed_state = "CONFIGURED_NOT_RUNNING" if not booted else "DEGRADED"
+            else:
+                observed_state = "NOT_PROVISIONED"
+            rows.append({
+                **endpoint.public(),
+                "observed_state": observed_state,
+                "heartbeat_age_seconds": None,
+                "heartbeat_ttl_seconds": None,
+                "identity_verified": arkan_identity_verified,
+                "execution_eligible": arkan_ready,
+                "readiness": "SIMULATION_READY" if arkan_ready else observed_state,
+                "native_os_boot_verified": False,
+                "supported_execution": ["bounded_symbolic_virtual_simulation"] if arkan_ready else [],
+            })
+            continue
+
         heartbeat = observed.get(endpoint.endpoint_id)
         age = heartbeat.get("age_seconds") if heartbeat else None
         is_online = bool(heartbeat and heartbeat.get("online") and age is not None and float(age) <= ttl)
@@ -130,7 +169,7 @@ def build_fleet_status(agent_status: dict) -> dict:
     return {
         "ok": True,
         "status": "OBSERVED_NOT_EXECUTION_READY",
-        "source": "device_bridge.agent_status",
+        "source": "device_bridge.agent_status+arkan_virtual_runtime",
         "fleet": rows,
         "cloud": {
             "status": "NOT_PROBED",
