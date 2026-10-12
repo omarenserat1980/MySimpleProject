@@ -90,3 +90,10 @@ A successful acceptance record must point to the same workflow run and include:
 ## Change-control boundary
 
 The related hardening work is tracked in PR #226 and remains subject to owner review. Do not merge it automatically. No Windows Server 2025 boot is claimed until the acceptance evidence above exists.
+
+
+### 5. Arkan host-capacity gate
+
+The workflow now runs `brain_v12/tools/arkan_windows_server_2025_preflight.py` after verifying the signed execution contract and before downloading the ISO. It requires the canonical `arkan-virtual-01` identity, Linux x86-64, at least 2 logical CPUs, 4 GiB total RAM, 3 GiB available RAM, 25 GiB free workspace storage, read/write `/dev/kvm`, QEMU/QEMU-img, OVMF, ISO/WIM/FAT tools, and a passing signed-contract gate. It emits `arkan-windows-server-2025-readiness.json` and blocks before media download if any prerequisite fails.
+
+This gate is read-only and is not boot evidence. The workflow still requires guest-written boot evidence, the installed-disk boot marker, and the independent completion/proof gates. The modeled Arkan CPU/RAM/storage profile cannot substitute for a live KVM-capable host. Do not dispatch until a suitably sized authorized runner and all protected environment prerequisites are available.
