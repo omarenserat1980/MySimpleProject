@@ -1,23 +1,23 @@
-name: Brain Internal Runtime - GitHub Control Plane
+name: Brain Hosted Software Runtime - GitHub Control Plane
 
 on:
   workflow_call:
     inputs:
       task:
-        description: "Brain task to execute on the Brain-owned internal runner"
+        description: "Allowlisted software task; supervisor is simulation-only"
         required: false
         default: "health"
         type: string
   workflow_dispatch:
     inputs:
       task:
-        description: "Brain task to execute on the Brain-owned internal runner"
+        description: "Allowlisted software task"
         required: false
         default: "health"
         type: string
 
 concurrency:
-  group: brain-internal-runtime-${{ github.ref }}
+  group: brain-hosted-software-runtime-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -29,15 +29,15 @@ jobs:
     if: ${{ inputs.task == 'revenue-tests' }}
     uses: ./.github/workflows/brain-revenue-conversion-tests.yml
 
-  brain-internal:
+  brain-software:
     if: ${{ inputs.task != 'revenue-tests' }}
-    name: Brain Internal Runtime
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
-    timeout-minutes: 60
+    name: Brain Allowlisted Software Task
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     env:
-      BRAIN_INTERNAL_RUNNER_FLAG: "1"
-      BRAIN_CLOUD_MODE: brain-internal
-      BRAIN_TASK: health
+      BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE
+      BRAIN_CLOUD_MODE: github-hosted-software
+      BRAIN_TASK: ${{ inputs.task || 'health' }}
       BRAIN_FFMPEG_BIN: ffmpeg
       BRAIN_FFPROBE_BIN: ffprobe
     steps:
@@ -46,86 +46,80 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Fail-closed internal runner preflight
-        run: |
-          set -euo pipefail
-          python -m brain_v12.brain.internal_runner_preflight
-          python - <<'PY'
-          from brain_v12.brain.internal_runner_preflight import verify_and_write
-          evidence = verify_and_write("internal-runner-preflight.json")
-          assert evidence["verified"] is True, evidence
-          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
-          PY
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: brain_v12/requirements.txt
 
-      - name: Resolve Brain task
-        env:
-          WORKFLOW_TASK: ${{ inputs.task }}
+      - name: Verify hosted identity and read-only authority
+        shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY' >> "$GITHUB_ENV"
-          import json, os
-          task = os.environ.get("WORKFLOW_TASK", "").strip()
-          if not task:
-              with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as f:
-                  event = json.load(f)
-              task = (event.get("inputs") or {}).get("task") or "health"
-          print("BRAIN_TASK=" + task)
-          PY
-          echo "BRAIN_TASK=$BRAIN_TASK"
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          test "$RUNNER_OS" = "Linux"
+          echo "BRAIN_EXECUTION_MODE=$BRAIN_EXECUTION_MODE"
+          echo "BRAIN_PHYSICAL_HARDWARE_REQUIRED=false"
+          echo "BRAIN_EXTERNAL_SIDE_EFFECTS=NOT_AUTHORIZED"
 
-      - name: Audit internal runtime
+      - name: Install declared Python dependencies
+        run: python -m pip install --disable-pip-version-check -r brain_v12/requirements.txt
+
+      - name: Install software media tools
         run: |
           set -euo pipefail
-          mkdir -p brain6_artifacts/internal_runtime
-          {
-            echo "state=RUNNER_READY"
-            echo "mode=$BRAIN_CLOUD_MODE"
-            echo "task=$BRAIN_TASK"
-            echo "run_id=$GITHUB_RUN_ID"
-            echo "commit=$GITHUB_SHA"
-            echo "ref=$GITHUB_REF_NAME"
-            echo "os=$RUNNER_OS"
-            echo "arch=$RUNNER_ARCH"
-            echo "runner_name=$RUNNER_NAME"
-            echo "python=$(python --version)"
-            echo "ffmpeg=$(ffmpeg -version | head -n 1)"
-          } | tee brain6_artifacts/internal_runtime/runtime.txt
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
 
       - name: Compile Brain
-        run: |
-          set -euo pipefail
-          python -m compileall -q brain_v12
+        run: python -m compileall -q brain_v12
 
-      - name: Run Brain task
-        run: |
-          set -euo pipefail
-          python brain_v12/ci/brain_runner.py
+      - name: Run allowlisted Brain task
+        run: python brain_v12/ci/brain_runner.py
 
-      - name: Run Brain tests
-        run: |
-          set -euo pipefail
-          PYTHONPATH=. pytest -q brain_v12/tests
+      - name: Run Brain test suite
+        run: PYTHONPATH=. pytest -q brain_v12/tests
 
       - name: Verify unified objective gate
+        run: PYTHONPATH=. python -m unittest brain_v12.tests.test_verification_gate -v
+
+      - name: Write hosted software execution evidence
+        if: success()
+        shell: bash
         run: |
           set -euo pipefail
-          PYTHONPATH=. python -m unittest brain_v12.tests.test_verification_gate -v
+          mkdir -p brain6_artifacts/hosted_software_runtime
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          data = {
+              "state": "VERIFIED_HOSTED_SOFTWARE_EXECUTION",
+              "mode": os.environ["BRAIN_CLOUD_MODE"],
+              "execution_mode": os.environ["BRAIN_EXECUTION_MODE"],
+              "task": os.environ["BRAIN_TASK"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "commit": os.environ["GITHUB_SHA"],
+              "runner_environment": os.environ["RUNNER_ENVIRONMENT"],
+              "runner_os": os.environ["RUNNER_OS"],
+              "runner_arch": os.environ["RUNNER_ARCH"],
+              "github_hosted_runtime": True,
+              "physical_hardware_required": False,
+              "external_side_effects_authorized": False,
+          }
+          Path("brain6_artifacts/hosted_software_runtime/evidence.json").write_text(
+              json.dumps(data, indent=2), encoding="utf-8"
+          )
+          print(json.dumps(data, indent=2))
+          PY
 
-      - name: Write internal execution evidence
-        if: success()
-        run: |
-          set -euo pipefail
-          mkdir -p brain6_artifacts/internal_runtime
-          cat > brain6_artifacts/internal_runtime/evidence.json <<EOF
-          {"state":"VERIFIED_INTERNAL_RUNNER_EXECUTION","mode":"brain-internal","task":"$BRAIN_TASK","run_id":"$GITHUB_RUN_ID","commit":"$GITHUB_SHA","runner_name":"$RUNNER_NAME","github_hosted_runtime":false}
-          EOF
-
-      - name: Upload evidence
-        if: success()
+      - name: Upload hosted software execution evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: brain-internal-runtime-evidence
-          path: |
-            brain6_artifacts/internal_runtime/
-            internal-runner-preflight.json
-          retention-days: 7
+          name: brain-hosted-software-runtime-evidence
+          path: brain6_artifacts/hosted_software_runtime/
+          if-no-files-found: warn
+          retention-days: 14
