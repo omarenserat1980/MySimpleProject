@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .evidence_store import EvidenceStore
+from .signed_golden_verifier import verify_signed_verification
 
 
 @dataclass(frozen=True)
@@ -156,10 +157,42 @@ class GoldenAcceptanceGate:
             and str(item.get("producer", "")) not in producers
             and bool(item.get("producer"))
         ]
+        independent_verified = bool(independent_records)
         if not independent_records:
             reasons.append("INDEPENDENT_VERIFICATION_MISSING")
+        elif expected_reality != "SIMULATED":
+            # Real/remote acceptance requires a cryptographic verifier attestation.
+            # A payload label or different producer string is not sufficient.
+            signed_ok = False
+            signed_errors = []
+            expected_scope = {
+                "task_id": task_id,
+                "mission_id": mission_id,
+                "attempt": attempt,
+                "reality_level": expected_reality,
+                "verified": True,
+                "evidence_ids": [item["evidence_id"] for item in selected],
+                "criterion_ids": [criterion.criterion_id for criterion in criteria],
+            }
+            for item in independent_records:
+                attestation = item["payload"].get("attestation")
+                try:
+                    verified_attestation = verify_signed_verification(
+                        attestation,
+                        replay_db_path=self.evidence.path,
+                        expected=expected_scope,
+                    )
+                    if item.get("producer") != verified_attestation["verifier_id"]:
+                        raise ValueError("GOLDEN_VERIFIER_PRODUCER_MISMATCH")
+                    signed_ok = True
+                    break
+                except (ValueError, TypeError, KeyError) as exc:
+                    signed_errors.append(str(exc))
+            if not signed_ok:
+                reasons.append("SIGNED_INDEPENDENT_ATTESTATION_REQUIRED")
+                reasons.extend("SIGNED_ATTESTATION:" + error for error in signed_errors)
 
-        accepted = not reasons and len(selected) == len(criteria)
+        accepted = not reasons and len(selected) == len(criteria) and independent_verified
         if accepted:
             status = "GOLDEN_LOOP_VERIFIED"
         elif any(reason.endswith("EVIDENCE_INTEGRITY_FAILURE") for reason in reasons):
