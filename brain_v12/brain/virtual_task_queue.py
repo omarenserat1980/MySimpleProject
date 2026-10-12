@@ -93,7 +93,7 @@ class VirtualTaskQueue:
             return None
         if task.requirement.storage_bytes>1024*1024:
             return None
-        capabilities=task.required_capabilities or {"cpu"}
+        capabilities={"cpu","ram","storage","network","gpu"} | set(task.required_capabilities or {"cpu"})
         blade=self.chassis.create_blade(capabilities=capabilities,ram_size=self.virtual_ram_bytes)
         try:
             blade.power_on()
