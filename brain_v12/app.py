@@ -168,7 +168,10 @@ brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
 workload_controller=WorkloadController()
 workload_router=WorkloadRouter(workload_controller)
-worker_registry=WorkerRegistry(device_bridge)
+worker_registry=WorkerRegistry(
+    device_bridge,
+    include_device_adapters=os.getenv("BRAIN_ENABLE_DEVICE_WORKERS", "0").strip() == "1",
+)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))

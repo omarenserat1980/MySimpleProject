@@ -61,3 +61,12 @@ Electronic Brain includes a **draft, owner-reviewed pilot service package** for 
 - [Illustrative sample report](examples/ci-repair-sprint/SAMPLE_REPORT.md)
 
 The proposed USD 49–99 pilot price is indicative only and must be agreed before any work starts. Do not share secrets in logs. Record revenue only after independently verified payment.
+
+
+## Software-only execution nodes
+
+Brain's worker registry now defaults to software nodes. Physical-device/Termux workers are an optional compatibility adapter and are disabled unless `BRAIN_ENABLE_DEVICE_WORKERS=1` is explicitly configured. The registry remains usable when an optional device adapter is absent or fails.
+
+- Contract and limitations: [Software-only nodes](brain_v12/docs/SOFTWARE_ONLY_NODES.md)
+- Focused hosted CI: [Brain Software-Only Node Verification](.github/workflows/brain-software-only-nodes.yml)
+- This is an incremental decoupling step, not a claim that every Brain workload has already migrated or that virtual resources provide unlimited compute.
