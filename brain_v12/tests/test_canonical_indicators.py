@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from brain_v12.brain.canonical_indicators import (
     VerificationLevel,
+    aggregate_indicator_payloads,
     aggregate_required_indicators,
     build_indicator,
     indicators_for_fleet,
@@ -94,6 +95,24 @@ class CanonicalIndicatorTests(unittest.TestCase):
         result = aggregate_required_indicators([])
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertFalse(result["healthy"])
+
+    def test_configured_but_not_running_is_a_health_blocker(self):
+        item = self.make(value="CONFIGURED_NOT_RUNNING")
+        result = aggregate_required_indicators([item])
+        self.assertEqual(item.status, "VERIFIED")
+        self.assertEqual(result["status"], "DEGRADED")
+        self.assertFalse(result["healthy"])
+
+    def test_public_payload_aggregate_reports_health_blockers(self):
+        items = [
+            self.make().public(),
+            self.make(indicator_id="node.phone.readiness", value="PROFILE_REGISTERED_NOT_RUNNING").public(),
+        ]
+        result = aggregate_indicator_payloads(items)
+        self.assertEqual(result["required_count"], 2)
+        self.assertEqual(result["verified_count"], 2)
+        self.assertEqual(result["status"], "DEGRADED")
+        self.assertEqual(result["blockers"][0]["indicator_id"], "node.phone.readiness")
 
     def test_blank_identity_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "INDICATOR_ID_SUBJECT_AND_SOURCE_REQUIRED"):
