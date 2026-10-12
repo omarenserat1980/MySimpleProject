@@ -1,4 +1,4 @@
-""""Brain Virtual Computer hardware layer.
+"""Brain Virtual Computer hardware layer.
 
 Deterministic, inspectable software-defined hardware plus guest-OS contracts.
 """
