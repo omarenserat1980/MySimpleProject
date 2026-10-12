@@ -125,3 +125,13 @@
 - [ ] Track verified profit separately from revenue
 - [ ] Produce a weekly evidence-backed commercial review
 - [ ] Convert validated Brain capabilities into permission-gated customer acquisition workflows
+
+
+## Phase 2.6 — Software-only node foundation
+- [x] Make software workers the default in the existing worker registry
+- [x] Gate physical-device routing behind explicit opt-in configuration
+- [x] Isolate optional device-adapter failures from software worker registration
+- [x] Add focused hardware-independent registry tests and GitHub-hosted CI
+- [ ] Audit all core startup and mandatory CI paths for remaining hardware requirements
+- [ ] Migrate supported workloads to software nodes with durable task-state recovery
+- [ ] Verify remaining specialized workflows and document any non-migrated hardware requirements
