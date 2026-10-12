@@ -54,10 +54,10 @@ class VirtualECCMemoryController:
                 codeword ^= 1 << (syndrome - 1)
             else:
                 return 0, 0, 1
-            corrected = 1
+            corrected = syndrome
         elif syndrome == 0 and overall_mismatch:
             # Only the separate overall-parity bit is wrong; data remains intact.
-            corrected = 1
+            corrected = 72
         elif syndrome and not overall_mismatch:
             return 0, syndrome, 2
         else:
@@ -89,7 +89,7 @@ class VirtualECCMemoryController:
             self.stats["corrected_single_bit_errors"] += 1
             # The decoded data is repaired and re-encoded for subsequent reads.
             self._words[address] = self._encode(data)
-            if codeword != self._encode(data)[0]:
+            if correction in _PARITY_POSITIONS or correction == 72:
                 self.stats["parity_bit_errors"] += 1
         return {"ok": True, "status": "ECC_CORRECTED" if correction else "OK",
                 "address": address, "data": data, "corrected": bool(correction),
