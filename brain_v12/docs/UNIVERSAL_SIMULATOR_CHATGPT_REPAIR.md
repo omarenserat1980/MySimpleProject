@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Electronic Brain's supported simulators share one diagnostic and AI repair-planning service. The service discovers repository evidence for known simulator families, accepts custom simulator registrations, normalizes and redacts error reports, and asks the configured OpenAI-compatible provider for a structured repair proposal.
+Electronic Brain's supported simulators share one diagnostic and AI repair-planning service. The service discovers repository evidence for known simulator families and additional simulator-like Python modules, accepts custom simulator registrations, normalizes and redacts error reports, and asks the configured OpenAI-compatible provider for a structured repair proposal. Automatically discovered code candidates are marked as candidates until they implement and pass adapter conformance tests.
 
 **Registration is not connectivity.** A repository path is discovery evidence only. A registered external service is marked `NOT_PROBED` until an authorized, explicit health probe is implemented and passes. The service does not execute AI-generated scripts or patches.
 
