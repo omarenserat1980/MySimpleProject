@@ -4,17 +4,29 @@ on:
   pull_request:
     paths:
       - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tools/windows_server_install_plan.py"
+      - "brain_v12/tools/windows_official_media_download.py"
       - "brain_v12/tools/rebuild_windows_server_iso.ps1"
       - "brain_v12/tests/test_windows_server_iso_preflight.py"
+      - "brain_v12/tests/test_windows_server_install_plan.py"
+      - "brain_v12/tests/test_windows_official_media_download.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
+      - "docs/WINDOWS_SERVER_2025_INSTALL_PLAN.md"
+      - "docs/WINDOWS_SERVER_2025_OFFICIAL_MEDIA.md"
       - ".github/workflows/windows-iso-preflight.yml"
   push:
     branches: [main]
     paths:
       - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tools/windows_server_install_plan.py"
+      - "brain_v12/tools/windows_official_media_download.py"
       - "brain_v12/tools/rebuild_windows_server_iso.ps1"
       - "brain_v12/tests/test_windows_server_iso_preflight.py"
+      - "brain_v12/tests/test_windows_server_install_plan.py"
+      - "brain_v12/tests/test_windows_official_media_download.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
+      - "docs/WINDOWS_SERVER_2025_INSTALL_PLAN.md"
+      - "docs/WINDOWS_SERVER_2025_OFFICIAL_MEDIA.md"
       - ".github/workflows/windows-iso-preflight.yml"
   workflow_dispatch:
 
@@ -36,8 +48,15 @@ jobs:
           sudo apt-get install -y xorriso
       - name: Run isolated preflight tests
         run: python -m unittest brain_v12.tests.test_windows_server_iso_preflight -v
-      - name: Compile validator
-        run: python -m py_compile brain_v12/tools/windows_server_iso_preflight.py
+      - name: Run safe installation planning tests
+        run: python -m unittest brain_v12.tests.test_windows_server_install_plan -v
+      - name: Run official media download safety tests
+        run: python -m unittest brain_v12.tests.test_windows_official_media_download -v
+      - name: Compile Windows media and install planning tools
+        run: |
+          python -m py_compile brain_v12/tools/windows_server_iso_preflight.py
+          python -m py_compile brain_v12/tools/windows_server_install_plan.py
+          python -m py_compile brain_v12/tools/windows_official_media_download.py
 
   powershell-syntax:
     runs-on: windows-latest
