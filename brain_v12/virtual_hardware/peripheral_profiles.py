@@ -7,6 +7,7 @@ from dataclasses import dataclass
 NVIDIA_T4_SOURCE = "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-t4/t4-tensor-core-product-brief.pdf"
 INTEL_I225_SOURCE = "https://www.intel.com/content/www/us/en/products/sku/184676/intel-ethernet-controller-i225v/specifications.html"
 PCISIG_GEN4_SOURCE = "https://pcisig.com/pci-express-4.0-specification"
+PCISIG_OVERVIEW = "https://pcisig.com/specifications/pciexpress"
 
 
 @dataclass(frozen=True)
@@ -99,7 +100,7 @@ MOTHERBOARD_PROFILES = {
     ),
     "brain-pcie-gen3-x20": MotherboardProfile(
         "brain-pcie-gen3-x20", "Brain synthetic PCIe Gen3 x20 topology",
-        3, 20, 4, PCISIG_GEN4_SOURCE,
+        3, 20, 4, PCISIG_OVERVIEW,
     ),
 }
 
