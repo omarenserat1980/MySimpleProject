@@ -28,7 +28,7 @@ class ConnectionDoctorTests(unittest.TestCase):
     def test_success_requires_all_three_live_probes(self, request_json):
         request_json.side_effect = [
             {"ok": True, "status": 200, "json": {"ok": True}},
-            {"ok": True, "status": 200, "json": {"ok": True, "available": True}},
+            {"ok": True, "status": 200, "json": {"ok": True, "available": True, "provider": {"configured": True}, "model_router": {"providers": ["local"]}}},
             {"ok": True, "status": 200, "json": {"ok": True, "sessions": []}},
         ]
         report = run("https://brain.example.org")
@@ -47,10 +47,24 @@ class ConnectionDoctorTests(unittest.TestCase):
         self.assertEqual(report["blocker"], "ONE_OR_MORE_API_PROBES_FAILED")
 
     @patch("brain_v12.tools.brain_chatgpt_connection_doctor.request_json")
+    def test_no_model_provider_fails_closed(self, request_json):
+        request_json.side_effect = [
+            {"ok": True, "status": 200, "json": {"ok": True}},
+            {"ok": True, "status": 200, "json": {
+                "ok": True, "provider": {"configured": False}, "model_router": {"providers": []}
+            }},
+            {"ok": True, "status": 200, "json": {"ok": True, "sessions": []}},
+        ]
+        report = run("https://brain.example.org")
+        self.assertFalse(report["success"])
+        self.assertEqual(report["blocker"], "ONE_OR_MORE_API_PROBES_FAILED")
+        self.assertEqual(report["checks"]["brain_ai_status"]["error"], "NO_MODEL_PROVIDER_CONFIGURED")
+
+    @patch("brain_v12.tools.brain_chatgpt_connection_doctor.request_json")
     def test_live_chat_test_is_opt_in_and_safe_mode(self, request_json):
         request_json.side_effect = [
             {"ok": True, "status": 200, "json": {"ok": True}},
-            {"ok": True, "status": 200, "json": {"ok": True}},
+            {"ok": True, "status": 200, "json": {"ok": True, "provider": {"configured": True}, "model_router": {"providers": ["local"]}}},
             {"ok": True, "status": 200, "json": {"ok": True, "sessions": []}},
             {"ok": True, "status": 200, "json": {"ok": True, "session": {"id": "s-1"}}},
             {"ok": True, "status": 200, "json": {"ok": True, "response": {"content": "BRAIN_CHAT_CONNECTION_OK"}}},
