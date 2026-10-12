@@ -72,7 +72,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
             {
                 "exists": True,
                 "device_id": "arkan-virtual-01",
-                "host_dependencies_for_identity": True,
+                "identity_independent_of_host": True,
                 "runtime_loaded": True,
                 "simulator_booted": True,
                 "native_os_boot_verified": False,
@@ -95,7 +95,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
             {
                 "exists": True,
                 "device_id": "arkan-host-asus-vivobook",
-                "host_dependencies_for_identity": True,
+                "identity_independent_of_host": True,
                 "runtime_loaded": True,
                 "simulator_booted": True,
                 "runtime_status": {"powered": True},
