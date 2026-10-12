@@ -62,6 +62,7 @@ from .brain.universal_simulator_api import router as universal_simulator_router
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
+from .brain.canonical_indicators import aggregate_indicator_payloads, indicators_for_fleet
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
@@ -2008,6 +2009,40 @@ def device_cloud_federation_status(request: Request):
     """Read-only fleet/cloud readiness view; does not enqueue or provision work."""
     require_control_key(request)
     return JSONResponse(build_fleet_status(device_bridge.agent_status(), read_arkan_runtime_status()))
+
+
+@app.get("/api/device/software-nodes/indicators")
+def device_software_node_indicators(request: Request):
+    """Expose conservative indicators for Brain-owned software nodes only."""
+    require_control_key(request)
+    fleet = build_fleet_status(device_bridge.agent_status(), read_arkan_runtime_status())
+    rows = fleet.get("fleet", []) if isinstance(fleet, dict) else []
+    # Arkan is the selected canonical computer; the virtual phone remains an
+    # unselected profile. Do not invent observation timestamps or boot evidence.
+    selected_fleet = dict(fleet) if isinstance(fleet, dict) else {"fleet": []}
+    selected_fleet["fleet"] = [
+        {**row, "indicator_selected": row.get("endpoint_id") == "arkan-virtual-01"}
+        for row in rows if isinstance(row, dict)
+    ]
+    indicators = indicators_for_fleet(selected_fleet)
+    aggregate = aggregate_indicator_payloads(indicators)
+    selected_count = sum(
+        1 for row in selected_fleet["fleet"]
+        if row.get("indicator_selected") is True
+        and row.get("role") == "virtual_computer"
+        and row.get("reality") == "SIMULATED"
+        and row.get("physical_device_required") is not True
+    )
+    return JSONResponse({
+        "ok": True,
+        "source": "canonical_indicators",
+        "software_only": True,
+        "processed_count": len(indicators),
+        "unprocessed_count": max(0, selected_count - len(indicators)),
+        "indicators": indicators,
+        "aggregate": aggregate,
+        "native_windows_server_2025_boot_verified": False,
+    })
 
 
 class DeviceTask(BaseModel):
