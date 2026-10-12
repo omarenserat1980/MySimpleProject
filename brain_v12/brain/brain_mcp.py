@@ -38,14 +38,9 @@ def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIR
     widget_html = WIDGET_PATH.read_text(encoding="utf-8")
 
     widget_resource_meta = {
-        "ui": {
-            "prefersBorder": True,
-            "domain": "https://brain-control-plane-main.onrender.com",
-            "csp": {
-                "connectDomains": ["https://brain-control-plane-main.onrender.com"],
-                "resourceDomains": [],
-            },
-        },
+        # Let ChatGPT host the component in its sandbox until a dedicated,
+        # unique widget origin is selected for production app submission.
+        "ui": {"prefersBorder": True},
         "openai/widgetDescription": (
             "واجهة عربية للعقل الإلكتروني. يمكنها بدء جلسات محادثة محفوظة "
             "وإرسال حرف ع تلقائيًا ضمن حد آمن للدورات."
