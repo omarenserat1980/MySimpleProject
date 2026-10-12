@@ -58,6 +58,24 @@ class GoldenAcceptanceGate:
             }
         )
 
+    @staticmethod
+    def _references_all(
+        payload: dict[str, Any],
+        selected_ids: set[str],
+        criterion_ids: set[str],
+    ) -> bool:
+        evidence_refs = payload.get("verified_evidence_ids")
+        criterion_refs = payload.get("criterion_ids")
+        if not isinstance(evidence_refs, list) or not all(
+            isinstance(value, str) for value in evidence_refs
+        ):
+            return False
+        if not isinstance(criterion_refs, list) or not all(
+            isinstance(value, str) for value in criterion_refs
+        ):
+            return False
+        return selected_ids.issubset(set(evidence_refs)) and criterion_ids.issubset(set(criterion_refs))
+
     def evaluate(
         self,
         task_id: str,
@@ -163,8 +181,7 @@ class GoldenAcceptanceGate:
             and isinstance(item.get("payload"), dict)
             and item["payload"].get("verified") is True
             and item["payload"].get("reality_level") == expected_reality
-            and selected_ids.issubset(set(item["payload"].get("verified_evidence_ids", [])))
-            and required_criterion_ids.issubset(set(item["payload"].get("criterion_ids", [])))
+            and self._references_all(item["payload"], selected_ids, required_criterion_ids)
             and str(item.get("producer", "")) not in producers
             and bool(item.get("producer"))
         ]
