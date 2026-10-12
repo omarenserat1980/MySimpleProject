@@ -42,6 +42,16 @@ class BrainChatSimulatorContractTests(unittest.TestCase):
         self.assertIn('api("/api/brain-ai/status")', self.html)
         self.assertIn('تعذّر الاتصال', self.html)
 
+    def test_first_empty_install_starts_chat_with_ain(self):
+        self.assertIn('await sendMessage("ع")', self.html)
+        self.assertIn("if(!bootstrapStarted && !sessionId)", self.html)
+        self.assertIn("bootstrapStarted = false", self.html)
+
+    def test_every_assistant_message_ends_with_ain_in_ui_and_history(self):
+        self.assertIn('const withAinEnding = text =>', self.html)
+        self.assertIn('value.endsWith("ع") ? value : value + " ع"', self.html)
+        self.assertIn('role==="assistant"?withAinEnding(text):escapeText(text)', self.html)
+
 
 if __name__ == "__main__":
     unittest.main()
