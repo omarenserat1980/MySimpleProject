@@ -15,7 +15,7 @@ on:
       - "brain_v12/docs/SOFTWARE_ONLY_NODES.md"
       - ".github/workflows/brain-software-only-nodes.yml"
   push:
-    branches: [main]
+    branches: [main, "test/**"]
     paths:
       - "brain_v12/brain/worker_registry.py"
       - "brain_v12/brain/workload_router.py"
