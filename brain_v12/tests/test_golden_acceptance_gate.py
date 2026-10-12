@@ -67,6 +67,27 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
         self.assertEqual(result.status, "GOLDEN_LOOP_VERIFIED")
         self.assertEqual(set(result.evidence_ids), {first["evidence_id"], second["evidence_id"]})
 
+    def test_malformed_independent_references_fail_closed(self):
+        self.store.append(
+            "task-1", "artifact_verified", {"reality_level": "SIMULATED"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        self.store.append(
+            "task-1", "runtime_check_passed", {"reality_level": "SIMULATED"},
+            producer="executor-A", mission_id="mission-1", attempt=2,
+        )
+        self.store.append(
+            "task-1", "independent_verification",
+            {"verified": True, "reality_level": "SIMULATED",
+             "verified_evidence_ids": None, "criterion_ids": {"unexpected": "shape"}},
+            producer="independent-verifier", mission_id="mission-1", attempt=2,
+        )
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=2,
+        )
+        self.assertFalse(result.accepted)
+        self.assertIn("INDEPENDENT_VERIFICATION_MISSING", result.reasons)
+
     def test_missing_independent_verification_fails_closed(self):
         self.store.append(
             "task-1", "artifact_verified", {"reality_level": "SIMULATED"},
