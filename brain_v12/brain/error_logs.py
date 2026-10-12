@@ -40,7 +40,7 @@ class BrainErrorLogStore:
     """Append-only JSONL log store with safe, bounded read operations."""
 
     def __init__(self, path: str | Path | None = None):
-        default = Path(os.getenv("BRAIN_ERROR_LOG_PATH", ".brain/logs/errors.jsonl"))
+        default = Path(os.getenv("BRAIN_ERROR_LOG_PATH", str(Path(__file__).resolve().parents[2] / ".brain" / "logs" / "errors.jsonl")))
         self.path = Path(path or default).expanduser()
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -97,9 +97,17 @@ class BrainErrorLogStore:
         return found[-limit:][::-1]
 
     def get(self, event_id: str) -> dict[str, Any] | None:
-        for event in self.list(limit=1000):
-            if event.get("event_id") == event_id:
-                return event
+        if not self.path.exists():
+            return None
+        with _lock:
+            with self.path.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    try:
+                        event = json.loads(line)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if event.get("event_id") == event_id:
+                        return event
         return None
 
 
