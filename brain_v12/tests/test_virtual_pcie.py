@@ -17,7 +17,8 @@ class VirtualPCIeTests(unittest.TestCase):
         device = fabric.config_read("nic0", 2, 2)
         self.assertEqual(vendor["value"], 0x1234)
         self.assertEqual(device["value"], 0xABCD)
-        self.assertEqual(fabric.config_read("nic0", 9, 3)["value"], 0x020000)
+        self.assertEqual(fabric.config_read("nic0", 9, 1)["value"], 0x00)
+        self.assertEqual(fabric.config_read("nic0", 10, 2)["value"], 0x0200)
         self.assertEqual(fabric.status()["generation"], 5)
 
     def test_config_command_register_is_writable_ids_are_not(self):
@@ -33,7 +34,7 @@ class VirtualPCIeTests(unittest.TestCase):
         fabric.attach_endpoint("gpu0", bar_sizes={0: 4096})
         self.assertTrue(fabric.mmio_write("gpu0", 0, 4, 0x12345678)["ok"])
         self.assertEqual(fabric.mmio_read("gpu0", 0, 4)["value"], 0x12345678)
-        self.assertEqual(fabric.mmio_read("gpu0", 0, 5, 1)["value"], 0x12)
+        self.assertEqual(fabric.mmio_read("gpu0", 0, 5, 1)["value"], 0x56)
         self.assertEqual(fabric.status()["endpoints"][0]["bars"][0]["host_mapping"], False)
         with self.assertRaisesRegex(ValueError, "VPCIE_MMIO_ALIGNMENT_INVALID"):
             fabric.mmio_read("gpu0", 0, 3, 4)
