@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 RUNTIME_WORKFLOWS = (
     ".github/workflows/brain-github-cloud.yml",
-    ".github/workflows/brain-120-minute-cinema.yml",
     ".github/workflows/brain-continuous-self-healing.yml",
     ".github/workflows/brain-human-intermediary-autopilot.yml",
 )
@@ -45,6 +44,17 @@ def assert_runtime_contract() -> dict:
         for marker in REQUIRED_RUNTIME_MARKERS:
             if marker not in text:
                 failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+
+    # The long-form cinema pipeline is software rendering, not real guest boot.
+    cinema_path = ROOT / ".github/workflows/brain-120-minute-cinema.yml"
+    if cinema_path.exists():
+        cinema_text = cinema_path.read_text(encoding="utf-8")
+        if cinema_text.count("runs-on: ubuntu-latest") != 2:
+            failures.append("120_MINUTE_CINEMA_NOT_HOSTED")
+        if "internal_runner_preflight" in cinema_text:
+            failures.append("120_MINUTE_CINEMA_REQUIRES_INTERNAL_RUNNER")
+    else:
+        failures.append("MISSING_120_MINUTE_CINEMA_WORKFLOW")
 
     # The three-film renderer is software-only; real boot stays separately gated.
     three_films_path = ROOT / ".github/workflows/brain-three-films-factory.yml"
