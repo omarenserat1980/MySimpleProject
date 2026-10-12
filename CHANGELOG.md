@@ -1,5 +1,14 @@
 # Electronic Brain — Changelog
 
+## 2026-10-12
+
+### Software-only execution foundation
+- Changed the existing worker registry to default to software nodes and require explicit opt-in for physical-device worker discovery.
+- Isolated failures from optional DeviceBridge adapters so they do not break software-node registry operations.
+- Added regression tests for default-off device adapters, explicit opt-in, lease expiry, invalid worker IDs, and adapter failure isolation.
+- Added a GitHub-hosted Ubuntu workflow for focused software-node verification and documented the incremental migration boundary.
+- Verification is pending the actual GitHub Actions result; this changelog entry does not claim the tests have passed or the full repository has become hardware-independent.
+
 ## 2026-10-01
 
 ### Runtime reliability
