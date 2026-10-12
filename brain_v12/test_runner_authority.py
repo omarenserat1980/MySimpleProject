@@ -37,22 +37,25 @@ def test_allowlisted_software_runtime_uses_hosted_runner():
     assert '"github_hosted_runtime": True' in text
 
 
-def test_supervisor_keeps_task_dispatch_on_brain_owned_runtime():
+def test_supervisor_delegates_allowlisted_tasks_to_hosted_runtime():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
     dispatch = text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
-    assert "brain-github-cloud.yml/dispatches" not in text
-    assert "self-hosted" in dispatch
-    assert "brain-internal" in dispatch
-    assert "internal_runner_preflight" in dispatch
+    assert "uses: ./.github/workflows/brain-github-cloud.yml" in dispatch
+    assert "self-hosted" not in dispatch
+    assert "internal_runner_preflight" not in dispatch
 
 
 def test_supervisor_simulation_and_verification_use_hosted_runner():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
     health = text.split("health_and_recovery:", 1)[1].split("self_heal:", 1)[0]
     verify = text.split("verify:", 1)[1]
-    for job in (health, verify):
+    recovery = text.split("self_heal:", 1)[1].split("\n  verify:", 1)[0]
+    for job in (health, verify, recovery):
         assert "runs-on: ubuntu-latest" in job
         assert "internal_runner_preflight" not in job
+        assert "self-hosted" not in job
+    assert "actions: write" in recovery
+    assert "gh run rerun" in recovery
 
 
 def test_continuous_self_healing_runs_hosted_and_opens_review_pr():
