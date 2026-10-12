@@ -14,9 +14,11 @@ import os
 BRAIN_CARD_ID = "electronic-brain-runtime"
 BRAIN_CARD_VERSION = "runtime-route-contract-v1"
 CHAT_MESSAGE_ROUTE = "/api/brain-chat/sessions/{session_id}/messages"
-REQUIRED_CHAT_ROUTES = (
-    (CHAT_MESSAGE_ROUTE, "POST", "brain-chat"),
-)
+REQUIRED_ROUTES = {
+    "chat_message": (CHAT_MESSAGE_ROUTE, "POST", "brain-chat"),
+    "brain_ai_chat": ("/api/brain-ai/chat", "POST", "brain-ai"),
+    "brain_ai_tool": ("/api/brain-ai/tool", "POST", "brain-ai-tools"),
+}
 
 
 def _utc_now() -> str:
@@ -55,18 +57,23 @@ def run_chat_preflight(
             "evidence_ref": evidence,
         })
 
-    for path, method, target in REQUIRED_CHAT_ROUTES:
+    required = REQUIRED_ROUTES.get(str(input_kind))
+    if required is None:
+        record("input_kind.supported", False, "brain-card-contract", "contract:unknown-input-kind")
+    else:
+        path, method, target = required
         registered = (path, method) in route_set
-        record("route.chat_message.registered", registered, target,
+        record("route." + str(input_kind) + ".registered", registered, target,
                "route-table:registered" if registered else "route-table:missing")
 
     ai_ready = callable(getattr(brain_ai, "chat", None))
     record("service.brain_ai.callable", ai_ready, "brain-ai",
            "in-process:chat-callable" if ai_ready else "in-process:chat-unavailable")
 
-    store_ready = callable(getattr(store, "get", None)) and callable(getattr(store, "add_message", None))
-    record("service.chat_store.available", store_ready, "brain-chat-store",
-           "in-process:store-interface" if store_ready else "in-process:store-unavailable")
+    if str(input_kind) == "chat_message":
+        store_ready = callable(getattr(store, "get", None)) and callable(getattr(store, "add_message", None))
+        record("service.chat_store.available", store_ready, "brain-chat-store",
+               "in-process:store-interface" if store_ready else "in-process:store-unavailable")
 
     execution_plane = os.getenv("BRAIN_EXECUTION_PLANE", "software").strip().lower()
     software_plane = execution_plane in {"software", "virtual", "simulated"}
