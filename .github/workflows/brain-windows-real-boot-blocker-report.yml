@@ -1,0 +1,35 @@
+name: Brain Windows Real Boot Blocker Report
+
+on:
+  push:
+    branches:
+      - fix/windows-control-plane-public-url-default
+    paths:
+      - scripts/github/report_windows_real_boot_blockers.sh
+      - .github/workflows/brain-windows-real-boot-blocker-report.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  blocker-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate report script syntax
+        run: bash -n scripts/github/report_windows_real_boot_blockers.sh
+      - name: Run secret-safe live blocker report
+        shell: bash
+        run: |
+          set +e
+          bash scripts/github/report_windows_real_boot_blockers.sh
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "REPORT_TOOL=PASS_READINESS_ONLY" ;;
+            4) echo "REPORT_TOOL=PASS_BLOCKERS_REPORTED";;
+            *) echo "REPORT_TOOL=ERROR"; exit "$rc" ;;
+          esac
+          echo "NOTE=Tool health is separate from Windows boot proof."
