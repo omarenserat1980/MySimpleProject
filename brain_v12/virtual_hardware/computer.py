@@ -502,7 +502,7 @@ class VirtualComputer:
              "external_network_enabled": False, "host_hardware_required": False},
             ("TPM-like measurements", "USB port enumeration", "serial console", "watchdog state machine",
              "deterministic test RNG", "isolated modem state machine", "BMC telemetry", "software IOMMU allow-list",
-             "logical RAID health", "battery estimates", "input events", "audio frame accounting", "sensor estimates"),
+             "logical RAID health", "SECDED single-bit correction/double-bit detection", "battery estimates", "input events", "audio frame accounting", "sensor estimates"),
             ("hardware-backed TPM attestation", "cryptographic entropy", "physical cellular radio",
              "physical IOMMU enforcement", "persistent RAID data/rebuild", "physical USB/audio/input"),
             (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
