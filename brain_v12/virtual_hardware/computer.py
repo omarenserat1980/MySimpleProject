@@ -31,6 +31,7 @@ class VirtualComputer:
     gpu_width: int = 320
     gpu_height: int = 200
     cpu_profile_id: str | None = None
+    brainvm_profile_name: str | None = None
     storage_profile_id: str | None = None
     ram_profile_id: str | None = None
     cache_enabled: bool = False
@@ -44,7 +45,12 @@ class VirtualComputer:
     external_network_enabled: bool = False
 
     def __post_init__(self):
-        self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
+        if self.cpu_profile_id:
+            self.cpu = X86_64CPU(profile_id=self.cpu_profile_id)
+        elif self.brainvm_profile_name:
+            self.cpu = VirtualCPU(profile_name=self.brainvm_profile_name)
+        else:
+            self.cpu = VirtualCPU()
         self.ram=VirtualRAM(self.ram_size, profile_id=self.ram_profile_id, channels=self.memory_channels,
                             channel_width_bits=self.memory_channel_width_bits,
                             configured_cas_latency_cycles=self.configured_cas_latency_cycles,
@@ -83,7 +89,7 @@ class VirtualComputer:
 
     def configuration_fingerprint(self) -> str:
         configuration = {
-            "machine_id": self.name, "cpu_profile_id": self.cpu_profile_id or "brain-educational-8-register",
+            "machine_id": self.name, "cpu_profile_id": self.cpu_profile_id or getattr(self.cpu, "profile_name", "brain-educational-8-register"),
             "ram_size_cells": self.ram.size, "ram_profile_id": self.ram_profile_id,
             "memory_channels": self.memory_channels, "memory_channel_width_bits": self.memory_channel_width_bits,
             "ecc_enabled": self.ecc_enabled,
@@ -540,7 +546,7 @@ class VirtualComputer:
                 "bootloader":self.bootloader.VERSION,
                 "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
-                "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
+                "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"fidelity":self.cpu.fidelity_metadata() if hasattr(self.cpu,"fidelity_metadata") else {"native_isa_supported":True},"profile_id":self.cpu_profile_id or getattr(self.cpu, "profile_name", "brain-educational-8-register")},
                 "ram":self.ram.status(),"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status(),
