@@ -1,0 +1,38 @@
+name: Windows Server ISO Structural Preflight
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tests/test_windows_server_iso_preflight.py"
+      - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
+      - ".github/workflows/windows-iso-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tests/test_windows_server_iso_preflight.py"
+      - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
+      - ".github/workflows/windows-iso-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ISO inspection utility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xorriso
+      - name: Run isolated preflight tests
+        run: python -m unittest brain_v12.tests.test_windows_server_iso_preflight -v
+      - name: Compile validator
+        run: python -m py_compile brain_v12/tools/windows_server_iso_preflight.py
