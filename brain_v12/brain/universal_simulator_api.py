@@ -212,11 +212,18 @@ def discover_simulators() -> list[dict[str, Any]]:
         })
     known_ids = {item["simulator_id"] for item in results}
     for candidate in _discover_repository_components():
-        if candidate["simulator_id"] not in known_ids:
+        candidate_id = candidate["simulator_id"]
+        saved_candidate = registered.get(candidate_id)
+        if isinstance(saved_candidate, dict):
+            candidate.update(saved_candidate)
+            candidate["registration_status"] = "REGISTERED"
+        if candidate_id not in known_ids:
             results.append(candidate)
+            known_ids.add(candidate_id)
     for simulator_id, saved in registered.items():
         if simulator_id not in known_ids and isinstance(saved, dict):
             results.append({"simulator_id": simulator_id, **saved, "discovery_status": "REGISTERED_CUSTOM"})
+            known_ids.add(simulator_id)
     return sorted(results, key=lambda item: item["simulator_id"])
 
 
@@ -408,7 +415,7 @@ def brain_repair_status(request: Request):
         "ok": True,
         "service": "ChatGPT Brain Repair Center",
         "provider": _PROVIDER.status(),
-        "analysis_mode": "REAL_PROVIDER" if _PROVIDER.configured else "NOT_CONFIGURED",
+        "analysis_mode": "CONFIGURED_REAL_PROVIDER" if _PROVIDER.configured else "NOT_CONFIGURED",
         "repair_execution": "DISABLED_IN_ANALYSIS_ENDPOINT",
         "registry_count": len(discover_simulators()),
         "audit_path_configured": bool(os.getenv("BRAIN_REPAIR_AUDIT_PATH")),
