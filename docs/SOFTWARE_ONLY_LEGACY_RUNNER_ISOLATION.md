@@ -12,6 +12,23 @@ That workflow deliberately requires a protected GitHub Environment, a dedicated 
 
 Do not dispatch this workflow as a substitute for virtual-server profile tests. A passing unit-test or profile workflow does not prove Windows boot. Conversely, a missing real-boot runner does not mean the software-only Brain core is unhealthy.
 
+## Legacy runner paths found in the repository audit
+
+A repository search found additional self-hosted selectors outside the dedicated real-boot workflow, including:
+
+- `.github/workflows/brain-boot-iso.yml`
+- `.github/workflows/brain-supervisor.yml`
+- `.github/workflows/brain-github-cloud.yml`
+- `.github/workflows/linux-runner-smoke.yml`
+- `.github/workflows/brain-runner-preflight.yml`
+- `.github/workflows/brain-120-minute-cinema.yml`
+- `.github/workflows/brain-local-cinema-smoke.yml`
+- `.github/workflows/setup-exe-cloud-stage.yml`
+
+These are **audit findings, not yet certified as core or optional**. Before declaring the hardware-dependency removal complete, inspect each workflow's triggers, downstream callers, branch-protection/status-check use, and whether its workload can run on a GitHub-hosted software executor. Migrate ordinary tests and bounded software workloads to GitHub-hosted runners where appropriate; retain real-boot or host-specific diagnostics only as explicitly manual, isolated workflows. Do not simply change every `runs-on` to `ubuntu-latest`: workflows that claim real guest boot or require protected executor attestations must not be allowed to pass with a simulated substitute.
+
+Also review `brain_v12/test_runner_authority.py`, `brain_v12/execution_fabric_contract.py`, `BRAIN_RUNTIME_INDEPENDENCE_CONTRACT.md`, and old Arkan/runner setup guides together. Existing tests may encode historical self-hosted requirements and need a deliberate policy-aligned update rather than blind removal.
+
 ## Handling older runner setup instructions
 
 Documents and scripts for configuring Arkan, WSL, internal runners, Hyper-V, or QEMU may be retained as historical/manual diagnostics. They must be clearly described as optional legacy material, not as steps required to run Brain. Do not register physical devices as execution workers, and do not restore a self-hosted runner as a required status check or core runtime dependency.
