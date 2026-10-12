@@ -113,6 +113,28 @@ def test_local_cinema_smoke_is_hardware_independent():
     assert "BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED" in text
 
 
+def test_runner_diagnostics_use_hosted_software_runners():
+    linux_smoke = Path(".github/workflows/linux-runner-smoke.yml").read_text(encoding="utf-8")
+    pipeline_gate = Path(".github/workflows/autonomous-pipeline-runner-gate.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in linux_smoke
+    assert "runs-on: ubuntu-latest" in pipeline_gate
+    for workflow in (linux_smoke, pipeline_gate):
+        assert "RUNNER_ENVIRONMENT" in workflow
+        assert "github-hosted" in workflow
+        assert "self-hosted" not in workflow
+        assert "HARDWARE_DEPENDENCY=NONE" in workflow or "hardware_dependency=NONE" in workflow
+
+
+def test_windows_toolchain_preflight_does_not_require_arkan_or_azure_login():
+    text = Path(".github/workflows/brain-runner-preflight.yml").read_text(encoding="utf-8")
+    assert "runs-on: windows-latest" in text
+    assert "hashicorp/setup-terraform@v3" in text
+    assert "self-hosted" not in text
+    assert "C:\\actions-runner" not in text
+    assert "AZURE_AUTHENTICATION=NOT_ATTEMPTED" in text
+    assert "BRAIN_HARDWARE_DEPENDENCY=NONE" in text
+
+
 def test_canonical_internal_runtime_modules_exist():
     gateway = Path("brain_v12/brain/execution_gateway.py")
     runtime = Path("brain_v12/brain/internal_task_runtime.py")
