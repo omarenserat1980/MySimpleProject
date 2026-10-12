@@ -22,7 +22,7 @@ class ResourceManager:
 
     @staticmethod
     def _ram_used(computer)->int:
-        return sum(1 for value in computer.ram._data if value!=0)
+        return computer.ram.used_cells
 
     @staticmethod
     def _storage_used(computer)->int:
@@ -34,7 +34,7 @@ class ResourceManager:
         cpu_load=100 if not c.powered else min(100,int(c.cpu.cycles/max(1,c.cpu.cycles+100)*100))
         return {"blade_id":blade.blade_id,"state":blade.state,"capabilities":sorted(blade.capabilities),
           "cpu":{"architecture":"brain-virtual","cores":cpu_cores,"load_percent":cpu_load,"cycles":c.cpu.cycles},
-          "ram":{"total_bytes":c.ram.size,"used_bytes":ram_used,"free_bytes":c.ram.size-ram_used},
+          "ram":{"total_bytes":c.ram.size,"used_bytes":ram_used,"free_bytes":c.ram.size-ram_used,"capacity_unit":"addressable_cells","used_cells":ram_used,"host_payload_bytes_estimate":c.ram.host_payload_bytes_estimate,"host_rss_measured":False},
           "storage":{"total_bytes":c.storage.capacity,"used_bytes":storage_used,"free_bytes":c.storage.capacity-storage_used},
           "network":{"available":"network" in blade.capabilities,"rx_packets":len(c.nic.rx),"tx_packets":len(c.nic.tx)},
           "gpu":{"available":"gpu" in blade.capabilities,"width":c.gpu.width,"height":c.gpu.height}}
