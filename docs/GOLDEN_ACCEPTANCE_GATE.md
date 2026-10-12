@@ -5,7 +5,8 @@ The `GoldenAcceptanceGate` is a verification layer, not a second task orchestrat
 ## Acceptance requirements
 
 - Every declared criterion maps to a required runtime evidence kind.
-- Evidence is filtered by task, mission, and attempt.
+- Every acceptance decision, including `SIMULATED`, requires a non-empty `mission_id` and a positive integer `attempt`; unscoped calls are rejected before querying evidence.
+- Evidence is filtered by task, mission, and attempt, so a missing scope cannot widen the query across attempts.
 - Each evidence payload must pass the existing SHA-256 integrity check.
 - CI-only evidence cannot satisfy a runtime criterion.
 - Runtime evidence must declare the exact expected reality level.
