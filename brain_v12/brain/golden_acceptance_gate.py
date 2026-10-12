@@ -37,8 +37,14 @@ class GoldenGateResult:
 class GoldenAcceptanceGate:
     """Independent acceptance check using existing append-only evidence."""
 
-    def __init__(self, evidence_store: EvidenceStore | None = None) -> None:
+    def __init__(
+        self,
+        evidence_store: EvidenceStore | None = None,
+        *,
+        verifier_public_key_b64: str | None = None,
+    ) -> None:
         self.evidence = evidence_store or EvidenceStore()
+        self.verifier_public_key_b64 = verifier_public_key_b64
 
     @staticmethod
     def _is_ci_evidence(item: dict[str, Any]) -> bool:
@@ -160,7 +166,7 @@ class GoldenAcceptanceGate:
         independent_verified = bool(independent_records)
         if not independent_records:
             reasons.append("INDEPENDENT_VERIFICATION_MISSING")
-        elif expected_reality != "SIMULATED":
+        elif expected_reality != "SIMULATED" and len(selected) == len(criteria):
             # Real/remote acceptance requires a cryptographic verifier attestation.
             # A payload label or different producer string is not sufficient.
             signed_ok = False
@@ -179,6 +185,7 @@ class GoldenAcceptanceGate:
                 try:
                     verified_attestation = verify_signed_verification(
                         attestation,
+                        public_key_b64=self.verifier_public_key_b64,
                         replay_db_path=self.evidence.path,
                         expected=expected_scope,
                     )
