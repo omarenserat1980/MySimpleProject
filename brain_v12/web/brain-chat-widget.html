@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Electronic Brain — ChatGPT App</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#10131a;color:#f1f3f8}
+*{box-sizing:border-box}body{margin:0;padding:16px;background:#10131a}main{max-width:900px;margin:auto;border:1px solid #303747;border-radius:18px;overflow:hidden;background:#141923}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #303747}
+h1{font-size:16px;margin:0}small,.muted{color:#9ca7b9;font-size:12px}.state{display:flex;align-items:center;gap:7px;font-size:11px;color:#b9c2d2}.dot{width:8px;height:8px;border-radius:50%;background:#e8bd58}.dot.ok{background:#49d6a0}.dot.bad{background:#ff7285}
+.controls{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid #303747}button{border:1px solid #3b4355;border-radius:10px;padding:9px 12px;background:#242a38;color:#f1f3f8;font:inherit;cursor:pointer}button.primary{background:#e9e6ff;color:#1b1830;border-color:#e9e6ff;font-weight:650}button:disabled{opacity:.45;cursor:wait}
+#log{min-height:180px;max-height:55vh;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}.msg{padding:11px 13px;border-radius:14px;background:#202635;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;font-size:13px}.msg.user{align-self:flex-start;background:#303c58}.msg.assistant{align-self:stretch}.msg.error{border:1px solid #803d4c}.foot{padding:12px 16px;border-top:1px solid #303747;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.counter{font-size:11px;color:#9ca7b9}.notice{padding:0 16px 14px;color:#9ca7b9;font-size:11px;line-height:1.7}
+</style>
+</head>
+<body>
+<main>
+<header><div><h1>✦ العقل الإلكتروني V12</h1><small>واجهة محادثة مدمجة داخل ChatGPT</small></div><div class="state"><span class="dot" id="dot"></span><span id="status">بانتظار التهيئة</span></div></header>
+<div class="controls"><button class="primary" id="start">ابدأ دورة «ع»</button><button id="pause" disabled>إيقاف مؤقت</button><button id="resume" disabled>استئناف</button><button id="stop" disabled>إيقاف نهائي</button></div>
+<div id="log" aria-live="polite"><div class="muted">عند البدء، تُنشأ جلسة محفوظة ويُرسل حرف «ع». بعد اكتمال الرد، تبدأ جلسة جديدة تلقائيًا. الحد الأقصى 5 دورات لكل تشغيل.</div></div>
+<div class="foot"><span class="counter" id="cycle">الدورة: 0 / 5</span><span class="counter" id="session">الجلسة: لم تُنشأ</span></div>
+<div class="notice">يعرض هذا التطبيق نتائج الخادم فقط. لا ينفّذ أوامر نظام أو عمليات نشر. إيقاف الدورة يمنع بدء دورة جديدة، والطلبات الجارية تنتظر نتيجة الخادم.</div>
+</main>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const MAX_CYCLES = 5;
+  let busy = false, stopped = true, paused = false, runId = null, cycleNo = 0, sessionId = null;
+  let state = { runId: null, cycleNo: 0, sessionId: null, clientMessageId: null, paused: false, stopped: true };
+  const openai = window.openai;
+  function saveState() {
+    state = { runId, cycleNo, sessionId, clientMessageId: state.clientMessageId || null, paused, stopped };
+    try { openai?.setWidgetState?.(state); } catch (_) {}
+  }
+  function status(text, kind="") { $("status").textContent=text; $("dot").className="dot"+(kind?" "+kind:""); }
+  function log(text, role="assistant", error=false) {
+    const el=document.createElement("div");el.className="msg "+role+(error?" error":"");el.textContent=String(text ?? "");
+    $("log").appendChild(el);$("log").scrollTop=$("log").scrollHeight;
+  }
+  function controls() {
+    $("start").disabled=busy||(!stopped&&!paused);
+    $("pause").disabled=stopped||paused;
+    $("resume").disabled=stopped||!paused;
+    $("stop").disabled=stopped;
+    $("cycle").textContent="الدورة: "+cycleNo+" / "+MAX_CYCLES;
+    $("session").textContent="الجلسة: "+(sessionId||"لم تُنشأ");
+  }
+  async function callTool(name, args) {
+    if (typeof openai?.callTool === "function") {
+      const result=await openai.callTool(name,args);
+      if (result?.isError) throw new Error(result.content?.map(x=>x.text||"").join("\n")||"MCP_TOOL_ERROR");
+      return result?.structuredContent ?? result;
+    }
+    throw new Error("CHATGPT_TOOL_BRIDGE_UNAVAILABLE: افتح التطبيق من داخل ChatGPT مع تفعيل MCP Apps.");
+  }
+  async function createSession() {
+    const key=runId+":"+String(cycleNo+1);
+    const result=await callTool("brain.chat_session_create",{title:"دورة ع "+(cycleNo+1),client_session_key:key});
+    const id=result?.session?.id||result?.session_id;
+    if(!id) throw new Error(result?.status||"SESSION_CREATE_FAILED");
+    sessionId=id;saveState();controls();return id;
+  }
+  async function sendAin() {
+    if(!sessionId) await createSession();
+    const messageId=runId+":"+String(cycleNo+1)+":ain";
+    state.clientMessageId=messageId;saveState();
+    log("ع","user");
+    status("إرسال حرف ع…");
+    const result=await callTool("brain.chat_session_send",{session_id:sessionId,message:"ع",client_message_id:messageId});
+    const reply=result?.response?.content ?? result?.reply;
+    if(typeof reply!=="string") throw new Error(result?.status||"BRAIN_REPLY_MISSING");
+    if(result?.ok===false) throw new Error(result?.response?.error||result?.status||"BRAIN_REPLY_FAILED");
+    log(reply,"assistant");
+    cycleNo += 1;sessionId=null;state.clientMessageId=null;saveState();controls();
+    status("اكتملت الدورة "+cycleNo,"ok");
+  }
+  async function runLoop() {
+    if(busy||stopped||paused)return;
+    busy=true;controls();
+    try {
+      while(!stopped&&!paused&&cycleNo<MAX_CYCLES) {
+        await sendAin();
+        if(!stopped&&!paused&&cycleNo<MAX_CYCLES) {
+          status("اكتمل الرد؛ بدء جلسة جديدة…");
+        }
+      }
+      if(cycleNo>=MAX_CYCLES&&!stopped){stopped=true;status("اكتمل الحد الآمن للدورات","ok");}
+    } catch(e) {
+      paused=true;status("توقفت الدورة بسبب خطأ","bad");log("تعذّر إكمال الدورة: "+e.message,"assistant",true);
+    } finally {busy=false;saveState();controls();}
+  }
+  $("start").addEventListener("click",async()=>{
+    if(busy)return;
+    runId="brain-run-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
+    cycleNo=0;sessionId=null;paused=false;stopped=false;state.clientMessageId=null;
+    log("بدء تشغيل جديد. الحد الأقصى "+MAX_CYCLES+" دورات.","assistant");saveState();controls();await runLoop();
+  });
+  $("pause").addEventListener("click",()=>{paused=true;saveState();status("إيقاف مؤقت");controls();});
+  $("resume").addEventListener("click",()=>{if(!runId)return;paused=false;stopped=false;saveState();controls();void runLoop();});
+  $("stop").addEventListener("click",()=>{stopped=true;paused=false;saveState();status("تم إيقاف الدورة");controls();});
+  try {
+    const saved=openai?.widgetState;
+    if(saved&&typeof saved==="object"&&saved.runId) {
+      runId=saved.runId;cycleNo=Math.max(0,Math.min(MAX_CYCLES,Number(saved.cycleNo)||0));
+      sessionId=saved.sessionId||null;paused=true;stopped=false;
+      state={...state,...saved};status("تم استرجاع الحالة؛ اضغط استئناف للمتابعة");controls();
+    } else controls();
+  } catch (_) { controls(); }
+})();
+</script>
+</body>
+</html>
