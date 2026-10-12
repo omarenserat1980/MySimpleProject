@@ -140,9 +140,9 @@ jobs:
       - name: Gate real Arkan host capacity before media download
         run: |
           set -euo pipefail
-          python3 brain_v12/tools/arkan_windows_server_2025_preflight.py \\
-            --workspace "$GITHUB_WORKSPACE" \\
-            --contract-gate windows-execution-contract-gate.json \\
+          python3 brain_v12/tools/arkan_windows_server_2025_preflight.py \
+            --workspace "$GITHUB_WORKSPACE" \
+            --contract-gate windows-execution-contract-gate.json \
             --output arkan-windows-server-2025-readiness.json
           grep -q '"ready": true' arkan-windows-server-2025-readiness.json
           echo "ARKAN_WINDOWS_SERVER_2025_HOST_ADMISSION=PASS"
