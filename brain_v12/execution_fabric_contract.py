@@ -56,6 +56,20 @@ def assert_runtime_contract() -> dict:
     else:
         failures.append("MISSING_120_MINUTE_CINEMA_WORKFLOW")
 
+    # ISO creation plus QEMU emulation is hosted software verification, not physical boot.
+    iso_path = ROOT / ".github/workflows/brain-boot-iso.yml"
+    if iso_path.exists():
+        iso_text = iso_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in iso_text:
+            failures.append("BRAIN_ISO_QEMU_NOT_HOSTED")
+        if "self-hosted" in iso_text or "BRAIN_INTERNAL_RUNNER_FLAG" in iso_text:
+            failures.append("BRAIN_ISO_QEMU_REQUIRES_INTERNAL_RUNNER")
+        for package in ("grub-pc-bin", "xorriso", "gcc", "qemu-system-x86"):
+            if package not in iso_text:
+                failures.append(f"BRAIN_ISO_TOOLCHAIN_PACKAGE_MISSING:{package}")
+    else:
+        failures.append("MISSING_BRAIN_ISO_WORKFLOW")
+
     # The three-film renderer is software-only; real boot stays separately gated.
     three_films_path = ROOT / ".github/workflows/brain-three-films-factory.yml"
     if three_films_path.exists():
