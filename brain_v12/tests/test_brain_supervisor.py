@@ -135,5 +135,29 @@ class SupervisorTests(unittest.TestCase):
                 s.evidence.close()
 
 
+    def test_repair_and_retry_propagates_explicit_golden_contract(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = BrainSupervisor(root=d)
+            try:
+                job = self._prepare_verifying_job(s)
+                self._append_golden_evidence(s, job)
+                result = s.repair_and_retry(job, {
+                    "ok": True,
+                    "required_evidence_kind": "artifact_verified",
+                    "golden_criteria": (
+                        AcceptanceCriterion("artifact-exists", "artifact_verified"),
+                        AcceptanceCriterion("runtime-check", "runtime_check_passed"),
+                    ),
+                    "golden_expected_reality": "SIMULATED",
+                })
+                self.assertEqual(result["status"], "completed")
+                self.assertEqual(
+                    result["details"]["golden_acceptance"]["status"],
+                    "GOLDEN_LOOP_VERIFIED",
+                )
+            finally:
+                s.evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()
