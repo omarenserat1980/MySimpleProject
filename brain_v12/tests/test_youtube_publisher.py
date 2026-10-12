@@ -47,7 +47,7 @@ class YouTubePublisherTests(unittest.TestCase):
             publisher = YouTubePublisher(store)
             with patch("brain_v12.brain.youtube_publisher.subprocess.run") as run:
                 run.return_value.returncode = 0
-                run.return_value.stdout = "1.0\\n"
+                run.return_value.stdout = "1.0\n"
                 result = publisher.publish_cinematic_release("Test", media_path=media.name)
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "MASTER_RELEASE_EVIDENCE_REQUIRED")
@@ -60,7 +60,7 @@ class YouTubePublisherTests(unittest.TestCase):
             publisher = YouTubePublisher(store)
             with patch("brain_v12.brain.youtube_publisher.subprocess.run") as run:
                 run.return_value.returncode = 0
-                run.return_value.stdout = "1.0\\n"
+                run.return_value.stdout = "1.0\n"
                 result = publisher.publish_cinematic_release(
                     "Test",
                     media_path=media.name,
@@ -73,10 +73,9 @@ class YouTubePublisherTests(unittest.TestCase):
         credentials = object()
         with tempfile.NamedTemporaryFile(suffix=".mp4") as media:
             publisher = YouTubePublisher(store, lambda: credentials)
-            with patch("brain_v12.brain.youtube_publisher.subprocess.run") as run, \\
-                 patch("brain_v12.brain.youtube_publisher.build") as build:
+            with patch("brain_v12.brain.youtube_publisher.subprocess.run") as run, patch("brain_v12.brain.youtube_publisher.build") as build:
                 run.return_value.returncode = 0
-                run.return_value.stdout = "12.5\\n"
+                run.return_value.stdout = "12.5\n"
 
                 youtube = Mock()
                 build.return_value = youtube
