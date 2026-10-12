@@ -40,6 +40,7 @@ class MemoryProfile:
             "technology": self.technology, "component_density_bits": self.component_density_bits,
             "transfer_rate_mt_s": self.transfer_rate_mt_s, "component_width_bits": self.component_width_bits,
             "cas_latency_cycles": cas, "cas_latency_ns_estimate": cas_ns, "voltage_v": self.voltage_v,
+            "cas_latency_configuration_source": "vendor_spec" if self.cas_latency_cycles is not None else ("simulator_assumption" if configured_cas_latency_cycles is not None else "not_configured"),
             "t_rcd_cycles": self.t_rcd_cycles, "t_rp_cycles": self.t_rp_cycles,
             "t_ras_cycles": self.t_ras_cycles, "bank_count": self.bank_count,
             "channels": channels, "channel_width_bits": channel_width_bits,
@@ -164,7 +165,8 @@ class CacheHierarchy:
                             "hit_latency_cycles": s.profile.hit_latency_cycles,
                             "hits": s.hits, "misses": s.misses} for s in self._states],
                 "data_values_cached": False, "coherence_modeled": False,
-                "cycle_accurate": False, "host_memory_allocated_for_cache_bytes": 0}
+                "cycle_accurate": False, "host_cache_data_bytes_allocated": 0,
+                "host_tag_metadata_bytes_estimated": None, "host_rss_measured": False}
 
 
 @dataclass
