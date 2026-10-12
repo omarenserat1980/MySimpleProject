@@ -4,6 +4,8 @@ import unittest
 
 from brain_v12.virtual_hardware.devices import VirtualStorage
 from brain_v12.virtual_hardware.storage_profiles import get_storage_profile, list_storage_profiles
+from brain_v12.virtual_hardware.computer import VirtualComputer
+from brain_v12.blade_server import BladeChassis
 
 
 class StorageProfileTests(unittest.TestCase):
@@ -25,6 +27,21 @@ class StorageProfileTests(unittest.TestCase):
         self.assertEqual(disk.logical_capacity_bytes, 1_000_000_000_000)
         self.assertEqual(disk.smart_telemetry()["host_disk_allocation_bytes"], 0)
         self.assertEqual(disk.smart_telemetry()["in_process_payload_bytes"], 0)
+
+    def test_storage_profile_integrates_with_virtual_computer_manifest(self):
+        computer = VirtualComputer("nvme-node", storage_profile_id="samsung-990-pro-1tb")
+        manifest = computer.hardware_manifest()
+        storage = next(item for item in manifest["components"] if item["category"] == "storage")
+        self.assertEqual(storage["profile_id"], "samsung-990-pro-1tb")
+        self.assertEqual(storage["fidelity"], "timing_model")
+        self.assertEqual(storage["parameters"]["host_disk_allocation_bytes"], 0)
+        self.assertEqual(computer.storage.logical_capacity_bytes, 1_000_000_000_000)
+
+    def test_blade_creation_can_select_storage_profile_without_host_device(self):
+        chassis = BladeChassis("storage-profile-test")
+        blade = chassis.create_blade(storage_profile_id="samsung-870-evo-1tb")
+        self.assertEqual(blade.computer.storage.profile_id, "samsung-870-evo-1tb")
+        self.assertEqual(blade.computer.storage.smart_telemetry()["host_disk_allocation_bytes"], 0)
 
     def test_legacy_memory_storage_api_remains_compatible(self):
         disk = VirtualStorage(64)
