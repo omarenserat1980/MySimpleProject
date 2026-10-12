@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_WORKFLOWS = (
     ".github/workflows/brain-github-cloud.yml",
     ".github/workflows/brain-120-minute-cinema.yml",
-    ".github/workflows/brain-three-films-factory.yml",
     ".github/workflows/brain-continuous-self-healing.yml",
     ".github/workflows/brain-human-intermediary-autopilot.yml",
 )
@@ -46,6 +45,17 @@ def assert_runtime_contract() -> dict:
         for marker in REQUIRED_RUNTIME_MARKERS:
             if marker not in text:
                 failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+
+    # The three-film renderer is software-only; real boot stays separately gated.
+    three_films_path = ROOT / ".github/workflows/brain-three-films-factory.yml"
+    if three_films_path.exists():
+        three_films_text = three_films_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in three_films_text:
+            failures.append("THREE_FILMS_FACTORY_NOT_HOSTED")
+        if "internal_runner_preflight" in three_films_text:
+            failures.append("THREE_FILMS_FACTORY_REQUIRES_INTERNAL_RUNNER")
+    else:
+        failures.append("MISSING_THREE_FILMS_FACTORY_WORKFLOW")
 
     # Hardware-independent verification jobs must run on GitHub-hosted runners.
     supervisor_path = ROOT / ".github/workflows/brain-supervisor.yml"
