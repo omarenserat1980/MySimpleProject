@@ -82,7 +82,7 @@ class VirtualComputer:
         for profile in synthetic_baseline_profiles():
             parameters = dict(profile.parameters)
             if profile.category == "memory":
-                parameters["default_capacity_bytes"] = self.ram.size
+                parameters["default_addressable_cells"] = self.ram.size
             elif profile.category == "storage":
                 parameters["default_capacity_bytes"] = self.storage.capacity
             elif profile.category == "gpu":
