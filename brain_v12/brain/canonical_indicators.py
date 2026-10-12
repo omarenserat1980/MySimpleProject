@@ -141,6 +141,8 @@ def _value_is_unhealthy(value: Any) -> bool:
         return value.strip().upper() in {
             "FAIL", "FAILED", "ERROR", "UNHEALTHY", "NOT_READY",
             "NOT_HEALTHY", "BLOCKED", "OFFLINE", "UNAVAILABLE",
+            "NOT_PROVISIONED", "CONFIGURED_NOT_RUNNING",
+            "PROFILE_REGISTERED_NOT_RUNNING", "NOT_OBSERVED", "STALE", "DEGRADED",
         }
     return False
 
@@ -214,3 +216,33 @@ def indicators_for_fleet(fleet_status, *, now=None, freshness_seconds=300):
         result.append(item.public())
     return result
 
+
+ 
+def aggregate_indicator_payloads(indicators: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate public indicator payloads without discarding blockers."""
+    if not indicators:
+        return {
+            "status": "UNKNOWN",
+            "healthy": False,
+            "required_count": 0,
+            "verified_count": 0,
+            "blockers": [{"error_code": "NO_REQUIRED_INDICATORS"}],
+        }
+    blockers = [
+        {
+            "indicator_id": item.get("indicator_id"),
+            "subject_id": item.get("subject_id"),
+            "status": item.get("status", "UNKNOWN"),
+            "value": item.get("value"),
+            "error_code": item.get("error_code"),
+        }
+        for item in indicators
+        if item.get("status") != "VERIFIED" or _value_is_unhealthy(item.get("value"))
+    ]
+    return {
+        "status": "HEALTHY" if not blockers else "DEGRADED",
+        "healthy": not blockers,
+        "required_count": len(indicators),
+        "verified_count": sum(item.get("status") == "VERIFIED" for item in indicators),
+        "blockers": blockers,
+    }
