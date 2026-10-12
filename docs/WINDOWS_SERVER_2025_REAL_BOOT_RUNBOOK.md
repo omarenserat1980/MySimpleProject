@@ -62,8 +62,9 @@ Do not mint a production signing key in CI, fabricate an attestation, echo token
 1. Open Actions → **Brain Windows Real Boot Evidence**.
 2. Select **Run workflow** on the intended PR branch only after reviewing its code and the Control Plane configuration.
 3. Supply a direct, legitimate Microsoft Windows Server 2025 x64 ISO URL available to the operator. Microsoft registration/licensing requirements still apply.
-4. Set the timeout within the workflow's configured limits and start the run.
-5. Follow the same run through contract delivery, contract verification, ISO inspection, fresh QCOW2 creation, KVM boot, guest evidence, and independent completion gate.
+4. Supply the independently verified Microsoft SHA-256 for that exact ISO in the required `trusted_iso_sha256` input. Do not calculate the “trusted” value from the downloaded file; obtain it independently from Microsoft or a documented trusted Microsoft verification mechanism. The workflow blocks before ISO inspection if the checksum is absent or mismatched.
+5. Set the timeout within the workflow's configured limits and start the run.
+6. Follow the same run through contract delivery, contract verification, checksum validation, ISO inspection, fresh QCOW2 creation, KVM boot, guest evidence, and independent completion gate.
 
 The workflow creates a fresh `windows-server-2025.qcow2` and a separate evidence image in the runner workspace. Do not point it at or overwrite an existing VM disk.
 
