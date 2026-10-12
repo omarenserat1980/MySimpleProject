@@ -54,6 +54,8 @@ class VirtualRAM:
                              if self.profile else None)
         self.cache_hierarchy = CacheHierarchy(tuple(cache_levels)) if cache_levels else (CacheHierarchy() if cache_enabled else None)
         self.last_access_report = None
+        self._next_fault = None
+        self.fault_stats = {"read_errors": 0, "write_errors": 0, "bit_flips": 0}
 
     def _check(self, address: int):
         if not 0 <= address < self.size:
@@ -66,6 +68,36 @@ class VirtualRAM:
     @property
     def host_payload_bytes_estimate(self) -> int:
         return sum(max(1, (abs(value).bit_length() + 7) // 8) for value in self._cells.values())
+
+    def inject_fault(self, fault: str, address: int | None = None) -> dict:
+        if fault not in {"read_error", "write_error", "bit_flip"}:
+            raise ValueError(f"RAM_UNKNOWN_FAULT:{fault}")
+        if address is not None:
+            self._check(int(address))
+        self._next_fault = {"kind": fault, "address": int(address) if address is not None else None}
+        return {"ok": True, "fault": fault, "address": address, "deterministic": True}
+
+    def _consume_fault(self, operation: str, address: int):
+        fault = self._next_fault
+        if fault is None:
+            return
+        kind = fault["kind"]
+        if kind == "read_error" and operation == "read":
+            self._next_fault = None
+            self.fault_stats["read_errors"] += 1
+            raise RuntimeError("RAM_INJECTED_READ_ERROR")
+        if kind == "write_error" and operation == "write":
+            self._next_fault = None
+            self.fault_stats["write_errors"] += 1
+            raise RuntimeError("RAM_INJECTED_WRITE_ERROR")
+        if kind == "bit_flip" and operation == "read" and (fault["address"] is None or fault["address"] == address):
+            self._next_fault = None
+            value = self._cells.get(address, 0) ^ 1
+            if value:
+                self._cells[address] = value
+            else:
+                self._cells.pop(address, None)
+            self.fault_stats["bit_flips"] += 1
 
     def _record_access(self, address: int, operation: str):
         reports = {}
@@ -83,11 +115,13 @@ class VirtualRAM:
 
     def read(self, address: int) -> int:
         self._check(address)
+        self._consume_fault("read", address)
         self._record_access(address, "read")
         return self._cells.get(address, 0)
 
     def write(self, address: int, value: int) -> None:
         self._check(address)
+        self._consume_fault("write", address)
         self._record_access(address, "write")
         value = int(value)
         if value == 0:
@@ -120,6 +154,8 @@ class VirtualRAM:
             "profile_id": self.profile_id,
             "host_payload_bytes_estimate": self.host_payload_bytes_estimate,
             "host_rss_measured": False,
+            "fault_stats": dict(self.fault_stats),
+            "pending_fault": dict(self._next_fault) if self._next_fault else None,
             "host_buffer_allocated_for_full_capacity": False,
             "dram_timing": self.timing_model.snapshot() if self.timing_model else None,
             "cache_hierarchy": self.cache_hierarchy.snapshot() if self.cache_hierarchy else None,
