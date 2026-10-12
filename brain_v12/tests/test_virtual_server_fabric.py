@@ -42,6 +42,16 @@ class VirtualServerFabricTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "HOST_CAPACITY_UNKNOWN")
 
+    def test_unmarked_host_capacity_is_not_trusted(self):
+        host = HostCapacity(8, 8192, 100 * 1024**3, "Linux", "x86_64")
+        result = admit_server_workload(SERVER_PROFILES[0], host)
+        self.assertEqual(result["status"], "HOST_CAPACITY_NOT_OBSERVED")
+
+    def test_invalid_observed_host_capacity_is_rejected(self):
+        host = HostCapacity(0, 8192, 100 * 1024**3, "Linux", "x86_64", HOST_OBSERVED)
+        result = admit_server_workload(SERVER_PROFILES[0], host)
+        self.assertEqual(result["status"], "HOST_CAPACITY_INVALID")
+
     def test_admission_rejects_simulated_host_measurements(self):
         host = HostCapacity(4, 8192, 100 * 1024**3, "Linux", "x86_64", "SIMULATED")
         result = admit_server_workload(SERVER_PROFILES[0], host)
