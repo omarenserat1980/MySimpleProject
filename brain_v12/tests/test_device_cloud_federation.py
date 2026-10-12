@@ -111,7 +111,8 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(row["observed_state"], "SIMULATION_READY")
         self.assertTrue(row["execution_eligible"])
         self.assertFalse(row["native_os_boot_verified"])
-        self.assertEqual(ready["active_software_node"]["indicator_state"], "SIMULATION_READY")
+        self.assertEqual(ready["active_software_node"]["indicator_target"], "arkan-virtual-01")
+        self.assertNotEqual(ready["active_software_node"]["indicator_state"], "SIMULATION_READY")
 
     def test_wrong_arkan_identity_cannot_be_marked_ready(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
@@ -175,11 +176,13 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(rows["phone-virtual-01"]["observed_state"], "PROFILE_REGISTERED_NOT_RUNNING")
         self.assertEqual(rows["phone-virtual-01"]["role"], "virtual_phone")
         self.assertEqual(rows["phone-virtual-01"]["platform"], "brain-mobile-simulator")
-        self.assertTrue(rows["phone-virtual-01"]["indicator_selected"])
+        self.assertFalse(rows["phone-virtual-01"]["indicator_selected"])
         self.assertFalse(rows["phone-virtual-01"]["physical_device_required"])
         self.assertFalse(rows["phone-virtual-01"]["execution_eligible"])
-        self.assertEqual(result["active_software_node"]["indicator_target"], "phone-virtual-01")
-        self.assertEqual(result["active_software_node"]["display_name"], "هاتف برين الافتراضي")
+        self.assertTrue(rows["arkan-virtual-01"]["indicator_selected"])
+        self.assertEqual(result["active_software_node"]["indicator_target"], "arkan-virtual-01")
+        self.assertEqual(result["active_software_node"]["display_name"], "Arkan virtual computer")
+        self.assertEqual(result["active_software_node"]["indicator_state"], "NOT_PROVISIONED")
         self.assertFalse(result["active_software_node"]["physical_device_required"])
         self.assertEqual(rows["redmi3-01"]["observed_state"], "ONLINE")
         self.assertFalse(rows["redmi3-01"]["identity_verified"])
