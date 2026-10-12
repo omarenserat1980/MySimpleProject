@@ -99,6 +99,7 @@ jobs:
           echo "runner_name=${name}" >> "$GITHUB_OUTPUT"
           echo "runner_busy=${busy}" >> "$GITHUB_OUTPUT"
           echo "runner_status=${status}" >> "$GITHUB_OUTPUT"
+          echo "runner_status=${status}" >> "$GITHUB_OUTPUT"
 
   evidence:
     name: Evidence and Health Gate
