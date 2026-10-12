@@ -15,7 +15,7 @@ concurrency:
 
 env:
   REPO: omarenserat1980/MySimpleProject
-  REQUIRED_LABELS: '["brain-internal","linux","x64","qemu","windows-real-boot","self-hosted"]'
+  REQUIRED_LABELS: '["brain-internal","linux","x64","qemu","windows-real-boot","brain-cloud-executor","self-hosted"]'
 
 jobs:
   detect:
@@ -107,7 +107,7 @@ jobs:
     concurrency:
       group: brain-internal-execution-probe
       cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
     timeout-minutes: 5
     steps:
       - name: Prove runner can execute
