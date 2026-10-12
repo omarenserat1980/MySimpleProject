@@ -41,40 +41,14 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 jobs:
   dispatch_internal_task:
     if: github.event_name == 'workflow_dispatch'
-    concurrency:
-      group: brain-internal-execution
-      cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
-    timeout-minutes: 60
-    permissions:
-      contents: read
-      actions: read
-    env:
-      BRAIN_INTERNAL_RUNNER_FLAG: "1"
-      TASK: ${{ inputs.task }}
-    steps:
-      - name: Fail-closed internal runner preflight
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from brain_v12.brain.internal_runner_preflight import verify_and_write
-          evidence = verify_and_write("internal-runner-preflight.json")
-          assert evidence["verified"] is True, evidence
-          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
-          PY
-      - name: Checkout Brain
-        uses: actions/checkout@v5
-      - name: Execute task on Brain-owned runtime
-        run: |
-          set -euo pipefail
-          echo "BRAIN_EXECUTOR=brain-internal"
-          echo "BRAIN_TASK=$TASK"
-          python brain_v12/ci/brain_runner.py
+    uses: ./.github/workflows/brain-github-cloud.yml
+    with:
+      task: ${{ inputs.task }}
 
   health_and_recovery:
     concurrency:
@@ -105,20 +79,20 @@ jobs:
     concurrency:
       group: brain-internal-execution
       cancel-in-progress: false
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Fail-closed Brain internal runtime preflight
+      - name: Verify hosted bounded recovery authority
         run: |
           set -euo pipefail
-          python -m brain_v12.brain.internal_runner_preflight
-          python - <<'PY'
-          from brain_v12.brain.internal_runner_preflight import verify_and_write
-          e=verify_and_write("internal-runner-preflight.json")
-          assert e["verified"] is True, e
-          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
-          PY
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          test "$RUNNER_OS" = "Linux"
+          echo "BRAIN_RECOVERY_MODE=GITHUB_HOSTED_BOUNDED"
+          echo "BRAIN_PRODUCTION_CODE_MUTATION=NOT_AUTHORIZED"
       - name: Diagnose failed cinematic run
         env:
           GH_TOKEN: ${{ github.token }}

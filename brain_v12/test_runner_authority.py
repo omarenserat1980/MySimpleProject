@@ -22,55 +22,64 @@ def test_windows_real_boot_has_fail_closed_preflight():
 
 
 
-def test_internal_runtime_never_uses_github_hosted_runner():
+def test_allowlisted_software_runtime_uses_hosted_runner():
     text = INTERNAL_RUNTIME_WORKFLOW.read_text(encoding="utf-8")
-    assert "runs-on: ubuntu-latest" not in text
-    assert "self-hosted" in text
-    assert "brain-internal" in text
-    assert "BRAIN_INTERNAL_RUNNER_FLAG" in text
-    assert "internal_runner_preflight" in text
-    assert '"github_hosted_runtime":false' in text
+    assert "runs-on: ubuntu-latest" in text
+    assert "BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE" in text
+    assert "BRAIN_PHYSICAL_HARDWARE_REQUIRED=false" in text
+    assert "internal_runner_preflight" not in text
+    assert "BRAIN_INTERNAL_RUNNER_FLAG" not in text
+    assert "contents: write" not in text
+    runner = Path("brain_v12/ci/brain_runner.py").read_text(encoding="utf-8")
+    assert "TASKS = {" in runner
+    assert "REJECTED_TASK" in runner
+    assert "if command is None" in runner
+    assert '"github_hosted_runtime": True' in text
 
 
-def test_supervisor_keeps_task_dispatch_on_brain_owned_runtime():
+def test_supervisor_delegates_allowlisted_tasks_to_hosted_runtime():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
     dispatch = text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
-    assert "brain-github-cloud.yml/dispatches" not in text
-    assert "self-hosted" in dispatch
-    assert "brain-internal" in dispatch
-    assert "internal_runner_preflight" in dispatch
+    assert "uses: ./.github/workflows/brain-github-cloud.yml" in dispatch
+    assert "self-hosted" not in dispatch
+    assert "internal_runner_preflight" not in dispatch
 
 
 def test_supervisor_simulation_and_verification_use_hosted_runner():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
     health = text.split("health_and_recovery:", 1)[1].split("self_heal:", 1)[0]
     verify = text.split("verify:", 1)[1]
-    for job in (health, verify):
+    recovery = text.split("self_heal:", 1)[1].split("\n  verify:", 1)[0]
+    for job in (health, verify, recovery):
         assert "runs-on: ubuntu-latest" in job
         assert "internal_runner_preflight" not in job
+        assert "self-hosted" not in job
+    assert "actions: write" in recovery
+    assert "gh run rerun" in recovery
 
 
-RUNTIME_WORKFLOWS = (
-    Path(".github/workflows/brain-github-cloud.yml"),
-    Path(".github/workflows/brain-local-cinema-smoke.yml"),
-    Path(".github/workflows/brain-continuous-self-healing.yml"),
-    Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
-    Path(".github/workflows/brain-supervisor.yml"),
-)
+def test_continuous_self_healing_runs_hosted_and_opens_review_pr():
+    text = Path(".github/workflows/brain-continuous-self-healing.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "RUNNER_ENVIRONMENT" in text
+    assert "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SELF_HEALING" in text
+    assert "internal_runner_preflight" not in text
+    assert "self-hosted" not in text
+    assert "pull-requests: write" in text
+    assert "gh pr create" in text
+    assert "git push origin HEAD:main" not in text
+    assert "BRAIN_REPAIR_PR_FORBIDDEN_PATH" in text
+    assert "brain_v12.self_healing.verification_gate" in text
 
 
-def test_remaining_runtime_workloads_are_brain_owned():
-    # These still perform internal task execution or bounded autonomous repair.
-    # Migrate them separately; hosted-runner simulation jobs are classified above.
-    remaining = tuple(
-        workflow for workflow in RUNTIME_WORKFLOWS
-        if workflow.name not in {"brain-local-cinema-smoke.yml", "brain-supervisor.yml"}
-    )
-    for workflow in remaining:
-        text = workflow.read_text(encoding="utf-8")
-        assert "runs-on: ubuntu-latest" not in text, workflow
-        assert "brain-internal" in text, workflow
-        assert "internal_runner_preflight" in text, workflow
+def test_human_intermediary_autopilot_uses_hosted_runner_for_bounded_state_only():
+    text = Path(".github/workflows/brain-human-intermediary-autopilot.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "RUNNER_ENVIRONMENT" in text
+    assert "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SOFTWARE" in text
+    assert "internal_runner_preflight" not in text
+    assert "automatic_production_code_mutation" in text
+    assert "automatic_financial_or_external_side_effects" in text
 
 
 def test_brain_iso_qemu_verification_uses_hosted_runner():
@@ -102,6 +111,28 @@ def test_local_cinema_smoke_is_hardware_independent():
     assert "runs-on: ubuntu-latest" in text
     assert "internal_runner_preflight" not in text
     assert "BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED" in text
+
+
+def test_runner_diagnostics_use_hosted_software_runners():
+    linux_smoke = Path(".github/workflows/linux-runner-smoke.yml").read_text(encoding="utf-8")
+    pipeline_gate = Path(".github/workflows/autonomous-pipeline-runner-gate.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in linux_smoke
+    assert "runs-on: ubuntu-latest" in pipeline_gate
+    for workflow in (linux_smoke, pipeline_gate):
+        assert "RUNNER_ENVIRONMENT" in workflow
+        assert "github-hosted" in workflow
+        assert "self-hosted" not in workflow
+        assert "HARDWARE_DEPENDENCY=NONE" in workflow or "hardware_dependency=NONE" in workflow
+
+
+def test_windows_toolchain_preflight_does_not_require_arkan_or_azure_login():
+    text = Path(".github/workflows/brain-runner-preflight.yml").read_text(encoding="utf-8")
+    assert "runs-on: windows-latest" in text
+    assert "hashicorp/setup-terraform@v3" in text
+    assert "self-hosted" not in text
+    assert "C:\\actions-runner" not in text
+    assert "AZURE_AUTHENTICATION=NOT_ATTEMPTED" in text
+    assert "BRAIN_HARDWARE_DEPENDENCY=NONE" in text
 
 
 def test_canonical_internal_runtime_modules_exist():

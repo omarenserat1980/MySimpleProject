@@ -9,41 +9,80 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-RUNTIME_WORKFLOWS = (
-    ".github/workflows/brain-github-cloud.yml",
-    ".github/workflows/brain-continuous-self-healing.yml",
-    ".github/workflows/brain-human-intermediary-autopilot.yml",
-)
-
-FORBIDDEN_RUNTIME_MARKERS = (
-    "runs-on: ubuntu-latest",
-    "runs-on: ubuntu-24.04",
-    "runs-on: ubuntu-22.04",
-)
-
-REQUIRED_RUNTIME_MARKERS = (
-    "brain-internal",
-    "internal_runner_preflight",
-)
-
-
 def assert_runtime_contract() -> dict:
     failures: list[str] = []
     checked: list[str] = []
 
-    for relative in RUNTIME_WORKFLOWS:
-        path = ROOT / relative
-        checked.append(relative)
-        if not path.exists():
-            failures.append(f"MISSING_RUNTIME_WORKFLOW:{relative}")
-            continue
-        text = path.read_text(encoding="utf-8")
-        for marker in FORBIDDEN_RUNTIME_MARKERS:
-            if marker in text:
-                failures.append(f"FORBIDDEN_MARKER:{relative}:{marker}")
-        for marker in REQUIRED_RUNTIME_MARKERS:
-            if marker not in text:
-                failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+    # Self-healing can run on a hosted software runner because repair delivery
+    # is review-only; it must never push automated patches directly to main.
+    checked.append(".github/workflows/brain-continuous-self-healing.yml")
+    heal_path = ROOT / ".github/workflows/brain-continuous-self-healing.yml"
+    if heal_path.exists():
+        heal_text = heal_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in heal_text:
+            failures.append("SELF_HEALING_NOT_HOSTED")
+        if "self-hosted" in heal_text or "internal_runner_preflight" in heal_text:
+            failures.append("SELF_HEALING_REQUIRES_PHYSICAL_RUNNER")
+        for marker in (
+            "REVIEWED_PULL_REQUEST_ONLY",
+            "pull-requests: write",
+            "gh pr create",
+            "BRAIN_REPAIR_PR_FORBIDDEN_PATH",
+            "brain_v12.self_healing.verification_gate",
+        ):
+            if marker not in heal_text:
+                failures.append(f"SELF_HEALING_REVIEW_GATE_MISSING:{marker}")
+        if "git push origin HEAD:main" in heal_text:
+            failures.append("SELF_HEALING_DIRECT_MAIN_PUSH_FORBIDDEN")
+    else:
+        failures.append("MISSING_SELF_HEALING_WORKFLOW")
+
+    # Allowlisted software tasks and bounded supervisor recovery run on hosted infrastructure.
+    # Production provisioning and real Windows guest boot remain separately protected.
+    cloud_path = ROOT / ".github/workflows/brain-github-cloud.yml"
+    if cloud_path.exists():
+        cloud_text = cloud_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_NOT_HOSTED")
+        if "self-hosted" in cloud_text or "internal_runner_preflight" in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_REQUIRES_INTERNAL_RUNNER")
+        if "BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE" not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_MODE_MISSING")
+        if '"github_hosted_runtime": True' not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_EVIDENCE_MARKER_MISSING")
+        if "contents: write" in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_HAS_WRITE_PERMISSION")
+        task_runner = ROOT / "brain_v12/ci/brain_runner.py"
+        if not task_runner.exists():
+            failures.append("BRAIN_ALLOWLISTED_TASK_RUNNER_MISSING")
+        else:
+            runner_text = task_runner.read_text(encoding="utf-8")
+            for marker in ("TASKS = {", "REJECTED_TASK", "if command is None"):
+                if marker not in runner_text:
+                    failures.append(f"BRAIN_ALLOWLISTED_TASK_CONTRACT_MISSING:{marker}")
+    else:
+        failures.append("MISSING_BRAIN_SOFTWARE_RUNTIME_WORKFLOW")
+
+    # The human-intermediary predictor is bounded state/evidence work, not
+    # production execution; it is safe to run on GitHub-hosted infrastructure.
+    autopilot_path = ROOT / ".github/workflows/brain-human-intermediary-autopilot.yml"
+    if autopilot_path.exists():
+        autopilot_text = autopilot_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_NOT_HOSTED")
+        if "RUNNER_ENVIRONMENT" not in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_HOSTED_GUARD_MISSING")
+        if "internal_runner_preflight" in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_REQUIRES_INTERNAL_RUNNER")
+        for marker in (
+            "automatic_production_code_mutation",
+            "automatic_financial_or_external_side_effects",
+            "success_requires_evidence",
+        ):
+            if marker not in autopilot_text:
+                failures.append(f"HUMAN_INTERMEDIARY_AUTOPILOT_SAFETY_CONTRACT_MISSING:{marker}")
+    else:
+        failures.append("MISSING_HUMAN_INTERMEDIARY_AUTOPILOT")
 
     # The long-form cinema pipeline is software rendering, not real guest boot.
     cinema_path = ROOT / ".github/workflows/brain-120-minute-cinema.yml"
@@ -100,8 +139,18 @@ def assert_runtime_contract() -> dict:
         dispatch_start = supervisor_text.find("  dispatch_internal_task:")
         dispatch_end = supervisor_text.find("\n  health_and_recovery:", dispatch_start)
         dispatch = supervisor_text[dispatch_start:dispatch_end] if dispatch_start >= 0 and dispatch_end >= 0 else ""
-        if "self-hosted" not in dispatch or "internal_runner_preflight" not in dispatch:
-            failures.append("INTERNAL_TASK_DISPATCH_GUARD_MISSING")
+        if "./.github/workflows/brain-github-cloud.yml" not in dispatch or "self-hosted" in dispatch:
+            failures.append("SUPERVISOR_DISPATCH_NOT_DELEGATED_TO_HOSTED_ALLOWLISTED_RUNTIME")
+
+        heal_start = supervisor_text.find("  self_heal:")
+        heal_end = supervisor_text.find("\n  verify:", heal_start)
+        heal = supervisor_text[heal_start:heal_end] if heal_start >= 0 and heal_end >= 0 else ""
+        if "runs-on: ubuntu-latest" not in heal:
+            failures.append("SUPERVISOR_RECOVERY_NOT_HOSTED")
+        if "internal_runner_preflight" in heal or "self-hosted" in heal:
+            failures.append("SUPERVISOR_RECOVERY_REQUIRES_INTERNAL_RUNNER")
+        if "actions: write" not in heal or "gh run rerun" not in heal:
+            failures.append("SUPERVISOR_RECOVERY_AUTHORITY_NOT_BOUNDED")
     else:
         failures.append("MISSING_SUPERVISOR_WORKFLOW")
     if cinema_smoke_path.exists():

@@ -1,4 +1,4 @@
-name: Linux Runner Smoke Test
+name: Linux Hosted Runner Smoke Test
 
 on:
   push:
@@ -11,19 +11,27 @@ permissions:
 
 jobs:
   linux-runner-smoke:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Identify runner
+      - name: Identify GitHub-hosted runner
+        shell: bash
         run: |
-          echo "RUNNER_NAME=$RUNNER_NAME"
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          echo "RUNNER_ENVIRONMENT=$RUNNER_ENVIRONMENT"
           echo "RUNNER_OS=$RUNNER_OS"
           echo "RUNNER_ARCH=$RUNNER_ARCH"
-          hostname
           uname -a
-      - name: Verify runner
+
+      - name: Verify software runtime
+        shell: bash
         run: |
-          test "$RUNNER_NAME" = "linux-runner-01"
+          set -euo pipefail
           test "$RUNNER_OS" = "Linux"
           test "$RUNNER_ARCH" = "X64"
-          echo "LINUX_RUNNER_SMOKE=PASS"
+          command -v bash
+          command -v python3
+          python3 --version
+          echo "LINUX_HOSTED_RUNNER_SMOKE=PASS"
+          echo "HARDWARE_DEPENDENCY=NONE"

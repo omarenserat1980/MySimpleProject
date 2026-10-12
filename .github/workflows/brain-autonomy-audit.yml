@@ -1,0 +1,76 @@
+name: Brain Autonomy Runner Audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "brain_v12/brain/autonomy_audit.py"
+      - "brain_v12/test_autonomy_audit.py"
+      - ".github/workflows/brain-autonomy-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "brain_v12/brain/autonomy_audit.py"
+      - "brain_v12/test_autonomy_audit.py"
+      - ".github/workflows/brain-autonomy-audit.yml"
+  schedule:
+    - cron: "23 5 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-autonomy-runner-audit
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+      - name: Test audit methodology
+        run: python -m unittest brain_v12.test_autonomy_audit -v
+      - name: Produce reproducible audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .brain/evidence
+          python -m py_compile brain_v12/brain/autonomy_audit.py
+          python brain_v12/brain/autonomy_audit.py > .brain/evidence/runner-independence-audit.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path(".brain/evidence/runner-independence-audit.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert data["schema"] == "brain.runner-independence-audit.v1"
+          assert data["workflow_count"] > 0
+          assert data["job_count"] > 0
+          assert data["full_autonomy_certified"] is False
+          print("BRAIN_RUNNER_AUDIT=VALID")
+          print("WORKFLOWS=", data["workflow_count"])
+          print("JOBS=", data["job_count"])
+          print("ALL_WORKFLOW_RUNNER_INDEPENDENCE_PERCENT=", data["all_workflows"]["runner_independence_percent"])
+          print("SOFTWARE_SCOPE_RUNNER_INDEPENDENCE_PERCENT=", data["software_scope_excluding_explicit_hardware_dependencies"]["runner_independence_percent"])
+          print("SELF_HOSTED_JOB_COUNT=", data["all_workflows"]["self_hosted"])
+          for job in data["self_hosted_jobs"]:
+              print("SELF_HOSTED_JOB=", f"{job['workflow']}::{job['job']}")
+          for job in data["unresolved_jobs"]:
+              print("UNRESOLVED_RUNNER_JOB=", f"{job['workflow']}::{job['job']}::{job['runner_class']}")
+          print("FULL_AUTONOMY_CERTIFIED=false")
+          PY
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-runner-independence-audit
+          path: .brain/evidence/runner-independence-audit.json
+          if-no-files-found: error
+          retention-days: 30
