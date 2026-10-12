@@ -164,7 +164,7 @@ def synthetic_baseline_profiles() -> tuple[HardwareProfile, ...]:
         HardwareProfile(
             "brain-memory-functional-v1", "memory", "Brain addressable-cell RAM",
             FidelityLevel.FUNCTIONAL,
-            {"default_capacity_bytes": 65536, "cell_model": "integer-valued addressable cell"},
+            {"default_addressable_cells": 65536, "cell_model": "integer-valued addressable cell"},
             ("address bounds", "read/write", "snapshot/restore"),
             ("DDR channel timing", "refresh timing", "ECC fault model", "NUMA"),
             (source,), ("ram_bounds", "ram_snapshot_roundtrip", "ram_restore_size_mismatch"),
