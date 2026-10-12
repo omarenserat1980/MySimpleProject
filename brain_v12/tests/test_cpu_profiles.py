@@ -6,6 +6,7 @@ from brain_v12.virtual_hardware.cpu_profiles import get_cpu_profile, list_cpu_pr
 from brain_v12.virtual_hardware.x86_64 import X86_64CPU, X86UnsupportedInstruction
 from brain_v12.virtual_hardware.computer import VirtualComputer
 from brain_v12.blade_server import BladeChassis, BladeScheduler
+from brain_v12.virtual_hardware.cpu_benchmark import run_cpu_subset_benchmark
 
 
 class CPUProfileTests(unittest.TestCase):
@@ -80,6 +81,15 @@ class CPUProfileTests(unittest.TestCase):
         cpu = X86_64CPU()
         with self.assertRaisesRegex(RuntimeError, "X86_BAD_REGISTER"):
             cpu.step([("MOVI", "CR0", 1)])
+
+    def test_cpu_work_count_benchmark_is_reproducible_and_not_physical_performance(self):
+        first = run_cpu_subset_benchmark(25)
+        second = run_cpu_subset_benchmark(25)
+        self.assertEqual(first, second)
+        self.assertEqual(first["result_rax"], 25)
+        self.assertEqual(first["completed_interpreted_instructions"], 28)
+        self.assertIsNone(first["elapsed_host_seconds"])
+        self.assertFalse(first["physical_cpu_performance_claim"])
 
     def test_virtual_computer_selects_cpu_profile_and_reports_manifest(self):
         computer = VirtualComputer("profiled", ram_size=64, cpu_profile_id="intel-core-i7-6700")
