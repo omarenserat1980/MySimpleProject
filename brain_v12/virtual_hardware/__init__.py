@@ -9,12 +9,13 @@ from .bus import VirtualBus
 from .devices import VirtualNIC, VirtualStorage, VirtualGPU
 from .disk import VirtualDisk
 from .uefi import VirtualUEFI
-from .x86_64 import X86_64CPU
+from .x86_64 import X86_64CPU, X86UnsupportedInstruction
+from .cpu_profiles import CPUProfile, get_cpu_profile, list_cpu_profiles
 from .os_image import OSImage, windows_server_2025_image
 from .windows_server import WindowsServerVM
 
 __all__ = [
     "VirtualComputer","VirtualCPU","VirtualRAM","VirtualBus",
     "VirtualNIC","VirtualStorage","VirtualGPU","VirtualDisk","VirtualUEFI",
-    "X86_64CPU","OSImage","windows_server_2025_image","WindowsServerVM"
+    "X86_64CPU","X86UnsupportedInstruction","CPUProfile","get_cpu_profile","list_cpu_profiles","OSImage","windows_server_2025_image","WindowsServerVM"
 ]
