@@ -115,5 +115,25 @@ class SupervisorTests(unittest.TestCase):
                 s.evidence.close()
 
 
+    def test_direct_delivery_without_golden_contract_is_blocked(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = BrainSupervisor(root=d)
+            try:
+                job = self._prepare_verifying_job(s)
+                result = s.transition(
+                    job, "deliver", status="completed",
+                    required_evidence_kind="runtime_check_passed",
+                    enforce_authority=False,
+                )
+                self.assertEqual(result["status"], "blocked")
+                self.assertEqual(result["phase"], "blocked")
+                self.assertEqual(
+                    result["details"]["completion_gate"],
+                    "GOLDEN_ACCEPTANCE_CRITERIA_REQUIRED",
+                )
+            finally:
+                s.evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()
