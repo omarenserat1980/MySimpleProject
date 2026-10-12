@@ -30,11 +30,12 @@ class UniversalSimulatorApiTests(unittest.TestCase):
     def test_redacts_secrets_from_values_and_keys(self):
         value = api._redact({
             "api_key": "secret-value",
-            "log": "Authorization: abc123 Bearer xyz987 token=token-value",
+            "log": "Authorization: Bearer authsecret abc123 Bearer xyz987 token=token-value",
         })
         rendered = json.dumps(value)
         self.assertNotIn("secret-value", rendered)
         self.assertNotIn("abc123", rendered)
+        self.assertNotIn("authsecret", rendered)
         self.assertNotIn("xyz987", rendered)
         self.assertNotIn("token-value", rendered)
 
