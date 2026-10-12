@@ -263,7 +263,65 @@ class VirtualComputer:
                  "PCIe generation reference only; topology is synthetic, not a real motherboard specification."),),
                 ("test_topology_lane_budget_and_dma_accounting", "test_topology_conflict_rejected_before_boot"),
             ))
-        return MachineManifest(self.name, 1, tuple(profiles)).describe()
+        profiles.append(HardwareProfile(
+            "brain-virtual-firmware-v1", "firmware", "Brain deterministic virtual firmware and bootloader",
+            FidelityLevel.FUNCTIONAL,
+            {"firmware_version": self.firmware.VERSION, "bootloader_version": self.bootloader.VERSION,
+             "kernel_required": False},
+            ("device enumeration", "boot record", "optional kernel image check", "manifest-gated boot"),
+            ("physical BIOS/UEFI execution", "ACPI tables", "secure-boot cryptographic chain"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/firmware-v1",
+                                 "Software firmware contract, not a vendor firmware implementation."),),
+            ("test_machine_manifest_v2_includes_firmware_power_thermal",),
+            units={"firmware_version": "version string", "bootloader_version": "version string"},
+        ))
+        known_tdp = {}
+        if self.cpu_profile_id:
+            cpu_ref = get_cpu_profile(self.cpu_profile_id).specification_parameters
+            if cpu_ref.get("tdp_watts") is not None:
+                known_tdp["cpu"] = cpu_ref["tdp_watts"]
+        if self.gpu_profile_id:
+            known_tdp["gpu"] = get_gpu_profile(self.gpu_profile_id).tdp_watts
+        if self.nic_profile_id:
+            known_tdp["nic"] = get_nic_profile(self.nic_profile_id).tdp_watts
+        profiles.append(HardwareProfile(
+            "brain-power-estimate-v1", "power", "Brain synthetic load-to-power estimate",
+            FidelityLevel.PERFORMANCE_ESTIMATION,
+            {"modelled_idle_watts": self.power_thermal.idle_power_watts,
+             "modelled_peak_watts": self.power_thermal.peak_power_watts,
+             "known_vendor_tdp_references": known_tdp,
+             "known_vendor_tdp_sum_watts": sum(known_tdp.values()),
+             "tdp_sum_is_complete_system_power": False,
+             "calibrated": False},
+            ("load-fraction to estimated watts", "vendor TDP reference reporting", "thermal-model input"),
+            ("physical current/voltage measurement", "component-level transient power", "calibrated wall-power prediction"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/power-estimate-v1",
+                                 "Idle/peak power values are configurable synthetic defaults; vendor TDP references are reported separately."),),
+            ("test_power_thermal_estimates_and_throttling",),
+            units={"modelled_idle_watts": "W", "modelled_peak_watts": "W",
+                   "known_vendor_tdp_sum_watts": "W"},
+        ))
+        profiles.append(HardwareProfile(
+            "brain-thermal-rc-v1", "thermal", "Brain lumped thermal RC estimate",
+            FidelityLevel.TIMING_MODEL,
+            {"ambient_c": self.power_thermal.ambient_c,
+             "thermal_capacity_j_per_c": self.power_thermal.thermal_capacity_j_per_c,
+             "cooling_w_per_c": self.power_thermal.cooling_w_per_c,
+             "throttle_c": self.power_thermal.throttle_c, "shutdown_c": self.power_thermal.shutdown_c,
+             "fan_curve": "piecewise-linear synthetic curve"},
+            ("thermal inertia", "cooling effectiveness", "fan curve estimate", "throttling", "cool-down recovery", "fault injection"),
+            ("physical temperature sensor", "calibrated chassis thermal dynamics", "component hotspot CFD"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/thermal-rc-v1",
+                                 "Synthetic lumped RC parameters, not measured device thermals."),),
+            ("test_power_thermal_estimates_and_throttling", "test_thermal_fault_and_recovery"),
+            units={"ambient_c": "degC", "thermal_capacity_j_per_c": "J/degC",
+                   "cooling_w_per_c": "W/degC", "throttle_c": "degC", "shutdown_c": "degC"},
+        ))
+        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal")
+        return MachineManifest(self.name, 2, tuple(profiles), required_categories=required).describe()
 
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
