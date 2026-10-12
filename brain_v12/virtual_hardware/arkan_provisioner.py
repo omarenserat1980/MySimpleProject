@@ -170,7 +170,7 @@ def arkan_status(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
         "lifecycle": record.get("lifecycle", "failed"),
         "readiness": record.get("readiness", "UNKNOWN"),
         "execution_backend": record.get("execution_backend"),
-        "host_dependencies_for_identity": record.get("host_dependencies_for_identity") is False,
+        "identity_independent_of_host": record.get("host_dependencies_for_identity") is False,
         "os_target": record.get("os_target"),
         "claims": record.get("claims"),
         "task_execution_evidence": record.get("task_execution_evidence", {}),
