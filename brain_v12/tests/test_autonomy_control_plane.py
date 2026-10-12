@@ -44,7 +44,7 @@ class ControlPlaneTests(unittest.TestCase):
             index,row=latest_by_id[expired["job_id"]]
             row["lease_expires_at"]=0
             lines[index]=json.dumps(row,separators=(",",":"))
-            cp.jobs.write_text("\\n".join(lines)+"\\n",encoding="utf-8")
+            cp.jobs.write_text("\n".join(lines)+"\n",encoding="utf-8")
 
             restarted=ControlPlane(d)
             first=restarted.recover_expired_jobs()
