@@ -1,0 +1,45 @@
+name: Brain Universal Simulator and ChatGPT Repair
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/app.py"
+      - "brain_v12/brain/error_recovery_api.py"
+      - "brain_v12/brain/universal_simulator_api.py"
+      - "brain_v12/tests/test_error_recovery_api.py"
+      - "brain_v12/tests/test_universal_simulator_api.py"
+      - "brain_v12/docs/UNIVERSAL_SIMULATOR_CHATGPT_REPAIR.md"
+      - ".github/workflows/brain-error-recovery.yml"
+  push:
+    branches:
+      - main
+      - "feat/brain-unified-error-recovery"
+    paths:
+      - "brain_v12/brain/error_recovery_api.py"
+      - "brain_v12/brain/universal_simulator_api.py"
+      - "brain_v12/tests/test_error_recovery_api.py"
+      - "brain_v12/tests/test_universal_simulator_api.py"
+      - ".github/workflows/brain-error-recovery.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  error-recovery-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal API dependencies
+        run: python -m pip install --disable-pip-version-check fastapi httpx
+      - name: Compile new module and tests
+        run: python -m py_compile brain_v12/brain/error_recovery_api.py brain_v12/brain/universal_simulator_api.py brain_v12/tests/test_error_recovery_api.py brain_v12/tests/test_universal_simulator_api.py
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_error_recovery_api brain_v12.tests.test_universal_simulator_api -v
