@@ -7,6 +7,7 @@ from .cpu import VirtualCPU
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .pcie import VirtualPCIeBAR, VirtualPCIeEndpoint, VirtualPCIeFabric
+from .ecc_memory import VirtualECCMemoryController
 from .devices import VirtualNIC, VirtualStorage, VirtualGPU
 from .disk import VirtualDisk
 from .uefi import VirtualUEFI
@@ -25,7 +26,7 @@ from .extended_devices import (
 )
 
 __all__ = [
-    "VirtualComputer", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric",
+    "VirtualComputer", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric", "VirtualECCMemoryController",
     "VirtualNIC", "VirtualStorage", "VirtualGPU", "VirtualDisk", "VirtualUEFI",
     "X86_64CPU", "X86UnsupportedInstruction", "CPUProfile", "get_cpu_profile", "list_cpu_profiles",
     "StorageProfile", "get_storage_profile", "list_storage_profiles", "MemoryProfile", "CacheHierarchy",
