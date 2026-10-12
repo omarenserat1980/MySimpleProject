@@ -47,6 +47,14 @@ class BrainGitRouteSecurityTests(unittest.TestCase):
                     self.assertEqual(response.status_code, 403, response.text)
                     self.assertEqual(response.json()["detail"], "CONTROL_PLANE_AUTH_REQUIRED")
 
+    def test_read_routes_reject_invalid_key(self):
+        with patch.dict(os.environ, {"BRAIN_CONTROL_KEY": CONTROL_KEY}):
+            for path, _ in READ_ROUTES:
+                with self.subTest(path=path):
+                    response = self.client.get(path, headers={"X-Brain-Control-Key": "wrong-key"})
+                    self.assertEqual(response.status_code, 403, response.text)
+                    self.assertEqual(response.json()["detail"], "CONTROL_PLANE_AUTH_REQUIRED")
+
     def test_read_routes_reject_requests_when_control_plane_is_unconfigured(self):
         with patch.dict(os.environ, {"BRAIN_CONTROL_KEY": ""}):
             for path, _ in READ_ROUTES:
