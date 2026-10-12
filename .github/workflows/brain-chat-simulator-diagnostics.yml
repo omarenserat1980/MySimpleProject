@@ -1,0 +1,103 @@
+name: Brain Chat Simulator Diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/brain-chat-simulator-diagnostics.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-chat-simulator-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  diagnose-brain-node:
+    # Reuse the Brain-owned, software-first runner pool. This job is read-only:
+    # it does not install packages, change services, provision VMs, or boot guests.
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
+    timeout-minutes: 8
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Capture runtime and Windows boot prerequisites
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p brain-diagnostics
+          OUT=brain-diagnostics/diagnostics.txt
+          {
+            echo "BRAIN_DIAGNOSTICS_SCHEMA=1"
+            echo "TIMESTAMP_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "RUN_ID=$GITHUB_RUN_ID"
+            echo "RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            echo "RUNNER_NAME=${RUNNER_NAME:-unknown}"
+            echo "=== HOST ==="
+            hostname 2>&1 || true
+            uname -a 2>&1 || true
+            echo "ARCH=$(uname -m 2>/dev/null || echo unknown)"
+            echo "CPU_CORES=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo unknown)"
+            echo "=== MEMORY ==="
+            awk '/^(MemTotal|MemAvailable):/ {print}' /proc/meminfo 2>/dev/null || true
+            echo "=== DISK ==="
+            df -h "$GITHUB_WORKSPACE" 2>&1 || true
+            echo "=== VIRTUALIZATION / VM TOOLS ==="
+            if test -c /dev/kvm; then echo "KVM_DEVICE=present"; else echo "KVM_DEVICE=missing"; fi
+            if test -r /dev/kvm && test -w /dev/kvm; then echo "KVM_RW=pass"; else echo "KVM_RW=fail"; fi
+            for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy pwsh; do
+              if command -v "$tool" >/dev/null 2>&1; then printf '%s=present\n' "$tool"; else printf '%s=missing\n' "$tool"; fi
+            done
+            for f in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_CODE.fd; do
+              if test -r "$f"; then printf 'UEFI_FIRMWARE_READABLE=%s\n' "$f"; fi
+            done
+            echo "=== BRAIN HTTP READINESS ==="
+            python3 - <<'PY'
+          import json, urllib.error, urllib.request
+          for url in (
+              "http://127.0.0.1:8012/api/system/readiness",
+              "http://127.0.0.1:8012/api/media/health",
+              "http://127.0.0.1:8012/api/cinema/status",
+          ):
+              try:
+                  req=urllib.request.Request(url, headers={"Accept":"application/json"})
+                  with urllib.request.urlopen(req, timeout=3) as response:
+                      body=response.read(12000).decode("utf-8","replace")
+                      try:
+                          parsed=json.loads(body)
+                          body=json.dumps(parsed, ensure_ascii=False, sort_keys=True)
+                      except Exception:
+                          pass
+                      print("URL_CHECK="+url+" STATUS="+str(response.status))
+                      print(body[:12000])
+              except urllib.error.HTTPError as exc:
+                  print("URL_CHECK="+url+" STATUS="+str(exc.code))
+              except Exception as exc:
+                  print("URL_CHECK="+url+" ERROR="+type(exc).__name__+":"+str(exc)[:300])
+          PY
+            echo "=== RECENT BRAIN LOG FILE INVENTORY (NO CONTENTS) ==="
+            for root in "$GITHUB_WORKSPACE" "$HOME" /var/log /opt/brain /srv/brain; do
+              if test -d "$root"; then
+                find "$root" -maxdepth 4 -type f \( -iname '*brain*.log' -o -iname '*windows*boot*.log' -o -iname 'windows-boot-evidence.json' -o -iname 'windows-boot-proof.json' \) -printf '%TY-%Tm-%TdT%TH:%TM:%TSZ %s %p\n' 2>/dev/null | head -80
+              fi
+            done
+            echo "=== RUN CONTEXT ==="
+            echo "REPOSITORY=$GITHUB_REPOSITORY"
+            echo "REF=$GITHUB_REF"
+            echo "HOST_BOOT_STATUS=NOT_ASSERTED_BY_DIAGNOSTICS"
+            echo "WINDOWS_SERVER_2025_BOOT=UNVERIFIED_UNTIL_GUEST_EVIDENCE"
+          } > "$OUT" 2>&1
+
+          cat "$OUT"
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-chat-simulator-diagnostics-${{ github.run_id }}
+          path: brain-diagnostics/diagnostics.txt
+          if-no-files-found: warn
+          retention-days: 14
