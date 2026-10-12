@@ -55,25 +55,18 @@ def test_supervisor_simulation_and_verification_use_hosted_runner():
         assert "internal_runner_preflight" not in job
 
 
-RUNTIME_WORKFLOWS = (
-    Path(".github/workflows/brain-continuous-self-healing.yml"),
-    Path(".github/workflows/brain-local-cinema-smoke.yml"),
-    Path(".github/workflows/brain-supervisor.yml"),
-)
-
-
-def test_remaining_runtime_workloads_are_brain_owned():
-    # These still perform internal task execution or bounded autonomous repair.
-    # Migrate them separately; hosted-runner simulation jobs are classified above.
-    remaining = tuple(
-        workflow for workflow in RUNTIME_WORKFLOWS
-        if workflow.name not in {"brain-local-cinema-smoke.yml", "brain-supervisor.yml"}
-    )
-    for workflow in remaining:
-        text = workflow.read_text(encoding="utf-8")
-        assert "runs-on: ubuntu-latest" not in text, workflow
-        assert "brain-internal" in text, workflow
-        assert "internal_runner_preflight" in text, workflow
+def test_continuous_self_healing_runs_hosted_and_opens_review_pr():
+    text = Path(".github/workflows/brain-continuous-self-healing.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "RUNNER_ENVIRONMENT" in text
+    assert "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SELF_HEALING" in text
+    assert "internal_runner_preflight" not in text
+    assert "self-hosted" not in text
+    assert "pull-requests: write" in text
+    assert "gh pr create" in text
+    assert "git push origin HEAD:main" not in text
+    assert "BRAIN_REPAIR_PR_FORBIDDEN_PATH" in text
+    assert "brain_v12.self_healing.verification_gate" in text
 
 
 def test_human_intermediary_autopilot_uses_hosted_runner_for_bounded_state_only():
