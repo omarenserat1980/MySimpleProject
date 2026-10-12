@@ -8,7 +8,7 @@ class MissionSupervisorIntegrationTests(unittest.TestCase):
     def test_supervisor_phases_update_mission(self):
         s=BrainSupervisor(root=tempfile.mkdtemp(prefix="brain-v13-mission-"), max_cycles=3)
         job=s.create("mission")
-        expected={"discover":"UNDERSTANDING","plan":"PLANNING","select_backend":"READY","execute":"EXECUTING","verify":"VERIFYING"}
+        expected={"discover":"UNDERSTANDING","plan":"PLANNING","select_backend":"READY","execute":"EXECUTING","observe":"OBSERVING","verify":"VERIFYING"}
         for phase,state in expected.items():
             job=s.transition(job,phase,enforce_authority=False)
             self.assertEqual(s.missions[job["job_id"]].state, MissionState[state])
