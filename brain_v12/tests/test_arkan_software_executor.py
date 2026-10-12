@@ -89,6 +89,7 @@ class ArkanSoftwareExecutorTests(unittest.TestCase):
             first = service.submit("cpu_smoke", idempotency_key="same-request")
             second = service.submit("cpu_smoke", idempotency_key="same-request")
             self.assertEqual(first["task_id"], second["task_id"])
+            self.wait_for_terminal(service, first["task_id"])
         finally:
             service.close()
 
