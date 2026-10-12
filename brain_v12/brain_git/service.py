@@ -82,7 +82,7 @@ class BrainGitService:
                 if not isinstance(rel, str) or not rel or chr(0) in rel or chr(92) in rel:
                     raise BrainGitError("INVALID_REPOSITORY_PATH")
                 candidate=Path(rel)
-                if candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+                if candidate.is_absolute() or not candidate.parts or any(part in {"", ".", ".."} for part in candidate.parts):
                     raise BrainGitError("INVALID_REPOSITORY_PATH")
                 if candidate.parts and candidate.parts[0].lower()==".git":
                     raise BrainGitError("RESERVED_REPOSITORY_PATH")
