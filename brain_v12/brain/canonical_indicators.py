@@ -134,10 +134,25 @@ def build_indicator(
     )
 
 
+def _value_is_unhealthy(value: Any) -> bool:
+    if value is False:
+        return True
+    if isinstance(value, str):
+        return value.strip().upper() in {
+            "FAIL", "FAILED", "ERROR", "UNHEALTHY", "NOT_READY",
+            "NOT_HEALTHY", "BLOCKED", "OFFLINE", "UNAVAILABLE",
+        }
+    return False
+
+
 def aggregate_required_indicators(
     indicators: list[CanonicalIndicator],
 ) -> dict[str, Any]:
-    """Aggregate required component indicators without hiding uncertainty."""
+    """Aggregate required component indicators without hiding uncertainty.
+
+    A valid observation is not necessarily a healthy value: explicit false or
+    known failure states remain blockers even when the observation is fresh.
+    """
     if not indicators:
         return {
             "status": "UNKNOWN",
@@ -154,7 +169,7 @@ def aggregate_required_indicators(
             "error_code": item.error_code,
         }
         for item in indicators
-        if item.status != "VERIFIED"
+        if item.status != "VERIFIED" or _value_is_unhealthy(item.value)
     ]
     healthy = not blockers
     return {
