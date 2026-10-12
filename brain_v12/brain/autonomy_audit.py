@@ -19,14 +19,15 @@ HOSTED_MARKERS = (
     "windows-latest", "windows-2022", "windows-2019",
     "macos-latest", "macos-14", "macos-13",
 )
-# These workflows deliberately verify capabilities that cannot honestly be
-# certified by a generic hosted software runner. They remain visible in the
-# all-jobs score, but are excluded from the optional software-scope comparison.
+# These workflows explicitly depend on physical-device or real-guest capability.
+# They remain visible in the all-workflow score but are excluded from the
+# software-scope comparison; they are not prerequisites for software-only Brain.
 HARDWARE_SPECIFIC_WORKFLOWS = {
     "brain-windows-real-boot.yml",
     "brain-windows-real-boot-dependency-gate.yml",
     "windows-real-boot-runner-diagnostic.yml",
     "arkan-readonly-hyperv-preflight.yml",
+    "setup-exe-cloud-stage.yml",
 }
 
 
@@ -110,7 +111,7 @@ def calculate_audit(workflow_root: str | Path = WORKFLOW_ROOT) -> dict[str, Any]
         "delegated_reusable_workflow_calls": delegated_jobs,
         "delegated_reusable_workflow_call_count": len(delegated_jobs),
         "all_workflows": summarize(jobs),
-        "software_scope_excluding_explicit_hardware_verification": summarize(software_jobs),
+        "software_scope_excluding_explicit_hardware_dependencies": summarize(software_jobs),
         "hardware_specific_workflows_excluded_from_software_scope": sorted(HARDWARE_SPECIFIC_WORKFLOWS),
         "unresolved_jobs": [j for j in jobs if j["runner_class"] in {"dynamic_unresolved", "unknown", "missing"}],
         "self_hosted_jobs": [j for j in jobs if j["runner_class"] == "self_hosted"],
@@ -119,7 +120,7 @@ def calculate_audit(workflow_root: str | Path = WORKFLOW_ROOT) -> dict[str, Any]
             "This is a runner-placement index, not a complete autonomy percentage.",
             "A GitHub-hosted job can still require secrets, external services, or manual approval.",
             "Self-hosted jobs are counted as hardware/runner dependencies even if their host might be virtual.",
-            "Hardware-specific verification is excluded only from the software-scope comparison, never from the all-workflows view.",
+            "Explicit hardware-specific workflows are excluded only from the software-scope comparison, never from the all-workflows view.",
             "Behavioral execution, recovery, security boundaries, and artifact evidence require separate tests.",
         ],
     }
