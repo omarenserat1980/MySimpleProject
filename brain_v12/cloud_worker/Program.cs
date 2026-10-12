@@ -46,11 +46,16 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
 app.MapPost("/api/brain/command", async (HttpContext http, CommandRequest request, WorkerState state) =>
 {
     var expected = Environment.GetEnvironmentVariable("BRAIN_CLOUD_API_KEY");
-    if (!string.IsNullOrWhiteSpace(expected))
-    {
-        if (!http.Request.Headers.TryGetValue("X-Brain-Api-Key", out var supplied) || supplied != expected)
-            return Results.Unauthorized();
-    }
+    // Fail closed: never expose an unauthenticated command-acceptance endpoint
+    // merely because deployment configuration omitted the API key.
+    if (string.IsNullOrWhiteSpace(expected))
+        return Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "COMMAND_AUTH_NOT_CONFIGURED",
+            detail: "Command endpoint is disabled until BRAIN_CLOUD_API_KEY is configured.");
+
+    if (!http.Request.Headers.TryGetValue("X-Brain-Api-Key", out var supplied) || supplied != expected)
+        return Results.Unauthorized();
 
     var command = (request.Command ?? "").Trim();
     if (command.Length == 0 || command.Length > 4000)
