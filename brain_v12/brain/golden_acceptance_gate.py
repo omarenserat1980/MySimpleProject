@@ -61,15 +61,25 @@ class GoldenAcceptanceGate:
         expected_reality: str = "SIMULATED",
     ) -> GoldenGateResult:
         criteria = tuple(criteria)
-        if not task_id:
+        if not isinstance(task_id, str) or not task_id.strip():
             raise ValueError("TASK_ID_REQUIRED")
         if not criteria:
             raise ValueError("ACCEPTANCE_CRITERIA_REQUIRED")
-        if not expected_reality or expected_reality.strip() != expected_reality:
+        if (
+            not isinstance(expected_reality, str)
+            or not expected_reality
+            or expected_reality.strip() != expected_reality
+        ):
             raise ValueError("EXPECTED_REALITY_INVALID")
-        ids = [c.criterion_id for c in criteria]
-        if any(not c.criterion_id or not c.required_kind for c in criteria):
+        if any(not isinstance(c, AcceptanceCriterion) for c in criteria):
             raise ValueError("ACCEPTANCE_CRITERION_INVALID")
+        if any(
+            not isinstance(c.criterion_id, str) or not c.criterion_id.strip()
+            or not isinstance(c.required_kind, str) or not c.required_kind.strip()
+            for c in criteria
+        ):
+            raise ValueError("ACCEPTANCE_CRITERION_INVALID")
+        ids = [c.criterion_id for c in criteria]
         if len(ids) != len(set(ids)):
             raise ValueError("DUPLICATE_CRITERION_ID")
 
