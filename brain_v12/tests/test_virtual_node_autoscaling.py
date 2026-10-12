@@ -25,7 +25,7 @@ class VirtualNodeAutoscalingTests(unittest.TestCase):
                                      store_path=os.path.join(tmp, "tasks.db"))
             try:
                 original = next(iter(chassis.blades.values()))
-                original.power_off()
+                original.capabilities={"gpu"}
                 task = SimpleNamespace(
                     required_capabilities={"cpu"},
                     requirement=ResourceRequirement(),
