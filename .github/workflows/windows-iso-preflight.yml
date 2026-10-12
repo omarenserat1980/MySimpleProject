@@ -44,6 +44,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Run command-line quoting regression tests
+        shell: pwsh
+        run: ./brain_v12/tests/test_rebuild_windows_server_iso_arguments.ps1
       - name: Parse rebuild script without executing it
         shell: pwsh
         run: |
