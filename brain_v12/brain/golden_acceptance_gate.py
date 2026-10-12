@@ -39,6 +39,18 @@ class GoldenAcceptanceGate:
     def __init__(self, evidence_store: EvidenceStore | None = None) -> None:
         self.evidence = evidence_store or EvidenceStore()
 
+    @staticmethod
+    def _is_ci_evidence(item: dict[str, Any]) -> bool:
+        kind = str(item.get("kind", "")).strip().lower()
+        producer = str(item.get("producer", "")).strip().lower()
+        return (
+            kind in {"ci", "ci_evidence"}
+            or producer in {
+                "ci", "github-actions", "github-actions-ci",
+                "continuous-integration", "ci-runner",
+            }
+        )
+
     def evaluate(
         self,
         task_id: str,
@@ -80,7 +92,7 @@ class GoldenAcceptanceGate:
             candidates = [
                 item for item in valid_hash.values()
                 if item.get("kind") == criterion.required_kind
-                and str(item.get("kind", "")).lower() not in {"ci", "ci_evidence"}
+                and not self._is_ci_evidence(item)
             ]
             matching_reality = [
                 item for item in candidates
@@ -122,6 +134,7 @@ class GoldenAcceptanceGate:
         independent_records = [
             item for item in valid_hash.values()
             if item.get("kind") == "independent_verification"
+            and not self._is_ci_evidence(item)
             and isinstance(item.get("payload"), dict)
             and item["payload"].get("verified") is True
             and item["payload"].get("reality_level") == expected_reality
