@@ -1,0 +1,38 @@
+name: Brain Verification Update Publisher
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Open PR number whose current-head CI evidence should be published"
+        required: true
+        default: "356"
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: brain-verification-update-${{ inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PR number
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,5}$ ]] || { echo "Invalid PR number"; exit 2; }
+      - name: Publish evidence-backed update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: python3 brain_v12/tools/publish_verification_update.py --pr "$PR_NUMBER"

@@ -16,11 +16,13 @@ from typing import Any
 from .execution_gateway import BrainExecutionGateway
 from .windows_cloud_executor import CloudWindowsVM
 from .windows_cloud_task_executor import WindowsCloudTaskExecutor
+from .brain_leadership import BrainLeadershipStore
 
 
 class InternalTaskRuntime:
     def __init__(self, root: str | Path = ".brain/internal_runtime",
-                 gateway: BrainExecutionGateway | None = None) -> None:
+                 gateway: BrainExecutionGateway | None = None,
+                 leadership_store: BrainLeadershipStore | None = None) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.queue = self.root / "queue.jsonl"
@@ -28,6 +30,7 @@ class InternalTaskRuntime:
         self.evidence_dir = self.root / "evidence"
         self.evidence_dir.mkdir(exist_ok=True)
         self.gateway = gateway or BrainExecutionGateway()
+        self.leadership_store = leadership_store
 
     def enqueue(self, task: str, argv: list[str], capability: str = "brain-internal-execution",
                 metadata: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -63,7 +66,13 @@ class InternalTaskRuntime:
         item = items[0]
         started = time.time()
         try:
-            if item["capability"] == "windows-server-2025-real-boot":
+            metadata = item.get("metadata") or {}
+            risk = str(metadata.get("risk", "LOW")).upper()
+            if risk in {"HIGH", "CRITICAL"}:
+                if self.leadership_store is None:
+                    raise RuntimeError("BRAIN_LEADERSHIP_STORE_REQUIRED")
+                self.leadership_store.assert_contract_fenced({"leadership_fencing_token": metadata.get("leadership_fencing_token")})
+            if item["capability"] in {"windows-server-2025-cloud-native", "windows-server-2025-real-boot"}:
                 metadata = item.get("metadata") or {}
                 vm_data = metadata.get("vm")
                 node = metadata.get("node")
@@ -89,6 +98,7 @@ class InternalTaskRuntime:
                 state = "COMPLETED" if remote["ok"] else "FAILED"
                 evidence = {
                     "task_id": item["id"], "task": item["task"], "state": state,
+                    "capability": item["capability"],
                     "executor": remote["executor"], "authority": "brain-cloud-fabric",
                     "verified_executor": decision.verified, "job_id": remote["job_id"],
                     "remote_evidence": remote.get("evidence", []),

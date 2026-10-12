@@ -24,6 +24,10 @@ on:
       - ".github/workflows/brain-capability-fabric.yml"
   workflow_dispatch:
 
+concurrency:
+  group: brain-brain-capability-fabric-main
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

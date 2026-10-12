@@ -1,0 +1,63 @@
+name: Brain Emulator Cloud Readiness Checks
+
+on:
+  pull_request:
+    paths:
+      - "tools/brain_emulator_project_audit.py"
+      - "tools/brain_emulator_agent.py"
+      - "tools/install_windows_boot_prerequisites.sh"
+      - "brain_v12/tools/brain_emulator_agent.py"
+      - "brain_v12/brain/device_bridge.py"
+      - "brain_v12/tests/test_device_bridge.py"
+      - "brain_v12/tests/test_brain_emulator_project_audit.py"
+      - "docs/BRAIN_EMULATOR_WINDOWS_CLOUD_BOOT.md"
+      - ".github/workflows/brain-emulator-cloud-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-unit-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python files
+        run: |
+          python -m py_compile \
+            tools/brain_emulator_project_audit.py \
+            tools/brain_emulator_agent.py \
+            brain_v12/tools/brain_emulator_agent.py \
+            brain_v12/tests/test_brain_emulator_project_audit.py
+      - name: Run audit and device bridge tests
+        run: PYTHONPATH=. python -m unittest brain_v12.tests.test_brain_emulator_project_audit brain_v12.tests.test_device_bridge -v
+      - name: Validate installer shell syntax
+        run: bash -n tools/install_windows_boot_prerequisites.sh
+      - name: Generate read-only project and host audit
+        id: audit
+        shell: bash
+        run: |
+          mkdir -p evidence
+          set +e
+          python tools/brain_emulator_project_audit.py --json --output evidence/brain-project-audit.json
+          audit_rc=$?
+          set -e
+          echo "audit_exit_code=$audit_rc" >> "$GITHUB_OUTPUT"
+          if [ "$audit_rc" -eq 0 ]; then
+            echo "AUDIT_LOCAL_BOOT_CHECKS=READY_FOR_REVIEW"
+          else
+            echo "AUDIT_LOCAL_BOOT_CHECKS=BLOCKED (expected on hosted CI without trusted cloud executor/KVM)"
+          fi
+      - name: Upload audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-project-and-windows-boot-audit
+          path: evidence/brain-project-audit.json
+          if-no-files-found: error
+          retention-days: 14

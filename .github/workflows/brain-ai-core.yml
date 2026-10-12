@@ -8,7 +8,16 @@ on:
       - 'brain_v12/github_control_plane.py'
       - 'brain_v12/brain/brain_ai_api.py'
       - 'brain_v12/app.py'
+      - 'brain_v12/runtime_paths.py'
+      - 'brain_v12/media_engine.py'
+      - 'brain_v12/tests/test_runtime_paths.py'
       - 'brain_v12/tests/test_brain_ai*.py'
+      - 'brain_v12/tests/test_film_supervisor_golden_gate.py'
+      - 'brain_v12/tests/test_windows_server_network_contract.py'
+      - 'brain_v12/tests/test_windows_native_executor.py'
+      - 'brain_v12/tests/test_windows_native_gateway.py'
+      - 'brain_v12/brain/windows_real_boot_qemu_adapter.py'
+      - 'brain_v12/tests/test_windows_real_boot_qemu_adapter.py'
       - 'brain_v12/tests/test_chatgpt_tool_bridge.py'
       - 'brain_v12/tests/test_chatgpt_host_gateway.py'
       - 'brain_v12/tests/test_chat_session_api.py'
@@ -16,6 +25,7 @@ on:
       - 'brain_v12/tests/test_streaming_api.py'
       - 'brain_v12/tests/test_model_providers.py'
       - 'brain_v12/tests/test_model_router_providers.py'
+      - 'brain_v12/tests/test_honda_cloud_components.py'
       - 'docs/BRAIN_AI_GEMINI_LIKE_ARCHITECTURE.md'
       - '.github/workflows/brain-ai-core.yml'
   push:
@@ -25,7 +35,14 @@ on:
       - 'brain_v12/github_control_plane.py'
       - 'brain_v12/brain/brain_ai_api.py'
       - 'brain_v12/app.py'
+      - 'brain_v12/runtime_paths.py'
+      - 'brain_v12/media_engine.py'
+      - 'brain_v12/tests/test_runtime_paths.py'
       - 'brain_v12/tests/test_brain_ai*.py'
+      - 'brain_v12/tests/test_film_supervisor_golden_gate.py'
+      - 'brain_v12/tests/test_windows_server_network_contract.py'
+      - 'brain_v12/tests/test_windows_native_executor.py'
+      - 'brain_v12/tests/test_windows_native_gateway.py'
       - 'brain_v12/tests/test_chatgpt_tool_bridge.py'
       - 'brain_v12/tests/test_chatgpt_host_gateway.py'
       - 'brain_v12/tests/test_chat_session_api.py'
@@ -46,8 +63,20 @@ jobs:
           python-version: '3.11'
       - name: Install Brain AI test dependencies
         run: python -m pip install -r requirements.txt
+      - name: Test writable runtime paths and non-destructive migration
+        run: python -m unittest brain_v12.tests.test_runtime_paths -v
       - run: python -m unittest discover -s brain_v12/tests -p 'test_brain_ai*.py' -v
       - run: python -m unittest brain_v12.tests.test_success_bot -v
+      - name: Run Windows Server network trust contract tests
+        run: python -m unittest brain_v12.tests.test_windows_server_network_contract -v
+      - name: Run native Windows executor contract tests
+        run: python -m unittest brain_v12.tests.test_windows_native_executor brain_v12.tests.test_windows_native_gateway -v
+      - name: Run Windows real-boot QEMU adapter regression tests
+        run: python -m unittest brain_v12.tests.test_windows_real_boot_qemu_adapter -v
       - name: Run Supervisor solution and verification tests
         run: python -m unittest brain_v12.tests.test_problem_solver brain_v12.brain.test_solution_engine -v
+      - name: Run Film Supervisor Golden Acceptance tests
+        run: python -m unittest brain_v12.tests.test_film_supervisor_golden_gate -v
       - run: python -m unittest brain_v12.tests.test_chatgpt_tool_bridge brain_v12.tests.test_chatgpt_host_gateway brain_v12.tests.test_chat_session_api brain_v12.tests.test_autonomous_supervisor brain_v12.tests.test_streaming_api brain_v12.tests.test_model_providers brain_v12.tests.test_model_router_providers -v
+      - name: Run Honda cloud component safety tests
+        run: python -m unittest brain_v12.tests.test_honda_cloud_components -v

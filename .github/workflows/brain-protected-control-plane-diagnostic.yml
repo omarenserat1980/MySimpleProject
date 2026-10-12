@@ -1,0 +1,40 @@
+name: Brain Protected Control Plane Endpoint Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - diagnose/protected-control-plane-endpoint
+    paths:
+      - .github/workflows/brain-protected-control-plane-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  endpoint_diagnostic:
+    name: Classify protected endpoint without revealing it
+    runs-on: ubuntu-latest
+    environment:
+      name: windows-real-boot
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Classify the protected Control Plane URL
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED || vars.BRAIN_WINDOWS_CONTROL_PLANE_URL || 'https://brain-control-plane-main.onrender.com' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from brain_v12.tools.brain_deployment_dependency_audit import classify_endpoint
+
+          classification = classify_endpoint(os.environ.get("BRAIN_WINDOWS_CONTROL_PLANE_URL"))
+          print("BRAIN_WINDOWS_CONTROL_PLANE_ENDPOINT_CLASSIFICATION=" + classification)
+          if classification != "CONFIGURED_HTTPS_ENDPOINT":
+              print("BRAIN_WINDOWS_CONTROL_PLANE_ENDPOINT_GATE=BLOCKED")
+              raise SystemExit(2)
+          print("BRAIN_WINDOWS_CONTROL_PLANE_ENDPOINT_GATE=PASS")
+          print("NETWORK_REACHABILITY=NOT_TESTED")
+          print("WINDOWS_BOOT_VERIFIED=false")
+          PY

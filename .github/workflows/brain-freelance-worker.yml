@@ -43,10 +43,11 @@ jobs:
       - name: Run opportunity factory
         env:
           LIVE_SEARCH: "true"
+          BRAIN_AVAILABLE_CAPITAL_JOD: "0"
         run: |
           python .github/scripts/run_opportunity_factory.py
 
-      - name: Verify freelance artifact
+      - name: Verify freelance artifact and zero-capital gate
         run: |
           test -s brain6_artifacts/freelance_ready_offers.json
           python - <<'PY'
@@ -54,10 +55,23 @@ jobs:
           from pathlib import Path
           p = Path("brain6_artifacts/freelance_ready_offers.json")
           data = json.loads(p.read_text(encoding="utf-8"))
-          assert data.get("policy", {}).get("external_submission") == "HUMAN_CONTROLLED"
-          assert data.get("policy", {}).get("payment_movement") == "HUMAN_CONTROLLED"
+          policy = data.get("policy", {})
+          assert policy.get("zero_capital_gate") == "HARD"
+          assert policy.get("external_submission") == "HUMAN_CONTROLLED"
+          assert policy.get("payment_movement") == "HUMAN_CONTROLLED"
           assert isinstance(data.get("offers"), list)
-          print("Freelance artifact verified:", data.get("count", 0), "offers")
+          for offer in data["offers"]:
+              gate = offer.get("zero_capital_gate", {})
+              assert gate.get("eligible") is True
+              assert gate.get("status") == "ELIGIBLE"
+              assert gate.get("capital_required_jod") == 0.0
+          print(
+              "Freelance artifact verified:",
+              data.get("count", 0),
+              "zero-capital offers;",
+              data.get("zero_capital_rejected", 0),
+              "rejected by hard gate"
+          )
           PY
 
       - name: Upload research artifacts

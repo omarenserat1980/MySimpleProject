@@ -7,6 +7,10 @@ on:
       - "brain_v12/**"
       - ".github/workflows/brain-opportunity-discovery-smoke.yml"
   workflow_dispatch:
+concurrency:
+  group: brain-brain-opportunity-discovery-smoke-main
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

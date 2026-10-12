@@ -389,6 +389,23 @@ class ClientRevenueGuardian:
                 "verification_required": True,
             }
 
+        snapshot = income_engine.snapshot(client_id=client_id)
+        opportunities = list(snapshot.get("opportunities") or [])
+        ready = [x for x in opportunities if str(x.get("status") or "").upper() == "READY_TO_APPLY"]
+        active = [x for x in opportunities if str(x.get("status") or "").upper() not in {"STALE", "COMPLETED", "PAYMENT_VERIFIED"}]
+        ranked = sorted(
+            (ready or active),
+            key=lambda x: float(x.get("score") or x.get("fit_score") or (x.get("data") or {}).get("score") or 0),
+            reverse=True,
+        )
+        candidate = ranked[0] if ranked else None
+        candidate_data = dict((candidate or {}).get("data") or {})
+        candidate_id = str((candidate or {}).get("opportunity_id") or "")
+        candidate_title = str(candidate_data.get("title") or (candidate or {}).get("title") or "")
+        candidate_url = str(candidate_data.get("source_url") or candidate_data.get("url") or (candidate or {}).get("source_url") or (candidate or {}).get("url") or "")
+        candidate_evidence = str(candidate_data.get("evidence") or (candidate or {}).get("evidence") or "")
+        candidate_requirements = str(candidate_data.get("requirements") or "")
+        candidate_quality = bool(candidate_id and candidate_title and candidate_url.startswith(("http://", "https://")) and candidate_evidence.strip() and len(candidate_requirements.strip()) >= 8)
         mission = {
             "client_id": client_id,
             "guardian_client_id": GUARDIAN_CLIENT_ID,
@@ -399,6 +416,21 @@ class ClientRevenueGuardian:
             "payment_verification_required": True,
             "constraint": "ONE_OPPORTUNITY_ONE_EXTERNAL_ACTION",
             "no_fabricated_buyer_or_payment": True,
+            "selected_opportunity_id": candidate_id or None,
+            "selected_opportunity_title": candidate_title or None,
+            "selected_opportunity_url": candidate_url or None,
+            "selected_opportunity_quality": candidate_quality,
+            "recommended_offer_jod": 10.0,
+            "delivery_contract": {
+                "acceptance": "CLIENT_ACCEPTED",
+                "delivery_evidence_required": True,
+                "payment_request_after": "COMPLETED",
+                "payment_reconciliation_before_revenue": True,
+            },
+            "conversion_path": (
+                "SELECT_ONE_OPPORTUNITY -> HUMAN_APPROVAL -> EXTERNAL_SUBMISSION -> "
+                "CLIENT_ACCEPTED -> DELIVER -> PAYMENT_REQUEST -> PAYMENT_RECONCILIATION -> REVENUE_REALIZED"
+            ),
         }
         record = {
             **previous,

@@ -46,7 +46,7 @@ TOKEN="$(gh api --method POST \
 ./config.sh --unattended \
   --url "https://github.com/$REPO" \
   --token "$TOKEN" \
-  --name "${BRAIN_INTERNAL_RUNNER_ID:-brain-internal-$(hostname)}" \
+  --name "${BRAIN_INTERNAL_RUNNER_ID:-linux-runner-01}" \
   --labels "$LABELS" \
   --work "_work" \
   --replace

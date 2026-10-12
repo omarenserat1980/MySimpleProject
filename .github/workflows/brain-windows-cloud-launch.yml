@@ -1,0 +1,203 @@
+name: BRAIN Windows Cloud Launch
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Authorize creating/updating Azure resources after preflight"
+        required: true
+        type: boolean
+        default: false
+      cost_reviewed:
+        description: "Confirm the cost estimate and subscription free-benefit eligibility were reviewed in a prior preflight run"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: brain-windows-cloud-launch
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    environment: brain-windows-production
+    timeout-minutes: 90
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_admin_username: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+      TF_VAR_admin_password: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+      TF_VAR_allowed_source_ip: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+      BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
+      APPROVE_APPLY: ${{ inputs.approve_apply }}
+      COST_REVIEWED: ${{ inputs.cost_reviewed }}
+    steps:
+      - name: Validate required GitHub Environment configuration before cloud changes
+        id: config
+        shell: bash
+        env:
+          CHECK_AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          CHECK_AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CHECK_AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          CHECK_WINDOWS_ADMIN_USERNAME: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+          CHECK_WINDOWS_ADMIN_PASSWORD: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+          CHECK_ALLOWED_SOURCE_IP: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+          CHECK_BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            CHECK_AZURE_CLIENT_ID \
+            CHECK_AZURE_TENANT_ID \
+            CHECK_AZURE_SUBSCRIPTION_ID \
+            CHECK_ALLOWED_SOURCE_IP; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          # Explicitly approved deployment must fail closed if admin credentials
+          # are missing. Never silently downgrade an approved launch to preflight.
+          apply_enabled="${APPROVE_APPLY:-false}"
+          cost_reviewed="${COST_REVIEWED:-false}"
+          if [[ "$apply_enabled" == "true" && "$cost_reviewed" != "true" ]]; then
+            echo "BLOCKED_COST_REVIEW: review the cost-preflight artifact and confirm subscription-specific free benefits before apply."
+            exit 2
+          fi
+          if [[ "$apply_enabled" == "true" ]]; then
+            admin_missing=()
+            for name in CHECK_WINDOWS_ADMIN_USERNAME CHECK_WINDOWS_ADMIN_PASSWORD; do
+              if [[ -z "${!name:-}" ]]; then
+                admin_missing+=("$name")
+              fi
+            done
+            if (( ${#admin_missing[@]} > 0 )); then
+              echo "BLOCKED_CONFIGURATION: approved deployment is missing required Windows administrator secrets."
+              printf ' - %s\\n' "${admin_missing[@]}"
+              echo "Next action: add the missing secrets to GitHub Environment brain-windows-production."
+              exit 2
+            fi
+          fi
+          echo "apply_enabled=$apply_enabled" >> "$GITHUB_OUTPUT"
+          if [[ -n "${CHECK_BRAIN_TFSTATE_ACCOUNT:-}" ]]; then
+            if [[ ! "$CHECK_BRAIN_TFSTATE_ACCOUNT" =~ ^[a-z0-9]{3,24}$ ]]; then
+              echo "BLOCKED: BRAIN_TFSTATE_ACCOUNT must contain 3-24 lowercase letters or digits."
+              exit 2
+            fi
+          else
+            echo "Terraform state account: deterministic subscription-derived fallback will be used."
+          fi
+          if (( ${#missing[@]} > 0 )); then
+            echo "BLOCKED: required values are missing from GitHub Environment brain-windows-production:"
+            printf ' - %s\n' "${missing[@]}"
+            echo "Azure variables and BRAIN_ALLOWED_SOURCE_IP are required; BRAIN_WINDOWS_ADMIN_* secrets are required only when approve_apply=true."
+            echo "No Azure login, state bootstrap, or VM changes were attempted by this job."
+            exit 2
+          fi
+          python3 - <<'PY'
+          import ipaddress, os, sys
+          value = os.environ.get("CHECK_ALLOWED_SOURCE_IP", "").strip()
+          try:
+              network = ipaddress.ip_network(value, strict=False)
+              if network.version != 4 or network.prefixlen > 32:
+                  raise ValueError("IPv4 CIDR required")
+              if network.prefixlen == 0:
+                  raise ValueError("public-wide access is forbidden")
+          except ValueError:
+              print("BLOCKED: BRAIN_ALLOWED_SOURCE_IP must be a valid, narrow IPv4 CIDR; 0.0.0.0/0 is forbidden.")
+              sys.exit(2)
+          print("Allowed management source CIDR: valid; value withheld.")
+          PY
+          echo "Required environment configuration for this run is present; values were not printed."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell without modifying apt repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+          . /etc/os-release
+          if [ "${ID}" != "ubuntu" ] || [ "$(dpkg --print-architecture)" != "amd64" ]; then
+            echo "This job requires Ubuntu x86_64; detected ${ID}/$(dpkg --print-architecture)." >&2
+            exit 1
+          fi
+          command -v python3 >/dev/null
+          command -v tar >/dev/null
+          install_dir="$RUNNER_TEMP/pwsh"
+          mkdir -p "$install_dir"
+          asset_url="$(python3 - <<'PY'
+          import json, urllib.request
+          req = urllib.request.Request(
+              "https://api.github.com/repos/PowerShell/PowerShell/releases/latest",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "ElectronicBrain-CI"}
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              release = json.load(response)
+          assets = [a["browser_download_url"] for a in release.get("assets", [])
+                    if a.get("name", "").endswith("-linux-x64.tar.gz")
+                    and a.get("name", "").startswith("powershell-")]
+          if not assets:
+              raise SystemExit("No official Linux x64 PowerShell release archive found.")
+          print(assets[0])
+          PY
+          )"
+          echo "Downloading official PowerShell Linux x64 archive."
+          curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 --max-time 180 "$asset_url" -o "$install_dir/powershell.tar.gz"
+          tar -xzf "$install_dir/powershell.tar.gz" -C "$install_dir"
+          chmod +x "$install_dir/pwsh"
+          "$install_dir/pwsh" -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          echo "$install_dir" >> "$GITHUB_PATH"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Azure OIDC login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Register required Azure resource providers (no infrastructure resources)
+        shell: pwsh
+        run: ./scripts/windows-cloud/register-providers.ps1
+
+      - name: Bootstrap remote Terraform state
+        if: ${{ steps.config.outputs.apply_enabled == 'true' }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location northeurope
+
+      - name: Preflight (no VM changes)
+        shell: pwsh
+        run: |
+          # Use hashtable splatting so PowerShell passes named parameters,
+          # rather than treating the strings as positional arguments.
+          $preflightArgs = @{
+            Location = "northeurope"
+            VmSize = "Standard_B2s"
+          }
+          if ($env:APPROVE_APPLY -ne "true") {
+            $preflightArgs["AllowMissingAdminCredentials"] = $true
+          }
+          & ./scripts/windows-cloud/preflight.ps1 @preflightArgs
+
+      - name: Deploy and verify Windows Server 2025
+        if: ${{ steps.config.outputs.apply_enabled == 'true' }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location northeurope -ResourceGroup brain-windows-rg -VmName brain-windows-2025 -VmSize Standard_B2s -AllowedSourceIp "$env:TF_VAR_allowed_source_ip"
+
+      - name: Explain preflight-only run
+        if: ${{ steps.config.outputs.apply_enabled != 'true' }}
+        shell: bash
+        run: |
+          echo "Preflight only. No state storage or VM resources were created."
+          echo "Set approve_apply=true only when authorized to create the state store and deploy the VM."

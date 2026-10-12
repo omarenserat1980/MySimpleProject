@@ -21,8 +21,11 @@ from typing import Any
 from uuid import uuid4
 
 
-MEDIA_ROOT = pathlib.Path(os.getenv("BRAIN_MEDIA_ROOT", pathlib.Path(__file__).resolve().parent / "web" / "media")).resolve()
-OUTPUT_ROOT = (MEDIA_ROOT / "engine").resolve()
+RUNTIME_HOME = pathlib.Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser().resolve()
+MEDIA_ROOT = pathlib.Path(os.getenv("BRAIN_MEDIA_ROOT", str(RUNTIME_HOME / "media"))).expanduser().resolve()
+OUTPUT_ROOT = pathlib.Path(
+    os.getenv("BRAIN_MEDIA_OUTPUT_ROOT", str(RUNTIME_HOME / "media" / "engine"))
+).expanduser().resolve()
 OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 MAX_INPUTS = 50
 MAX_DURATION = int(os.getenv("BRAIN_MEDIA_MAX_DURATION_SECONDS", "3600"))

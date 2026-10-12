@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import os
 import platform
+import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -59,6 +61,33 @@ def execute(task: str, params: dict) -> dict:
             "system": platform.system(),
             "release": platform.release(),
             "machine": platform.machine(),
+        }
+    if task in {"brain_project_audit", "windows_cloud_boot_preflight"}:
+        root = Path(__file__).resolve().parents[1]
+        audit = root / "tools" / "brain_emulator_project_audit.py"
+        if not audit.is_file():
+            raise RuntimeError("BRAIN_PROJECT_AUDIT_TOOL_MISSING")
+        result = subprocess.run(
+            [sys.executable, str(audit), "--json"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        try:
+            report = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("BRAIN_PROJECT_AUDIT_OUTPUT_INVALID") from exc
+        return {
+            "returncode": result.returncode,
+            "status": report.get("boot_path", {}).get("status", "UNKNOWN"),
+            "host": report.get("host", {}),
+            "project_areas": report.get("project_areas", {}),
+            "project_goals_and_roadmap": report.get("project_goals_and_roadmap", {}),
+            "key_paths": report.get("key_paths", {}),
+            "boot_path": report.get("boot_path", {}),
+            "acceptance_rule": report.get("acceptance_rule", {}),
         }
     raise ValueError("task_not_allowed")
 

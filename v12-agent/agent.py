@@ -8,7 +8,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:10000").rstrip("/")
+BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://brain-control-plane-main.onrender.com").rstrip("/")
 AGENT_ID = os.getenv("V12_AGENT_ID", "redmi3-01")
 KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent.key"))
 POLL_SECONDS = float(os.getenv("V12_POLL_SECONDS", "3"))
@@ -22,7 +22,7 @@ def read_key():
 
 def request(method, path, payload=None, key=None, timeout=20):
     data = None
-    headers = {"Accept": "application/json", "User-Agent": "V12-Termux-Agent/1.0"}
+    headers = {"Accept": "application/json", "User-Agent": "V12-Termux-Agent/1.0", "X-V12-Agent-Id": AGENT_ID}
     if key:
         headers["X-V12-Agent-Key"] = key
     if payload is not None:
@@ -53,6 +53,7 @@ def main():
     print("Agent:", AGENT_ID)
     while True:
         try:
+            request("POST", "/api/device/heartbeat", {"agent_id": AGENT_ID, "metadata": {"agent": "V12-Termux-Agent", "python": platform.python_version()}}, key=key)
             polled = request("GET", "/api/device/poll?agent_id=" + urllib.parse.quote(AGENT_ID, safe=""), key=key)
             task = polled.get("task")
             if task:
