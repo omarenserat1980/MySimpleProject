@@ -42,7 +42,12 @@ class VirtualTaskQueue:
         self.workload_controller=workload_controller or WorkloadController()
         self.workload_router=workload_router or WorkloadRouter(self.workload_controller)
         self.max_workers=max(1,int(max_workers))
+        self.virtual_min_blades=max(0,int(os.getenv("BRAIN_VIRTUAL_MIN_BLADES","1")))
+        self.virtual_max_blades=max(self.virtual_min_blades,int(os.getenv("BRAIN_VIRTUAL_MAX_BLADES","4")))
+        self.virtual_ram_bytes=max(1024,int(os.getenv("BRAIN_VIRTUAL_RAM_BYTES_PER_BLADE","65536")))
+        self.virtual_autoscale=os.getenv("BRAIN_VIRTUAL_AUTOSCALE","1").strip().lower() not in {"0","false","no","off"}
         self.pool=ThreadPoolExecutor(max_workers=max(1,int(max_workers))); self.store=DurableTaskStore(store_path)
+        self._ensure_minimum_virtual_capacity()
         self._recover_on_start()
 
     def _row_to_task(self,row):
@@ -73,6 +78,55 @@ class VirtualTaskQueue:
         self._schedule(task.task_id)
         return task
 
+    def _ensure_minimum_virtual_capacity(self):
+        """Create Brain-owned software nodes without probing physical devices."""
+        while len(self.chassis.blades)<self.virtual_min_blades:
+            blade=self.chassis.create_blade(ram_size=self.virtual_ram_bytes)
+            blade.power_on()
+
+    def _ensure_virtual_capacity(self,task):
+        """Scale Brain-owned software nodes for admitted work without physical agents."""
+        if not self.virtual_autoscale:
+            return None
+        required=set(task.required_capabilities or {"cpu"})
+        for blade in self.chassis.blades.values():
+            if blade.state=="OFFLINE" and required.issubset(blade.capabilities):
+                blade.power_on()
+                return blade
+        if task.requirement.ram_bytes>self.virtual_ram_bytes or task.requirement.storage_bytes>1024*1024:
+            return None
+        if len(self.chassis.blades)>=self.virtual_max_blades:
+            for blade_id,blade in list(self.chassis.blades.items()):
+                if blade.state=="OFFLINE":
+                    self.chassis.remove_blade(blade_id)
+                    if len(self.chassis.blades)<self.virtual_max_blades:
+                        break
+        if len(self.chassis.blades)>=self.virtual_max_blades:
+            return None
+        capabilities={"cpu","ram","storage","network","gpu"} | required
+        blade=self.chassis.create_blade(capabilities=capabilities,ram_size=self.virtual_ram_bytes)
+        try:
+            blade.power_on()
+        except Exception:
+            self.chassis.remove_blade(blade.blade_id)
+            raise
+        return blade
+
+    def _scale_in_idle_virtual_capacity(self):
+        """Remove excess idle software nodes after the durable queue drains."""
+        if not self.virtual_autoscale:
+            return
+        counts=self.store.counts()
+        if int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))+int(counts.get("RUNNING",0))>0:
+            return
+        active_blades={t.blade_id for t in self.tasks.values() if t.status=="RUNNING" and t.blade_id}
+        for blade_id in list(self.chassis.blades):
+            if len(self.chassis.blades)<=self.virtual_min_blades:
+                break
+            if blade_id in active_blades or any(r.blade_id==blade_id for r in self.resources.reservations.values()):
+                continue
+            self.chassis.remove_blade(blade_id)
+
     def _find_blade(self,task):
         candidates=[b for b in self.chassis.blades.values() if b.state=="ONLINE"
           and task.required_capabilities.issubset(b.capabilities) and self.resources.can_allocate(b,task.requirement)]
@@ -85,6 +139,12 @@ class VirtualTaskQueue:
             counts=self.store.counts()
             queued=int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))
             active=int(counts.get("RUNNING",0))
+            has_capable_virtual_node=any(
+                b.state=="ONLINE" and task.required_capabilities.issubset(b.capabilities)
+                for b in self.chassis.blades.values()
+            )
+            if not has_capable_virtual_node:
+                self._ensure_virtual_capacity(task)
             decision=self.workload_router.choose(
                 queued=queued, active=active,
                 priority=getattr(task,"priority","NORMAL"),
@@ -98,6 +158,9 @@ class VirtualTaskQueue:
                 task.status="WAITING"
                 return
             blade=self._find_blade(task)
+            if blade is None:
+                self._ensure_virtual_capacity(task)
+                blade=self._find_blade(task)
             if blade is None: task.status="WAITING"; return
             reservation=self.resources.reserve(blade,task.task_id,task.requirement)
             if not reservation["ok"]: task.status="WAITING"; return
@@ -120,7 +183,9 @@ class VirtualTaskQueue:
                 task.result={"ok":False,"error":str(exc)}; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
                 self.store.finish(task_id,False,task.result)
         finally:
-            self.resources.release(task_id); self.pump()
+            self.resources.release(task_id)
+            self._scale_in_idle_virtual_capacity()
+            self.pump()
 
     def heartbeat(self,task_id,lease_id):
         with self.lock:
