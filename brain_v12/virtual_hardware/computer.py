@@ -4,6 +4,7 @@ from .cpu import VirtualCPU
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
+from .hardware_profiles import MachineManifest, synthetic_baseline_profiles
 from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
@@ -74,6 +75,10 @@ class VirtualComputer:
     def syscall(self,pid,name,**args):
         if not self.powered: raise RuntimeError("COMPUTER_POWER_OFF")
         return self.kernel.syscall(pid,name,**args)
+
+    def hardware_manifest(self):
+        """Describe existing devices and their declared fidelity; allocates no host resources."""
+        return MachineManifest(self.name, 1, synthetic_baseline_profiles()).describe()
 
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
