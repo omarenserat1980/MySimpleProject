@@ -60,6 +60,11 @@ jobs:
           print("JOBS=", data["job_count"])
           print("ALL_WORKFLOW_RUNNER_INDEPENDENCE_PERCENT=", data["all_workflows"]["runner_independence_percent"])
           print("SOFTWARE_SCOPE_RUNNER_INDEPENDENCE_PERCENT=", data["software_scope_excluding_explicit_hardware_verification"]["runner_independence_percent"])
+          print("SELF_HOSTED_JOB_COUNT=", data["all_workflows"]["self_hosted"])
+          for job in data["self_hosted_jobs"]:
+              print("SELF_HOSTED_JOB=", f"{job['workflow']}::{job['job']}")
+          for job in data["unresolved_jobs"]:
+              print("UNRESOLVED_RUNNER_JOB=", f"{job['workflow']}::{job['job']}::{job['runner_class']}")
           print("FULL_AUTONOMY_CERTIFIED=false")
           PY
       - name: Upload audit evidence
