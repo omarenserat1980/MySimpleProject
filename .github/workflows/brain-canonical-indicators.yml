@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/canonical_indicators.py"
+      - "brain_v12/app.py"
       - "brain_v12/brain/device_cloud_federation.py"
       - "brain_v12/tests/test_canonical_indicators.py"
       - "brain_v12/tests/test_device_cloud_federation.py"
@@ -41,6 +42,7 @@ jobs:
       - name: Compile indicator and fleet modules
         run: |
           python -m py_compile \
+            brain_v12/app.py \
             brain_v12/brain/canonical_indicators.py \
             brain_v12/brain/device_cloud_federation.py \
             brain_v12/tests/test_canonical_indicators.py \
