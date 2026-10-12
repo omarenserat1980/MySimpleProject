@@ -4,6 +4,7 @@ from .cpu import VirtualCPU
 from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
 from .storage_profiles import get_storage_profile
+from .memory_profiles import get_memory_profile, CacheHierarchy
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -25,10 +26,18 @@ class VirtualComputer:
     gpu_height: int = 200
     cpu_profile_id: str | None = None
     storage_profile_id: str | None = None
+    ram_profile_id: str | None = None
+    cache_enabled: bool = False
+    memory_channels: int = 1
+    memory_channel_width_bits: int = 64
+    configured_cas_latency_cycles: int | None = None
 
     def __post_init__(self):
         self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
-        self.ram=VirtualRAM(self.ram_size)
+        self.ram=VirtualRAM(self.ram_size, profile_id=self.ram_profile_id, channels=self.memory_channels,
+                            channel_width_bits=self.memory_channel_width_bits,
+                            configured_cas_latency_cycles=self.configured_cas_latency_cycles,
+                            cache_enabled=self.cache_enabled)
         self.bus=VirtualBus()
         self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
         self.nic=VirtualNIC()
@@ -98,7 +107,30 @@ class VirtualComputer:
                 parameters["default_height"] = self.gpu.height
             elif profile.category == "network":
                 parameters["mac"] = self.nic.mac
-            if profile.category == "storage" and self.storage_profile_id:
+            if profile.category == "memory" and self.ram_profile_id:
+                selected_memory = get_memory_profile(self.ram_profile_id)
+                memory_description = selected_memory.describe(self.memory_channels, self.memory_channel_width_bits,
+                                                               self.configured_cas_latency_cycles)
+                profiles.append(HardwareProfile(
+                    selected_memory.profile_id, "memory", selected_memory.model, FidelityLevel.TIMING_MODEL,
+                    {"logical_capacity_cells": self.ram.size, "capacity_unit": "addressable_cells",
+                     "technology": selected_memory.technology, "transfer_rate_mt_s": selected_memory.transfer_rate_mt_s,
+                     "channels": self.memory_channels, "channel_width_bits": self.memory_channel_width_bits,
+                     "peak_theoretical_bandwidth_bytes_per_second": memory_description["peak_theoretical_bandwidth_bytes_per_second"],
+                     "cas_latency_cycles": memory_description["cas_latency_cycles"],
+                     "cas_latency_ns_estimate": memory_description["cas_latency_ns_estimate"],
+                     "host_payload_bytes_estimate": self.ram.host_payload_bytes_estimate,
+                     "host_full_capacity_buffer_allocated": False},
+                    ("sparse addressable cells", "analytical CAS and transfer-time estimate",
+                     "request queue and bank-contention estimate"),
+                    tuple(memory_description["unsupported_features"]),
+                    (SpecificationSource(ProvenanceKind.VENDOR_DOCUMENTATION, selected_memory.source_url,
+                     selected_memory.source_note),),
+                    ("test_real_spec_profiles_and_analytical_bandwidth",
+                     "test_sparse_capacity_does_not_allocate_full_host_buffer",
+                     "test_memory_timing_queue_and_bank_contention"),
+                ))
+            elif profile.category == "storage" and self.storage_profile_id:
                 selected_storage = get_storage_profile(self.storage_profile_id)
                 storage_description = selected_storage.describe()
                 profiles.append(HardwareProfile(
@@ -135,6 +167,21 @@ class VirtualComputer:
                 ))
             else:
                 profiles.append(replace(profile, parameters=parameters))
+        if self.cache_enabled:
+            profiles.append(HardwareProfile(
+                "brain-l1-l2-l3-tag-model-v1", "cache", "Brain synthetic L1/L2/L3 tag hierarchy",
+                FidelityLevel.TIMING_MODEL,
+                {"levels": [{"name": level.name, "size_bytes": level.size_bytes,
+                             "line_size_bytes": level.line_size_bytes, "associativity": level.associativity,
+                             "hit_latency_cycles": level.hit_latency_cycles}
+                            for level in self.ram.cache_hierarchy.levels]},
+                ("set-associative tags", "LRU replacement", "hit/miss counters", "approximate hit latency"),
+                ("cache data storage", "coherence", "MESI/MOESI", "prefetching", "cycle-accurate arbitration"),
+                (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                     "brain://virtual-hardware/cache-tag-model-v1",
+                                     "Synthetic cache geometry for deterministic tests, not a claim about a named CPU."),),
+                ("test_l1_l2_l3_tag_model_and_deterministic_hits",),
+            ))
         return MachineManifest(self.name, 1, tuple(profiles)).describe()
 
     def status(self):
@@ -144,6 +191,6 @@ class VirtualComputer:
                 "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
                 "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
-                "ram":{"size":self.ram.size},"devices":self.bus.device_names(),
+                "ram":self.ram.status(),"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":{"mac":self.nic.mac},"gpu":{"width":self.gpu.width,"height":self.gpu.height}}
