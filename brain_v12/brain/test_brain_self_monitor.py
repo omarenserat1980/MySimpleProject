@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -57,7 +58,7 @@ class BrainSelfMonitorTests(unittest.TestCase):
         self.assertFalse(checks["supervisor"]["ok"])
         self.assertTrue(checks["brain_root"]["ok"])
 
-    @patch("brain_v12.brain.brain_self_monitor.subprocess.run", side_effect=TimeoutError("git timeout"))
+    @patch("brain_v12.brain.brain_self_monitor.subprocess.run", side_effect=subprocess.TimeoutExpired(["git", "rev-parse"], 3))
     def test_git_timeout_is_reported_without_crashing(self, run):
         with tempfile.TemporaryDirectory() as temp:
             _, app = self.make_layout(temp)
@@ -66,7 +67,7 @@ class BrainSelfMonitorTests(unittest.TestCase):
         self.assertFalse(report["ok"])
         checks = {item["name"]: item for item in report["checks"]}
         self.assertFalse(checks["git_repository"]["ok"])
-        self.assertIn("git timeout", checks["git_repository"]["detail"])
+        self.assertIn("timed out", checks["git_repository"]["detail"])
 
 
 if __name__ == "__main__":
