@@ -34,6 +34,7 @@ class VirtualComputer:
     storage_profile_id: str | None = None
     ram_profile_id: str | None = None
     cache_enabled: bool = False
+    ecc_enabled: bool = False
     memory_channels: int = 1
     memory_channel_width_bits: int = 64
     configured_cas_latency_cycles: int | None = None
@@ -47,7 +48,7 @@ class VirtualComputer:
         self.ram=VirtualRAM(self.ram_size, profile_id=self.ram_profile_id, channels=self.memory_channels,
                             channel_width_bits=self.memory_channel_width_bits,
                             configured_cas_latency_cycles=self.configured_cas_latency_cycles,
-                            cache_enabled=self.cache_enabled)
+                            cache_enabled=self.cache_enabled, ecc_enabled=self.ecc_enabled)
         self.bus=VirtualBus(profile_id=self.motherboard_profile_id)
         self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
         self.nic=VirtualNIC(profile_id=self.nic_profile_id, external_network_enabled=self.external_network_enabled)
@@ -85,6 +86,7 @@ class VirtualComputer:
             "machine_id": self.name, "cpu_profile_id": self.cpu_profile_id or "brain-educational-8-register",
             "ram_size_cells": self.ram.size, "ram_profile_id": self.ram_profile_id,
             "memory_channels": self.memory_channels, "memory_channel_width_bits": self.memory_channel_width_bits,
+            "ecc_enabled": self.ecc_enabled,
             "configured_cas_latency_cycles": self.configured_cas_latency_cycles, "cache_enabled": self.cache_enabled,
             "storage_profile_id": self.storage_profile_id, "storage_capacity_bytes": self.storage.capacity,
             "gpu_profile_id": self.gpu_profile_id, "gpu_width": self.gpu.width, "gpu_height": self.gpu.height,
@@ -438,6 +440,22 @@ class VirtualComputer:
                  "PCIe generation reference only; topology is synthetic, not a real motherboard specification."),),
                 ("test_topology_lane_budget_and_dma_accounting", "test_topology_conflict_rejected_before_boot"),
             ))
+        if self.ecc_enabled:
+            ecc_status = self.ram.ecc_controller.status()
+            profiles.append(HardwareProfile(
+                "brain-memory-secdec-ecc-v1", "memory_integrity", "Brain SECDED ECC memory path",
+                FidelityLevel.FUNCTIONAL,
+                {"scheme": "SECDED", "word_bits": 64, "check_bits_per_word": 8,
+                 "integrated_with_virtual_ram": True, "logical_words": ecc_status["logical_words"]},
+                ("encode on RAM write", "single-bit correction on RAM read",
+                 "double-bit error detection", "deterministic bit-flip injection", "ECC state snapshot/restore"),
+                ("DDR ECC signaling", "physical DIMM/controller behavior", "burst-error guarantees",
+                 "cycle-accurate ECC timing"),
+                (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                     "brain://virtual-hardware/secdec-ecc-v1",
+                                     "Functional SECDED implementation; no physical memory bus is emulated."),),
+                ("test_ecc_ram_path_corrects_single_bit_fault", "test_ecc_ram_path_rejects_mode_mismatch"),
+            ))
         profiles.append(HardwareProfile(
             "brain-virtual-firmware-v1", "firmware", "Brain deterministic virtual firmware and bootloader",
             FidelityLevel.FUNCTIONAL,
@@ -512,6 +530,8 @@ class VirtualComputer:
              "test_modem_never_transmits_externally", "test_iommu_allow_list_blocks_unmapped_regions"),
         ))
         required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal", "peripherals")
+        if self.ecc_enabled:
+            required = (*required, "memory_integrity")
         return MachineManifest(self.name, 2, tuple(profiles), required_categories=required).describe()
 
     def status(self):
