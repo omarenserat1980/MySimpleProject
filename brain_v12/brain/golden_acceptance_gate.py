@@ -110,11 +110,23 @@ class GoldenAcceptanceGate:
         ids = [c.criterion_id for c in criteria]
         if len(ids) != len(set(ids)):
             raise ValueError("DUPLICATE_CRITERION_ID")
-        if expected_reality != "SIMULATED":
-            if not isinstance(mission_id, str) or not mission_id.strip():
-                raise ValueError("REAL_ACCEPTANCE_MISSION_ID_REQUIRED")
-            if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
-                raise ValueError("REAL_ACCEPTANCE_ATTEMPT_REQUIRED")
+        # Every acceptance decision must be scoped to exactly one mission
+        # attempt, including simulations. Omitting either field must never turn
+        # EvidenceStore.for_task() into a cross-attempt query.
+        if not isinstance(mission_id, str) or not mission_id.strip():
+            error = (
+                "REAL_ACCEPTANCE_MISSION_ID_REQUIRED"
+                if expected_reality != "SIMULATED"
+                else "ACCEPTANCE_MISSION_ID_REQUIRED"
+            )
+            raise ValueError(error)
+        if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
+            error = (
+                "REAL_ACCEPTANCE_ATTEMPT_REQUIRED"
+                if expected_reality != "SIMULATED"
+                else "ACCEPTANCE_ATTEMPT_REQUIRED"
+            )
+            raise ValueError(error)
 
         scoped = self.evidence.for_task(
             task_id, mission_id=mission_id, attempt=attempt
