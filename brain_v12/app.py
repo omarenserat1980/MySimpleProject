@@ -17,6 +17,7 @@ from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from .brain.error_logs import BrainErrorLogStore, BrainErrorLoggingMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -201,6 +202,8 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_S
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+error_log_store = BrainErrorLogStore()
+app.add_middleware(BrainErrorLoggingMiddleware, store=error_log_store)
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(virtual_hardware_router)
 app.include_router(arkan_software_executor_router)
@@ -245,6 +248,38 @@ app.include_router(cloud_executor_attestation_router)
 app.include_router(open_source_tools_router)
 app.include_router(asic_simulator_router)
 app.include_router(bitcoin_mining_intelligence_router)
+
+
+@app.get("/api/logs/errors")
+def brain_error_logs(request: Request, limit: int = 100, severity: str | None = None,
+                     category: str | None = None, component: str | None = None):
+    """Read recent redacted Brain error events; requires the Brain control key."""
+    require_control_key(request)
+    events = error_log_store.list(limit=limit, severity=severity, category=category, component=component)
+    return {"ok": True, "count": len(events), "events": events}
+
+
+@app.get("/api/logs/errors/{event_id}")
+def brain_error_log_detail(request: Request, event_id: str):
+    """Read one error event by ID for root-cause investigation."""
+    require_control_key(request)
+    event = error_log_store.get(event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="ERROR_LOG_NOT_FOUND")
+    return {"ok": True, "event": event}
+
+
+@app.post("/api/logs/errors/test")
+def brain_error_log_test(request: Request):
+    """Write a harmless diagnostic event to verify that persistent logging works."""
+    require_control_key(request)
+    event = error_log_store.record(
+        category="manual_diagnostic", severity="INFO",
+        component="error_logging", source="/api/logs/errors/test",
+        message="Brain error logging diagnostic event",
+        context={"purpose": "verify log write/read path"},
+    )
+    return {"ok": True, "event_id": event["event_id"], "trace_id": event["trace_id"]}
 
 
 @app.get("/api/brain/workload")
