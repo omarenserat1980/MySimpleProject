@@ -1,0 +1,28 @@
+name: Brain Virtual Software Runtime
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/brain-virtual-software-runtime-v1
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/virtual_software/**"
+      - "brain_v12/tests/test_virtual_software_runtime.py"
+      - ".github/workflows/brain-virtual-software-runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  virtual-software-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run focused virtual software runtime tests
+        run: python -m unittest brain_v12.tests.test_virtual_software_runtime -v
