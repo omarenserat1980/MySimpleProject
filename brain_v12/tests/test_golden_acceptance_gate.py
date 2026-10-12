@@ -168,6 +168,8 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
             self.gate.evaluate("task-1", self.criteria, expected_reality=7)
         with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERION_INVALID"):
             self.gate.evaluate("task-1", [object()])
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_INVALID"):
+            self.gate.evaluate("task-1", None)
 
 
 if __name__ == "__main__":
