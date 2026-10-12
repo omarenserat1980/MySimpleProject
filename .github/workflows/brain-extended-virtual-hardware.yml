@@ -8,6 +8,9 @@ on:
       - "brain_v12/virtual_hardware/ecc_memory.py"
       - "brain_v12/virtual_hardware/device_catalog.py"
       - "brain_v12/tests/test_device_catalog.py"
+      - "brain_v12/virtual_hardware/mining_hardware.py"
+      - "brain_v12/tests/test_mining_hardware.py"
+      - "docs/BRAIN_VIRTUAL_BITCOIN_MINING_HARDWARE.md"
       - "brain_v12/tests/test_ecc_memory.py"
       - "brain_v12/virtual_hardware/bus.py"
       - "brain_v12/virtual_hardware/computer.py"
@@ -50,7 +53,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run focused tests
-        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory brain_v12.tests.test_device_catalog -v
+        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory brain_v12.tests.test_device_catalog brain_v12.tests.test_mining_hardware -v
       - name: Import and inventory smoke test
         run: |
           python - <<'PY'
