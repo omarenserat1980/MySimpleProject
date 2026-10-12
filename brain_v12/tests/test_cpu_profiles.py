@@ -19,7 +19,7 @@ class CPUProfileTests(unittest.TestCase):
             self.assertTrue(p["specification_urls"])
             self.assertEqual(p["fidelity"], "functional_subset")
             self.assertFalse(p["physical_performance_claim"])
-            self.assertEqual(p["microarchitecture_simulation"], "not_implemented")
+            self.assertEqual(p["microarchitecture_simulation"], "not_simulated")
             self.assertIn("complete x86-64 instruction set", p["unsupported_features"])
 
     def test_unknown_profile_fails_closed(self):
