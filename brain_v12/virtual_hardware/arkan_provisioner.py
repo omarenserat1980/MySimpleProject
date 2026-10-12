@@ -97,6 +97,8 @@ def provision_arkan(
     )
     if smoke_test.get("output") != [1] or not smoke_test.get("halted"):
         raise RuntimeError("ARKAN_SIMULATOR_SMOKE_TEST_FAILED")
+    # Leave the simulator ready for the next submitted task, not halted on the smoke program.
+    active.cpu.reset()
 
     previous = read_arkan_record(target)
     now = _utc_now()
