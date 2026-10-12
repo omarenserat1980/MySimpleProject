@@ -160,11 +160,12 @@ jobs:
       - name: Download and validate Microsoft media
         env:
           ISO_URL_INPUT: ${{ inputs.iso_url }}
+          TRUSTED_ISO_SHA256_INPUT: ${{ inputs.trusted_iso_sha256 }}
         run: |
           set -euo pipefail
           DEFAULT_ISO_URL='https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us'
           ISO_URL="${ISO_URL_INPUT:-$DEFAULT_ISO_URL}"
-          TRUSTED_SHA256="${{ inputs.trusted_iso_sha256 }}"
+          TRUSTED_SHA256="$TRUSTED_ISO_SHA256_INPUT"
           if [[ -z "${ISO_URL//[[:space:]]/}" ]]; then
             echo "BLOCKED: ISO_URL is empty."
             exit 2
