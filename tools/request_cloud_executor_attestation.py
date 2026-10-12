@@ -4,6 +4,12 @@ from __future__ import annotations
 import argparse, json, os, tempfile, urllib.error, urllib.request
 from pathlib import Path
 
+# Only these fixed server codes may cross the boundary into CI logs.
+_SAFE_ERROR_DETAILS = {
+    "CLOUD_EXECUTOR_AUTH_REJECTED",
+    "CLOUD_EXECUTOR_HOST_BINDING_REQUIRED",
+}
+
 def post(base: str, path: str, token: str, payload: dict) -> dict:
     request = urllib.request.Request(
         base.rstrip("/") + path,
@@ -15,19 +21,18 @@ def post(base: str, path: str, token: str, payload: dict) -> dict:
         with urllib.request.urlopen(request, timeout=10) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        # Preserve only the server's fixed error code, never response bodies that
-        # might contain sensitive deployment details or credentials.
-        code = "UNKNOWN"
+        detail = ""
         try:
-            body = json.loads(exc.read().decode("utf-8"))
+            body = json.loads(exc.read(16_384).decode("utf-8"))
             candidate = body.get("detail") if isinstance(body, dict) else None
-            if isinstance(candidate, str) and candidate.replace("_", "").isalnum():
-                code = candidate[:100]
+            if isinstance(candidate, str) and candidate in _SAFE_ERROR_DETAILS:
+                detail = ":" + candidate
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             pass
-        raise RuntimeError(f"CLOUD_EXECUTOR_HTTP_{exc.code}:{code}") from exc
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_REQUEST_FAILED") from exc
+        # Do not chain HTTPError: its URL/headers/body may contain sensitive data.
+        raise RuntimeError(f"CLOUD_EXECUTOR_HTTP_{exc.code}{detail}") from None
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_REQUEST_FAILED") from None
     if not isinstance(result, dict):
         raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_RESPONSE_INVALID")
     return result

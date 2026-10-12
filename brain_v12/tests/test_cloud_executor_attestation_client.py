@@ -24,7 +24,8 @@ class CloudExecutorAttestationClientTests(unittest.TestCase):
                 post("https://example.invalid", "/path", "never-print-this", {"executor_id": "test"})
         self.assertNotIn("never-print-this", str(ctx.exception))
         self.assertNotIn(secret_like, str(ctx.exception))
-        self.assertIn("CLOUD_EXECUTOR_HTTP_403:UNKNOWN", str(ctx.exception))
+        # Untrusted detail must be dropped entirely, not replaced by a guessed code.
+        self.assertEqual(str(ctx.exception), "CLOUD_EXECUTOR_HTTP_403")
 
 
 if __name__ == "__main__":
