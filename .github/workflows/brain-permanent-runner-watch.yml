@@ -1,6 +1,9 @@
 name: Brain Permanent Runner System Watch
 
 on:
+  push:
+    branches:
+      - brain/runner-watch-probe-20261012
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
