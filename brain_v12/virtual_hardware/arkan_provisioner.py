@@ -90,6 +90,7 @@ def provision_arkan(
         active.power_on()
 
     # A bounded symbolic workload proves simulator task execution only.
+    active.cpu.reset()
     smoke_test = active.execute(
         [("MOVI", 0, 1), ("OUT", 0), ("HALT",)],
         max_cycles=10,
