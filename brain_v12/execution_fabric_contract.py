@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_WORKFLOWS = (
     ".github/workflows/brain-github-cloud.yml",
     ".github/workflows/brain-continuous-self-healing.yml",
-    ".github/workflows/brain-human-intermediary-autopilot.yml",
 )
 
 FORBIDDEN_RUNTIME_MARKERS = (
@@ -44,6 +43,27 @@ def assert_runtime_contract() -> dict:
         for marker in REQUIRED_RUNTIME_MARKERS:
             if marker not in text:
                 failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+
+    # The human-intermediary predictor is bounded state/evidence work, not
+    # production execution; it is safe to run on GitHub-hosted infrastructure.
+    autopilot_path = ROOT / ".github/workflows/brain-human-intermediary-autopilot.yml"
+    if autopilot_path.exists():
+        autopilot_text = autopilot_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_NOT_HOSTED")
+        if "RUNNER_ENVIRONMENT" not in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_HOSTED_GUARD_MISSING")
+        if "internal_runner_preflight" in autopilot_text:
+            failures.append("HUMAN_INTERMEDIARY_AUTOPILOT_REQUIRES_INTERNAL_RUNNER")
+        for marker in (
+            "automatic_production_code_mutation",
+            "automatic_financial_or_external_side_effects",
+            "success_requires_evidence",
+        ):
+            if marker not in autopilot_text:
+                failures.append(f"HUMAN_INTERMEDIARY_AUTOPILOT_SAFETY_CONTRACT_MISSING:{marker}")
+    else:
+        failures.append("MISSING_HUMAN_INTERMEDIARY_AUTOPILOT")
 
     # The long-form cinema pipeline is software rendering, not real guest boot.
     cinema_path = ROOT / ".github/workflows/brain-120-minute-cinema.yml"
