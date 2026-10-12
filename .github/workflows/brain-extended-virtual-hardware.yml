@@ -1,0 +1,52 @@
+name: Brain Extended Virtual Hardware
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/virtual_hardware/extended_devices.py"
+      - "brain_v12/virtual_hardware/__init__.py"
+      - "brain_v12/tests/test_extended_virtual_devices.py"
+      - "docs/BRAIN_EXTENDED_VIRTUAL_PERIPHERAL_FABRIC.md"
+      - ".github/workflows/brain-extended-virtual-hardware.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/virtual_hardware/extended_devices.py"
+      - "brain_v12/virtual_hardware/__init__.py"
+      - "brain_v12/tests/test_extended_virtual_devices.py"
+      - "docs/BRAIN_EXTENDED_VIRTUAL_PERIPHERAL_FABRIC.md"
+      - ".github/workflows/brain-extended-virtual-hardware.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-extended-virtual-hardware-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  focused-tests:
+    name: Software-only peripheral tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run focused tests
+        run: python -m unittest brain_v12.tests.test_extended_virtual_devices -v
+      - name: Import and inventory smoke test
+        run: |
+          python - <<'PY'
+          from brain_v12.virtual_hardware import VirtualPeripheralFabric
+          inventory = VirtualPeripheralFabric().inventory()
+          assert inventory["mode"] == "SIMULATED"
+          assert inventory["host_hardware_required"] is False
+          assert inventory["external_network_enabled"] is False
+          assert len(inventory["devices"]) >= 12
+          print("inventory_devices=", len(inventory["devices"]))
+          PY
