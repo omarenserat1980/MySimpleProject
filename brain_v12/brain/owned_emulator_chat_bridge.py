@@ -235,7 +235,8 @@ def main(argv: list[str] | None = None) -> int:
                 if args.once:
                     return 1
             if args.once:
-                return 0
+                # A completed poll is not a successful check if the status probe failed closed.
+                return 0 if all(outcome.get("ok") is True for outcome in outcomes) else 1
             time.sleep(args.poll_seconds)
     except (ValueError, RuntimeError) as exc:
         print(json.dumps({"ok": False, "state": "CONFIGURATION_ERROR", "error": str(exc)}), file=sys.stderr)
