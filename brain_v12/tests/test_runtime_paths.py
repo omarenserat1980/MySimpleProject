@@ -204,7 +204,16 @@ class RuntimePathsTests(unittest.TestCase):
         store_mock = MagicMock()
         with tempfile.TemporaryDirectory() as temporary:
             runtime_home = Path(temporary) / "runtime"
-            with patch.dict(os.environ, {"BRAIN_RUNTIME_HOME": str(runtime_home)}, clear=True):
+            with patch.dict(
+                os.environ,
+                {
+                    "BRAIN_RUNTIME_HOME": str(runtime_home),
+                    # MagicMock chassis does not mutate its blades mapping when create_blade is called.
+                    # Disable minimum-capacity creation so this test isolates store-path wiring.
+                    "BRAIN_VIRTUAL_MIN_BLADES": "0",
+                },
+                clear=True,
+            ):
                 with patch("brain_v12.brain.virtual_task_queue.DurableTaskStore", return_value=store_mock) as factory:
                     queue = VirtualTaskQueue(chassis=MagicMock(), resource_manager=MagicMock())
                     try:
