@@ -22,7 +22,7 @@ class FakeProvider:
             "provider": "openai",
             "model": "test-model",
             "response_id": "resp_test",
-            "reply": '{"root_cause_hypotheses":["test hypothesis"],"risk_level":"low","requires_human_approval":false}',
+            "reply": '{"root_cause_hypotheses":["test hypothesis"],"evidence":["mock evidence"],"confidence":0.8,"recommended_actions":["run a focused test"],"required_tools":[],"proposed_files":[],"proposed_scripts":[],"test_plan":["unit test"],"rollback_plan":["revert patch"],"risk_level":"low","requires_human_approval":false}',
         }
 
 
@@ -64,10 +64,9 @@ class UniversalSimulatorApiTests(unittest.TestCase):
     def test_analysis_returns_not_configured_without_provider_key(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
             "BRAIN_REPAIR_AUDIT_PATH": str(Path(tmp) / "audit.jsonl")
-        }), patch.object(api, "_PROVIDER", FakeProvider()):
-            with patch.object(api, "_PROVIDER") as provider:
-                provider.configured = False
-                result = api.analyze_error({"simulator_id": "azure-brain", "message": "deployment timeout"})
+        }), patch.object(api, "_PROVIDER", FakeProvider()) as provider:
+            provider.configured = False
+            result = api.analyze_error({"simulator_id": "azure-brain", "message": "deployment timeout"})
             self.assertEqual(result["status"], "NOT_CONFIGURED")
             self.assertFalse(result["repair_executed"])
 
