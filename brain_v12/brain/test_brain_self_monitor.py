@@ -25,8 +25,8 @@ class BrainSelfMonitorTests(unittest.TestCase):
 
         self.assertTrue(report["ok"])
         self.assertEqual(report["status"], "HEALTHY")
-        self.assertEqual(report["roots"]["repository"], str(repo))
-        self.assertEqual(report["roots"]["application"], str(app))
+        self.assertEqual(report["root_mode"], "repository_root")
+        self.assertEqual(report["root_mode"], "repository_root")
         self.assertTrue(report["observed_at_utc"].endswith("+00:00"))
         run.assert_called_once()
         self.assertEqual(run.call_args.kwargs["cwd"], str(repo))
@@ -40,8 +40,8 @@ class BrainSelfMonitorTests(unittest.TestCase):
             report = BrainSelfMonitor(app).snapshot()
 
         self.assertTrue(report["ok"])
-        self.assertEqual(report["roots"]["repository"], str(repo))
-        self.assertEqual(report["roots"]["application"], str(app))
+        self.assertEqual(report["root_mode"], "application_root")
+        self.assertEqual(report["root_mode"], "application_root")
         self.assertEqual(run.call_args.kwargs["cwd"], str(repo))
 
     @patch("brain_v12.brain.brain_self_monitor.subprocess.run")
@@ -67,7 +67,7 @@ class BrainSelfMonitorTests(unittest.TestCase):
         self.assertFalse(report["ok"])
         checks = {item["name"]: item for item in report["checks"]}
         self.assertFalse(checks["git_repository"]["ok"])
-        self.assertIn("timed out", checks["git_repository"]["detail"])
+        self.assertEqual(checks["git_repository"]["error_type"], "TimeoutExpired")
 
 
 if __name__ == "__main__":
