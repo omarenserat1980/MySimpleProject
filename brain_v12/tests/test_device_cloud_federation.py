@@ -130,7 +130,8 @@ class DeviceCloudFederationTests(unittest.TestCase):
             self.assertEqual(indicators[tool]["owner"], "Electronic Brain")
             self.assertFalse(indicators[tool]["physical_device_required"])
             self.assertFalse(indicators[tool]["external_app_required"])
-            self.assertTrue(indicators[tool]["execution_eligible"])
+            self.assertFalse(indicators[tool]["execution_eligible"])
+            self.assertEqual(indicators[tool]["observed_state"], "NOT_PROVISIONED")
 
     def test_wrong_arkan_identity_cannot_be_marked_ready(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
