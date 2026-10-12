@@ -42,7 +42,12 @@ class VirtualTaskQueue:
         self.workload_controller=workload_controller or WorkloadController()
         self.workload_router=workload_router or WorkloadRouter(self.workload_controller)
         self.max_workers=max(1,int(max_workers))
+        self.virtual_min_blades=max(0,int(os.getenv("BRAIN_VIRTUAL_MIN_BLADES","1")))
+        self.virtual_max_blades=max(self.virtual_min_blades,int(os.getenv("BRAIN_VIRTUAL_MAX_BLADES","4")))
+        self.virtual_ram_bytes=max(1024,int(os.getenv("BRAIN_VIRTUAL_RAM_BYTES_PER_BLADE","65536")))
+        self.virtual_autoscale=os.getenv("BRAIN_VIRTUAL_AUTOSCALE","1").strip().lower() not in {"0","false","no","off"}
         self.pool=ThreadPoolExecutor(max_workers=max(1,int(max_workers))); self.store=DurableTaskStore(store_path)
+        self._ensure_minimum_virtual_capacity()
         self._recover_on_start()
 
     def _row_to_task(self,row):
@@ -73,6 +78,45 @@ class VirtualTaskQueue:
         self._schedule(task.task_id)
         return task
 
+    def _ensure_minimum_virtual_capacity(self):
+        """Create Brain-owned software nodes; this never probes or requires physical devices."""
+        while len(self.chassis.blades)<self.virtual_min_blades:
+            blade=self.chassis.create_blade(ram_size=self.virtual_ram_bytes)
+            blade.power_on()
+
+    def _ensure_virtual_capacity(self,task):
+        """Scale out only when no current virtual blade can satisfy a task."""
+        if not self.virtual_autoscale or len(self.chassis.blades)>=self.virtual_max_blades:
+            return None
+        # Avoid multiplying nodes for a request that exceeds every node's configured RAM.
+        if task.requirement.ram_bytes>self.virtual_ram_bytes:
+            return None
+        if task.requirement.storage_bytes>1024*1024:
+            return None
+        capabilities=task.required_capabilities or {"cpu"}
+        blade=self.chassis.create_blade(capabilities=capabilities,ram_size=self.virtual_ram_bytes)
+        try:
+            blade.power_on()
+        except Exception:
+            self.chassis.remove_blade(blade.blade_id)
+            raise
+        return blade
+
+    def _scale_in_idle_virtual_capacity(self):
+        """Return idle excess nodes to the configured floor after the queue drains."""
+        if not self.virtual_autoscale:
+            return
+        counts=self.store.counts()
+        if int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))+int(counts.get("RUNNING",0))>0:
+            return
+        active_blades={t.blade_id for t in self.tasks.values() if t.status=="RUNNING" and t.blade_id}
+        for blade_id in list(self.chassis.blades):
+            if len(self.chassis.blades)<=self.virtual_min_blades:
+                break
+            if blade_id in active_blades or any(r.blade_id==blade_id for r in self.resources.reservations.values()):
+                continue
+            self.chassis.remove_blade(blade_id)
+
     def _find_blade(self,task):
         candidates=[b for b in self.chassis.blades.values() if b.state=="ONLINE"
           and task.required_capabilities.issubset(b.capabilities) and self.resources.can_allocate(b,task.requirement)]
@@ -98,6 +142,9 @@ class VirtualTaskQueue:
                 task.status="WAITING"
                 return
             blade=self._find_blade(task)
+            if blade is None:
+                self._ensure_virtual_capacity(task)
+                blade=self._find_blade(task)
             if blade is None: task.status="WAITING"; return
             reservation=self.resources.reserve(blade,task.task_id,task.requirement)
             if not reservation["ok"]: task.status="WAITING"; return
@@ -120,7 +167,9 @@ class VirtualTaskQueue:
                 task.result={"ok":False,"error":str(exc)}; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
                 self.store.finish(task_id,False,task.result)
         finally:
-            self.resources.release(task_id); self.pump()
+            self.resources.release(task_id)
+            self._scale_in_idle_virtual_capacity()
+            self.pump()
 
     def heartbeat(self,task_id,lease_id):
         with self.lock:
