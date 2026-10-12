@@ -10,7 +10,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
         fleet = default_fleet()
         self.assertEqual(
             [item.endpoint_id for item in fleet],
-            ["arkan-virtual-01", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
+            ["arkan-virtual-01", "phone-virtual-01", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
         )
         self.assertTrue(all(not item.online for item in fleet))
         self.assertTrue(all(not item.identity_verified for item in fleet))
@@ -87,6 +87,32 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(row["supported_execution"], ["bounded_symbolic_virtual_simulation"])
         self.assertFalse(row["native_os_boot_verified"])
 
+    def test_virtual_phone_requires_live_simulator_and_task_evidence_for_readiness(self):
+        from brain_v12.brain.device_cloud_federation import build_fleet_status
+
+        configured = build_fleet_status({"ttl_seconds": 15, "agents": []})
+        row = next(x for x in configured["fleet"] if x["endpoint_id"] == "phone-virtual-01")
+        self.assertEqual(row["observed_state"], "PROFILE_REGISTERED_NOT_RUNNING")
+        self.assertFalse(row["execution_eligible"])
+
+        ready = build_fleet_status(
+            {"ttl_seconds": 15, "agents": []},
+            virtual_phone_status={
+                "exists": True,
+                "device_id": "phone-virtual-01",
+                "identity_independent_of_host": True,
+                "runtime_loaded": True,
+                "simulator_booted": True,
+                "runtime_status": {"powered": True},
+                "task_execution_evidence": {"status": "PASS"},
+            },
+        )
+        row = next(x for x in ready["fleet"] if x["endpoint_id"] == "phone-virtual-01")
+        self.assertEqual(row["observed_state"], "SIMULATION_READY")
+        self.assertTrue(row["execution_eligible"])
+        self.assertFalse(row["native_os_boot_verified"])
+        self.assertEqual(ready["active_software_node"]["indicator_state"], "SIMULATION_READY")
+
     def test_wrong_arkan_identity_cannot_be_marked_ready(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
 
@@ -146,6 +172,15 @@ class DeviceCloudFederationTests(unittest.TestCase):
             ],
         })
         rows = {row["endpoint_id"]: row for row in result["fleet"]}
+        self.assertEqual(rows["phone-virtual-01"]["observed_state"], "PROFILE_REGISTERED_NOT_RUNNING")
+        self.assertEqual(rows["phone-virtual-01"]["role"], "virtual_phone")
+        self.assertEqual(rows["phone-virtual-01"]["platform"], "brain-mobile-simulator")
+        self.assertTrue(rows["phone-virtual-01"]["indicator_selected"])
+        self.assertFalse(rows["phone-virtual-01"]["physical_device_required"])
+        self.assertFalse(rows["phone-virtual-01"]["execution_eligible"])
+        self.assertEqual(result["active_software_node"]["indicator_target"], "phone-virtual-01")
+        self.assertEqual(result["active_software_node"]["display_name"], "هاتف برين الافتراضي")
+        self.assertFalse(result["active_software_node"]["physical_device_required"])
         self.assertEqual(rows["redmi3-01"]["observed_state"], "ONLINE")
         self.assertFalse(rows["redmi3-01"]["identity_verified"])
         self.assertFalse(rows["redmi3-01"]["execution_eligible"])
