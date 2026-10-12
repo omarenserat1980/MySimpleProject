@@ -69,9 +69,12 @@ class VirtualRAM:
 
     def _record_access(self, address: int, operation: str):
         reports = {}
-        if self.cache_hierarchy:
-            reports["cache"] = self.cache_hierarchy.access(address)
-        if self.timing_model:
+        cache_report = self.cache_hierarchy.access(address) if self.cache_hierarchy else None
+        if cache_report:
+            reports["cache"] = cache_report
+        # Only a cache miss is modeled as a DRAM request. This is a tag/timing abstraction,
+        # not a coherent data cache or cycle-accurate bus transaction.
+        if self.timing_model and (cache_report is None or cache_report["hit_level"] == "DRAM"):
             request = self.timing_model.begin_access(address, 1, operation)
             self.timing_model.complete_access(request["token"])
             reports["dram"] = request
