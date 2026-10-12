@@ -1,9 +1,8 @@
-"""Safe cloud-offload policy for Brain's device fleet.
+"""Software-only fleet indicators and safe execution planning for Brain.
 
-This module describes device roles and chooses an execution *plan* only.
-It does not connect to devices, execute commands, provision cloud resources,
-or control vehicle systems. Runtime liveness and identity must be supplied by
-fresh, independently verified evidence.
+The active fleet contains Brain-managed software nodes only. Legacy external
+device observations are not execution targets and do not feed active status
+indicators. This module plans work; it does not execute or provision resources.
 """
 from __future__ import annotations
 
@@ -107,9 +106,8 @@ def build_fleet_status(
     only on its canonical persisted ID, an in-process simulator boot, and a
     passing bounded symbolic task; it grants simulation capability only.
     """
-    agents = agent_status.get("agents", []) if isinstance(agent_status, dict) else []
-    ttl = max(5, int(agent_status.get("ttl_seconds", 15))) if isinstance(agent_status, dict) else 15
-    observed = {str(item.get("agent_id", "")): item for item in agents if isinstance(item, dict)}
+    # Retain the parameter for API compatibility, but never let physical-agent
+    # heartbeats influence canonical software-node indicators.
     virtual_status = virtual_computer_status if isinstance(virtual_computer_status, dict) else {}
     phone_status = virtual_phone_status if isinstance(virtual_phone_status, dict) else {}
     arkan_identity_verified = (
@@ -212,7 +210,7 @@ def build_fleet_status(
     return {
         "ok": True,
         "status": "OBSERVED_NOT_EXECUTION_READY",
-        "source": "device_bridge.agent_status+software_virtual_nodes",
+        "source": "software_virtual_nodes",
         "active_software_node": {
             "endpoint_id": "arkan-virtual-01",
             "display_name": "Arkan virtual computer",
