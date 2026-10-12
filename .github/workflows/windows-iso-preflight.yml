@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tools/rebuild_windows_server_iso.ps1"
       - "brain_v12/tests/test_windows_server_iso_preflight.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
       - ".github/workflows/windows-iso-preflight.yml"
@@ -11,6 +12,7 @@ on:
     branches: [main]
     paths:
       - "brain_v12/tools/windows_server_iso_preflight.py"
+      - "brain_v12/tools/rebuild_windows_server_iso.ps1"
       - "brain_v12/tests/test_windows_server_iso_preflight.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
       - ".github/workflows/windows-iso-preflight.yml"
@@ -36,3 +38,28 @@ jobs:
         run: python -m unittest brain_v12.tests.test_windows_server_iso_preflight -v
       - name: Compile validator
         run: python -m py_compile brain_v12/tools/windows_server_iso_preflight.py
+
+  powershell-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse rebuild script without executing it
+        shell: pwsh
+        run: |
+          $scriptPath = Join-Path $env:GITHUB_WORKSPACE "brain_v12/tools/rebuild_windows_server_iso.ps1"
+          if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
+            throw "ISO rebuild script is missing: $scriptPath"
+          }
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $scriptPath,
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error ("Line {0}: {1}" -f $_.Extent.StartLineNumber, $_.Message) }
+            throw "PowerShell syntax validation failed."
+          }
+          Write-Output "POWERSHELL_PARSE_OK; rebuild script was parsed only and was not executed."
