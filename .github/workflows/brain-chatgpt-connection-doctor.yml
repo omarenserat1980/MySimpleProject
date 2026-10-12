@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN || vars.BRAIN_API_ORIGIN || secrets.BRAIN_ORIGIN || vars.BRAIN_ORIGIN || 'https://electronic-brain-v12-gwwg.onrender.com' }}
+      BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN || vars.BRAIN_API_ORIGIN || secrets.BRAIN_ORIGIN || vars.BRAIN_ORIGIN || 'https://brain-control-plane-main.onrender.com' }}
       BRAIN_API_ORIGIN_SOURCE: ${{ secrets.BRAIN_API_ORIGIN != '' && 'secret:BRAIN_API_ORIGIN' || vars.BRAIN_API_ORIGIN != '' && 'var:BRAIN_API_ORIGIN' || secrets.BRAIN_ORIGIN != '' && 'secret:BRAIN_ORIGIN' || vars.BRAIN_ORIGIN != '' && 'var:BRAIN_ORIGIN' || 'existing-project-default' }}
     steps:
       - uses: actions/checkout@v4
