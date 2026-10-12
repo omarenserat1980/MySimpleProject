@@ -111,19 +111,29 @@ def provision_canonical_arkan(request: Request):
     }
 
 
+def read_arkan_runtime_status():
+    """Return canonical identity plus live in-process simulator evidence."""
+    with _lock:
+        machine = _machines.get(ARKAN_ID)
+        persisted = arkan_status()
+        persisted["runtime_loaded"] = machine is not None
+        if machine is not None:
+            persisted["runtime_status"] = machine.status()
+            persisted["simulator_booted"] = bool(
+                machine.powered
+                and machine.boot_record
+                and machine.boot_record.get("ok")
+            )
+        else:
+            persisted["simulator_booted"] = False
+        return persisted
+
+
 @router.get("/arkan/status")
 def get_canonical_arkan_status(request: Request):
     """Read persisted identity and distinguish it from an in-memory simulator."""
     _authorized(request)
-    with _lock:
-        machine = _machines.get(ARKAN_ID)
-        persisted = arkan_status()
-        if machine is not None:
-            persisted["runtime_loaded"] = True
-            persisted["runtime_status"] = machine.status()
-        else:
-            persisted["runtime_loaded"] = False
-        return persisted
+    return read_arkan_runtime_status()
 
 
 @router.get("/machines/{machine_id}/manifest")
