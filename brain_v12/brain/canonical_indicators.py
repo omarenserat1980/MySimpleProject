@@ -179,3 +179,38 @@ def aggregate_required_indicators(
         "verified_count": len(indicators) - len(blockers),
         "blockers": blockers,
     }
+
+def indicators_for_fleet(fleet_status, *, now=None, freshness_seconds=300):
+    """Adapt fleet status without inventing observation timestamps."""
+    rows = fleet_status.get("fleet", []) if isinstance(fleet_status, dict) else []
+    if not isinstance(rows, list):
+        return []
+    result = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("role") not in {"virtual_computer", "virtual_phone"}:
+            continue
+        subject_id = row.get("endpoint_id")
+        if not isinstance(subject_id, str) or row.get("physical_device_required") is True:
+            continue
+        if row.get("reality") != "SIMULATED":
+            continue
+        item = build_indicator(
+            indicator_id=f"node.{subject_id}.readiness",
+            subject_id=subject_id,
+            indicator_type="readiness",
+            value=row.get("observed_state", "UNKNOWN"),
+            source="device_cloud_federation",
+            backend_id=row.get("platform") if isinstance(row.get("platform"), str) else None,
+            verification_level=VerificationLevel.REGISTERED,
+            required_level=VerificationLevel.REGISTERED,
+            observed_at=row.get("observed_at"),
+            verified_at=row.get("verified_at"),
+            evidence_refs=row.get("evidence_refs", ()),
+            freshness_seconds=freshness_seconds,
+            now=now,
+        )
+        result.append(item.public())
+    return result
+
