@@ -46,6 +46,7 @@ class HardwareProfile:
     unsupported_features: tuple[str, ...] = ()
     sources: tuple[SpecificationSource, ...] = ()
     conformance_tests: tuple[str, ...] = ()
+    units: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("profile_id", "category", "model"):
@@ -65,6 +66,7 @@ class HardwareProfile:
             "model": self.model,
             "fidelity": self.fidelity.value,
             "parameters": dict(self.parameters),
+            "units": dict(self.units),
             "modeled_behaviors": list(self.modeled_behaviors),
             "unsupported_features": list(self.unsupported_features),
             "sources": [
