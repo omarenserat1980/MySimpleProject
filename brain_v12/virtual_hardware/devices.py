@@ -418,6 +418,10 @@ class VirtualGPU:
         fault = self._next_fault
         if fault is None:
             return
+        if fault == "transfer_timeout" and operation != "transfer":
+            return
+        if fault == "queue_full" and operation != "compute":
+            return
         self._next_fault = None
         if fault == "transfer_timeout" and operation == "transfer":
             raise TimeoutError("GPU_INJECTED_TRANSFER_TIMEOUT")
