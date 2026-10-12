@@ -259,7 +259,7 @@ def brain_workload_route(body:dict):
         queued=int(body.get("queued",0)), active=int(body.get("active",0)),
         priority=str(body.get("priority","NORMAL")),
         required_capabilities=body.get("required_capabilities",[]),
-        workers=workers, github_available=bool(body.get("github_available",True)),
+        workers=workers, github_available=bool(body.get("github_available",False)),
         key_active=int(body.get("key_active",0)), retry_count=int(body.get("retry_count",0)),
         duplicate=bool(body.get("duplicate",False)))
 
