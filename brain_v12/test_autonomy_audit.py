@@ -60,5 +60,25 @@ class AutonomyAuditTests(unittest.TestCase):
             self.assertEqual(result["self_hosted_jobs"][0]["workflow"], "brain-windows-real-boot.yml")
 
 
+    def test_local_reusable_workflow_calls_are_delegated_not_missing_runners(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "parent.yml").write_text(
+                "name: Parent\non:\n  workflow_dispatch:\njobs:\n"
+                "  child:\n    uses: ./.github/workflows/child.yml\n",
+                encoding="utf-8",
+            )
+            (root / "child.yml").write_text(
+                "name: Child\non:\n  workflow_call:\njobs:\n"
+                "  hosted:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo ok\n",
+                encoding="utf-8",
+            )
+            result = calculate_audit(root)
+            self.assertEqual(result["job_count"], 1)
+            self.assertEqual(result["all_workflows"]["github_hosted"], 1)
+            self.assertEqual(result["all_workflows"]["missing"], 0)
+            self.assertEqual(result["delegated_reusable_workflow_call_count"], 1)
+            self.assertEqual(result["delegated_reusable_workflow_calls"][0]["workflow"], "parent.yml")
+
 if __name__ == "__main__":
     unittest.main()
