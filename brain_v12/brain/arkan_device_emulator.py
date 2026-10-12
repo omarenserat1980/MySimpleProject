@@ -1,4 +1,4 @@
-"""Arkan Device Emulator: deterministic virtual twin of the Brain arkan executor."""
+"""Legacy host-profile simulator, explicitly separate from canonical Arkan virtual computer."""
 from __future__ import annotations
 from dataclasses import dataclass,field
 from pathlib import Path
@@ -12,8 +12,8 @@ SCHEMA="brain.arkan-device-emulator.v1"
 
 @dataclass
 class ArkanProfile:
-    device_id:str="d0f5f0a0-f105-4750-8254-cca35dfe9c29"
-    name:str="arkan"
+    device_id:str="arkan-host-sim-asus-vivobook"
+    name:str="arkan-host-sim-asus-vivobook"
     os:str="Windows 10 Pro"
     build:str="26300"
     model:str="ASUS Vivobook X1504VA"
@@ -22,7 +22,7 @@ class ArkanProfile:
     architecture:str="x64"
     wsl_distribution:str="Ubuntu-24.04"
     wsl_version:int=2
-    labels:list[str]=field(default_factory=lambda:["self-hosted","windows-real-boot","brain-internal"])
+    labels:list[str]=field(default_factory=lambda:["simulated-host-profile","not-a-runtime-agent"])
 
 class ArkanDeviceEmulator:
     def __init__(self,root:str|Path,profile:ArkanProfile|None=None):
