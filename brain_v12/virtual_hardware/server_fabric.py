@@ -108,7 +108,7 @@ class HostCapacity:
     available_disk_bytes: int | None
     operating_system: str
     architecture: str
-    provenance: str = HOST_OBSERVED
+    provenance: str = "UNVERIFIED"
 
     def describe(self) -> dict[str, Any]:
         return asdict(self)
@@ -215,6 +215,8 @@ def admit_server_workload(
         return {"ok": False, "status": "INVALID_CPU_BUDGET"}
     if host.provenance != HOST_OBSERVED:
         return {"ok": False, "status": "HOST_CAPACITY_NOT_OBSERVED"}
+    if host.logical_cpus < 1 or (host.available_memory_mib is not None and host.available_memory_mib < 0) or (host.available_disk_bytes is not None and host.available_disk_bytes < 0):
+        return {"ok": False, "status": "HOST_CAPACITY_INVALID"}
     if host.available_memory_mib is None or host.available_disk_bytes is None:
         return {"ok": False, "status": "HOST_CAPACITY_UNKNOWN"}
     max_vcpus = max(1, int(host.logical_cpus * max_cpu_fraction))
