@@ -10,6 +10,12 @@
 
 The logical identity is independent of a physical ASUS VivoBook, Desktop Commander, a self-hosted runner, or any other host. Host/backend availability and guest execution are separate concerns.
 
+## Brain fleet integration
+
+The fleet inventory uses `arkan-virtual-01` as the canonical Arkan identity and labels its platform `brain-simulator`. The former physical ASUS VivoBook is not an alias for this identity. Fleet status reports `SIMULATION_READY` only when the in-process simulator is booted and a bounded symbolic CPU task has passed; otherwise it reports `NOT_PROVISIONED`, `CONFIGURED_NOT_RUNNING`, or `DEGRADED`. This readiness is limited to symbolic simulation and never proves a native OS boot.
+
+The optional physical host, if configured later, must use a distinct ID such as `arkan-host-asus-vivobook` and cannot inherit Arkan identity.
+
 ## API
 
 Both endpoints require the existing Brain control key:
@@ -38,4 +44,4 @@ python -m unittest brain_v12.tests.test_arkan_provisioner -v
 python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/virtual_hardware/api.py
 ```
 
-A passing simulator test establishes software simulation readiness only, not native guest OS boot.
+A passing simulator test establishes software simulation readiness only, not native guest OS boot. Fleet integration tests also verify that an ASUS/physical host ID cannot be marked as the canonical Arkan identity.
