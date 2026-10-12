@@ -56,5 +56,29 @@ class WindowsServerIsoPreflightTests(unittest.TestCase):
         self.assertFalse(report["checks"]["iso_file"]["passed"])
 
 
+    @patch("brain_v12.tools.windows_server_iso_preflight.shutil.which", return_value="/usr/bin/xorriso")
+    @patch("brain_v12.tools.windows_server_iso_preflight.subprocess.run")
+    def test_xorriso_timeout_fails_closed(self, run, _which):
+        run.side_effect = __import__("subprocess").TimeoutExpired(cmd="xorriso", timeout=15)
+        report = inspect_iso(self.iso)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertFalse(report["checks"]["xorriso"]["passed"])
+        self.assertIn("TimeoutExpired", report["checks"]["xorriso"]["reason"])
+        self.assertEqual(report["boot_status"], "NOT_TESTED")
+
+    @patch("brain_v12.tools.windows_server_iso_preflight.shutil.which", return_value="/usr/bin/xorriso")
+    @patch("brain_v12.tools.windows_server_iso_preflight.subprocess.run")
+    def test_iso_listing_timeout_fails_closed(self, run, _which):
+        run.side_effect = [
+            SimpleNamespace(returncode=0, stdout="xorriso 1.5.6", stderr=""),
+            __import__("subprocess").TimeoutExpired(cmd="xorriso", timeout=120),
+        ]
+        report = inspect_iso(self.iso)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertFalse(report["checks"]["iso9660_listing"]["passed"])
+        self.assertIn("TimeoutExpired", report["checks"]["iso9660_listing"]["reason"])
+        self.assertEqual(report["boot_status"], "NOT_TESTED")
+
+
 if __name__ == "__main__":
     unittest.main()
