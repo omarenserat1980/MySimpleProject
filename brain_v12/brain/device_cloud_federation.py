@@ -14,11 +14,13 @@ from typing import Iterable
 
 class EndpointRole(str, Enum):
     COMPUTE_HOST = "compute_host"
+    VIRTUAL_COMPUTER = "virtual_computer"
     ANDROID_AGENT = "android_agent"
     VEHICLE_CLIENT = "vehicle_client"
 
 
 class Workload(str, Enum):
+    VIRTUAL_SIMULATION = "virtual_simulation"
     AI_INFERENCE = "ai_inference"
     BUILD_TEST = "build_test"
     MEDIA_RENDER = "media_render"
@@ -64,13 +66,15 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
     """Return logical profiles, not claims that devices are currently online."""
     return (
         DeviceEndpoint(
-            endpoint_id="arkan",
-            display_name="Arkan Windows host",
-            role=EndpointRole.COMPUTE_HOST,
-            platform="windows",
-            allowed_workloads=(Workload.BUILD_TEST, Workload.MEDIA_RENDER,
-                               Workload.SYNC_BACKUP),
-            notes="Host identity, available RAM, and VM boot must be verified live.",
+            endpoint_id="arkan-virtual-01",
+            display_name="Arkan virtual computer",
+            role=EndpointRole.VIRTUAL_COMPUTER,
+            platform="brain-simulator",
+            allowed_workloads=(Workload.VIRTUAL_SIMULATION,),
+            notes=(
+                "Canonical software-defined identity. Simulator provisioning and a supported "
+                "task must be verified before execution; never alias this identity to a physical host."
+            ),
         ),
         DeviceEndpoint(
             endpoint_id="redmi3-01",
