@@ -7,6 +7,7 @@ on:
       - "brain_v12/virtual_hardware/arkan_provisioner.py"
       - "brain_v12/virtual_hardware/api.py"
       - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/brain/brain_council.py"
       - "brain_v12/app.py"
       - "brain_v12/tests/test_arkan_provisioner.py"
       - "brain_v12/tests/test_device_cloud_federation.py"
@@ -38,7 +39,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Compile Arkan provisioning and API
-        run: python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/virtual_hardware/api.py brain_v12/brain/device_cloud_federation.py brain_v12/app.py
+        run: python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/virtual_hardware/api.py brain_v12/brain/device_cloud_federation.py brain_v12/brain/brain_council.py brain_v12/app.py
       - name: Run Arkan provisioning tests
         run: python -m unittest brain_v12.tests.test_arkan_provisioner -v
       - name: Run fleet identity regression tests
