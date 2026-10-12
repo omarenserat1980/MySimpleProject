@@ -9,6 +9,9 @@ on:
       - "brain_v12/virtual_hardware/device_catalog.py"
       - "brain_v12/tests/test_device_catalog.py"
       - "brain_v12/virtual_hardware/network_hardware.py"
+      - "brain_v12/virtual_hardware/software_hardware_nodes.py"
+      - "brain_v12/tests/test_software_hardware_nodes.py"
+      - "docs/BRAIN_SOFTWARE_HARDWARE_NODE_INVENTORY.md"
       - "brain_v12/tests/test_network_hardware.py"
       - "docs/BRAIN_VIRTUAL_NETWORK_HARDWARE.md"
       - "brain_v12/virtual_hardware/mining_hardware.py"
@@ -64,7 +67,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run focused tests
-        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory brain_v12.tests.test_device_catalog brain_v12.tests.test_mining_hardware brain_v12.tests.test_mining_farm brain_v12.tests.test_network_hardware -v
+        run: python -m unittest brain_v12.tests.test_extended_virtual_devices brain_v12.tests.test_virtual_pcie brain_v12.tests.test_ecc_memory brain_v12.tests.test_device_catalog brain_v12.tests.test_mining_hardware brain_v12.tests.test_mining_farm brain_v12.tests.test_network_hardware brain_v12.tests.test_software_hardware_nodes -v
       - name: Import and inventory smoke test
         run: |
           python - <<'PY'
