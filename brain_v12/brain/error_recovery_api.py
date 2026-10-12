@@ -26,7 +26,7 @@ from .universal_simulator_api import analyze_error, discover_simulators
 router = APIRouter(tags=["brain-error-recovery"])
 _LOCK = threading.Lock()
 _SECRET_PATTERNS = [
-    re.compile(r"(?i)(token|password|secret|api[_-]?key|authorization)\s*[:=]\s*([^\s,;]+)"),
+    re.compile(r"(?i)(token|password|secret|api[_-]?key|authorization)\s*[:=]\s*(?:bearer\s+)?([^\s,;]+)"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/-]+=*"),
 ]
 
