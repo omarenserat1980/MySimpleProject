@@ -9,6 +9,7 @@ import hashlib, json, subprocess, time
 from pathlib import Path
 from .brain_supervisor import BrainSupervisor
 from .golden_acceptance_gate import AcceptanceCriterion
+from .mission import MissionState
 
 class FilmSupervisor:
     def __init__(self, work="/tmp/last-light", artifact_root="brain6_artifacts", max_attempts=3):
@@ -60,7 +61,14 @@ class FilmSupervisor:
                     )
 
                 mission_id=job["job_id"]
-                evidence_attempt=int(job.get("attempts",1))
+                mission=supervisor.missions[mission_id]
+                mission.transition(MissionState.UNDERSTANDING,reason="film artifact discovered")
+                mission.transition(MissionState.PLANNING,reason="local renderer selected")
+                mission.transition(MissionState.READY,reason="renderer plan ready")
+                mission.transition(MissionState.EXECUTING,reason="render completed")
+                mission.transition(MissionState.OBSERVING,reason="independent artifact probe completed")
+                mission.transition(MissionState.VERIFYING,reason="golden acceptance evidence prepared")
+                evidence_attempt=mission.attempts
                 artifact_evidence=supervisor.evidence.append(
                     mission_id,"artifact_verified",
                     {"reality_level":"SIMULATED","artifact":str(self.work/"last_light_city.mp4"),
