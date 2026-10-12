@@ -75,6 +75,20 @@ class CanonicalIndicatorTests(unittest.TestCase):
         self.assertEqual(result["verified_count"], 1)
         self.assertEqual(result["blockers"][0]["indicator_id"], "node.disk")
 
+    def test_verified_but_failed_value_still_blocks_healthy_aggregate(self):
+        failed = self.make(value="FAILED")
+        result = aggregate_required_indicators([failed])
+        self.assertEqual(failed.status, "VERIFIED")
+        self.assertEqual(result["status"], "DEGRADED")
+        self.assertFalse(result["healthy"])
+        self.assertEqual(result["blockers"][0]["indicator_id"], "node.arkan.health")
+
+    def test_verified_false_boolean_still_blocks_healthy_aggregate(self):
+        failed = self.make(value=False)
+        result = aggregate_required_indicators([failed])
+        self.assertEqual(result["status"], "DEGRADED")
+        self.assertFalse(result["healthy"])
+
     def test_empty_aggregate_is_unknown(self):
         result = aggregate_required_indicators([])
         self.assertEqual(result["status"], "UNKNOWN")
