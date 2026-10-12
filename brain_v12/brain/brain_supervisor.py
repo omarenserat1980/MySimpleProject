@@ -11,6 +11,7 @@ from .brain_constitution import BrainConstitution
 from .mission import Mission
 from .evidence_store import EvidenceStore
 from .verification_core import VerificationCore
+from .golden_acceptance_gate import AcceptanceCriterion, GoldenAcceptanceGate
 from .asic_resource_adapter import ASICResourceAdapter
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
@@ -30,9 +31,50 @@ class BrainSupervisor:
         self.max_cycles=max(1,min(int(max_cycles),5))
         self.control=ControlPlane(str(self.root/"control_plane")); self.reasoner=AutonomousReasoner()
         self.execution_gateway=execution_gateway or BrainExecutionGateway(); self.resource_guard=EmergencyResourceGuard()
-        self.reality=RealityCore(); self.constitution=BrainConstitution(); self.evidence=EvidenceStore(str(self.root/"evidence.db")); self.verification=VerificationCore(self.evidence,self.constitution); self.missions={}
+        self.reality=RealityCore(); self.constitution=BrainConstitution(); self.evidence=EvidenceStore(str(self.root/"evidence.db")); self.verification=VerificationCore(self.evidence,self.constitution); self.golden_gate=GoldenAcceptanceGate(self.evidence); self.missions={}
         # ASIC simulations and external telemetry use the supervisor's evidence journal.
-        self.asic_resources=ASICResourceAdapter(evidence=self.evidence)
+
+    def deliver_if_golden(self, job, criteria, *, expected_reality="SIMULATED", details=None):
+        """Deliver only when the golden evidence gate and existing runtime gate both pass.
+
+        This is a guarded path layered onto the single BrainSupervisor; it does
+        not create a second orchestrator. The evidence producer labels are not
+        cryptographic remote attestation, so this method cannot prove a remote
+        executor identity or a real VM boot by itself.
+        """
+        criteria = tuple(criteria)
+        mission_id = job["job_id"]
+        mission = self.missions.get(mission_id)
+        result = self.golden_gate.evaluate(
+            mission_id, criteria, mission_id=mission_id,
+            attempt=mission.attempts if mission else None,
+            expected_reality=expected_reality,
+        )
+        result_data = {
+            "accepted": result.accepted,
+            "status": result.status,
+            "task_id": result.task_id,
+            "mission_id": result.mission_id,
+            "attempt": result.attempt,
+            "reality_level": result.reality_level,
+            "evidence_ids": list(result.evidence_ids),
+            "criterion_results": list(result.criterion_results),
+            "reasons": list(result.reasons),
+        }
+        self._event(mission_id, "golden_acceptance_gate", result_data)
+        if not result.accepted:
+            return self.transition(
+                job, "blocked", status="blocked",
+                details={**(details or {}), "golden_acceptance": result_data},
+                enforce_authority=False,
+            )
+        # Keep the pre-existing runtime-evidence gate in force as well.
+        return self.transition(
+            job, "deliver", status="completed",
+            details={**(details or {}), "golden_acceptance": result_data},
+            enforce_authority=False,
+            required_evidence_kind=criteria[0].required_kind,
+        )
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
@@ -176,5 +218,3 @@ class BrainSupervisor:
         final="completed" if evidence_result.verified else "blocked"
         job=self.transition(job,"deliver",status="completed",details={"result":final},required_evidence_kind="simulation_runtime_verified")
         self.snapshot(job,{"verified":evidence_result.verified,"result":job["status"]});return job
-
-if __name__=="__main__":print(json.dumps(BrainSupervisor().run_simulation("supervisor_smoke_test"),indent=2))
