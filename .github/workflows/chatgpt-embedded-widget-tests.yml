@@ -1,0 +1,42 @@
+name: ChatGPT embedded Brain widget tests
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/brain_mcp.py'
+      - 'brain_v12/mcp_server.py'
+      - 'brain_v12/web/brain-chat-widget.html'
+      - 'brain_v12/tests/test_brain_mcp_apps_widget.py'
+      - '.github/workflows/chatgpt-embedded-widget-tests.yml'
+  push:
+    branches:
+      - 'feature/chatgpt-embedded-brain-chat'
+    paths:
+      - 'brain_v12/brain/brain_mcp.py'
+      - 'brain_v12/mcp_server.py'
+      - 'brain_v12/web/brain-chat-widget.html'
+      - 'brain_v12/tests/test_brain_mcp_apps_widget.py'
+      - '.github/workflows/chatgpt-embedded-widget-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  widget-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install minimal test dependency
+        run: python -m pip install --disable-pip-version-check fastapi
+      - name: Compile MCP implementation and tests
+        run: python -m py_compile brain_v12/brain/brain_mcp.py brain_v12/mcp_server.py brain_v12/tests/test_brain_mcp_apps_widget.py
+      - name: Run embedded widget contract tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_brain_mcp_apps_widget -v
