@@ -102,6 +102,41 @@ class ASICResourceAdapter:
         self.health.register(executor_id, lambda rid=resource.resource_id: self._health_probe(rid))
         return self.resource_snapshot(resource.resource_id)
 
+    def register_simulator_fleet(
+        self, count: int, *, prefix: str = "asic-sim", config: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        """Register a bounded, deterministic fleet of software-only ASIC simulators.
+
+        Shared config is limited to descriptive/simulation inputs. This method
+        cannot register remote providers or physical devices.
+        """
+        if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 128:
+            raise ValueError("FLEET_COUNT_OUT_OF_RANGE")
+        if not isinstance(prefix, str) or not prefix.strip() or any(
+            not (char.isalnum() or char in "-_") for char in prefix
+        ):
+            raise ValueError("INVALID_FLEET_PREFIX")
+        shared = {} if config is None else config
+        if not isinstance(shared, dict):
+            raise ValueError("FLEET_CONFIG_MUST_BE_OBJECT")
+        allowed = {"device_model", "capabilities", "hashrate", "hashrate_unit",
+                   "power_watts", "power_cost", "metadata"}
+        unknown = set(shared) - allowed
+        if unknown:
+            raise ValueError("UNSUPPORTED_FLEET_CONFIG:" + ",".join(sorted(unknown)))
+        resources = [
+            ASICResource(resource_id=f"{prefix}-{index:03d}", execution_mode="SIMULATOR", **shared)
+            for index in range(1, count + 1)
+        ]
+        ids = [resource.resource_id for resource in resources]
+        if len(set(ids)) != len(ids) or any(resource_id in self.resources for resource_id in ids):
+            raise ValueError("FLEET_RESOURCE_ID_CONFLICT")
+        # Validate all requested resources before mutating registries.
+        snapshots = []
+        for resource in resources:
+            snapshots.append(self.register(resource))
+        return snapshots
+
     def select(self, required_capabilities: set[str] | tuple[str, ...] = ()) -> list[dict[str, Any]]:
         selected = self.registry.select(required_capabilities)
         result = []
