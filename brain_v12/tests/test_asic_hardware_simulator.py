@@ -69,3 +69,21 @@ def test_cycle_limit_and_nonbinary_signal_are_rejected():
         sim.step({"a": "x"})
     with pytest.raises(ASICSimulationError, match="CYCLE_LIMIT_EXCEEDED"):
         sim.run([{"a": 0}, {"a": 1}], max_cycles=1)
+
+
+def test_failed_run_rolls_back_all_mutable_simulation_state():
+    sim = ASICLogicSimulator({
+        "nodes": [
+            {"name": "d", "op": "INPUT"},
+            {"name": "q", "op": "DFF", "inputs": ["d"]},
+            {"name": "out", "op": "BUF", "inputs": ["q"]},
+        ],
+        "outputs": ["out"],
+    })
+    before = (dict(sim.state), dict(sim.previous_values), sim.total_toggles, sim.total_cycles)
+
+    with pytest.raises(ASICSimulationError, match="SIGNAL_MUST_BE_0_OR_1"):
+        sim.run([{"d": 1}, {"d": "invalid"}])
+
+    after = (dict(sim.state), dict(sim.previous_values), sim.total_toggles, sim.total_cycles)
+    assert after == before
