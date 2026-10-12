@@ -7,6 +7,7 @@ The first server-fabric increment provides deterministic server workload profile
 ## Current implementation
 
 - `server_fabric.py` defines declarative server profiles for general, web, database, file, API, monitoring, backup, DNS, DHCP, directory, certificate, and reverse-proxy workflows.
+- `brain-arkan-software-node-v1` gives the former Arkan identity a high-capacity **simulated** profile: 128 virtual CPUs, 1 TiB modeled RAM, and 100 TiB modeled virtual disk. These are configuration targets for the software model only; they do not create physical memory, reserve host resources, combine machines into shared RAM, or prove that a workload can run. Hardware/host capacity admission remains separate and fail-closed.
 - `observe_host_capacity()` observes logical CPU count, available memory where the host exposes it, free disk bytes, operating system, and architecture. Host observations are not reservations.
 - `discover_backends()` detects selected executables and platform indicators for QEMU, KVM, Hyper-V, libvirt, Docker, and Podman. Presence detection is not proof that a backend can boot a guest.
 - `admit_server_workload()` checks a profile against observed capacity and safety reserves. It does not reserve resources or start a VM.
