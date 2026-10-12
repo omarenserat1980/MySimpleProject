@@ -13,10 +13,8 @@ RUNTIME_WORKFLOWS = (
     ".github/workflows/brain-github-cloud.yml",
     ".github/workflows/brain-120-minute-cinema.yml",
     ".github/workflows/brain-three-films-factory.yml",
-    ".github/workflows/brain-local-cinema-smoke.yml",
     ".github/workflows/brain-continuous-self-healing.yml",
     ".github/workflows/brain-human-intermediary-autopilot.yml",
-    ".github/workflows/brain-supervisor.yml",
 )
 
 FORBIDDEN_RUNTIME_MARKERS = (
@@ -48,6 +46,38 @@ def assert_runtime_contract() -> dict:
         for marker in REQUIRED_RUNTIME_MARKERS:
             if marker not in text:
                 failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+
+    # Hardware-independent verification jobs must run on GitHub-hosted runners.
+    supervisor_path = ROOT / ".github/workflows/brain-supervisor.yml"
+    cinema_smoke_path = ROOT / ".github/workflows/brain-local-cinema-smoke.yml"
+    if supervisor_path.exists():
+        supervisor_text = supervisor_path.read_text(encoding="utf-8")
+        for job_name, next_job in (("health_and_recovery", "self_heal"), ("verify", None)):
+            start = supervisor_text.find(f"  {job_name}:")
+            end = supervisor_text.find(f"\\n  {next_job}:", start) if next_job else len(supervisor_text)
+            if start < 0 or end < 0:
+                failures.append(f"SUPERVISOR_JOB_MISSING:{job_name}")
+                continue
+            job_text = supervisor_text[start:end]
+            if "runs-on: ubuntu-latest" not in job_text:
+                failures.append(f"SIMULATION_JOB_NOT_HOSTED:{job_name}")
+            if "internal_runner_preflight" in job_text:
+                failures.append(f"SIMULATION_JOB_REQUIRES_INTERNAL_HARDWARE:{job_name}")
+        dispatch_start = supervisor_text.find("  dispatch_internal_task:")
+        dispatch_end = supervisor_text.find("\\n  health_and_recovery:", dispatch_start)
+        dispatch = supervisor_text[dispatch_start:dispatch_end] if dispatch_start >= 0 and dispatch_end >= 0 else ""
+        if "self-hosted" not in dispatch or "internal_runner_preflight" not in dispatch:
+            failures.append("INTERNAL_TASK_DISPATCH_GUARD_MISSING")
+    else:
+        failures.append("MISSING_SUPERVISOR_WORKFLOW")
+    if cinema_smoke_path.exists():
+        cinema_text = cinema_smoke_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in cinema_text:
+            failures.append("LOCAL_CINEMA_SMOKE_NOT_HOSTED")
+        if "internal_runner_preflight" in cinema_text:
+            failures.append("LOCAL_CINEMA_SMOKE_REQUIRES_INTERNAL_RUNNER")
+    else:
+        failures.append("MISSING_LOCAL_CINEMA_SMOKE_WORKFLOW")
 
     fabric = ROOT / "brain_v12/brain/execution_fabric.py"
     gateway = ROOT / "brain_v12/brain/execution_gateway.py"
