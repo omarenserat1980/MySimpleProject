@@ -7,6 +7,7 @@ on:
       - feat/brain-virtual-server-fabric-v1
     paths:
       - "brain_v12/virtual_hardware/server_fabric.py"
+      - "brain_v12/virtual_hardware/api.py"
       - "brain_v12/tests/test_virtual_server_fabric.py"
       - "docs/BRAIN_VIRTUAL_SERVER_FABRIC.md"
       - ".github/workflows/brain-virtual-server-fabric.yml"
@@ -31,8 +32,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile server fabric
-        run: python -m py_compile brain_v12/virtual_hardware/server_fabric.py
+      - name: Compile server fabric and API
+        run: python -m py_compile brain_v12/virtual_hardware/server_fabric.py brain_v12/virtual_hardware/api.py
       - name: Run focused server fabric tests
         run: python -m unittest brain_v12.tests.test_virtual_server_fabric -v
       - name: Verify documentation contract
