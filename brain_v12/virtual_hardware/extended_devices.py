@@ -12,6 +12,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from .ecc_memory import VirtualECCMemoryController
+
 
 def _json_digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
@@ -396,6 +398,7 @@ class VirtualPeripheralFabric:
         self.input = VirtualInputDevice()
         self.audio = VirtualAudioDevice()
         self.sensors = VirtualSensorHub()
+        self.ecc_memory = VirtualECCMemoryController()
 
     def inventory(self) -> dict:
         return {
@@ -417,6 +420,7 @@ class VirtualPeripheralFabric:
                 "input": {"present": True, "fidelity": "event_queue"},
                 "audio": {"present": True, "fidelity": "frame_accounting"},
                 "sensors": {"present": True, "fidelity": "uncalibrated_estimates"},
+                "ecc_memory": {"present": True, "fidelity": "functional_SECDED_single_bit_correction_double_bit_detection"},
             },
             "not_emulated": [
                 "physical electrical signaling", "vendor firmware execution", "hardware-backed TPM keys",
@@ -430,4 +434,5 @@ class VirtualPeripheralFabric:
                 "modem": self.modem.status(), "bmc": self.bmc.status(),
                 "iommu": self.iommu.status(), "raid": self.raid.status(),
                 "battery_state_of_charge": self.battery.state_of_charge,
+                "ecc_memory": self.ecc_memory.status(),
                 "usb": self.usb.status(), "physical_hardware_used": False}
