@@ -26,8 +26,8 @@ class BrainSelfMonitorTests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual(report["status"], "HEALTHY")
         self.assertEqual(report["root_mode"], "repository_root")
-        self.assertEqual(report["root_mode"], "repository_root")
         self.assertTrue(report["observed_at_utc"].endswith("+00:00"))
+        self.assertNotIn("roots", report)
         run.assert_called_once()
         self.assertEqual(run.call_args.kwargs["cwd"], str(repo))
         self.assertEqual(run.call_args.kwargs["timeout"], 3)
@@ -40,7 +40,6 @@ class BrainSelfMonitorTests(unittest.TestCase):
             report = BrainSelfMonitor(app).snapshot()
 
         self.assertTrue(report["ok"])
-        self.assertEqual(report["root_mode"], "application_root")
         self.assertEqual(report["root_mode"], "application_root")
         self.assertEqual(run.call_args.kwargs["cwd"], str(repo))
 
