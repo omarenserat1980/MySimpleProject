@@ -43,30 +43,29 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
     recent_pulses = state.Snapshot().TakeLast(50)
 }));
 
-app.MapPost("/api/brain/command", async (HttpContext http, CommandRequest request, WorkerState state) =>
+app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
 {
     var expected = Environment.GetEnvironmentVariable("BRAIN_CLOUD_API_KEY");
-    if (!string.IsNullOrWhiteSpace(expected))
-    {
-        if (!http.Request.Headers.TryGetValue("X-Brain-Api-Key", out var supplied) || supplied != expected)
-            return Results.Unauthorized();
-    }
+    // Fail closed if deployment configuration omitted the API key.
+    if (string.IsNullOrWhiteSpace(expected))
+        return Results.Problem(
+            statusCode: StatusCodes.Status503ServiceUnavailable,
+            title: "COMMAND_AUTH_NOT_CONFIGURED",
+            detail: "Command endpoint is disabled until BRAIN_CLOUD_API_KEY is configured.");
+
+    if (!http.Request.Headers.TryGetValue("X-Brain-Api-Key", out var supplied) || supplied != expected)
+        return Results.Unauthorized();
 
     var command = (request.Command ?? "").Trim();
     if (command.Length == 0 || command.Length > 4000)
         return Results.BadRequest(new { ok = false, error = "command must be 1..4000 characters" });
 
-    var id = Guid.NewGuid().ToString("N");
-    state.Record("api", "accepted", $"command_id={id}");
-    await Task.CompletedTask;
-
-    return Results.Accepted($"/api/brain/command/{id}", new
-    {
-        ok = true,
-        command_id = id,
-        state = "ACCEPTED",
-        command
-    });
+    // Do not claim a command was accepted: this endpoint is not yet connected
+    // to the durable InternalTaskRuntime queue or a verified execution adapter.
+    return Results.Problem(
+        statusCode: StatusCodes.Status501NotImplemented,
+        title: "COMMAND_EXECUTION_NOT_CONNECTED",
+        detail: "Authentication succeeded, but no durable task queue is connected. No command was executed.");
 });
 
 app.Run();
