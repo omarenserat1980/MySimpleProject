@@ -112,7 +112,9 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertTrue(row["execution_eligible"])
         self.assertFalse(row["native_os_boot_verified"])
         self.assertEqual(ready["active_software_node"]["indicator_target"], "arkan-virtual-01")
-        self.assertNotEqual(ready["active_software_node"]["indicator_state"], "SIMULATION_READY")
+        self.assertEqual(ready["active_software_node"]["indicator_state"], "SIMULATION_READY")
+        self.assertFalse(ready["active_software_node"]["physical_device_required"])
+        self.assertEqual(ready["active_software_node"]["reality"], "SIMULATED")
 
     def test_wrong_arkan_identity_cannot_be_marked_ready(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
