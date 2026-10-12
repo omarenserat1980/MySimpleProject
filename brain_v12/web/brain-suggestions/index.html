@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain Suggestions Panel</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui,sans-serif}body{margin:0;background:#10141c;color:#edf2f7}main{max-width:1100px;margin:auto;padding:24px}input,select,button,textarea{font:inherit;padding:10px;border:1px solid #465266;border-radius:8px;background:#1b2431;color:inherit}button{cursor:pointer}button:hover{background:#29374a}.bar,.filters{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.bar input{flex:1;min-width:230px}.card{border:1px solid #354155;border-radius:12px;padding:16px;margin:12px 0;background:#151c27}.muted{color:#aab6c7}.status{font-weight:700;color:#a8d6ff}pre{white-space:pre-wrap;overflow-wrap:anywhere}.error{color:#ff9e9e}
+</style>
+</head>
+<body><main>
+<h1>Brain Suggestions Panel</h1>
+<p class="muted">Evidence-based recommendations from Brain error logs. Recommendations do not execute code.</p>
+<div class="bar"><input id="key" type="password" autocomplete="off" placeholder="Brain control key (held in this page only)"><button id="load">Load suggestions</button><button id="analyze">Analyze recent errors</button></div>
+<div class="filters"><select id="status"><option value="">All statuses</option><option>NEW</option><option>READY_FOR_REVIEW</option><option>APPROVED</option><option>VERIFIED</option><option>REJECTED</option><option>FAILED</option></select><input id="component" placeholder="Component filter"><input id="incident" placeholder="Incident ID filter"></div>
+<p id="message" class="muted">Enter the control key, then load suggestions.</p><section id="summary" class="card">Summary metrics load with suggestions.</section><section id="items"></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function headers(){return {"X-Brain-Control-Key":$("key").value,"Content-Type":"application/json"}}
+async function request(path,method="GET",body){const r=await fetch("/api/brain/suggestions"+path,{method,headers:headers(),body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.detail||("HTTP "+r.status));return d}
+function show(items){const root=$("items");root.replaceChildren();if(!items.length){root.textContent="No suggestions found.";return}
+for(const item of items){const p=item.payload||{};const card=document.createElement("article");card.className="card";const h=document.createElement("h3");h.textContent=p.problem_summary||item.problem_summary||"Suggestion";card.append(h);
+const status=document.createElement("p");status.className="status";status.textContent=item.status+" · "+(p.severity||"unknown")+" · confidence "+Math.round((p.confidence||0)*100)+"%";card.append(status);
+for(const [label,value] of [["Likely cause",p.probable_root_cause],["Proposed solution",p.proposed_solution],["Risk",p.risk_assessment],["Test plan",p.test_plan],["Rollback plan",p.rollback_plan]]){const div=document.createElement("p");div.textContent=label+": "+(Array.isArray(value)?value.join("; "):(value||"Not provided"));card.append(div)}
+const meta=document.createElement("p");meta.className="muted";meta.textContent="ID: "+item.suggestion_id+" · Incident: "+item.incident_id+" · Provider: "+item.provider+" · "+item.created_at;card.append(meta);
+if(["NEW","READY_FOR_REVIEW"].includes(item.status)){const approve=document.createElement("button");approve.textContent="Approve recommendation";approve.onclick=async()=>{try{await request("/"+encodeURIComponent(item.suggestion_id)+"/approve","POST",{reason:"Approved by authorized reviewer in dashboard"});await load()}catch(e){$("message").textContent=e.message}};card.append(approve);
+const reject=document.createElement("button");reject.textContent="Reject";reject.style.marginLeft="8px";reject.onclick=async()=>{const reason=prompt("Reason for rejection:");if(!reason)return;try{await request("/"+encodeURIComponent(item.suggestion_id)+"/reject","POST",{reason});await load()}catch(e){$("message").textContent=e.message}};card.append(reject)}
+root.append(card)}}
+async function load(){try{$("message").textContent="Loading…";const metrics=await request("/summary");const s=metrics.summary;$("summary").textContent="Recent: "+s.total_recent+" · Critical unresolved: "+s.critical_unresolved+" · High/critical unresolved: "+s.high_or_critical_unresolved+" · Verified: "+s.verified_count+" · Failed: "+s.failed_count+" · Rollbacks: "+s.rollback_count+" · Verification success rate: "+(s.verification_success_rate===null?"N/A":Math.round(s.verification_success_rate*100)+"%");const q=new URLSearchParams({limit:"100"});if($("status").value)q.set("status",$("status").value);if($("component").value)q.set("component",$("component").value);if($("incident").value)q.set("incident_id",$("incident").value);const d=await request("?"+q.toString());show(d.suggestions);$("message").textContent="Loaded "+d.count+" suggestion(s)."}catch(e){$("message").textContent=e.message;$("message").className="error"}}
+$("load").onclick=load;$("status").onchange=load;$("component").onchange=load;$("incident").onchange=load;
+$("analyze").onclick=async()=>{try{$("message").textContent="Analyzing recent error logs…";const d=await request("/analyze","POST",{limit:20});$("message").textContent="Analyzed/reused "+d.created_or_reused+" incident(s).";await load()}catch(e){$("message").textContent=e.message;$("message").className="error"}};
+</script></body></html>
