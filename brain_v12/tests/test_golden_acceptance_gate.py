@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from brain_v12.brain.evidence_store import EvidenceStore
 from brain_v12.brain.golden_acceptance_gate import (
@@ -95,6 +97,51 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
         result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
         self.assertFalse(result.accepted)
         self.assertTrue(any(reason.endswith("ACCEPTANCE_EVIDENCE_MISSING") for reason in result.reasons))
+
+    def test_corrupted_payload_is_rejected(self):
+        self._add_valid_bundle()
+        first = self.store.for_task("task-1", mission_id="mission-1", attempt=2)[0]
+        self.store.db.execute(
+            "UPDATE evidence SET payload=? WHERE evidence_id=?",
+            ('{"reality_level":"SIMULATED","tampered":true}', first["evidence_id"]),
+        )
+        self.store.db.commit()
+        result = self.gate.evaluate("task-1", self.criteria, mission_id="mission-1", attempt=2)
+        self.assertFalse(result.accepted)
+        self.assertEqual(result.status, "EVIDENCE_INTEGRITY_FAILURE")
+
+    def test_evidence_survives_store_reopen(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "evidence.db"
+            store = EvidenceStore(path)
+            first = store.append(
+                "task-persist", "artifact_verified", {"reality_level": "SIMULATED"},
+                producer="executor-A", mission_id="mission-persist", attempt=1,
+            )
+            second = store.append(
+                "task-persist", "runtime_check_passed", {"reality_level": "SIMULATED"},
+                producer="executor-A", mission_id="mission-persist", attempt=1,
+            )
+            store.append(
+                "task-persist", "independent_verification",
+                {
+                    "verified": True, "reality_level": "SIMULATED",
+                    "verified_evidence_ids": [first["evidence_id"], second["evidence_id"]],
+                    "criterion_ids": ["artifact-exists", "runtime-check"],
+                },
+                producer="independent-verifier", mission_id="mission-persist", attempt=1,
+            )
+            store.close()
+
+            reopened = EvidenceStore(path)
+            try:
+                result = GoldenAcceptanceGate(reopened).evaluate(
+                    "task-persist", self.criteria, mission_id="mission-persist", attempt=1,
+                )
+                self.assertTrue(result.accepted)
+                self.assertEqual(result.status, "GOLDEN_LOOP_VERIFIED")
+            finally:
+                reopened.close()
 
     def test_empty_criteria_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_REQUIRED"):
