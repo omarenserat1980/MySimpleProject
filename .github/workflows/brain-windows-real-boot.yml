@@ -27,6 +27,7 @@ jobs:
       name: windows-real-boot
     env:
       BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
+      BRAIN_ARKAN_ID: arkan-virtual-01
       BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
@@ -135,6 +136,16 @@ jobs:
             --output windows-execution-contract-gate.json
           grep -q '"verified": true' windows-execution-contract-gate.json
           echo "WINDOWS_EXECUTION_CONTRACT=VERIFIED"
+
+      - name: Gate real Arkan host capacity before media download
+        run: |
+          set -euo pipefail
+          python3 brain_v12/tools/arkan_windows_server_2025_preflight.py \\
+            --workspace "$GITHUB_WORKSPACE" \\
+            --contract-gate windows-execution-contract-gate.json \\
+            --output arkan-windows-server-2025-readiness.json
+          grep -q '"ready": true' arkan-windows-server-2025-readiness.json
+          echo "ARKAN_WINDOWS_SERVER_2025_HOST_ADMISSION=PASS"
 
       - name: Install real VM tooling
         run: |
@@ -537,6 +548,7 @@ jobs:
           name: brain-windows-server-2025-real-boot-evidence-${{ github.run_id }}
           if-no-files-found: warn
           path: |
+            arkan-windows-server-2025-readiness.json
             windows-server-2025.iso.sha256
             proof-iso.sha256
             wim-info.txt
