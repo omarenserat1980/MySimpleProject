@@ -7,7 +7,7 @@ accounting.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -44,6 +44,21 @@ class MiningEngine:
         if value < 0:
             raise ValueError("INVALID_HASHRATE")
         return value * self.UNITS_TO_HS[unit]
+
+    @staticmethod
+    def profit_gate(revenue_verification: str = "UNVERIFIED") -> dict[str, Any]:
+        """Fail closed: input-derived revenue never unlocks a profit/execution claim.
+
+        This pure gate does not accept caller-provided evidence or booleans as proof.
+        Evidence-backed verification must be implemented by a trusted integration
+        before this gate can be opened; no such integration is configured here.
+        """
+        return {
+            "status": "BLOCKED_REVENUE_UNVERIFIED",
+            "revenue_verification": "UNVERIFIED",
+            "execution_authorized": False,
+            "reason": "EXTERNAL_FINANCIAL_EVIDENCE_NOT_CONNECTED",
+        }
 
     def analyze(self, data: MiningInput | dict[str, Any]) -> dict[str, Any]:
         item = data if isinstance(data, MiningInput) else MiningInput(**data)
@@ -82,6 +97,7 @@ class MiningEngine:
             "hardware_cost_jod": round(item.hardware_cost_jod, 6),
             "break_even_days": round(break_even_days, 2) if break_even_days is not None else None,
             "revenue_verification": "UNVERIFIED",
+            "profit_gate": self.profit_gate(),
             "live_market_data": False,
             "note": "النتيجة حسابية من المدخلات فقط؛ لا تثبت ربحًا فعليًا أو دخلًا محققًا.",
         }
@@ -95,7 +111,7 @@ class MiningEngine:
             "candidates": results,
             "order": [x["algorithm"] for x in ranked],
             "ranking_basis": "net_jod_per_day_from_supplied_inputs",
-            "warning": "هذا ترتيب حسابي للمدخلات المقدمة وليس not a recommendation؛ وليس توصية استثمارية أو توقعًا للسوق.",
+            "warning": "هذا ترتيب حسابي للمدخلات المقدمة وليس توصية استثمارية أو توقعًا للسوق.",
         }
 
     def snapshot(self) -> dict[str, Any]:
