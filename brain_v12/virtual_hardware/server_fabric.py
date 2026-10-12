@@ -58,6 +58,9 @@ class ServerProfile:
 
 
 SERVER_PROFILES: tuple[ServerProfile, ...] = (
+    # Arkan is a logical identity only: these capacities are simulated configuration,
+    # not physical RAM/CPU and not a promise that this host can execute the workload.
+    ServerProfile("brain-arkan-software-node-v1", "Arkan high-capacity software node", "general-purpose-compute", 128, 1024 * 1024, 100 * 1024, execution_mode="SIMULATED_WORKFLOW", fidelity=SIMULATED),
     ServerProfile("brain-server-small-v1", "Small virtual server", "general", 1, 512, 8),
     ServerProfile("brain-server-web-v1", "Web server workflow", "web", 1, 512, 8),
     ServerProfile("brain-server-database-v1", "Database workflow", "database", 2, 1024, 16),
