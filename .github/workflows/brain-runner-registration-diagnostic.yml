@@ -1,0 +1,50 @@
+name: Brain Runner Registration Diagnostic
+
+on:
+  push:
+    paths:
+      - ".github/workflows/brain-runner-registration-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect registered runner state
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REPO: omarenserat1980/MySimpleProject
+      RUNNER_NAME: brain-internal-arkan
+      RUNNER_ID: "23"
+      GH_TOKEN: ${{ secrets.BRAIN_RUNNER_WATCH_TOKEN || github.token }}
+    steps:
+      - name: Query all registered runners and labels
+        shell: bash
+        run: |
+          set -euo pipefail
+          json="$(gh api "/repos/${REPO}/actions/runners?per_page=100")"
+          printf '%s' "$json" | jq --arg name "$RUNNER_NAME" --arg id "$RUNNER_ID" '
+            {
+              total_count,
+              runners: [
+                .runners[]
+                | select(.name == $name or ((.id|tostring) == $id))
+                | {id,name,status,busy,labels:[.labels[].name],os,architecture}
+              ]
+            }
+          ' | tee runner-registration-diagnostic.json
+          count="$(jq '.runners | length' runner-registration-diagnostic.json)"
+          if [ "$count" -eq 0 ]; then
+            echo "RESULT=TARGET_RUNNER_NOT_FOUND"
+          else
+            jq -r '.runners[] | "RESULT runner=\(.name) id=\(.id) status=\(.status) busy=\(.busy) os=\(.os) arch=\(.architecture) labels=\(.labels|join(","))"' runner-registration-diagnostic.json
+          fi
+      - name: Upload diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-runner-registration-diagnostic-${{ github.run_id }}
+          path: runner-registration-diagnostic.json
+          retention-days: 14
