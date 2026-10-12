@@ -176,7 +176,7 @@ def build_fleet_status(
                 observed_state = "NOT_PROVISIONED"
             rows.append({
                 **endpoint.public(),
-                "indicator_selected": False,
+                "indicator_selected": True,
                 "reality": "SIMULATED",
                 "physical_device_required": False,
                 "observed_state": observed_state,
@@ -199,7 +199,7 @@ def build_fleet_status(
                 observed_state = "PROFILE_REGISTERED_NOT_RUNNING"
             rows.append({
                 **endpoint.public(),
-                "indicator_selected": True,
+                "indicator_selected": False,
                 "reality": "SIMULATED",
                 "physical_device_required": False,
                 "observed_state": observed_state,
@@ -227,20 +227,20 @@ def build_fleet_status(
             "identity_verified": False,
             "execution_eligible": False,
         })
-    selected_phone = next(row for row in rows if row["endpoint_id"] == "phone-virtual-01")
+    selected_arkan = next(row for row in rows if row["endpoint_id"] == "arkan-virtual-01")
     return {
         "ok": True,
         "status": "OBSERVED_NOT_EXECUTION_READY",
         "source": "device_bridge.agent_status+software_virtual_nodes",
         "active_software_node": {
-            "endpoint_id": "phone-virtual-01",
-            "display_name": "هاتف برين الافتراضي",
-            "indicator_target": "phone-virtual-01",
-            "indicator_state": selected_phone["observed_state"],
+            "endpoint_id": "arkan-virtual-01",
+            "display_name": "Arkan virtual computer",
+            "indicator_target": "arkan-virtual-01",
+            "indicator_state": selected_arkan["observed_state"],
             "reality": "SIMULATED",
             "physical_device_required": False,
-            "execution_eligible": selected_phone["execution_eligible"],
-            "note": "Selected as the software-only phone profile; selection does not prove a running Android OS.",
+            "execution_eligible": selected_arkan["execution_eligible"],
+            "note": "Selected as the software-only Arkan computer profile; selection does not prove a running native OS.",
         },
         "fleet": rows,
         "cloud": {
