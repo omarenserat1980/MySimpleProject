@@ -158,6 +158,7 @@ def observe_host_capacity(path: str | os.PathLike[str] = ".") -> HostCapacity:
         available_disk_bytes=available_disk_bytes,
         operating_system=platform.system() or "unknown",
         architecture=platform.machine() or "unknown",
+        provenance=HOST_OBSERVED,
     )
 
 
