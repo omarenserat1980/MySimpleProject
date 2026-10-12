@@ -18,6 +18,7 @@ from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .brain.error_logs import BrainErrorLogStore, BrainErrorLoggingMiddleware
+from .brain.suggestions_engine import BrainSuggestionsEngine
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -207,6 +208,7 @@ RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "un
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 error_log_store = BrainErrorLogStore()
 app.add_middleware(BrainErrorLoggingMiddleware, store=error_log_store)
+suggestions_engine = BrainSuggestionsEngine(openai_provider, error_log_store)
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(error_recovery_router)
 app.include_router(universal_simulator_router)
@@ -285,6 +287,87 @@ def brain_error_log_test(request: Request):
         context={"purpose": "verify log write/read path"},
     )
     return {"ok": True, "event_id": event["event_id"], "trace_id": event["trace_id"]}
+
+
+@app.get("/api/brain/suggestions")
+def brain_suggestions_list(request: Request, limit: int = 100, status: str | None = None,
+                           component: str | None = None, severity: str | None = None,
+                           incident_id: str | None = None):
+    """List stored ChatGPT recommendations; requires the Brain control key."""
+    require_control_key(request)
+    items = suggestions_engine.list(limit=limit, status=status, component=component,
+                                    severity=severity, incident_id=incident_id)
+    return {"ok": True, "count": len(items), "suggestions": items}
+
+
+@app.get("/api/brain/suggestions/summary")
+def brain_suggestions_summary(request: Request):
+    require_control_key(request)
+    return {"ok": True, "summary": suggestions_engine.summary()}
+
+
+@app.get("/api/brain/suggestions/{suggestion_id}")
+def brain_suggestion_detail(request: Request, suggestion_id: str):
+    require_control_key(request)
+    item = suggestions_engine._get(suggestion_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="SUGGESTION_NOT_FOUND")
+    return {"ok": True, "suggestion": item}
+
+
+@app.post("/api/brain/suggestions/analyze")
+def brain_suggestions_analyze(request: Request, body: dict | None = None):
+    """Analyze one logged event by event ID, or recent error events if omitted."""
+    require_control_key(request)
+    body = body or {}
+    try:
+        return suggestions_engine.analyze(
+            incident_id=str(body.get("incident_id") or "").strip() or None,
+            limit=int(body.get("limit", 10)),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/brain/suggestions/{suggestion_id}/approve")
+def brain_suggestion_approve(request: Request, suggestion_id: str, body: dict | None = None):
+    require_control_key(request)
+    try:
+        return {"ok": True, "suggestion": suggestions_engine.transition(
+            suggestion_id, "approve", reason=str((body or {}).get("reason", "Human-approved recommendation"))
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/brain/suggestions/{suggestion_id}/reject")
+def brain_suggestion_reject(request: Request, suggestion_id: str, body: dict):
+    require_control_key(request)
+    try:
+        return {"ok": True, "suggestion": suggestions_engine.transition(
+            suggestion_id, "reject", reason=str(body.get("reason") or "")
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/brain/suggestions/{suggestion_id}/verify")
+def brain_suggestion_verify(request: Request, suggestion_id: str, body: dict):
+    require_control_key(request)
+    try:
+        action = "verify" if body.get("passed") is True else "fail"
+        return {"ok": True, "suggestion": suggestions_engine.transition(
+            suggestion_id, action, reason=str(body.get("reason") or ""),
+            outcome={"passed": body.get("passed") is True, "evidence": body.get("evidence")},
+        )}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/brain/workload")
