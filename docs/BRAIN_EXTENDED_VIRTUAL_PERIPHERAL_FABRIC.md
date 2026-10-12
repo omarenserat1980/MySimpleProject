@@ -63,3 +63,36 @@ python -m unittest brain_v12.tests.test_extended_virtual_devices -v
 ```
 
 A successful code commit or pull-request creation is not itself evidence that CI passed. Merge only after the focused test and required GitHub Actions checks pass, and review integration with existing virtual hardware first.
+
+
+## PCIe transaction-level model
+
+Module: `brain_v12/virtual_hardware/pcie.py`
+
+The virtual bus now owns a `VirtualPCIeFabric` instance and exposes configuration-space and BAR/MMIO operations. Non-CPU/RAM devices attached to the bus receive deterministic virtual BDFs and synthetic BARs; no host MMIO range is mapped.
+
+Modeled behavior:
+- BDF endpoint enumeration and basic 256-byte PCI configuration header fields.
+- Vendor/device/class identifiers, command/status registers, synthetic BAR discovery.
+- Sparse little-endian BAR memory with aligned 1/2/4/8-byte MMIO reads and writes.
+- Bounded transaction trace, modeled completion latency by configured link generation, counters, and deterministic timeout/drop/error injection.
+- Failed transport completions do not mutate MMIO state.
+- The bus status and hardware manifest expose PCIe generation, endpoint count, transaction statistics, and explicit fidelity boundaries.
+
+Not modeled: bit-accurate TLP/DLLP framing and CRC/replay, link training/electrical signaling, cycle-accurate arbitration, real host BAR mapping, physical IOMMU enforcement, vendor device firmware, or real hardware hot-plug.
+
+Example:
+
+```python
+from brain_v12.virtual_hardware import VirtualBus
+
+bus = VirtualBus()
+bus.attach("gpu0", object())
+bus.config_read("gpu0", 0, 2)       # synthetic vendor ID
+bus.mmio_write("gpu0", 0, 0, 0x1234)
+assert bus.mmio_read("gpu0", 0, 0)["value"] == 0x1234
+```
+
+Focused tests: `python -m unittest brain_v12.tests.test_virtual_pcie -v`.
+
+The transaction-level PCIe addition increases functional device-bus fidelity, but it is not cycle-accurate or electrical emulation and must not be interpreted as a single overall hardware-emulation percentage.
