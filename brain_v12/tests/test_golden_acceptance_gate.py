@@ -163,5 +163,12 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
             ])
 
 
+    def test_invalid_contract_types_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "EXPECTED_REALITY_INVALID"):
+            self.gate.evaluate("task-1", self.criteria, expected_reality=7)
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERION_INVALID"):
+            self.gate.evaluate("task-1", [object()])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
