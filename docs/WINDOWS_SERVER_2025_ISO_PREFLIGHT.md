@@ -34,5 +34,6 @@ The script refuses to overwrite the source or an existing output, requires a fre
 
 - NOT_TESTED: no structural validation evidence.
 - ISO_STRUCTURE_VALIDATED: required paths and ISO enumeration passed; no boot is implied.
-- REBUILT_NOT_BOOT_TESTED: a separate ISO was generated and hashed; no boot is implied.
+- REBUILT_STRUCTURE_VALIDATED_NOT_BOOT_TESTED: a separate ISO was generated, hashed, remounted read-only, and checked for required boot/setup files; no firmware boot is implied.
+- REBUILT_NOT_BOOT_TESTED: legacy status used by earlier script versions; it does not imply structural validation of the generated output.
 - FIRMWARE_BOOTED, WINDOWS_SETUP_BOOTED, and OS_FIRST_BOOT_VERIFIED are reserved for independent, real execution evidence from the protected boot workflow.
