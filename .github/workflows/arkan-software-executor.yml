@@ -41,6 +41,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install API test dependency
+        run: python -m pip install "fastapi>=0.110,<1"
       - name: Compile executor and application integration
         run: python -m py_compile brain_v12/brain/arkan_software_executor.py brain_v12/brain/arkan_software_executor_api.py brain_v12/app.py
       - name: Test persistence, idempotency, and restart recovery
