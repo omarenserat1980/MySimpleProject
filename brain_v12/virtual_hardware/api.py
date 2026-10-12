@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..brain.control_auth import require_control_key
 from .computer import VirtualComputer
 from .arkan_provisioner import ARKAN_ID, arkan_status, provision_arkan
+from .arkan_persistence import load_arkan_checkpoint, save_arkan_checkpoint
 from .cpu_profiles import list_cpu_profiles
 from .storage_profiles import list_storage_profiles
 from .memory_profiles import list_memory_profiles
@@ -134,6 +135,43 @@ def get_canonical_arkan_status(request: Request):
     """Read persisted identity and distinguish it from an in-memory simulator."""
     _authorized(request)
     return read_arkan_runtime_status()
+
+
+@router.post("/arkan/checkpoint")
+def checkpoint_canonical_arkan(request: Request):
+    """Persist a verified simulator checkpoint; never claims a native OS snapshot."""
+    _authorized(request)
+    with _lock:
+        machine = _machines.get(ARKAN_ID)
+        if machine is None:
+            raise HTTPException(status_code=409, detail="ARKAN_SIMULATOR_NOT_LOADED")
+        try:
+            result = save_arkan_checkpoint(machine.checkpoint())
+        except (ValueError, OSError, TypeError) as exc:
+            raise HTTPException(status_code=409, detail={"code": "ARKAN_CHECKPOINT_SAVE_FAILED", "error": str(exc)}) from exc
+    return {**result, "fidelity": "SIMULATOR_CHECKPOINT", "native_os_state_saved": False}
+
+
+@router.post("/arkan/restore")
+def restore_canonical_arkan(request: Request):
+    """Restore a previously persisted simulator checkpoint and re-run virtual firmware."""
+    _authorized(request)
+    with _lock:
+        machine = _machines.get(ARKAN_ID)
+        if machine is None:
+            raise HTTPException(status_code=409, detail="ARKAN_SIMULATOR_NOT_LOADED")
+        try:
+            saved = load_arkan_checkpoint()
+            restored = machine.restore_checkpoint(saved["checkpoint"])
+            status = machine.power_on()
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, RuntimeError, OSError, KeyError, TypeError) as exc:
+            raise HTTPException(status_code=409, detail={"code": "ARKAN_CHECKPOINT_RESTORE_FAILED", "error": str(exc)}) from exc
+    return {"ok": True, "device_id": ARKAN_ID, "saved_at": saved["saved_at"],
+            "restore": restored, "runtime_status": status,
+            "fidelity": "SIMULATOR_CHECKPOINT", "kernel_process_state_restored": False,
+            "native_os_boot_verified": False}
 
 
 @router.get("/machines/{machine_id}/manifest")

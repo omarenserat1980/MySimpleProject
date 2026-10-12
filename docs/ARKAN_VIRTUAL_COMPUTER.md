@@ -72,3 +72,15 @@ python3 -m unittest brain_v12.tests.test_arkan_windows_server_2025_preflight -v
 ```
 
 A modeled 128-vCPU/1-TiB profile does not satisfy these host checks. The previously constrained ASUS host (about 3.6 GiB total RAM) does not meet the new minimum and must not be silently used as the execution backend. Use a separately authorized, adequately sized execution host; no paid cloud resource is provisioned by this change.
+
+
+## Durable simulator checkpoints
+
+Authenticated endpoints are available while Brain is running:
+
+- `POST /api/virtual-hardware/arkan/checkpoint` — persist the canonical simulator's CPU, modeled RAM, virtual storage, NIC queues, GPU framebuffer, bus counters, and thermal model snapshot.
+- `POST /api/virtual-hardware/arkan/restore` — verify the saved checkpoint, restore supported simulator state, and re-run virtual firmware.
+
+The default checkpoint file is `~/.brain/virtual-machines/arkan-virtual-01.checkpoint.json`; override it with `BRAIN_ARKAN_CHECKPOINT_PATH`. Writes use atomic replacement, best-effort restrictive file permissions, and an envelope checksum in addition to the simulator checkpoint checksum. These endpoints require the existing Brain control key.
+
+Restore intentionally reports that kernel process tables/open handles are not restored. A simulator checkpoint is not a native Windows VM disk, and it never proves Windows Server 2025 boot. Back up the checkpoint file separately if you need off-device disaster recovery.
