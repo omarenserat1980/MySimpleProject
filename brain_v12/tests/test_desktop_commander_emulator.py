@@ -85,6 +85,34 @@ class EmulatorTests(unittest.TestCase):
         self.assertEqual(e.process_snapshot()["processes"],[])
         self.assertEqual(e.stop_process(started["process_id"])["status"],"PROCESS_NOT_FOUND")
 
+    def test_stop_racing_watchdog_leaves_no_registered_process(self):
+        import sys, threading, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.15),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(3)"')
+        self.assertTrue(started["ok"])
+        barrier=threading.Barrier(2)
+        result={}
+        def stop_at_deadline():
+            time.sleep(0.12)
+            barrier.wait()
+            result.update(e.stop_process(started["process_id"]))
+        stopper=threading.Thread(target=stop_at_deadline)
+        stopper.start()
+        barrier.wait()
+        stopper.join(timeout=3)
+        self.assertFalse(stopper.is_alive())
+        self.assertIn(result.get("status"),{"STOPPED","PROCESS_NOT_FOUND"})
+        deadline=time.monotonic()+2
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        # If the watchdog won the race, the result must remain retrievable.
+        if result.get("status")=="PROCESS_NOT_FOUND":
+            self.assertIn(e.read_process_output(started["process_id"])["status"],{"TIMED_OUT","COMPLETED"})
+
     def test_process_roundtrip_when_explicitly_enabled(self):
         e=DesktopCommanderEmulator(self.tmp.name,policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True))
         r=e.start_process("python --version")
