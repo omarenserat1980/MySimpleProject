@@ -14,14 +14,18 @@ permissions:
 
 jobs:
   build-and-qemu-verify:
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Install hosted ISO and QEMU toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y grub-pc-bin grub-common xorriso gcc qemu-system-x86
       - name: Verify toolchain
         run: |
           set -euo pipefail
-          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
           command -v grub-mkrescue
           command -v xorriso
           command -v gcc

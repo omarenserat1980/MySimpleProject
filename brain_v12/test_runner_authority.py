@@ -32,17 +32,26 @@ def test_internal_runtime_never_uses_github_hosted_runner():
     assert '"github_hosted_runtime":false' in text
 
 
-def test_supervisor_does_not_dispatch_github_hosted_runtime():
+def test_supervisor_keeps_task_dispatch_on_brain_owned_runtime():
     text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
+    dispatch = text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
     assert "brain-github-cloud.yml/dispatches" not in text
-    assert "runs-on: ubuntu-latest" not in text.split("dispatch_internal_task:", 1)[1].split("health_and_recovery:", 1)[0]
-    assert "brain-internal" in text
+    assert "self-hosted" in dispatch
+    assert "brain-internal" in dispatch
+    assert "internal_runner_preflight" in dispatch
+
+
+def test_supervisor_simulation_and_verification_use_hosted_runner():
+    text = SUPERVISOR_WORKFLOW.read_text(encoding="utf-8")
+    health = text.split("health_and_recovery:", 1)[1].split("self_heal:", 1)[0]
+    verify = text.split("verify:", 1)[1]
+    for job in (health, verify):
+        assert "runs-on: ubuntu-latest" in job
+        assert "internal_runner_preflight" not in job
 
 
 RUNTIME_WORKFLOWS = (
     Path(".github/workflows/brain-github-cloud.yml"),
-    Path(".github/workflows/brain-120-minute-cinema.yml"),
-    Path(".github/workflows/brain-three-films-factory.yml"),
     Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-continuous-self-healing.yml"),
     Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
@@ -50,12 +59,49 @@ RUNTIME_WORKFLOWS = (
 )
 
 
-def test_runtime_workloads_are_brain_owned():
-    for workflow in RUNTIME_WORKFLOWS:
+def test_remaining_runtime_workloads_are_brain_owned():
+    # These still perform internal task execution or bounded autonomous repair.
+    # Migrate them separately; hosted-runner simulation jobs are classified above.
+    remaining = tuple(
+        workflow for workflow in RUNTIME_WORKFLOWS
+        if workflow.name not in {"brain-local-cinema-smoke.yml", "brain-supervisor.yml"}
+    )
+    for workflow in remaining:
         text = workflow.read_text(encoding="utf-8")
         assert "runs-on: ubuntu-latest" not in text, workflow
         assert "brain-internal" in text, workflow
         assert "internal_runner_preflight" in text, workflow
+
+
+def test_brain_iso_qemu_verification_uses_hosted_runner():
+    text = Path(".github/workflows/brain-boot-iso.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "self-hosted" not in text
+    assert "BRAIN_INTERNAL_RUNNER_FLAG" not in text
+    assert "qemu-system-x86" in text
+    assert "Boot ISO with QEMU" in text
+
+
+def test_120_minute_cinema_uses_hosted_software_runners():
+    text = Path(".github/workflows/brain-120-minute-cinema.yml").read_text(encoding="utf-8")
+    assert text.count("runs-on: ubuntu-latest") == 2
+    assert "internal_runner_preflight" not in text
+    assert "name: Render shard" in text
+    assert "name: Assemble and verify cinematic master" in text
+
+
+def test_three_films_factory_is_hardware_independent():
+    text = Path(".github/workflows/brain-three-films-factory.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "internal_runner_preflight" not in text
+    assert "Build three original masters" in text
+
+
+def test_local_cinema_smoke_is_hardware_independent():
+    text = Path(".github/workflows/brain-local-cinema-smoke.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "internal_runner_preflight" not in text
+    assert "BRAIN_LOCAL_PAINTER_SMOKE=VERIFIED" in text
 
 
 def test_canonical_internal_runtime_modules_exist():

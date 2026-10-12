@@ -11,24 +11,17 @@ permissions:
   contents: read
 jobs:
   build:
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Fail-closed Brain internal runtime preflight
-        run: |
-          set -euo pipefail
-          python -m brain_v12.brain.internal_runner_preflight
-          python - <<'PY'
-          from brain_v12.brain.internal_runner_preflight import verify_and_write
-          e=verify_and_write("internal-runner-preflight.json")
-          assert e["verified"] is True, e
-          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
-          PY
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - name: Install renderer dependency
-        run: python -m pip install pillow
+      - name: Install system and renderer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install pillow
       - name: Build three original masters
         run: |
           set -euo pipefail
