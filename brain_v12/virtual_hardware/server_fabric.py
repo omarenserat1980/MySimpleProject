@@ -114,16 +114,44 @@ class HostCapacity:
         return asdict(self)
 
 
+def _read_int(path: str) -> int | None:
+    try:
+        value = Path(path).read_text(encoding="ascii").strip()
+        if value and value != "max":
+            return int(value)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _cgroup_memory_available_mib() -> int | None:
+    """Return effective cgroup headroom when the host exposes a memory limit."""
+    # cgroup v2
+    limit = _read_int("/sys/fs/cgroup/memory.max")
+    current = _read_int("/sys/fs/cgroup/memory.current")
+    if limit is not None and current is not None and limit > 0:
+        return max(0, limit - current) // (1024 * 1024)
+    # cgroup v1
+    limit = _read_int("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    current = _read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    if limit is not None and current is not None and 0 < limit < (1 << 60):
+        return max(0, limit - current) // (1024 * 1024)
+    return None
+
+
 def _available_memory_mib() -> int | None:
+    """Observe memory headroom, respecting tighter cgroup limits where visible."""
+    observed: int | None = None
     # Linux/Android (including Termux) path; no third-party dependency.
     try:
         for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
             if line.startswith("MemAvailable:"):
-                return max(0, int(line.split()[1]) // 1024)
+                observed = max(0, int(line.split()[1]) // 1024)
+                break
     except (OSError, ValueError, IndexError):
         pass
     # Windows fallback using the native memory-status API.
-    if os.name == "nt":
+    if observed is None and os.name == "nt":
         try:
             import ctypes
 
@@ -138,15 +166,46 @@ def _available_memory_mib() -> int | None:
             status = MEMORYSTATUSEX()
             status.dwLength = ctypes.sizeof(status)
             if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-                return int(status.ullAvailPhys // (1024 * 1024))
+                observed = int(status.ullAvailPhys // (1024 * 1024))
         except (AttributeError, OSError, TypeError):
             pass
-    return None
+    cgroup_available = _cgroup_memory_available_mib()
+    if observed is None:
+        return cgroup_available
+    return min(observed, cgroup_available) if cgroup_available is not None else observed
+
+
+def _effective_logical_cpus() -> int:
+    """Respect CPU affinity and cgroup quota rather than host-wide CPU count alone."""
+    host_count = os.cpu_count() or 1
+    affinity_count = host_count
+    try:
+        affinity_count = max(1, len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        pass
+    quota_count: int | None = None
+    # cgroup v2 cpu.max contains '<quota> <period>' or 'max <period>'.
+    try:
+        quota_text = Path("/sys/fs/cgroup/cpu.max").read_text(encoding="ascii").split()
+        if len(quota_text) == 2 and quota_text[0] != "max":
+            quota, period = int(quota_text[0]), int(quota_text[1])
+            if quota > 0 and period > 0:
+                quota_count = max(1, (quota + period - 1) // period)
+    except (OSError, ValueError, IndexError):
+        pass
+    # cgroup v1 CPU quota.
+    if quota_count is None:
+        quota = _read_int("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")
+        period = _read_int("/sys/fs/cgroup/cpu/cpu.cfs_period_us")
+        if quota is not None and period is not None and quota > 0 and period > 0:
+            quota_count = max(1, (quota + period - 1) // period)
+    return max(1, min(host_count, affinity_count, quota_count) if quota_count is not None
+               else min(host_count, affinity_count))
 
 
 def observe_host_capacity(path: str | os.PathLike[str] = ".") -> HostCapacity:
     """Observe basic host capacity without reserving resources or starting a VM."""
-    logical_cpus = os.cpu_count() or 1
+    logical_cpus = _effective_logical_cpus()
     available_memory_mib = _available_memory_mib()
     try:
         available_disk_bytes = shutil.disk_usage(path).free
