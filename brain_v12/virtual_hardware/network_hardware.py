@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from ipaddress import ip_network
+from ipaddress import ip_address, ip_network
 from typing import Any
 
 NETWORK_DEVICE_KINDS = {
@@ -152,7 +152,7 @@ class VirtualNetworkFabric:
         if pattern == "*":
             return True
         try:
-            return value in ip_network(pattern, strict=False)
+            return ip_address(value) in ip_network(pattern, strict=False)
         except ValueError:
             return pattern == value
 
