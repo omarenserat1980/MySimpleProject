@@ -28,6 +28,8 @@ jobs:
         shell: bash
         run: |
           set -uo pipefail
+          # Diagnostics must continue after individual probes fail; report each result.
+          set +e
           mkdir -p brain-diagnostics
           OUT=brain-diagnostics/diagnostics.txt
           {
