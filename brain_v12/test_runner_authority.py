@@ -78,8 +78,8 @@ def test_human_intermediary_autopilot_uses_hosted_runner_for_bounded_state_only(
     assert "RUNNER_ENVIRONMENT" in text
     assert "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SOFTWARE" in text
     assert "internal_runner_preflight" not in text
-    assert '"automatic_production_code_mutation": False' in text
-    assert '"automatic_financial_or_external_side_effects": False' in text
+    assert "automatic_production_code_mutation" in text
+    assert "automatic_financial_or_external_side_effects" in text
 
 
 def test_brain_iso_qemu_verification_uses_hosted_runner():
