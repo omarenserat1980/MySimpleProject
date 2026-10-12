@@ -70,3 +70,9 @@ Do not include secret values, tokens, raw authorization headers, or full user pa
 This design is intended to integrate with PR #500 (unified error recovery gateway), PR #501 (durable error logs), and PR #502 (suggestions/repair engine). Those integrations must be checked against their actual merged state before implementation.
 
 **Status: specification added; runtime enforcement, end-to-end ChatGPT connectivity, and live path health are not yet verified.**
+
+## Implementation status (2026-10-12)
+
+The first executable gate is now wired into the browser chat session endpoint and the direct Brain AI chat/tool endpoints. It checks the route registered in the live in-process FastAPI router, the AI/store callable interfaces required by that ingress, and the configured software execution plane. It returns a sanitized report and blocks before message persistence, model processing, or direct tool dispatch when a required check fails. Trace IDs and the Brain Card contract version are attached to responses/metadata.
+
+Important limitation: repository search did not identify an existing machine-readable canonical Brain Card registry. The current adapter therefore exposes an explicitly versioned in-process route/service snapshot; it does **not** verify external deployment health, a remote simulator, PR #500/#501/#502 error/suggestion paths, or every future task/event ingress. Those integrations and passing targeted CI remain required before this contract can be called complete.
