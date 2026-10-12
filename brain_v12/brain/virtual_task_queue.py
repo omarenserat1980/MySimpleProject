@@ -129,6 +129,14 @@ class VirtualTaskQueue:
             counts=self.store.counts()
             queued=int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))
             active=int(counts.get("RUNNING",0))
+            # Provision the Brain-owned worker before routing, so an empty virtual
+            # cluster never gets mistaken for a reason to wait for a physical agent.
+            has_capable_virtual_node=any(
+                b.state=="ONLINE" and task.required_capabilities.issubset(b.capabilities)
+                for b in self.chassis.blades.values()
+            )
+            if not has_capable_virtual_node:
+                self._ensure_virtual_capacity(task)
             decision=self.workload_router.choose(
                 queued=queued, active=active,
                 priority=getattr(task,"priority","NORMAL"),
