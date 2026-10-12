@@ -87,7 +87,9 @@ class MemoryHierarchyTests(unittest.TestCase):
         status = ram.status()
         self.assertEqual(status["dram_timing"]["technology"], "DDR5")
         self.assertEqual(status["cache_hierarchy"]["levels"][0]["hits"], 1)
-        self.assertGreater(status["dram_timing"]["bytes_transferred"], 0)
+        self.assertEqual(status["dram_timing"]["bytes_transferred"], 1)
+        self.assertEqual(ram.last_access_report["cache"]["hit_level"], "L1")
+        self.assertNotIn("dram", ram.last_access_report)
 
     def test_virtual_computer_manifest_declares_memory_and_synthetic_cache(self):
         computer = VirtualComputer("memory-profiled", ram_size=10**8,
