@@ -15,6 +15,15 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertTrue(all(not item.online for item in fleet))
         self.assertTrue(all(not item.identity_verified for item in fleet))
 
+    def test_live_fleet_inspection_records_observation_timestamps_for_virtual_nodes(self):
+        from brain_v12.brain.device_cloud_federation import build_fleet_status
+
+        result = build_fleet_status({"ttl_seconds": 15, "agents": []})
+        for row in result["fleet"]:
+            if row["role"] in {"virtual_computer", "virtual_phone"}:
+                self.assertTrue(row["observed_at"].endswith("Z"))
+                self.assertEqual(row["reality"], "SIMULATED")
+
     def test_unverified_devices_do_not_receive_work(self):
         plan = plan_execution(Workload.BUILD_TEST)
         self.assertEqual(plan.status, "BLOCKED_NO_VERIFIED_SOFTWARE_NODE")
