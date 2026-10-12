@@ -15,6 +15,15 @@ class ControlPlane:
         lines=self.events.read_text(encoding="utf-8").splitlines()
         if not lines:return "GENESIS"
         return json.loads(lines[-1]).get("digest","GENESIS")
+    def load(self,job_id):
+        """Load the latest persisted snapshot for a job, or None if it is unknown."""
+        if not self.jobs.exists(): return None
+        latest=None
+        for line in self.jobs.read_text(encoding="utf-8").splitlines():
+            if not line.strip(): continue
+            row=json.loads(line)
+            if row.get("job_id")==job_id: latest=row
+        return latest
     def create(self,task,steps,max_attempts=3,budget=10,idempotency_key=None):
         key=idempotency_key or uuid.uuid4().hex
         if self.jobs.exists():
@@ -42,5 +51,19 @@ class ControlPlane:
         if job.get("status")=="running" and float(job.get("lease_expires_at") or 0)<time.time():
             job=dict(job); job["status"]="ready"; job["lease_id"]=None; job["lease_expires_at"]=None; job["updated_at"]=time.time(); self._append(self.jobs,job); self.audit(job["job_id"],"lease_recovered",{}); return job
         return job
+    def recover_expired_jobs(self):
+        """Recover expired running jobs from the latest persisted snapshots."""
+        latest={}
+        if not self.jobs.exists(): return []
+        for line in self.jobs.read_text(encoding="utf-8").splitlines():
+            if not line.strip(): continue
+            row=json.loads(line)
+            latest[row["job_id"]]=row
+        recovered=[]
+        now=time.time()
+        for job in latest.values():
+            if job.get("status")=="running" and float(job.get("lease_expires_at") or 0)<now:
+                recovered.append(self.recover_expired(job))
+        return recovered
     def audit(self,job_id,event,data=None):
         payload={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {},"prev":self._last_event_digest()}; raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,separators=(",",":")); payload["digest"]=hashlib.sha256(raw.encode()).hexdigest(); self._append(self.events,payload); return payload["digest"]
