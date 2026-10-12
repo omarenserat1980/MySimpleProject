@@ -277,6 +277,29 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
                 expected_reality="REAL",
             )
 
+    def test_simulated_acceptance_also_requires_mission_and_attempt_scope(self):
+        self._add_valid_bundle()
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_MISSION_ID_REQUIRED"):
+            self.gate.evaluate("task-1", self.criteria, attempt=2)
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_ATTEMPT_REQUIRED"):
+            self.gate.evaluate("task-1", self.criteria, mission_id="mission-1")
+        with self.assertRaisesRegex(ValueError, "ACCEPTANCE_ATTEMPT_REQUIRED"):
+            self.gate.evaluate(
+                "task-1", self.criteria, mission_id="mission-1", attempt=True,
+            )
+
+    def test_simulated_acceptance_never_combines_evidence_across_attempts(self):
+        self._add_valid_bundle()
+        # Evidence exists for attempt 2 only; attempt 3 must not borrow it.
+        result = self.gate.evaluate(
+            "task-1", self.criteria, mission_id="mission-1", attempt=3,
+        )
+        self.assertFalse(result.accepted)
+        self.assertTrue(any(
+            reason.endswith("ACCEPTANCE_EVIDENCE_MISSING")
+            for reason in result.reasons
+        ))
+
     def test_empty_criteria_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "ACCEPTANCE_CRITERIA_REQUIRED"):
             self.gate.evaluate("task-1", [])
