@@ -41,7 +41,7 @@ class CPUProfile:
             "unsupported_features": list(self.unsupported_features),
             "conformance_tests": list(self.conformance_tests),
             "physical_performance_claim": False,
-            "microarchitecture_simulation": "not_implemented",
+            "microarchitecture_simulation": "not_simulated",
         }
 
 
