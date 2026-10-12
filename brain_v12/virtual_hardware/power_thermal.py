@@ -134,4 +134,5 @@ class PowerThermalModel:
                 setattr(self, name, snapshot[name])
         self.__post_init__()
         self._next_fault = None
+        self.history = []
         return {"ok": True, **self.status()}
