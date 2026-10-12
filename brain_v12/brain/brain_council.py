@@ -149,29 +149,30 @@ class BrainCouncil:
             row = con.execute("SELECT * FROM brain_council_meetings WHERE id=?", (int(meeting_id),)).fetchone()
         if not row:
             return {"ok": False, "status": "MEETING_NOT_FOUND"}
+        # Retain this endpoint for legacy diagnostics, but do not treat a physical
+        # agent heartbeat as Arkan identity or as an execution authorization.
         device = self.device_reader() or {}
         agents = list(device.get("agents") or [])
         online = [a for a in agents if a.get("online")]
-        arkan = [a for a in online if matches_agent(a)]
-        selected = arkan[0] if arkan else (online[0] if online else None)
         presence = {
-            "present": bool(selected),
-            "agent_id": str(selected.get("agent_id")) if selected else None,
-            "state": selected.get("state") if selected else "NO_ONLINE_AGENT",
-            "online": bool(selected),
-            "preferred_arkan": bool(arkan),
+            "present": bool(online),
+            "agent_id": str(online[0].get("agent_id")) if online else None,
+            "state": online[0].get("state") if online else "NO_ONLINE_AGENT",
+            "online": bool(online),
+            "preferred_arkan": False,
+            "execution_eligible": False,
             "checked_at": _now(),
             "ttl_seconds": device.get("ttl_seconds"),
         }
         with self._connect() as con:
             participants = json.loads(row["participants"] or "[]")
             participants = [p for p in participants if p.get("role") != "device_observer_and_execution_endpoint"]
-            if selected:
+            if online:
                 participants.append({
-                    "id": str(selected.get("agent_id")),
-                    "role": "device_observer_and_execution_endpoint",
+                    "id": str(online[0].get("agent_id")),
+                    "role": "device_observer_only",
                     "online": True,
-                    "state": selected.get("state", "ONLINE"),
+                    "state": online[0].get("state", "ONLINE"),
                     "presence_checked_at": presence["checked_at"],
                 })
             con.execute(
@@ -179,7 +180,11 @@ class BrainCouncil:
                 (json.dumps(participants, ensure_ascii=False), _now(), int(meeting_id)),
             )
             con.commit()
-        return {"ok": True, "meeting_id": int(meeting_id), "status": "DEVICE_PRESENT" if selected else "DEVICE_UNAVAILABLE", "presence": presence, "executor_identity": identity()}
+        return {
+            "ok": True, "meeting_id": int(meeting_id),
+            "status": "DEVICE_OBSERVED_NOT_EXECUTOR" if online else "NO_DEVICE_OBSERVED",
+            "presence": presence, "executor_identity": "brain-software-pipeline",
+        }
 
     def execute_minutes(self, meeting_id: int) -> dict[str, Any]:
         with self._connect() as con:
@@ -219,13 +224,11 @@ class BrainCouncil:
                 "constraint": "ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE",
                 "external_evidence_required": True,
             }
-            device = self.device_reader() or {}
-            online_agents = [a for a in list(device.get("agents") or []) if a.get("online")]
-            arkan_agents = [a for a in online_agents if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"}]
-            device_endpoint = arkan_agents[0] if arkan_agents else (online_agents[0] if online_agents else None)
-            action["device_endpoint"] = str(device_endpoint.get("agent_id")) if device_endpoint else None
-            action["device_presence_required"] = bool(device_endpoint)
-            action["device_identity_gate"] = "ONLINE_AGENT_REQUIRED"
+            # Council actions use Brain's authorized software pipeline. Physical
+            # agent presence is diagnostic only and must never select an executor.
+            action["device_endpoint"] = None
+            action["device_presence_required"] = False
+            action["device_identity_gate"] = "SOFTWARE_ONLY_NO_PHYSICAL_DEVICE_DEPENDENCY"
             action["device_capability_gate"] = "PRIMARY_PIPELINE_CAPABILITY_REQUIRED"
             action["pre_execution_evidence_required"] = True
             action["post_execution_evidence_required"] = True
