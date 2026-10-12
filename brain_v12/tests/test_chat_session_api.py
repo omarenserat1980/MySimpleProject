@@ -163,6 +163,57 @@ class ChatSessionApiTests(unittest.TestCase):
             self.assertEqual(ids, {phone["id"], desktop["id"]})
             self.assertNotIn(other["id"], ids)
 
+    def test_message_endpoint_includes_session_memory_and_prior_context(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            session = store.create("Context persistence")
+            store.set_memory(session["id"], "Project checkpoint: Brain GPT Core")
+            store.add_message(session["id"], "user", "Earlier user question")
+            store.add_message(session["id"], "assistant", "Earlier assistant answer")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+
+            result = endpoint(session["id"], MessageIn(message="Continue the project"))
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(len(brain.calls), 1)
+            instructions = brain.calls[0][1]
+            self.assertIn("[BRAIN_SESSION_MEMORY]", instructions)
+            self.assertIn("Project checkpoint: Brain GPT Core", instructions)
+            self.assertIn("[BRAIN_SESSION_CONTEXT]", instructions)
+            self.assertIn("Earlier user question", instructions)
+            self.assertIn("Earlier assistant answer", instructions)
+
+    def test_message_endpoint_does_not_leak_context_between_sessions(self):
+        with tempfile.NamedTemporaryFile() as f:
+            store = ChatSessionStore(f.name)
+            store.init()
+            first = store.create("Private context A")
+            second = store.create("Private context B")
+            store.set_memory(first["id"], "SECRET_CONTEXT_A")
+            store.set_memory(second["id"], "SECRET_CONTEXT_B")
+            store.add_message(first["id"], "user", "ONLY_SESSION_A")
+            store.add_message(second["id"], "user", "ONLY_SESSION_B")
+            brain = FakeBrain()
+            endpoint = next(route.endpoint for route in router(brain, store=store).routes
+                            if getattr(route, "path", "") == "/api/brain-chat/sessions/{session_id}/messages")
+
+            endpoint(first["id"], MessageIn(message="continue A"))
+            instructions_a = brain.calls[-1][1]
+            endpoint(second["id"], MessageIn(message="continue B"))
+            instructions_b = brain.calls[-1][1]
+
+            self.assertIn("SECRET_CONTEXT_A", instructions_a)
+            self.assertIn("ONLY_SESSION_A", instructions_a)
+            self.assertNotIn("SECRET_CONTEXT_B", instructions_a)
+            self.assertNotIn("ONLY_SESSION_B", instructions_a)
+            self.assertIn("SECRET_CONTEXT_B", instructions_b)
+            self.assertIn("ONLY_SESSION_B", instructions_b)
+            self.assertNotIn("SECRET_CONTEXT_A", instructions_b)
+            self.assertNotIn("ONLY_SESSION_A", instructions_b)
+
     def test_router_builds(self):
         app = router(FakeBrain())
         self.assertTrue(app.routes)
