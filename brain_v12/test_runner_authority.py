@@ -52,7 +52,6 @@ def test_supervisor_simulation_and_verification_use_hosted_runner():
 
 RUNTIME_WORKFLOWS = (
     Path(".github/workflows/brain-github-cloud.yml"),
-    Path(".github/workflows/brain-120-minute-cinema.yml"),
     Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-continuous-self-healing.yml"),
     Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
@@ -72,6 +71,14 @@ def test_remaining_runtime_workloads_are_brain_owned():
         assert "runs-on: ubuntu-latest" not in text, workflow
         assert "brain-internal" in text, workflow
         assert "internal_runner_preflight" in text, workflow
+
+
+def test_120_minute_cinema_uses_hosted_software_runners():
+    text = Path(".github/workflows/brain-120-minute-cinema.yml").read_text(encoding="utf-8")
+    assert text.count("runs-on: ubuntu-latest") == 2
+    assert "internal_runner_preflight" not in text
+    assert "name: Render shard" in text
+    assert "name: Assemble and verify cinematic master" in text
 
 
 def test_three_films_factory_is_hardware_independent():
