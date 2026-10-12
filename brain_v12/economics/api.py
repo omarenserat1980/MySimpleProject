@@ -35,7 +35,7 @@ class PaymentInput(BaseModel):
 @router.post("/score")
 def score_opportunity(item: OpportunityInput):
     try:
-        value = score(Opportunity(**item.model_dump()))
+        value = score(Opportunity(**item.dict()))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"opportunity_id": item.opportunity_id, "score": value}
@@ -44,7 +44,7 @@ def score_opportunity(item: OpportunityInput):
 @router.post("/revenue/verify")
 def verify_payment(item: PaymentInput):
     """Validate evidence shape only; never represent this as payment verification."""
-    evidence = PaymentEvidence(**item.model_dump())
+    evidence = PaymentEvidence(**item.dict())
     if (
         not evidence.evidence_id.strip()
         or not evidence.opportunity_id.strip()
