@@ -81,3 +81,45 @@ def test_rejection_requires_reason_and_verification_evidence(tmp_path):
                                  outcome={"passed": True, "evidence": ["pytest exit code 0"]})
     assert verified["status"] == "VERIFIED"
     assert verified["payload"]["verification_result"]["status"] == "VERIFIED"
+
+
+
+def test_provider_exception_is_captured_as_local_fallback(tmp_path):
+    class RaisingProvider:
+        def respond(self, **kwargs):
+            raise TimeoutError("provider timeout")
+
+    engine, _ = _engine(tmp_path, RaisingProvider())
+    item = engine.analyze()["results"][0]["suggestion"]
+    assert item["provider"] == "none"
+    assert item["status"] == "NEW"
+    assert item["payload"]["provider_error"] == "PROVIDER_EXCEPTION"
+
+
+def test_failed_verification_can_be_marked_rolled_back(tmp_path):
+    engine, _ = _engine(tmp_path)
+    item = engine.analyze()["results"][0]["suggestion"]
+    engine.transition(item["suggestion_id"], "approve", reason="Reviewed")
+    failed = engine.transition(item["suggestion_id"], "fail",
+                               outcome={"passed": False, "evidence": ["regression test failed"]})
+    assert failed["status"] == "FAILED"
+    rolled_back = engine.transition(item["suggestion_id"], "rollback",
+                                    outcome={"evidence": ["patch reverted", "baseline tests passed"]})
+    assert rolled_back["status"] == "ROLLED_BACK"
+
+
+def test_control_key_auth_rejects_missing_and_accepts_valid_key(monkeypatch):
+    from fastapi import HTTPException
+    from starlette.requests import Request
+    from brain_v12.brain.control_auth import require_control_key
+
+    def request_with(key):
+        headers = [] if key is None else [(b"x-brain-control-key", key.encode())]
+        scope = {"type": "http", "method": "GET", "path": "/", "headers": headers}
+        return Request(scope)
+
+    monkeypatch.setenv("BRAIN_CONTROL_KEY", "test-control-key")
+    with pytest.raises(HTTPException) as exc:
+        require_control_key(request_with(None))
+    assert exc.value.status_code == 403
+    require_control_key(request_with("test-control-key"))
