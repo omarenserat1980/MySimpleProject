@@ -93,10 +93,8 @@ class VirtualRAM:
             self._cells[address] = value
 
     def snapshot(self) -> dict:
-        return {"size": self.size, "capacity_unit": "addressable_cells",
-                "nonzero": {str(i): v for i, v in sorted(self._cells.items())},
-                "profile_id": self.profile_id,
-                "host_payload_bytes_estimate": self.host_payload_bytes_estimate}
+        return {"size": self.size,
+                "nonzero": {str(i): v for i, v in sorted(self._cells.items())}}
 
     def restore(self, snapshot: dict) -> None:
         if int(snapshot.get("size", self.size)) != self.size:
