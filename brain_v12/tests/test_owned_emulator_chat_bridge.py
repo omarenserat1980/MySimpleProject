@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from brain_v12.brain.owned_emulator_chat_bridge import (
     BridgeConfig,
@@ -41,7 +41,7 @@ class OwnedEmulatorChatBridgeTests(unittest.TestCase):
         self.assertFalse(is_authorized_status_task({**issue, "author": {"login": "someone-else"}}, self.config))
         self.assertFalse(is_authorized_status_task({**issue, "title": "[BRAIN-EMU] COMMAND"}, self.config))
 
-    @patch("brain_v12.brain.owned_emulator_chat_bridge.urllib.request.urlopen")
+    @patch("brain_v12.brain.owned_emulator_chat_bridge.http.client.HTTPConnection")
     def test_status_requires_explicit_virtual_reality(self, mocked_open):
         payload = {
             "ok": True,
@@ -51,10 +51,12 @@ class OwnedEmulatorChatBridgeTests(unittest.TestCase):
             "heartbeat": {"state": "ONLINE", "node_id": "brain-virtual-01", "private_field": "must-not-leak"},
             "private_field": "must-not-leak",
         }
-        response = unittest.mock.MagicMock()
-        response.__enter__.return_value.status = 200
-        response.__enter__.return_value.read.return_value = json.dumps(payload).encode()
-        mocked_open.return_value = response
+        connection = MagicMock()
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = json.dumps(payload).encode()
+        connection.getresponse.return_value = response
+        mocked_open.return_value = connection
         result = fetch_status(self.config)
         self.assertTrue(result["ok"])
         self.assertTrue(result["verified_simulation"])
@@ -62,10 +64,12 @@ class OwnedEmulatorChatBridgeTests(unittest.TestCase):
 
     @patch("brain_v12.brain.owned_emulator_chat_bridge.urllib.request.urlopen")
     def test_missing_reality_fails_closed(self, mocked_open):
-        response = unittest.mock.MagicMock()
-        response.__enter__.return_value.status = 200
-        response.__enter__.return_value.read.return_value = json.dumps({"ok": True, "mode": "VIRTUAL"}).encode()
-        mocked_open.return_value = response
+        connection = MagicMock()
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = json.dumps({"ok": True, "mode": "VIRTUAL"}).encode()
+        connection.getresponse.return_value = response
+        mocked_open.return_value = connection
         result = fetch_status(self.config)
         self.assertFalse(result["ok"])
         self.assertFalse(result["verified_simulation"])
