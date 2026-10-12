@@ -90,6 +90,8 @@ class PowerThermalModel:
             self.shutdown_required = True
         if self.temperature_c < self.throttle_c - 5:
             self.throttled = False
+            if self.cooling_enabled:
+                self.shutdown_required = False
         elif self.temperature_c >= self.throttle_c:
             self.throttled = True
         result = self.status()
