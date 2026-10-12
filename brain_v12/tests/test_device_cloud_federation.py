@@ -10,7 +10,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
         fleet = default_fleet()
         self.assertEqual(
             [item.endpoint_id for item in fleet],
-            ["arkan", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
+            ["arkan-virtual-01", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
         )
         self.assertTrue(all(not item.online for item in fleet))
         self.assertTrue(all(not item.identity_verified for item in fleet))
@@ -35,8 +35,8 @@ class DeviceCloudFederationTests(unittest.TestCase):
 
     def test_verified_online_host_can_receive_allowed_work(self):
         host = DeviceEndpoint(
-            endpoint_id="arkan",
-            display_name="Arkan",
+            endpoint_id="arkan-host-asus-vivobook",
+            display_name="Optional physical execution host (ASUS VivoBook)",
             role=EndpointRole.COMPUTE_HOST,
             platform="windows",
             identity_verified=True,
@@ -45,7 +45,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
         )
         plan = plan_execution(Workload.BUILD_TEST, [host])
         self.assertEqual(plan.status, "LOCAL_TARGET_VERIFIED")
-        self.assertEqual(plan.target, "arkan")
+        self.assertEqual(plan.target, "arkan-host-asus-vivobook")
 
     def test_vehicle_endpoint_is_not_a_compute_executor(self):
         car = DeviceEndpoint(
@@ -90,7 +90,11 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertFalse(rows["redmi3-01"]["identity_verified"])
         self.assertFalse(rows["redmi3-01"]["execution_eligible"])
         self.assertEqual(rows["realme-pending-identity"]["observed_state"], "STALE")
-        self.assertEqual(rows["arkan"]["observed_state"], "NOT_OBSERVED")
+        self.assertEqual(rows["arkan-virtual-01"]["observed_state"], "NOT_OBSERVED")
+        self.assertEqual(rows["arkan-virtual-01"]["role"], "virtual_computer")
+        self.assertEqual(rows["arkan-virtual-01"]["platform"], "brain-simulator")
+        self.assertEqual(rows["arkan-virtual-01"]["allowed_workloads"], ["virtual_simulation"])
+        self.assertFalse(rows["arkan-virtual-01"]["execution_eligible"])
         self.assertFalse(result["cloud"]["capacity_verified"])
         self.assertFalse(result["cloud"]["paid_provisioning_allowed"])
 
