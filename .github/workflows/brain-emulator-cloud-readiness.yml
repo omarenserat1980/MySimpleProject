@@ -35,7 +35,7 @@ jobs:
             tools/brain_emulator_project_audit.py \
             tools/brain_emulator_agent.py \
             brain_v12/tools/brain_emulator_agent.py \
-            brain_v12/tests/test_brain_emulator_project_audit.py \\
+            brain_v12/tests/test_brain_emulator_project_audit.py \
             brain_v12/tests/test_brain_termux_emulator_runtime.py
       - name: Run audit and device bridge tests
         run: PYTHONPATH=. python -m unittest brain_v12.tests.test_brain_emulator_project_audit brain_v12.tests.test_device_bridge brain_v12.tests.test_brain_termux_emulator_runtime -v
