@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain APM Control Center</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:900px;margin:auto;padding:24px;background:#0b1020;color:#eef}
+.card{background:#151d33;border:1px solid #2b385b;border-radius:16px;padding:20px;margin:12px 0}
+button{padding:12px 16px;margin:5px;border:0;border-radius:10px;cursor:pointer;font-weight:700}
+#run{font-size:1.1rem}
+pre{white-space:pre-wrap;word-break:break-word;background:#080c16;padding:12px;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+</style>
+</head>
+<body>
+<h1>🧠 Brain APM Control Center</h1>
+<div class="card">
+  <div class="grid">
+    <button id="run">▶ RUN TO COMPLETION</button>
+    <button id="resume">▶ RESUME</button>
+    <button id="status">📊 STATUS</button>
+    <button id="stop">■ STOP SAFELY</button>
+  </div>
+</div>
+<div class="card">
+  <label>Control key <input id="key" type="password" autocomplete="off"></label><br><br>
+  <label>Pipeline <input id="pipeline" value=".brain/apm/pipeline.json"></label><br><br><label>Active run ID <input id="runid" placeholder="GitHub Actions run ID"></label>
+  <p>Current workflow: <code>apm.yml</code> · source of truth: GitHub main.</p>
+</div>
+<div class="card">
+<h2>Result</h2><pre id="out">READY — no execution claimed.</pre></div>
+<script>
+const repo="omarenserat1980/MySimpleProject", workflow="apm.yml";
+const out=document.getElementById("out");
+function key(){return document.getElementById("key").value.trim()}
+async function dispatch(resume){
+  const body={owner:"omarenserat1980",repo:"MySimpleProject",workflow,ref:"main",brain_command:resume?"APM_RESUME":"APM_RUN",auto_confirm:false};
+  const r=await fetch("/api/brain-hub/actions/dispatch",{method:"POST",headers:{"Content-Type":"application/json","X-Brain-Control-Key":key()},body:JSON.stringify(body)});
+  const t=await r.text(); out.textContent=t;
+}
+document.getElementById("run").onclick=()=>dispatch(false);
+document.getElementById("resume").onclick=()=>dispatch(true);
+document.getElementById("status").onclick=()=>location.href="https://github.com/"+repo+"/actions/workflows/"+workflow;
+document.getElementById("stop").onclick=()=>{
+  out.textContent="STOP SAFELY requires the active GitHub Actions run ID. Open STATUS, copy the run ID, then cancel it from GitHub. No destructive stop is claimed here.";
+};
+</script>
+</body>
+</html>
