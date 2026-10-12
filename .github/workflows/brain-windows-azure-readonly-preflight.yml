@@ -1,0 +1,138 @@
+name: Brain Windows Azure Read-only Preflight
+
+on:
+  push:
+    branches:
+      - fix/windows-control-plane-public-url-default
+    paths:
+      - .github/workflows/brain-windows-azure-readonly-preflight.yml
+      - scripts/windows-cloud/preflight.ps1
+      - scripts/windows-cloud/deploy.ps1
+      - scripts/windows-cloud/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: brain-windows-azure-readonly-preflight
+  cancel-in-progress: true
+
+jobs:
+  azure-readonly-preflight:
+    name: Azure OIDC and Windows Server 2025 deployment-default preflight (no provisioning)
+    runs-on: ubuntu-latest
+    environment: brain-windows-production
+    timeout-minutes: 20
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_allowed_source_ip: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+      BRAIN_TFSTATE_ACCOUNT: ${{ vars.BRAIN_TFSTATE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate configuration presence without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in ARM_CLIENT_ID ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_VAR_allowed_source_ip; do
+            if [[ -z "${!name:-}" ]]; then
+              printf 'CONFIG_MISSING=%s\n' "$name"
+              missing=1
+            else
+              printf 'CONFIG_PRESENT=%s\n' "$name"
+            fi
+          done
+          if [[ -n "${BRAIN_TFSTATE_ACCOUNT:-}" && ! "$BRAIN_TFSTATE_ACCOUNT" =~ ^[a-z0-9]{3,24}$ ]]; then
+            echo "CONFIG_INVALID=BRAIN_TFSTATE_ACCOUNT"
+            exit 2
+          fi
+          python3 - <<'PY'
+          import ipaddress, os, sys
+          try:
+              n = ipaddress.ip_network(os.environ.get("TF_VAR_allowed_source_ip", ""), strict=False)
+              assert n.version == 4 and n.prefixlen > 0
+          except Exception:
+              print("SOURCE_CIDR=BLOCKED")
+              sys.exit(2)
+          print("SOURCE_CIDR=VALID_VALUE_WITHHELD")
+          PY
+          [[ "$missing" -eq 0 ]] || exit 2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Install PowerShell in runner temp directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/pwsh-url"
+          import json, urllib.request
+          req = urllib.request.Request(
+              "https://api.github.com/repos/PowerShell/PowerShell/releases/latest",
+              headers={"Accept":"application/vnd.github+json","User-Agent":"ElectronicBrain-Azure-Preflight"}
+          )
+          with urllib.request.urlopen(req, timeout=20) as r:
+              release = json.load(r)
+          assets = [a["browser_download_url"] for a in release.get("assets", [])
+                    if a.get("name","").startswith("powershell-") and a.get("name","").endswith("-linux-x64.tar.gz")]
+          if not assets:
+              raise SystemExit("Official PowerShell Linux x64 archive unavailable")
+          print(assets[0])
+          PY
+          mkdir -p "$RUNNER_TEMP/pwsh"
+          curl --fail --location --silent --show-error --retry 3 --connect-timeout 15 --max-time 180 "$(cat "$RUNNER_TEMP/pwsh-url")" -o "$RUNNER_TEMP/pwsh/powershell.tar.gz"
+          tar -xzf "$RUNNER_TEMP/pwsh/powershell.tar.gz" -C "$RUNNER_TEMP/pwsh"
+          chmod +x "$RUNNER_TEMP/pwsh/pwsh"
+          echo "$RUNNER_TEMP/pwsh" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/pwsh/pwsh" -NoLogo -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+      - name: Azure OIDC login (read-only checks only)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Discover eligible VM SKUs across approved candidate regions (read-only)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $account = az account show --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $account.id) { throw "Azure OIDC session unavailable; SKU discovery cannot run." }
+          if ($account.id -ne $env:ARM_SUBSCRIPTION_ID) { throw "Azure subscription mismatch; refusing discovery." }
+          ./scripts/windows-cloud/discover-eligible-vm-skus.ps1
+          Write-Host "AZURE_RESOURCE_CREATION=NOT_ATTEMPTED"
+          Write-Host "WINDOWS_SERVER_2025_BOOT=NOT_VERIFIED"
+
+      - name: Verify active subscription and run deployment-default preflight
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $deploy = Get-Content ./scripts/windows-cloud/deploy.ps1 -Raw
+          $locationMatch = [regex]::Match($deploy, '(?m)^\s*\[string\]\$Location\s*=\s*"([^"]+)"')
+          $sizeMatch = [regex]::Match($deploy, '(?m)^\s*\[string\]\$VmSize\s*=\s*"([^"]+)"')
+          if (-not $locationMatch.Success -or -not $sizeMatch.Success) {
+            throw "Could not extract deployment defaults; refusing to report unrelated capacity."
+          }
+          $location = $locationMatch.Groups[1].Value
+          $size = $sizeMatch.Groups[1].Value
+          $account = az account show --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $account.id) { throw "Azure OIDC account verification failed." }
+          if ($account.id -ne $env:ARM_SUBSCRIPTION_ID) { throw "Azure subscription mismatch." }
+          Write-Host "AZURE_OIDC_LOGIN=PASS"
+          Write-Host "AZURE_SUBSCRIPTION_MATCH=PASS"
+          Write-Host "DEPLOYMENT_DEFAULT_LOCATION=$location"
+          Write-Host "DEPLOYMENT_DEFAULT_VM_SIZE=$size"
+          ./scripts/windows-cloud/preflight.ps1 -Location $location -VmSize $size -AllowMissingAdminCredentials
+          Write-Host "AZURE_WINDOWS_2025_READONLY_PREFLIGHT=PASS"
+          Write-Host "AZURE_RESOURCE_CREATION=NOT_ATTEMPTED"
+          Write-Host "WINDOWS_SERVER_2025_BOOT=NOT_VERIFIED"
+
