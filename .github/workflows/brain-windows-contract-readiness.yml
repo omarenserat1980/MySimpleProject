@@ -1,0 +1,98 @@
+name: Brain Windows Contract Readiness (Secret-Safe)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-windows-contract-readiness
+  cancel-in-progress: false
+
+jobs:
+  control-plane-readiness:
+    runs-on: ubuntu-latest
+    environment:
+      name: windows-real-boot
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test secret-safe readiness checker
+        run: python -m unittest brain_v12.tests.test_windows_contract_readiness -v
+
+      - name: Check protected GitHub secret presence only
+        env:
+          BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+          BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_AUTHORITY_PUBLIC_KEY_B64: ${{ secrets.BRAIN_AUTHORITY_PUBLIC_KEY_B64_PROTECTED }}
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in \
+            BRAIN_CLOUD_EXECUTOR_REGISTRY_URL \
+            BRAIN_CLOUD_EXECUTOR_TOKEN \
+            BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64 \
+            BRAIN_AUTHORITY_PUBLIC_KEY_B64 \
+            BRAIN_WINDOWS_CONTROL_PLANE_URL \
+            BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY; do
+            if [ -n "${!name:-}" ]; then
+              printf '%s=PRESENT\n' "$name"
+            else
+              printf '%s=MISSING\n' "$name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "GITHUB_PROTECTED_SECRET_PREFLIGHT=BLOCKED"
+            exit 2
+          fi
+          echo "GITHUB_PROTECTED_SECRET_PREFLIGHT=PASS"
+
+      - name: Check Control Plane prerequisites without issuing a contract
+        env:
+          BRAIN_WINDOWS_CONTROL_PLANE_URL: ${{ secrets.BRAIN_WINDOWS_CONTROL_PLANE_URL_PROTECTED }}
+          BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys, urllib.error, urllib.request
+          base = os.environ["BRAIN_WINDOWS_CONTROL_PLANE_URL"].strip().rstrip("/")
+          key = os.environ["BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY"]
+          if not base.startswith("https://"):
+              print("CONTROL_PLANE_READINESS=BLOCKED: HTTPS_REQUIRED")
+              sys.exit(2)
+          req = urllib.request.Request(
+              base + "/api/brain/windows/contracts/readiness",
+              headers={"Accept": "application/json", "X-Brain-Contract-Delivery-Key": key},
+              method="GET",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as exc:
+              print("CONTROL_PLANE_READINESS=BLOCKED: HTTP_" + str(exc.code))
+              sys.exit(2)
+          except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+              print("CONTROL_PLANE_READINESS=BLOCKED: UNREACHABLE_OR_INVALID_RESPONSE")
+              sys.exit(2)
+          print("CONTROL_PLANE_READINESS=" + str(payload.get("status", "UNKNOWN")))
+          print("CONTROL_PLANE_PREREQUISITES_OK=" + str(payload.get("ok") is True).lower())
+          for name, present in sorted((payload.get("secrets") or {}).items()):
+              print("CONTROL_PLANE_SECRET_" + name + "=" + ("PRESENT" if present else "MISSING"))
+          for name, item in sorted((payload.get("files") or {}).items()):
+              ok = isinstance(item, dict) and item.get("readable_json_object") is True
+              print("CONTROL_PLANE_FILE_" + name + "=" + ("READABLE_JSON" if ok else "BLOCKED"))
+          if payload.get("ok") is not True:
+              sys.exit(2)
+          PY
