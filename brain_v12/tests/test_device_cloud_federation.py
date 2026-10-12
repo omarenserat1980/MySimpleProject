@@ -116,6 +116,21 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertFalse(ready["active_software_node"]["physical_device_required"])
         self.assertEqual(ready["active_software_node"]["reality"], "SIMULATED")
 
+        indicators = {item["tool"]: item for item in ready["virtual_tool_indicators"]}
+        self.assertEqual(
+            indicators["termux_emulator"]["indicator_target"],
+            "brain-termux-virtual-01",
+        )
+        self.assertFalse(indicators["termux_emulator"]["physical_device_required"])
+        self.assertFalse(indicators["termux_emulator"]["external_app_required"])
+        self.assertFalse(indicators["termux_emulator"]["execution_eligible"])
+        for tool in ("powershell_emulator", "desktop_commander_emulator"):
+            self.assertEqual(indicators[tool]["indicator_target"], "arkan-virtual-01")
+            self.assertEqual(indicators[tool]["owner"], "Electronic Brain")
+            self.assertFalse(indicators[tool]["physical_device_required"])
+            self.assertFalse(indicators[tool]["external_app_required"])
+            self.assertTrue(indicators[tool]["execution_eligible"])
+
     def test_wrong_arkan_identity_cannot_be_marked_ready(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
 
