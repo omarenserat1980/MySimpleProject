@@ -62,12 +62,8 @@ class FilmSupervisor:
 
                 mission_id=job["job_id"]
                 mission=supervisor.missions[mission_id]
-                mission.transition(MissionState.UNDERSTANDING,reason="film artifact discovered")
-                mission.transition(MissionState.PLANNING,reason="local renderer selected")
-                mission.transition(MissionState.READY,reason="renderer plan ready")
-                mission.transition(MissionState.EXECUTING,reason="render completed")
-                mission.transition(MissionState.OBSERVING,reason="independent artifact probe completed")
-                mission.transition(MissionState.VERIFYING,reason="golden acceptance evidence prepared")
+                # supervisor.transition above has already advanced the mission state machine.
+                # Reuse its authoritative attempt count instead of replaying transitions.
                 evidence_attempt=mission.attempts
                 artifact_evidence=supervisor.evidence.append(
                     mission_id,"artifact_verified",
