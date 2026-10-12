@@ -150,6 +150,11 @@ class FilmSupervisor:
                 (self.work / "ffprobe.json").unlink(missing_ok=True)
 
         trace.append({"phase": "failed", "attempts": self.max_attempts})
+        if job.get("status") != "blocked":
+            job = supervisor.transition(
+                job, "blocked", status="blocked",
+                details={"reason": "film_verification_or_execution_failed", "attempts": self.max_attempts},
+            )
         supervisor.snapshot(job, {"verified": False, "trace": trace})
         (self.artifacts / "film_supervisor_trace.json").write_text(
             json.dumps(trace, ensure_ascii=False, indent=2), encoding="utf-8"
