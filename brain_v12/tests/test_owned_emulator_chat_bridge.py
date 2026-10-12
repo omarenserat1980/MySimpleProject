@@ -62,7 +62,7 @@ class OwnedEmulatorChatBridgeTests(unittest.TestCase):
         self.assertTrue(result["verified_simulation"])
         self.assertNotIn("private_field", json.dumps(result))
 
-    @patch("brain_v12.brain.owned_emulator_chat_bridge.urllib.request.urlopen")
+    @patch("brain_v12.brain.owned_emulator_chat_bridge.http.client.HTTPConnection")
     def test_missing_reality_fails_closed(self, mocked_open):
         connection = MagicMock()
         response = MagicMock()
