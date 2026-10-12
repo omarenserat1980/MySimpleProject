@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -34,6 +35,8 @@ class VirtualServerFabricTests(unittest.TestCase):
         observed = observe_host_capacity(".")
         self.assertEqual(observed.provenance, HOST_OBSERVED)
         self.assertGreaterEqual(observed.logical_cpus, 1)
+        self.assertLessEqual(observed.logical_cpus, os.cpu_count() or 1)
+        self.assertGreaterEqual(observed.available_memory_mib or 0, 0)
         self.assertIsNotNone(observed.available_disk_bytes)
 
     def test_admission_rejects_unknown_host_capacity(self):
