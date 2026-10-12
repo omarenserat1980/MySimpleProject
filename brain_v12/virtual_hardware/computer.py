@@ -1,9 +1,10 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from .cpu import VirtualCPU
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
+from .hardware_profiles import MachineManifest, synthetic_baseline_profiles
 from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
@@ -74,6 +75,23 @@ class VirtualComputer:
     def syscall(self,pid,name,**args):
         if not self.powered: raise RuntimeError("COMPUTER_POWER_OFF")
         return self.kernel.syscall(pid,name,**args)
+
+    def hardware_manifest(self):
+        """Describe existing devices and their declared fidelity; allocates no host resources."""
+        profiles = []
+        for profile in synthetic_baseline_profiles():
+            parameters = dict(profile.parameters)
+            if profile.category == "memory":
+                parameters["default_addressable_cells"] = self.ram.size
+            elif profile.category == "storage":
+                parameters["default_capacity_bytes"] = self.storage.capacity
+            elif profile.category == "gpu":
+                parameters["default_width"] = self.gpu.width
+                parameters["default_height"] = self.gpu.height
+            elif profile.category == "network":
+                parameters["mac"] = self.nic.mac
+            profiles.append(replace(profile, parameters=parameters))
+        return MachineManifest(self.name, 1, tuple(profiles)).describe()
 
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
