@@ -5,6 +5,7 @@ from brain_v12.brain.canonical_indicators import (
     VerificationLevel,
     aggregate_required_indicators,
     build_indicator,
+    indicators_for_fleet,
 )
 
 
@@ -97,6 +98,54 @@ class CanonicalIndicatorTests(unittest.TestCase):
     def test_blank_identity_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "INDICATOR_ID_SUBJECT_AND_SOURCE_REQUIRED"):
             self.make(subject_id=" ")
+
+
+    def test_fleet_adapter_keeps_missing_observation_unknown(self):
+        fleet = {
+            "fleet": [{
+                "endpoint_id": "arkan-virtual-01",
+                "role": "virtual_computer",
+                "platform": "brain-simulator",
+                "reality": "SIMULATED",
+                "observed_state": "SIMULATION_READY",
+                "physical_device_required": False,
+            }]
+        }
+        items = indicators_for_fleet(fleet, now=self.now)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["status"], "UNKNOWN")
+        self.assertIsNone(items[0]["observed_at"])
+
+    def test_fleet_adapter_excludes_physical_and_non_simulated_rows(self):
+        fleet = {"fleet": [
+            {
+                "endpoint_id": "arkan-host-sim-asus-vivobook",
+                "role": "compute_host",
+                "reality": "OBSERVED_DEVICE",
+                "observed_state": "ONLINE",
+            },
+            {
+                "endpoint_id": "phone-virtual-01",
+                "role": "virtual_phone",
+                "reality": "UNKNOWN",
+                "observed_state": "ONLINE",
+            },
+        ]}
+        self.assertEqual(indicators_for_fleet(fleet, now=self.now), [])
+
+    def test_fleet_adapter_uses_backend_observation_time_when_present(self):
+        fleet = {"fleet": [{
+            "endpoint_id": "arkan-virtual-01",
+            "role": "virtual_computer",
+            "platform": "brain-simulator",
+            "reality": "SIMULATED",
+            "observed_state": "SIMULATION_READY",
+            "observed_at": self.now.isoformat(),
+            "physical_device_required": False,
+        }]}
+        items = indicators_for_fleet(fleet, now=self.now)
+        self.assertEqual(items[0]["status"], "VERIFIED")
+        self.assertEqual(items[0]["verification_level"], "REGISTERED")
 
 
 if __name__ == "__main__":
