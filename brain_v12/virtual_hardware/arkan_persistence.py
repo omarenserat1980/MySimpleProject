@@ -26,7 +26,7 @@ def default_checkpoint_path() -> Path:
 
 
 def _canonical_bytes(value: dict[str, Any]) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _atomic_private_json(path: Path, data: dict[str, Any]) -> None:
