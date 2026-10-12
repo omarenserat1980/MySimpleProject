@@ -123,8 +123,7 @@ class FilmSupervisor:
         if not mp4.is_file() or mp4.stat().st_size <= 0:
             return False, {"reason":"missing_or_empty_mp4"}
         probe=subprocess.run(
-            ["ffprobe","-v","error","-show_entries","format=duration,size",
-             "-show_entries","stream=codec_type,codec_name,width,height","-of","json",str(mp4)],
+            ["ffprobe","-v","error","-show_entries","format=duration,size:stream=codec_type,codec_name,width,height","-of","json",str(mp4)],
             text=True,capture_output=True
         )
         if probe.returncode != 0:
@@ -149,8 +148,7 @@ class FilmSupervisor:
         if not mp4.exists() or mp4.stat().st_size<=0:
             return False,{"reason":"missing_or_empty_mp4"}
         probe=subprocess.run(
-            ["ffprobe","-v","error","-show_entries","format=duration,size",
-             "-show_entries","stream=codec_type,codec_name,width,height","-of","json",str(mp4)],
+            ["ffprobe","-v","error","-show_entries","format=duration,size:stream=codec_type,codec_name,width,height","-of","json",str(mp4)],
             text=True,capture_output=True
         )
         if probe.returncode != 0:
