@@ -1,4 +1,4 @@
-"""Brain Virtual Computer hardware layer.
+""""Brain Virtual Computer hardware layer.
 
 Deterministic, inspectable software-defined hardware plus guest-OS contracts.
 """
@@ -19,6 +19,7 @@ from .peripheral_profiles import GPUProfile, NICProfile, MotherboardProfile, get
 from .power_thermal import PowerThermalModel
 from .os_image import OSImage, windows_server_2025_image
 from .windows_server import WindowsServerVM
+from .device_catalog import COMPONENT_CLASSES, DEVICE_FAMILIES, get_device_family, list_component_classes, list_device_families, validate_catalog
 from .extended_devices import (
     VirtualTPM, VirtualUSBController, VirtualSerialConsole, VirtualWatchdog, VirtualRNG,
     VirtualModem, VirtualBMC, VirtualIOMMU, VirtualRAID, VirtualBattery,
@@ -33,6 +34,7 @@ __all__ = [
     "MemoryTimingModel", "get_memory_profile", "list_memory_profiles", "GPUProfile", "NICProfile",
     "MotherboardProfile", "get_gpu_profile", "get_nic_profile", "get_motherboard_profile",
     "PowerThermalModel", "OSImage", "windows_server_2025_image", "WindowsServerVM",
+    "COMPONENT_CLASSES", "DEVICE_FAMILIES", "get_device_family", "list_component_classes", "list_device_families", "validate_catalog",
     "VirtualTPM", "VirtualUSBController", "VirtualSerialConsole", "VirtualWatchdog", "VirtualRNG",
     "VirtualModem", "VirtualBMC", "VirtualIOMMU", "VirtualRAID", "VirtualBattery",
     "VirtualInputDevice", "VirtualAudioDevice", "VirtualSensorHub", "VirtualPeripheralFabric",
