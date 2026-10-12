@@ -193,6 +193,10 @@ def indicators_for_fleet(fleet_status, *, now=None, freshness_seconds=300):
             continue
         if row.get("role") not in {"virtual_computer", "virtual_phone"}:
             continue
+        # Explicitly unselected software profiles are not canonical indicators.
+        # Missing selection remains backward-compatible for minimal fixtures.
+        if row.get("indicator_selected") is False:
+            continue
         subject_id = row.get("endpoint_id")
         if not isinstance(subject_id, str) or row.get("physical_device_required") is True:
             continue
