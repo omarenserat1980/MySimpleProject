@@ -59,7 +59,7 @@ from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
-from .brain.canonical_indicators import indicators_for_fleet
+from .brain.canonical_indicators import aggregate_indicator_payloads, indicators_for_fleet
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
@@ -1967,11 +1967,15 @@ def device_software_node_indicators(request: Request):
     require_control_key(request)
     fleet = build_fleet_status(device_bridge.agent_status(), read_arkan_runtime_status())
     indicators = indicators_for_fleet(fleet)
+    aggregate = aggregate_indicator_payloads(indicators)
     return JSONResponse({
         "ok": True,
         "source": "canonical_indicators",
         "software_only": True,
+        "processed_count": len(indicators),
+        "unprocessed_count": 0,
         "indicators": indicators,
+        "aggregate": aggregate,
         "native_windows_server_2025_boot_verified": False,
     })
 
