@@ -139,8 +139,18 @@ def assert_runtime_contract() -> dict:
         dispatch_start = supervisor_text.find("  dispatch_internal_task:")
         dispatch_end = supervisor_text.find("\n  health_and_recovery:", dispatch_start)
         dispatch = supervisor_text[dispatch_start:dispatch_end] if dispatch_start >= 0 and dispatch_end >= 0 else ""
-        if "self-hosted" not in dispatch or "internal_runner_preflight" not in dispatch:
-            failures.append("INTERNAL_TASK_DISPATCH_GUARD_MISSING")
+        if "./.github/workflows/brain-github-cloud.yml" not in dispatch or "self-hosted" in dispatch:
+            failures.append("SUPERVISOR_DISPATCH_NOT_DELEGATED_TO_HOSTED_ALLOWLISTED_RUNTIME")
+
+        heal_start = supervisor_text.find("  self_heal:")
+        heal_end = supervisor_text.find("\n  verify:", heal_start)
+        heal = supervisor_text[heal_start:heal_end] if heal_start >= 0 and heal_end >= 0 else ""
+        if "runs-on: ubuntu-latest" not in heal:
+            failures.append("SUPERVISOR_RECOVERY_NOT_HOSTED")
+        if "internal_runner_preflight" in heal or "self-hosted" in heal:
+            failures.append("SUPERVISOR_RECOVERY_REQUIRES_INTERNAL_RUNNER")
+        if "actions: write" not in heal or "gh run rerun" not in heal:
+            failures.append("SUPERVISOR_RECOVERY_AUTHORITY_NOT_BOUNDED")
     else:
         failures.append("MISSING_SUPERVISOR_WORKFLOW")
     if cinema_smoke_path.exists():
