@@ -7,7 +7,7 @@ heartbeat, capabilities and append-only audit records.
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-import json, os, shlex, subprocess, threading, time, uuid
+import json, os, shlex, signal, subprocess, threading, time, uuid
 from typing import Any
 
 SCHEMA="brain.desktop-commander-emulator.v1"
@@ -103,7 +103,7 @@ class DesktopCommanderEmulator:
             clean_env[key]=value
         try:
             proc=subprocess.Popen(args,cwd=work,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                                  env={**os.environ,**clean_env})
+                                  env={**os.environ,**clean_env},start_new_session=(os.name!="nt"))
         except OSError as exc:
             return {"ok":False,"status":"PROCESS_START_FAILED","error_type":type(exc).__name__}
         pid=uuid.uuid4().hex
@@ -119,6 +119,18 @@ class DesktopCommanderEmulator:
                                      "reality":"SIMULATED","timeout_seconds":self.policy.command_timeout_seconds})
         return {"ok":True,"process_id":pid,"pid":proc.pid,"status":"RUNNING","reality":"SIMULATED"}
 
+    @staticmethod
+    def _kill_process_tree(proc:subprocess.Popen[str])->None:
+        """Kill the process group created for this command, including pipe-holding descendants."""
+        try:
+            if os.name!="nt":
+                os.killpg(proc.pid,signal.SIGKILL)
+            elif proc.poll() is None:
+                proc.kill()
+        except (ProcessLookupError,PermissionError,OSError):
+            # The process group may already have exited; cleanup remains best-effort.
+            pass
+
     def _expire_process(self,process_id:str)->None:
         """Enforce the deadline even when no client polls for process output."""
         with self._lock:
@@ -132,9 +144,22 @@ class DesktopCommanderEmulator:
             if proc is None or started is None:
                 return
             timed_out=proc.poll() is None
-            if timed_out:
-                proc.kill()
-            output,_=proc.communicate()
+            output=""
+            try:
+                # A finished parent may leave descendants holding the captured pipe open.
+                # Bound the drain so the watchdog itself can never wait indefinitely.
+                output,_=proc.communicate(timeout=0.25)
+            except subprocess.TimeoutExpired as exc:
+                timed_out=True
+                output=exc.output or ""
+                self._kill_process_tree(proc)
+                try:
+                    tail,_=proc.communicate(timeout=0.75)
+                    output=tail or output
+                except subprocess.TimeoutExpired as final_exc:
+                    output=final_exc.output or output
+                    if proc.stdout is not None:
+                        proc.stdout.close()
             text_output=output or ""
             result={"ok":not timed_out,"status":"TIMED_OUT" if timed_out else "COMPLETED",
                     "process_id":process_id,"returncode":proc.returncode,
