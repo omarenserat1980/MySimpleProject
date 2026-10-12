@@ -61,7 +61,7 @@ class BrainErrorLogStore:
             "trace_id": trace_id or str(uuid4()),
             "message": str(message)[:4000],
             "exception_type": type(exception).__name__ if exception else None,
-            "traceback": traceback.format_exception(type(exception), exception, exception.__traceback__)[-1][-12000:]
+            "traceback": ''.join(traceback.format_exception(type(exception), exception, exception.__traceback__))[-12000:]
                 if exception else None,
             "status_code": status_code,
             "context": _redact(context or {}),
