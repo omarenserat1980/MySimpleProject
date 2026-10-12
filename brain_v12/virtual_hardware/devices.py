@@ -301,6 +301,9 @@ class VirtualNIC:
 
     def inject(self, payload: bytes):
         packet = bytes(payload)
+        if not self.profile:
+            self.rx.append(packet)
+            return {"ok": True, "bytes": len(packet)}
         if self.profile:
             if len(packet) > self.mtu:
                 self.stats["rx_drops"] += 1
