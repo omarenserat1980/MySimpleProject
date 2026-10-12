@@ -13,7 +13,7 @@ The `GoldenAcceptanceGate` is a verification layer, not a second task orchestrat
 - The independent verifier's producer must differ from the producers of the accepted runtime evidence.
 - For every non-`SIMULATED` reality level, the independent verification record must contain an Ed25519-signed attestation bound to the exact task, mission, attempt, reality level, evidence IDs, and criterion IDs.
 - The verifier trust anchor is supplied out-of-band through `BRAIN_GOLDEN_VERIFIER_PUBLIC_KEY_B64`; there is no private signing key in Brain or CI.
-- Signed verifier attestations expire within five minutes and use a persistent SQLite nonce ledger to reject replay.
+- Signed verifier attestations expire within five minutes, require explicit mission/attempt scope, and use a persistent SQLite nonce ledger to reject replay.
 - Missing evidence, mismatched reality, integrity failures, missing trust anchors, invalid signatures, expired attestations, or replayed nonces fail closed.
 
 ## Scope and limitations
