@@ -88,7 +88,7 @@ class AzureEmulator:
                   and vm.properties.get("architecture") == "x86_64")
         evidence = {
             "schema": "BRAIN-AZURE-EMULATOR-EVIDENCE-1", "checked_at": _now(),
-            "ok": ok, "provider": "brain-emulated-azure",
+            "ok": ok, "provider": "brain-emulated-azure", "provenance": "SIMULATED",
             "vm": asdict(vm) if vm else None, "usage": self._usage(), "quota": self.quota,
         }
         evidence["sha256"] = hashlib.sha256(
