@@ -1,11 +1,15 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
+import base64
+import hashlib
+import json
 from .cpu import VirtualCPU
 from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
 from .storage_profiles import get_storage_profile
 from .memory_profiles import get_memory_profile, CacheHierarchy
 from .peripheral_profiles import (get_gpu_profile, get_nic_profile, get_motherboard_profile)
+from .power_thermal import PowerThermalModel
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -34,7 +38,7 @@ class VirtualComputer:
     configured_cas_latency_cycles: int | None = None
     gpu_profile_id: str | None = None
     nic_profile_id: str | None = None
-    motherboard_profile_id: str | None = None
+    motherboard_profile_id: str | None = "brain-pcie-gen4-x24"
     external_network_enabled: bool = False
 
     def __post_init__(self):
@@ -58,8 +62,40 @@ class VirtualComputer:
         self.powered=False
         self.boot_count=0
         self.boot_record=None
+        self.power_thermal=PowerThermalModel()
+        self._checkpoint_resume=False
+
+    def validate_configuration(self) -> dict:
+        manifest = self.hardware_manifest()
+        topology = self.bus.validate_topology()
+        errors = list(manifest["validation"]["errors"])
+        if not topology["ok"]:
+            errors.extend(topology["errors"])
+        if self.ram.size <= 0 or self.storage.capacity <= 0:
+            errors.append("MACHINE_CAPACITY_INVALID")
+        return {"ok": not errors, "machine_id": self.name, "schema_version": manifest["schema_version"],
+                "errors": errors, "manifest_validation": manifest["validation"],
+                "topology_validation": topology, "host_resources_created": False}
+
+    def configuration_fingerprint(self) -> str:
+        configuration = {
+            "machine_id": self.name, "cpu_profile_id": self.cpu_profile_id or "brain-educational-8-register",
+            "ram_size_cells": self.ram.size, "ram_profile_id": self.ram_profile_id,
+            "memory_channels": self.memory_channels, "memory_channel_width_bits": self.memory_channel_width_bits,
+            "configured_cas_latency_cycles": self.configured_cas_latency_cycles, "cache_enabled": self.cache_enabled,
+            "storage_profile_id": self.storage_profile_id, "storage_capacity_bytes": self.storage.capacity,
+            "gpu_profile_id": self.gpu_profile_id, "gpu_width": self.gpu.width, "gpu_height": self.gpu.height,
+            "nic_profile_id": self.nic_profile_id, "nic_mtu": self.nic.mtu,
+            "motherboard_profile_id": self.motherboard_profile_id,
+        }
+        return hashlib.sha256(json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
     def power_on(self, boot_evidence: BootGateEvidence | None = None):
+        validation = self.validate_configuration()
+        if not validation["ok"]:
+            self.powered = False
+            self.boot_record = {"ok": False, "status": "CONFIGURATION_INVALID", "validation": validation}
+            raise RuntimeError("BRAIN_MACHINE_MANIFEST_INVALID")
         if boot_evidence is not None:
             gate=evaluate(boot_evidence)
             if not gate.ok:
@@ -68,8 +104,10 @@ class VirtualComputer:
                 raise RuntimeError("BRAIN_BOOT_BLOCKED")
         self.powered=True
         self.boot_count+=1
-        self.cpu.reset()
-        self.kernel.reset()
+        if not self._checkpoint_resume:
+            self.cpu.reset()
+            self.kernel.reset()
+        self._checkpoint_resume = False
         self.boot_record=self.firmware.boot(self)
         self.boot_record["bootloader"]=self.bootloader.load(self)
         if not self.boot_record["bootloader"].get("ok"):
@@ -80,11 +118,126 @@ class VirtualComputer:
             raise RuntimeError("FIRMWARE_BOOT_FAILED")
         if boot_evidence is not None:
             self.boot_record["boot_gate"]={"ok":True,"status":"BRAIN_READY","task_id":boot_evidence.task_id}
+        self.boot_record["machine_manifest"] = validation["manifest_validation"]
+        self.boot_record["configuration_fingerprint"] = self.configuration_fingerprint()
         return self.status()
 
     def power_off(self):
         self.powered=False
         return self.status()
+
+    def shutdown(self):
+        return self.power_off()
+
+    def advance_thermal(self, load_fraction: float, dt_seconds: float, power_watts: float | None = None) -> dict:
+        if self.power_thermal.shutdown_required:
+            return {"ok": False, "status": "THERMAL_SHUTDOWN_REQUIRED", **self.power_thermal.status()}
+        return {"ok": True, **self.power_thermal.update(load_fraction, dt_seconds, power_watts)}
+
+    def run_benchmark(self, program, max_cycles: int = 10000) -> dict:
+        result = self.execute(program, max_cycles)
+        serialized = json.dumps(program, separators=(",", ":"), default=str).encode()
+        return {"benchmark": "brain-virtual-computer-instruction-work-v1",
+                "machine_id": self.name, "configuration_fingerprint": self.configuration_fingerprint(),
+                "workload_sha256": hashlib.sha256(serialized).hexdigest(),
+                "result": result, "elapsed_host_seconds": None,
+                "physical_performance_measurement": False,
+                "claim": "deterministic emulator work result; not physical CPU/GPU performance"}
+
+    def checkpoint(self) -> dict:
+        if isinstance(self.cpu, X86_64CPU):
+            cpu_state = {"engine": "x86_64_symbolic_subset", "profile_id": self.cpu.profile_id,
+                         "registers": dict(self.cpu.registers), "flags": dict(self.cpu.flags),
+                         "zero_flag": self.cpu.zero_flag, "halted": self.cpu.halted,
+                         "cycles": self.cpu.cycles, "output": list(self.cpu.output),
+                         "privilege_level": self.cpu.privilege_level,
+                         "interrupts_enabled": self.cpu.interrupts_enabled,
+                         "pending_interrupts": list(self.cpu.pending_interrupts)}
+        else:
+            cpu_state = {"engine": "brain_educational", "registers": list(self.cpu.registers),
+                         "pc": self.cpu.pc, "zero": self.cpu.zero, "halted": self.cpu.halted,
+                         "cycles": self.cpu.cycles, "output": list(self.cpu.output)}
+        encode_files = lambda files: {path: base64.b64encode(data).decode("ascii") for path, data in files.items()}
+        payload = {
+            "schema_version": 1, "machine_id": self.name,
+            "configuration_fingerprint": self.configuration_fingerprint(),
+            "cpu": cpu_state, "ram": self.ram.snapshot(),
+            "storage": {"files": encode_files(self.storage.files),
+                        "durable_files": encode_files(self.storage.durable_files),
+                        "dirty_bytes": self.storage.dirty_bytes, "stats": dict(self.storage.stats)},
+            "nic": {"rx": [base64.b64encode(x).decode("ascii") for x in self.nic.rx],
+                    "tx": [base64.b64encode(x).decode("ascii") for x in self.nic.tx],
+                    "tx_pending": [base64.b64encode(x).decode("ascii") for x in self.nic.tx_pending],
+                    "stats": dict(self.nic.stats), "link_up": self.nic.link_up},
+            "gpu": {"framebuffer": list(self.gpu.framebuffer), "vram_bytes_used": self.gpu.vram_bytes_used,
+                    "command_queue": list(self.gpu.command_queue), "completed_commands": self.gpu.completed_commands,
+                    "stats": dict(self.gpu.stats)},
+            "bus": {"interrupts": list(self.bus.interrupts), "dma_transfers": list(self.bus.dma_transfers),
+                    "stats": dict(self.bus.stats)},
+            "power_thermal": self.power_thermal.snapshot(),
+            "powered_at_checkpoint": self.powered, "boot_count": self.boot_count,
+            "checkpoint_gaps": ["kernel process table and open handles", "host RSS and external device state"],
+            "host_disk_allocation_bytes": 0,
+        }
+        payload["checksum_sha256"] = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return payload
+
+    def restore_checkpoint(self, checkpoint: dict) -> dict:
+        payload = dict(checkpoint)
+        checksum = payload.pop("checksum_sha256", None)
+        expected = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        if not checksum or checksum != expected:
+            raise ValueError("BRAIN_CHECKPOINT_CHECKSUM_INVALID")
+        if payload.get("schema_version") != 1 or payload.get("machine_id") != self.name:
+            raise ValueError("BRAIN_CHECKPOINT_MACHINE_MISMATCH")
+        if payload.get("configuration_fingerprint") != self.configuration_fingerprint():
+            raise ValueError("BRAIN_CHECKPOINT_CONFIGURATION_MISMATCH")
+        self.ram.restore(payload["ram"])
+        storage = payload["storage"]
+        decode_files = lambda files: {path: base64.b64decode(data.encode("ascii")) for path, data in files.items()}
+        self.storage.files = decode_files(storage["files"])
+        self.storage.durable_files = decode_files(storage["durable_files"])
+        self.storage.dirty_bytes = int(storage["dirty_bytes"])
+        self.storage.stats.update(storage["stats"])
+        cpu = payload["cpu"]
+        if isinstance(self.cpu, X86_64CPU) and cpu["engine"] == "x86_64_symbolic_subset":
+            self.cpu.registers = dict(cpu["registers"]); self.cpu.flags = dict(cpu["flags"])
+            self.cpu.zero_flag = bool(cpu["zero_flag"]); self.cpu.halted = bool(cpu["halted"])
+            self.cpu.cycles = int(cpu["cycles"]); self.cpu.output = list(cpu["output"])
+            self.cpu.privilege_level = int(cpu["privilege_level"])
+            self.cpu.interrupts_enabled = bool(cpu["interrupts_enabled"])
+            self.cpu.pending_interrupts = list(cpu["pending_interrupts"])
+        elif not isinstance(self.cpu, X86_64CPU) and cpu["engine"] == "brain_educational":
+            self.cpu.registers = list(cpu["registers"]); self.cpu.pc = int(cpu["pc"])
+            self.cpu.zero = bool(cpu["zero"]); self.cpu.halted = bool(cpu["halted"])
+            self.cpu.cycles = int(cpu["cycles"]); self.cpu.output = list(cpu["output"])
+        else:
+            raise ValueError("BRAIN_CHECKPOINT_CPU_ENGINE_MISMATCH")
+        nic = payload["nic"]
+        self.nic.rx = [base64.b64decode(x.encode("ascii")) for x in nic["rx"]]
+        self.nic.tx = [base64.b64decode(x.encode("ascii")) for x in nic["tx"]]
+        self.nic.tx_pending = [base64.b64decode(x.encode("ascii")) for x in nic["tx_pending"]]
+        self.nic.stats.update(nic["stats"]); self.nic.link_up = bool(nic["link_up"])
+        gpu = payload["gpu"]
+        if len(gpu["framebuffer"]) != self.gpu.width * self.gpu.height:
+            raise ValueError("BRAIN_CHECKPOINT_GPU_FRAMEBUFFER_MISMATCH")
+        self.gpu.framebuffer = list(gpu["framebuffer"])
+        self.gpu.vram_bytes_used = int(gpu["vram_bytes_used"])
+        self.gpu.command_queue = list(gpu["command_queue"])
+        self.gpu.completed_commands = int(gpu["completed_commands"])
+        self.gpu.stats.update(gpu["stats"])
+        bus = payload["bus"]
+        self.bus.interrupts = list(bus["interrupts"]); self.bus.dma_transfers = list(bus["dma_transfers"])
+        self.bus.stats.update(bus["stats"])
+        self.power_thermal.restore(payload["power_thermal"])
+        self.boot_count = int(payload["boot_count"])
+        self.powered = False
+        self.boot_record = {"ok": True, "status": "RESTORED_NEEDS_BOOT", "checkpoint_checksum": checksum}
+        self._checkpoint_resume = True
+        return {"ok": True, "status": "RESTORED_NEEDS_BOOT", "machine_id": self.name,
+                "configuration_fingerprint": self.configuration_fingerprint(),
+                "kernel_state_restored": False, "host_disk_allocation_bytes": 0}
 
     def execute(self,program,max_cycles:int=10000):
         if not self.powered: raise RuntimeError("COMPUTER_POWER_OFF")
@@ -257,7 +410,65 @@ class VirtualComputer:
                  "PCIe generation reference only; topology is synthetic, not a real motherboard specification."),),
                 ("test_topology_lane_budget_and_dma_accounting", "test_topology_conflict_rejected_before_boot"),
             ))
-        return MachineManifest(self.name, 1, tuple(profiles)).describe()
+        profiles.append(HardwareProfile(
+            "brain-virtual-firmware-v1", "firmware", "Brain deterministic virtual firmware and bootloader",
+            FidelityLevel.FUNCTIONAL,
+            {"firmware_version": self.firmware.VERSION, "bootloader_version": self.bootloader.VERSION,
+             "kernel_required": False},
+            ("device enumeration", "boot record", "optional kernel image check", "manifest-gated boot"),
+            ("physical BIOS/UEFI execution", "ACPI tables", "secure-boot cryptographic chain"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/firmware-v1",
+                                 "Software firmware contract, not a vendor firmware implementation."),),
+            ("test_machine_manifest_v2_includes_firmware_power_thermal",),
+            units={"firmware_version": "version string", "bootloader_version": "version string"},
+        ))
+        known_tdp = {}
+        if self.cpu_profile_id:
+            cpu_ref = get_cpu_profile(self.cpu_profile_id).specification_parameters
+            if cpu_ref.get("tdp_watts") is not None:
+                known_tdp["cpu"] = cpu_ref["tdp_watts"]
+        if self.gpu_profile_id:
+            known_tdp["gpu"] = get_gpu_profile(self.gpu_profile_id).tdp_watts
+        if self.nic_profile_id:
+            known_tdp["nic"] = get_nic_profile(self.nic_profile_id).tdp_watts
+        profiles.append(HardwareProfile(
+            "brain-power-estimate-v1", "power", "Brain synthetic load-to-power estimate",
+            FidelityLevel.PERFORMANCE_ESTIMATION,
+            {"modelled_idle_watts": self.power_thermal.idle_power_watts,
+             "modelled_peak_watts": self.power_thermal.peak_power_watts,
+             "known_vendor_tdp_references": known_tdp,
+             "known_vendor_tdp_sum_watts": sum(known_tdp.values()),
+             "tdp_sum_is_complete_system_power": False,
+             "calibrated": False},
+            ("load-fraction to estimated watts", "vendor TDP reference reporting", "thermal-model input"),
+            ("physical current/voltage measurement", "component-level transient power", "calibrated wall-power prediction"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/power-estimate-v1",
+                                 "Idle/peak power values are configurable synthetic defaults; vendor TDP references are reported separately."),),
+            ("test_power_thermal_estimates_and_throttling",),
+            units={"modelled_idle_watts": "W", "modelled_peak_watts": "W",
+                   "known_vendor_tdp_sum_watts": "W"},
+        ))
+        profiles.append(HardwareProfile(
+            "brain-thermal-rc-v1", "thermal", "Brain lumped thermal RC estimate",
+            FidelityLevel.TIMING_MODEL,
+            {"ambient_c": self.power_thermal.ambient_c,
+             "thermal_capacity_j_per_c": self.power_thermal.thermal_capacity_j_per_c,
+             "cooling_w_per_c": self.power_thermal.cooling_w_per_c,
+             "throttle_c": self.power_thermal.throttle_c, "shutdown_c": self.power_thermal.shutdown_c,
+             "fan_curve": "piecewise-linear synthetic curve"},
+            ("thermal inertia", "cooling effectiveness", "fan curve estimate", "throttling", "cool-down recovery", "fault injection"),
+            ("physical temperature sensor", "calibrated chassis thermal dynamics", "component hotspot CFD"),
+            (SpecificationSource(ProvenanceKind.SYNTHETIC_BASELINE,
+                                 "brain://virtual-hardware/thermal-rc-v1",
+                                 "Synthetic lumped RC parameters, not measured device thermals."),),
+            ("test_power_thermal_estimates_and_throttling", "test_thermal_fault_and_recovery"),
+            units={"ambient_c": "degC", "thermal_capacity_j_per_c": "J/degC",
+                   "cooling_w_per_c": "W/degC", "throttle_c": "degC", "shutdown_c": "degC"},
+        ))
+        required = ("cpu", "memory", "bus", "storage", "network", "motherboard", "firmware", "power", "thermal")
+        return MachineManifest(self.name, 2, tuple(profiles), required_categories=required).describe()
 
     def status(self):
         return {"name":self.name,"powered":self.powered,"boot_count":self.boot_count,
@@ -268,4 +479,8 @@ class VirtualComputer:
                 "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
                 "ram":self.ram.status(),"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
-                "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status()}
+                "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status(),
+                "storage_telemetry":self.storage.smart_telemetry(),
+                "power_thermal":self.power_thermal.status(),
+                "machine_manifest_validation":self.hardware_manifest()["validation"],
+                "configuration_validation":self.validate_configuration()}

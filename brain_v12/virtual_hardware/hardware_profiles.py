@@ -46,6 +46,7 @@ class HardwareProfile:
     unsupported_features: tuple[str, ...] = ()
     sources: tuple[SpecificationSource, ...] = ()
     conformance_tests: tuple[str, ...] = ()
+    units: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("profile_id", "category", "model"):
@@ -57,6 +58,33 @@ class HardwareProfile:
             raise ValueError("PROFILE_MODELED_BEHAVIORS_REQUIRED")
         if not self.conformance_tests:
             raise ValueError("PROFILE_CONFORMANCE_TESTS_REQUIRED")
+        if not self.units and self.parameters:
+            inferred_units = {}
+            for key in self.parameters:
+                if key.endswith("_bytes_per_second"):
+                    inferred_units[key] = "bytes/s"
+                elif key.endswith("_bytes"):
+                    inferred_units[key] = "bytes"
+                elif key.endswith("_hz"):
+                    inferred_units[key] = "Hz"
+                elif key.endswith("_watts") or key.endswith("_watts_reference"):
+                    inferred_units[key] = "W"
+                elif key.endswith("_volts") or key.endswith("_voltage_v"):
+                    inferred_units[key] = "V"
+                elif key.endswith("_mt_s"):
+                    inferred_units[key] = "MT/s"
+                elif key.endswith("_ns") or key.endswith("_ns_estimate"):
+                    inferred_units[key] = "ns"
+                elif key.endswith("_cycles"):
+                    inferred_units[key] = "cycles"
+                elif key.endswith("_bits"):
+                    inferred_units[key] = "bits"
+                elif key.endswith("_cells"):
+                    inferred_units[key] = "addressable_cells"
+                elif key in {"cores", "threads", "channels", "compute_units", "execution_lanes", "tensor_cores",
+                             "register_count", "pcie_lanes", "total_pcie_lanes", "sata_ports", "component_count"}:
+                    inferred_units[key] = "count"
+            object.__setattr__(self, "units", inferred_units)
 
     def describe(self) -> dict:
         return {
@@ -65,6 +93,7 @@ class HardwareProfile:
             "model": self.model,
             "fidelity": self.fidelity.value,
             "parameters": dict(self.parameters),
+            "units": dict(self.units),
             "modeled_behaviors": list(self.modeled_behaviors),
             "unsupported_features": list(self.unsupported_features),
             "sources": [
