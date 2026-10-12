@@ -144,6 +144,7 @@ class VirtualRAM:
             if value:
                 restored[address] = value
         self._cells = restored
+        self._next_fault = None
 
     def status(self) -> dict:
         return {
