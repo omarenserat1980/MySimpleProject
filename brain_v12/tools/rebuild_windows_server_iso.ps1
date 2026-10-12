@@ -59,6 +59,7 @@ New-Item -ItemType Directory -Path $work | Out-Null
 $manifestPath = Join-Path $work "iso-rebuild-manifest.json"
 $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
 $mounted = $null
+$outputMounted = $null
 $log = Join-Path $work "oscdimg.log"
 try {
     $mounted = Mount-DiskImage -ImagePath $source -StorageType ISO -Access ReadOnly -PassThru
@@ -94,9 +95,27 @@ try {
     $process = Start-Process -FilePath $oscdimg -ArgumentList $argumentLine -Wait -PassThru -NoNewWindow -RedirectStandardOutput $log -RedirectStandardError ($log + ".err")
     if ($process.ExitCode -ne 0) { throw "oscdimg failed with exit code $($process.ExitCode)." }
     if (-not (Test-Path -LiteralPath $output -PathType Leaf)) { throw "oscdimg returned success but output ISO is missing." }
+
+    # Independently mount the newly generated image and inspect its contents.
+    # This proves only that the output ISO is structurally readable, not that it boots.
+    $outputMounted = Mount-DiskImage -ImagePath $output -StorageType ISO -Access ReadOnly -PassThru
+    $outputVolume = $outputMounted | Get-Volume | Where-Object DriveLetter | Select-Object -First 1
+    if (-not $outputVolume) { throw "Rebuilt ISO has no accessible drive letter." }
+    $outputRoot = "$($outputVolume.DriveLetter):\\"
+    foreach ($relative in @("efi\\boot\\bootx64.efi", "sources\\boot.wim", "boot\\etfsboot.com", "efi\\microsoft\\boot\\efisys.bin")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $relative) -PathType Leaf)) {
+            throw "Rebuilt ISO is missing required boot/setup file: $relative"
+        }
+    }
+    if (-not ((Test-Path -LiteralPath (Join-Path $outputRoot "sources\\install.wim") -PathType Leaf) -or (Test-Path -LiteralPath (Join-Path $outputRoot "sources\\install.esd") -PathType Leaf))) {
+        throw "Rebuilt ISO is missing sources\\install.wim and sources\\install.esd."
+    }
+    Dismount-DiskImage -ImagePath $output -ErrorAction Stop | Out-Null
+    $outputMounted = $null
+
     $manifest = [ordered]@{
         schema = "brain.windows-server-iso-rebuild.v1"
-        status = "REBUILT_NOT_BOOT_TESTED"
+        status = "REBUILT_STRUCTURE_VALIDATED_NOT_BOOT_TESTED"
         boot_status = "NOT_TESTED"
         source_name = [System.IO.Path]::GetFileName($source)
         source_sha256 = $sourceHash
@@ -116,5 +135,6 @@ try {
     Write-Output ("Manifest: " + $manifestPath)
 }
 finally {
+    if ($outputMounted) { Dismount-DiskImage -ImagePath $output -ErrorAction SilentlyContinue | Out-Null }
     if ($mounted) { Dismount-DiskImage -ImagePath $source -ErrorAction SilentlyContinue | Out-Null }
 }
