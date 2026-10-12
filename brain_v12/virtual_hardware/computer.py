@@ -479,4 +479,8 @@ class VirtualComputer:
                 "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
                 "ram":self.ram.status(),"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
-                "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status()}
+                "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status(),
+                "storage_telemetry":self.storage.smart_telemetry(),
+                "power_thermal":self.power_thermal.status(),
+                "machine_manifest_validation":self.hardware_manifest()["validation"],
+                "configuration_validation":self.validate_configuration()}
