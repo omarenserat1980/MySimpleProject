@@ -92,6 +92,12 @@ def run(origin: str, send_test_message: bool = False, timeout: float = 8.0) -> d
             if body.get("ok") is False or body.get("available") is False:
                 result["ok"] = False
                 result["error"] = "BRAIN_AI_REPORTS_UNAVAILABLE"
+            provider = body.get("provider") if isinstance(body.get("provider"), dict) else {}
+            model_router = body.get("model_router") if isinstance(body.get("model_router"), dict) else {}
+            providers = model_router.get("providers")
+            if provider.get("configured") is False and not providers:
+                result["ok"] = False
+                result["error"] = "NO_MODEL_PROVIDER_CONFIGURED"
 
     if send_test_message and all(report["checks"].get(k, {}).get("ok") for k, _ in CHECKS):
         report["chat_test"]["performed"] = True
