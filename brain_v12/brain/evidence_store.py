@@ -1,12 +1,16 @@
 from __future__ import annotations
-import hashlib,json,sqlite3,time
+import hashlib,json,os,sqlite3,time
 from pathlib import Path
 from uuid import uuid4
 
 class EvidenceStore:
     """Append-only evidence index; verification never trusts an executor's success alone."""
-    def __init__(self,path="brain6_artifacts/evidence/evidence.db"):
-        self.path=Path(path); self.path.parent.mkdir(parents=True,exist_ok=True)
+    def __init__(self,path=None):
+        if path is None:
+            runtime_path = os.getenv("BRAIN_EVIDENCE_DB")
+            runtime_home = os.getenv("BRAIN_RUNTIME_HOME")
+            path = runtime_path or (Path(runtime_home).expanduser() / "brain6_artifacts" / "evidence" / "evidence.db" if runtime_home else "brain6_artifacts/evidence/evidence.db")
+        self.path=Path(path).expanduser(); self.path.parent.mkdir(parents=True,exist_ok=True)
         self.db=sqlite3.connect(self.path,check_same_thread=False)
         self.db.row_factory=sqlite3.Row
         self.db.execute("""CREATE TABLE IF NOT EXISTS evidence(

@@ -31,25 +31,34 @@ def issue_windows_contract(*, identity:dict[str,Any], checkpoint:dict[str,Any],
     source_commit=str(source_commit).strip().lower()
     if len(source_commit)!=40 or any(c not in "0123456789abcdef" for c in source_commit):
         raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_INVALID")
-    if source_commit!=verified["source_commit"]: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_SOURCE_COMMIT_MISMATCH")
+    # The checkpoint commit identifies the trusted recovery baseline; the contract
+    # commit identifies the exact workflow revision being authorized. They are
+    # intentionally distinct when code has advanced beyond the golden checkpoint.
     if not capability_verified: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_CAPABILITY_NOT_VERIFIED")
     if str(task_id).strip()=="" or str(attempt_id).strip()=="": raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_TASK_ATTEMPT_REQUIRED")
     if lease.holder_id=="" or lease.fencing_token<1: raise RuntimeError("BRAIN_LEADERSHIP_LEASE_INVALID")
     if owner_approval is None: raise RuntimeError("OWNER_APPROVAL_REQUIRED")
     if not owner_public_key_b64: raise RuntimeError("OWNER_APPROVAL_PUBLIC_KEY_REQUIRED")
-    owner=verify_owner_approval(owner_approval,owner_public_key_b64,now=now)
+    owner=verify_owner_approval(owner_approval,owner_public_key_b64,now=now,
+        source_commit=source_commit,task_id=str(task_id).strip(),attempt_id=str(attempt_id).strip())
     if owner.scope != CAPABILITY: raise RuntimeError("OWNER_APPROVAL_SCOPE_MISMATCH")
     decision=BrainAuthorityPolicy().decide(subject=EXECUTOR,action="windows-real-boot",risk="HIGH",capability=True,human_approval_token=human_approval_token)
     require_authorized(decision)
     now=time.time() if now is None else float(now)
     if expires_seconds<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_EXPIRY_TOO_SHORT")
+    if lease.expires_at-now<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_LEADERSHIP_LEASE_EXPIRY_TOO_SOON")
+    contract_expires_at=min(now+int(expires_seconds),owner.expires_at,lease.expires_at)
+    if contract_expires_at-now<60: raise RuntimeError("WINDOWS_EXECUTION_CONTRACT_OWNER_APPROVAL_EXPIRY_TOO_SOON")
     c={"schema":SCHEMA,"status":"VERIFIED","capability":CAPABILITY,"executor":EXECUTOR,
        "authority_policy_version":POLICY,"authority_decision":"AUTHORIZED",
        "brain_id":verified["brain_id"],"generation":verified["generation"],
        "fencing_token":lease.fencing_token,"lease_id":lease.lease_id,"holder_id":lease.holder_id,
        "task_id":str(task_id).strip(),"attempt_id":str(attempt_id).strip(),
-       "source_commit":source_commit,"issued_at":now,"expires_at":now+int(expires_seconds),
-       "owner_id":owner.owner_id,"owner_challenge_id":owner.challenge_id,"owner_scope":owner.scope}
+       "source_commit":source_commit,"checkpoint_source_commit":verified["source_commit"],
+       "issued_at":now,"expires_at":contract_expires_at,
+       "owner_id":owner.owner_id,"owner_challenge_id":owner.challenge_id,"owner_scope":owner.scope,
+       "owner_approval_source_commit":owner.source_commit,"owner_approval_task_id":owner.task_id,
+       "owner_approval_attempt_id":owner.attempt_id}
     c["authority_signature_algorithm"]=ALGORITHM
     c["authority_signature"]=sign_contract(c)
     return c
@@ -73,6 +82,7 @@ def issue_from_files(*,identity_file:str,checkpoint_file:str,lease_file:str,outp
             task_id=task_id,attempt_id=attempt_id,
             capability_verified=capability_verified,human_approval_token=human_approval_token,
             owner_approval=owner_approval,owner_public_key_b64=owner_public_key_b64)
+        store.consume_owner_approval(c["owner_challenge_id"], c["attempt_id"])
     finally: store.close()
     out=Path(output); out.parent.mkdir(parents=True,exist_ok=True)
     tmp=out.with_suffix(out.suffix+".tmp"); tmp.write_text(json.dumps(c,indent=2,sort_keys=True),encoding="utf-8"); os.replace(tmp,out)

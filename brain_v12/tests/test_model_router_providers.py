@@ -26,6 +26,21 @@ class ModelRouterProviderTests(unittest.TestCase):
         self.assertTrue(result["routing"]["fallback_used"])
         self.assertEqual(len(result["evidence"]["attempts"]), 2)
 
+    def test_adapts_text_model_provider_signature(self):
+        calls = []
+
+        def text_provider(user_text, context="", instructions=""):
+            calls.append((user_text, context, instructions))
+            return {"ok": True, "result": {"reply": "adapted", "model": "text-test"}}
+
+        router = ModelRouter()
+        router.register("text-test", text_provider, tasks=["chat"])
+        result = router.respond("hello", context="remember this", instructions="be concise")
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["reply"], "adapted")
+        self.assertEqual(calls, [("hello", "remember this", "be concise")])
+
     def test_no_provider_fails_closed(self):
         result = ModelRouter().respond("hi")
         self.assertFalse(result["ok"])

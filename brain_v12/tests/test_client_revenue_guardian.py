@@ -232,3 +232,47 @@ def test_first_revenue_mission_accepts_live_url_field():
     assert mission["selected_opportunity_url"] == "https://example.com/projects/1"
     assert mission["selected_opportunity_quality"] is True
     assert saved[-1]["dispatch_allowed"] is False
+
+
+# The revenue-conversion workflow invokes this module with unittest, while the
+# assertions above are written as pytest-style functions. Expose wrappers so
+# unittest actually executes the tests instead of reporting "Ran 0 tests".
+import unittest
+
+
+class ClientRevenueGuardianUnittestAdapter(unittest.TestCase):
+    def test_registry_targets_cl_000003(self):
+        test_registry_targets_cl_000003()
+
+    def test_no_verified_revenue_is_not_reported_as_revenue(self):
+        test_no_verified_revenue_is_not_reported_as_revenue()
+
+    def test_blocker_has_priority_over_activity(self):
+        test_blocker_has_priority_over_activity()
+
+    def test_verified_revenue_stops_nudge(self):
+        test_verified_revenue_stops_nudge()
+
+    def test_nudge_is_single_bounded_request(self):
+        test_nudge_is_single_bounded_request()
+
+    def test_deep_audit_uses_existing_income_lifecycle(self):
+        test_deep_audit_uses_existing_income_lifecycle()
+
+    def test_deep_audit_enables_client_data_isolation(self):
+        test_deep_audit_enables_client_data_isolation()
+
+    def test_history_is_append_only_and_preserves_each_step(self):
+        test_history_is_append_only_and_preserves_each_step()
+
+    def test_deep_inspect_derives_bounded_recovery_action_on_decrease(self):
+        test_deep_inspect_derives_bounded_recovery_action_on_decrease()
+
+    def test_advance_once_requests_one_persisted_next_step(self):
+        test_advance_once_requests_one_persisted_next_step()
+
+    def test_advance_once_blocks_duplicate_without_new_measurement(self):
+        test_advance_once_blocks_duplicate_without_new_measurement()
+
+    def test_first_revenue_mission_accepts_live_url_field(self):
+        test_first_revenue_mission_accepts_live_url_field()

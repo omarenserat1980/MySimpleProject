@@ -5,13 +5,17 @@ from brain_v12.brain.owner_cryptographic_approval import *
 class OwnerApprovalTests(unittest.TestCase):
  def setUp(self):
   self.k=Ed25519PrivateKey.generate(); self.pub=base64.b64encode(self.k.public_key().public_bytes_raw()).decode()
-  self.a={"schema":SCHEMA,"owner_id":"owner-1","challenge_id":"c-1","scope":"windows-server-2025-real-boot","expires_at":2000.0}
-  self.a["signature"]=base64.b64encode(self.k.sign(approval_payload(self.a["owner_id"],self.a["challenge_id"],self.a["scope"],self.a["expires_at"]))).decode()
+  self.a={"schema":SCHEMA,"owner_id":"owner-1","challenge_id":"c-1","scope":"windows-server-2025-real-boot","expires_at":2000.0,"source_commit":"a"*40,"task_id":"windows-real-boot","attempt_id":"attempt-1"}
+  self.a["signature"]=base64.b64encode(self.k.sign(approval_payload(self.a["owner_id"],self.a["challenge_id"],self.a["scope"],self.a["expires_at"],self.a["source_commit"],self.a["task_id"],self.a["attempt_id"]))).decode()
  def test_valid(self): self.assertEqual(verify_owner_approval(self.a,self.pub,now=1000).scope,self.a["scope"])
  def test_expired(self):
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_EXPIRED"): verify_owner_approval(self.a,self.pub,now=2000)
  def test_replay(self):
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_REPLAY"): verify_owner_approval(self.a,self.pub,now=1000,used_challenges={"c-1"})
+ def test_wrong_commit_is_rejected(self):
+  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_SOURCE_COMMIT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,source_commit="b"*40)
+ def test_wrong_attempt_is_rejected(self):
+  with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_ATTEMPT_MISMATCH"): verify_owner_approval(self.a,self.pub,now=1000,attempt_id="attempt-2")
  def test_tamper(self):
   self.a["scope"]="other"
   with self.assertRaisesRegex(ValueError,"OWNER_APPROVAL_SIGNATURE_INVALID"): verify_owner_approval(self.a,self.pub,now=1000)

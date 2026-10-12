@@ -1,0 +1,58 @@
+name: Brain Cloud Windows Runner Launch
+run-name: Verify cloud Windows runner on main
+
+on:
+  push:
+    branches:
+      - main
+      - ops/launch-cloud-windows-runner
+    paths:
+      - .github/workflows/brain-cloud-windows-runner-launch.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows_cloud_runner:
+    name: Start and verify cloud Windows runner
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify real Windows host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $os = Get-CimInstance Win32_OperatingSystem
+          $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+          $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+          $report = [ordered]@{
+            status = "WINDOWS_CLOUD_RUNNER_ONLINE"
+            os_caption = $os.Caption
+            os_version = $os.Version
+            os_build = $os.BuildNumber
+            architecture = $os.OSArchitecture
+            computer_name_present = [bool]$env:COMPUTERNAME
+            processor_name = $cpu.Name
+            logical_processors = $cpu.NumberOfLogicalProcessors
+            total_memory_gb = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+            c_drive_free_gb = [math]::Round($disk.FreeSpace / 1GB, 2)
+            github_run_id = $env:GITHUB_RUN_ID
+            github_run_attempt = $env:GITHUB_RUN_ATTEMPT
+            runner_os = $env:RUNNER_OS
+            runner_arch = $env:RUNNER_ARCH
+            timestamp_utc = [DateTime]::UtcNow.ToString("o")
+          }
+          if ($env:RUNNER_OS -ne "Windows") { throw "RUNNER_OS_NOT_WINDOWS" }
+          if ($os.Caption -notmatch "Windows") { throw "GUEST_OS_NOT_WINDOWS" }
+          if ($disk.FreeSpace -le 0) { throw "WINDOWS_DISK_NOT_READY" }
+          $report | ConvertTo-Json -Depth 4 | Set-Content -Path windows-cloud-runner-proof.json -Encoding utf8
+          $report | ConvertTo-Json -Depth 4
+          "WINDOWS_CLOUD_RUNNER=ONLINE" | Write-Host
+      - name: Upload host proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-cloud-windows-runner-proof-${{ github.run_id }}
+          path: windows-cloud-runner-proof.json
+          if-no-files-found: warn
