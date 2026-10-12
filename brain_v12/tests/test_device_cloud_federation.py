@@ -55,7 +55,7 @@ class DeviceCloudFederationTests(unittest.TestCase):
             {
                 "exists": True,
                 "device_id": "arkan-virtual-01",
-                "host_dependencies_for_identity": True,
+                "identity_independent_of_host": True,
                 "runtime_loaded": False,
                 "simulator_booted": False,
                 "native_os_boot_verified": False,
