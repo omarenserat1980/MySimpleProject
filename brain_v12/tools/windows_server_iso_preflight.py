@@ -53,14 +53,30 @@ def inspect_iso(iso: Path) -> dict:
         report["checks"]["xorriso"] = {"passed": False, "reason": "xorriso not installed"}
         return report
 
-    version = subprocess.run(
-        [xorriso, "-version"], capture_output=True, text=True, timeout=15, check=False
-    )
+    try:
+        version = subprocess.run(
+            [xorriso, "-version"], capture_output=True, text=True, timeout=15, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        report["status"] = "BLOCKED"
+        report["checks"]["xorriso"] = {
+            "passed": False,
+            "reason": f"xorriso version probe failed: {type(exc).__name__}",
+        }
+        return report
     report["tool"] = {"name": "xorriso", "version": (version.stdout or version.stderr).splitlines()[:2]}
-    listing = subprocess.run(
-        [xorriso, "-indev", str(iso), "-find", "/", "-type", "f", "-print"],
-        capture_output=True, text=True, timeout=120, check=False,
-    )
+    try:
+        listing = subprocess.run(
+            [xorriso, "-indev", str(iso), "-find", "/", "-type", "f", "-print"],
+            capture_output=True, text=True, timeout=120, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        report["status"] = "BLOCKED"
+        report["checks"]["iso9660_listing"] = {
+            "passed": False,
+            "reason": f"xorriso ISO listing failed: {type(exc).__name__}",
+        }
+        return report
     report["checks"]["iso9660_listing"] = {
         "passed": listing.returncode == 0,
         "returncode": listing.returncode,
