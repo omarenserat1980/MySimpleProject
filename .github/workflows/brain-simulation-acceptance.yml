@@ -11,6 +11,9 @@ on:
       - "brain_v12/brain/desktop_commander_emulator.py"
       - "brain_v12/brain/golden_closed_loop.py"
       - "brain_v12/brain/evidence_store.py"
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/tools/arkan_software_node_smoke.py"
+      - "brain_v12/tests/test_arkan_provisioner.py"
       - "brain_v12/brain/workload_controller.py"
       - "brain_v12/tests/test_digital_twin_fabric.py"
       - "brain_v12/tests/test_arkan_device_emulator.py"
@@ -45,6 +48,21 @@ jobs:
         run: |
           mkdir -p evidence
           python tools/brain_simulation_acceptance.py --output evidence/brain-simulation-acceptance.json
+      - name: Run software-only Arkan node smoke test
+        run: |
+          python -m unittest brain_v12.tests.test_arkan_provisioner -v
+          python -m py_compile brain_v12/tools/arkan_software_node_smoke.py
+          python -m brain_v12.tools.arkan_software_node_smoke --output evidence/arkan-software-node-report.json
+          python - <<'PY'
+          import json
+          report=json.load(open("evidence/arkan-software-node-report.json",encoding="utf-8"))
+          assert report["status"] == "SIMULATION_READY", report
+          assert report["node"]["physical_host_required"] is False, report
+          assert report["node"]["desktop_commander_required"] is False, report
+          assert report["windows_server_2025"]["native_os_boot_verified"] is False, report
+          print("ARKAN_SOFTWARE_NODE=SIMULATION_READY")
+          print("NATIVE_WINDOWS_BOOT=NOT_VERIFIED")
+          PY
       - name: Run focused emulator regression tests
         run: |
           PYTHONPATH=. python -m unittest \
@@ -58,6 +76,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: brain-simulation-acceptance-${{ github.run_id }}
-          path: evidence/brain-simulation-acceptance.json
+          path: |
+            evidence/brain-simulation-acceptance.json
+            evidence/arkan-software-node-report.json
           if-no-files-found: warn
           retention-days: 30
