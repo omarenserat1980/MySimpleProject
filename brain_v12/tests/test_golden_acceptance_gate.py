@@ -11,7 +11,8 @@ from brain_v12.brain.golden_acceptance_gate import (
 
 class GoldenAcceptanceGateTests(unittest.TestCase):
     def setUp(self):
-        self.store = EvidenceStore(":memory:")
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = EvidenceStore(Path(self.tempdir.name) / "evidence.db")
         self.gate = GoldenAcceptanceGate(self.store)
         self.criteria = (
             AcceptanceCriterion("artifact-exists", "artifact_verified"),
@@ -20,6 +21,7 @@ class GoldenAcceptanceGateTests(unittest.TestCase):
 
     def tearDown(self):
         self.store.close()
+        self.tempdir.cleanup()
 
     def _add_valid_bundle(self, *, reality="SIMULATED", verifier="independent-verifier"):
         first = self.store.append(
