@@ -55,6 +55,7 @@ def evaluate_readiness(facts: dict[str, Any]) -> dict[str, Any]:
         "qemu": facts.get("tools", {}).get("qemu-system-x86_64") is True,
         "qemu_img": facts.get("tools", {}).get("qemu-img") is True,
         "media_tools": all(facts.get("tools", {}).get(n) is True for n in ("xorriso", "wimlib-imagex", "mcopy")),
+        "fat_tools": facts.get("tools", {}).get("fat_mkfs") is True,
         "uefi_firmware": facts.get("ovmf_readable") is True,
         "signed_contract_gate": facts.get("contract_verified") is True,
     }
