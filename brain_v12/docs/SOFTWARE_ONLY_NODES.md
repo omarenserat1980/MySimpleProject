@@ -36,4 +36,8 @@ PYTHONPATH=. pytest -q brain_v12/test_worker_registry.py
 
 The dedicated GitHub Actions workflow runs this focused suite on a GitHub-hosted
 Ubuntu runner and does not require Termux, Android, Windows, Hyper-V, QEMU/KVM, or
-a self-hosted runner.
+a self-hosted runner. It also runs the clean-environment preflight, which removes
+device/agent environment variables, disables both physical-device adapter flags,
+imports the FastAPI application, verifies core routes, and checks the health
+contract. This is an import/startup smoke test, not proof that every workload or
+external integration is hardware-independent.
