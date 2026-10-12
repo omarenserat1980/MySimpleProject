@@ -224,3 +224,72 @@ def default_profile(device_id: str, device_type: str) -> PowerThermalProfile:
         idle_watts=idle, max_watts=peak, thermal_resistance_c_per_w=resistance,
         thermal_capacitance_j_per_c=capacitance, cooling_effectiveness=cooling,
         temperature_limit_c=limit, throttle_start_c=throttle)
+
+
+@dataclass
+class VirtualHardwareDynamics:
+    """Dynamics/evidence adapter for an existing VirtualHardwareMachine.
+
+    Uses its existing device registry and does not create a second topology or queue.
+    """
+    machine: Any
+    fault_controller: FaultController = field(default_factory=FaultController)
+    models: dict[str, PowerThermalModel] = field(default_factory=dict)
+
+    def configure_device(self, device_id: str, profile: PowerThermalProfile | None = None) -> dict[str, Any]:
+        if device_id not in self.machine.devices:
+            raise KeyError("VHW_DEVICE_NOT_FOUND")
+        spec = self.machine.devices[device_id]
+        selected = profile or default_profile(device_id, str(spec.device_type).lower())
+        if selected.device_id != device_id:
+            raise ValueError("POWER_PROFILE_DEVICE_MISMATCH")
+        self.models[device_id] = PowerThermalModel(selected)
+        return self.models[device_id].snapshot()
+
+    def set_workload(self, device_id: str, utilization: float) -> None:
+        if device_id not in self.models:
+            self.configure_device(device_id)
+        self.models[device_id].set_workload(utilization)
+
+    def advance(self, dt_s: float) -> dict[str, Any]:
+        readings = {}
+        for device_id in sorted(self.models):
+            readings[device_id] = asdict(self.models[device_id].advance(dt_s))
+        return {"model_version": MODEL_VERSION, "machine": self.machine.name,
+                "readings": readings, "physical_validation": False,
+                "notice": "Watts and temperatures are estimates unless calibrated per device."}
+
+    def inject_fault(self, fault: FaultType | str, *, target: str, event_id: str,
+                     queued_task_ids: Iterable[str] = (), details: dict[str, Any] | None = None) -> dict[str, Any]:
+        if target not in self.machine.devices and target not in {"machine", "power"}:
+            raise KeyError("VHW_DEVICE_NOT_FOUND")
+        result = self.fault_controller.inject(fault, target=target, event_id=event_id,
+            queued_task_ids=queued_task_ids, details=details)
+        kind = FaultType(fault)
+        # Fault effects are deliberately represented as model state/evidence only.
+        # Actual queue durability and physical power behavior require external adapters.
+        if kind == FaultType.DEVICE_RESET and target in self.models:
+            profile = self.models[target].profile
+            self.models[target] = PowerThermalModel(profile)
+        if kind == FaultType.POWER_INTERRUPTION:
+            result["machine_state_before"] = getattr(self.machine.state, "value", str(self.machine.state))
+            result["simulated_effect"] = "POWER_INTERRUPTION_RECORDED"
+        elif kind == FaultType.MEMORY_ERROR:
+            result["simulated_effect"] = "MEMORY_ERROR_RECORDED"
+        elif kind == FaultType.STORAGE_TIMEOUT:
+            result["simulated_effect"] = "STORAGE_TIMEOUT_RECORDED"
+        elif kind == FaultType.NETWORK_LOSS:
+            result["simulated_effect"] = "NETWORK_LOSS_RECORDED"
+        elif kind == FaultType.DEVICE_RESET:
+            result["simulated_effect"] = "DEVICE_RESET_MODEL_REINITIALIZED" if target in self.models else "DEVICE_RESET_RECORDED"
+        return result
+
+    def recover_fault(self, event_id: str, *, recovery_evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self.fault_controller.recover(event_id, recovery_evidence=recovery_evidence)
+
+    def evidence_report(self) -> dict[str, Any]:
+        report = self.fault_controller.report()
+        report["machine"] = self.machine.name
+        report["device_telemetry"] = {k: v.snapshot() for k, v in sorted(self.models.items())}
+        report["temperature_and_power_are_estimates_unless_calibrated"] = True
+        return report
