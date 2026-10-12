@@ -1,10 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from .cpu import VirtualCPU
+from .x86_64 import X86_64CPU
+from .cpu_profiles import get_cpu_profile
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
-from .hardware_profiles import MachineManifest, synthetic_baseline_profiles
+from .hardware_profiles import (MachineManifest, synthetic_baseline_profiles, HardwareProfile,
+                                FidelityLevel, SpecificationSource, ProvenanceKind)
 from .firmware import VirtualFirmware
 from .kernel import VirtualKernel
 from .filesystem import VirtualFilesystem
@@ -19,9 +22,10 @@ class VirtualComputer:
     storage_size: int = 1024*1024
     gpu_width: int = 320
     gpu_height: int = 200
+    cpu_profile_id: str | None = None
 
     def __post_init__(self):
-        self.cpu=VirtualCPU()
+        self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
         self.ram=VirtualRAM(self.ram_size)
         self.bus=VirtualBus()
         self.storage=VirtualStorage(self.storage_size)
@@ -66,6 +70,8 @@ class VirtualComputer:
 
     def execute(self,program,max_cycles:int=10000):
         if not self.powered: raise RuntimeError("COMPUTER_POWER_OFF")
+        if isinstance(self.cpu, X86_64CPU):
+            return self.cpu.run(program, max_cycles)
         return self.cpu.run(program,self.ram,max_cycles)
 
     def create_process(self,name):
@@ -90,7 +96,20 @@ class VirtualComputer:
                 parameters["default_height"] = self.gpu.height
             elif profile.category == "network":
                 parameters["mac"] = self.nic.mac
-            profiles.append(replace(profile, parameters=parameters))
+            if profile.category == "cpu" and self.cpu_profile_id:
+                selected = get_cpu_profile(self.cpu_profile_id)
+                source_kind = (ProvenanceKind.SYNTHETIC_BASELINE if selected.vendor == "Electronic Brain"
+                               else ProvenanceKind.VENDOR_DOCUMENTATION)
+                profiles.append(HardwareProfile(
+                    selected.profile_id, "cpu", selected.model, FidelityLevel.FUNCTIONAL,
+                    selected.specification_parameters, selected.modeled_behaviors,
+                    selected.unsupported_features,
+                    tuple(SpecificationSource(source_kind, url, "Reference metadata; not proof of ISA conformance.")
+                          for url in selected.specification_urls),
+                    selected.conformance_tests,
+                ))
+            else:
+                profiles.append(replace(profile, parameters=parameters))
         return MachineManifest(self.name, 1, tuple(profiles)).describe()
 
     def status(self):
@@ -99,7 +118,7 @@ class VirtualComputer:
                 "bootloader":self.bootloader.VERSION,
                 "filesystem":{"files":len(self.storage.files)},
                 "kernel":self.kernel.status(),
-                "cpu":{"pc":self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted},
+                "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
                 "ram":{"size":self.ram.size},"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
                 "network":{"mac":self.nic.mac},"gpu":{"width":self.gpu.width,"height":self.gpu.height}}
