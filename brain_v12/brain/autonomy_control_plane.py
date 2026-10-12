@@ -1,10 +1,23 @@
 """Durable Brain control plane with append-only events, bounded attempts and recovery metadata."""
 from __future__ import annotations
 import hashlib, json, os, time, uuid
+from dataclasses import asdict, is_dataclass
+from enum import Enum
 from contextlib import contextmanager
 from pathlib import Path
 
 TERMINAL={"completed","failed","blocked","cancelled"}
+
+def _json_default(value):
+    """Serialize structured contract values in durable control-plane records."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 class ControlPlane:
     def __init__(self, root="brain6_artifacts/control_plane"):
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
@@ -34,7 +47,7 @@ class ControlPlane:
                 finally:
                     fcntl.flock(lock_file.fileno(),fcntl.LOCK_UN)
     def _append(self,path,row):
-        with path.open("a",encoding="utf-8") as f: f.write(json.dumps(row,ensure_ascii=False,separators=(",",":"))+"\n")
+        with path.open("a",encoding="utf-8") as f: f.write(json.dumps(row,ensure_ascii=False,separators=(",",":"),default=_json_default)+"\n")
     def _last_event_digest(self):
         if not self.events.exists(): return "GENESIS"
         lines=self.events.read_text(encoding="utf-8").splitlines()
