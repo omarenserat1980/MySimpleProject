@@ -37,3 +37,14 @@ The authenticated endpoint `GET /api/device/cloud-federation/status` combines th
 ## Current limitation / next proof gate
 
 This code provides a deterministic planning contract and tests only. It does not yet connect the registry to the live Agent Gateway or provision a cloud VM. The next gate is to pass Arkan provisioning/fleet CI and verify the live status endpoint after provisioning, then run a harmless end-to-end simulation task. Discover the Realme agent identity separately if that Android endpoint is still needed. Windows Server 2025 is not considered deployed until the guest is reachable and boot evidence is captured.
+
+
+## Brain-owned virtual tool indicators
+
+The authenticated fleet status response also exposes `virtual_tool_indicators` so the UI and task router can display logical Brain targets instead of legacy installed-app/device targets:
+
+- `termux_emulator` points to `brain-termux-virtual-01`, owned by Electronic Brain. It is explicitly `CONFIGURED_NOT_PROVEN` and not execution-eligible until its own runtime boot and bounded task evidence are implemented and verified. It must not silently route to physical Android agent `redmi3-01` or a Termux installation.
+- `powershell_emulator` points to `arkan-virtual-01` and uses the sandboxed Brain PowerShell-like interpreter.
+- `desktop_commander_emulator` points to `arkan-virtual-01` and uses the Brain virtual filesystem/process/audit model, not the external Desktop Commander connection.
+
+All three indicators report `physical_device_required=false` and `external_app_required=false`. The PowerShell and Desktop Commander indicators inherit Arkan simulator readiness and cannot claim native Windows PowerShell, Desktop Commander connectivity, or Windows Server 2025 boot. Simulated evidence remains distinct from real execution evidence.
