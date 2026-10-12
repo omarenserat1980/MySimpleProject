@@ -51,7 +51,8 @@ print(fabric.inventory())
 - The RNG is deterministic and explicitly not cryptographically secure.
 - RAID reports logical capacity/health; it does not store data or claim durability.
 - Power, temperature, fan, voltage, battery, timing, and capacity values are estimates or configured model inputs unless an independent calibration source is added.
-- The extended fabric is a composable module and is not yet automatically injected into every `VirtualComputer` instance. Integrating it into machine manifests and boot lifecycle is a separate compatibility-gated step.
+- `VirtualComputer` now creates the extended fabric and includes its inventory/status in machine status and the versioned hardware manifest. This does not claim device-specific boot firmware or guest driver support.
+- Extended peripheral runtime state is not yet included in machine checkpoint/restore; restart persistence must not be assumed.
 
 ## Verification
 
