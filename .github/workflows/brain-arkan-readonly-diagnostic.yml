@@ -1,0 +1,69 @@
+name: Brain Arkan Read-Only Diagnostic
+
+on:
+  push:
+    branches:
+      - brain/arkan-readonly-diagnostic-20261012
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-arkan-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    runs-on: [self-hosted, Windows, brain-internal]
+    timeout-minutes: 5
+    steps:
+      - name: Collect read-only Arkan evidence
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $evidence = [ordered]@{
+            collected_at = (Get-Date).ToString('o')
+            hostname = $env:COMPUTERNAME
+            runner_os = '${{ runner.os }}'
+            project_exists = Test-Path -LiteralPath 'C:\Brain\MySimpleProject'
+            api = $null
+            hyperv_service = $null
+            virtual_machines = @()
+            errors = @()
+          }
+
+          try {
+            $evidence.api = Invoke-RestMethod -Uri 'http://127.0.0.1:8012/api/system/readiness' -TimeoutSec 5
+          } catch {
+            $evidence.api = @{ ok = $false; error = $_.Exception.Message }
+          }
+
+          try {
+            $s = Get-Service -Name vmms -ErrorAction Stop
+            $evidence.hyperv_service = @{ name = $s.Name; status = [string]$s.Status; start_type = [string]$s.StartType }
+          } catch {
+            $evidence.hyperv_service = @{ error = $_.Exception.Message }
+          }
+
+          try {
+            $evidence.virtual_machines = @(Get-VM -ErrorAction Stop | Select-Object Name, State, Status, CPUUsage, MemoryAssigned)
+          } catch {
+            $evidence.errors += ('Get-VM: ' + $_.Exception.Message)
+          }
+
+          $json = $evidence | ConvertTo-Json -Depth 8
+          $json | Set-Content -LiteralPath "$env:RUNNER_TEMP\brain-arkan-diagnostic.json" -Encoding UTF8
+          $json | Write-Output
+          "## Arkan read-only diagnostic" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- Host: $($evidence.hostname)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- Project path exists: $($evidence.project_exists)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- API: $(if ($evidence.api.ok -eq $true) { 'RESPONDED' } else { 'UNAVAILABLE/ERROR' })" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- Hyper-V service: $(if ($evidence.hyperv_service.status) { $evidence.hyperv_service.status } else { 'UNAVAILABLE/ERROR' })" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- VM count: $(@($evidence.virtual_machines).Count)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-arkan-readonly-diagnostic
+          path: ${{ runner.temp }}/brain-arkan-diagnostic.json
+          if-no-files-found: error
