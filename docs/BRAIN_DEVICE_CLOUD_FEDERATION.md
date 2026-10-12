@@ -1,14 +1,12 @@
 # Brain Device Cloud Federation
 
-Status: safe planning foundation; live device and cloud execution are not yet proven.
+Status: software-only active fleet and evidence-backed indicator contract; native guest execution remains separately gated.
 
 ## Fleet profiles
 
 - **Arkan** — canonical software-defined computer `arkan-virtual-01`, backed by Brain simulator. The fleet status indicator and the logical replacement for Desktop Commander/TRIGGERcmd target this software node, not the physical ASUS VivoBook. Only bounded symbolic simulation is eligible after live simulator boot and smoke-task evidence; Windows Server 2025 remains unverified. A physical host, if used, must have a distinct `arkan-host-*` ID.
 - **Brain virtual phone** — software-only phone profile `phone-virtual-01`, displayed as **هاتف برين الافتراضي**. It remains a separate unselected profile. It does not claim that an Android OS or emulator process is running; `execution_eligible` stays false until independent simulator boot and bounded task evidence are supplied.
-- **Redmi** — Android/Termux agent profile using the known logical ID `redmi3-01`. This registry entry is not a live heartbeat.
-- **Realme** — Android endpoint placeholder `realme-pending-identity`. Do not route missions to it until discovery confirms its model and actual agent ID.
-- **Honda e:NP1 2023 / Honda CONNECT** — companion client for information and synchronization only. It is not a compute worker. Do not modify firmware, bypass region/carrier restrictions, or send commands to safety-critical vehicle systems.
+- **Legacy physical endpoints** — `redmi3-01`, Realme identifiers, physical host IDs, and vehicle clients are not members of the active software fleet and cannot receive work through the software-only router. Historical audit records may retain these identifiers, but active status indicators must not present them as Brain software nodes.
 
 ## Cloud capacity layer
 
@@ -32,8 +30,14 @@ The Cloud Hardware Fabric models CPU, RAM, storage, network, and optional GPU. T
 
 ## Read-only status API
 
-The authenticated endpoint `GET /api/device/cloud-federation/status` combines the current DeviceBridge heartbeat snapshot with the logical fleet profiles. The response field `active_software_node` points the status indicator to `arkan-virtual-01` (Arkan virtual computer) and explicitly reports `reality=SIMULATED` and `physical_device_required=false`. This is a selected software profile, not a claim of a running native OS. The phone profile remains registered separately and is not the active indicator target. It requires the Brain control credential. It reports `ONLINE`, `STALE`, or `NOT_OBSERVED` for known Android agent IDs, but deliberately keeps `identity_verified=false` and `execution_eligible=false`: the shared agent credential and heartbeat are not a unique hardware identity proof. The canonical Arkan row is `NOT_PROVISIONED`, `CONFIGURED_NOT_RUNNING`, or `SIMULATION_READY` based on the persisted identity and live in-process simulator/task evidence; this never means native OS boot. Physical host heartbeats do not set Arkan identity or execution eligibility. Honda remains `NOT_OBSERVED` unless a dedicated verified telemetry adapter is implemented. Cloud capacity remains `NOT_PROBED` and paid provisioning remains disabled.
+The authenticated endpoint `GET /api/device/cloud-federation/status` uses canonical software-node profiles and simulator evidence. The `active_software_node` indicator targets `arkan-virtual-01` and explicitly reports `reality=SIMULATED` and `physical_device_required=false`. This is a selected software profile, not proof of a running native OS. The active fleet includes only Brain software nodes; physical Android agents, physical hosts, and vehicle clients are excluded from active indicators and execution routing. Arkan may report `NOT_PROVISIONED`, `CONFIGURED_NOT_RUNNING`, `DEGRADED`, or `SIMULATION_READY` based on canonical identity, simulator runtime evidence, and a passing bounded task. `SIMULATION_READY` never means native OS boot. Cloud fallback is disabled in the software-only router; cloud capacity indicators remain unverified unless a separately authorized Brain-managed backend contract is introduced.
+
+## Indicator contract
+
+The canonical indicator engine in `brain_v12/brain/canonical_indicators.py` records subject identity, source, backend, observation/verification timestamps, verification level, evidence references, freshness, and machine-readable error codes. Missing observations are `UNKNOWN`; stale observations are `STALE`; insufficient evidence is `UNVERIFIED`. Required-indicator aggregation exposes blockers rather than hiding them behind a green aggregate.
+
+Execution planning accepts only verified Brain virtual-computer or virtual-phone endpoints. Physical host, Android-agent, and vehicle roles are rejected by the default software-only policy. Cloud fallback is not a substitute for an internal software node and remains disabled by this router.
 
 ## Current limitation / next proof gate
 
-This code provides a deterministic planning contract and tests only. It does not yet connect the registry to the live Agent Gateway or provision a cloud VM. The next gate is to pass Arkan provisioning/fleet CI and verify the live status endpoint after provisioning, then run a harmless end-to-end simulation task. Discover the Realme agent identity separately if that Android endpoint is still needed. Windows Server 2025 is not considered deployed until the guest is reachable and boot evidence is captured.
+The indicator engine and policy tests establish code-level contracts; they do not by themselves prove that a persistent simulator process or Windows guest is running. Verify the targeted CI, then provision and run the canonical Arkan simulator and capture a bounded task result. Windows Server 2025 is not considered deployed until a compatible guest-execution backend returns fresh guest OS identity, boot, heartbeat, and health evidence.
