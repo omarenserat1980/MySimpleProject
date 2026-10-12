@@ -85,15 +85,29 @@ class VirtualTaskQueue:
             blade.power_on()
 
     def _ensure_virtual_capacity(self,task):
-        """Scale out only when no current virtual blade can satisfy a task."""
-        if not self.virtual_autoscale or len(self.chassis.blades)>=self.virtual_max_blades:
+        """Reactivate or scale out Brain-owned software nodes without physical agents."""
+        if not self.virtual_autoscale:
             return None
+        required=set(task.required_capabilities or {"cpu"})
+        for blade in self.chassis.blades.values():
+            if blade.state=="OFFLINE" and required.issubset(blade.capabilities):
+                blade.power_on()
+                return blade
         # Avoid multiplying nodes for a request that exceeds every node's configured RAM.
         if task.requirement.ram_bytes>self.virtual_ram_bytes:
             return None
         if task.requirement.storage_bytes>1024*1024:
             return None
-        capabilities={"cpu","ram","storage","network","gpu"} | set(task.required_capabilities or {"cpu"})
+        if len(self.chassis.blades)>=self.virtual_max_blades:
+            # Offline, incompatible nodes cannot help; replace them rather than blocking forever.
+            for blade_id, blade in list(self.chassis.blades.items()):
+                if blade.state=="OFFLINE":
+                    self.chassis.remove_blade(blade_id)
+                    if len(self.chassis.blades)<self.virtual_max_blades:
+                        break
+        if len(self.chassis.blades)>=self.virtual_max_blades:
+            return None
+        capabilities={"cpu","ram","storage","network","gpu"} | required
         blade=self.chassis.create_blade(capabilities=capabilities,ram_size=self.virtual_ram_bytes)
         try:
             blade.power_on()
