@@ -1,0 +1,66 @@
+name: Arkan Canonical Virtual Computer
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/tools/arkan_windows_server_2025_preflight.py"
+      - "brain_v12/tests/test_arkan_windows_server_2025_preflight.py"
+      - "brain_v12/virtual_hardware/api.py"
+      - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/brain/brain_council.py"
+      - "brain_v12/brain/arkan_device_emulator.py"
+      - "brain_v12/tests/test_arkan_device_emulator.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_arkan_provisioner.py"
+      - "brain_v12/tests/test_device_cloud_federation.py"
+      - "brain_v12/tests/test_arkan_council_routing.py"
+      - "docs/ARKAN_VIRTUAL_COMPUTER.md"
+      - ".github/workflows/arkan-virtual-computer.yml"
+  push:
+    branches: [feat/arkan-canonical-virtual-computer-v1]
+    paths:
+      - "brain_v12/virtual_hardware/arkan_provisioner.py"
+      - "brain_v12/virtual_hardware/api.py"
+      - "brain_v12/brain/device_cloud_federation.py"
+      - "brain_v12/brain/brain_council.py"
+      - "brain_v12/app.py"
+      - "brain_v12/tests/test_arkan_provisioner.py"
+      - "brain_v12/tests/test_device_cloud_federation.py"
+      - "brain_v12/tests/test_arkan_council_routing.py"
+      - "docs/ARKAN_VIRTUAL_COMPUTER.md"
+      - ".github/workflows/arkan-virtual-computer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-arkan-simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Arkan provisioning and API
+        run: python -m py_compile brain_v12/virtual_hardware/arkan_provisioner.py brain_v12/virtual_hardware/api.py brain_v12/brain/device_cloud_federation.py brain_v12/brain/brain_council.py brain_v12/brain/arkan_device_emulator.py brain_v12/app.py
+      - name: Compile Windows Server 2025 readiness gate
+        run: python -m py_compile brain_v12/tools/arkan_windows_server_2025_preflight.py
+      - name: Run Windows Server 2025 host admission tests
+        run: python -m unittest brain_v12.tests.test_arkan_windows_server_2025_preflight -v
+      - name: Run Arkan provisioning tests
+        run: python -m unittest brain_v12.tests.test_arkan_provisioner -v
+      - name: Run fleet identity regression tests
+        run: python -m unittest brain_v12.tests.test_device_cloud_federation -v
+      - name: Run legacy host emulator regression tests
+        run: python -m unittest brain_v12.tests.test_arkan_device_emulator -v
+      - name: Run council routing regression tests
+        run: python -m unittest brain_v12.tests.test_arkan_council_routing -v
+      - name: Verify honest OS boot contract
+        run: |
+          grep -q "SIMULATION_READY" brain_v12/virtual_hardware/arkan_provisioner.py
+          grep -q "native_os_boot_verified" brain_v12/virtual_hardware/arkan_provisioner.py
+          grep -q "NOT_INSTALLED" brain_v12/virtual_hardware/arkan_provisioner.py

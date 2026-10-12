@@ -4,7 +4,7 @@ Status: safe planning foundation; live device and cloud execution are not yet pr
 
 ## Fleet profiles
 
-- **Arkan** — Windows compute/build host. Its current RAM, runner connectivity, Hyper-V state, and Windows Server 2025 guest must be verified from fresh evidence before it is considered available.
+- **Arkan** — canonical software-defined computer `arkan-virtual-01`, backed by Brain simulator. It is not the ASUS VivoBook or a Windows runner. Only bounded symbolic simulation is eligible after live simulator boot and smoke-task evidence; Windows Server 2025 remains unverified. A physical host, if used, must have a distinct `arkan-host-*` ID.
 - **Redmi** — Android/Termux agent profile using the known logical ID `redmi3-01`. This registry entry is not a live heartbeat.
 - **Realme** — Android endpoint placeholder `realme-pending-identity`. Do not route missions to it until discovery confirms its model and actual agent ID.
 - **Honda e:NP1 2023 / Honda CONNECT** — companion client for information and synchronization only. It is not a compute worker. Do not modify firmware, bypass region/carrier restrictions, or send commands to safety-critical vehicle systems.
@@ -31,8 +31,8 @@ The Cloud Hardware Fabric models CPU, RAM, storage, network, and optional GPU. T
 
 ## Read-only status API
 
-The authenticated endpoint `GET /api/device/cloud-federation/status` combines the current DeviceBridge heartbeat snapshot with the logical fleet profiles. It requires the Brain control credential. It reports `ONLINE`, `STALE`, or `NOT_OBSERVED` for known Android agent IDs, but deliberately keeps `identity_verified=false` and `execution_eligible=false`: the shared agent credential and heartbeat are not a unique hardware identity proof. Arkan and Honda remain `NOT_OBSERVED` unless a dedicated verified telemetry adapter is implemented. Cloud capacity remains `NOT_PROBED` and paid provisioning remains disabled.
+The authenticated endpoint `GET /api/device/cloud-federation/status` combines the current DeviceBridge heartbeat snapshot with the logical fleet profiles. It requires the Brain control credential. It reports `ONLINE`, `STALE`, or `NOT_OBSERVED` for known Android agent IDs, but deliberately keeps `identity_verified=false` and `execution_eligible=false`: the shared agent credential and heartbeat are not a unique hardware identity proof. The canonical Arkan row is `NOT_PROVISIONED`, `CONFIGURED_NOT_RUNNING`, or `SIMULATION_READY` based on the persisted identity and live in-process simulator/task evidence; this never means native OS boot. Physical host heartbeats do not set Arkan identity or execution eligibility. Honda remains `NOT_OBSERVED` unless a dedicated verified telemetry adapter is implemented. Cloud capacity remains `NOT_PROBED` and paid provisioning remains disabled.
 
 ## Current limitation / next proof gate
 
-This code provides a deterministic planning contract and tests only. It does not yet connect the registry to the live Agent Gateway or provision a cloud VM. The next gate is to discover the Realme agent identity, collect authenticated fresh heartbeats for Arkan and Redmi, and run one harmless end-to-end mission through a verified free executor. Windows Server 2025 is not considered deployed until the guest is reachable and boot evidence is captured.
+This code provides a deterministic planning contract and tests only. It does not yet connect the registry to the live Agent Gateway or provision a cloud VM. The next gate is to pass Arkan provisioning/fleet CI and verify the live status endpoint after provisioning, then run a harmless end-to-end simulation task. Discover the Realme agent identity separately if that Android endpoint is still needed. Windows Server 2025 is not considered deployed until the guest is reachable and boot evidence is captured.

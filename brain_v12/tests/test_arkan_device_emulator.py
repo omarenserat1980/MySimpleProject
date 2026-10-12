@@ -6,7 +6,7 @@ class ArkanEmulatorTests(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory(); self.a=ArkanDeviceEmulator(self.tmp.name)
  def tearDown(self): self.tmp.cleanup()
  def test_identity_matches_arkan_profile(self):
-  i=self.a.info(); self.assertEqual(i["device"]["name"],"arkan"); self.assertEqual(i["device"]["logical_cpus"],8); self.assertEqual(i["device"]["architecture"],"x64")
+  i=self.a.info(); self.assertEqual(i["device"]["name"],"arkan-host-sim-asus-vivobook"); self.assertEqual(i["device"]["device_id"],"arkan-host-sim-asus-vivobook"); self.assertNotIn("self-hosted",i["device"]["labels"]); self.assertNotIn("windows-real-boot",i["device"]["labels"]); self.assertEqual(i["device"]["logical_cpus"],8); self.assertEqual(i["device"]["architecture"],"x64")
  def test_readiness_has_hard_gates(self):
   r=self.a.readiness(); self.assertFalse(r["ok"]); self.assertFalse(r["checks"]["kvm"])
   self.a.set_network(kvm=True); self.assertTrue(self.a.readiness()["ok"])

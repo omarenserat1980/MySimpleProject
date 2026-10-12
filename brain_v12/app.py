@@ -76,7 +76,7 @@ from .brain.virtual_datacenter import BrainVirtualDatacenter
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
-from .virtual_hardware.api import router as virtual_hardware_router
+from .virtual_hardware.api import router as virtual_hardware_router, read_arkan_runtime_status
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
 from .brain.quranic_core.api import build_router as quranic_core_router
@@ -286,7 +286,7 @@ def brain_council_convene(request: Request, body: dict | None = None):
 
 @app.post("/api/brain/council/{meeting_id}/device-presence")
 def brain_council_device_presence(request: Request, meeting_id: int):
-    """Record fresh Arkan/fallback Brain Agent presence for the council."""
+    """Record legacy physical-agent diagnostics; this is not Arkan identity or execution routing."""
     require_control_key(request)
     return brain_council.verify_device_presence(meeting_id)
 
@@ -1953,7 +1953,7 @@ def device_status():
 def device_cloud_federation_status(request: Request):
     """Read-only fleet/cloud readiness view; does not enqueue or provision work."""
     require_control_key(request)
-    return JSONResponse(build_fleet_status(device_bridge.agent_status()))
+    return JSONResponse(build_fleet_status(device_bridge.agent_status(), read_arkan_runtime_status()))
 
 
 class DeviceTask(BaseModel):

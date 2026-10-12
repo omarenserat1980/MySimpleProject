@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..brain.control_auth import require_control_key
 from .computer import VirtualComputer
+from .arkan_provisioner import ARKAN_ID, arkan_status, provision_arkan
 from .cpu_profiles import list_cpu_profiles
 from .storage_profiles import list_storage_profiles
 from .memory_profiles import list_memory_profiles
@@ -86,6 +87,53 @@ def list_virtual_machines(request: Request):
     with _lock:
         return {"ok": True, "machines": [{"machine_id": key, "status": machine.status()}
                                          for key, machine in sorted(_machines.items())]}
+
+
+@router.post("/arkan/provision")
+def provision_canonical_arkan(request: Request):
+    """Idempotently provision Arkan's software simulator and persist its identity."""
+    _authorized(request)
+    with _lock:
+        existing = _machines.get(ARKAN_ID)
+        try:
+            result = provision_arkan(machine=existing)
+        except (ValueError, RuntimeError, TypeError, OSError) as exc:
+            raise HTTPException(status_code=409, detail={
+                "code": "ARKAN_PROVISIONING_FAILED", "error": str(exc)
+            }) from exc
+        _machines[ARKAN_ID] = result["machine"]
+    return {
+        "ok": True,
+        "record": result["record"],
+        "runtime_loaded": True,
+        "readiness": "SIMULATION_READY",
+        "native_os_boot_verified": False,
+    }
+
+
+def read_arkan_runtime_status():
+    """Return canonical identity plus live in-process simulator evidence."""
+    with _lock:
+        machine = _machines.get(ARKAN_ID)
+        persisted = arkan_status()
+        persisted["runtime_loaded"] = machine is not None
+        if machine is not None:
+            persisted["runtime_status"] = machine.status()
+            persisted["simulator_booted"] = bool(
+                machine.powered
+                and machine.boot_record
+                and machine.boot_record.get("ok")
+            )
+        else:
+            persisted["simulator_booted"] = False
+        return persisted
+
+
+@router.get("/arkan/status")
+def get_canonical_arkan_status(request: Request):
+    """Read persisted identity and distinguish it from an in-memory simulator."""
+    _authorized(request)
+    return read_arkan_runtime_status()
 
 
 @router.get("/machines/{machine_id}/manifest")
