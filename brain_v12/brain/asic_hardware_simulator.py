@@ -177,7 +177,20 @@ class ASICLogicSimulator:
             raise ASICSimulationError("INVALID_MAX_CYCLES")
         if len(vectors) > max_cycles:
             raise ASICSimulationError("CYCLE_LIMIT_EXCEEDED")
-        trace = [self.step(vector) for vector in vectors]
+        # A failed vector must not leave earlier cycles partially committed.
+        # Snapshot all mutable simulation state and roll back if any cycle fails.
+        saved_state = dict(self.state)
+        saved_previous_values = dict(self.previous_values)
+        saved_total_toggles = self.total_toggles
+        saved_total_cycles = self.total_cycles
+        try:
+            trace = [self.step(vector) for vector in vectors]
+        except Exception:
+            self.state = saved_state
+            self.previous_values = saved_previous_values
+            self.total_toggles = saved_total_toggles
+            self.total_cycles = saved_total_cycles
+            raise
         return {
             "ok": True, "simulator": "Brain ASIC Logic Simulator", "version": SIMULATOR_VERSION,
             "model": "IDEAL_2_STATE_DIGITAL", "cycles": self.total_cycles,
