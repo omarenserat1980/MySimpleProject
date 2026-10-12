@@ -167,5 +167,31 @@ class CanonicalIndicatorTests(unittest.TestCase):
         self.assertEqual(items[0]["verification_level"], "REGISTERED")
 
 
+
+    def test_fleet_adapter_excludes_explicitly_unselected_software_node(self):
+        fleet = {"fleet": [
+            {
+                "endpoint_id": "arkan-virtual-01",
+                "role": "virtual_computer",
+                "platform": "brain-simulator",
+                "reality": "SIMULATED",
+                "indicator_selected": True,
+                "observed_state": "CONFIGURED_NOT_RUNNING",
+                "observed_at": self.now.isoformat(),
+            },
+            {
+                "endpoint_id": "phone-virtual-01",
+                "role": "virtual_phone",
+                "platform": "brain-mobile-simulator",
+                "reality": "SIMULATED",
+                "indicator_selected": False,
+                "observed_state": "PROFILE_REGISTERED_NOT_RUNNING",
+                "observed_at": self.now.isoformat(),
+            },
+        ]}
+        items = indicators_for_fleet(fleet, now=self.now)
+        self.assertEqual([item["subject_id"] for item in items], ["arkan-virtual-01"])
+
+
 if __name__ == "__main__":
     unittest.main()
