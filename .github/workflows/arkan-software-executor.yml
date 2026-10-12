@@ -45,7 +45,7 @@ jobs:
       - name: Execute bounded software-only task
         run: |
           mkdir -p evidence
-          python -m brain_v12.brain.arkan_software_executor submit --root "$RUNNER_TEMP/arkan-software-node" --task-type cpu_smoke --idempotency-key ci-\${{ github.run_id }} > evidence/arkan-software-executor-submit.json
+          python -m brain_v12.brain.arkan_software_executor submit --root "$RUNNER_TEMP/arkan-software-node" --task-type cpu_smoke --idempotency-key ci-${{ github.run_id }} > evidence/arkan-software-executor-submit.json
           python -m brain_v12.brain.arkan_software_executor status --root "$RUNNER_TEMP/arkan-software-node" > evidence/arkan-software-executor-status.json
           python - <<'PY'
           import json
@@ -64,7 +64,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: arkan-persistent-executor-evidence-\${{ github.run_id }}
+          name: arkan-persistent-executor-evidence-${{ github.run_id }}
           path: evidence/*.json
           if-no-files-found: error
           retention-days: 30
