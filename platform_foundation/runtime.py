@@ -79,7 +79,8 @@ class PlatformRuntime:
             self.evidence.record("job.success", result.__dict__)
             return result
         except Exception as exc:
-            result = JobResult(job_id, "FAILED", error=f"{type(exc).__name__}: {exc}")
+            # Exception messages can contain secrets; expose only the type and a generic message.
+            result = JobResult(job_id, "FAILED", error=f"{type(exc).__name__}: operation failed")
             self.failures.record(job_id, exc)
             self.evidence.record("job.failed", result.__dict__)
             return result
