@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 import sqlite3
 import time
@@ -63,7 +64,19 @@ def verify_signed_verification(
         raise ValueError("GOLDEN_VERIFIER_DID_NOT_VERIFY")
 
     for field in ("task_id", "mission_id", "attempt", "reality_level", "evidence_ids", "criterion_ids"):
-        if attestation[field] != expected[field]:
+        actual = attestation[field]
+        expected_value = expected[field]
+        if field in {"task_id", "mission_id", "reality_level"}:
+            if not isinstance(actual, str) or not actual.strip():
+                raise ValueError("GOLDEN_VERIFIER_SCOPE_FIELD_INVALID:" + field)
+        elif field == "attempt":
+            # bool is an int subclass in Python; never let True satisfy attempt=1.
+            if isinstance(actual, bool) or not isinstance(actual, int) or actual < 1:
+                raise ValueError("GOLDEN_VERIFIER_SCOPE_FIELD_INVALID:attempt")
+        else:
+            if not isinstance(actual, list) or not all(isinstance(value, str) for value in actual):
+                raise ValueError("GOLDEN_VERIFIER_SCOPE_FIELD_INVALID:" + field)
+        if type(actual) is not type(expected_value) or actual != expected_value:
             raise ValueError("GOLDEN_VERIFIER_SCOPE_MISMATCH:" + field)
 
     issued_at = attestation["issued_at"]
@@ -73,6 +86,8 @@ def verify_signed_verification(
     if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float)):
         raise ValueError("GOLDEN_VERIFIER_EXPIRY_INVALID")
     current = time.time() if now is None else float(now)
+    if not math.isfinite(issued_at) or not math.isfinite(expires_at) or not math.isfinite(current):
+        raise ValueError("GOLDEN_VERIFIER_TIME_INVALID")
     if issued_at > current + 60:
         raise ValueError("GOLDEN_VERIFIER_NOT_YET_VALID")
     if expires_at <= current:
