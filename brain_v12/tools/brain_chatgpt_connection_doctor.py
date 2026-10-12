@@ -73,6 +73,7 @@ def run(origin: str, send_test_message: bool = False, timeout: float = 8.0) -> d
     report: dict[str, Any] = {
         "schema": "electronic-brain.chatgpt-connection-doctor.v1",
         "origin_configured": bool(origin),
+        "origin_source": os.getenv("BRAIN_API_ORIGIN_SOURCE", "explicit-or-environment"),
         "checks": {},
         "chat_test": {"requested": send_test_message, "performed": False},
         "success": False,
