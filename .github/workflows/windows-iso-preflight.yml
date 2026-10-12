@@ -12,6 +12,7 @@ on:
       - "brain_v12/tests/test_windows_official_media_download.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
       - "docs/WINDOWS_SERVER_2025_INSTALL_PLAN.md"
+      - "docs/WINDOWS_SERVER_2025_OFFICIAL_MEDIA.md"
       - ".github/workflows/windows-iso-preflight.yml"
   push:
     branches: [main]
@@ -25,6 +26,7 @@ on:
       - "brain_v12/tests/test_windows_official_media_download.py"
       - "docs/WINDOWS_SERVER_2025_ISO_PREFLIGHT.md"
       - "docs/WINDOWS_SERVER_2025_INSTALL_PLAN.md"
+      - "docs/WINDOWS_SERVER_2025_OFFICIAL_MEDIA.md"
       - ".github/workflows/windows-iso-preflight.yml"
   workflow_dispatch:
 
