@@ -48,7 +48,7 @@ class HardwareProfileTests(unittest.TestCase):
         self.assertTrue(report["validation"]["ok"], report["validation"])
         self.assertEqual(report["validation"]["component_count"], 6)
         memory = next(p for p in report["components"] if p["category"] == "memory")
-        self.assertEqual(memory["parameters"]["default_capacity_bytes"], 128)
+        self.assertEqual(memory["parameters"]["default_addressable_cells"], 128)
         self.assertFalse(report["validation"]["host_resources_created"])
         self.assertIn("claim", report["validation"])
 
