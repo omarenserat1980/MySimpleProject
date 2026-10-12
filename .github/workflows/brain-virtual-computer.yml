@@ -75,3 +75,5 @@ jobs:
           grep -q "BladeScheduler" brain_v12/VIRTUAL_COMPUTER_ARCHITECTURE.md
           python -m py_compile brain_v12/virtual_hardware/firmware.py brain_v12/virtual_hardware/kernel.py brain_v12/virtual_hardware/network.py
           echo "BRAIN_VIRTUAL_COMPUTER_CONTRACT=VERIFIED"
+      - name: Run repository completion audit
+        run: python brain_v12/self_healing/completion_audit.py
