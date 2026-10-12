@@ -98,5 +98,21 @@ class SignedGoldenVerifierTests(unittest.TestCase):
             )
 
 
+    def test_boolean_attempt_cannot_match_integer_attempt(self):
+        document = self.signed(attempt=True)
+        with self.assertRaisesRegex(ValueError, "SCOPE_FIELD_INVALID:attempt"):
+            self.verify(document)
+
+    def test_scope_arrays_must_be_lists_of_strings(self):
+        document = self.signed(evidence_ids="ev-a,ev-b")
+        with self.assertRaisesRegex(ValueError, "SCOPE_FIELD_INVALID:evidence_ids"):
+            self.verify(document)
+
+    def test_non_finite_timestamp_is_rejected(self):
+        document = self.signed()
+        document["issued_at"] = float("nan")
+        with self.assertRaisesRegex(ValueError, "GOLDEN_VERIFIER_TIME_INVALID"):
+            self.verify(document)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
