@@ -15,6 +15,7 @@ from typing import Iterable
 class EndpointRole(str, Enum):
     COMPUTE_HOST = "compute_host"
     VIRTUAL_COMPUTER = "virtual_computer"
+    VIRTUAL_PHONE = "virtual_phone"
     ANDROID_AGENT = "android_agent"
     VEHICLE_CLIENT = "vehicle_client"
 
@@ -77,6 +78,17 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
             ),
         ),
         DeviceEndpoint(
+            endpoint_id="phone-virtual-01",
+            display_name="هاتف برين الافتراضي",
+            role=EndpointRole.VIRTUAL_PHONE,
+            platform="brain-mobile-simulator",
+            allowed_workloads=(Workload.VIRTUAL_SIMULATION,),
+            notes=(
+                "Software-only phone profile; not a physical Android handset and not a claim "
+                "that Android OS or an emulator process is currently running."
+            ),
+        ),
+        DeviceEndpoint(
             endpoint_id="redmi3-01",
             display_name="Redmi Android agent",
             role=EndpointRole.ANDROID_AGENT,
@@ -106,6 +118,7 @@ def default_fleet() -> tuple[DeviceEndpoint, ...]:
 def build_fleet_status(
     agent_status: dict,
     virtual_computer_status: dict | None = None,
+    virtual_phone_status: dict | None = None,
 ) -> dict:
     """Join agent heartbeats with live evidence from the software Arkan simulator.
 
@@ -117,6 +130,7 @@ def build_fleet_status(
     ttl = max(5, int(agent_status.get("ttl_seconds", 15))) if isinstance(agent_status, dict) else 15
     observed = {str(item.get("agent_id", "")): item for item in agents if isinstance(item, dict)}
     virtual_status = virtual_computer_status if isinstance(virtual_computer_status, dict) else {}
+    phone_status = virtual_phone_status if isinstance(virtual_phone_status, dict) else {}
     arkan_identity_verified = (
         virtual_status.get("exists") is True
         and virtual_status.get("device_id") == "arkan-virtual-01"
@@ -133,6 +147,24 @@ def build_fleet_status(
     task_passed = isinstance(task_evidence, dict) and task_evidence.get("status") == "PASS"
     arkan_ready = arkan_identity_verified and booted and task_passed
 
+    phone_identity_verified = (
+        phone_status.get("exists") is True
+        and phone_status.get("device_id") == "phone-virtual-01"
+        and phone_status.get("identity_independent_of_host") is True
+    )
+    phone_runtime = phone_status.get("runtime_status", {})
+    phone_booted = (
+        phone_status.get("runtime_loaded") is True
+        and phone_status.get("simulator_booted") is True
+        and isinstance(phone_runtime, dict)
+        and phone_runtime.get("powered") is True
+    )
+    phone_evidence = phone_status.get("task_execution_evidence", {})
+    phone_task_passed = (
+        isinstance(phone_evidence, dict) and phone_evidence.get("status") == "PASS"
+    )
+    phone_ready = phone_identity_verified and phone_booted and phone_task_passed
+
     rows = []
     for endpoint in default_fleet():
         if endpoint.endpoint_id == "arkan-virtual-01":
@@ -144,6 +176,9 @@ def build_fleet_status(
                 observed_state = "NOT_PROVISIONED"
             rows.append({
                 **endpoint.public(),
+                "indicator_selected": True,
+                "reality": "SIMULATED",
+                "physical_device_required": False,
                 "observed_state": observed_state,
                 "heartbeat_age_seconds": None,
                 "heartbeat_ttl_seconds": None,
@@ -155,21 +190,58 @@ def build_fleet_status(
             })
             continue
 
+        if endpoint.endpoint_id == "phone-virtual-01":
+            if phone_ready:
+                observed_state = "SIMULATION_READY"
+            elif phone_status.get("exists") is True:
+                observed_state = "CONFIGURED_NOT_RUNNING" if not phone_booted else "DEGRADED"
+            else:
+                observed_state = "PROFILE_REGISTERED_NOT_RUNNING"
+            rows.append({
+                **endpoint.public(),
+                "indicator_selected": False,
+                "reality": "SIMULATED",
+                "physical_device_required": False,
+                "observed_state": observed_state,
+                "heartbeat_age_seconds": None,
+                "heartbeat_ttl_seconds": None,
+                "identity_verified": phone_identity_verified,
+                "execution_eligible": phone_ready,
+                "readiness": "SIMULATION_READY" if phone_ready else observed_state,
+                "native_os_boot_verified": False,
+                "supported_execution": ["bounded_mobile_simulation"] if phone_ready else [],
+            })
+            continue
+
         heartbeat = observed.get(endpoint.endpoint_id)
         age = heartbeat.get("age_seconds") if heartbeat else None
         is_online = bool(heartbeat and heartbeat.get("online") and age is not None and float(age) <= ttl)
         rows.append({
             **endpoint.public(),
+            "indicator_selected": False,
+            "reality": "OBSERVED_DEVICE" if is_online else "UNKNOWN",
+            "physical_device_required": endpoint.role == EndpointRole.ANDROID_AGENT,
             "observed_state": "ONLINE" if is_online else ("STALE" if heartbeat else "NOT_OBSERVED"),
             "heartbeat_age_seconds": age,
             "heartbeat_ttl_seconds": ttl,
             "identity_verified": False,
             "execution_eligible": False,
         })
+    selected_arkan = next(row for row in rows if row["endpoint_id"] == "arkan-virtual-01")
     return {
         "ok": True,
         "status": "OBSERVED_NOT_EXECUTION_READY",
-        "source": "device_bridge.agent_status+arkan_virtual_runtime",
+        "source": "device_bridge.agent_status+software_virtual_nodes",
+        "active_software_node": {
+            "endpoint_id": "arkan-virtual-01",
+            "display_name": "Arkan virtual computer",
+            "indicator_target": "arkan-virtual-01",
+            "indicator_state": selected_arkan["observed_state"],
+            "reality": "SIMULATED",
+            "physical_device_required": False,
+            "execution_eligible": selected_arkan["execution_eligible"],
+            "note": "Selected as the software-only Arkan computer profile; selection does not prove a running native OS.",
+        },
         "fleet": rows,
         "cloud": {
             "status": "NOT_PROBED",
