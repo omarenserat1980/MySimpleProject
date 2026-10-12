@@ -88,6 +88,10 @@ class PowerThermalModel:
         self.simulated_seconds += dt_seconds
         if self.temperature_c >= self.shutdown_c:
             self.shutdown_required = True
+        if self.temperature_c < self.throttle_c - 5:
+            self.throttled = False
+        elif self.temperature_c >= self.throttle_c:
+            self.throttled = True
         result = self.status()
         result.update({"requested_power_watts": requested, "estimated_power_watts": effective,
                        "load_fraction": load_fraction, "dt_seconds": dt_seconds,
