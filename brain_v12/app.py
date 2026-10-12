@@ -3,9 +3,15 @@ import os
 import ast
 import base64
 import json
+import hmac
+import re
 import pathlib
 import threading
 import subprocess
+from .runtime_paths import configure_runtime_paths
+
+# Initialize runtime storage before importing components with import-time state.
+RUNTIME_STATE_ROOT = configure_runtime_paths()
 import httpx
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
@@ -48,13 +54,19 @@ from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
+from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.device_cloud_federation import build_fleet_status
+from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
 from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
+from .brain.workload_controller import WorkloadController
+from .brain.workload_router import WorkloadRouter, WorkerTarget
+from .brain.worker_registry import WorkerRegistry
 from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
@@ -66,6 +78,7 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
+from .brain.quranic_core.api import build_router as quranic_core_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
@@ -78,6 +91,10 @@ from .brain import internal_clients
 from cloud.brain_fabric import list_nodes as list_fabric_nodes
 
 from .brain.security_middleware import apply_security_headers
+from .brain.cloud_executor_attestation_api import router as cloud_executor_attestation_router
+from .brain.open_source_tools_api import router as open_source_tools_router
+from .brain.asic_simulator_api import router as asic_simulator_router
+from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -148,6 +165,9 @@ industrial_actions=GitHubActionsOperator()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
+workload_controller=WorkloadController()
+workload_router=WorkloadRouter(workload_controller)
+worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
@@ -169,11 +189,11 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or os.getenv("RENDER_GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME") or os.getenv("RENDER_GIT_BRANCH") or "unknown"
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_SLUG") or "unknown"
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
+RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
@@ -185,20 +205,58 @@ from .brain.customer_portal import router as customer_router
 from .brain.economic_reconciliation import router as economic_reconciliation_router
 from .brain.industrial_quote_portal import router as industrial_quote_portal_router
 from .brain.commerce_reversals import router as commerce_reversals_router
+from .brain.habitat.api import router as habitat_router
+from .economics.router_bundle import router as economics_router
+from .youtube.router_bundle import router as youtube_router
+from .marketing.router_bundle import router as marketing_router
+from .intelligence.router_bundle import router as intelligence_router
+from .integration.api import build_router as mission_router_builder
 app.include_router(brain_git_router(brain_git))
-app.include_router(brain_ai_router(brain_ai))
+app.include_router(brain_ai_router(brain_ai, chat_session_store))
 app.include_router(ai_fabric_router(fabric))
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(revenue_conversion_router(income_lifecycle))
 app.include_router(games_store_router)
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_industrial_quotes.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(habitat_router)
+app.include_router(economics_router)
+app.include_router(youtube_router)
+app.include_router(marketing_router)
+app.include_router(intelligence_router)
+app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
+app.include_router(quranic_core_router())
+app.include_router(cloud_executor_attestation_router)
+app.include_router(open_source_tools_router)
+app.include_router(asic_simulator_router)
+app.include_router(bitcoin_mining_intelligence_router)
 
+
+@app.get("/api/brain/workload")
+def brain_workload_status(queued:int=0, active:int=0, oldest_age_seconds:float|None=None):
+    return workload_controller.status(queued=queued, active=active, oldest_age_seconds=oldest_age_seconds)
+
+@app.post("/api/brain/workload/admit")
+def brain_workload_admit(body:dict):
+    return workload_controller.evaluate(queued=int(body.get("queued",0)), active=int(body.get("active",0)), key_active=int(body.get("key_active",0)), priority=str(body.get("priority","NORMAL")), retry_count=int(body.get("retry_count",0)), duplicate=bool(body.get("duplicate",False)))
+
+
+@app.post("/api/brain/workload/route")
+def brain_workload_route(body:dict):
+    workers=[WorkerTarget(str(x.get("worker_id","unknown")), str(x.get("kind","unknown")), frozenset(x.get("capabilities",[])), bool(x.get("online",True))) for x in body.get("workers",[])]
+    return workload_router.choose(
+        queued=int(body.get("queued",0)), active=int(body.get("active",0)),
+        priority=str(body.get("priority","NORMAL")),
+        required_capabilities=body.get("required_capabilities",[]),
+        workers=workers, github_available=bool(body.get("github_available",True)),
+        key_active=int(body.get("key_active",0)), retry_count=int(body.get("retry_count",0)),
+        duplicate=bool(body.get("duplicate",False)))
 
 class BrainInternalClientRequest(BaseModel):
     client_id: str
@@ -208,7 +266,7 @@ class BrainInternalClientRequest(BaseModel):
 class IndustrialClientRequest(BaseModel):
     client_id: str
     request: str
-    target: str = "arkan"
+    target: str | None = None
 
 
 @app.post("/api/brain/council/convene")
@@ -476,7 +534,7 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
             "status": "ALREADY_RUNNING",
             "client_id": body.client_id,
             "request": body.request,
-            "target": body.target,
+            "target": contract["target"],
             "workflow": workflow,
             "run_id": latest.get("id"),
             "run_url": latest.get("html_url"),
@@ -491,7 +549,7 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
             "status": "ALREADY_RUNNING",
             "client_id": body.client_id,
             "request": body.request,
-            "target": body.target,
+            "target": contract["target"],
             "workflow": workflow,
             "request_id": claim.get("request_id"),
             "execution_policy": "EXISTING_PRIMARY_PIPELINE",
@@ -500,14 +558,15 @@ def industrial_client_request(request: Request, body: IndustrialClientRequest):
         "request_id": request_id,
         "client_id": body.client_id,
         "request": body.request,
-        "target": body.target,
+        "target": contract["target"],
+        "executor_identity": contract.get("executor_identity"),
         "workflow": workflow,
     })
     store.industrial_client_request(
         body.client_id,
         request_id,
         activity_id=contract.get("request", body.request),
-        target=body.target,
+        target=contract["target"],
         backend="INDUSTRIAL_PRIMARY_WORKFLOW",
         workflow=workflow,
         stage="QUEUED",
@@ -613,6 +672,45 @@ def industrial_client_request_status():
         "conclusion": conclusion,
         "verified": verified,
     }
+
+
+class WindowsContractIssueRequest(BaseModel):
+    source_commit: str
+    task_id: str
+    attempt_id: str
+
+
+@app.post("/api/brain/windows/contracts/issue")
+async def issue_windows_execution_contract(payload: WindowsContractIssueRequest, request: Request):
+    """Issue a signed short-lived contract to the dedicated HTTPS delivery client."""
+    configured = os.environ.get("BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY", "")
+    supplied = request.headers.get("X-Brain-Contract-Delivery-Key", "")
+    if not configured or not supplied or not hmac.compare_digest(configured, supplied):
+        raise HTTPException(status_code=401, detail="WINDOWS_CONTRACT_DELIVERY_UNAUTHORIZED")
+    commit = payload.source_commit.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_SOURCE_COMMIT_INVALID")
+    task_id, attempt_id = payload.task_id.strip(), payload.attempt_id.strip()
+    if not task_id or not attempt_id:
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_TASK_ATTEMPT_REQUIRED")
+    try:
+        from .brain.windows_contract_service import issue as issue_contract
+        result = issue_contract({"source_commit": commit, "task_id": task_id, "attempt_id": attempt_id})
+        contract_path = pathlib.Path(result["contract_path"])
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        if any(contract.get(k) != v for k, v in {
+            "source_commit": commit, "task_id": task_id, "attempt_id": attempt_id
+        }.items()):
+            raise RuntimeError("WINDOWS_CONTRACT_REQUEST_BINDING_MISMATCH")
+        return {"issued": True, "contract": contract, "metadata": {
+            "schema": contract.get("schema"), "source_commit": contract.get("source_commit"),
+            "task_id": contract.get("task_id"), "attempt_id": contract.get("attempt_id"),
+            "expires_at": contract.get("expires_at"),
+        }}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc).splitlines()[0][:160]) from exc
+    except (OSError, ValueError, KeyError) as exc:
+        raise HTTPException(status_code=503, detail="WINDOWS_CONTRACT_ISSUANCE_UNAVAILABLE") from exc
 
 
 @app.get("/api/brain/windows/cloud/status")
@@ -787,11 +885,23 @@ async def brain_hub_issues(owner:str="",repo:str="",state:str="open"):
 
 @app.get("/api/cinema/status")
 async def cinema_status():
-    """Human-facing cinema control/status; GitHub Actions stays behind Brain."""
+    """Human-facing cinema status; public-repo reads can work without a token."""
     full=_github_repo()
+    try:
+        headers = _github_headers()
+    except HTTPException as exc:
+        # This endpoint only reads Actions metadata. For this known public repo,
+        # GitHub allows unauthenticated reads; do not require a secret just to
+        # render status. Other configured repositories remain fail-closed.
+        if exc.status_code != 503 or exc.detail != "GITHUB_TOKEN_NOT_CONFIGURED" or full != "omarenserat1980/MySimpleProject":
+            raise
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
     async with httpx.AsyncClient(timeout=20) as client:
         r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",
-                           headers=_github_headers(),
+                           headers=headers,
                            params={"per_page":50})
     if r.status_code>=400:
         raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
@@ -1513,7 +1623,7 @@ class CinematicReleaseIn(BaseModel):
 
 @app.post("/api/media/upload")
 async def media_upload(file:UploadFile=File(...)):
-    media_dir=os.path.join(ROOT,"web","media"); os.makedirs(media_dir,exist_ok=True)
+    media_dir=str(media_engine.MEDIA_ROOT); os.makedirs(media_dir,exist_ok=True)
     safe=os.path.basename(file.filename or "upload.bin"); target=os.path.join(media_dir,safe); data=await file.read()
     if len(data) > 20 * 1024 * 1024:
         return {"ok":False,"error":"MEDIA_TOO_LARGE","max_bytes":20 * 1024 * 1024}
@@ -1724,7 +1834,7 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
+    expected = os.getenv("GITHUB_SHA") or os.getenv("RENDER_GIT_COMMIT", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
@@ -1785,9 +1895,22 @@ def system_connection():
         "checks": checks,
     }
 
+@app.get("/api/brain/workers")
+def brain_workers():
+    return worker_registry.snapshot()
+
+@app.post("/api/brain/workers/register")
+def brain_worker_register(body:dict):
+    return worker_registry.register(
+        body.get("worker_id",""),
+        body.get("kind","local"),
+        body.get("capabilities",[]),
+        body.get("lease_seconds",30),
+    )
+
 @app.get("/api/device/agent-status/{agent_id}")
 def device_agent_status_by_id(agent_id: str, request: Request):
-    if not require_device_agent(request):
+    if not require_device_agent(request, agent_id):
         return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
     age = device_bridge.heartbeat_age_seconds(agent_id)
     if age is None:
@@ -1821,6 +1944,13 @@ def device_status():
     return device_bridge.status()
 
 
+@app.get("/api/device/cloud-federation/status")
+def device_cloud_federation_status(request: Request):
+    """Read-only fleet/cloud readiness view; does not enqueue or provision work."""
+    require_control_key(request)
+    return JSONResponse(build_fleet_status(device_bridge.agent_status()))
+
+
 class DeviceTask(BaseModel):
     task:str
     params:dict={}
@@ -1834,11 +1964,25 @@ class DeviceReport(BaseModel):
     error:str=""
 
 
-def require_device_agent(request:Request) -> None:
+def require_device_agent(request:Request, agent_id:str|None=None) -> bool:
+    header_agent_id=request.headers.get("X-V12-Agent-Id","").strip()
+    query_agent_id=request.query_params.get("agent_id","").strip()
+    resolved_agent_id=str(agent_id or query_agent_id or header_agent_id).strip()
+    if header_agent_id and resolved_agent_id and header_agent_id != resolved_agent_id:
+        raise HTTPException(status_code=403, detail="DEVICE_AGENT_ID_MISMATCH")
     supplied=request.headers.get("X-V12-Agent-Key","")
-    if not device_bridge.authenticate(supplied):
-        from fastapi import HTTPException
+    if resolved_agent_id:
+        authorized=device_bridge.authenticate(supplied, resolved_agent_id)
+    else:
+        # Preserve legacy shared-key clients only when per-agent mode is off.
+        # A configured per-agent registry requires an explicit agent identity.
+        if os.getenv("BRAIN_AGENT_KEYS_JSON", "").strip():
+            authorized=False
+        else:
+            authorized=device_bridge.authenticate(supplied)
+    if not authorized:
         raise HTTPException(status_code=403, detail="DEVICE_AGENT_AUTH_REQUIRED")
+    return True
 
 
 @app.post("/api/device/enqueue")
@@ -1851,15 +1995,19 @@ def device_enqueue(request:Request, body:DeviceTask):
 
 @app.post("/api/device/heartbeat")
 def device_heartbeat(request: Request, body: dict | None = None):
-    if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", "")):
+    header_agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    body_agent_id = str((body or {}).get("agent_id", "")).strip()
+    if header_agent_id and body_agent_id and header_agent_id != body_agent_id:
+        raise HTTPException(status_code=401, detail="DEVICE_AGENT_ID_MISMATCH")
+    agent_id = header_agent_id or body_agent_id or "android-termux-v12"
+    if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", ""), agent_id):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
-    agent_id = request.headers.get("X-V12-Agent-Id") or str((body or {}).get("agent_id", "")).strip() or "android-termux-v12"
     return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
 
 
 @app.get("/api/device/poll")
 def device_poll(request:Request, agent_id:str):
-    require_device_agent(request)
+    require_device_agent(request, agent_id)
     result=device_bridge.poll(agent_id)
     if result.get("task"):
         store.event("DEVICE_TASK_CLAIMED", {"task_id": result["task"]["task_id"], "agent_id": agent_id})
@@ -1868,7 +2016,7 @@ def device_poll(request:Request, agent_id:str):
 
 @app.post("/api/device/report")
 def device_report(request:Request, body:DeviceReport):
-    require_device_agent(request)
+    require_device_agent(request, body.agent_id)
     result=device_bridge.report(body.task_id, body.agent_id, body.ok, body.result, body.error)
     store.event("DEVICE_TASK_RESULT", {"task_id": body.task_id, "agent_id": body.agent_id, "ok": body.ok})
     return result
@@ -1887,6 +2035,21 @@ def device_self_test_request(request:Request):
         raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
     result = device_bridge.enqueue("brain_self_test", {"requested_by_agent": agent_id, "bootstrap": True})
     store.event("DEVICE_SELF_TEST_REQUESTED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "agent_id": agent_id,
+        "status": result.get("status"),
+    })
+    return result
+
+@app.post("/api/device/android-open-app-test")
+def device_android_open_app_test(request: Request):
+    """Least-privilege live Android Executor mission: launch Android Settings."""
+    require_device_agent(request)
+    agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
+    result = device_bridge.enqueue("open_app", {"package": "com.android.settings", "requested_by_agent": agent_id, "mission": "android_executor_live_test"})
+    store.event("ANDROID_OPEN_APP_TEST_REQUESTED", {
         "task_id": result.get("task", {}).get("task_id"),
         "agent_id": agent_id,
         "status": result.get("status"),
@@ -2690,14 +2853,14 @@ def human_draw(body: Chat):
     if request["provider"] == "local":
         result = draw_local(prompt)
         filename = "brain-draw-" + uuid4().hex + ".png"
-        media_dir = os.path.join(ROOT, "web", "media", "drawings")
+        media_dir = os.path.join(str(media_engine.MEDIA_ROOT), "drawings")
         os.makedirs(media_dir, exist_ok=True)
         with open(os.path.join(media_dir, filename), "wb") as fh:
             fh.write(base64.b64decode(result["png_base64"]))
         result.update({"filename": filename, "url": f"/media/drawings/{filename}", "viewer_url": f"/local-painter/?src=/media/drawings/{filename}&prompt="+httpx.QueryParams({"prompt": prompt}).get("prompt",""), "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
-    result = draw_openai(prompt, openai_provider.generate_image, pathlib.Path(os.path.join(ROOT, "web", "media", "generated")))
+    result = draw_openai(prompt, openai_provider.generate_image, (media_engine.MEDIA_ROOT / "generated"))
     if result.get("ok"):
         store.event("BRAIN_DRAW", {"provider": "openai", "prompt": prompt, "verified": result.get("verified", False)})
     return result
@@ -2728,7 +2891,7 @@ def image_factory_generate(body:dict):
         b64=item.get("b64_json")
         if not b64:
             return {"ok":False,"error":"IMAGE_DATA_MISSING"}
-        media_dir=os.path.join(ROOT,"web","media","generated")
+        media_dir=os.path.join(str(media_engine.MEDIA_ROOT),"generated")
         os.makedirs(media_dir,exist_ok=True)
         filename=f"brain-image-{int(time.time()*1000)}.png"
         path=os.path.join(media_dir,filename)
@@ -2808,7 +2971,119 @@ def brain_evidence(evidence_id:str):
 def brain_task_evidence(task_id:str):
     return {"ok":True,"task_id":task_id,"evidence":evidence_store.for_task(task_id)}
 
-app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
+@app.get("/api/brain/life-certificate")
+def brain_life_certificate():
+    """Return an evidence-based Brain life certificate with a safe execution probe."""
+    return assess_brain_liveness_full(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+
+@app.get("/api/brain/liveness")
+def brain_liveness():
+    """Read-only evidence-based Brain liveness assessment."""
+    return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+# Simulation-first remote fabric. All routes operate on the virtual twin unless a
+# separately configured, independently validated real-device probe is supplied.
+from .brain.arkan_failover_gateway import ArkanFailoverGateway
+_arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(RUNTIME_STATE_ROOT, "virtual", "arkan"))
+arkan_remote_fabric = ArkanFailoverGateway(_arkan_virtual_root)
+from .brain.background_work_coordinator import BackgroundWorkCoordinator
+
+def _background_simulation_health():
+    gateway = arkan_remote_fabric.connect()
+    return {"gateway": gateway, "heartbeat": arkan_remote_fabric.heartbeat(), "reality": "SIMULATED"}
+
+def _background_simulation_inventory():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.info()
+
+def _background_simulation_readiness():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.readiness()
+
+background_work = BackgroundWorkCoordinator(
+    max_workers=int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, os.cpu_count() or 2)))),
+    max_pending=int(os.getenv("BRAIN_BACKGROUND_MAX_PENDING", "64")),
+    db_path=os.getenv("BRAIN_BACKGROUND_DB", os.path.join(RUNTIME_STATE_ROOT, "state", "background_work.sqlite3")),
+    handlers={
+        "simulation_health": _background_simulation_health,
+        "simulation_inventory": _background_simulation_inventory,
+        "simulation_readiness": _background_simulation_readiness,
+    },
+)
+
+
+class ArkanSimulationCommand(BaseModel):
+    command: str
+
+
+@app.on_event("startup")
+def background_work_startup():
+    return background_work.resume_pending()
+
+@app.on_event("shutdown")
+def background_work_shutdown():
+    background_work.shutdown(wait=True)
+
+@app.get("/api/background-work/status")
+def background_work_status(request: Request):
+    require_control_key(request)
+    return background_work.snapshot()
+
+@app.post("/api/background-work/submit")
+def background_work_submit(request: Request, body: dict):
+    require_control_key(request)
+    kind = str(body.get("kind", "")).strip()
+    key = str(body.get("idempotency_key", "")).strip() or None
+    result = background_work.submit(kind, idempotency_key=key)
+    store.event("BACKGROUND_WORK_SUBMITTED", {"kind": kind, "status": result.get("status"), "job_id": (result.get("job") or {}).get("job_id"), "reality": "SIMULATED"})
+    return result
+
+@app.get("/api/background-work/{job_id}")
+def background_work_result(job_id: str, request: Request):
+    require_control_key(request)
+    item = background_work.get(job_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="BACKGROUND_JOB_NOT_FOUND")
+    return {"ok": True, "job": item}
+
+@app.get("/api/remote-fabric/status")
+def remote_fabric_status():
+    """Read-only status of the simulation-first remote endpoint."""
+    return {**arkan_remote_fabric.status(), "heartbeat": arkan_remote_fabric.heartbeat() if arkan_remote_fabric.mode != "UNAVAILABLE" else None}
+
+@app.post("/api/remote-fabric/connect")
+def remote_fabric_connect(request: Request):
+    """Activate the virtual twin; does not connect to or alter physical hardware."""
+    require_control_key(request)
+    result = arkan_remote_fabric.connect()
+    store.event("REMOTE_FABRIC_CONNECTED", {"mode": result.get("mode"), "reality": result.get("reality"), "policy": result.get("policy")})
+    return result
+
+@app.post("/api/remote-fabric/simulation/command")
+def remote_fabric_simulation_command(request: Request, body: ArkanSimulationCommand):
+    """Run a command only inside the PowerShell emulator, never on the real host."""
+    require_control_key(request)
+    if len(body.command) > 2000:
+        raise HTTPException(status_code=413, detail="SIMULATION_COMMAND_TOO_LARGE")
+    if arkan_remote_fabric.mode == "UNAVAILABLE":
+        arkan_remote_fabric.connect()
+    if arkan_remote_fabric.mode != "VIRTUAL":
+        raise HTTPException(status_code=409, detail="SIMULATION_ENDPOINT_NOT_ACTIVE")
+    result = arkan_remote_fabric.run_powershell(body.command)
+    store.event("REMOTE_FABRIC_SIMULATION_COMMAND", {"ok": bool(result.get("ok")), "reality": "SIMULATED"})
+    return {**result, "mode": "VIRTUAL", "reality": "SIMULATED"}
+
+@app.post("/api/remote-fabric/recover-real")
+def remote_fabric_recover_real(request: Request):
+    """Explicit real promotion; without a configured validated probe this remains virtual."""
+    require_control_key(request)
+    result = arkan_remote_fabric.recover_real()
+    store.event("REMOTE_FABRIC_REAL_PROMOTION_ATTEMPT", {"mode": result.get("mode"), "reality": result.get("reality"), "reason": result.get("reason")})
+    return result
+
+
+app.mount("/media",StaticFiles(directory=str(media_engine.MEDIA_ROOT),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
 app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
 app.mount('/code-hub', StaticFiles(directory=os.path.join(ROOT,'web','code-hub'), html=True), name='code-hub')

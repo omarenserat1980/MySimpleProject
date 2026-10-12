@@ -1,7 +1,7 @@
 variable "resource_group_location" {
   type        = string
   description = "Azure region for the Brain Windows node."
-  default     = "westeurope"
+  default     = "northeurope"
 }
 
 variable "vm_name" {
@@ -17,16 +17,18 @@ variable "resource_group_name" {
 variable "admin_username" {
   type      = string
   sensitive = true
+  default   = "brainadmin"
 }
 
 variable "admin_password" {
   type      = string
   sensitive = true
+  default   = null
 }
 
 variable "vm_size" {
   type    = string
-  default = "Standard_D4s_v5"
+  default = "Standard_B2s"
 }
 
 variable "allowed_source_ip" {

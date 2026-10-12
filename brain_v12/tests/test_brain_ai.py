@@ -158,5 +158,19 @@ class TestBrainAI(unittest.TestCase):
         self.assertEqual(result["status"], "WAITING_APPROVAL")
 
 
+
+    def test_live_chat_attaches_twenty_layer_trace_to_response_evidence(self):
+        result = self.ai.chat("trace this request")
+        traces = [item for item in result.evidence if item.get("type") == "brain_gpt_20_layer_trace"]
+        self.assertEqual(len(traces), 1)
+        self.assertEqual(traces[0]["architecture_layers"], 20)
+        self.assertEqual(len(traces[0]["layers"]), 20)
+        self.assertFalse(traces[0]["execution_performed_by_trace"])
+        by_key = {item["key"]: item for item in traces[0]["layers"]}
+        self.assertEqual(by_key["input_gateway"]["status"], "COMPLETED")
+        self.assertEqual(by_key["identity_access"]["status"], "NOT_WIRED")
+        self.assertEqual(by_key["memory_consolidation"]["status"], "NOT_WIRED")
+
+
 if __name__ == "__main__":
     unittest.main()

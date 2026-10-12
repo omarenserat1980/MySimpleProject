@@ -1,0 +1,41 @@
+name: Bitcoin Mining Intelligence Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain_v12/brain/bitcoin_mining_intelligence_api.py'
+      - 'brain_v12/brain/mining_engine.py'
+      - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
+      - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
+  push:
+    branches: [brain-bitcoin-mining-intelligence]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bitcoin-mining-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install minimal test dependencies
+        run: python -m pip install --upgrade pip fastapi pydantic pytest
+      - name: Compile changed Python modules
+        run: |
+          python -m py_compile \
+            brain_v12/brain/bitcoin_mining_intelligence_api.py \
+            brain_v12/brain/mining_engine.py \
+            brain_v12/tests/test_bitcoin_mining_intelligence_api.py
+      - name: Run mining engine regression tests
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
+            brain_v12/tests/test_mining_engine.py

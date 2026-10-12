@@ -1,3 +1,13 @@
+resource "random_password" "brain_admin" {
+  length           = 32
+  special          = true
+  override_special = "!@#%_+=-"
+}
+
+locals {
+  effective_admin_password = var.admin_password != null && var.admin_password != "" ? var.admin_password : random_password.brain_admin.result
+}
+
 resource "azurerm_resource_group" "brain" {
   name     = var.resource_group_name
   location = var.resource_group_location
@@ -40,6 +50,17 @@ resource "azurerm_network_security_group" "brain" {
     destination_port_range = "5986"
     source_address_prefix  = var.allowed_source_ip
   }
+
+  security_rule {
+    name                   = "AllowRDP"
+    priority               = 110
+    direction              = "Inbound"
+    access                 = "Allow"
+    protocol               = "Tcp"
+    source_port_range      = "*"
+    destination_port_range = "3389"
+    source_address_prefix  = var.allowed_source_ip
+  }
 }
 
 resource "azurerm_network_interface" "brain" {
@@ -67,18 +88,18 @@ resource "azurerm_windows_virtual_machine" "brain" {
   location              = azurerm_resource_group.brain.location
   size                  = var.vm_size
   admin_username        = var.admin_username
-  admin_password        = var.admin_password
+  admin_password        = local.effective_admin_password
   network_interface_ids = [azurerm_network_interface.brain.id]
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = "Premium_LRS"
+    storage_account_type = "Standard_LRS"
   }
 
   source_image_reference {
     publisher = "MicrosoftWindowsServer"
     offer     = "WindowsServer"
-    sku       = "2025-datacenter-azure-edition"
+    sku       = "2025-datacenter-g2"
     version   = "latest"
   }
 }

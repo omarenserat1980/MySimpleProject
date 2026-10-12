@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -50,6 +51,22 @@ class ModelRouter:
         return {"ok": True, "status": "MODEL_SELECTED", "task": task, "model": ordered[0],
                 "fallbacks": ordered[1:], "candidates": available}
 
+    @staticmethod
+    def _invoke_provider(handler, payload):
+        """Support both payload-dict handlers and text-model handlers."""
+        if isinstance(payload, dict):
+            try:
+                parameters = inspect.signature(handler).parameters
+            except (TypeError, ValueError):
+                parameters = {}
+            if "user_text" in parameters:
+                return handler(
+                    str(payload.get("user_text", payload.get("message", ""))),
+                    context=str(payload.get("context", "")),
+                    instructions=str(payload.get("instructions", "")),
+                )
+        return handler(payload)
+
     def route(self, task, payload, preferred=None):
         selection = self.select(task, preferred)
         if not selection["ok"]:
@@ -59,7 +76,7 @@ class ModelRouter:
         for index, name in enumerate(ordered):
             provider = self.providers[name]
             try:
-                result = provider.handler(payload)
+                result = self._invoke_provider(provider.handler, payload)
                 if isinstance(result, dict) and result.get("ok", True):
                     return {
                         "ok": True, "status": "MODEL_COMPLETED", "model": name, "task": task,

@@ -1,0 +1,84 @@
+name: BRAIN Windows Cloud Provision
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Explicitly authorize Terraform apply"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: brain-windows-cloud-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: [self-hosted, brain-internal]
+    timeout-minutes: 90
+    environment: brain-windows-production
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      BRAIN_WINDOWS_CLOUD_ALLOW_APPLY: "true"
+      BRAIN_WINDOWS_CLOUD_PLAN_APPROVED: ${{ inputs.approve_apply == true }}
+      ARM_USE_CLI: "true"
+      TF_VAR_allowed_source_ip: "212.34.20.123/32"
+      TF_VAR_resource_group_location: "westeurope"
+      TF_VAR_vm_name: "brain-windows-2025"
+      TF_VAR_resource_group_name: "brain-windows-rg"
+      TF_VAR_vm_size: "Standard_B1s"
+    defaults:
+      run:
+        working-directory: brain_v12/cloud/windows_terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          clean: false
+          sparse-checkout: |
+            brain_v12/cloud/windows_terraform
+            scripts/windows-cloud
+          sparse-checkout-cone-mode: false
+
+      - name: Verify Azure CLI session
+        shell: cmd
+        run: |
+          az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
+
+      - name: Terraform version
+        shell: cmd
+        run: terraform version
+
+      - name: Terraform init
+        shell: cmd
+        run: terraform init -upgrade -input=false
+
+      - name: Terraform fmt check
+        shell: cmd
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        shell: cmd
+        run: terraform validate
+
+      - name: Terraform plan (safe preflight)
+        shell: cmd
+        run: terraform plan -input=false -out=brain.tfplan
+
+      - name: Terraform apply (explicit approval only)
+        if: ${{ inputs.approve_apply == true }}
+        shell: cmd
+        run: terraform apply -input=false brain.tfplan
+
+      - name: Export infrastructure proof
+        if: ${{ inputs.approve_apply == true }}
+        shell: cmd
+        run: terraform output -json > brain-terraform-outputs.json

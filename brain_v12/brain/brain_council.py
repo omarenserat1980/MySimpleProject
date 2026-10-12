@@ -14,6 +14,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from .executor_identity import matches_agent, identity
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -90,7 +92,7 @@ class BrainCouncil:
         ]
         device = self.device_reader() or {}
         agents = list(device.get("agents") or [])
-        preferred = [a for a in agents if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"} and a.get("online")]
+        preferred = [a for a in agents if matches_agent(a) and a.get("online")]
         online = preferred or [a for a in agents if a.get("online")]
         if online:
             selected = online[0]
@@ -136,6 +138,7 @@ class BrainCouncil:
             "client_states": states,
             "chatgpt": advice,
             "device_invitation": device_invitation,
+            "executor_identity": identity(),
             "device_status": device,
             "execution_policy": "ONE_BOUNDED_ACTION_PER_CLIENT_THROUGH_EXISTING_PRIMARY_PIPELINE",
             "new_client_policy": "PROPOSAL_ONLY_UNTIL_EXPLICIT_ADMISSION",
@@ -149,7 +152,7 @@ class BrainCouncil:
         device = self.device_reader() or {}
         agents = list(device.get("agents") or [])
         online = [a for a in agents if a.get("online")]
-        arkan = [a for a in online if str(a.get("agent_id") or "").lower() in {"arkan", "arkan-01", "arkan01"}]
+        arkan = [a for a in online if matches_agent(a)]
         selected = arkan[0] if arkan else (online[0] if online else None)
         presence = {
             "present": bool(selected),
@@ -176,7 +179,7 @@ class BrainCouncil:
                 (json.dumps(participants, ensure_ascii=False), _now(), int(meeting_id)),
             )
             con.commit()
-        return {"ok": True, "meeting_id": int(meeting_id), "status": "DEVICE_PRESENT" if selected else "DEVICE_UNAVAILABLE", "presence": presence}
+        return {"ok": True, "meeting_id": int(meeting_id), "status": "DEVICE_PRESENT" if selected else "DEVICE_UNAVAILABLE", "presence": presence, "executor_identity": identity()}
 
     def execute_minutes(self, meeting_id: int) -> dict[str, Any]:
         with self._connect() as con:

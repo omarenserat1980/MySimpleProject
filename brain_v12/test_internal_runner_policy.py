@@ -17,9 +17,8 @@ class InternalRunnerPolicyTests(unittest.TestCase):
         self.assertIn("brain-internal-execution", runner.capabilities())
 
     def test_internal_executor_wins(self):
-        selected = choose_executor(default_executors(), WINDOWS_REAL_BOOT)
-        self.assertEqual(selected.name, BRAIN_INTERNAL)
-        self.assertFalse(selected.external)
+        with self.assertRaisesRegex(RuntimeError, "NO_EXECUTOR_FOR:windows-server-2025-real-boot"):
+            choose_executor(default_executors(), WINDOWS_REAL_BOOT)
 
     def test_external_runtime_fallback_is_forbidden(self):
         with self.assertRaisesRegex(RuntimeError, "EXTERNAL_EXECUTOR_FORBIDDEN"):

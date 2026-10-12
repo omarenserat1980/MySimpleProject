@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run capability health probe
-        run: python brain_v12/brain/open_source_health.py
+        run: python -m brain_v12.brain.open_source_health
       - name: Validate registry
         run: |
           test -s brain6_artifacts/open_source_stack_status.json

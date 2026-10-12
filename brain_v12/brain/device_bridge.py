@@ -1,13 +1,21 @@
 """Brain Cloud ↔ Brain Termux execution bridge."""
 from __future__ import annotations
-import hashlib,hmac,os,time
+import hashlib,hmac,json,os,time
 from uuid import uuid4
 from .device_sync_adapter import DeviceTaskSyncAdapter
-AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
+AGENT_KEY_ENV="BRAIN_AGENT_KEY"; AGENT_KEY_SHA256_ENV="BRAIN_AGENT_KEY_SHA256"; AGENT_KEYS_JSON_ENV="BRAIN_AGENT_KEYS_JSON"; ENABLE_ENV="BRAIN_ENABLE_DEVICE_BRIDGE"; HEARTBEAT_STALE="STALE"
 
 class DeviceBridge:
-    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"cinematic_room13_render":{},
-                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{}}
+    ALLOWED_TASKS={"status":{},"python_version":{},"platform":{},"brain_self_test":{},"internet_download":{},"open_url":{},"open_app":{},"create_app_project":{},"cinematic_room13_render":{},
+                   "brain_local_painter_draw":{},"brain_machine_cinema_60m":{},"brain_machine_cinema_120m":{},"brain_runtime_launch":{},
+                    "brain_project_audit":{},"windows_cloud_boot_preflight":{}}
+    TASK_CAPABILITIES = {
+        "internet_download": "internet_download",
+        "open_url": "open_url",
+        "open_app": "open_app",
+        "create_app_project": "create_app_project",
+    }
+    ANDROID_EXECUTOR_PREFIX = "android-executor-"
     def __init__(self,store,sync_adapter=None):
         self.store=store; self._last_seen=None
         self.sync_adapter=sync_adapter or DeviceTaskSyncAdapter(
@@ -21,7 +29,9 @@ class DeviceBridge:
         )
 
     def configured(self):
-        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"):
+        if os.getenv(AGENT_KEYS_JSON_ENV, "").strip():
+            return True
+        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"):
             return True
         key_file = self._key_file()
         try:
@@ -41,13 +51,33 @@ class DeviceBridge:
             return True
         return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
+        if os.getenv(AGENT_KEYS_JSON_ENV, "").strip(): return "PER_AGENT_KEYS_JSON"
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY (legacy documented alias)"
         return "NOT_CONFIGURED"
-    def authenticate(self,supplied):
-        if not self.enabled() or not supplied:return False
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
+    def authenticate(self, supplied, agent_id=None):
+        if not self.enabled() or not supplied:
+            return False
+        # A configured per-agent registry overrides legacy shared credentials.
+        # Invalid registries, duplicate key values, and missing IDs fail closed.
+        raw_registry = os.getenv(AGENT_KEYS_JSON_ENV, "").strip()
+        if raw_registry:
+            try:
+                registry = json.loads(raw_registry)
+            except (TypeError, ValueError):
+                return False
+            if not isinstance(registry, dict) or not registry:
+                return False
+            values = list(registry.values())
+            if any(not isinstance(value, str) or not value for value in values):
+                return False
+            if len(set(values)) != len(values):
+                return False
+            expected = registry.get(str(agent_id or "").strip())
+            return bool(expected) and hmac.compare_digest(supplied, expected)
+        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
             if key_file and os.path.isfile(key_file):
@@ -57,16 +87,34 @@ class DeviceBridge:
         if expected and hmac.compare_digest(supplied,expected):return True
         expected_hash=os.getenv(AGENT_KEY_SHA256_ENV,"").strip().lower()
         return bool(expected_hash) and hmac.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),expected_hash)
+    def authorized_executor_for_task(self, task):
+        capability=self.TASK_CAPABILITIES.get(task)
+        if capability is None: return None
+        ttl=max(5,int(os.getenv("TERMUX_AGENT_TTL_SECONDS","15"))); now=time.time()
+        for item in self.store.device_agents():
+            agent_id=item.get("agent_id","")
+            age=max(0.,now-float(item.get("last_seen",0)))
+            if agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX) and age <= ttl:
+                return agent_id
+        return None
+
     def enqueue(self,task,params=None):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED"}
         if task not in self.ALLOWED_TASKS:return {"ok":False,"status":"TASK_NOT_ALLOWED","task":task}
+        if task in self.TASK_CAPABILITIES and not self.authorized_executor_for_task(task):
+            return {"ok":False,"status":"CAPABILITY_WORKER_OFFLINE","task":task,"capability":self.TASK_CAPABILITIES[task],"required_executor":"android-executor-*"}
         task_id="brain-termux-"+uuid4().hex
         self.store.device_task_create(task_id,task,params or {},time.time())
         self.sync_adapter.task_transition(task_id,status="QUEUED",task=task)
         return {"ok":True,"status":"QUEUED","task":self.store.device_task_get(task_id)}
     def poll(self,agent_id):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","task":None}
-        task=self.store.device_task_claim(agent_id)
+        required = self.TASK_CAPABILITIES
+        if agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX):
+            allowed_tasks = set(self.ALLOWED_TASKS)
+        else:
+            allowed_tasks = set(self.ALLOWED_TASKS) - set(required)
+        task=self.store.device_task_claim(agent_id, allowed_tasks=allowed_tasks)
         if self.sync_adapter and task:
             self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))
         return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
@@ -97,6 +145,14 @@ class DeviceBridge:
             stdout=str(result.get("stdout","")).strip(); exit_code=result.get("returncode",result.get("exit_code")); verified=bool(stdout) and exit_code in (None,0)
         elif task in ("brain_machine_cinema_60m","brain_machine_cinema_120m"):
             evidence=result.get("result") or result; verified=bool(result.get("ok") and evidence.get("status")=="VERIFIED_COMPLETED" and evidence.get("final"))
+        elif task in self.TASK_CAPABILITIES:
+            verified=bool(item.get("ok") and result.get("opened") is True if task in ("open_app","open_url") else item.get("ok"))
+        elif task in ("brain_project_audit", "windows_cloud_boot_preflight"):
+            verified=bool(
+                result.get("status") in ("BLOCKED", "READY_FOR_REVIEW")
+                and isinstance(result.get("boot_path"), dict)
+                and isinstance(result.get("project_areas"), dict)
+            )
         else: verified=bool(item.get("ok"))
         return {"ok":verified,"verified":verified,"status":"VERIFIED" if verified else "VERIFICATION_FAILED","task_id":item["task_id"],"result":result}
     def wait_result(self,task_id,timeout=20):
@@ -106,6 +162,43 @@ class DeviceBridge:
             if r.get("ok") and r.get("task",{}).get("status") in ("COMPLETED","FAILED"):return r
             time.sleep(.5)
         return {"ok":False,"status":"RESULT_TIMEOUT","task_id":task_id}
+    def executor_capacities(self):
+        """Return only explicitly enrolled, live Android executors for scheduling."""
+        from .android_executor_adapter import android_executor_capacities
+
+        now = time.time()
+        ttl = max(5, int(os.getenv("TERMUX_AGENT_TTL_SECONDS", "15")))
+        records = []
+        for item in self.store.device_agents():
+            agent_id = item.get("agent_id", "")
+            if not agent_id.startswith(self.ANDROID_EXECUTOR_PREFIX):
+                continue
+            record = self.sync_adapter.store.get(f"device/agent/{agent_id}")
+            value = record.value if record and not record.deleted else {}
+            records.append({
+                "agent_id": agent_id,
+                "last_seen": item.get("last_seen", 0),
+                "metadata": value.get("metadata", {}),
+            })
+        return [
+            {
+                "executor_id": executor.executor_id,
+                "capabilities": sorted(executor.capabilities),
+                "cpu_cores": executor.cpu_cores,
+                "memory_mb": executor.memory_mb,
+                "disk_mb": executor.disk_mb,
+                "gpu_count": executor.gpu_count,
+                "tier": executor.tier,
+                "online": executor.online,
+                "healthy": executor.healthy,
+                "permissions": sorted(executor.permissions),
+                "metadata": dict(executor.metadata),
+            }
+            for executor in android_executor_capacities(
+                records, now=now, heartbeat_ttl_seconds=ttl
+            )
+        ]
+
     def agent_status(self):
         ttl=max(5,int(os.getenv("TERMUX_AGENT_TTL_SECONDS","15"))); now=time.time(); agents=[]
         for item in self.store.device_agents():

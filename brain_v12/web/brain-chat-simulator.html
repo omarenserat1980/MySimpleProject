@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="description" content="واجهة محادثة عربية للعقل الإلكتروني V12 مع حالة اتصال حقيقية ولوحة ذاكرة واستدلال.">
+<title>Brain Chat Simulator — العقل الإلكتروني V12</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0d12;--panel:#12151d;--panel2:#191d27;--line:#2a303d;--text:#eef0f5;--muted:#9ca5b5;--green:#4dd6a0;--amber:#f3c969;--red:#ff7185;--accent:#9b8cff;--blue:#79b9ff}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.app{min-height:100dvh;display:grid;grid-template-columns:280px minmax(0,1fr) 265px}.sidebar,.inspector{background:#10131a;border-color:var(--line);padding:17px;min-width:0}.sidebar{border-left:1px solid var(--line);display:flex;flex-direction:column;gap:16px}.inspector{border-right:1px solid var(--line)}.brand{display:flex;gap:11px;align-items:center}.logo{width:43px;height:43px;border-radius:14px;background:linear-gradient(145deg,#b9a8ff,#6961d9 55%,#344b8d);display:grid;place-items:center;font-size:23px;color:#fff;box-shadow:0 0 28px #8272ff30}.brand h1{font-size:15px;margin:0}.brand p{font-size:11px;color:var(--muted);margin:4px 0 0}.primary,.secondary,.iconBtn,.sessionBtn{border:1px solid var(--line);border-radius:11px;padding:10px 12px;color:var(--text);background:var(--panel2)}.primary{background:#f1efff;color:#171523;border-color:#f1efff;font-weight:700}.full{width:100%}.sectionLabel{font-size:10px;color:#788295;letter-spacing:.08em;margin:3px 0 8px}.sessions{display:grid;gap:5px;max-height:34vh;overflow:auto}.sessionBtn{background:transparent;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-color:transparent;font-size:12px}.sessionBtn.active,.sessionBtn:hover{background:#202432;border-color:#343b4d}.sideNote{font-size:11px;line-height:1.8;color:var(--muted);margin-top:auto}.main{min-width:0;min-height:100dvh;display:flex;flex-direction:column}.topbar{height:65px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:12px}.titleLine{display:flex;align-items:center;gap:10px}.titleLine h2{font-size:15px;margin:0}.titleLine p{font-size:11px;color:var(--muted);margin:4px 0 0}.livePill{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:99px;padding:7px 10px;color:var(--muted);font-size:11px;white-space:nowrap}.dot{width:7px;height:7px;border-radius:50%;background:var(--amber)}.livePill.ok .dot{background:var(--green)}.livePill.bad .dot{background:var(--red)}.chatArea{width:min(850px,100%);margin:0 auto;flex:1;padding:26px 22px 16px;display:flex;flex-direction:column;min-height:0}.welcome{text-align:center;margin:auto 0;padding:30px 0}.orb{width:67px;height:67px;margin:0 auto 22px;border-radius:22px;display:grid;place-items:center;font-size:33px;background:linear-gradient(145deg,#b8adff,#6354c9 58%,#273c77);box-shadow:0 0 55px #7566ff20}.welcome h3{font-size:25px;margin:0 0 10px;font-weight:650;letter-spacing:-.03em}.welcome p{color:var(--muted);font-size:13px;line-height:1.9;max-width:500px;margin:auto}.suggestions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:24px}.suggestions button{background:#141720;border:1px solid #2a303d;color:#cbd0dc;border-radius:14px;padding:11px 13px;font-size:12px}.suggestions button:hover{border-color:#6256b2}.messages{display:flex;flex-direction:column;gap:22px;padding-bottom:25px}.message{display:flex;gap:10px;align-items:flex-start}.message.user{flex-direction:row-reverse}.avatar{width:29px;height:29px;flex:0 0 29px;border-radius:10px;background:#242838;display:grid;place-items:center;font-size:14px}.message.user .avatar{background:#34466a}.content{min-width:0;max-width:min(700px,calc(100% - 40px));line-height:1.9;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}.message.user .content{background:#252938;padding:11px 14px;border-radius:17px 5px 17px 17px}.message.assistant .content{padding:2px 0}.meta{color:#7f899c;font-size:10px;margin-top:6px}.typing{color:var(--muted);font-size:12px}.composerWrap{position:sticky;bottom:0;padding:10px 22px 19px;background:linear-gradient(transparent,var(--bg) 18%)}.composer{width:min(850px,100%);margin:auto;border:1px solid #353b4a;border-radius:20px;background:#171a23;padding:10px;box-shadow:0 10px 45px #0003}.composer textarea{width:100%;resize:vertical;min-height:55px;max-height:190px;background:transparent;color:var(--text);border:0;outline:0;padding:7px 9px;line-height:1.7}.composerBottom{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 3px 0}.hint{font-size:10px;color:#7e8798}.send{width:39px;height:39px;border:0;border-radius:13px;background:#f0edff;color:#191627;font-size:18px;font-weight:700}.send:disabled{opacity:.45;cursor:wait}.finePrint{text-align:center;color:#727b8d;font-size:10px;margin-top:9px}.inspector h3{font-size:13px;margin:5px 0 15px}.statusCard{border:1px solid var(--line);background:#151922;border-radius:14px;padding:12px;margin-bottom:9px}.statusHead{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}.statusValue{font-size:12px;color:var(--muted);margin-top:9px;overflow-wrap:anywhere}.pill{font-size:10px;border-radius:99px;padding:4px 7px;background:#2b2c32;color:var(--amber)}.pill.ok{background:#14362e;color:var(--green)}.pill.bad{background:#3a2029;color:var(--red)}.pipeline{display:grid;gap:7px}.step{display:flex;align-items:center;gap:9px;border:1px solid #272d39;background:#141720;padding:9px;border-radius:10px;font-size:11px;color:#aab2c1}.stepNum{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:#262a38;color:#c7c0ff;font-size:10px}.step.active{border-color:#6256b2;color:#f2efff}.step.active .stepNum{background:#6256b2;color:white}.notice{font-size:10px;line-height:1.8;color:#8e97a8;margin-top:16px;border-top:1px solid var(--line);padding-top:13px}.mobileToggle{display:none}
+@media(max-width:1050px){.app{grid-template-columns:245px minmax(0,1fr)}.inspector{display:none}}@media(max-width:700px){.app{display:block}.sidebar{position:fixed;z-index:5;inset:0 auto 0 0;width:min(300px,86vw);transform:translateX(-105%);transition:transform .2s;box-shadow:20px 0 70px #0008}.sidebar.open{transform:translateX(0)}.mobileToggle{display:inline-grid;place-items:center;width:37px;height:37px;padding:0}.topbar{height:60px;padding:0 12px}.chatArea{padding:16px 13px 10px}.welcome{padding:18px 0}.welcome h3{font-size:22px}.composerWrap{padding:8px 10px 12px}.hint{max-width:75%;line-height:1.6}.content{font-size:13px}.livePill{font-size:10px}.titleLine p{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><div class="logo" aria-hidden="true">✦</div><div><h1>العقل الإلكتروني</h1><p>Brain V12 · مساحة المحادثة</p></div></div>
+  <button class="primary full" id="newChat">＋ محادثة جديدة</button>
+  <div><div class="sectionLabel">المحادثات الأخيرة</div><div class="sessions" id="sessions"><div class="sideNote">جارٍ تحميل المحادثات…</div></div></div>
+  <div><div class="sectionLabel">روابط النظام</div><a href="/" style="color:#b9b2ff;font-size:12px;text-decoration:none">↗ لوحة العقل الإلكتروني الرئيسية</a><br><a href="/brain-chat/" style="display:inline-block;margin-top:10px;color:#b9b2ff;font-size:12px;text-decoration:none">↗ واجهة المحادثة الحالية</a></div>
+  <div class="sideNote">وضع آمن: هذه الواجهة لا تشغّل أوامر نظام ولا تنشئ خادم Windows. إرسال الرسائل يمر عبر واجهة Brain Chat الحالية.</div>
+</aside>
+<main class="main">
+  <header class="topbar">
+    <div class="titleLine"><button class="secondary mobileToggle" id="menuBtn" aria-label="فتح قائمة المحادثات">☰</button><div><h2>Brain Chat Simulator</h2><p id="subTitle">محادثة عربية مع العقل الإلكتروني</p></div></div>
+    <div class="livePill" id="connectionPill"><span class="dot"></span><span id="connectionText">جارٍ فحص الاتصال…</span></div>
+  </header>
+  <section class="chatArea" id="chatArea" aria-live="polite">
+    <div class="welcome" id="welcome"><div class="orb" aria-hidden="true">✦</div><h3>كيف أستطيع مساعدتك اليوم؟</h3><p>واجهة محادثة شبيهة بـ ChatGPT، مرتبطة بواجهة Brain V12 الحالية. ستظهر حالة الاتصال ومعلومات النموذج من الخادم عند توفرها.</p><div class="suggestions"><button data-prompt="افحص حالة العقل الإلكتروني والاتصال الحالي، وميّز بين المؤكد وغير المؤكد.">افحص حالة العقل</button><button data-prompt="اشرح لي مسارات الذاكرة والاستدلال الموجودة حاليًا.">الذاكرة والاستدلال</button><button data-prompt="ضع خطة آمنة لتجربة محاكي Windows دون إنشاء موارد سحابية.">خطة محاكي Windows</button></div></div>
+    <div class="messages" id="messages"></div>
+  </section>
+  <div class="composerWrap"><form class="composer" id="chatForm"><textarea id="messageInput" aria-label="اكتب رسالتك" placeholder="اكتب رسالتك إلى العقل الإلكتروني…" rows="2" required></textarea><div class="composerBottom"><span class="hint">Enter للإرسال · Shift+Enter لسطر جديد · تنفيذ الأدوات الخارجية غير مفعّل في هذه الواجهة</span><button class="send" id="sendBtn" aria-label="إرسال الرسالة" type="submit">↑</button></div></form><div class="finePrint">قد تكون إجابات النموذج غير مكتملة؛ تحقّق من الأدلة قبل تنفيذ أي إجراء حقيقي.</div></div>
+</main>
+<aside class="inspector">
+  <h3>حالة العقل الحية</h3>
+  <div class="statusCard"><div class="statusHead"><span>خدمة Brain API</span><span class="pill" id="apiPill">فحص</span></div><div class="statusValue" id="apiValue">لم تُستلم نتيجة بعد.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>مزود النموذج</span><span class="pill" id="modelPill">فحص</span></div><div class="statusValue" id="modelValue">لن نفترض أن النموذج مهيأ قبل قراءة الحالة.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>الجلسة</span><span class="pill" id="sessionPill">محلية</span></div><div class="statusValue" id="sessionValue">لم تُنشأ جلسة بعد.</div></div>
+  <h3 style="margin-top:22px">مسار المعالجة</h3>
+  <div class="pipeline"><div class="step" data-step="0"><span class="stepNum">01</span> فهم الطلب</div><div class="step" data-step="1"><span class="stepNum">02</span> سياق المحادثة والذاكرة</div><div class="step" data-step="2"><span class="stepNum">03</span> توجيه النموذج</div><div class="step" data-step="3"><span class="stepNum">04</span> استلام الرد</div><div class="step" data-step="4"><span class="stepNum">05</span> عرض النتيجة</div></div>
+  <div class="notice">ملاحظة أدلة: المؤشرات أعلاه تُحدّث من استجابات API الفعلية. لا تمثّل الرسوم وحدها دليلًا على وجود مزود أو خادم Windows أو جهاز منفّذ متصل.</div>
+</aside>
+</div>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  let sessionId = null, busy = false, sessionTitle = "محادثة جديدة";
+  const api = async (path, options={}) => {
+    const response = await fetch(path, {cache:"no-store", ...options, headers:{"Accept":"application/json","Content-Type":"application/json",...(options.headers||{})}});
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || body.status || ("HTTP " + response.status));
+    return body;
+  };
+  const setPill = (pillId, text, state="") => { const el=$(pillId); el.textContent=text; el.className="pill"+(state?" "+state:""); };
+  const setStep = index => document.querySelectorAll(".step").forEach((el,i)=>el.classList.toggle("active",i===index));
+  const escapeText = text => String(text ?? "");
+  function appendMessage(role, text, meta="") {
+    $("welcome").style.display = "none";
+    const item=document.createElement("div"); item.className="message "+(role==="user"?"user":"assistant");
+    const avatar=document.createElement("div"); avatar.className="avatar"; avatar.textContent=role==="user"?"أنت":"✦";
+    const body=document.createElement("div"); body.className="content"; body.textContent=escapeText(text);
+    if(meta){const m=document.createElement("div");m.className="meta";m.textContent=meta;body.appendChild(m);}
+    item.append(avatar,body);$("messages").appendChild(item);$("chatArea").scrollTop=$("chatArea").scrollHeight;
+  }
+  function renderHistory(messages=[]) {
+    $("messages").replaceChildren(); $("welcome").style.display=messages.length?"none":"block";
+    for(const item of messages){if(item.role==="user"||item.role==="assistant")appendMessage(item.role,item.content,item.role==="assistant"?(item.metadata?.model||""):"");}
+  }
+  async function refreshStatus() {
+    try {
+      const health=await api("/health");
+      $("connectionPill").className="livePill ok";$("connectionText").textContent="متصل بالخادم";
+      setPill("apiPill","متصل","ok");$("apiValue").textContent="استجابة /health ناجحة"+(health.version?" · الإصدار "+health.version:"")+(health.brain?" · "+health.brain:"");
+    } catch(e) {
+      $("connectionPill").className="livePill bad";$("connectionText").textContent="تعذّر الاتصال";
+      setPill("apiPill","غير متاح","bad");$("apiValue").textContent="فشل فحص /health: "+e.message;
+    }
+    try {
+      const data=await api("/api/brain-ai/status");
+      const provider=data.provider || {};
+      const router=data.model_router || {};
+      const bridge=data.chatgpt_bridge || {};
+      const configured=provider.configured===true || provider.available===true || router.enabled===true;
+      setPill("modelPill",configured?"مهيأ بحسب API":"غير مثبت",configured?"ok":"bad");
+      $("modelValue").textContent="الحالة كما أعادها الخادم: "+JSON.stringify({provider,model_router:router,chatgpt_bridge:bridge});
+    } catch(e) {setPill("modelPill","تعذّر الفحص","bad");$("modelValue").textContent=e.message;}
+  }
+  async function loadSessions() {
+    try {
+      const data=await api("/api/brain-chat/sessions");
+      const root=$("sessions");root.replaceChildren();
+      const list=Array.isArray(data.sessions)?data.sessions:[];
+      if(!list.length){const note=document.createElement("div");note.className="sideNote";note.textContent="لا توجد محادثات محفوظة بعد.";root.appendChild(note);return;}
+      for(const session of list.slice().reverse().slice(0,30)){
+        const b=document.createElement("button");b.className="sessionBtn"+(session.id===sessionId?" active":"");b.textContent=session.title||"محادثة";
+        b.addEventListener("click",()=>openSession(session.id));root.appendChild(b);
+      }
+    } catch(e){$("sessions").textContent="تعذّر تحميل السجل: "+e.message;}
+  }
+  async function newSession() {
+    const data=await api("/api/brain-chat/sessions",{method:"POST",body:JSON.stringify({title:"محادثة جديدة"})});
+    sessionId=data.session?.id||data.session?.session_id;
+    if(!sessionId) throw new Error("استجابة إنشاء الجلسة لا تحتوي على معرّف.");
+    sessionTitle=data.session.title||"محادثة جديدة";
+    $("subTitle").textContent=sessionTitle;$("sessionValue").textContent="جلسة محفوظة: "+sessionId;setPill("sessionPill","محفوظة","ok");
+    renderHistory([]);await loadSessions();return sessionId;
+  }
+  async function openSession(id) {
+    try {
+      const data=await api("/api/brain-chat/sessions/"+encodeURIComponent(id));
+      if(!data.session)throw new Error(data.status||"لم يتم العثور على الجلسة");
+      sessionId=id;sessionTitle=data.session.title||"محادثة";$("subTitle").textContent=sessionTitle;
+      $("sessionValue").textContent="جلسة محفوظة: "+sessionId;setPill("sessionPill","محفوظة","ok");
+      renderHistory(data.session.messages||[]);await loadSessions();$("sidebar").classList.remove("open");
+    } catch(e){appendMessage("assistant","تعذّر فتح المحادثة: "+e.message);}
+  }
+  async function sendMessage(message) {
+    if(busy||!message.trim())return;
+    busy=true;$("sendBtn").disabled=true;
+    try {
+      if(!sessionId)await newSession();
+      setStep(0);appendMessage("user",message);
+      const typing=document.createElement("div");typing.className="typing";typing.textContent="العقل يعالج الطلب…";typing.id="typing";$("messages").appendChild(typing);
+      setStep(1);
+      const clientId=(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():("msg-"+Date.now()+"-"+Math.random().toString(16).slice(2));
+      setStep(2);
+      const data=await api("/api/brain-chat/sessions/"+encodeURIComponent(sessionId)+"/messages",{method:"POST",body:JSON.stringify({message,instructions:"واجهة محادثة عربية. وضع آمن: لا تنفذ إجراءات خارجية أو أدوات دون تفويض صريح.",approved:false,client_message_id:clientId})});
+      setStep(3);$("typing")?.remove();
+      const response=data.response||{};
+      if(response.content!==undefined)appendMessage("assistant",response.content,(response.model||response.mode||"")+"");
+      else appendMessage("assistant",response.reply||"وصل رد من الواجهة لكنه لا يحتوي على نص متوقع.");
+      if(data.ok===false&&response.error)appendMessage("assistant","تنبيه من الخادم: "+response.error);
+      setStep(4);await loadSessions();
+    } catch(e) {
+      $("typing")?.remove();appendMessage("assistant","لم أتمكن من إكمال الطلب عبر Brain API.\nالتفاصيل: "+e.message+"\nلم يتم استبدال الرد بمحاكاة وهمية.");
+    } finally {busy=false;$("sendBtn").disabled=false;$("messageInput").focus();}
+  }
+  $("chatForm").addEventListener("submit",e=>{e.preventDefault();const value=$("messageInput").value.trim();if(!value)return;$("messageInput").value="";sendMessage(value);});
+  $("messageInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("chatForm").requestSubmit();}});
+  $("newChat").addEventListener("click",async()=>{try{await newSession();$("messageInput").focus();$("sidebar").classList.remove("open");}catch(e){appendMessage("assistant","تعذّر إنشاء جلسة: "+e.message);}});
+  $("menuBtn").addEventListener("click",()=>$("sidebar").classList.toggle("open"));
+  document.querySelectorAll("[data-prompt]").forEach(b=>b.addEventListener("click",()=>{ $("messageInput").value=b.dataset.prompt; $("messageInput").focus(); }));
+  refreshStatus();loadSessions();
+})();
+</script>
+</body>
+</html>

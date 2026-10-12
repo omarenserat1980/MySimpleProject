@@ -11,7 +11,7 @@ output "brain_region" {
 }
 
 output "brain_state" {
-  value = "RUNNING"
+  value = "PROVISIONED_NOT_RUNTIME_VERIFIED"
 }
 
 output "brain_os" {

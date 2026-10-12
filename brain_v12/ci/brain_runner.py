@@ -10,6 +10,7 @@ TASKS = {
     "tests": [sys.executable, "-m", "unittest", "discover", "-s", "brain_v12/tests", "-p", "test_*.py"],
     "media-test": [sys.executable, "-m", "unittest", "brain_v12.tests.test_media_engine"],
     "cinema-test": [sys.executable, "-m", "unittest", "brain_v12.movie_summary_factory.test_room13_pipeline"],
+    "revenue-tests": [sys.executable, "-m", "unittest", "brain_v12.tests.test_payment_gateway", "brain_v12.tests.test_commerce_api", "brain_v12.tests.test_income_lifecycle", "brain_v12.tests.test_client_revenue_guardian", "brain_v12.tests.test_live_opportunity_researcher"],
 }
 
 def main() -> int:

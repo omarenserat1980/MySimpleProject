@@ -76,7 +76,11 @@ class TaskEngine:
 
     def verify_and_complete(self, task_id, verification, evidence_ref=None):
         """Complete only when an external verification result explicitly passes."""
-        if not verification:
+        if isinstance(verification, dict):
+            passed = verification.get("ok") is True or verification.get("verified") is True or verification.get("status") == "VERIFIED"
+        else:
+            passed = verification is True
+        if not passed:
             return {"ok": False, "error": "VERIFICATION_FAILED"}
         return self.complete(task_id, evidence_ref)
 

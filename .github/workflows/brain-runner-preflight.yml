@@ -1,0 +1,44 @@
+name: BRAIN Arkan Runner Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-arkan-runner-preflight
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: [self-hosted, brain-internal]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - name: Runner identity
+        run: |
+          echo RUNNER_OK
+          echo HOST=%COMPUTERNAME%
+          echo USER=%USERNAME%
+          ver
+
+      - name: Workspace health
+        run: |
+          if not exist "C:\actions-runner\actions-runner\_work" exit /b 1
+          echo RUNNER_ROOT_OK
+          echo WORKDIR_OK
+
+      - name: Azure CLI session check
+        run: |
+          az account show --query "{user:user.name,subscription:id,tenant:tenantId}" -o json
+          if errorlevel 1 exit /b 1
+          echo AZURE_SESSION_OK
+
+      - name: Terraform availability
+        run: |
+          terraform version
+          if errorlevel 1 exit /b 1
+          echo TERRAFORM_OK

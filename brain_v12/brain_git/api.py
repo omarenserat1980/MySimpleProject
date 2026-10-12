@@ -30,17 +30,21 @@ def router(service:BrainGitService|None=None):
     svc=service or BrainGitService()
     r=APIRouter(prefix="/api/brain-git",tags=["Brain Git"])
     @r.get("/status")
-    def status():
+    def status(request:Request):
+        require_control_key(request)
         return {"ok":True,"authority":"BRAIN_GIT_PRIMARY","github_dependency":False,"repositories":len(svc.list_repositories())}
     @r.get("/repositories")
-    def repositories(): return {"ok":True,"repositories":svc.list_repositories()}
+    def repositories(request:Request):
+        require_control_key(request)
+        return {"ok":True,"repositories":svc.list_repositories()}
     @r.post("/repositories")
     def create(request:Request,body:RepoIn):
         require_control_key(request)
         try:return {"ok":True,"repository":svc.create_repository(body.name,body.private)}
         except BrainGitError as e: raise HTTPException(400,str(e))
     @r.get("/repositories/{name}")
-    def get(name:str):
+    def get(request:Request,name:str):
+        require_control_key(request)
         try:return {"ok":True,"repository":svc.repository(name),"branches":svc.branches(name)}
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.post("/repositories/{name}/branches")
@@ -54,29 +58,33 @@ def router(service:BrainGitService|None=None):
         try:return {"ok":True,"commit":svc.commit_files(name,body.files,body.message,body.branch)}
         except BrainGitError as e: raise HTTPException(400,str(e))
     @r.get("/repositories/{name}/tree")
-    def tree(name:str,ref:str="HEAD",prefix:str=""):
+    def tree(request:Request,name:str,ref:str="HEAD",prefix:str=""):
+        require_control_key(request)
         try:return {"ok":True,"repository":name,"ref":ref,"files":BrainGitFileBrowser(svc).tree(name,ref,prefix)}
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.get("/repositories/{name}/file")
-    def file(name:str,path:str,ref:str="HEAD"):
+    def file(request:Request,name:str,path:str,ref:str="HEAD"):
+        require_control_key(request)
         try:return {"ok":True,"path":path,"ref":ref,"content":svc.read_file_at(name,path,ref)}
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.get("/repositories/{name}/fsck")
-    def fsck(name:str):
+    def fsck(request:Request,name:str):
+        require_control_key(request)
         try:return svc.fsck(name)
         except BrainGitError as e: raise HTTPException(404,str(e))
     @r.post("/workflows")
     def create_workflow(request:Request,body:WorkflowIn):
         require_control_key(request)
         wf_id=f"brain-wf-{int(time.time()*1000)}"
-        service.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
+        svc.root.joinpath("workflows").mkdir(parents=True,exist_ok=True)
         import json
-        p=service.root/"workflows"/f"{wf_id}.json"
+        p=svc.root/"workflows"/f"{wf_id}.json"
         p.write_text(json.dumps({"id":wf_id,"name":body.name,"status":"QUEUED","created_at":time.time(),"command":body.command,"metadata":body.metadata},ensure_ascii=False,indent=2),encoding="utf-8")
         return {"ok":True,"workflow":{"id":wf_id,"name":body.name,"status":"QUEUED"}}
     @r.get("/workflows")
-    def workflows():
-        d=service.root/"workflows"; items=[]
+    def workflows(request:Request):
+        require_control_key(request)
+        d=svc.root/"workflows"; items=[]
         if d.exists():
             import json
             for p in sorted(d.glob("*.json"),reverse=True):
@@ -84,11 +92,14 @@ def router(service:BrainGitService|None=None):
                 except Exception: pass
         return {"ok":True,"workflows":items}
     @r.get("/workflows/{workflow_id}")
-    def workflow(workflow_id:str):
+    def workflow(request:Request,workflow_id:str):
+        require_control_key(request)
         import json
-        p=service.root/"workflows"/f"{workflow_id}.json"
+        p=svc.root/"workflows"/f"{workflow_id}.json"
         if not p.exists(): raise HTTPException(404,"WORKFLOW_NOT_FOUND")
         return {"ok":True,"workflow":json.loads(p.read_text(encoding="utf-8"))}
     @r.get("/audit")
-    def audit(repository:str|None=None): return {"ok":True,"audit":svc.audit(repository)}
+    def audit(request:Request,repository:str|None=None):
+        require_control_key(request)
+        return {"ok":True,"audit":svc.audit(repository)}
     return r

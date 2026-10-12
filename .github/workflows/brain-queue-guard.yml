@@ -1,0 +1,63 @@
+name: Brain Queue Guard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: brain-queue-guard
+  cancel-in-progress: true
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Cancel stale queued runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          gh run list --repo "$repo" --limit 1000 --json databaseId,status,workflowName,headBranch,createdAt             > runs.json
+          python - <<'PY'
+          import json, subprocess
+          rows=json.load(open("runs.json"))
+          latest={}
+          for r in rows:
+              if r["status"] not in {"queued","in_progress"}:
+                  continue
+              key=(r.get("workflowName"), r.get("headBranch"))
+              if key not in latest:
+                  latest[key]=r["databaseId"]
+          queued=[r for r in rows if r["status"]=="queued" and r["workflowName"]!="Brain Queue Guard"]
+          def priority(name):
+              n=(name or "").lower()
+              if any(x in n for x in ("release","security","critical","hotfix")): return 0
+              if any(x in n for x in ("audit","test","benchmark","reflection","smoke","ranking","media","opportunity","evolution")): return 2
+              return 1
+          emergency=len(queued)>=800
+          congested=len(queued)>=500
+          cancelled=0
+          for r in rows:
+              if r["status"] not in {"queued","in_progress"}:
+                  continue
+              if r["workflowName"]=="Brain Queue Guard":
+                  continue
+              key=(r.get("workflowName"), r.get("headBranch"))
+              stale=latest.get(key)!=r["databaseId"]
+              overload=(r["status"]=="queued" and ((emergency and priority(r["workflowName"])==2) or (congested and priority(r["workflowName"])==2)))
+              if stale or overload:
+                  subprocess.run(["gh","run","cancel",str(r["databaseId"]),"--repo","${{ github.repository }}"],check=False)
+                  cancelled+=1
+          print(f"QUEUE_OBSERVED={len(queued)}")
+          print(f"QUEUE_MODE={'EMERGENCY' if emergency else 'CONGESTED' if congested else 'NORMAL'}")
+          print(f"STALE_OR_OVERLOAD_CANCEL_REQUESTED={cancelled}")
+          print(f"LATEST_RUNS_RETAINED={len(latest)}")
+          PY
