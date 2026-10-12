@@ -14,6 +14,7 @@ class FidelityLevel(str, Enum):
     FUNCTIONAL = "functional"
     TIMING_MODEL = "timing_model"
     CYCLE_ACCURATE = "cycle_accurate"
+    PERFORMANCE_ESTIMATION = "performance_estimation"
 
 
 class ProvenanceKind(str, Enum):

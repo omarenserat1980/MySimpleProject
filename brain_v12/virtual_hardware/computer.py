@@ -5,6 +5,7 @@ from .x86_64 import X86_64CPU
 from .cpu_profiles import get_cpu_profile
 from .storage_profiles import get_storage_profile
 from .memory_profiles import get_memory_profile, CacheHierarchy
+from .peripheral_profiles import (get_gpu_profile, get_nic_profile, get_motherboard_profile)
 from .memory import VirtualRAM
 from .bus import VirtualBus
 from .devices import VirtualNIC,VirtualStorage,VirtualGPU
@@ -31,6 +32,10 @@ class VirtualComputer:
     memory_channels: int = 1
     memory_channel_width_bits: int = 64
     configured_cas_latency_cycles: int | None = None
+    gpu_profile_id: str | None = None
+    nic_profile_id: str | None = None
+    motherboard_profile_id: str | None = None
+    external_network_enabled: bool = False
 
     def __post_init__(self):
         self.cpu = X86_64CPU(profile_id=self.cpu_profile_id) if self.cpu_profile_id else VirtualCPU()
@@ -38,10 +43,12 @@ class VirtualComputer:
                             channel_width_bits=self.memory_channel_width_bits,
                             configured_cas_latency_cycles=self.configured_cas_latency_cycles,
                             cache_enabled=self.cache_enabled)
-        self.bus=VirtualBus()
+        self.bus=VirtualBus(profile_id=self.motherboard_profile_id)
         self.storage=VirtualStorage(capacity=self.storage_size, profile_id=self.storage_profile_id)
-        self.nic=VirtualNIC()
-        self.gpu=VirtualGPU(self.gpu_width,self.gpu_height)
+        self.nic=VirtualNIC(profile_id=self.nic_profile_id, external_network_enabled=self.external_network_enabled)
+        self.gpu=VirtualGPU(self.gpu_width,self.gpu_height,profile_id=self.gpu_profile_id)
+        self.nic.attach_bus(self.bus)
+        self.gpu.attach_bus(self.bus)
         self.firmware=VirtualFirmware()
         self.kernel=VirtualKernel()
         self.filesystem=VirtualFilesystem(self.storage)
@@ -153,6 +160,61 @@ class VirtualComputer:
                      "test_queue_depth_and_estimated_latency_are_deterministic",
                      "test_write_back_flush_and_restart_recovery"),
                 ))
+            elif profile.category == "gpu" and self.gpu_profile_id:
+                selected_gpu = get_gpu_profile(self.gpu_profile_id)
+                gpu_description = selected_gpu.describe()
+                profiles.append(HardwareProfile(
+                    selected_gpu.profile_id, "gpu", selected_gpu.model, FidelityLevel.PERFORMANCE_ESTIMATION,
+                    {"compute_units": selected_gpu.compute_units, "execution_lanes": selected_gpu.execution_lanes,
+                     "tensor_cores": selected_gpu.tensor_cores, "logical_vram_capacity_bytes": self.gpu.logical_vram_capacity_bytes,
+                     "vram_bandwidth_bytes_per_second_vendor_peak": selected_gpu.vram_bandwidth_bytes_per_second,
+                     "fp32_peak_flops_per_second_vendor_peak": selected_gpu.fp32_peak_flops_per_second,
+                     "pcie_generation": selected_gpu.pcie_generation, "pcie_lanes": selected_gpu.pcie_lanes,
+                     "tdp_watts_reference": selected_gpu.tdp_watts, "host_gpu_acceleration": False},
+                    ("framebuffer API", "logical VRAM quota", "command queue", "synchronization",
+                     "analytical FP32 throughput estimate", "modeled transfer bandwidth"),
+                    tuple(gpu_description["unsupported_features"]),
+                    (SpecificationSource(ProvenanceKind.VENDOR_DOCUMENTATION, selected_gpu.source_url,
+                     "Vendor peak specifications are reference values, not simulated or measured throughput."),),
+                    ("test_gpu_profile_metadata_and_logical_vram",
+                     "test_gpu_queue_and_deterministic_throughput_estimate"),
+                ))
+            elif profile.category == "network" and self.nic_profile_id:
+                selected_nic = get_nic_profile(self.nic_profile_id)
+                nic_description = selected_nic.describe()
+                profiles.append(HardwareProfile(
+                    selected_nic.profile_id, "network", selected_nic.model, FidelityLevel.TIMING_MODEL,
+                    {"link_speed_bits_per_second": selected_nic.link_speed_bits_per_second,
+                     "mtu_bytes": self.nic.mtu, "pcie_generation": selected_nic.pcie_generation,
+                     "pcie_lanes": selected_nic.pcie_lanes, "tdp_watts_reference": selected_nic.tdp_watts,
+                     "queue_depth_model": self.nic.queue_depth, "external_network_enabled": self.external_network_enabled},
+                    ("packet queues", "MTU enforcement", "estimated serialization latency",
+                     "interrupt moderation", "modeled DMA accounting", "backpressure"),
+                    tuple(nic_description["unsupported_features"]),
+                    (SpecificationSource(ProvenanceKind.VENDOR_DOCUMENTATION, selected_nic.source_url,
+                     "Device link speed is vendor specified; timing/queue behavior remains modeled."),),
+                    ("test_nic_packet_queues_mtu_and_backpressure",
+                     "test_nic_profile_uses_no_external_network"),
+                ))
+            elif profile.category == "bus" and self.motherboard_profile_id:
+                topology = self.bus.validate_topology()
+                profiles.append(HardwareProfile(
+                    "brain-bus-topology-" + self.motherboard_profile_id, "bus",
+                    "Brain PCIe lane allocator and DMA/interrupt event model", FidelityLevel.TIMING_MODEL,
+                    {"motherboard_profile_id": self.motherboard_profile_id,
+                     "pcie_lanes_allocated": topology["pcie_lanes_allocated"],
+                     "pcie_lanes_total": topology["pcie_lanes_total"],
+                     "sata_ports_allocated": topology["sata_ports_allocated"],
+                     "topology_valid": topology["ok"], "electrical_fidelity": False},
+                    ("device enumeration", "lane allocation and generation negotiation",
+                     "topology validation", "DMA transfer accounting", "interrupt routing",
+                     "virtual reset and hot-plug"),
+                    ("PCIe TLP/DLLP protocol", "electrical signaling", "real IOMMU", "hardware-compatible hot-plug"),
+                    (SpecificationSource(ProvenanceKind.DERIVED, get_motherboard_profile(self.motherboard_profile_id).source_url,
+                     "Derived topology profile; no commercial motherboard is emulated."),),
+                    ("test_topology_lane_budget_and_dma_accounting",
+                     "test_topology_conflict_rejected_before_boot"),
+                ))
             elif profile.category == "cpu" and self.cpu_profile_id:
                 selected = get_cpu_profile(self.cpu_profile_id)
                 source_kind = (ProvenanceKind.SYNTHETIC_BASELINE if selected.vendor == "Electronic Brain"
@@ -182,6 +244,19 @@ class VirtualComputer:
                                      "Synthetic cache geometry for deterministic tests, not a claim about a named CPU."),),
                 ("test_l1_l2_l3_tag_model_and_deterministic_hits",),
             ))
+        if self.motherboard_profile_id:
+            board = get_motherboard_profile(self.motherboard_profile_id)
+            board_description = board.describe()
+            profiles.append(HardwareProfile(
+                board.profile_id, "motherboard", board.model, FidelityLevel.TIMING_MODEL,
+                {"pcie_generation": board.pcie_generation, "total_pcie_lanes": board.total_pcie_lanes,
+                 "sata_ports": board.sata_ports, "device_count": len(self.bus.devices)},
+                ("synthetic slot/lane topology", "capacity validation", "virtual hot-plug/reset"),
+                tuple(board_description["unsupported_features"]),
+                (SpecificationSource(ProvenanceKind.DERIVED, board.source_url,
+                 "PCIe generation reference only; topology is synthetic, not a real motherboard specification."),),
+                ("test_topology_lane_budget_and_dma_accounting", "test_topology_conflict_rejected_before_boot"),
+            ))
         return MachineManifest(self.name, 1, tuple(profiles)).describe()
 
     def status(self):
@@ -193,4 +268,4 @@ class VirtualComputer:
                 "cpu":{"pc":self.cpu.registers["RIP"] if isinstance(self.cpu, X86_64CPU) else self.cpu.pc,"cycles":self.cpu.cycles,"halted":self.cpu.halted,"profile_id":self.cpu_profile_id or "brain-educational-8-register"},
                 "ram":self.ram.status(),"devices":self.bus.device_names(),
                 "storage":{"capacity":self.storage.capacity,"files":len(self.storage.files)},
-                "network":{"mac":self.nic.mac},"gpu":{"width":self.gpu.width,"height":self.gpu.height}}
+                "network":self.nic.status(),"gpu":self.gpu.status(),"bus":self.bus.status()}
