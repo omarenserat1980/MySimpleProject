@@ -10,7 +10,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 RUNTIME_WORKFLOWS = (
-    ".github/workflows/brain-github-cloud.yml",
     ".github/workflows/brain-continuous-self-healing.yml",
 )
 
@@ -43,6 +42,32 @@ def assert_runtime_contract() -> dict:
         for marker in REQUIRED_RUNTIME_MARKERS:
             if marker not in text:
                 failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+
+    # Allowlisted unit-test/health tasks are safe on hosted infrastructure.
+    # Privileged supervisor repair remains in the separate protected workflow.
+    cloud_path = ROOT / ".github/workflows/brain-github-cloud.yml"
+    if cloud_path.exists():
+        cloud_text = cloud_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_NOT_HOSTED")
+        if "self-hosted" in cloud_text or "internal_runner_preflight" in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_REQUIRES_INTERNAL_RUNNER")
+        if "BRAIN_EXECUTION_MODE: GITHUB_HOSTED_SOFTWARE" not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_MODE_MISSING")
+        if "github_hosted_runtime\\\": True" not in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_EVIDENCE_MARKER_MISSING")
+        if "contents: write" in cloud_text:
+            failures.append("BRAIN_SOFTWARE_RUNTIME_HAS_WRITE_PERMISSION")
+        task_runner = ROOT / "brain_v12/ci/brain_runner.py"
+        if not task_runner.exists():
+            failures.append("BRAIN_ALLOWLISTED_TASK_RUNNER_MISSING")
+        else:
+            runner_text = task_runner.read_text(encoding="utf-8")
+            for marker in ("TASKS = {", "REJECTED_TASK", "if command is None"):
+                if marker not in runner_text:
+                    failures.append(f"BRAIN_ALLOWLISTED_TASK_CONTRACT_MISSING:{marker}")
+    else:
+        failures.append("MISSING_BRAIN_SOFTWARE_RUNTIME_WORKFLOW")
 
     # The human-intermediary predictor is bounded state/evidence work, not
     # production execution; it is safe to run on GitHub-hosted infrastructure.
