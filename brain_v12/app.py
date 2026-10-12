@@ -295,6 +295,12 @@ def brain_suggestions_list(request: Request, limit: int = 100, status: str | Non
     return {"ok": True, "count": len(items), "suggestions": items}
 
 
+@app.get("/api/brain/suggestions/summary")
+def brain_suggestions_summary(request: Request):
+    require_control_key(request)
+    return {"ok": True, "summary": suggestions_engine.summary()}
+
+
 @app.get("/api/brain/suggestions/{suggestion_id}")
 def brain_suggestion_detail(request: Request, suggestion_id: str):
     require_control_key(request)
