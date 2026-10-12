@@ -9,39 +9,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-RUNTIME_WORKFLOWS = (
-    ".github/workflows/brain-continuous-self-healing.yml",
-)
-
-FORBIDDEN_RUNTIME_MARKERS = (
-    "runs-on: ubuntu-latest",
-    "runs-on: ubuntu-24.04",
-    "runs-on: ubuntu-22.04",
-)
-
-REQUIRED_RUNTIME_MARKERS = (
-    "brain-internal",
-    "internal_runner_preflight",
-)
-
-
 def assert_runtime_contract() -> dict:
     failures: list[str] = []
     checked: list[str] = []
 
-    for relative in RUNTIME_WORKFLOWS:
-        path = ROOT / relative
-        checked.append(relative)
-        if not path.exists():
-            failures.append(f"MISSING_RUNTIME_WORKFLOW:{relative}")
-            continue
-        text = path.read_text(encoding="utf-8")
-        for marker in FORBIDDEN_RUNTIME_MARKERS:
-            if marker in text:
-                failures.append(f"FORBIDDEN_MARKER:{relative}:{marker}")
-        for marker in REQUIRED_RUNTIME_MARKERS:
-            if marker not in text:
-                failures.append(f"REQUIRED_MARKER_MISSING:{relative}:{marker}")
+    # Self-healing can run on a hosted software runner because repair delivery
+    # is review-only; it must never push automated patches directly to main.
+    checked.append(".github/workflows/brain-continuous-self-healing.yml")
+    heal_path = ROOT / ".github/workflows/brain-continuous-self-healing.yml"
+    if heal_path.exists():
+        heal_text = heal_path.read_text(encoding="utf-8")
+        if "runs-on: ubuntu-latest" not in heal_text:
+            failures.append("SELF_HEALING_NOT_HOSTED")
+        if "self-hosted" in heal_text or "internal_runner_preflight" in heal_text:
+            failures.append("SELF_HEALING_REQUIRES_PHYSICAL_RUNNER")
+        for marker in (
+            "REVIEWED_PULL_REQUEST_ONLY",
+            "pull-requests: write",
+            "gh pr create",
+            "BRAIN_REPAIR_PR_FORBIDDEN_PATH",
+            "brain_v12.self_healing.verification_gate",
+        ):
+            if marker not in heal_text:
+                failures.append(f"SELF_HEALING_REVIEW_GATE_MISSING:{marker}")
+        if "git push origin HEAD:main" in heal_text:
+            failures.append("SELF_HEALING_DIRECT_MAIN_PUSH_FORBIDDEN")
+    else:
+        failures.append("MISSING_SELF_HEALING_WORKFLOW")
 
     # Allowlisted unit-test/health tasks are safe on hosted infrastructure.
     # Privileged supervisor repair remains in the separate protected workflow.
