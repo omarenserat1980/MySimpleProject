@@ -56,6 +56,7 @@ from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
 from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
+from .brain.error_recovery_api import router as error_recovery_router
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
@@ -202,6 +203,7 @@ DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") o
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
+app.include_router(error_recovery_router)
 app.include_router(virtual_hardware_router)
 app.include_router(arkan_software_executor_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
