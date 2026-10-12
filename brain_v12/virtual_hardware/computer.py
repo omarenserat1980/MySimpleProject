@@ -110,7 +110,7 @@ class VirtualComputer:
             if profile.category == "memory" and self.ram_profile_id:
                 selected_memory = get_memory_profile(self.ram_profile_id)
                 memory_description = selected_memory.describe(self.memory_channels, self.memory_channel_width_bits,
-                                                               self.configured_cas_latency_cycles)
+                                                               self.ram.timing_model.configured_cas_latency_cycles if self.ram.timing_model else self.configured_cas_latency_cycles)
                 profiles.append(HardwareProfile(
                     selected_memory.profile_id, "memory", selected_memory.model, FidelityLevel.TIMING_MODEL,
                     {"logical_capacity_cells": self.ram.size, "capacity_unit": "addressable_cells",
