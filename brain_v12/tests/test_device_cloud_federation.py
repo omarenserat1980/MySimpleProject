@@ -6,14 +6,15 @@ from brain_v12.brain.device_cloud_federation import (
 
 
 class DeviceCloudFederationTests(unittest.TestCase):
-    def test_default_fleet_is_inventory_not_fabricated_liveness(self):
+    def test_default_fleet_contains_only_software_nodes(self):
         fleet = default_fleet()
+        ids = [item.endpoint_id for item in fleet]
         self.assertEqual(
-            [item.endpoint_id for item in fleet],
-            ["arkan-virtual-01", "redmi3-01", "realme-pending-identity", "honda-enp1-2023"],
+            ids,
+            ["brain-control-plane-main", "arkan-software-executor", "github-actions-runner"],
         )
-        self.assertTrue(all(not item.online for item in fleet))
-        self.assertTrue(all(not item.identity_verified for item in fleet))
+        forbidden = ("redmi", "realme", "honda", "android", "termux", "hardware")
+        self.assertFalse(any(any(token in item.endpoint_id.lower() for token in forbidden) for item in fleet))
 
     def test_unverified_devices_do_not_receive_work(self):
         plan = plan_execution(Workload.BUILD_TEST)
@@ -47,54 +48,13 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(plan.status, "LOCAL_TARGET_VERIFIED")
         self.assertEqual(plan.target, "arkan-host-asus-vivobook")
 
-    def test_arkan_virtual_runtime_is_ready_only_with_live_simulator_and_task_evidence(self):
+    def test_status_ignores_legacy_hardware_heartbeats_and_runtime(self):
         from brain_v12.brain.device_cloud_federation import build_fleet_status
-
-        not_running = build_fleet_status(
-            {"ttl_seconds": 15, "agents": []},
-            {
-                "exists": True,
-                "device_id": "arkan-virtual-01",
-                "identity_independent_of_host": True,
-                "runtime_loaded": False,
-                "simulator_booted": False,
-                "native_os_boot_verified": False,
-                "task_execution_evidence": {"status": "PASS"},
-            },
-        )
-        row = next(x for x in not_running["fleet"] if x["endpoint_id"] == "arkan-virtual-01")
-        self.assertEqual(row["observed_state"], "CONFIGURED_NOT_RUNNING")
-        self.assertFalse(row["execution_eligible"])
-        self.assertFalse(row["native_os_boot_verified"])
-
-        ready = build_fleet_status(
-            {"ttl_seconds": 15, "agents": []},
-            {
-                "exists": True,
-                "device_id": "arkan-virtual-01",
-                "identity_independent_of_host": True,
-                "runtime_loaded": True,
-                "simulator_booted": True,
-                "native_os_boot_verified": False,
-                "runtime_status": {"powered": True},
-                "task_execution_evidence": {"status": "PASS"},
-            },
-        )
-        row = next(x for x in ready["fleet"] if x["endpoint_id"] == "arkan-virtual-01")
-        self.assertEqual(row["observed_state"], "SIMULATION_READY")
-        self.assertTrue(row["identity_verified"])
-        self.assertTrue(row["execution_eligible"])
-        self.assertEqual(row["supported_execution"], ["bounded_symbolic_virtual_simulation"])
-        self.assertFalse(row["native_os_boot_verified"])
-
-    def test_wrong_arkan_identity_cannot_be_marked_ready(self):
-        from brain_v12.brain.device_cloud_federation import build_fleet_status
-
         result = build_fleet_status(
-            {"ttl_seconds": 15, "agents": []},
+            {"ttl_seconds": 15, "agents": [{"agent_id": "redmi3-01", "online": True, "age_seconds": 1}]},
             {
                 "exists": True,
-                "device_id": "arkan-host-asus-vivobook",
+                "device_id": "arkan-virtual-01",
                 "identity_independent_of_host": True,
                 "runtime_loaded": True,
                 "simulator_booted": True,
@@ -102,10 +62,14 @@ class DeviceCloudFederationTests(unittest.TestCase):
                 "task_execution_evidence": {"status": "PASS"},
             },
         )
-        row = next(x for x in result["fleet"] if x["endpoint_id"] == "arkan-virtual-01")
-        self.assertFalse(row["identity_verified"])
-        self.assertFalse(row["execution_eligible"])
-        self.assertNotEqual(row["observed_state"], "SIMULATION_READY")
+        self.assertEqual(result["mode"], "software-only")
+        self.assertFalse(result["hardware_indicators_enabled"])
+        self.assertEqual(result["hardware_nodes"], [])
+        rows = {row["endpoint_id"]: row for row in result["fleet"]}
+        self.assertEqual(set(rows), {"brain-control-plane-main", "arkan-software-executor", "github-actions-runner"})
+        self.assertEqual(rows["arkan-software-executor"]["observed_state"], "NOT_PROBED")
+        self.assertFalse(any(row["execution_eligible"] for row in rows.values()))
+        self.assertFalse(any("redmi" in row["endpoint_id"] for row in result["fleet"]))
 
     def test_vehicle_endpoint_is_not_a_compute_executor(self):
         car = DeviceEndpoint(
@@ -135,28 +99,6 @@ class DeviceCloudFederationTests(unittest.TestCase):
         self.assertEqual(plan.target, "honda-enp1-2023")
 
 
-    def test_fleet_status_reports_live_heartbeat_without_claiming_identity(self):
-        from brain_v12.brain.device_cloud_federation import build_fleet_status
-        result = build_fleet_status({
-            "ttl_seconds": 15,
-            "agents": [
-                {"agent_id": "redmi3-01", "online": True, "age_seconds": 2.5},
-                {"agent_id": "other-device", "online": True, "age_seconds": 1.0},
-                {"agent_id": "realme-pending-identity", "online": False, "age_seconds": 90.0},
-            ],
-        })
-        rows = {row["endpoint_id"]: row for row in result["fleet"]}
-        self.assertEqual(rows["redmi3-01"]["observed_state"], "ONLINE")
-        self.assertFalse(rows["redmi3-01"]["identity_verified"])
-        self.assertFalse(rows["redmi3-01"]["execution_eligible"])
-        self.assertEqual(rows["realme-pending-identity"]["observed_state"], "STALE")
-        self.assertEqual(rows["arkan-virtual-01"]["observed_state"], "NOT_PROVISIONED")
-        self.assertEqual(rows["arkan-virtual-01"]["role"], "virtual_computer")
-        self.assertEqual(rows["arkan-virtual-01"]["platform"], "brain-simulator")
-        self.assertEqual(rows["arkan-virtual-01"]["allowed_workloads"], ["virtual_simulation"])
-        self.assertFalse(rows["arkan-virtual-01"]["execution_eligible"])
-        self.assertFalse(result["cloud"]["capacity_verified"])
-        self.assertFalse(result["cloud"]["paid_provisioning_allowed"])
 
 
 if __name__ == "__main__":
