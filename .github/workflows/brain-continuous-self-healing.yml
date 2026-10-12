@@ -28,6 +28,8 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
+  actions: read
 
 concurrency:
   group: brain-self-healing
@@ -35,22 +37,20 @@ concurrency:
 
 jobs:
   heal:
-    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout Brain
         uses: actions/checkout@v4
 
-      - name: Fail-closed Brain internal runtime preflight
+      - name: Verify hosted software-only execution
         run: |
           set -euo pipefail
-          python3 -m brain_v12.brain.internal_runner_preflight
-          python3 - <<'PY'
-          from brain_v12.brain.internal_runner_preflight import verify_and_write
-          e=verify_and_write("internal-runner-preflight.json")
-          assert e["verified"] is True, e
-          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
-          PY
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          test "$RUNNER_OS" = "Linux"
+          echo "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SELF_HEALING"
+          echo "BRAIN_PHYSICAL_HARDWARE_REQUIRED=false"
+          echo "BRAIN_REPAIR_DELIVERY=REVIEWED_PULL_REQUEST_ONLY"
 
       - name: Prepare Brain runtime
         run: |
@@ -128,12 +128,15 @@ jobs:
           print("VERIFIED_COMPLETED=AUTHORIZED")
           PY
 
-      - name: Persist Verified Repair
+      - name: Propose Verified Repair as Pull Request
         if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
           if test ! -f .brain/state/last_applied_patch.diff; then
-            echo "BRAIN_VERIFIED_REPAIR_COMMIT=SKIPPED_NO_PATCH"
+            echo "BRAIN_VERIFIED_REPAIR_PR=SKIPPED_NO_PATCH"
             exit 0
           fi
           git diff --check
@@ -142,19 +145,34 @@ jobs:
           while IFS= read -r path; do
             case "$path" in
               brain_v12/*|tests/*|scripts/*) ;;
-              *) echo "BRAIN_REPAIR_COMMIT_FORBIDDEN_PATH=$path"; exit 2 ;;
+              *) echo "BRAIN_REPAIR_PR_FORBIDDEN_PATH=$path"; exit 2 ;;
             esac
           done <<< "$changed"
+
+          # Avoid flooding main with duplicate automated repair PRs.
+          existing="$(gh pr list --base main --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("brain-self-heal-"))] | length')"
+          if test "$existing" -gt 0; then
+            echo "BRAIN_VERIFIED_REPAIR_PR=SKIPPED_EXISTING_REPAIR_PR"
+            exit 0
+          fi
+
           git config user.name "brain-autonomous-repair"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- $changed
           if git diff --cached --quiet; then
-            echo "BRAIN_VERIFIED_REPAIR_COMMIT=SKIPPED_NO_GIT_DIFF"
+            echo "BRAIN_VERIFIED_REPAIR_PR=SKIPPED_NO_GIT_DIFF"
             exit 0
           fi
-          git commit -m "brain: persist verified self-healing repair"
-          git push origin HEAD:main
-          echo "BRAIN_VERIFIED_REPAIR_COMMIT=PUSHED"
+          git commit -m "brain: propose verified self-healing repair"
+          branch="brain-self-heal-${GITHUB_RUN_ID}"
+          git checkout -b "$branch"
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Brain: verified self-healing repair #${GITHUB_RUN_ID}" \
+            --body "Automated repair proposal produced on a GitHub-hosted runner. The workflow passed its verification gate before opening this PR. Review the code diff and uploaded evidence; this PR is not auto-merged."
+          echo "BRAIN_VERIFIED_REPAIR_PR=OPENED"
 
       - name: Publish healing evidence
         if: always()
