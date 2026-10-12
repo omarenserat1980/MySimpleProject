@@ -50,6 +50,15 @@ class FilmSupervisor:
                     (self.artifacts/"film_supervisor_trace.json").write_text(json.dumps(trace,ensure_ascii=False,indent=2),encoding="utf-8")
                     return 1
 
+                # Advance the mission state machine through a real bounded simulated attempt.
+                # This scopes acceptance evidence to mission.attempts=1 rather than a missing/zero attempt.
+                for phase in ("discover","plan","select_backend","execute","observe","verify"):
+                    job=supervisor.transition(
+                        job,phase,status="running",
+                        details={"source":"film_supervisor","reality_level":"SIMULATED"},
+                        enforce_authority=False,
+                    )
+
                 mission_id=job["job_id"]
                 evidence_attempt=int(job.get("attempts",1))
                 artifact_evidence=supervisor.evidence.append(
