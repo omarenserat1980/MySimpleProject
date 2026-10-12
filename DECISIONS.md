@@ -95,3 +95,11 @@ Minimize routine human intervention while maximizing Brain's independent capabil
 - A visual/demo impression is not sufficient for commercial launch.
 - No claim of COMMERCIAL_READY is permitted until the public API, persistent customer state, trial enforcement, service execution path, and payment path are each verified in production-like conditions.
 - Reviewer feedback becomes improvement input; no reviewer score is fabricated or inferred as an external opinion.
+
+
+## D-013 — Software nodes are the default execution resources
+Decision: The existing worker registry defaults to software workers. Physical-device adapters are disabled unless explicitly enabled with `BRAIN_ENABLE_DEVICE_WORKERS=1`.
+
+Reason: Brain Core startup and compatible software workloads must not depend on a particular phone, PC, Termux installation, or self-hosted physical runner.
+
+Constraints: This is an incremental migration. A registered node or passing CI job is not proof that every workload is hardware-independent. Specialized workflows remain separately gated until migrated and verified. Simulated resources must never be represented as real hardware or unlimited compute.
