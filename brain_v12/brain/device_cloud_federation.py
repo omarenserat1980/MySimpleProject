@@ -7,6 +7,7 @@ indicators. This module plans work; it does not execute or provision resources.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Iterable
 
@@ -110,6 +111,8 @@ def build_fleet_status(
     # heartbeats influence canonical software-node indicators.
     virtual_status = virtual_computer_status if isinstance(virtual_computer_status, dict) else {}
     phone_status = virtual_phone_status if isinstance(virtual_phone_status, dict) else {}
+    # Timestamp the live inspection, not a fabricated external heartbeat.
+    observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     arkan_identity_verified = (
         virtual_status.get("exists") is True
         and virtual_status.get("device_id") == "arkan-virtual-01"
@@ -159,6 +162,7 @@ def build_fleet_status(
                 "reality": "SIMULATED",
                 "physical_device_required": False,
                 "observed_state": observed_state,
+                "observed_at": observed_at,
                 "heartbeat_age_seconds": None,
                 "heartbeat_ttl_seconds": None,
                 "identity_verified": arkan_identity_verified,
@@ -182,6 +186,7 @@ def build_fleet_status(
                 "reality": "SIMULATED",
                 "physical_device_required": False,
                 "observed_state": observed_state,
+                "observed_at": observed_at,
                 "heartbeat_age_seconds": None,
                 "heartbeat_ttl_seconds": None,
                 "identity_verified": phone_identity_verified,
