@@ -21,6 +21,15 @@ class BrainGitServiceTests(unittest.TestCase):
             s.create_branch("proof","test-branch","main")
             self.assertTrue(any(x["name"]=="test-branch" for x in s.branches("proof")))
             self.assertTrue(s.fsck("proof")["ok"])
+    def test_commit_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as d:
+            s=BrainGitService(Path(d))
+            s.create_repository("proof")
+            for unsafe in ("../escaped.txt", "/tmp/escaped.txt", ".git/config", "folder\\\\escaped.txt"):
+                with self.subTest(path=unsafe):
+                    with self.assertRaises(BrainGitError):
+                        s.commit_files("proof", {unsafe: "must not be written"}, "reject unsafe path")
+
     def test_duplicate_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             s=BrainGitService(d); s.create_repository("x")
