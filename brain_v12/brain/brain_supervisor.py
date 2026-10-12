@@ -163,20 +163,32 @@ class BrainSupervisor:
 
     def next_action(self,job,verification):
         completion=self._completion_decision(verification)
+        acceptance_contract={
+            "golden_criteria":verification.get("golden_criteria"),
+            "golden_expected_reality":verification.get("golden_expected_reality","SIMULATED"),
+        }
         if completion:
-            if completion["action"]=="deliver":return {"action":"deliver","reason":"verified_problem_completion","completion":completion}
+            if completion["action"]=="deliver":
+                return {"action":"deliver","reason":"verified_problem_completion","completion":completion,**acceptance_contract}
             if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit_after_reality_check","completion":completion}
             return {"action":"treat","reason":"problem_not_complete","completion":completion}
         if verification.get("ok"):
-            return {"action":"deliver","reason":"verification_contract_ok"}
+            return {"action":"deliver","reason":"verification_contract_ok",**acceptance_contract}
         evidence_result=self.verify_evidence(job["job_id"],required_kind=verification.get("required_evidence_kind"))
-        if evidence_result.verified:return {"action":"deliver","reason":"runtime_evidence_verified","evidence_ids":list(evidence_result.evidence_ids)}
+        if evidence_result.verified:
+            return {"action":"deliver","reason":"runtime_evidence_verified","evidence_ids":list(evidence_result.evidence_ids),**acceptance_contract}
         if job.get("attempts",0)>=job.get("max_attempts",self.max_cycles):return {"action":"blocked","reason":"attempt_limit"}
         return self.decide_repair(verification)
 
     def repair_and_retry(self,job,verification):
         action=self.next_action(job,verification)
-        if action["action"]=="deliver":return self.transition(job,"deliver",status="completed",details=action,required_evidence_kind=action.get("required_evidence_kind"))
+        if action["action"]=="deliver":
+            return self.transition(
+                job,"deliver",status="completed",details=action,
+                required_evidence_kind=verification.get("required_evidence_kind"),
+                golden_criteria=action.get("golden_criteria"),
+                golden_expected_reality=action.get("golden_expected_reality","SIMULATED"),
+            )
         if action["action"]=="blocked":return self.transition(job,"blocked",status="blocked",details=action)
         repaired=self.transition(job,"repair",details=action)
         recovered=self.transition(repaired,"recover",details={"action":action["action"]})
