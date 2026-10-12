@@ -1,0 +1,30 @@
+name: Brain Suggestion Execution Tests
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/suggestion_execution.py'
+      - 'brain_v12/tests/test_suggestion_execution.py'
+      - '.github/workflows/brain-suggestion-execution.yml'
+  push:
+    branches:
+      - feat/chatgpt-propose-execute-brain
+    paths:
+      - 'brain_v12/brain/suggestion_execution.py'
+      - 'brain_v12/tests/test_suggestion_execution.py'
+      - '.github/workflows/brain-suggestion-execution.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test proposal execution policy
+        run: python -m unittest brain_v12.tests.test_suggestion_execution -v
