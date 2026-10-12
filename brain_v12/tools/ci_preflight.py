@@ -25,13 +25,31 @@ def require_routes(application,routes:Iterable[str])->None:
     available={getattr(route,"path","") for route in getattr(application,"routes",[])}
     missing=sorted(set(routes)-available)
     if missing: fail(f"required routes missing: {missing}")
+def clear_hardware_environment()->None:
+    """Prove core startup does not depend on physical-device agent configuration."""
+    optional_hardware_env = (
+        "TERMUX_VERSION", "TERMUX_APP_PID", "TERMUX_MAIN_PACKAGE_FORMAT",
+        "ANDROID_ROOT", "ANDROID_DATA", "ANDROID_ART_ROOT", "ANDROID_I18N_ROOT",
+        "EXTERNAL_STORAGE", "V12_AGENT_ID", "V12_AGENT_KEY_FILE",
+        "V12_BRAIN_URL", "V12_POLL_SECONDS", "BRAIN_AGENT_ID",
+        "BRAIN_AGENT_KEY", "BRAIN_AGENT_KEY_SHA256", "BRAIN_AGENT_KEYS_JSON",
+        "BRAIN_AGENT_KEY_FILE", "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY",
+    )
+    for name in optional_hardware_env:
+        os.environ.pop(name, None)
+    os.environ["BRAIN_ENABLE_DEVICE_BRIDGE"] = "0"
+    os.environ["BRAIN_ENABLE_DEVICE_WORKERS"] = "0"
+    os.environ["BRAIN_RUNTIME_HOME"] = "/tmp/brain-v12-preflight-runtime"
+    os.environ["BRAIN_SYNC_QUEUE"] = "/tmp/brain-v12-preflight-runtime/device-sync.jsonl"
+
 def main()->int:
+    clear_hardware_environment()
     require_files(("brain_v12/app.py","brain_v12/Dockerfile","brain_v12/requirements.txt","brain_v12/tools/ci_preflight.py"))
     require_dirs(("brain_v12/brain","brain_v12/movie_summary_factory","brain_v7"))
-    os.environ.setdefault("BRAIN_DB","/tmp/brain-v12-preflight.db")
-    os.environ.setdefault("BRAIN_LIVE_INCOME_SEARCH_ENABLED","false")
-    os.environ.setdefault("BRAIN_WORKFORCE_ENABLED","false")
-    os.environ.setdefault("BRAIN_V14_VERSION","14.0")
+    os.environ["BRAIN_DB"] = "/tmp/brain-v12-preflight.db"
+    os.environ["BRAIN_LIVE_INCOME_SEARCH_ENABLED"] = "false"
+    os.environ["BRAIN_WORKFORCE_ENABLED"] = "false"
+    os.environ["BRAIN_V14_VERSION"] = "14.0"
     compile_tree()
     application=import_application()
     require_routes(application,("/health","/api/system/readiness","/api/system/diagnostics","/api/deploy/verify"))
