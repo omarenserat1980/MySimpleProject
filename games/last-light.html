@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRAIN Original — Last Light</title>
+<style>html,body{margin:0;height:100%;background:#020304;color:#eee;font-family:system-ui;overflow:hidden}body{display:grid;place-items:center}canvas{width:min(100vw,960px);aspect-ratio:16/9;border-radius:18px;border:1px solid #333;background:#050607}.tip{position:fixed;bottom:16px;background:#000c;padding:10px 14px;border-radius:12px;color:#bbb}</style></head>
+<body><canvas id="c" width="960" height="540"></canvas><div class="tip">حرّك المصباح بالماوس/اللمس • اجمع 5 شظايا نور وتجنب الظل</div>
+<script>
+const c=document.getElementById('c'),g=c.getContext('2d');let W=960,H=540,px=W/2,py=H/2,parts=[],shadow={x:120,y:120},got=0,lost=false,t=0;
+function pos(e){let r=c.getBoundingClientRect();px=(e.clientX-r.left)*W/r.width;py=(e.clientY-r.top)*H/r.height}c.addEventListener('pointermove',pos);c.addEventListener('pointerdown',pos);
+for(let i=0;i<5;i++)parts.push({x:90+Math.random()*780,y:80+Math.random()*380,r:8,ok:false});
+function loop(){requestAnimationFrame(loop);t++;if(lost)return draw();let dx=px-shadow.x,dy=py-shadow.y,d=Math.hypot(dx,dy)||1;shadow.x+=dx/d*.7;shadow.y+=dy/d*.7;parts.forEach(p=>{if(!p.ok&&Math.hypot(px-p.x,py-p.y)<28){p.ok=true;got++}});if(d<35)lost=true;draw()}
+function draw(){g.fillStyle='#020304';g.fillRect(0,0,W,H);g.fillStyle='#111820';for(let i=0;i<18;i++)g.fillRect((i*71)%W,(i*43)%H,50,3);let grd=g.createRadialGradient(px,py,20,px,py,155);grd.addColorStop(0,'#fff');grd.addColorStop(.12,'#ffeaa6');grd.addColorStop(1,'#0000');g.fillStyle=grd;g.fillRect(0,0,W,H);parts.forEach(p=>{if(!p.ok){g.fillStyle='#ffe9a6';g.beginPath();g.arc(p.x,p.y,p.r+Math.sin(t/8)*2,0,7);g.fill()}});g.fillStyle='#06070a';g.beginPath();g.arc(shadow.x,shadow.y,25,0,7);g.fill();g.fillStyle='#fff';g.font='bold 22px system-ui';g.fillText('شظايا النور: '+got+'/5',24,38);if(got===5){g.fillStyle='#fff';g.font='bold 46px system-ui';g.textAlign='center';g.fillText('وصلت إلى آخر ضوء',W/2,H/2);g.textAlign='start'}if(lost){g.fillStyle='#000b';g.fillRect(0,0,W,H);g.fillStyle='#fff';g.textAlign='center';g.font='bold 48px system-ui';g.fillText('ابتلعك الظل',W/2,H/2);g.font='20px system-ui';g.fillText('أعد تحميل الصفحة للمحاولة من جديد',W/2,H/2+40);g.textAlign='start'}}
+loop();
+</script></body></html>

@@ -1,0 +1,220 @@
+{
+  "client_id": "CL-000003",
+  "mode": "DEEP_COMMERCIAL_EXECUTION",
+  "status": "REVENUE_PURSUIT_REQUESTED",
+  "active_request_limit": 1,
+  "current_request": {
+    "id": "REQ-CL-000003-DEEP-001",
+    "type": "DIGITAL_SERVICES_AND_REVENUE",
+    "objective": "Discover, build, validate, and deliver a useful digital solution for the prospect while pursuing a real paid outcome.",
+    "allowed_build_types": [
+      "WEB_APPLICATION",
+      "WEBSITE",
+      "LANDING_PAGE",
+      "DIGITAL_SERVICE",
+      "BUSINESS_WORKFLOW",
+      "VIDEO_PRODUCTION",
+      "REPORTING_DASHBOARD",
+      "QUOTE_REQUEST_SYSTEM",
+      "API_INTEGRATION"
+    ],
+    "phase": "DEMO",
+    "blockers": [],
+    "evidence_refs": [
+      "brain_v12/business/cl_000003_demo_package.md",
+      "QC_RUN_37529986118",
+      "QC_ARTIFACT_11443882749"
+    ],
+    "customer_instruction": "حقق مكاسب مادية حقيقية للعميل من خلال تطوير وتسويق وبيع خدمات Brain الرقمية، ومتابعة الفرص حتى الدفع والتحقق.",
+    "started_at": "2026-10-06"
+  },
+  "gates": {
+    "customer_need_validated": false,
+    "solution_built": true,
+    "technical_verification": true,
+    "customer_acceptance": false,
+    "order_accepted": false,
+    "delivery_verified": false,
+    "payment_verified": false,
+    "revenue_realized": false,
+    "profit_verified": false
+  },
+  "financial_boundary": {
+    "automatic_contract": false,
+    "automatic_charge": false,
+    "automatic_purchase": false,
+    "automatic_transfer": false,
+    "automatic_withdrawal": false,
+    "funds_moved_by_brain": false
+  },
+  "success_rule": "Do not mark REVENUE_REALIZED until independent payment verification and delivery/reconciliation evidence exist.",
+  "cycle_policy": {
+    "mode": "BOUNDED_CONTINUOUS",
+    "required_output_per_cycle": "OPPORTUNITY_OR_BUILD_OR_TEST_OR_BLOCKER",
+    "phases": [
+      {
+        "phase": "DISCOVER",
+        "output": "validated_problem_candidates"
+      },
+      {
+        "phase": "PRIORITIZE",
+        "output": "ranked_solution_candidate"
+      },
+      {
+        "phase": "SPECIFY",
+        "output": "acceptance_criteria"
+      },
+      {
+        "phase": "BUILD",
+        "output": "working_artifact"
+      },
+      {
+        "phase": "VERIFY",
+        "output": "test_and_artifact_evidence"
+      },
+      {
+        "phase": "DEMO",
+        "output": "reviewable_demo"
+      },
+      {
+        "phase": "REQUEST_APPROVAL",
+        "output": "approval_or_explicit_blocker"
+      },
+      {
+        "phase": "DELIVER",
+        "output": "delivery_evidence"
+      },
+      {
+        "phase": "COLLECT",
+        "output": "payment_path_status"
+      },
+      {
+        "phase": "VERIFY_PAYMENT",
+        "output": "independent_payment_evidence"
+      },
+      {
+        "phase": "RECONCILE",
+        "output": "bound_financial_and_delivery_evidence"
+      },
+      {
+        "phase": "REALIZE",
+        "output": "revenue_realized_only_if_gate_passes"
+      }
+    ],
+    "no_progress_rule": "If a cycle produces no new evidence, artifact, validated opportunity, or blocker diagnosis, do not claim progress; diagnose the stalled phase.",
+    "evidence_rule": "Every advancement must reference inspectable evidence.",
+    "commercial_rule": "Technical completion never implies customer acceptance, payment, revenue, or profit."
+  },
+  "revenue_target": {
+    "status": "ACTIVE",
+    "rule": "Do not stop at marketing activity; pursue qualified opportunities through order, delivery, independently verified payment, and reconciliation."
+  },
+  "operating_loop": {
+    "enabled": true,
+    "objective": "REAL_MATERIAL_GAIN",
+    "repeat_until": "REVENUE_REALIZED",
+    "cycle_order": [
+      "DISCOVER",
+      "PRIORITIZE",
+      "SPECIFY",
+      "BUILD",
+      "VERIFY",
+      "MARKET",
+      "QUALIFY_LEADS",
+      "PREPARE_OFFER",
+      "REQUEST_CUSTOMER_ACCEPTANCE",
+      "DELIVER",
+      "VERIFY_PAYMENT",
+      "RECONCILE",
+      "REALIZE"
+    ],
+    "measurement": {
+      "required_metrics": [
+        "qualified_leads",
+        "offers_prepared",
+        "customer_acceptances",
+        "orders",
+        "deliveries",
+        "verified_payments",
+        "realized_revenue"
+      ],
+      "zero_revenue_rule": "If realized_revenue remains zero, Brain must not declare success and must continue diagnosis and permitted opportunity development."
+    },
+    "blocker_policy": "At each cycle identify the first blocking condition, produce evidence, repair or choose the next viable path, and record the result.",
+    "reporting": "When CL-000003 asks for financial gains, report cycle progress and evidence without inflating financial status."
+  },
+  "adaptive_revenue_policy": {
+    "enabled": true,
+    "decision_rule": "Optimize for verified commercial progress, not code volume.",
+    "checkpoints": [
+      "NEED_SIGNAL",
+      "SOLUTION_VALUE",
+      "BUILD_READINESS",
+      "DEMO_QUALITY",
+      "MARKETING_RESPONSE",
+      "QUALIFIED_LEAD",
+      "CUSTOMER_ACCEPTANCE",
+      "ORDER",
+      "DELIVERY",
+      "PAYMENT",
+      "RECONCILIATION"
+    ],
+    "pivot_rules": [
+      "If no credible need signal, improve discovery rather than building blindly.",
+      "If need exists but offer is weak, refine value proposition and demo.",
+      "If offer exists but no qualified leads, improve targeting/content/channel within authorization.",
+      "If qualified leads exist but no acceptance, diagnose objections and refine the offer.",
+      "If acceptance exists but no order, identify the missing commercial authorization or purchasing step.",
+      "If order exists but no payment, track the permitted payment blocker and request required action.",
+      "If payment exists but cannot be independently verified, block revenue recognition and resolve evidence gap.",
+      "If delivery exists but reconciliation is incomplete, repair the evidence chain before recognizing revenue."
+    ],
+    "stop_conditions": [
+      "REVENUE_REALIZED",
+      "CUSTOMER_REQUEST_CANCELLED",
+      "AUTHORIZATION_REQUIRED_AND_NOT_AVAILABLE",
+      "SAFETY_OR_LEGAL_BOUNDARY_BLOCKS_EXECUTION"
+    ],
+    "progress_rule": "Every cycle must produce new commercial evidence, a working artifact, a verified test, a qualified lead, a customer response, or a diagnosed blocker. Otherwise diagnose the stalled loop."
+  },
+  "revenue_portfolio": {
+    "enabled": true,
+    "principle": "One active customer request may contain multiple bounded commercial experiments, but financial claims remain isolated and evidence-bound per opportunity/order.",
+    "portfolio_limit": 5,
+    "candidate_lanes": [
+      "WEB_APPLICATION",
+      "WEBSITE",
+      "DIGITAL_SERVICE",
+      "VIDEO_PRODUCTION",
+      "REPORTING_DASHBOARD"
+    ],
+    "lane_selection": {
+      "score_dimensions": [
+        "customer_need",
+        "time_to_demo",
+        "buildability",
+        "delivery_verifiability",
+        "marketability",
+        "payment_path_clarity"
+      ],
+      "rule": "Select the highest-scoring viable lane; keep other candidates parked rather than building all simultaneously."
+    },
+    "isolation_rules": [
+      "Each opportunity gets a unique opportunity_id.",
+      "Each offer/order/delivery/payment evidence chain must bind to its opportunity_id.",
+      "A successful experiment must not transfer revenue status to another opportunity.",
+      "A failed experiment becomes evidence for reprioritization, not a fabricated success.",
+      "The portfolio never bypasses the single active customer-request limit."
+    ],
+    "escalation": {
+      "trigger": "No verified commercial progress after bounded cycles on the current lane.",
+      "action": "Re-rank parked lanes using fresh evidence and select one next lane.",
+      "prohibition": "Do not create parallel uncontrolled execution streams."
+    },
+    "revenue_target": {
+      "metric": "verified_realized_revenue",
+      "target_state": "REVENUE_REALIZED",
+      "proof": "independent payment + delivery/reconciliation evidence"
+    }
+  }
+}

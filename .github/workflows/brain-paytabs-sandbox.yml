@@ -1,0 +1,41 @@
+name: BRAIN PayTabs Sandbox Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-paytabs-sandbox:
+    runs-on: ubuntu-latest
+    env:
+      PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_PROFILE_ID }}
+      PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SERVER_KEY }}
+      PAYTABS_BASE_URL: https://secure-jordan.paytabs.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate secret configuration without printing secrets
+        run: |
+          test -n "$PAYTABS_PROFILE_ID"
+          test -n "$PAYTABS_SERVER_KEY"
+          echo "PAYTABS_SECRET_CONFIGURATION=READY" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run PayTabs adapter safety tests
+        run: python -m pytest -q brain/provider_hub/test_paytabs_adapter.py
+
+      - name: Run Provider Hub tests
+        run: python -m pytest -q brain/provider_hub
+
+      - name: Report sandbox verification boundary
+        run: |
+          echo "ADAPTER_TESTS=PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "SECRET_NOT_PRINTED=TRUE" >> "$GITHUB_STEP_SUMMARY"
+          echo "LIVE_PAYMENT_VERIFICATION=NOT_PERFORMED" >> "$GITHUB_STEP_SUMMARY"
+          echo "PAYTABS_SANDBOX_STATUS=READY_FOR_PAYMENT_REQUEST" >> "$GITHUB_STEP_SUMMARY"
+          echo "No real payment is claimed by this workflow." >> "$GITHUB_STEP_SUMMARY"

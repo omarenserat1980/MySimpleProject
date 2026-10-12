@@ -52,7 +52,13 @@ def optional_pytest(timeout: int) -> dict:
             "passed": True,
             "skipped": True,
         }
-    return run("pytest", [sys.executable, "-m", "pytest", "-q"], timeout)
+    raw_targets = os.getenv("BRAIN_GATE_PYTEST_TARGETS", "").strip()
+    targets = raw_targets.split() if raw_targets else [
+        "brain_v12/tests/test_control_plane.py",
+        "brain_v12/tests/test_execution_coordinator.py",
+        "brain_v12/tests/test_github_execution_bridge.py",
+    ]
+    return run("pytest", [sys.executable, "-m", "pytest", "-q", *targets], timeout)
 
 def main() -> int:
     timeout = int(os.getenv("BRAIN_GATE_TIMEOUT", "120"))

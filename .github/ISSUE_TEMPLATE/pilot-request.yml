@@ -1,0 +1,43 @@
+name: Pilot Request
+description: Request a Brain Company pilot service
+title: "[PILOT] "
+labels: ["commercial","pilot"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Brain will evaluate the request against its evidence-first delivery gate.
+        Submitting a request does not create a contract.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should be working or delivered?
+    validations:
+      required: true
+  - type: textarea
+    id: artifact
+    attributes:
+      label: Current artifact or repository
+      description: Provide a public repository/link or describe the existing system.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What objective evidence would make the delivery acceptable?
+    validations:
+      required: true
+  - type: input
+    id: deadline
+    attributes:
+      label: Target deadline
+    validations:
+      required: false
+  - type: input
+    id: contact
+    attributes:
+      label: Preferred contact channel
+    validations:
+      required: true

@@ -47,9 +47,25 @@ class MemoryStore:
               id INTEGER PRIMARY KEY CHECK(id=1),
               data TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS revenue_guardian_history(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              client_id TEXT NOT NULL,
+              recorded_at TEXT NOT NULL,
+              previous_verified_revenue_jod REAL NOT NULL DEFAULT 0,
+              current_verified_revenue_jod REAL NOT NULL DEFAULT 0,
+              delta_jod REAL NOT NULL DEFAULT 0,
+              trend TEXT NOT NULL,
+              state TEXT,
+              highest_priority TEXT,
+              active_opportunities INTEGER NOT NULL DEFAULT 0,
+              ready_to_apply INTEGER NOT NULL DEFAULT 0,
+              step TEXT NOT NULL,
+              data TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS income_opportunities(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               opportunity_id TEXT UNIQUE NOT NULL,
+              client_id TEXT,
               category TEXT NOT NULL,
               title TEXT NOT NULL,
               source_url TEXT,
@@ -92,8 +108,57 @@ class MemoryStore:
               agent_id TEXT PRIMARY KEY,
               last_seen REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS industrial_client_locks(
+              client_id TEXT PRIMARY KEY,
+              status TEXT NOT NULL,
+              request_id TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
             INSERT OR IGNORE INTO state(id,data) VALUES(1,'{"status":"READY"}');
             """)
+            cols={r["name"] for r in con.execute("PRAGMA table_info(income_opportunities)").fetchall()}
+            if "client_id" not in cols:
+                con.execute("ALTER TABLE income_opportunities ADD COLUMN client_id TEXT")
+            con.execute("UPDATE income_opportunities SET client_id=json_extract(data,'$.client_id') WHERE client_id IS NULL")
+            con.execute("CREATE INDEX IF NOT EXISTS idx_income_client ON income_opportunities(client_id)")
+            con.commit()
+
+    def industrial_client_request(self, client_id, request_id, *, activity_id="", target="", backend="", workflow="", stage="RECEIVED", status="ACTIVE", checkpoint=None, run_id=""):
+        """Create or refresh the durable state for one client request."""
+        payload = {
+            "request_id": request_id,
+            "client_id": client_id,
+            "activity_id": activity_id,
+            "target": target,
+            "backend": backend,
+            "workflow": workflow,
+            "stage": stage,
+            "status": status,
+            "checkpoint": checkpoint or {},
+            "run_id": run_id,
+            "updated_at": now(),
+        }
+        key = f"industrial_client:{client_id}:request"
+        self.save_memory(key, json.dumps(payload, ensure_ascii=False))
+        return payload
+
+    def industrial_client_request_state(self, client_id):
+        key = f"industrial_client:{client_id}:request"
+        with self.connect() as con:
+            row = con.execute("SELECT value FROM memories WHERE key=?", (key,)).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["value"])
+        except Exception:
+            return None
+
+    def update_industrial_client_request(self, client_id, **changes):
+        current = self.industrial_client_request_state(client_id) or {"client_id": client_id}
+        current.update(changes)
+        current["updated_at"] = now()
+        self.save_memory(f"industrial_client:{client_id}:request", json.dumps(current, ensure_ascii=False))
+        return current
 
     def state(self):
         with self.connect() as con:
@@ -159,24 +224,31 @@ class MemoryStore:
         data=dict(opportunity)
         oid=data["opportunity_id"]
         with self.connect() as con:
-            row=con.execute("SELECT id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
+            client_id=data.get("client_id")
+            row=con.execute("SELECT id,client_id FROM income_opportunities WHERE opportunity_id=?",(oid,)).fetchone()
             if row:
+                existing_client_id=row["client_id"]
+                if existing_client_id and client_id and existing_client_id != client_id:
+                    raise ValueError("CLIENT_SCOPE_MISMATCH")
+                if existing_client_id and not client_id:
+                    client_id=existing_client_id
+                data["client_id"]=client_id
                 con.execute("""UPDATE income_opportunities
-                               SET category=?,title=?,source_url=?,evidence=?,status=?,score=?,
+                               SET client_id=?,category=?,title=?,source_url=?,evidence=?,status=?,score=?,
                                    expected_value_jod=?,verified_amount_jod=?,verification_status=?,
                                    owner_role=?,updated_at=?,data=? WHERE opportunity_id=?""",
-                            (data.get("category",""),data.get("title",""),data.get("source_url"),
+                            (client_id,data.get("category",""),data.get("title",""),data.get("source_url"),
                              data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
                              data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
                              data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
                              now_iso,json.dumps(data,ensure_ascii=False),oid))
             else:
                 con.execute("""INSERT INTO income_opportunities
-                               (opportunity_id,category,title,source_url,evidence,status,score,
+                               (opportunity_id,client_id,category,title,source_url,evidence,status,score,
                                 expected_value_jod,verified_amount_jod,verification_status,owner_role,
                                 created_at,updated_at,data)
-                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                            (oid,data.get("category",""),data.get("title",""),data.get("source_url"),
+                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (oid,client_id,data.get("category",""),data.get("title",""),data.get("source_url"),
                              data.get("evidence",""),data.get("status","DISCOVERY"),float(data.get("score",0)),
                              data.get("expected_value_jod"),float(data.get("verified_amount_jod",0)),
                              data.get("verification_status","UNVERIFIED"),data.get("owner_role"),
@@ -197,10 +269,13 @@ class MemoryStore:
         if removed: self.event("INCOME_LEGACY_CHANNELS_PURGED", {"removed":removed})
         return removed
 
-    def income_opportunities(self, limit=100):
+    def income_opportunities(self, limit=100, client_id=None):
         with self.connect() as con:
-            rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",
-                             (max(1,min(int(limit),500)),)).fetchall()
+            lim=max(1,min(int(limit),500))
+            if client_id is None:
+                rows=con.execute("SELECT * FROM income_opportunities ORDER BY score DESC,id DESC LIMIT ?",(lim,)).fetchall()
+            else:
+                rows=con.execute("SELECT * FROM income_opportunities WHERE client_id=? ORDER BY score DESC,id DESC LIMIT ?",(client_id,lim)).fetchall()
         out=[]
         for row in rows:
             item=dict(row)
@@ -209,14 +284,57 @@ class MemoryStore:
             out.append(item)
         return out
 
-    def income_summary(self):
+    def income_summary(self, client_id=None):
         with self.connect() as con:
-            row=con.execute("""SELECT COUNT(*) total,
-                                      COALESCE(SUM(verified_amount_jod),0) verified,
-                                      COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
-                                      COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
-                               FROM income_opportunities""").fetchone()
+            if client_id is None:
+                row=con.execute("""SELECT COUNT(*) total,
+                                          COALESCE(SUM(verified_amount_jod),0) verified,
+                                          COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
+                                          COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
+                                   FROM income_opportunities""").fetchone()
+            else:
+                row=con.execute("""SELECT COUNT(*) total,
+                                          COALESCE(SUM(verified_amount_jod),0) verified,
+                                          COALESCE(SUM(CASE WHEN status IN ('READY','IN_PROGRESS') THEN 1 ELSE 0 END),0) active,
+                                          COALESCE(SUM(CASE WHEN verification_status='VERIFIED' THEN 1 ELSE 0 END),0) verified_count
+                                   FROM income_opportunities WHERE client_id=?""",(client_id,)).fetchone()
         return dict(row)
+
+
+    def claim_industrial_client(self, client_id, request_id):
+        """Atomically claim one active industrial request per client."""
+        with self.connect() as con:
+            con.execute("BEGIN IMMEDIATE")
+            row=con.execute(
+                "SELECT status,request_id FROM industrial_client_locks WHERE client_id=?",
+                (client_id,),
+            ).fetchone()
+            if row and row["status"] == "ACTIVE":
+                con.rollback()
+                return {"ok": False, "status": "ALREADY_ACTIVE", "request_id": row["request_id"]}
+            con.execute(
+                """INSERT INTO industrial_client_locks(client_id,status,request_id,updated_at)
+                   VALUES(?,?,?,?)
+                   ON CONFLICT(client_id) DO UPDATE SET status=excluded.status,
+                     request_id=excluded.request_id,updated_at=excluded.updated_at""",
+                (client_id,"ACTIVE",request_id,now()),
+            )
+            con.commit()
+            return {"ok": True, "status": "CLAIMED", "request_id": request_id}
+
+    def release_industrial_client(self, client_id, request_id=None):
+        with self.connect() as con:
+            if request_id:
+                con.execute(
+                    "UPDATE industrial_client_locks SET status='IDLE',updated_at=? WHERE client_id=? AND request_id=?",
+                    (now(),client_id,request_id),
+                )
+            else:
+                con.execute(
+                    "UPDATE industrial_client_locks SET status='IDLE',updated_at=? WHERE client_id=?",
+                    (now(),client_id),
+                )
+            con.commit()
 
     def events_for_run(self,run_id,limit=100):
         with self.connect() as con:
@@ -228,6 +346,83 @@ class MemoryStore:
             if payload.get("run_id")==run_id: out.append(dict(row))
             if len(out)>=limit: break
         return out
+
+    def revenue_guardian_history(self, client_id, limit=100):
+        with self.connect() as con:
+            rows = con.execute(
+                """SELECT * FROM revenue_guardian_history
+                   WHERE client_id=? ORDER BY id DESC LIMIT ?""",
+                (client_id, max(1, min(int(limit), 500))),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def save_revenue_guardian_checkpoint(self, client_id, record):
+        key = f"revenue_guardian:{client_id}:checkpoint"
+        payload = dict(record)
+        payload["recorded_at"] = now()
+        self.save_memory(key, json.dumps(payload, ensure_ascii=False))
+        with self.connect() as con:
+            con.execute(
+                """INSERT INTO revenue_guardian_history(
+                     client_id,recorded_at,previous_verified_revenue_jod,
+                     current_verified_revenue_jod,delta_jod,trend,state,
+                     highest_priority,active_opportunities,ready_to_apply,step,data
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    client_id, payload["recorded_at"],
+                    float(payload.get("previous_verified_revenue_jod", 0) or 0),
+                    float(payload.get("current_verified_revenue_jod", 0) or 0),
+                    float(payload.get("delta_jod", 0) or 0),
+                    str(payload.get("trend") or "UNKNOWN"),
+                    payload.get("state"), payload.get("highest_priority"),
+                    int(payload.get("active_opportunities", 0) or 0),
+                    int(payload.get("ready_to_apply", 0) or 0),
+                    str(payload.get("step") or "UNKNOWN"),
+                    json.dumps(payload, ensure_ascii=False),
+                ),
+            )
+            con.commit()
+        self.event("REVENUE_GUARDIAN_STEP_SAVED", dict(payload))
+        return payload
+
+    def save_revenue_project_marketing_result(self, client_id, result):
+        """Append one immutable project-marketing measurement to guardian history."""
+        payload = dict(result or {})
+        payload["client_id"] = client_id
+        payload["recorded_at"] = datetime.now(timezone.utc).isoformat()
+        with self.connect() as con:
+            con.execute(
+                "CREATE TABLE IF NOT EXISTS revenue_project_marketing_history "
+                "(id INTEGER PRIMARY KEY AUTOINCREMENT, client_id TEXT NOT NULL, "
+                "recorded_at TEXT NOT NULL, project_id TEXT NOT NULL, data TEXT NOT NULL)"
+            )
+            con.execute(
+                "INSERT INTO revenue_project_marketing_history(client_id, recorded_at, project_id, data) "
+                "VALUES(?,?,?,?)",
+                (client_id, payload["recorded_at"], str(payload.get("project_id") or ""), json.dumps(payload, ensure_ascii=False))
+            )
+            con.commit()
+        return payload
+
+    def revenue_guardian_status(self, client_id, history_limit=20):
+        checkpoint = self.revenue_guardian_checkpoint(client_id) or {}
+        history = self.revenue_guardian_history(client_id, history_limit)
+        latest = history[0] if history else checkpoint
+        return {
+            "client_id": client_id,
+            "checkpoint": checkpoint,
+            "latest_step": latest,
+            "history_count": len(history),
+            "history": history,
+            "status": (
+                "NO_RECORDED_GUARDIAN_STATE" if not latest
+                else "REVENUE_INCREASED" if latest.get("trend") == "INCREASED"
+                else "REVENUE_DECREASED" if latest.get("trend") == "DECREASED"
+                else "REVENUE_UNCHANGED" if latest.get("trend") == "UNCHANGED"
+                else "BASELINE_RECORDED" if latest.get("trend") == "BASELINE"
+                else "GUARDIAN_STATE_RECORDED"
+            ),
+        }
 
     def monitor_state(self):
         for item in self.memories():
@@ -294,11 +489,19 @@ class MemoryStore:
                         (task_id,task,json.dumps(params or {},ensure_ascii=False),"QUEUED",str(created_at)))
             con.commit()
 
-    def device_task_claim(self, agent_id):
+    def device_task_claim(self, agent_id, allowed_tasks=None):
         # Serialize claimers so two polling requests cannot claim the same task.
         with self.connect() as con:
             con.execute("BEGIN IMMEDIATE")
-            row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
+            if allowed_tasks:
+                names=tuple(sorted(set(allowed_tasks)))
+                placeholders=",".join("?" for _ in names)
+                row=con.execute(
+                    f"SELECT * FROM device_tasks WHERE status='QUEUED' AND task IN ({placeholders}) ORDER BY created_at,task_id LIMIT 1",
+                    names,
+                ).fetchone()
+            else:
+                row=con.execute("SELECT * FROM device_tasks WHERE status='QUEUED' ORDER BY created_at,task_id LIMIT 1").fetchone()
             if not row:
                 con.commit()
                 return None

@@ -1,0 +1,53 @@
+name: Brain Product Factory
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 */6 * * *"
+
+concurrency:
+  group: brain-product-factory
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build revenue strategy
+        run: python3 scripts/brain_revenue_strategy.py
+
+      - name: Select owned product and build plan
+        run: python3 scripts/brain_product_factory.py
+
+      - name: Verify product factory gate
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path(".brain_state/product_factory_plan.json").read_text())
+          assert p["stage"] == "BUILD_PLAN_READY"
+          assert p["financial_authority"] == "NONE"
+          assert p["external_publication"] == "BLOCKED"
+          assert p["payment"] == "NOT_VERIFIED"
+          assert p["revenue_forecast"]["counts_as_revenue"] is False
+          assert p["cost_tracking"]["money_spent"] == 0
+          print("PRODUCT_FACTORY_GATE=VERIFIED")
+          print("PRODUCT="+p["product"]["product_id"])
+          print("FORECAST_ONLY=true")
+          print("MONEY_SPENT=0")
+          PY
+
+      - name: Archive factory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-product-factory-plan
+          path: |
+            .brain_state/revenue_strategy.json
+            .brain_state/product_factory_plan.json
+          retention-days: 14

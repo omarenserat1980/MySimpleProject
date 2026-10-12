@@ -11,6 +11,7 @@ from uuid import uuid4
 import hashlib
 import json
 from .solution_engine import Alternative, AlternativeRegistry, Problem, SolutionEngine, SourceType
+from .execution_gateway import BrainExecutionGateway
 
 
 class ProblemSolver:
@@ -18,12 +19,13 @@ class ProblemSolver:
 
     def __init__(self, cognitive_loop, solution_engine=None,
                  alternative_executors=None, alternative_verifier=None,
-                 supervisor=None):
+                 supervisor=None, execution_gateway=None):
         self.cognitive = cognitive_loop
         self.solution_engine = solution_engine or SolutionEngine()
         self.alternative_executors = dict(alternative_executors or {})
         self.alternative_verifier = alternative_verifier
         self.supervisor = supervisor
+        self.execution_gateway = execution_gateway or (getattr(supervisor, "execution_gateway", None) if supervisor is not None else None)
 
     @staticmethod
     def _tool_params(tool_id, action):
@@ -164,6 +166,10 @@ class ProblemSolver:
             executors.setdefault(tool, execute_builtin)
 
         self.cognitive._state("EXECUTE", goal=goal, run_id=run_id)
+        if self.execution_gateway is not None:
+            self.execution_gateway.authorize("brain-internal-execution")
+            if self.alternative_executors:
+                raise RuntimeError("EXTERNAL_ALTERNATIVE_EXECUTOR_FORBIDDEN")
         if supervisor_job is not None:
             supervisor_job = self.supervisor.transition(
                 supervisor_job, "execute", details={"run_id": run_id}

@@ -32,6 +32,14 @@ HEARTBEAT_SECONDS = max(5, int(os.getenv("BRAIN_EMULATOR_HEARTBEAT_SECONDS", "10
 REQUEST_TIMEOUT = max(5, int(os.getenv("BRAIN_EMULATOR_REQUEST_TIMEOUT", "30")))
 ROOT = Path(__file__).resolve().parent.parent
 
+SELF_TESTS = (
+    "brain_v12.brain.test_security_guard",
+    "brain_v12.brain.test_company_operating_system",
+    "brain_v12.brain.test_competitive_evolution",
+    "brain_v12.self_healing.test_future_evolution_executor",
+)
+AUTO_SELF_TEST = os.getenv("BRAIN_AGENT_AUTO_SELF_TEST", "1").lower() == "1"
+
 def request(method, path, payload=None, params=None):
     if not BRAIN_URL:
         raise RuntimeError("BRAIN_URL_OR_V12_BRAIN_URL_REQUIRED")
@@ -50,6 +58,23 @@ def request(method, path, payload=None, params=None):
         return json.loads(response.read().decode("utf-8"))
 
 def execute(task, params):
+    if task == "brain_self_test":
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+        p = subprocess.run(
+            ["python", "-m", "unittest", *SELF_TESTS, "-v"],
+            cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=180,
+        )
+        combined_output = "\n".join((p.stdout or "", p.stderr or ""))
+        ok = p.returncode == 0 and "Ran " in combined_output and "OK" in combined_output
+        return ok, {
+            "returncode": p.returncode,
+            "stdout": p.stdout[-12000:],
+            "stderr": p.stderr[-6000:],
+            "tests": list(SELF_TESTS),
+            "verified": ok,
+        }, "" if ok else "BRAIN_SELF_TEST_FAILED"
+
     if task == "python_version":
         p = subprocess.run(["python", "--version"], capture_output=True, text=True, timeout=20)
         output = (p.stdout or p.stderr).strip()
@@ -150,6 +175,14 @@ def execute(task, params):
 
 def main():
     print(f"[Brain-Termux] READY id={AGENT_ID}")
+    self_test_requested = False
+    if AUTO_SELF_TEST:
+        try:
+            requested = request("POST", "/api/device/self-test/request", payload={})
+            print(f"[Brain-Termux] SELF_TEST_REQUESTED task={requested.get('task', {}).get('task_id', 'UNKNOWN')}")
+            self_test_requested = True
+        except Exception as exc:
+            print(f"[Brain-Termux] SELF_TEST_REQUEST_FAILURE: {type(exc).__name__}: {exc}")
     completed = 0
     last_heartbeat = 0.0
     while completed < MAX_TASKS_PER_RUN:
@@ -177,6 +210,9 @@ def main():
                       "result": result, "error": error}
             request("POST", "/api/device/report", payload=report)
             print(f"[Brain-Termux] REPORTED {task_id} ok={ok}")
+            if task_name == "brain_self_test" and ok:
+                verified = request("GET", f"/api/device/verify/{task_id}")
+                print(f"[Brain-Termux] VERIFIED {task_id} verified={verified.get('verified', False)}")
             completed += 1
             if STOP_ON_ERROR and not ok:
                 return

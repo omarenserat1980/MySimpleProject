@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .brain_gpt_20_layer_trace import build_request_layer_trace
+
 import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
@@ -51,6 +53,7 @@ class BrainAI:
         def solve(params):
             goal = str((params or {}).get("goal", "")).strip()
             if not goal:
+                # Keep the empty-input contract consistent with ProblemSolver.
                 return {"ok": False, "status": "EMPTY_GOAL"}
             result = problem_solver.solve(goal)
             return result
@@ -269,6 +272,20 @@ class BrainAI:
                 normalized.append({"name": name, "params": params if isinstance(params, dict) else {}})
         return normalized
 
+    def _with_layer_trace(self, response, user_text, instructions=""):
+        """Attach a truthful diagnostic trace without changing execution decisions."""
+        try:
+            response.evidence.append(build_request_layer_trace(self, user_text, instructions, response))
+        except Exception as exc:
+            # Observability must never break the underlying Brain AI response.
+            response.evidence.append({
+                "type": "brain_gpt_20_layer_trace",
+                "status": "TRACE_FAILED",
+                "error": type(exc).__name__,
+                "execution_performed_by_trace": False,
+            })
+        return response
+
     def chat(self, user_text: str, instructions: str = "", approved=False) -> BrainAIResponse:
         user_text=(user_text or "").strip()
         if not user_text: return BrainAIResponse(False,"","error",error="EMPTY_MESSAGE")
@@ -279,13 +296,13 @@ class BrainAI:
         for round_no in range(1, self.max_tool_rounds + 1):
             result=self._provider_respond(user_text, self._context(), instructions or self._system_instructions(), trace)
             if not result.get("ok"):
-                return BrainAIResponse(False,"","error",model=result.get("model"),tool_calls=calls,evidence=evidence,error=result.get("error"))
+                return self._with_layer_trace(BrainAIResponse(False,"","error",model=result.get("model"),tool_calls=calls,evidence=evidence,error=result.get("error")), user_text, instructions)
             evidence.append({"type":"provider","provider":result.get("provider"),"model":result.get("model"),"response_id":result.get("response_id"),"round":round_no})
             if result.get("routing") or result.get("evidence", {}).get("type") == "model_routing":
                 evidence.append({"type":"model_routing", **(result.get("routing") or result.get("evidence") or {})})
             intents=self._tool_intents(result)
             if not intents:
-                return BrainAIResponse(True,result.get("reply",""),"model",model=result.get("model"),tool_calls=calls,evidence=evidence)
+                return self._with_layer_trace(BrainAIResponse(True,result.get("reply",""),"model",model=result.get("model"),tool_calls=calls,evidence=evidence), user_text, instructions)
             for intent in intents:
                 name=intent["name"]
                 params=intent["params"]
@@ -328,8 +345,8 @@ class BrainAI:
                             "error": item.get("error"),
                         })
                 if not outcome.get("ok") and outcome.get("status") in {"WAITING_APPROVAL","WAITING_PERMISSION"}:
-                    return BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status"))
-        return BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT")
+                    return self._with_layer_trace(BrainAIResponse(False,"Approval or permission is required before this action can continue.","approval",model=result.get("model"),tool_calls=calls,evidence=evidence,error=outcome.get("status")), user_text, instructions)
+        return self._with_layer_trace(BrainAIResponse(False,"Tool execution limit reached before a final answer was produced.","limit",model=(result or {}).get("model"),tool_calls=calls,evidence=evidence,error="TOOL_LOOP_LIMIT"), user_text, instructions)
 
     @staticmethod
     def _verify_tool_outcome(outcome: Dict[str, Any]) -> bool:
@@ -364,16 +381,43 @@ class BrainAI:
         return {"intent": intent, "outcome": self.execute_tool(intent["name"], intent["params"], approved=approved)}
 
     def execute_tool(self, name: str, params: Optional[Dict[str, Any]]=None, approved: bool=False) -> Dict[str, Any]:
-        tool=self.tools.get(name)
-        if not tool: return {"ok":False,"status":"UNKNOWN_TOOL","tool":name}
-        if tool.risk=="high" and not approved: return {"ok":False,"status":"WAITING_APPROVAL","tool":name}
+        import time
+        from ..self_healing.tool_evolution import record_invocation
+
+        tool = self.tools.get(name)
+        safe_params = params or {}
+        started = time.monotonic()
+
+        def observed(outcome, status, error=None, risk=None, permission=None):
+            # Evolution telemetry is best-effort and must never change tool semantics.
+            try:
+                record_invocation(
+                    name, status, params=safe_params,
+                    duration_ms=(time.monotonic() - started) * 1000,
+                    error=error, risk=risk or (tool.risk if tool else "low"),
+                    permission=permission if permission is not None else (tool.permission if tool else None),
+                )
+            except Exception:
+                pass
+            return outcome
+
+        if not tool:
+            return observed({"ok":False,"status":"UNKNOWN_TOOL","tool":name}, "UNKNOWN_TOOL")
+        if tool.risk=="high" and not approved:
+            return observed({"ok":False,"status":"WAITING_APPROVAL","tool":name}, "WAITING_APPROVAL")
         if tool.permission and self.cognitive is not None:
             grants=getattr(getattr(self.cognitive,"permissions",None),"grants",set())
-            if tool.permission not in grants: return {"ok":False,"status":"WAITING_PERMISSION","tool":name,"permission":tool.permission}
-        try: result=tool.handler(params or {})
-        except Exception as exc: return {"ok":False,"status":"FAILED","tool":name,"error":str(exc)[:1000]}
-        if not isinstance(result,dict): return {"ok":False,"status":"INVALID_TOOL_RESULT","tool":name}
-        return {"tool":name,"ok":True,**result}
+            if tool.permission not in grants:
+                return observed({"ok":False,"status":"WAITING_PERMISSION","tool":name,"permission":tool.permission}, "WAITING_PERMISSION")
+        try:
+            result = tool.handler(safe_params)
+        except Exception as exc:
+            return observed({"ok":False,"status":"FAILED","tool":name,"error":str(exc)[:1000]}, "FAILED", error=type(exc).__name__)
+        if not isinstance(result,dict):
+            return observed({"ok":False,"status":"INVALID_TOOL_RESULT","tool":name}, "INVALID_TOOL_RESULT")
+        outcome = {"tool":name,"ok":True,**result}
+        status = str(result.get("status") or ("FAILED" if result.get("ok") is False else "OK"))
+        return observed(outcome, status)
 
     @staticmethod
     def _system_instructions() -> str:

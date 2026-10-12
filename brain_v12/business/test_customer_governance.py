@@ -1,4 +1,4 @@
-from customer_governance import Consent, CustomerOperation, CustomerProfile, build_customer_policy
+from .customer_governance import Consent, CustomerOperation, CustomerProfile, build_customer_policy
 
 def test_marketing_requires_consent():
     p = CustomerProfile("c1", "Example")

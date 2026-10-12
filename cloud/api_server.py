@@ -21,6 +21,8 @@ from cloud.runtime_orchestrator import CloudRuntime
 from cloud.approval_desk import create_approval, decide_approval, get_approval, list_approvals, notification_status
 from cloud.customer_communications import Channel, CommunicationHub, MessageState
 from cloud.diwan import CaseFile, Correspondence, CorrespondenceState, RoutingAssignment, RecordState, archive_eligible, register_number
+from cloud.brain_fabric_api import router as fabric_router
+from brain_v12.business.customer_activity_supervisor import CustomerActivitySupervisor
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE = Path(os.getenv("BRAIN_STATE_DIR", str(ROOT / ".brain_state")))
@@ -29,6 +31,7 @@ TOKEN = os.getenv("BRAIN_CONTROL_TOKEN", "")
 app = FastAPI(title="BRAIN Cloud Hub", docs_url=None, redoc_url=None)
 runtime = CloudRuntime()
 COMMUNICATION_HUB = CommunicationHub(STATE / "customer_communications")
+app.include_router(fabric_router)
 
 # The Cloud Hub owns its queue worker. No Termux/external process is required.
 if os.getenv("BRAIN_API_QUEUE_WORKER", "1").strip().lower() in {"1", "true", "yes", "on"}:
@@ -62,6 +65,230 @@ FEEDBACK_STORE = FeedbackStore(STATE)
 
 CUSTOMER_REQUESTS = STATE / "customer_requests"
 CUSTOMER_REQUESTS.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# PUBLIC CLIENT ACCOUNTS / 5-DAY TRIAL
+# The trial is server-side and tied to a normalized email address. The client
+# UI is never trusted to decide eligibility.
+# ---------------------------------------------------------------------------
+CLIENT_ACCOUNTS = STATE / "client_accounts"
+CLIENT_ACCOUNTS.mkdir(parents=True, exist_ok=True)
+CLIENT_SESSIONS = STATE / "client_sessions"
+CLIENT_SESSIONS.mkdir(parents=True, exist_ok=True)
+TRIAL_SECONDS = 5 * 24 * 60 * 60
+
+def _email_key(email: str) -> str:
+    value = email.strip().lower()
+    if "@" not in value or len(value) > 254:
+        raise HTTPException(status_code=400, detail="valid email is required")
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+def _account_path(email: str) -> Path:
+    return CLIENT_ACCOUNTS / (_email_key(email) + ".json")
+
+def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
+    if len(password) < 10:
+        raise HTTPException(status_code=400, detail="password must be at least 10 characters")
+    salt = salt or os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 210_000)
+    return salt.hex(), digest.hex()
+
+def _verify_password(password: str, account: dict) -> bool:
+    try:
+        salt = bytes.fromhex(account["password_salt"])
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 210_000).hex()
+        return hmac.compare_digest(digest, account["password_hash"])
+    except (KeyError, ValueError):
+        return False
+
+def _save_account(account: dict) -> None:
+    tmp = _account_path(account["email"]).with_suffix(".tmp")
+    tmp.write_text(json.dumps(account, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(_account_path(account["email"]))
+
+def _load_account(email: str) -> dict | None:
+    path = _account_path(email)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=500, detail="account state is unreadable")
+
+def _create_client_session(email: str) -> str:
+    raw = uuid.uuid4().hex + uuid.uuid4().hex
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    record = {"email": email.strip().lower(), "expires_at": time.time() + 24 * 60 * 60}
+    (CLIENT_SESSIONS / (token_hash + ".json")).write_text(json.dumps(record), encoding="utf-8")
+    return raw
+
+def _client_account_from_token(request: Request) -> dict:
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="login required")
+    raw = header[7:].strip()
+    if not raw:
+        raise HTTPException(status_code=401, detail="login required")
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    path = CLIENT_SESSIONS / (token_hash + ".json")
+    if not path.exists():
+        raise HTTPException(status_code=401, detail="session expired")
+    try:
+        session = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(status_code=401, detail="invalid session")
+    if float(session.get("expires_at", 0)) <= time.time():
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=401, detail="session expired")
+    account = _load_account(session["email"])
+    if not account:
+        raise HTTPException(status_code=401, detail="account unavailable")
+    return account
+
+class ClientAuthRequest(BaseModel):
+    email: str
+    password: str = Field(min_length=10, max_length=200)
+    display_name: str = Field(default="", max_length=120)
+
+class ClientOrderRequest(BaseModel):
+    service: str
+    plan: str
+    need: str = Field(min_length=10, max_length=10000)
+
+
+@app.post("/api/payments/paytabs/callback")
+async def paytabs_callback(request: Request):
+    """Public PayTabs callback; verify HMAC before changing payment state."""
+    from brain.provider_hub.paytabs_webhook import parse_and_validate_payment
+    raw_body = await request.body()
+    signature = request.headers.get("Signature", "")
+    server_key = os.getenv("PAYTABS_SERVER_KEY", "").strip()
+    if not server_key:
+        raise HTTPException(status_code=503, detail="payment provider secret is not configured")
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+        order_id = str(payload.get("cart_id", ""))
+        amount = str(payload.get("cart_amount", ""))
+        currency = str(payload.get("cart_currency", ""))
+        verified = parse_and_validate_payment(raw_body, signature, server_key, expected_order_id=order_id, expected_amount=amount, expected_currency=currency)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    evidence_dir = STATE / "payment_evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    tran_ref = str(verified["tran_ref"])
+    evidence_path = evidence_dir / (hashlib.sha256(tran_ref.encode()).hexdigest() + ".json")
+    if evidence_path.exists():
+        return {"ok": True, "status": "ALREADY_RECORDED", "tran_ref": tran_ref}
+    record = {"provider":"paytabs","order_id":order_id,"tran_ref":tran_ref,"amount":amount,"currency":currency,"verified_at":time.time(),"payment_state":"PAYMENT_VERIFIED","evidence":verified}
+    evidence_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"ok": True, "status": "PAYMENT_VERIFIED", "tran_ref": tran_ref}
+
+@app.post("/api/auth/register")
+def client_register(body: ClientAuthRequest):
+    email = body.email.strip().lower()
+    existing = _load_account(email)
+    if existing:
+        # Deliberately generic: do not reveal account existence.
+        raise HTTPException(status_code=409, detail="account cannot be created with these credentials")
+    salt, password_hash = _hash_password(body.password)
+    now = time.time()
+    account = {
+        "client_id": str(uuid.uuid4()),
+        "email": email,
+        "display_name": body.display_name.strip() or email.split("@")[0],
+        "password_salt": salt,
+        "password_hash": password_hash,
+        "created_at": now,
+        "trial": {"eligible": True, "started_at": now, "duration_seconds": TRIAL_SECONDS,
+                  "used": True, "state": "TRIAL_ACTIVE"},
+        "orders": [],
+        "audit": [{"event": "ACCOUNT_CREATED_AND_TRIAL_STARTED", "at": now}],
+    }
+    _save_account(account)
+    token = _create_client_session(email)
+    return {"ok": True, "token": token, "account": _client_public(account)}
+
+@app.post("/api/auth/login")
+def client_login(body: ClientAuthRequest):
+    account = _load_account(body.email)
+    if not account or not _verify_password(body.password, account):
+        raise HTTPException(status_code=401, detail="invalid email or password")
+    token = _create_client_session(account["email"])
+    return {"ok": True, "token": token, "account": _client_public(account)}
+
+def _client_public(account: dict) -> dict:
+    trial = dict(account["trial"])
+    remaining = max(0, int(trial["started_at"] + trial["duration_seconds"] - time.time()))
+    trial["remaining_seconds"] = remaining
+    trial["remaining_days"] = round(remaining / 86400, 2)
+    trial["state"] = "TRIAL_ACTIVE" if remaining > 0 else "TRIAL_EXPIRED"
+    return {"client_id": account["client_id"], "email": account["email"],
+            "display_name": account["display_name"], "trial": trial,
+            "orders": account.get("orders", [])}
+
+# ---------------------------------------------------------------------------
+# AUTHORIZED CUSTOMER ACTIVITY REPORT + CONTINUATION
+# Cross-customer visibility is intentionally restricted to the Brain control
+# plane. A customer session may access only its own account/orders.
+# ---------------------------------------------------------------------------
+CUSTOMER_ACTIVITY_SUPERVISOR = CustomerActivitySupervisor(STATE)
+
+@app.get("/api/brain/customers/activity-report", dependencies=[Depends(require_auth)])
+def brain_customer_activity_report(include_completed: bool = True):
+    """Return the current customer/activity inventory for an authorized operator."""
+    return CUSTOMER_ACTIVITY_SUPERVISOR.report(include_completed=include_completed)
+
+
+@app.post("/api/brain/customers/activity-continue", dependencies=[Depends(require_auth)])
+def brain_customer_activity_continue(customer_id: str | None = None, limit: int = 50):
+    """Inspect unfinished activities and continue them through an injected executor.
+
+    The executor must return completed=True plus structured verification:
+    passed=True, a non-empty criterion, and evidence. Without that proof the
+    activity remains incomplete.
+    """
+    return CUSTOMER_ACTIVITY_SUPERVISOR.continue_unfinished(customer_id=customer_id, limit=limit)
+
+
+@app.get("/api/auth/me")
+def client_me(request: Request):
+    return {"ok": True, "account": _client_public(_client_account_from_token(request))}
+
+@app.get("/api/trial")
+def client_trial(request: Request):
+    account = _client_account_from_token(request)
+    return {"ok": True, "trial": _client_public(account)["trial"]}
+
+@app.post("/api/orders")
+def client_order(request: Request, body: ClientOrderRequest):
+    account = _client_account_from_token(request)
+    public = _client_public(account)
+    if public["trial"]["state"] != "TRIAL_ACTIVE" and body.plan.upper().startswith("FREE TRIAL"):
+        raise HTTPException(status_code=409, detail="free trial has expired")
+    # One active request per client: completed/cancelled orders are allowed,
+    # but a second live request is rejected instead of accumulating work.
+    terminal_order_states = {"COMPLETED", "CLOSED", "CANCELLED", "VERIFIED_COMPLETED", "FAILED"}
+    active_orders = [
+        item for item in account.get("orders", [])
+        if str(item.get("state", "")).upper() not in terminal_order_states
+    ]
+    if active_orders:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ACTIVE_REQUEST_EXISTS",
+                "message": "client already has one active request; finish it before creating another",
+                "active_order_id": active_orders[0].get("order_id"),
+            },
+        )
+    order_id = "BRAIN-CLIENT-" + time.strftime("%Y%m%d") + "-" + uuid.uuid4().hex[:8].upper()
+    order = {"order_id": order_id, "service": body.service.strip(), "plan": body.plan.strip(),
+             "need": body.need.strip(), "state": "TRIAL_REQUESTED" if body.plan.upper().startswith("FREE TRIAL") else "NEW",
+             "created_at": time.time(), "payment_state": "NOT_REQUIRED_TRIAL" if body.plan.upper().startswith("FREE TRIAL") else "PAYMENT_PENDING"}
+    account.setdefault("orders", []).append(order)
+    account.setdefault("audit", []).append({"event": "SERVICE_ORDER_CREATED", "order_id": order_id, "at": time.time()})
+    _save_account(account)
+    return {"ok": True, "order": order, "account": _client_public(account)}
 
 
 class CustomerRequest(BaseModel):
@@ -618,7 +845,9 @@ def decide_diwan_approval(approval_id: str, body: ApprovalDecisionRequest):
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        detail = str(exc)
+        status_code = 422 if detail.startswith("invalid transition") or "requires evidence_ref" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     return {"ok": True, "system": "BRAIN_DIWAN", "approval": approval}
 
 
@@ -810,7 +1039,9 @@ def transition_feedback(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="feedback not found")
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        detail = str(exc)
+        status_code = 422 if detail.startswith("invalid transition") or "requires evidence_ref" in detail else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     return {"ok": True, "feedback": asdict(f)}
 
 class CommunicationCreateRequest(BaseModel):

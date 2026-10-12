@@ -1,6 +1,6 @@
 """Unified GitHub Control Plane for Electronic Brain."""
 from __future__ import annotations
-import hashlib, json, os, time
+import hashlib, json, os, time, shutil, subprocess
 from dataclasses import dataclass
 from typing import Any
 import httpx
@@ -18,8 +18,21 @@ class GitHubControlPlane:
     API = "https://api.github.com"
     VERSION = "2022-11-28"
     def __init__(self, token: str | None = None, policy: GitHubPolicy | None = None):
-        self.token = token or os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN")
+        self.token = token or os.getenv("BRAIN_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or self._gh_token()
+        
         self.policy = policy or GitHubPolicy(); self.audit: list[dict[str, Any]] = []
+    @staticmethod
+    def _gh_token() -> str | None:
+        gh = shutil.which("gh") or shutil.which("gh.exe") or (r"C:\Program Files\GitHub CLI\gh.exe" if os.path.exists(r"C:\Program Files\GitHub CLI\gh.exe") else None)
+        if not gh:
+            return None
+        try:
+            out = subprocess.run([gh, "auth", "token", "--hostname", "github.com"], capture_output=True, text=True, timeout=10, check=True)
+            value = out.stdout.strip()
+            return value or None
+        except (OSError, subprocess.SubprocessError):
+            return None
+
     def configured(self) -> bool: return bool(self.token)
     def _auth(self):
         if not self.token: raise GitHubControlError("GITHUB_TOKEN_NOT_CONFIGURED")

@@ -1,0 +1,60 @@
+name: Brain Boot ISO
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/build_brain_boot_iso.sh"
+      - "tools/verify_brain_iso_qemu.sh"
+      - "brain_v12/brain/self_trust_boot_gate.py"
+      - ".github/workflows/brain-boot-iso.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-qemu-verify:
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify toolchain
+        run: |
+          set -euo pipefail
+          test "${BRAIN_INTERNAL_RUNNER_FLAG:-}" = "1"
+          command -v grub-mkrescue
+          command -v xorriso
+          command -v gcc
+          command -v qemu-system-x86_64
+      - name: Build Brain Boot ISO
+        run: |
+          set -euo pipefail
+          chmod +x tools/build_brain_boot_iso.sh tools/verify_brain_iso_qemu.sh
+          tools/build_brain_boot_iso.sh brain-boot-self-trust.iso
+          test -s brain-boot-self-trust.iso
+      - name: Inspect ISO contract
+        run: |
+          set -euo pipefail
+          xorriso -indev brain-boot-self-trust.iso -toc | tee iso-toc.txt
+          xorriso -indev brain-boot-self-trust.iso -find / -name brain_boot.elf -print | tee iso-kernel.txt
+          xorriso -indev brain-boot-self-trust.iso -find / -name boot-gate.json -print | tee iso-gate.txt
+          grep -q 'brain_boot.elf' iso-kernel.txt
+          grep -q 'boot-gate.json' iso-gate.txt
+      - name: Boot ISO with QEMU
+        run: |
+          set -euo pipefail
+          ./tools/verify_brain_iso_qemu.sh
+      - name: Publish evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-boot-iso-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            brain-boot-self-trust.iso
+            brain-boot-self-trust.iso.sha256
+            iso-toc.txt
+            iso-kernel.txt
+            iso-gate.txt
+            brain-iso-serial.log
+            brain-iso-debug.log

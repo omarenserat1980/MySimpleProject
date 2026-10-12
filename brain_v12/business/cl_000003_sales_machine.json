@@ -1,0 +1,113 @@
+{
+  "client_id": "CL-000003",
+  "opportunity_id": "OP-CL3-001",
+  "status": "READY",
+  "machine": "BRAIN_SELLABLE_SERVICE_MACHINE",
+  "stages": [
+    {
+      "id": "S1",
+      "name": "DISCOVERY",
+      "output": "validated problem hypothesis"
+    },
+    {
+      "id": "S2",
+      "name": "MVP",
+      "output": "working portal MVP"
+    },
+    {
+      "id": "S3",
+      "name": "QC",
+      "output": "technical verification evidence"
+    },
+    {
+      "id": "S4",
+      "name": "DEMO",
+      "output": "reviewable demo"
+    },
+    {
+      "id": "S5",
+      "name": "OFFER",
+      "output": "commercial offer draft"
+    },
+    {
+      "id": "S6",
+      "name": "MARKETING",
+      "output": "authorized promotional assets"
+    },
+    {
+      "id": "S7",
+      "name": "LEAD_CAPTURE",
+      "output": "qualified lead evidence"
+    },
+    {
+      "id": "S8",
+      "name": "CUSTOMER_RESPONSE",
+      "output": "acceptance/objection evidence"
+    },
+    {
+      "id": "S9",
+      "name": "ORDER",
+      "output": "accepted order evidence"
+    },
+    {
+      "id": "S10",
+      "name": "DELIVERY",
+      "output": "delivery evidence"
+    },
+    {
+      "id": "S11",
+      "name": "PAYMENT",
+      "output": "independent payment evidence"
+    },
+    {
+      "id": "S12",
+      "name": "RECONCILIATION",
+      "output": "bound financial/delivery evidence"
+    },
+    {
+      "id": "S13",
+      "name": "REVENUE",
+      "output": "REVENUE_REALIZED"
+    }
+  ],
+  "rules": {
+    "one_active_stage": true,
+    "evidence_required_for_advancement": true,
+    "failure_requires_diagnosis": true,
+    "no_vanity_success": true,
+    "no_fabricated_revenue": true,
+    "no_unauthorized_external_commitments": true
+  },
+  "current_stage": "S4",
+  "financial_truth": {
+    "revenue_realized": false,
+    "amount": 0,
+    "currency": null
+  },
+  "execution_status": "DEMO_READY_AFTER_QC",
+  "artifacts": {
+    "backend": "brain_v12/brain/industrial_quote_portal.py",
+    "tests": "brain_v12/tests/test_industrial_quote_portal.py",
+    "customer_ui": "brain_v12/web/industrial-quote-portal/index.html",
+    "admin_ui": "brain_v12/web/industrial-quote-portal/admin.html",
+    "qc_workflow": ".github/workflows/cl-000003-industrial-portal-qc.yml"
+  },
+  "qc": {
+    "syntax_check": "PASS",
+    "unit_tests": "PASS",
+    "ui_contract": "PASS",
+    "runtime_smoke": "PASS",
+    "professional_review": "REVIEWED_AND_REPAIRED",
+    "release_gate": "PASS",
+    "evidence_artifact": "VERIFIED",
+    "evidence_run_id": 37529986118,
+    "evidence_artifact_id": 11443882749,
+    "evidence_commit": "c16d995dcf78cbd0ab6ced7338f2977fa460a0ea",
+    "evidence_digest": "sha256:e5736372ca10702c27d9606440487202bc94363f0ca63fdd56fd69aa05115701"
+  },
+  "findings": [
+    "Initial bilingual claim was incomplete because UI did not switch language.",
+    "Admin tracking view was missing.",
+    "Both issues were repaired before release consideration."
+  ]
+}

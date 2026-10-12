@@ -13,7 +13,7 @@ permissions:
 jobs:
   render:
     name: Render shard ${{ matrix.shard }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -25,6 +25,16 @@ jobs:
           - {shard: 4, start: 181, end: 240}
     steps:
       - uses: actions/checkout@v4
+      - name: Fail-closed Brain internal runtime preflight
+        run: |
+          set -euo pipefail
+          python -m brain_v12.brain.internal_runner_preflight
+          python - <<'PY'
+          from brain_v12.brain.internal_runner_preflight import verify_and_write
+          e=verify_and_write("internal-runner-preflight.json")
+          assert e["verified"] is True, e
+          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
+          PY
       - name: Install media runtime
         run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
       - name: Verify Brain source
@@ -50,10 +60,20 @@ jobs:
   assemble:
     name: Assemble and verify cinematic master
     needs: render
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Fail-closed Brain internal runtime preflight
+        run: |
+          set -euo pipefail
+          python -m brain_v12.brain.internal_runner_preflight
+          python - <<'PY'
+          from brain_v12.brain.internal_runner_preflight import verify_and_write
+          e=verify_and_write("internal-runner-preflight.json")
+          assert e["verified"] is True, e
+          print("BRAIN_INTERNAL_RUNNER=VERIFIED")
+          PY
       - name: Install media runtime
         run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
       - name: Download shards

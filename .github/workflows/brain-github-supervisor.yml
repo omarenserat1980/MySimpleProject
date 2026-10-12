@@ -1,0 +1,78 @@
+name: Brain GitHub Supervisor - Autonomous Cloud Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Brain Cloud task"
+        required: false
+        default: "health"
+        type: string
+  schedule:
+    - cron: "17 * * * *"
+
+concurrency:
+  group: brain-github-supervisor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  brain-cloud:
+    name: Run Brain Cloud through reusable workflow
+    uses: ./.github/workflows/brain-github-cloud.yml
+    with:
+      task: ${{ inputs.task || 'health' }}
+    permissions:
+      contents: read
+      actions: read
+
+  verify:
+    name: Verify Brain Cloud evidence
+    needs: brain-cloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download Brain Cloud evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: brain-github-cloud-evidence
+          path: brain6_artifacts/supervisor-evidence
+
+      - name: Verify evidence contract
+        run: |
+          set -euo pipefail
+          test -s brain6_artifacts/supervisor-evidence/evidence.json
+          test -s brain6_artifacts/supervisor-evidence/task_result.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("brain6_artifacts/supervisor-evidence")
+          evidence = json.loads((root / "evidence.json").read_text(encoding="utf-8"))
+          task = json.loads((root / "task_result.json").read_text(encoding="utf-8"))
+
+          assert task.get("ok") is True, task
+          assert task.get("state") == "TASK_COMPLETED", task
+          assert evidence.get("github_capability_registry") == 90, evidence
+          assert evidence.get("github_agent_tests") == "PASS", evidence
+          assert evidence.get("verification_gate") == "ACTION_VERIFIED_ONLY", evidence
+
+          print(json.dumps({
+              "supervisor_verified": True,
+              "objective_verified": False,
+              "action_verified": True,
+              "evidence_contract": "PASS",
+              "task": task,
+              "evidence": evidence,
+          }, indent=2, ensure_ascii=False))
+          PY
+
+      - name: Upload supervisor verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-github-supervisor-evidence
+          path: brain6_artifacts/supervisor-evidence/
+          retention-days: 1

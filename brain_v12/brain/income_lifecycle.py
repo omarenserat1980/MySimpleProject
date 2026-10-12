@@ -40,8 +40,8 @@ class IncomeLifecycle:
     def _now(self):
         return datetime.now(timezone.utc).isoformat()
 
-    def _find(self, opportunity_id):
-        rows = self.store.income_opportunities(500)
+    def _find(self, opportunity_id, client_id=None):
+        rows = self.store.income_opportunities(500, client_id=client_id)
         return next((x for x in rows if x.get("opportunity_id") == opportunity_id), None)
 
     def _save(self, row, **updates):
@@ -51,8 +51,8 @@ class IncomeLifecycle:
         self.store.upsert_income_opportunity(data)
         return data
 
-    def _transition(self, opportunity_id, target, evidence="", actor="external_executor"):
-        row = self._find(opportunity_id)
+    def _transition(self, opportunity_id, target, evidence="", actor="external_executor", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND", "opportunity_id": opportunity_id}
         current = str(row.get("status") or "DISCOVERY")
@@ -78,18 +78,18 @@ class IncomeLifecycle:
         })
         return {"ok": True, "status": target, "opportunity": data}
 
-    def qualify(self, opportunity_id, notes=""):
-        row = self._find(opportunity_id)
+    def qualify(self, opportunity_id, notes="", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND"}
         req = str((row.get("data") or {}).get("requirements") or "")
         url = str(row.get("source_url") or "")
         if not url.startswith(("http://", "https://")) or len(req.strip()) < 8:
             return {"ok": False, "status": "NOT_QUALIFIED", "reason": "MISSING_SOURCE_OR_REQUIREMENTS"}
-        return self._transition(opportunity_id, "QUALIFIED", actor="brain")
+        return self._transition(opportunity_id, "QUALIFIED", actor="brain", client_id=client_id)
 
-    def prepare(self, opportunity_id, proposal=""):
-        row = self._find(opportunity_id)
+    def prepare(self, opportunity_id, proposal="", client_id=None):
+        row = self._find(opportunity_id, client_id=client_id)
         if not row:
             return {"ok": False, "status": "NOT_FOUND"}
         data = dict(row.get("data") or {})
@@ -112,12 +112,125 @@ class IncomeLifecycle:
         return {"ok": True, "status": "READY_TO_APPLY", "opportunity": data,
                 "external_submission": "NOT_PERFORMED"}
 
-    def record_external(self, opportunity_id, status, evidence):
+    def record_external(self, opportunity_id, status, evidence, client_id=None):
         """Record an externally completed step only when its evidence is supplied."""
-        return self._transition(opportunity_id, status, evidence=evidence, actor="external_executor")
+        return self._transition(opportunity_id, status, evidence=evidence, actor="external_executor", client_id=client_id)
 
-    def summary(self):
-        rows = self.store.income_opportunities(500)
+    def request_payment(self, opportunity_id, amount_jod, currency="JOD", client_id=None, order_id=None):
+        """Create an auditable payment request after verified delivery."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        status = str(row.get("status") or "DISCOVERY")
+        if status != "COMPLETED":
+            return {"ok": False, "status": "DELIVERY_NOT_VERIFIED", "current": status}
+        amount = float(amount_jod)
+        if amount <= 0:
+            return {"ok": False, "status": "INVALID_AMOUNT"}
+        data = dict(row.get("data") or {})
+        existing = data.get("payment_request") or {}
+        if existing:
+            if float(existing.get("amount_jod", 0) or 0) == amount and existing.get("currency") == currency:
+                return {"ok": True, "status": "ALREADY_REQUESTED", "payment_request": existing}
+            return {"ok": False, "status": "PAYMENT_REQUEST_IMMUTABLE"}
+        request_id = "PAY-" + hashlib.sha1(
+            f"{opportunity_id}|{client_id}|{amount:.2f}|{currency}".encode()
+        ).hexdigest()[:12]
+        payment_request = {
+            "request_id": request_id,
+            "opportunity_id": opportunity_id,
+            "order_id": order_id,
+            "client_id": client_id,
+            "amount_jod": round(amount, 2),
+            "currency": currency,
+            "status": "REQUESTED",
+            "created_at": self._now(),
+            "payment_provider": "HUMAN_OR_CONNECTED_PROVIDER",
+        }
+        data = self._save(row, payment_request=payment_request)
+        self.store.event("PAYMENT_REQUEST_CREATED", {
+            "request_id": request_id,
+            "opportunity_id": opportunity_id,
+            "amount_jod": round(amount, 2),
+        })
+        return {"ok": True, "status": "PAYMENT_REQUESTED", "payment_request": payment_request}
+
+    def reconcile_payment(self, opportunity_id, amount_jod, currency, transaction_id, evidence, client_id=None, order_id=None):
+        """Reconcile independent payment evidence before revenue recognition."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        data = dict(row.get("data") or {})
+        request = data.get("payment_request") or {}
+        if not request:
+            return {"ok": False, "status": "PAYMENT_REQUEST_REQUIRED"}
+        if order_id and request.get("order_id") and order_id != request.get("order_id"):
+            return {"ok": False, "status": "ORDER_MISMATCH"}
+        if currency != request.get("currency"):
+            return {"ok": False, "status": "CURRENCY_MISMATCH"}
+        received = float(amount_jod)
+        requested = float(request.get("amount_jod", 0) or 0)
+        if received < requested:
+            return {"ok": False, "status": "AMOUNT_MISMATCH", "requested": requested, "received": received}
+        if not str(transaction_id).strip() or not str(evidence).strip():
+            return {"ok": False, "status": "INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED"}
+        # Revenue conversion is fail-closed: free-form evidence is not enough.
+        # A connected payment authority must explicitly mark the reconciliation
+        # as independently verified (normally from a signed provider webhook).
+        if not isinstance(evidence, dict) or evidence.get("independent_verification") != "SIGNED_PROVIDER_WEBHOOK":
+            return {"ok": False, "status": "SIGNED_PROVIDER_AUTHORITY_REQUIRED"}
+        existing = data.get("payment_reconciliation")
+        if existing:
+            if existing.get("transaction_id") == transaction_id and float(existing.get("received_amount_jod", 0) or 0) == received:
+                return {"ok": True, "status": "ALREADY_RECONCILED", "reconciliation": existing}
+            return {"ok": False, "status": "PAYMENT_RECONCILIATION_IMMUTABLE"}
+        reconciliation = {
+            "transaction_id": str(transaction_id)[:300],
+            "received_amount_jod": round(received, 2),
+            "currency": currency,
+            "evidence": str(evidence.get("evidence_ref") or "")[:4000],
+            "independent_verification": evidence.get("independent_verification"),
+            "provider": str(evidence.get("provider") or "")[:100],
+            "event_id": str(evidence.get("event_id") or "")[:200],
+            "reconciled_at": self._now(),
+            "order_id": order_id or request.get("order_id"),
+        }
+        data = self._save(row, payment_reconciliation=reconciliation)
+        self.store.event("PAYMENT_RECONCILED", {
+            "opportunity_id": opportunity_id,
+            "transaction_id": str(transaction_id)[:300],
+            "received_amount_jod": round(received, 2),
+        })
+        return {"ok": True, "status": "RECONCILED", "reconciliation": reconciliation}
+
+    def realize_revenue(self, opportunity_id, client_id=None):
+        """Recognize revenue only after delivery, payment request, and reconciliation."""
+        row = self._find(opportunity_id, client_id=client_id)
+        if not row:
+            return {"ok": False, "status": "NOT_FOUND"}
+        data = dict(row.get("data") or {})
+        if str(data.get("status")) not in {"COMPLETED", "PAYMENT_VERIFIED"}:
+            return {"ok": False, "status": "DELIVERY_NOT_VERIFIED"}
+        reconciliation = data.get("payment_reconciliation") or {}
+        if not reconciliation:
+            return {"ok": False, "status": "PAYMENT_NOT_RECONCILED"}
+        if data.get("revenue_realized"):
+            return {"ok": True, "status": "ALREADY_REALIZED", "amount_jod": float(data.get("verified_amount_jod", 0) or 0)}
+        amount = float(reconciliation.get("received_amount_jod", 0) or 0)
+        if amount <= 0:
+            return {"ok": False, "status": "INVALID_RECONCILED_AMOUNT"}
+        data = self._save(row, status="PAYMENT_VERIFIED", verification_status="VERIFIED",
+                          verified_amount_jod=amount, revenue_realized=True,
+                          revenue_realized_at=self._now())
+        self.store.event("REVENUE_REALIZED", {
+            "opportunity_id": opportunity_id,
+            "amount_jod": amount,
+            "transaction_id": reconciliation.get("transaction_id"),
+        })
+        return {"ok": True, "status": "REVENUE_REALIZED", "amount_jod": amount}
+
+    def summary(self, client_id=None):
+        rows = self.store.income_opportunities(500, client_id=client_id)
         counts = {s: 0 for s in self.ORDER}
         for row in rows:
             s = str(row.get("status") or "DISCOVERY")
@@ -125,6 +238,7 @@ class IncomeLifecycle:
         return {
             "counts": counts,
             "external_execution_ready": False,
-            "reason": "لا توجد قناة تنفيذ خارجية متصلة بالحسابات؛ يمكن تجهيز العروض وتسجيل الأدلة فقط.",
-            "payment_verified_jod": sum(float(x.get("verified_amount_jod") or 0) for x in rows),
+            "reason": "يمكن إنشاء طلب دفع بعد التسليم؛ الاعتراف بالإيراد يتطلب مصالحة مستقلة للدفع.",
+            "payment_verified_jod": sum(float(x.get("verified_amount_jod") or 0) for x in rows if x.get("revenue_realized")),
+            "client_id": client_id,
         }

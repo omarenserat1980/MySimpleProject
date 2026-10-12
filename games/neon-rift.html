@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BRAIN Original — Neon Rift</title>
+<style>html,body{margin:0;height:100%;background:#050712;color:#eef;font-family:system-ui;overflow:hidden}body{display:grid;place-items:center}#wrap{width:min(100vw,1000px);padding:10px}canvas{display:block;width:100%;aspect-ratio:16/9;background:radial-gradient(circle,#141b45,#050712);border:1px solid #39416e;border-radius:18px;box-shadow:0 20px 70px #000}#ui{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none;font-weight:800}.hint{position:fixed;bottom:18px;background:#080b18d9;padding:9px 14px;border-radius:12px;color:#aab3d8}button{pointer-events:auto;background:#7567ff;color:white;border:0;border-radius:10px;padding:9px 13px}</style></head>
+<body><div id="wrap"><canvas id="c" width="960" height="540"></canvas></div><div id="ui"><span id="score">النقاط: 0</span><span id="hp">الطاقة: 100</span><button id="restart">إعادة</button></div><div class="hint">حرّك بالفأرة/اللمس • اضغط لإطلاق النبضات • اهزم موجات الشق</div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');let W=c.width,H=c.height,px=W/2,py=H-70,shots=[],foes=[],score=0,hp=100,dead=false,t=0,down=false;
+function aim(e){const r=c.getBoundingClientRect();px=(e.clientX-r.left)*W/r.width;py=(e.clientY-r.top)*H/r.height-10;py=Math.max(80,Math.min(H-35,py))}
+c.addEventListener('pointermove',aim);c.addEventListener('pointerdown',e=>{down=true;aim(e)});c.addEventListener('pointerup',()=>down=false);
+document.getElementById('restart').onclick=()=>{shots=[];foes=[];score=0;hp=100;dead=false};
+function fire(){shots.push({x:px,y:py-18,v:8})}
+function spawn(){foes.push({x:30+Math.random()*(W-60),y:-20,r:12+Math.random()*15,v:1+Math.random()*1.6,h:2})}
+function loop(){requestAnimationFrame(loop);t++;if(dead){draw();return}if(t%34===0)spawn();if(down&&t%8===0)fire();
+shots.forEach(s=>s.y-=s.v);foes.forEach(f=>f.y+=f.v);
+for(let i=foes.length-1;i>=0;i--){let f=foes[i];if(f.y>H+30){hp-=10;foes.splice(i,1);continue}for(let j=shots.length-1;j>=0;j--){let s=shots[j];if(Math.hypot(s.x-f.x,s.y-f.y)<f.r+4){f.h--;shots.splice(j,1);if(f.h<=0){score+=10;foes.splice(i,1)}break}}if(Math.hypot(px-f.x,py-f.y)<f.r+16){hp-=20;foes.splice(i,1)}}if(hp<=0)dead=true;document.getElementById('score').textContent='النقاط: '+score;document.getElementById('hp').textContent='الطاقة: '+Math.max(0,hp);draw()}
+function draw(){x.clearRect(0,0,W,H);for(let i=0;i<35;i++){x.fillStyle='#ffffff22';x.fillRect((i*173)%W,(i*97+t*.25)%H,2,2)}x.strokeStyle='#7567ff88';x.beginPath();x.arc(px,py,22,0,7);x.stroke();x.fillStyle='#26d7c5';x.beginPath();x.moveTo(px,py-20);x.lineTo(px-13,py+15);x.lineTo(px+13,py+15);x.fill();shots.forEach(s=>{x.fillStyle='#aaf';x.fillRect(s.x-2,s.y-12,4,12)});foes.forEach(f=>{x.fillStyle='#ff5477';x.beginPath();x.arc(f.x,f.y,f.r,0,7);x.fill();x.fillStyle='#fff';x.fillRect(f.x-3,f.y-3,6,6)});if(dead){x.fillStyle='#000b';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.textAlign='center';x.font='bold 48px system-ui';x.fillText('انتهت المهمة',W/2,H/2);x.font='22px system-ui';x.fillText('نقاطك: '+score,W/2,H/2+42)}}
+loop();
+</script></body></html>

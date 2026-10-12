@@ -7,6 +7,9 @@
 - [x] Require verified attributable costs before profit verification
 - [x] Build unified monetization registry and initial capability catalog
 - [ ] Add commercial KPI/evidence dashboard
+- [ ] Run independent BRAIN AI Marketing evaluation across customer, marketer, marketing manager, and agency-owner perspectives
+- [ ] Convert reviewer findings into tracked UX/commercial improvements
+- [ ] Pass public API + account + trial + order + execution + payment production gate
 
 ## Phase 1 — Evidence and runtime foundation
 - [x] GitHub source-of-truth workflow
@@ -28,7 +31,20 @@
 - [ ] Verify result and record evidence
 - [ ] Stop after bounded attempts
 
+## Phase 2.5 — Capability Fabric and provider independence
+- [x] Define provider-neutral capability contract
+- [x] Add Brain-owned Capability Fabric with bounded executor fallback
+- [x] Add permission-aware executor selection
+- [x] Add no-executor / no-fake-success behavior
+- [x] Add dedicated Capability Fabric CI gate
+- [x] Register existing Brain-owned media/code/AI/device executors into the common fabric
+- [x] Add health scoring and evidence-aware executor ranking
+- [x] Enforce Brain-owned → free-diverse → paid-external autonomy tiers
+- [x] Keep paid executors disabled unless commercial mode explicitly enables them
+
 ## Phase 3 — Brain Cloud execution
+- [x] Add policy-only portable resource scheduler and configurable local-host resource budget (implementation branch; CI validation pending)
+- [ ] Add durable portable run/evidence index and executor request/result schema
 - [x] Free GitHub-hosted Linux runner
 - [x] Python runtime
 - [x] FFmpeg/FFprobe installation
@@ -50,8 +66,11 @@
 - [ ] Profit measurement after verified delivery and costs
 - [ ] YouTube publishing only after explicit authorization and OAuth verification
 
-## Phase 5 — Device bridge
+## Phase 5 — Device bridge and synchronization
 - [x] Device bridge modules
+- [x] Deterministic synchronization core
+- [x] Idempotent event replay and optimistic concurrency
+- [x] Tombstones, deterministic snapshot digests, and audit-chain validation
 - [ ] BRAIN Termux Emulator as primary phone-side executor
 - [ ] Secure polling/command contract
 - [ ] Offline queue and recovery
@@ -96,6 +115,10 @@
 - [ ] Establish end-to-end release gate
 
 ## Phase 10 — Commercial execution
+- [x] Define evidence-first Founder Compensation Engine and extraordinary-compensation ambition
+- [ ] Implement compensation calculation/eligibility service against verified Economic Ledger evidence
+- [ ] Add founder compensation evidence dashboard and audit trail
+- [ ] Validate jurisdiction-specific compensation/tax policy before any real payment
 - [ ] Generate a commercial KPI/evidence dashboard
 - [ ] Connect every monetization entry to an offer, customer evidence, delivery evidence, payment evidence, and cost evidence
 - [ ] Track verified revenue separately from forecasts and opportunities

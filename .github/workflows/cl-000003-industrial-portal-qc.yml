@@ -1,0 +1,62 @@
+name: CL-000003 Industrial Quote Portal QC
+on:
+  push:
+    paths:
+      - "brain_v12/brain/industrial_quote_portal.py"
+      - "brain_v12/tests/test_industrial_quote_portal.py"
+      - "brain_v12/web/industrial-quote-portal/**"
+      - "brain_v12/app.py"
+      - ".github/workflows/cl-000003-industrial-portal-qc.yml"
+  workflow_dispatch:
+jobs:
+  qc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -U pip pytest fastapi pydantic httpx
+      - name: Compile portal backend
+        run: python -m py_compile brain_v12/brain/industrial_quote_portal.py
+      - name: Portal unit tests
+        run: python -m pytest -q brain_v12/tests/test_industrial_quote_portal.py
+      - name: Runtime smoke checks
+        run: |
+          python - <<'PY'
+          from fastapi import FastAPI
+          from fastapi.testclient import TestClient
+          from brain_v12.brain.industrial_quote_portal import router
+          app=FastAPI()
+          app.include_router(router("/tmp/brain-v12-industrial-qc.json"))
+          c=TestClient(app)
+          assert c.get("/api/industrial-quotes/health").status_code == 200
+          r=c.post("/api/industrial-quotes/inquiries", json={"company":"QC Industrial","contact_name":"QC User","email":"qc@example.com","category":"Hydraulics","message":"Runtime smoke inquiry for verification."})
+          assert r.status_code == 200, r.text
+          assert r.json()["inquiry_id"].startswith("Q-")
+          print("RUNTIME_SMOKE_PASS")
+          PY
+
+      - name: UI contract checks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("brain_v12/web/industrial-quote-portal/index.html")
+          s=p.read_text(encoding="utf-8")
+          required=["/api/industrial-quotes/inquiries","type=\"email\"","minlength=\"10\"","dir=\"rtl\"","@media(max-width:800px)"]
+          missing=[x for x in required if x not in s]
+          assert not missing, missing
+          print("UI_CONTRACT_PASS")
+          PY
+      - name: Write QC evidence
+        if: always()
+        run: |
+          mkdir -p qc-evidence
+          printf '%s\n' '{"workflow":"cl-000003-industrial-portal-qc","commit":"${{ github.sha }}","checks":["compile","unit_tests","runtime_smoke","ui_contract"],"evidence_source":"github_actions"}' > qc-evidence/industrial_portal_qc.json
+      - name: Upload QC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cl-000003-industrial-portal-qc-evidence
+          path: qc-evidence/industrial_portal_qc.json

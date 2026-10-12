@@ -1,0 +1,205 @@
+from __future__ import annotations
+
+"""Windows Cloud node registration/heartbeat helper.
+
+Runs inside a real Windows Server 2025 cloud VM. It never provisions
+infrastructure and never stores provider credentials. The VM must be
+enrolled with Brain Cloud Fabric and then reports its capability/heartbeat.
+"""
+
+import os
+import platform
+import time
+import urllib.request
+import json
+import subprocess
+import threading
+
+
+def _post(url: str, payload: dict, token: str) -> dict:
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        url,
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + token},
+    )
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return json.loads(response.read().decode())
+
+
+def heartbeat(*, jobs_running: int = 0) -> dict:
+    origin = os.getenv("BRAIN_FABRIC_URL", "").rstrip("/")
+    node_id = os.getenv("BRAIN_WINDOWS_NODE_ID", platform.node()).strip()
+    token = os.getenv("BRAIN_ENROLLMENT_TOKEN", "").strip()
+    if not origin or not node_id or not token:
+        return {
+            "ok": False,
+            "status": "NOT_CONFIGURED",
+            "reason": "BRAIN_FABRIC_URL_NODE_ID_OR_ENROLLMENT_TOKEN_MISSING",
+        }
+
+    payload = {
+        "enrollment_token": token,
+        "state": "READY",
+        "jobs_running": max(0, int(jobs_running)),
+        "architecture": "x86_64" if platform.machine().lower() in {"amd64", "x86_64"} else platform.machine(),
+        "capabilities": [
+            "windows-server-2025",
+            "windows-cloud",
+            "brain-task-execution",
+            "brain-heartbeat",
+            "brain-evidence",
+        ],
+    }
+    result = _post(f"{origin}/v1/fabric/nodes/{node_id}/heartbeat", payload, token)
+    return {"ok": True, "status": "HEARTBEAT_SENT", "node": result.get("node")}
+
+
+def _get(url: str, token: str) -> dict:
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": "Bearer " + token},
+    )
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return json.loads(response.read().decode())
+
+
+def _post_result(origin: str, node_id: str, job_id: str, token: str, state: str, evidence: dict) -> dict:
+    lease_id = str(evidence.pop("lease_id", "")).strip()
+    if not lease_id:
+        raise RuntimeError("WINDOWS_JOB_LEASE_ID_REQUIRED")
+    return _post(
+        f"{origin}/v1/fabric/nodes/{node_id}/jobs/{job_id}/result",
+        {"state": state, "evidence": evidence, "lease_id": lease_id},
+        token,
+    )
+
+
+def execute_job(job: dict) -> dict:
+    if os.name != "nt":
+        raise RuntimeError("WINDOWS_AGENT_REQUIRES_WINDOWS")
+    payload = job.get("payload") or {}
+    argv = payload.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
+        raise RuntimeError("WINDOWS_JOB_REQUIRES_ARGV_LIST")
+    timeout = max(1, min(int(payload.get("timeout", payload.get("timeout_seconds", 900))), 3600))
+    cwd = payload.get("cwd")
+    if cwd is not None and not isinstance(cwd, str):
+        raise RuntimeError("WINDOWS_JOB_CWD_INVALID")
+    started = time.time()
+    completed = subprocess.run(
+        argv,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        shell=False,
+        check=False,
+    )
+    return {
+        "exit_code": completed.returncode,
+        "stdout": completed.stdout[-20000:],
+        "stderr": completed.stderr[-20000:],
+        "duration_seconds": round(time.time() - started, 3),
+        "shell": False,
+        "executor": "windows-server-2025-cloud-agent",
+    }
+
+
+def _job_heartbeat_loop(stop: threading.Event, interval: float = 30.0) -> None:
+    while not stop.wait(max(5.0, min(interval, 60.0))):
+        try:
+            heartbeat(jobs_running=1)
+        except Exception as exc:
+            print(
+                json.dumps(
+                    {"ok": False, "status": "JOB_HEARTBEAT_RETRY",
+                     "error": f"{type(exc).__name__}:{exc}"},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+
+
+def poll_once() -> dict:
+    origin = os.getenv("BRAIN_FABRIC_URL", "").rstrip("/")
+    node_id = os.getenv("BRAIN_WINDOWS_NODE_ID", platform.node()).strip()
+    token = os.getenv("BRAIN_ENROLLMENT_TOKEN", "").strip()
+    if not origin or not node_id or not token:
+        return {"ok": False, "status": "NOT_CONFIGURED"}
+    job_response = _get(
+        f"{origin}/v1/fabric/nodes/{node_id}/jobs/next",
+        token,
+    )
+    job = job_response.get("job")
+    if not job:
+        return {"ok": True, "status": "IDLE"}
+    stop_heartbeat = threading.Event()
+    worker = threading.Thread(
+        target=_job_heartbeat_loop, args=(stop_heartbeat,), daemon=True
+    )
+    worker.start()
+    try:
+        heartbeat(jobs_running=1)
+        evidence = execute_job(job)
+        state = "SUCCESS" if evidence["exit_code"] == 0 else "FAILED"
+    except subprocess.TimeoutExpired as exc:
+        evidence = {
+            "error": "PROCESS_TIMEOUT",
+            "stdout": (exc.stdout or "")[-20000:] if isinstance(exc.stdout, str) else "",
+            "stderr": (exc.stderr or "")[-20000:] if isinstance(exc.stderr, str) else "",
+            "executor": "windows-server-2025-cloud-agent",
+        }
+        state = "FAILED"
+    except Exception as exc:
+        evidence = {
+            "error": f"{type(exc).__name__}:{exc}",
+            "executor": "windows-server-2025-cloud-agent",
+        }
+        state = "FAILED"
+    finally:
+        stop_heartbeat.set()
+        try:
+            heartbeat(jobs_running=0)
+        except Exception:
+            pass
+    lease_id = str(job.get("lease_id", "")).strip()
+    if not lease_id:
+        raise RuntimeError("WINDOWS_JOB_LEASE_ID_REQUIRED")
+    result = _post_result(
+        origin, node_id, job["job_id"], token, state,
+        {**evidence, "lease_id": lease_id},
+    )
+    return {"ok": True, "status": "JOB_COMPLETED", "job_id": job["job_id"], "state": state, "result": result}
+
+
+def run_forever(poll_seconds: float = 5.0) -> None:
+    interval = max(1.0, float(poll_seconds))
+    while True:
+        try:
+            hb = heartbeat()
+            if hb.get("ok"):
+                poll_once()
+        except Exception as exc:
+            # Network/control-plane interruptions must not terminate the VM agent.
+            # The next cycle retries and the node becomes stale if the outage persists.
+            print(
+                json.dumps(
+                    {"ok": False, "status": "FABRIC_RETRY", "error": f"{type(exc).__name__}:{exc}"},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+        time.sleep(interval)
+
+
+if __name__ == "__main__":
+    if os.name != "nt":
+        raise SystemExit("Windows Cloud Agent must run on Windows")
+    result = heartbeat()
+    if result.get("ok"):
+        run_forever(float(os.getenv("BRAIN_WINDOWS_AGENT_POLL_SECONDS", "5")))
+    print(json.dumps(result, indent=2, sort_keys=True))
+    raise SystemExit(0 if result.get("ok") else 2)

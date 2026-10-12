@@ -305,6 +305,7 @@ def test_customer_feedback_api_lifecycle_and_evidence(monkeypatch, tmp_path):
         params={"state": "RESOLVED"},
     )
     assert unresolved.status_code == 422
+    assert "requires evidence_ref" in unresolved.json()["detail"]
 
     resolved = client.post(
         f"/v1/feedback/{feedback_id}/transition",

@@ -1,0 +1,55 @@
+name: BRAIN Commercial Readiness Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "brain/provider_hub/**"
+      - ".github/workflows/brain-commercial-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=8,<9"
+          python -m pip check
+      - name: Run provider and commercial safety tests
+        run: |
+          python -m pytest -q brain/provider_hub
+      - name: Enforce honest launch status
+        run: |
+          python - <<'PY'
+          from brain.provider_hub.commercial_gate import evaluate
+          from brain.provider_hub.evidence import CommercialEvidenceGate
+          from brain.provider_hub.lifecycle import ProviderRecord
+          r = evaluate(
+              public_api=False,
+              auth_verified=True,
+              trial_enforced=True,
+              order_flow_verified=True,
+              payment_provider=ProviderRecord("payment","payment",1,"DISCOVERED"),
+              payment_verification_live=False,
+              delivery_verified=False,
+              evidence_gate=CommercialEvidenceGate(),
+              order_id="CI-READINESS",
+          )
+          assert r.status == "COMMERCIAL_LAUNCH_BLOCKED"
+          from brain.provider_hub.readiness_report import build_report
+          build_report(r, "commercial_readiness.json")
+          print("Honest launch gate: BLOCKED until external evidence exists.")
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-commercial-readiness
+          path: commercial_readiness.json

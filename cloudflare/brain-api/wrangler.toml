@@ -3,4 +3,15 @@ main = "src/index.js"
 compatibility_date = "2026-10-02"
 
 [vars]
-BRAIN_ORIGIN = "https://REPLACE_WITH_BRAIN_WORKER_HOST"
+BRAIN_ALLOWED_ORIGIN = "https://omarenserat1980.github.io"
+BRAIN_RETURN_PAGE = "https://omarenserat1980.github.io/MySimpleProject/cinema.html"
+
+[[d1_databases]]
+binding = "BRAIN_DB"
+database_name = "brain-commercial"
+database_id = "REPLACED_IN_CI"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "CINEMA_MEDIA"
+bucket_name = "brain-cinema-media"

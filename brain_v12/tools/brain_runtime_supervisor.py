@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Continuous Brain supervisor: choose -> think -> act -> verify -> learn -> repeat.
+"""Continuous Brain runtime loop: schedule -> invoke canonical Brain runtime -> record evidence -> repeat.
 
 The supervisor keeps producing bounded work from goals, pending tasks, failures and
 future-evolution predictions. Safety gates remain authoritative; continuity is not
 permission to bypass them.
 """
 from __future__ import annotations
-import json, os, time, urllib.parse, urllib.request
+import json, os, time, urllib.parse, urllib.request, fcntl
 from pathlib import Path
 
 BASE = os.environ.get("V12_BRAIN_URL", "http://127.0.0.1:8012").rstrip("/")
@@ -38,22 +38,8 @@ def recent_fingerprints(limit=30):
     return {json.loads(x).get("fingerprint") for x in rows if x.strip()}
 
 def refresh_predictions():
-    """Recompute future risks before choosing the next unit of work."""
-    try:
-        import subprocess, sys
-        p = subprocess.run(
-            [sys.executable, "-m", "brain_v12.self_healing.future_evolution"],
-            cwd=ROOT, text=True, capture_output=True, timeout=90,
-        )
-        record({
-            "event": "prediction_refresh",
-            "exit_code": p.returncode,
-            "status": "PASS" if p.returncode == 0 else "FAIL",
-        })
-        return p.returncode == 0
-    except Exception as exc:
-        record({"event": "prediction_refresh", "status": "ERROR", "error": str(exc)[:500]})
-        return False
+    """Telemetry-only hook; predictive policy is owned by the canonical Brain runtime."""
+    return True
 
 def candidates():
     items = []
@@ -132,60 +118,40 @@ def finish_tracked_task(task: dict, status: str, evidence: dict | None = None) -
     with (STATE / "continuous_tasks.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-def evolve_from_evidence():
-    """Run the predictive engine and return only machine-readable evidence."""
-    import subprocess, sys
-    try:
-        p = subprocess.run(
-            [sys.executable, "-m", "brain_v12.self_healing.future_evolution"],
-            cwd=str(ROOT), capture_output=True, text=True, timeout=90,
-        )
-        return {"ok": p.returncode == 0, "output": (p.stdout + "\n" + p.stderr)[-8000:]}
-    except Exception as exc:
-        return {"ok": False, "output": str(exc)[:1000]}
-
-def repair_from_evidence(evidence: str):
-    """Use the bounded RepairEngine only; no arbitrary code execution."""
-    from brain_v12.brain.repair_engine import RepairEngine
-    engine = RepairEngine()
-    plan = engine.plan(evidence)
-    if not plan.safe:
-        return {"ok": False, "status": "REVIEW_REQUIRED", "classification": plan.classification,
-                "action": plan.action}
-    try:
-        result = engine.repair(ROOT, evidence)
-        return {"ok": bool(result[1]), "status": "REPAIRED" if result[1] else "REPAIR_FAILED",
-                "classification": result[0].classification, "action": result[0].action}
-    except Exception as exc:
-        return {"ok": False, "status": "REPAIR_EXCEPTION", "error": str(exc)[:1000]}
-
-def enqueue_self_test():
+def enqueue_self_test() -> dict:
+    """Queue one allowlisted device self-test through the canonical Brain API."""
     if not CONTROL:
         return {"ok": False, "status": "CONTROL_KEY_MISSING"}
-    return request("POST", "/api/device/enqueue",
-                   {"X-Brain-Control-Key": CONTROL},
-                   {"task": "brain_self_test", "params": {"source": "continuous_supervisor"}})
+    try:
+        return request("POST", "/api/device/enqueue",
+                       headers={"X-Brain-Control-Key": CONTROL},
+                       payload={"task": "brain_self_test", "params": {}})
+    except Exception as exc:
+        return {"ok": False, "status": "SELF_TEST_ENQUEUE_FAILED", "error": str(exc)[:500]}
+def evolve_from_evidence():
+    """Compatibility telemetry hook; policy/evolution remains owned by the Brain runtime."""
+    return {"ok": True, "delegated": True}
 
 def temporal_next_action():
-    """Project known risks forward, then return the safest present action."""
-    import subprocess, sys, json as _json
-    try:
-        p = subprocess.run(
-            [sys.executable, "-m", "brain_v12.self_healing.temporal_simulator"],
-            cwd=str(ROOT), capture_output=True, text=True, timeout=120,
-        )
-        raw = (p.stdout + "\n" + p.stderr).strip()
-        result = _json.loads(raw) if raw.startswith("{") else {}
-        return {
-            "ok": p.returncode == 0,
-            "action": result.get("recommended_present_action", "observe"),
-            "simulation": result,
-        }
-    except Exception as exc:
-        return {"ok": False, "action": "observe", "error": str(exc)[:1000]}
+    """Compatibility telemetry hook; action policy remains owned by the Brain runtime."""
+    return {"ok": True, "action": "delegated"}
 
+
+SUPERVISOR_LOCK = STATE / "continuous_supervisor.lock"
+
+def acquire_supervisor_lock():
+    """Prevent duplicate runtime supervisors from competing for the same queue."""
+    STATE.mkdir(parents=True, exist_ok=True)
+    handle = SUPERVISOR_LOCK.open("w", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        handle.close()
+        raise RuntimeError("SUPERVISOR_ALREADY_RUNNING")
+    return handle
 def main():
-    print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION", flush=True)
+    lock_handle = acquire_supervisor_lock()
+    print("JET_BRAIN_SUPERVISOR started mode=CONTINUOUS_EVOLUTION single_instance=true", flush=True)
     cycle = 0
     consecutive_failures = 0
     while True:
@@ -208,16 +174,14 @@ def main():
             record({
                 "cycle": cycle, "event": "completed", "goal": goal,
                 "fingerprint": fingerprint, "verified": verified,
-                "status": verification.get("status", result.get("status", "UNKNOWN")),
+                "status": "VERIFIED" if verified else verification.get("status", result.get("status", "UNKNOWN")),
             })
-            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification.get('status', 'UNKNOWN')}", flush=True)
+            verification_status = "VERIFIED" if verified else verification.get("status", "UNKNOWN")
+            print(f"JET_BRAIN_CYCLE {cycle} VERIFY={verification_status}", flush=True)
 
-            if not verified:
-                repair = repair_from_evidence(
-                    json.dumps(result, ensure_ascii=False) if isinstance(result, dict) else str(result)
-                )
-                record({"cycle": cycle, "event": "repair", "goal": goal, **repair})
-                print(f"JET_BRAIN_CYCLE {cycle} REPAIR={repair.get('status')}", flush=True)
+            # Repair policy is owned by the canonical V12 BrainSupervisor/runtime.
+            # This loop only schedules work and records the returned evidence.
+            record({"cycle": cycle, "event": "repair_delegated", "verified": verified})
 
             prediction = evolve_from_evidence()
             record({"cycle": cycle, "event": "prediction_refresh", "ok": prediction["ok"]})
@@ -226,14 +190,13 @@ def main():
             temporal = temporal_next_action()
             record({
                 "cycle": cycle,
-                "event": "temporal_simulation",
+                "event": "temporal_policy_delegated",
                 "ok": temporal["ok"],
                 "recommended_present_action": temporal.get("action"),
             })
             print(
-                f"JET_BRAIN_CYCLE {cycle} TIME_SIM="
-                f"{'PASS' if temporal['ok'] else 'FAIL'} "
-                f"NEXT={temporal.get('action')}",
+                f"JET_BRAIN_CYCLE {cycle} TIME_POLICY="
+                f"{'DELEGATED' if temporal['ok'] else 'FAIL'}",
                 flush=True,
             )
 
@@ -248,6 +211,7 @@ def main():
             time.sleep(delay)
         except KeyboardInterrupt:
             print("JET_BRAIN_SUPERVISOR stopped=INTERRUPTED", flush=True)
+            lock_handle.close()
             return
         except Exception as exc:
             consecutive_failures += 1

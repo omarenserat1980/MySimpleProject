@@ -1,0 +1,91 @@
+{
+  "client_id": "CL-000003",
+  "generated_from": "DEEP_COMMERCIAL_EXECUTION",
+  "status": "DISCOVERY_CANDIDATES",
+  "opportunities": [
+    {
+      "id": "OP-CL3-001",
+      "name": "Industrial Quote & Inquiry Portal",
+      "type": "WEB_APPLICATION",
+      "customer_value": "تحويل زوار المنتجات الصناعية إلى طلبات عروض أسعار واستفسارات قابلة للمتابعة والقياس.",
+      "mvp": [
+        "product/category pages",
+        "Arabic/English inquiry form",
+        "quote request ID",
+        "lead status",
+        "admin dashboard",
+        "export/report"
+      ],
+      "acceptance": [
+        "form submission works",
+        "request is persisted",
+        "admin can track status",
+        "basic reporting works",
+        "mobile layout verified"
+      ],
+      "commercial_priority": 1
+    },
+    {
+      "id": "OP-CL3-002",
+      "name": "Industrial Digital Presence Website",
+      "type": "WEBSITE",
+      "customer_value": "عرض المنتجات والخدمات الصناعية بصورة منظمة مع مسارات واضحة للطلب والتواصل.",
+      "mvp": [
+        "responsive homepage",
+        "category navigation",
+        "service/product sections",
+        "contact and quote CTA",
+        "Arabic/English structure"
+      ],
+      "acceptance": [
+        "responsive",
+        "navigation verified",
+        "CTA flow verified",
+        "content placeholders clearly marked",
+        "deployment package reproducible"
+      ],
+      "commercial_priority": 2
+    },
+    {
+      "id": "OP-CL3-003",
+      "name": "Industrial Product Video Pack",
+      "type": "VIDEO_PRODUCTION",
+      "customer_value": "فيديوهات قصيرة لشرح المنتجات والخدمات واستخدامها في التسويق والمبيعات.",
+      "mvp": [
+        "3 short product/service videos",
+        "Arabic voice/script",
+        "captions",
+        "vertical and landscape variants"
+      ],
+      "acceptance": [
+        "rendered files",
+        "audio/video QC",
+        "captions checked",
+        "metadata package"
+      ],
+      "commercial_priority": 3
+    },
+    {
+      "id": "OP-CL3-004",
+      "name": "Sales Reporting Dashboard",
+      "type": "REPORTING_DASHBOARD",
+      "customer_value": "قياس الاستفسارات وطلبات عروض الأسعار ومراحل المتابعة.",
+      "mvp": [
+        "lead counters",
+        "status funnel",
+        "date filters",
+        "export"
+      ],
+      "acceptance": [
+        "metrics trace to source records",
+        "filters work",
+        "export works",
+        "no fabricated metrics"
+      ],
+      "commercial_priority": 4
+    }
+  ],
+  "next_action": "PRIORITIZE",
+  "constraint": "These are candidate solutions, not customer-approved requirements or a paid order.",
+  "revenue_status": "NOT_REALIZED"
+}

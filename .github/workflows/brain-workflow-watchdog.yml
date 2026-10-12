@@ -1,21 +1,9 @@
 name: Brain Global Workflow Watchdog
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/**"
-      - "brain_v12/brain/**"
-      - "brain0/**"
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
-  workflow_run:
-    workflows:
-      - "BRAIN 120 Minute Cinema"
-      - "Brain Windows Real Boot Evidence"
-      - "Brain Virtual Computer"
-    types: [completed]
+    - cron: "47 * * * *"
 
 permissions:
   contents: read
@@ -32,6 +20,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Establish recovery target SHA
+        env:
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          CURRENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_sha="${WORKFLOW_RUN_SHA:-$CURRENT_SHA}"
+          test -n "$target_sha"
+          printf '%s\n' "$target_sha" > brain6_artifacts_target_sha.txt
+          echo "WATCHDOG_TARGET_SHA=$target_sha"
+
+      - name: Check email watchdog freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p brain6_artifacts/workflow_watchdog
+          gh run list --workflow brain-email-watchdog.yml --limit 1 --json databaseId,status,conclusion,createdAt,updatedAt,headSha > brain6_artifacts/workflow_watchdog/email-watchdog-latest.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          rows=json.loads(Path("brain6_artifacts/workflow_watchdog/email-watchdog-latest.json").read_text())
+          now=datetime.now(timezone.utc)
+          evidence={"schema":"brain.email_watchdog.freshness.v1","state":"WATCHDOG_STALE","latest_run":None}
+          if rows:
+              r=rows[0]
+              evidence["latest_run"]={k:r.get(k) for k in ("databaseId","status","conclusion","createdAt","updatedAt","headSha")}
+              stamp=r.get("updatedAt") or r.get("createdAt")
+              if stamp:
+                  age=(now-datetime.fromisoformat(stamp.replace("Z","+00:00"))).total_seconds()
+                  evidence["age_seconds"]=round(age)
+                  if age <= 4500 and r.get("status") == "completed":
+                      evidence["state"]="FRESH"
+          Path("brain6_artifacts/workflow_watchdog/email-watchdog-freshness.json").write_text(json.dumps(evidence,indent=2),encoding="utf-8")
+          print("EMAIL_WATCHDOG_STATE="+evidence["state"])
+          print("EMAIL_WATCHDOG_AGE_SECONDS="+str(evidence.get("age_seconds","unknown")))
+          if evidence["state"] == "WATCHDOG_STALE":
+              print("EMAIL_WATCHDOG_RECOVERY=FRESHNESS_ALERT_ONLY")
+          PY
+
       - name: Inspect recent workflow failures
         id: inspect
         env:
@@ -40,11 +72,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p brain6_artifacts/workflow_watchdog
-          gh run list --limit 50 --json databaseId,status,conclusion,workflowName,attempt,headSha,createdAt,updatedAt             > brain6_artifacts/workflow_watchdog/recent-runs.json
+          cp brain6_artifacts_target_sha.txt brain6_artifacts/workflow_watchdog/target_sha.txt
+          gh run list --limit 50 --json databaseId,status,conclusion,workflowName,attempt,headSha,createdAt,updatedAt \
+            > brain6_artifacts/workflow_watchdog/recent-runs.json
 
           python - <<'PY'
           import json
           from pathlib import Path
+          from brain_v12.brain.workflow_watchdog_policy import partition_failures
 
           data=json.loads(Path("brain6_artifacts/workflow_watchdog/recent-runs.json").read_text())
           rows=[]
@@ -63,12 +98,22 @@ jobs:
                   "created_at": r.get("createdAt"),
                   "updated_at": r.get("updatedAt"),
               })
-          Path("brain6_artifacts/workflow_watchdog/failures.json").write_text(
+
+          target_sha=Path("brain6_artifacts/workflow_watchdog/target_sha.txt").read_text().strip()
+          eligible, ignored = partition_failures(rows, target_sha)
+          Path("brain6_artifacts/workflow_watchdog/failures-observed.json").write_text(
               json.dumps(rows,indent=2), encoding="utf-8"
           )
+          Path("brain6_artifacts/workflow_watchdog/failures.json").write_text(
+              json.dumps(eligible,indent=2), encoding="utf-8"
+          )
+          Path("brain6_artifacts/workflow_watchdog/ignored-cross-sha.json").write_text(
+              json.dumps(ignored,indent=2), encoding="utf-8"
+          )
+          print(f"WATCHDOG_TARGET_SHA={target_sha}")
           print(f"FAILURES_OBSERVED={len(rows)}")
-          for row in rows:
-              print(json.dumps(row, sort_keys=True))
+          print(f"FAILURES_ELIGIBLE={len(eligible)}")
+          print(f"CROSS_SHA_IGNORED={len(ignored)}")
           PY
 
       - name: Diagnose and apply bounded recovery
@@ -77,7 +122,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          failures="brain6_artifacts/workflow_watchdog/failures.json"
           python - <<'PY'
           import json
           from pathlib import Path
@@ -103,15 +147,41 @@ jobs:
           print(f"BOUNDED_BLOCKED={len(blocked)}")
           PY
 
+          target_sha="$(cat brain6_artifacts/workflow_watchdog/target_sha.txt)"
           while IFS= read -r row; do
             run_id="$(python -c 'import json,sys; print(json.load(sys.stdin)["run_id"])' <<< "$row")"
             workflow="$(python -c 'import json,sys; print(json.load(sys.stdin)["workflow"])' <<< "$row")"
             attempt="$(python -c 'import json,sys; print(json.load(sys.stdin)["attempt"])' <<< "$row")"
+            row_sha="$(python -c 'import json,sys; print(json.load(sys.stdin)["head_sha"])' <<< "$row")"
 
             echo "=== BRAIN FAILURE OBSERVED ==="
-            echo "WORKFLOW=$workflow RUN_ID=$run_id ATTEMPT=$attempt"
+            echo "WORKFLOW=$workflow RUN_ID=$run_id ATTEMPT=$attempt HEAD_SHA=$row_sha TARGET_SHA=$target_sha"
+
+            if [ "$row_sha" != "$target_sha" ]; then
+              echo "RECOVERY=SKIPPED_CROSS_SHA"
+              printf '%s\n' "RUN_ID=$run_id" "REASON=CROSS_SHA_DEFENSE" >> brain6_artifacts/workflow_watchdog/actions.log
+              continue
+            fi
+
+            if ! python - <<'PY' "$workflow" "$row_sha" "$target_sha"
+          import sys
+          from brain_v12.brain.workflow_watchdog_policy import recovery_allowed
+          row={"workflow":sys.argv[1],"head_sha":sys.argv[2]}
+          raise SystemExit(0 if recovery_allowed(row, sys.argv[3]) else 41)
+          PY
+            then
+              echo "RECOVERY=POLICY_BLOCKED"
+              printf '%s\n' "RUN_ID=$run_id" "REASON=POLICY_BLOCKED" >> brain6_artifacts/workflow_watchdog/actions.log
+              continue
+            fi
 
             if gh run view "$run_id" --json status,conclusion,jobs,headSha > "brain6_artifacts/workflow_watchdog/run-$run_id.json"; then
+              actual_sha="$(python -c 'import json,sys; print(json.load(sys.stdin)["headSha"])' < "brain6_artifacts/workflow_watchdog/run-$run_id.json")"
+              if [ "$actual_sha" != "$target_sha" ]; then
+                echo "RECOVERY=SKIPPED_CROSS_SHA_RACE"
+                printf '%s\n' "RUN_ID=$run_id" "REASON=RUN_SHA_CHANGED" >> brain6_artifacts/workflow_watchdog/actions.log
+                continue
+              fi
               gh run view "$run_id" --log-failed > "brain6_artifacts/workflow_watchdog/run-$run_id.log" || true
             fi
 
@@ -132,11 +202,19 @@ jobs:
               class="LOG_UNAVAILABLE"
             fi
 
-            printf '%s\n' "RUN_ID=$run_id" "WORKFLOW=$workflow" "ATTEMPT=$attempt" "FAILURE_CLASS=$class"               >> brain6_artifacts/workflow_watchdog/actions.log
+            printf '%s\n' "RUN_ID=$run_id" "WORKFLOW=$workflow" "ATTEMPT=$attempt" "HEAD_SHA=$row_sha" "FAILURE_CLASS=$class" \
+              >> brain6_artifacts/workflow_watchdog/actions.log
 
             case "$class" in
               CODE_OR_TEST)
                 echo "REPAIR=BOUNDED_EXACT_PATCH_ENGINE"
+                checked_out_sha="$(git rev-parse HEAD)"
+                if [ "$checked_out_sha" != "$target_sha" ]; then
+                  echo "RECOVERY=REPAIR_SKIPPED_CHECKOUT_MISMATCH"
+                  echo "CHECKED_OUT_SHA=$checked_out_sha"
+                  echo "TARGET_SHA=$target_sha"
+                  continue
+                fi
                 if python -m brain_v12.brain.repair_engine "$log"; then
                   if git status --porcelain --untracked-files=no | grep -q .; then
                     changed="$(git diff --name-only)"
@@ -188,6 +266,8 @@ jobs:
             echo "BRAIN_GLOBAL_WATCHDOG=ACTIVE"
             echo "POLICY=BOUNDED_AUTONOMOUS_RECOVERY"
             echo "MAX_AUTOMATIC_ATTEMPTS=3"
+            echo "RECOVERY_SCOPE=TARGET_HEAD_SHA_ONLY"
+            echo "CROSS_SHA_RECOVERY=DENY"
           } > brain6_artifacts/workflow_watchdog/contract.txt
 
       - name: Upload Brain workflow evidence

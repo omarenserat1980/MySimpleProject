@@ -16,6 +16,6 @@ def test_planner_blocks_mutating_route_without_approval():
 
 def test_describe_does_not_execute_mutation():
     d=GitHubPlanner().describe("code_write")
-    assert d["tool"]=="write_contents"
+    assert d["tool"]=="update_file"
     assert d["requires_approval"] is True
     assert d["execution_ready"] is False

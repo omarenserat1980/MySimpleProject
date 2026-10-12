@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "updated": "2026-10-04",
+  "movies": [
+    {
+      "id": "brain-room-13",
+      "title": "الغرفة 13",
+      "year": 2026,
+      "genre": "رعب • غموض",
+      "access": "planned",
+      "commercial_status": "BLOCKED",
+      "href": "./film-room-13.html",
+      "evidence": []
+    },
+    {
+      "id": "brain-last-signal",
+      "title": "بعد الإشارة",
+      "year": 2026,
+      "genre": "خيال علمي • تشويق",
+      "access": "planned",
+      "commercial_status": "BLOCKED",
+      "href": "./film-last-signal.html",
+      "evidence": []
+    },
+    {
+      "id": "brain-zero-line",
+      "title": "خط الصفر",
+      "year": 2026,
+      "genre": "إثارة • مغامرة",
+      "access": "planned",
+      "commercial_status": "BLOCKED",
+      "href": "./film-zero-line.html",
+      "evidence": []
+    }
+  ],
+  "release_policy": {
+    "paid_requires": "VERIFIED_COMMERCIAL",
+    "evidence": [
+      "master_sha256",
+      "qc_report",
+      "rights_manifest",
+      "story_review",
+      "sound_review",
+      "continuity_review"
+    ],
+    "fallback": "PLANNED"
+  }
+}

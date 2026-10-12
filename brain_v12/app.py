@@ -3,12 +3,19 @@ import os
 import ast
 import base64
 import json
+import hmac
+import re
 import pathlib
 import threading
 import subprocess
+from .runtime_paths import configure_runtime_paths
+
+# Initialize runtime storage before importing components with import-time state.
+RUNTIME_STATE_ROOT = configure_runtime_paths()
 import httpx
 from uuid import uuid4
 from fastapi import FastAPI, UploadFile, File, Response, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -21,13 +28,19 @@ from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
 from .brain.ai_gateway import AIGateway
+from .brain.decision_engine import DecisionEngine
+from .brain.client_suggestion_bridge import ClientSuggestionBridge
+from .brain.brain_council import BrainCouncil
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
+from .brain.chat_session_store import ChatSessionStore
 from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
 from .brain.model_router import ModelRouter
 from .brain.model_providers import configured_model_providers
+from .ai_fabric import AIFabric, FabricPolicy
+from .ai_fabric.api import router as ai_fabric_router
 from .brain.draw_gateway import parse_human_draw_request, draw_local, draw_openai
 from .brain.plugin_manager import PluginManager
 from brain_v7.braincore_v2.code_workspace_tool import CodeWorkspaceTool, CodeChange
@@ -41,10 +54,19 @@ from .brain.workforce_control import WorkforceControl
 from .brain.income_strategy import IncomeStrategy
 from .brain.live_opportunity_researcher import LiveOpportunityResearcher
 from .brain.income_lifecycle import IncomeLifecycle
+from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.device_bridge import DeviceBridge
+from .brain.device_cloud_federation import build_fleet_status
+from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
+from .brain.sync_engine import BrainSyncStore
+from .brain.sync_runtime import DurableSyncQueue
+from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
+from .brain.workload_controller import WorkloadController
+from .brain.workload_router import WorkloadRouter, WorkerTarget
+from .brain.worker_registry import WorkerRegistry
 from .brain.film_completion_gate import FilmCompletionGate
 from .brain_git.service import BrainGitService
 from .brain_git.workflow_engine import BrainWorkflowEngine
@@ -56,12 +78,23 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
+from .brain.quranic_core.api import build_router as quranic_core_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
 from . import visual_engine
 from . import short_video_factory
 from .cloud_bootstrap import bootstrap_status
+from .brain.windows_cloud_discovery import discover_windows_cloud_nodes
+from .brain.windows_cloud_secret_gate import check_windows_cloud_secret_readiness
+from .brain import internal_clients
+from cloud.brain_fabric import list_nodes as list_fabric_nodes
+
+from .brain.security_middleware import apply_security_headers
+from .brain.cloud_executor_attestation_api import router as cloud_executor_attestation_router
+from .brain.open_source_tools_api import router as open_source_tools_router
+from .brain.asic_simulator_api import router as asic_simulator_router
+from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -72,6 +105,18 @@ model_router=ModelRouter()
 for _provider in configured_model_providers():
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))
 brain_ai=BrainAI(openai_provider, store, cognitive, model_router=model_router)
+fabric=AIFabric(FabricPolicy(
+    free_first=os.getenv("BRAIN_AI_FREE_FIRST","1")=="1",
+    max_attempts=int(os.getenv("BRAIN_AI_MAX_ATTEMPTS","3")),
+    require_verification=os.getenv("BRAIN_AI_REQUIRE_VERIFICATION","1")=="1",
+    allow_external_side_effects=False,
+))
+for _name, _provider in model_router.providers.items():
+    fabric.register(_name, "model", _provider.handler, set(_provider.tasks), _provider.priority, free=_name in {"ollama","local","qwen","llama","mistral"})
+for _name, _tool in brain_ai.tools.items():
+    fabric.register(_name, "tool", lambda payload, _t=_tool: brain_ai.execute_tool(_t.name, payload, approved=False), {"*"}, 100, True)
+chat_session_store=ChatSessionStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db")))
+chat_session_store.init()
 code_root=os.getenv("BRAIN_CODE_ROOT", os.path.abspath(os.path.join(ROOT, "..")))
 code_workspace=CodeWorkspaceTool(root=code_root, allowed_prefixes=("brain_v7/","brain_v12/"))
 code_team=CodeToolEngineeringTeam(EmployeeHierarchy(), code_workspace)
@@ -81,6 +126,24 @@ cognitive.code_tool=code_tool
 
 secret_control=SecretControlPlane()
 workforce=WorkforceControl(store)
+decision_engine=DecisionEngine()
+client_suggestion_bridge=ClientSuggestionBridge(
+    os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")),
+    openai_provider,
+    decision_engine,
+    workforce.request_revenue_guardian_action,
+)
+brain_council=BrainCouncil(
+    os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")),
+    openai_provider,
+    decision_engine,
+    state_reader=lambda client_id: {
+        "industrial_request": store.industrial_client_request_state(client_id),
+        "income": income_lifecycle.summary(client_id=client_id),
+    },
+    action_requester=workforce.request_revenue_guardian_action,
+    device_reader=lambda: device_bridge.agent_status(),
+)
 mining=MiningEngine()
 freelance=FreelanceAgent(store)
 youtube_oauth=YouTubeOAuth(store)
@@ -89,12 +152,23 @@ income_strategy=IncomeStrategy(workforce.income_engine)
 live_income_researcher=LiveOpportunityResearcher(workforce.income_engine, store)
 income_lifecycle=IncomeLifecycle(store)
 device_bridge=DeviceBridge(store)
+
+sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
+sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
+task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
+from .github_actions_operator import GitHubActionsOperator
+from .brain.execution_gateway import BrainExecutionGateway
+execution_gateway=BrainExecutionGateway()
+brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")), execution_gateway=execution_gateway)
+industrial_actions=GitHubActionsOperator()
 problem_solver=ProblemSolver(cognitive, supervisor=brain_supervisor)
 brain_ai.connect_supervisor(problem_solver)
 brain_self_monitor=BrainSelfMonitor(ROOT)
+workload_controller=WorkloadController()
+workload_router=WorkloadRouter(workload_controller)
+worker_registry=WorkerRegistry(device_bridge)
 brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
-brain_workflows=BrainWorkflowEngine(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_git_data")))
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
@@ -115,28 +189,541 @@ for p in PLUGINS:
         plugins.enable(plugin_id)
 
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or os.getenv("RENDER_GIT_COMMIT") or "unknown"
+DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME") or os.getenv("RENDER_GIT_BRANCH") or "unknown"
+DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_SLUG") or "unknown"
+DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
+RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+_allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
 from .brain_git.api import router as brain_git_router
 from .brain.commerce_api import router as commerce_router
+from .brain.games_store_api import router as games_store_router
 from .brain.payment_gateway import router as payment_router
 from .brain.customer_portal import router as customer_router
 from .brain.economic_reconciliation import router as economic_reconciliation_router
+from .brain.industrial_quote_portal import router as industrial_quote_portal_router
 from .brain.commerce_reversals import router as commerce_reversals_router
+from .brain.habitat.api import router as habitat_router
+from .economics.router_bundle import router as economics_router
+from .youtube.router_bundle import router as youtube_router
+from .marketing.router_bundle import router as marketing_router
+from .intelligence.router_bundle import router as intelligence_router
+from .integration.api import build_router as mission_router_builder
 app.include_router(brain_git_router(brain_git))
-app.include_router(brain_ai_router(brain_ai))
-app.include_router(brain_chat_router(brain_ai, store))
+app.include_router(brain_ai_router(brain_ai, chat_session_store))
+app.include_router(ai_fabric_router(fabric))
+app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(revenue_conversion_router(income_lifecycle))
+app.include_router(games_store_router)
 app.include_router(payment_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
+app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_industrial_quotes.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+app.include_router(habitat_router)
+app.include_router(economics_router)
+app.include_router(youtube_router)
+app.include_router(marketing_router)
+app.include_router(intelligence_router)
+app.include_router(mission_router_builder())
 app.include_router(commercial_dashboard_router())
+app.include_router(quranic_core_router())
+app.include_router(cloud_executor_attestation_router)
+app.include_router(open_source_tools_router)
+app.include_router(asic_simulator_router)
+app.include_router(bitcoin_mining_intelligence_router)
+
+
+@app.get("/api/brain/workload")
+def brain_workload_status(queued:int=0, active:int=0, oldest_age_seconds:float|None=None):
+    return workload_controller.status(queued=queued, active=active, oldest_age_seconds=oldest_age_seconds)
+
+@app.post("/api/brain/workload/admit")
+def brain_workload_admit(body:dict):
+    return workload_controller.evaluate(queued=int(body.get("queued",0)), active=int(body.get("active",0)), key_active=int(body.get("key_active",0)), priority=str(body.get("priority","NORMAL")), retry_count=int(body.get("retry_count",0)), duplicate=bool(body.get("duplicate",False)))
+
+
+@app.post("/api/brain/workload/route")
+def brain_workload_route(body:dict):
+    workers=[WorkerTarget(str(x.get("worker_id","unknown")), str(x.get("kind","unknown")), frozenset(x.get("capabilities",[])), bool(x.get("online",True))) for x in body.get("workers",[])]
+    return workload_router.choose(
+        queued=int(body.get("queued",0)), active=int(body.get("active",0)),
+        priority=str(body.get("priority","NORMAL")),
+        required_capabilities=body.get("required_capabilities",[]),
+        workers=workers, github_available=bool(body.get("github_available",True)),
+        key_active=int(body.get("key_active",0)), retry_count=int(body.get("retry_count",0)),
+        duplicate=bool(body.get("duplicate",False)))
+
+class BrainInternalClientRequest(BaseModel):
+    client_id: str
+    approved: bool = False
+
+
+class IndustrialClientRequest(BaseModel):
+    client_id: str
+    request: str
+    target: str | None = None
+
+
+@app.post("/api/brain/council/convene")
+def brain_council_convene(request: Request, body: dict | None = None):
+    """Convene Brain + ChatGPT + current clients and store durable minutes."""
+    require_control_key(request)
+    body = body or {}
+    title = str(body.get("title") or "اجتماع عقل برين والعملاء").strip()
+    agenda = body.get("agenda") if isinstance(body.get("agenda"), list) else None
+    return brain_council.convene(title=title, agenda=agenda)
+
+
+@app.post("/api/brain/council/{meeting_id}/device-presence")
+def brain_council_device_presence(request: Request, meeting_id: int):
+    """Record fresh Arkan/fallback Brain Agent presence for the council."""
+    require_control_key(request)
+    return brain_council.verify_device_presence(meeting_id)
+
+
+@app.post("/api/brain/council/{meeting_id}/execute")
+def brain_council_execute(request: Request, meeting_id: int):
+    """Execute the bounded decisions recorded for a council meeting."""
+    require_control_key(request)
+    return brain_council.execute_minutes(meeting_id)
+
+
+@app.post("/api/brain/council/{meeting_id}/verify")
+def brain_council_verify(request: Request, meeting_id: int):
+    """Verify council actions against fresh evidence before allowing the next council cycle."""
+    require_control_key(request)
+    return brain_council.verify_minutes(meeting_id)
+
+
+@app.get("/api/brain/council/{meeting_id}")
+def brain_council_minutes(request: Request, meeting_id: int):
+    """Read a durable council meeting and its execution evidence."""
+    require_control_key(request)
+    return brain_council.minutes(meeting_id)
+
+
+@app.get("/api/brain/council")
+def brain_council_latest(request: Request):
+    """Read the latest council meeting without mutating state."""
+    require_control_key(request)
+    with store.connect() as con:
+        row = con.execute("SELECT id FROM brain_council_meetings ORDER BY id DESC LIMIT 1").fetchone()
+    return brain_council.minutes(int(row["id"])) if row else {"ok": True, "status": "NO_MEETINGS"}
+
+
+@app.post("/api/brain/client-3/suggestion")
+def brain_client_3_suggestion(request: Request, body: dict):
+    """Route one Client 3 suggestion through ChatGPT advice, Brain decision, and one bounded action."""
+    require_control_key(request)
+    suggestion = str(body.get("suggestion") or body.get("request") or "").strip()
+    context = body.get("context") if isinstance(body.get("context"), dict) else {}
+    return client_suggestion_bridge.submit("CL-000003", suggestion, context)
+
+
+@app.post("/api/brain/client-3/suggestions/{suggestion_id}/reconcile")
+def brain_client_3_reconcile(request: Request, suggestion_id: int, body: dict):
+    """Record one measured Client 3 outcome and route the next bounded path."""
+    require_control_key(request)
+    return client_suggestion_bridge.reconcile(suggestion_id, body)
+
+
+@app.get("/api/brain/client-3/suggestions")
+def brain_client_3_suggestions(request: Request):
+    """Read Client 3 suggestion/decision/action history without mutating it."""
+    require_control_key(request)
+    return client_suggestion_bridge.history("CL-000003", limit=50)
+
+
+@app.get("/api/brain/internal-clients")
+def brain_internal_clients():
+    """Expose the bounded active Brain-client registry to internal software tools."""
+    return internal_clients.public_registry()
+
+
+@app.post("/api/brain/revenue-guardian/{client_id}/first-revenue")
+def brain_revenue_guardian_first_revenue(request: Request, client_id: str):
+    """Create/retrieve the bounded first-revenue mission."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.first_revenue_mission(
+        workforce.income_engine,
+        income_lifecycle,
+        client_id,
+    )
+    store.event("REVENUE_GUARDIAN_FIRST_REVENUE_MISSION", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "target_jod": 10.0,
+    })
+    return result
+
+
+@app.post("/api/brain/revenue-guardian/{client_id}/promote-successful")
+def brain_revenue_guardian_promote_successful(request: Request, client_id: str):
+    """Check successful projects, request one bounded social-marketing action, and track revenue."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.promote_successful_projects_once(
+        workforce.income_engine,
+        income_lifecycle,
+        client_id,
+    )
+    store.event("REVENUE_GUARDIAN_SUCCESSFUL_PROJECT_MARKETING", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "successful_projects_count": result.get("successful_projects_count", 0),
+        "verified_revenue_jod": result.get("verified_revenue_jod", 0),
+    })
+    return result
+
+
+@app.post("/api/brain/revenue-guardian/{client_id}/reconcile-marketing")
+def brain_revenue_guardian_reconcile_marketing(request: Request, client_id: str):
+    """Reconcile one marketed project against client-scoped payment evidence."""
+    require_control_key(request)
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.reconcile_marketing_once(workforce.income_engine, client_id)
+    store.event("REVENUE_GUARDIAN_MARKETING_RECONCILED", {
+        "client_id": client_id,
+        "status": result.get("status"),
+        "project_id": result.get("project_id"),
+        "revenue_delta_jod": result.get("revenue_delta_jod", 0),
+        "attribution": result.get("attribution"),
+    })
+    return result
+
+
+@app.get("/api/brain/revenue-guardian/{client_id}/status")
+def brain_revenue_guardian_status(request: Request, client_id: str):
+    """Return the persisted guardian state/history without mutating it."""
+    require_control_key(request)
+    return store.revenue_guardian_status(client_id, history_limit=20)
+
+
+@app.get("/api/brain/revenue-guardian/{client_id}")
+def brain_revenue_guardian(request: Request, client_id: str):
+    """Deep evidence audit for the revenue guardian; no external side effects."""
+    require_control_key(request)
+    from .brain.client_revenue_guardian import ClientRevenueGuardian
+    def _client_activity(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        counts = summary.get("counts") or {}
+        return {
+            "source": "income_lifecycle",
+            "client_id": target_id,
+            "opportunities": sum(int(v or 0) for v in counts.values()),
+            "completed": int(counts.get("COMPLETED", 0) or 0),
+            "payment_verified": int(counts.get("PAYMENT_VERIFIED", 0) or 0),
+        }
+
+    def _client_revenue(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        return {
+            "client_id": target_id,
+            "verified_revenue_jod": float(summary.get("payment_verified_jod", 0) or 0),
+        }
+
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.deep_inspect(workforce.income_engine, income_lifecycle, client_id)
+    store.event("REVENUE_GUARDIAN_DEEP_AUDIT", {
+        "guardian_client_id": "CL-000004",
+        "target_client_id": client_id,
+        "state": result.get("state"),
+        "verified_revenue_jod": result.get("deep_audit", {}).get("verified_revenue_jod", 0),
+        "priority": result.get("deep_audit", {}).get("highest_priority"),
+        "revenue_trend": result.get("deep_audit", {}).get("revenue_trend"),
+        "revenue_delta_jod": result.get("deep_audit", {}).get("revenue_delta_jod", 0),
+        "progress_step": result.get("deep_audit", {}).get("progress_step"),
+    })
+    return result
+@app.post("/api/brain/revenue-guardian/{client_id}/advance")
+def brain_revenue_guardian_advance(request: Request, client_id: str):
+    """Request exactly one bounded internal revenue action; no payment is claimed."""
+    require_control_key(request)
+    from .brain.client_revenue_guardian import ClientRevenueGuardian
+
+    def _client_activity(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        counts = summary.get("counts") or {}
+        return {"opportunities": sum(int(v or 0) for v in counts.values()),
+                "completed": int(counts.get("COMPLETED", 0) or 0)}
+
+    def _client_revenue(target_id):
+        summary = income_lifecycle.summary(client_id=target_id)
+        return {"verified_revenue_jod": float(summary.get("payment_verified_jod", 0) or 0)}
+
+    guardian = ClientRevenueGuardian(
+        activity_reader=_client_activity,
+        revenue_reader=_client_revenue,
+        progress_reader=store.revenue_guardian_checkpoint,
+        progress_writer=store.save_revenue_guardian_checkpoint,
+        action_requester=workforce.request_revenue_guardian_action,
+    )
+    result = guardian.advance_once(workforce.income_engine, income_lifecycle, client_id)
+    store.event("REVENUE_GUARDIAN_ADVANCE", {
+        "guardian_client_id": "CL-000004",
+        "target_client_id": client_id,
+        "status": result.get("status"),
+        "action_requested": result.get("action_requested", False),
+        "payment_verified": False,
+    })
+    return result
+
+
+@app.post("/api/brain/internal-clients/plan")
+def brain_internal_client_plan(request: Request, body: BrainInternalClientRequest):
+    """Build a fail-closed launch plan; no external side effect occurs here."""
+    require_control_key(request)
+    result = internal_clients.launch_plan(body.client_id, device_bridge)
+    store.event("BRAIN_INTERNAL_CLIENT_PLAN", {
+        "client_id": body.client_id,
+        "status": result.get("status"),
+        "approved": body.approved,
+    })
+    return result
+
+
+@app.post("/api/industrial-clients/request")
+def industrial_client_request(request: Request, body: IndustrialClientRequest):
+    """Accept one bounded industrial-client request and dispatch only the primary ISO workflow."""
+    from .brain import industrial_clients
+
+    client_key = request.headers.get("X-Brain-Client-Key", "")
+    if not industrial_clients.authenticate(body.client_id, client_key):
+        raise HTTPException(status_code=403, detail="INDUSTRIAL_CLIENT_UNAUTHORIZED")
+
+    contract = industrial_clients.build_request(body.client_id, body.request, body.target)
+    if not contract.get("ok"):
+        return contract
+
+    repo = _github_repo()
+    workflow = contract["workflow"]
+    latest = industrial_actions.latest_run(repo, workflow)
+    if latest and latest.get("status") in {"queued", "in_progress", "waiting", "requested"}:
+        return {
+            "ok": True,
+            "status": "ALREADY_RUNNING",
+            "client_id": body.client_id,
+            "request": body.request,
+            "target": contract["target"],
+            "workflow": workflow,
+            "run_id": latest.get("id"),
+            "run_url": latest.get("html_url"),
+            "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        }
+
+    request_id = "industrial-" + uuid4().hex
+    claim = store.claim_industrial_client(body.client_id, request_id)
+    if not claim.get("ok"):
+        return {
+            "ok": True,
+            "status": "ALREADY_RUNNING",
+            "client_id": body.client_id,
+            "request": body.request,
+            "target": contract["target"],
+            "workflow": workflow,
+            "request_id": claim.get("request_id"),
+            "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        }
+    store.event("INDUSTRIAL_CLIENT_REQUESTED", {
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "request": body.request,
+        "target": contract["target"],
+        "executor_identity": contract.get("executor_identity"),
+        "workflow": workflow,
+    })
+    store.industrial_client_request(
+        body.client_id,
+        request_id,
+        activity_id=contract.get("request", body.request),
+        target=contract["target"],
+        backend="INDUSTRIAL_PRIMARY_WORKFLOW",
+        workflow=workflow,
+        stage="QUEUED",
+        status="ACTIVE",
+    )
+    try:
+        dispatch = industrial_actions.dispatch(
+            repo,
+            workflow,
+            ref="main",
+            inputs={
+                "iso_url": "https://go.microsoft.com/fwlink/?linkid=2345730&clcid=0x409&culture=en-us&country=us",
+                "timeout_minutes": "55",
+            },
+            approved=True,
+        )
+    except Exception:
+        store.release_industrial_client(body.client_id, request_id)
+        raise
+    run_id = dispatch.get("run_id") or dispatch.get("id")
+    store.update_industrial_client_request(
+        body.client_id,
+        stage="EXECUTING",
+        status="ACTIVE",
+        run_id=run_id or "",
+        checkpoint={"stage": "EXECUTING", "request_id": request_id},
+    )
+    store.event("INDUSTRIAL_CLIENT_DISPATCHED", {
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "workflow": workflow,
+        "run_id": run_id,
+        "dispatch_status": dispatch.get("state"),
+    })
+    return {
+        "ok": True,
+        "status": "DISPATCH_ACCEPTED",
+        "request_id": request_id,
+        "client_id": body.client_id,
+        "request": body.request,
+        "target": body.target,
+        "workflow": workflow,
+        "execution_policy": "EXISTING_PRIMARY_PIPELINE",
+        "verification": "PENDING_RUN_OBSERVATION",
+    }
+
+
+@app.get("/api/brain/internal-clients/state/{client_id}")
+def brain_internal_client_state(client_id: str):
+    """Return the durable lifecycle state without exposing credentials."""
+    from .brain import industrial_clients
+    if client_id not in industrial_clients.INTERNAL_CLIENTS:
+        raise HTTPException(status_code=404, detail="UNKNOWN_INTERNAL_CLIENT")
+    state = store.industrial_client_request_state(
+        industrial_clients.INTERNAL_CLIENTS[client_id]["customer_id"]
+    )
+    return {"ok": True, "client_id": client_id, "state": state}
+
+
+@app.get("/api/industrial-clients/request/status")
+def industrial_client_request_status():
+    from .brain import industrial_clients
+
+    repo = _github_repo()
+    workflow = industrial_clients.PRIMARY_WORKFLOW
+    persisted = store.industrial_client_request_state(industrial_clients.INDUSTRIAL_CLIENT_ID) or {}
+    persisted_run_id = str(persisted.get("run_id") or "")
+    latest = industrial_actions.latest_run(repo, workflow)
+    # Reconcile against the persisted request first; never claim an unrelated
+    # newer workflow run as this client's execution.
+    if persisted_run_id:
+        if not latest or str(latest.get("id") or "") != persisted_run_id:
+            return {
+                "ok": True,
+                "status": "RECONCILIATION_PENDING",
+                "workflow": workflow,
+                "request_id": persisted.get("request_id"),
+                "run_id": persisted_run_id,
+                "checkpoint": persisted.get("checkpoint", {}),
+            }
+    elif not latest:
+        return {"ok": True, "status": "NO_RUN_OBSERVED", "workflow": workflow}
+    conclusion = latest.get("conclusion")
+    state = latest.get("status")
+    verified = state == "completed" and conclusion == "success"
+    if state == "completed":
+        final_status = "VERIFIED_COMPLETED" if verified else "FAILED"
+        store.update_industrial_client_request(
+            industrial_clients.INDUSTRIAL_CLIENT_ID,
+            stage="VERIFIED" if verified else "FAILED",
+            status=final_status,
+            run_id=str(latest.get("id") or ""),
+            checkpoint={"stage": "VERIFIED" if verified else "FAILED", "conclusion": conclusion},
+        )
+        store.release_industrial_client(industrial_clients.INDUSTRIAL_CLIENT_ID)
+    return {
+        "ok": True,
+        "status": "VERIFIED" if verified else ("RUNNING" if state != "completed" else "FAILED"),
+        "workflow": workflow,
+        "run_id": latest.get("id"),
+        "run_url": latest.get("html_url"),
+        "github_status": state,
+        "conclusion": conclusion,
+        "verified": verified,
+    }
+
+
+class WindowsContractIssueRequest(BaseModel):
+    source_commit: str
+    task_id: str
+    attempt_id: str
+
+
+@app.post("/api/brain/windows/contracts/issue")
+async def issue_windows_execution_contract(payload: WindowsContractIssueRequest, request: Request):
+    """Issue a signed short-lived contract to the dedicated HTTPS delivery client."""
+    configured = os.environ.get("BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY", "")
+    supplied = request.headers.get("X-Brain-Contract-Delivery-Key", "")
+    if not configured or not supplied or not hmac.compare_digest(configured, supplied):
+        raise HTTPException(status_code=401, detail="WINDOWS_CONTRACT_DELIVERY_UNAUTHORIZED")
+    commit = payload.source_commit.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_SOURCE_COMMIT_INVALID")
+    task_id, attempt_id = payload.task_id.strip(), payload.attempt_id.strip()
+    if not task_id or not attempt_id:
+        raise HTTPException(status_code=400, detail="WINDOWS_CONTRACT_TASK_ATTEMPT_REQUIRED")
+    try:
+        from .brain.windows_contract_service import issue as issue_contract
+        result = issue_contract({"source_commit": commit, "task_id": task_id, "attempt_id": attempt_id})
+        contract_path = pathlib.Path(result["contract_path"])
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        if any(contract.get(k) != v for k, v in {
+            "source_commit": commit, "task_id": task_id, "attempt_id": attempt_id
+        }.items()):
+            raise RuntimeError("WINDOWS_CONTRACT_REQUEST_BINDING_MISMATCH")
+        return {"issued": True, "contract": contract, "metadata": {
+            "schema": contract.get("schema"), "source_commit": contract.get("source_commit"),
+            "task_id": contract.get("task_id"), "attempt_id": contract.get("attempt_id"),
+            "expires_at": contract.get("expires_at"),
+        }}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc).splitlines()[0][:160]) from exc
+    except (OSError, ValueError, KeyError) as exc:
+        raise HTTPException(status_code=503, detail="WINDOWS_CONTRACT_ISSUANCE_UNAVAILABLE") from exc
+
+
+@app.get("/api/brain/windows/cloud/status")
+def brain_windows_cloud_status():
+    """Return only freshly heartbeating, verified Windows Cloud nodes."""
+    nodes = list_fabric_nodes()
+    timeout = float(os.getenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120"))
+    return discover_windows_cloud_nodes(nodes, heartbeat_timeout=timeout)
+
+@app.get("/api/brain/windows/cloud/secrets/readiness")
+def brain_windows_cloud_secrets_readiness():
+    """Return fail-closed Windows Cloud guest enrollment readiness without secrets."""
+    return check_windows_cloud_secret_readiness()
 
 @app.get("/api/brain/cloud/status")
 def brain_cloud_status():
@@ -146,6 +733,7 @@ def brain_cloud_status():
 @app.middleware("http")
 async def no_cache(request, call_next):
     response=await call_next(request)
+    apply_security_headers(response)
     response.headers["Cache-Control"]="no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"]="no-cache"
     return response
@@ -297,11 +885,23 @@ async def brain_hub_issues(owner:str="",repo:str="",state:str="open"):
 
 @app.get("/api/cinema/status")
 async def cinema_status():
-    """Human-facing cinema control/status; GitHub Actions stays behind Brain."""
+    """Human-facing cinema status; public-repo reads can work without a token."""
     full=_github_repo()
+    try:
+        headers = _github_headers()
+    except HTTPException as exc:
+        # This endpoint only reads Actions metadata. For this known public repo,
+        # GitHub allows unauthenticated reads; do not require a secret just to
+        # render status. Other configured repositories remain fail-closed.
+        if exc.status_code != 503 or exc.detail != "GITHUB_TOKEN_NOT_CONFIGURED" or full != "omarenserat1980/MySimpleProject":
+            raise
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
     async with httpx.AsyncClient(timeout=20) as client:
         r=await client.get(f"https://api.github.com/repos/{full}/actions/runs",
-                           headers=_github_headers(),
+                           headers=headers,
                            params={"per_page":50})
     if r.status_code>=400:
         raise HTTPException(status_code=r.status_code,detail=r.text[:1000])
@@ -1023,7 +1623,7 @@ class CinematicReleaseIn(BaseModel):
 
 @app.post("/api/media/upload")
 async def media_upload(file:UploadFile=File(...)):
-    media_dir=os.path.join(ROOT,"web","media"); os.makedirs(media_dir,exist_ok=True)
+    media_dir=str(media_engine.MEDIA_ROOT); os.makedirs(media_dir,exist_ok=True)
     safe=os.path.basename(file.filename or "upload.bin"); target=os.path.join(media_dir,safe); data=await file.read()
     if len(data) > 20 * 1024 * 1024:
         return {"ok":False,"error":"MEDIA_TOO_LARGE","max_bytes":20 * 1024 * 1024}
@@ -1200,18 +1800,41 @@ def freelance_payment_verified(body:dict):
 def workforce_health():
     return workforce.health()
 
+def _cloud_worker_attestation() -> dict:
+    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
+    heartbeat = root / "cloud-worker-heartbeat.json"
+    if not heartbeat.exists():
+        return {"state": "NOT_RUNNING", "verified": False, "reason": "HEARTBEAT_MISSING"}
+    try:
+        payload = json.loads(heartbeat.read_text(encoding="utf-8"))
+        age = max(0.0, __import__("time").time() - float(payload.get("timestamp", 0)))
+        ttl = max(5, int(os.getenv("BRAIN_WORKER_HEARTBEAT_TTL_SECONDS", "15")))
+        verified = (payload.get("service") == "brain-cloud-runtime" and payload.get("state") == "RUNNING" and age <= ttl and isinstance(payload.get("preflight"), dict) and payload["preflight"].get("verified") is True)
+        return {
+            "state": "RUNNING" if verified else "STALE",
+            "verified": verified,
+            "age_seconds": round(age, 3),
+            "ttl_seconds": ttl,
+            "heartbeat": payload,
+        }
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        return {"state": "NOT_RUNNING", "verified": False, "reason": f"HEARTBEAT_INVALID:{str(exc)[:200]}"}
+
 @app.get("/health")
 def health():
+    worker = _cloud_worker_attestation()
     return {
         "ok": True,
         "status": "healthy",
+        "state": "RUNNING" if worker["verified"] else "NOT_RUNNING",
         "version": APP_VERSION,
         "runtime": "BRAIN_CLOUD_NATIVE",
+        "worker": worker,
         "deployment": _deployment_snapshot() if "_deployment_snapshot" in globals() else {"converged": False},
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
+    expected = os.getenv("GITHUB_SHA") or os.getenv("RENDER_GIT_COMMIT", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
@@ -1272,9 +1895,22 @@ def system_connection():
         "checks": checks,
     }
 
+@app.get("/api/brain/workers")
+def brain_workers():
+    return worker_registry.snapshot()
+
+@app.post("/api/brain/workers/register")
+def brain_worker_register(body:dict):
+    return worker_registry.register(
+        body.get("worker_id",""),
+        body.get("kind","local"),
+        body.get("capabilities",[]),
+        body.get("lease_seconds",30),
+    )
+
 @app.get("/api/device/agent-status/{agent_id}")
 def device_agent_status_by_id(agent_id: str, request: Request):
-    if not require_device_agent(request):
+    if not require_device_agent(request, agent_id):
         return JSONResponse({"ok": False, "status": "UNAUTHORIZED"}, status_code=401)
     age = device_bridge.heartbeat_age_seconds(agent_id)
     if age is None:
@@ -1308,6 +1944,13 @@ def device_status():
     return device_bridge.status()
 
 
+@app.get("/api/device/cloud-federation/status")
+def device_cloud_federation_status(request: Request):
+    """Read-only fleet/cloud readiness view; does not enqueue or provision work."""
+    require_control_key(request)
+    return JSONResponse(build_fleet_status(device_bridge.agent_status()))
+
+
 class DeviceTask(BaseModel):
     task:str
     params:dict={}
@@ -1321,11 +1964,25 @@ class DeviceReport(BaseModel):
     error:str=""
 
 
-def require_device_agent(request:Request) -> None:
+def require_device_agent(request:Request, agent_id:str|None=None) -> bool:
+    header_agent_id=request.headers.get("X-V12-Agent-Id","").strip()
+    query_agent_id=request.query_params.get("agent_id","").strip()
+    resolved_agent_id=str(agent_id or query_agent_id or header_agent_id).strip()
+    if header_agent_id and resolved_agent_id and header_agent_id != resolved_agent_id:
+        raise HTTPException(status_code=403, detail="DEVICE_AGENT_ID_MISMATCH")
     supplied=request.headers.get("X-V12-Agent-Key","")
-    if not device_bridge.authenticate(supplied):
-        from fastapi import HTTPException
+    if resolved_agent_id:
+        authorized=device_bridge.authenticate(supplied, resolved_agent_id)
+    else:
+        # Preserve legacy shared-key clients only when per-agent mode is off.
+        # A configured per-agent registry requires an explicit agent identity.
+        if os.getenv("BRAIN_AGENT_KEYS_JSON", "").strip():
+            authorized=False
+        else:
+            authorized=device_bridge.authenticate(supplied)
+    if not authorized:
         raise HTTPException(status_code=403, detail="DEVICE_AGENT_AUTH_REQUIRED")
+    return True
 
 
 @app.post("/api/device/enqueue")
@@ -1338,15 +1995,19 @@ def device_enqueue(request:Request, body:DeviceTask):
 
 @app.post("/api/device/heartbeat")
 def device_heartbeat(request: Request, body: dict | None = None):
-    if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", "")):
+    header_agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    body_agent_id = str((body or {}).get("agent_id", "")).strip()
+    if header_agent_id and body_agent_id and header_agent_id != body_agent_id:
+        raise HTTPException(status_code=401, detail="DEVICE_AGENT_ID_MISMATCH")
+    agent_id = header_agent_id or body_agent_id or "android-termux-v12"
+    if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", ""), agent_id):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
-    agent_id = request.headers.get("X-V12-Agent-Id") or str((body or {}).get("agent_id", "")).strip() or "android-termux-v12"
     return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
 
 
 @app.get("/api/device/poll")
 def device_poll(request:Request, agent_id:str):
-    require_device_agent(request)
+    require_device_agent(request, agent_id)
     result=device_bridge.poll(agent_id)
     if result.get("task"):
         store.event("DEVICE_TASK_CLAIMED", {"task_id": result["task"]["task_id"], "agent_id": agent_id})
@@ -1355,14 +2016,54 @@ def device_poll(request:Request, agent_id:str):
 
 @app.post("/api/device/report")
 def device_report(request:Request, body:DeviceReport):
-    require_device_agent(request)
+    require_device_agent(request, body.agent_id)
     result=device_bridge.report(body.task_id, body.agent_id, body.ok, body.result, body.error)
     store.event("DEVICE_TASK_RESULT", {"task_id": body.task_id, "agent_id": body.agent_id, "ok": body.ok})
+    return result
+
+@app.post("/api/device/self-test/request")
+def device_self_test_request(request:Request):
+    """Least-privilege self-test request for an authenticated device agent.
+
+    This endpoint intentionally accepts only the fixed brain_self_test task and
+    requires the device-agent credential, not the Brain control-plane secret.
+    It is a bootstrap capability, not a general task-enqueue API.
+    """
+    require_device_agent(request)
+    agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
+    result = device_bridge.enqueue("brain_self_test", {"requested_by_agent": agent_id, "bootstrap": True})
+    store.event("DEVICE_SELF_TEST_REQUESTED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "agent_id": agent_id,
+        "status": result.get("status"),
+    })
+    return result
+
+@app.post("/api/device/android-open-app-test")
+def device_android_open_app_test(request: Request):
+    """Least-privilege live Android Executor mission: launch Android Settings."""
+    require_device_agent(request)
+    agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="DEVICE_AGENT_ID_REQUIRED")
+    result = device_bridge.enqueue("open_app", {"package": "com.android.settings", "requested_by_agent": agent_id, "mission": "android_executor_live_test"})
+    store.event("ANDROID_OPEN_APP_TEST_REQUESTED", {
+        "task_id": result.get("task", {}).get("task_id"),
+        "agent_id": agent_id,
+        "status": result.get("status"),
+    })
     return result
 
 @app.get("/api/device/result/{task_id}")
 def device_result(task_id:str):
     return device_bridge.result(task_id)
+
+@app.get("/api/device/verify/{task_id}")
+def device_verify(request:Request, task_id:str):
+    require_device_agent(request)
+    return device_bridge.verify_result(task_id)
 
 
 @app.post("/api/brain-git/cinema/start")
@@ -1399,6 +2100,21 @@ def brain_windows_provision(request:Request, body:dict):
 def brain_windows_boot(request:Request, vm_name:str):
     require_control_key(request)
     return brain_datacenter.boot_windows_server_2025(vm_name)
+
+@app.get("/api/brain/windows/cloud/readiness")
+def brain_windows_cloud_readiness():
+    from .brain.windows_cloud_executor import WindowsCloudExecutor
+    from .brain.windows_cloud_provider_factory import windows_cloud_provider_readiness
+
+    provider_readiness = windows_cloud_provider_readiness()
+    provider = None
+    if provider_readiness.get("ready"):
+        from .brain.windows_cloud_provider_factory import build_windows_cloud_provider
+        provider = build_windows_cloud_provider()
+
+    result = WindowsCloudExecutor(provider=provider).readiness()
+    result["provider_readiness"] = provider_readiness
+    return result
 
 @app.get("/api/brain/windows/status")
 def brain_windows_status():
@@ -1636,16 +2352,19 @@ def render_monitor_status():
 
 class IncomeLifecycleRequest(BaseModel):
     opportunity_id:str
+    client_id:str
     notes:str=""
 
 
 class IncomePrepareRequest(BaseModel):
     opportunity_id:str
+    client_id:str
     proposal:str=""
 
 
 class IncomeExternalEvidence(BaseModel):
     opportunity_id:str
+    client_id:str
     status:str
     evidence:str
 
@@ -1678,13 +2397,13 @@ def income_lifecycle_status():
 @app.post("/api/income/qualify")
 def income_qualify(request:Request, body:IncomeLifecycleRequest):
     require_control_key(request)
-    return income_lifecycle.qualify(body.opportunity_id, body.notes)
+    return income_lifecycle.qualify(body.opportunity_id, body.notes, client_id=body.client_id)
 
 
 @app.post("/api/income/prepare")
 def income_prepare(request:Request, body:IncomePrepareRequest):
     require_control_key(request)
-    return income_lifecycle.prepare(body.opportunity_id, body.proposal)
+    return income_lifecycle.prepare(body.opportunity_id, body.proposal, client_id=body.client_id)
 
 
 @app.post("/api/income/external-evidence")
@@ -1693,11 +2412,12 @@ def income_external_evidence(request:Request, body:IncomeExternalEvidence):
     allowed={"SUBMITTED","CLIENT_RESPONDED","ACCEPTED","DELIVERING","COMPLETED"}
     if body.status not in allowed:
         return {"ok":False,"status":"INVALID_EXTERNAL_STATUS","allowed":sorted(allowed)}
-    return income_lifecycle.record_external(body.opportunity_id, body.status, body.evidence)
+    return income_lifecycle.record_external(body.opportunity_id, body.status, body.evidence, client_id=body.client_id)
 
 
 class IncomeVerification(BaseModel):
     opportunity_id:str
+    client_id:str
     amount_jod:float
     evidence:str
 
@@ -1705,13 +2425,13 @@ class IncomeVerification(BaseModel):
 @app.post("/api/income/verify")
 def income_verify(request:Request, body:IncomeVerification):
     require_control_key(request)
-    row=income_lifecycle._find(body.opportunity_id)
+    row=income_lifecycle._find(body.opportunity_id, client_id=body.client_id)
     if not row:
         return {"ok":False,"status":"NOT_FOUND"}
     if str(row.get("status")) not in ("COMPLETED", "PAYMENT_VERIFIED"):
         return {"ok":False,"status":"DELIVERY_NOT_VERIFIED","current":row.get("status"),
                 "reason":"يجب إثبات القبول/التنفيذ/التسليم قبل تسجيل الدفع."}
-    result=workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence)
+    result=workforce.income_engine.verify_payment(body.opportunity_id,body.amount_jod,body.evidence,client_id=body.client_id)
     if result.get("ok"):
         income_lifecycle._save(row,status="PAYMENT_VERIFIED",payment_evidence=body.evidence[:4000],
                                payment_verified_at=income_lifecycle._now())
@@ -2133,14 +2853,14 @@ def human_draw(body: Chat):
     if request["provider"] == "local":
         result = draw_local(prompt)
         filename = "brain-draw-" + uuid4().hex + ".png"
-        media_dir = os.path.join(ROOT, "web", "media", "drawings")
+        media_dir = os.path.join(str(media_engine.MEDIA_ROOT), "drawings")
         os.makedirs(media_dir, exist_ok=True)
         with open(os.path.join(media_dir, filename), "wb") as fh:
             fh.write(base64.b64decode(result["png_base64"]))
         result.update({"filename": filename, "url": f"/media/drawings/{filename}", "viewer_url": f"/local-painter/?src=/media/drawings/{filename}&prompt="+httpx.QueryParams({"prompt": prompt}).get("prompt",""), "display": True})
         store.event("BRAIN_DRAW", {"provider": "local", "prompt": prompt, "verified": result.get("verified", False)})
         return result
-    result = draw_openai(prompt, openai_provider.generate_image, pathlib.Path(os.path.join(ROOT, "web", "media", "generated")))
+    result = draw_openai(prompt, openai_provider.generate_image, (media_engine.MEDIA_ROOT / "generated"))
     if result.get("ok"):
         store.event("BRAIN_DRAW", {"provider": "openai", "prompt": prompt, "verified": result.get("verified", False)})
     return result
@@ -2171,7 +2891,7 @@ def image_factory_generate(body:dict):
         b64=item.get("b64_json")
         if not b64:
             return {"ok":False,"error":"IMAGE_DATA_MISSING"}
-        media_dir=os.path.join(ROOT,"web","media","generated")
+        media_dir=os.path.join(str(media_engine.MEDIA_ROOT),"generated")
         os.makedirs(media_dir,exist_ok=True)
         filename=f"brain-image-{int(time.time()*1000)}.png"
         path=os.path.join(media_dir,filename)
@@ -2251,7 +2971,119 @@ def brain_evidence(evidence_id:str):
 def brain_task_evidence(task_id:str):
     return {"ok":True,"task_id":task_id,"evidence":evidence_store.for_task(task_id)}
 
-app.mount("/media",StaticFiles(directory=os.path.join(ROOT,"web","media"),check_dir=False),name="media")
+@app.get("/api/brain/life-certificate")
+def brain_life_certificate():
+    """Return an evidence-based Brain life certificate with a safe execution probe."""
+    return assess_brain_liveness_full(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+
+@app.get("/api/brain/liveness")
+def brain_liveness():
+    """Read-only evidence-based Brain liveness assessment."""
+    return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+# Simulation-first remote fabric. All routes operate on the virtual twin unless a
+# separately configured, independently validated real-device probe is supplied.
+from .brain.arkan_failover_gateway import ArkanFailoverGateway
+_arkan_virtual_root = os.getenv("BRAIN_ARKAN_SIM_ROOT", os.path.join(RUNTIME_STATE_ROOT, "virtual", "arkan"))
+arkan_remote_fabric = ArkanFailoverGateway(_arkan_virtual_root)
+from .brain.background_work_coordinator import BackgroundWorkCoordinator
+
+def _background_simulation_health():
+    gateway = arkan_remote_fabric.connect()
+    return {"gateway": gateway, "heartbeat": arkan_remote_fabric.heartbeat(), "reality": "SIMULATED"}
+
+def _background_simulation_inventory():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.info()
+
+def _background_simulation_readiness():
+    arkan_remote_fabric.connect()
+    return arkan_remote_fabric.virtual.readiness()
+
+background_work = BackgroundWorkCoordinator(
+    max_workers=int(os.getenv("BRAIN_BACKGROUND_WORKERS", str(min(4, os.cpu_count() or 2)))),
+    max_pending=int(os.getenv("BRAIN_BACKGROUND_MAX_PENDING", "64")),
+    db_path=os.getenv("BRAIN_BACKGROUND_DB", os.path.join(RUNTIME_STATE_ROOT, "state", "background_work.sqlite3")),
+    handlers={
+        "simulation_health": _background_simulation_health,
+        "simulation_inventory": _background_simulation_inventory,
+        "simulation_readiness": _background_simulation_readiness,
+    },
+)
+
+
+class ArkanSimulationCommand(BaseModel):
+    command: str
+
+
+@app.on_event("startup")
+def background_work_startup():
+    return background_work.resume_pending()
+
+@app.on_event("shutdown")
+def background_work_shutdown():
+    background_work.shutdown(wait=True)
+
+@app.get("/api/background-work/status")
+def background_work_status(request: Request):
+    require_control_key(request)
+    return background_work.snapshot()
+
+@app.post("/api/background-work/submit")
+def background_work_submit(request: Request, body: dict):
+    require_control_key(request)
+    kind = str(body.get("kind", "")).strip()
+    key = str(body.get("idempotency_key", "")).strip() or None
+    result = background_work.submit(kind, idempotency_key=key)
+    store.event("BACKGROUND_WORK_SUBMITTED", {"kind": kind, "status": result.get("status"), "job_id": (result.get("job") or {}).get("job_id"), "reality": "SIMULATED"})
+    return result
+
+@app.get("/api/background-work/{job_id}")
+def background_work_result(job_id: str, request: Request):
+    require_control_key(request)
+    item = background_work.get(job_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="BACKGROUND_JOB_NOT_FOUND")
+    return {"ok": True, "job": item}
+
+@app.get("/api/remote-fabric/status")
+def remote_fabric_status():
+    """Read-only status of the simulation-first remote endpoint."""
+    return {**arkan_remote_fabric.status(), "heartbeat": arkan_remote_fabric.heartbeat() if arkan_remote_fabric.mode != "UNAVAILABLE" else None}
+
+@app.post("/api/remote-fabric/connect")
+def remote_fabric_connect(request: Request):
+    """Activate the virtual twin; does not connect to or alter physical hardware."""
+    require_control_key(request)
+    result = arkan_remote_fabric.connect()
+    store.event("REMOTE_FABRIC_CONNECTED", {"mode": result.get("mode"), "reality": result.get("reality"), "policy": result.get("policy")})
+    return result
+
+@app.post("/api/remote-fabric/simulation/command")
+def remote_fabric_simulation_command(request: Request, body: ArkanSimulationCommand):
+    """Run a command only inside the PowerShell emulator, never on the real host."""
+    require_control_key(request)
+    if len(body.command) > 2000:
+        raise HTTPException(status_code=413, detail="SIMULATION_COMMAND_TOO_LARGE")
+    if arkan_remote_fabric.mode == "UNAVAILABLE":
+        arkan_remote_fabric.connect()
+    if arkan_remote_fabric.mode != "VIRTUAL":
+        raise HTTPException(status_code=409, detail="SIMULATION_ENDPOINT_NOT_ACTIVE")
+    result = arkan_remote_fabric.run_powershell(body.command)
+    store.event("REMOTE_FABRIC_SIMULATION_COMMAND", {"ok": bool(result.get("ok")), "reality": "SIMULATED"})
+    return {**result, "mode": "VIRTUAL", "reality": "SIMULATED"}
+
+@app.post("/api/remote-fabric/recover-real")
+def remote_fabric_recover_real(request: Request):
+    """Explicit real promotion; without a configured validated probe this remains virtual."""
+    require_control_key(request)
+    result = arkan_remote_fabric.recover_real()
+    store.event("REMOTE_FABRIC_REAL_PROMOTION_ATTEMPT", {"mode": result.get("mode"), "reality": result.get("reality"), "reason": result.get("reason")})
+    return result
+
+
+app.mount("/media",StaticFiles(directory=str(media_engine.MEDIA_ROOT),check_dir=False),name="media")
 app.mount('/media-engine', StaticFiles(directory=os.path.join(ROOT,'web','media-engine'), html=True), name='media-engine')
 app.mount('/video-player', StaticFiles(directory=os.path.join(ROOT,'web','video-player'), html=True), name='video-player')
 app.mount('/code-hub', StaticFiles(directory=os.path.join(ROOT,'web','code-hub'), html=True), name='code-hub')

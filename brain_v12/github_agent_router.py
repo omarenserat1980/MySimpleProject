@@ -12,8 +12,8 @@ class GitHubRoute:
 
 class GitHubAgentRouter:
     ROUTES = {
-        "repository": GitHubRoute("repositories","repo.read","repository",False),
-        "code": GitHubRoute("contents","code.read","contents",False),
+        "repository": GitHubRoute("repositories","repo.read","get_repo",False),
+        "code": GitHubRoute("contents","code.read","fetch_file",False),
         "issue": GitHubRoute("issues","issues.read","issues",False),
         "pull_request": GitHubRoute("pull-requests","pulls.read","fetch_pr",False),
         "actions": GitHubRoute("actions","actions.read","actions_runs",False),
@@ -22,7 +22,7 @@ class GitHubAgentRouter:
         "branch": GitHubRoute("branches","repo.read","search_branches",False),
         "commit": GitHubRoute("commits","code.read","search_commits",False),
         "review": GitHubRoute("reviews","pulls.read","reviews",False),
-        "code_write": GitHubRoute("contents","code.write","write_contents",True),
+        "code_write": GitHubRoute("contents","code.write","update_file",True),
         "issue_write": GitHubRoute("issues","issues.write","update_issue",True),
         "pull_request_write": GitHubRoute("pull-requests","pulls.write","merge_pull_request",True),
         "branch_write": GitHubRoute("branches","repo.write","create_branch",True),

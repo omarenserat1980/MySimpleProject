@@ -4,8 +4,24 @@ on:
     branches: [main]
     paths:
       - "cloud/web/**"
+      - "platform.html"
+      - "brain-cloud.html"
+      - "games-store.html"
+      - "games-success.html"
+      - "games/**"
+      - "brain_v12/web/platform.html"
+      - "brain_v12/web/index.html"
+      - "brain_v12/web/**/*.html"
       - "brain_v12/web/brain-app-v2/**"
       - "brain_v12/web/brain-chat/**"
+      - "docs/cinema.html"
+      - "docs/movies.html"
+      - "docs/catalog.json"
+      - "docs/studio/**"
+      - "docs/film-zero-line.html"
+      - "docs/film-last-signal.html"
+      - "docs/film-room-13.html"
+      - "docs/films/**"
       - ".github/workflows/brain-pages.yml"
   workflow_dispatch:
 permissions:
@@ -29,49 +45,133 @@ jobs:
           enablement: true
       - name: Build static Brain Web payload
         env:
-          BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN }}
+          BRAIN_API_ORIGIN: ${{ secrets.BRAIN_API_ORIGIN || vars.BRAIN_API_ORIGIN || secrets.BRAIN_ORIGIN || vars.BRAIN_ORIGIN }}
         run: |
           rm -rf _site
           mkdir -p _site/brain-app-v2 _site/brain-chat
           cp -a cloud/web/. _site/
+          cp platform.html _site/platform.html
+          cp brain-cloud.html _site/brain-cloud.html
+          cp games-store.html _site/games-store.html
+          cp games-success.html _site/games-success.html
+          mkdir -p _site/games
+          cp -a games/. _site/games/
+          mkdir -p _site/brain_v12/web _site/brain_v12/film_hub _site/marketing _site/customer-portal _site/studio
+          cp -a brain_v12/web/. _site/brain_v12/web/
+          cp -a brain_v12/film_hub/. _site/brain_v12/film_hub/
+          cp -a marketing/. _site/marketing/
+          cp -a customer-portal/. _site/customer-portal/
           cp -a brain_v12/web/brain-app-v2/. _site/brain-app-v2/
           cp -a brain_v12/web/brain-chat/. _site/brain-chat/
+          cp -a docs/studio/. _site/studio/
+          cp docs/cinema.html _site/cinema.html
+          cp docs/movies.html _site/movies.html
+          cp docs/catalog.json _site/catalog.json
+          mkdir -p _site/assets
           python - <<'PY'
           import json, os
           from pathlib import Path
           origin = os.environ.get("BRAIN_API_ORIGIN", "").strip().rstrip("/")
-          if origin and not origin.startswith("https://"):
+          if not origin:
+              raise SystemExit("BRAIN_API_ORIGIN is required: refusing to deploy a disconnected Brain UI")
+          if not origin.startswith("https://"):
               raise SystemExit("BRAIN_API_ORIGIN must use HTTPS")
+          bridge = """(function(){\n  const base=(window.BRAIN_API_BASE||"").replace(/\\/$/,"");\n  if(!base)return;\n  const nativeFetch=window.fetch.bind(window);\n  function rewrite(input){\n    if(typeof input==="string"){\n      if(input.startsWith("/api/")) return base+input;\n      return input;\n    }\n    if(input instanceof Request){\n      const u=new URL(input.url, location.href);\n      if(u.origin===location.origin && u.pathname.startsWith("/api/")){\n        return new Request(base+u.pathname+u.search, input);\n      }\n    }\n    return input;\n  }\n  window.fetch=function(input,init){return nativeFetch(rewrite(input),init);};\n})();\n"""
+          Path("_site/brain-api-config.js").write_text(
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n", encoding="utf-8")
+          Path("_site/brain-api-bridge.js").write_text(
+              "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n" + bridge,
+              encoding="utf-8")
+          for html in Path("_site").rglob("*.html"):
+              s=html.read_text(encoding="utf-8")
+              rel=os.path.relpath(Path("_site/brain-api-bridge.js"), html.parent).replace(os.sep, "/")
+              marker=f'<script src="{rel}"></script>'
+              if "brain-api-bridge.js" not in s:
+                  if "</head>" in s:
+                      s=s.replace("</head>", marker+"</head>", 1)
+                  else:
+                      s=s.replace("</body>", marker+"</body>", 1)
+                  html.write_text(s, encoding="utf-8")
           Path("_site/brain-app-v2/config.json").write_text(
-              json.dumps({"api_base": origin}, ensure_ascii=False),
-              encoding="utf-8",
-          )
+              json.dumps({"api_base": origin}, ensure_ascii=False), encoding="utf-8")
+          Path("_site/games-api-config.js").write_text("window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n", encoding="utf-8")
           Path("_site/brain-chat/config.js").write_text(
               "window.BRAIN_API_BASE = " + json.dumps(origin, ensure_ascii=False) + ";\n",
-              encoding="utf-8",
-          )
-          if not Path("_site/index.html").is_file():
-              raise SystemExit("Pages root entry point is missing from artifact")
-          if not Path("_site/brain-chat/index.html").is_file():
-              raise SystemExit("Brain Chat entry point is missing from Pages artifact")
-          if not Path("_site/brain-chat/config.js").is_file():
-              raise SystemExit("Brain Chat runtime configuration was not generated")
-          if "\\n" in Path("_site/brain-chat/config.js").read_text(encoding="utf-8"):
-              raise SystemExit("Brain Chat config contains a literal backslash-n")
+              encoding="utf-8")
+          required = [
+              "_site/index.html", "_site/platform.html", "_site/brain-cloud.html", "_site/games-store.html", "_site/games-success.html", "_site/games-api-config.js",
+              "_site/games/neon-rift.html", "_site/games/last-light.html", "_site/games/drift-circuit.html", "_site/brain-api-config.js", "_site/brain-api-bridge.js",
+              "_site/movies.html", "_site/cinema.html",
+              "_site/brain-chat/index.html", "_site/brain-chat/config.js",
+              "_site/brain-app-v2/config.json", "_site/studio/index.html",
+              "_site/studio/storyboard.html", "_site/marketing/index.html",
+              "_site/customer-portal/index.html", "_site/brain_v12/web/index.html",
+              "_site/brain_v12/film_hub/web/index.html",
+          ]
+          missing = [p for p in required if not Path(p).is_file()]
+          if missing:
+              raise SystemExit("Missing Pages artifact files: " + ", ".join(missing))
+          from html.parser import HTMLParser
+          class LinkParser(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.hrefs=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag == "a":
+                      href = dict(attrs).get("href", "")
+                      if href and not href.startswith(("#","http://","https://","mailto:")):
+                          self.hrefs.append(href.split("#",1)[0].split("?",1)[0])
+          parser = LinkParser()
+          parser.feed(Path("_site/platform.html").read_text(encoding="utf-8"))
+          root = Path("_site").resolve()
+          for href in parser.hrefs:
+              target = (root / href.lstrip("/")).resolve()
+              if not str(target).startswith(str(root)):
+                  raise SystemExit(f"Platform link escapes Pages artifact: {href}")
+              if not target.is_file() and not (target.is_dir() and (target/"index.html").is_file()):
+                  raise SystemExit(f"Broken platform link: {href}")
           config = json.loads(Path("_site/brain-app-v2/config.json").read_text(encoding="utf-8"))
           if "api_base" not in config:
               raise SystemExit("Brain app config is missing api_base")
+          gamejs = Path("_site/games-api-config.js").read_text(encoding="utf-8")
+          assert gamejs.startswith("window.BRAIN_API_BASE = ")
+          js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
+          if "\\n" in js or not js.startswith("window.BRAIN_API_BASE = "):
+              raise SystemExit("Brain Chat config is malformed")
+          print(f"Platform link validation: OK ({len(parser.hrefs)} local links)")
+          print("BRAIN_API_ORIGIN_STATE=" + ("configured" if origin else "not configured"))
           summary = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary:
               with open(summary, "a", encoding="utf-8") as stream:
                   stream.write("## Brain Pages build\n")
-                  stream.write("- Brain API origin: " + ("configured" if origin else "not configured; the deployed UI will show the backend as disconnected until an API origin is supplied") + "\n")
-                  stream.write("- Brain Chat artifact: present\n")
+                  stream.write("- Brain API origin: configured\n")
+                  stream.write(f"- Local platform links validated: {len(parser.hrefs)}\n")
+                  stream.write("- Studio artifact: present\n")
           PY
       - name: Validate Pages payload
         run: |
           test -f _site/index.html
+          test -f _site/platform.html
+          test -f _site/brain-cloud.html
+          test -f _site/games-store.html
+          test -f _site/games-success.html
+          test -f _site/games-api-config.js
+          test -f _site/games/neon-rift.html
+          test -f _site/games/last-light.html
+          test -f _site/games/drift-circuit.html
+          test -f _site/brain-api-config.js
+          test -f _site/brain-api-bridge.js
+          test -f _site/marketing/index.html
+          test -f _site/customer-portal/index.html
+          test -f _site/brain_v12/web/index.html
+          test -f _site/brain_v12/film_hub/web/index.html
           test -f _site/brain-chat/index.html
+          test -f _site/cinema.html
+          test -f _site/movies.html
+          test -f _site/studio/storyboard.html
+          test -f _site/studio/index.html
+          test -f _site/studio/app.js
+          test -f _site/studio/studio.css
+          test -f _site/catalog.json
           test -f _site/brain-chat/config.js
           test -f _site/brain-app-v2/config.json
           python - <<'PY'
@@ -82,6 +182,10 @@ jobs:
           js = Path("_site/brain-chat/config.js").read_text(encoding="utf-8")
           assert "\\n" not in js
           assert js.startswith("window.BRAIN_API_BASE = ")
+          bridge = Path("_site/brain-api-bridge.js").read_text(encoding="utf-8")
+          assert "window.fetch=function" in bridge
+          assert "BRAIN_API_BASE" in bridge
+          assert "brain-api-bridge.js" in Path("_site/index.html").read_text(encoding="utf-8")
           print("Pages payload validation: OK")
           PY
       - uses: actions/upload-pages-artifact@v4

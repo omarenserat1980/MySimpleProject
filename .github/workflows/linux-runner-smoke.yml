@@ -1,0 +1,29 @@
+name: Linux Runner Smoke Test
+
+on:
+  push:
+    paths:
+      - ".github/workflows/linux-runner-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-runner-smoke:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    steps:
+      - name: Identify runner
+        run: |
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          echo "RUNNER_OS=$RUNNER_OS"
+          echo "RUNNER_ARCH=$RUNNER_ARCH"
+          hostname
+          uname -a
+      - name: Verify runner
+        run: |
+          test "$RUNNER_NAME" = "linux-runner-01"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
+          echo "LINUX_RUNNER_SMOKE=PASS"

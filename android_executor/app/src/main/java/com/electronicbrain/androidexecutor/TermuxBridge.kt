@@ -51,6 +51,17 @@ object TermuxBridge {
             false
         }
 
+    fun runBrainRuntimeBootstrap(context: Context): TermuxResult {
+        if (!isInstalled(context)) return TermuxResult(-1, "", "", -1, "TERMUX_NOT_INSTALLED")
+        return runFixedCommand(context, "/data/data/com.termux/files/usr/bin/bash", listOf("/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_bootstrap.sh"), timeoutMs = 15000L)
+    }
+
+    private fun runFixedCommand(context: Context, executable: String, arguments: List<String>, workDir: String = "/data/data/com.termux/files/home", timeoutMs: Long = 30 * 60 * 1000L): TermuxResult {
+        require(executable == "/data/data/com.termux/files/usr/bin/bash") { "TERMUX_EXECUTABLE_NOT_ALLOWED" }
+        require(arguments.size == 1 && arguments[0] == "/data/data/com.termux/files/home/MySimpleProject/brain_v12/tools/brain_runtime_launcher.sh") { "TERMUX_ARGUMENTS_NOT_ALLOWED" }
+        return runInternal(context, executable, arguments, workDir, timeoutMs)
+    }
+
     fun run(
         context: Context,
         executable: String,
@@ -62,6 +73,10 @@ object TermuxBridge {
                 executable == "/data/data/com.termux/files/usr/bin/ffprobe") {
             "TERMUX_EXECUTABLE_NOT_ALLOWED"
         }
+        return runInternal(context, executable, arguments, workDir, timeoutMs)
+    }
+
+    private fun runInternal(context: Context, executable: String, arguments: List<String>, workDir: String, timeoutMs: Long): TermuxResult {
         require(arguments.size <= 512) { "TERMUX_ARGUMENT_LIMIT" }
         if (!isInstalled(context)) {
             return TermuxResult(-1, "", "", -1, "TERMUX_NOT_INSTALLED")
@@ -90,8 +105,8 @@ object TermuxBridge {
                 putExtra(EXTRA_WORKDIR, workDir)
                 putExtra(EXTRA_BACKGROUND, true)
                 putExtra(EXTRA_PENDING_INTENT, pendingIntent)
-                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Electronic Brain FFmpeg")
-                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Electronic Brain media execution requested by the authorized Brain Executor.")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Electronic Brain Runtime")
+                putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "Electronic Brain runtime bootstrap requested by the authorized Brain Executor.")
             }
 
             context.startService(intent)
