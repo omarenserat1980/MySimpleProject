@@ -57,7 +57,7 @@ class VirtualNodeAutoscalingTests(unittest.TestCase):
                         break
                     time.sleep(0.02)
                 self.assertEqual(current.status, "COMPLETED", getattr(current, "result", None))
-                self.assertGreaterEqual(len(chassis.blades), 1)
+                self.assertTrue(current.blade_id)
             finally:
                 queue.shutdown()
 
