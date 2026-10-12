@@ -131,19 +131,21 @@ class DesktopCommanderEmulator:
                 started=self._process_started.get(process_id)
             if proc is None or started is None:
                 return
-            if proc.poll() is None:
+            timed_out=proc.poll() is None
+            if timed_out:
                 proc.kill()
             output,_=proc.communicate()
             text_output=output or ""
-            result={"ok":False,"status":"TIMED_OUT","process_id":process_id,
-                    "returncode":proc.returncode,"output":text_output[:self.policy.max_output_bytes],
+            result={"ok":not timed_out,"status":"TIMED_OUT" if timed_out else "COMPLETED",
+                    "process_id":process_id,"returncode":proc.returncode,
+                    "output":text_output[:self.policy.max_output_bytes],
                     "truncated":len(text_output)>self.policy.max_output_bytes,"reality":"SIMULATED"}
             self._forget_process(process_id)
             with self._lock:
                 self._process_results[process_id]=result
-            self._audit("process_timeout",{"process_id":process_id,
-                                           "timeout_seconds":self.policy.command_timeout_seconds,
-                                           "enforced_by_watchdog":True})
+            self._audit("process_timeout" if timed_out else "process_completed",
+                        {"process_id":process_id,"timeout_seconds":self.policy.command_timeout_seconds,
+                         "enforced_by_watchdog":True})
 
     def read_process_output(self,process_id:str,timeout:float=0.2)->dict[str,Any]:
         with self._lock:
@@ -188,7 +190,16 @@ class DesktopCommanderEmulator:
         """Stop a sandbox process and reap it so it cannot leak in the emulator registry."""
         with self._lock:
             proc=self._processes.get(process_id)
+            process_lock=self._process_locks.get(process_id)
         if proc is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
+        if process_lock is None:return {"ok":False,"status":"PROCESS_NOT_FOUND"}
+        with process_lock:
+            with self._lock:
+                if self._processes.get(process_id) is not proc:
+                    return {"ok":False,"status":"PROCESS_NOT_FOUND"}
+            return self._stop_process_locked(process_id,proc)
+
+    def _stop_process_locked(self,process_id:str,proc:subprocess.Popen[str])->dict[str,Any]:
         try:
             if proc.poll() is None:
                 proc.terminate()
