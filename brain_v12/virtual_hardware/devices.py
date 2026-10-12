@@ -81,10 +81,15 @@ class VirtualStorage:
         if not self.profile:
             return 100 * 1024 * 1024, 1000
         if operation == "read":
-            return (self.profile.sequential_read_bytes_per_second,
-                    self.profile.random_read_iops_qd1 if self.queue_depth == 1 else self.profile.random_read_iops_qd32)
-        return (self.profile.sequential_write_bytes_per_second,
-                self.profile.random_write_iops_qd1 if self.queue_depth == 1 else self.profile.random_write_iops_qd32)
+            qd1, qd32 = self.profile.random_read_iops_qd1, self.profile.random_read_iops_qd32
+        else:
+            qd1, qd32 = self.profile.random_write_iops_qd1, self.profile.random_write_iops_qd32
+        # The datasheets publish QD1 and QD32 points, not a full curve. Intermediate
+        # queue depths use a labeled linear interpolation rather than invented measurements.
+        modeled_iops = int(qd1 + (min(self.queue_depth, 32) - 1) * (qd32 - qd1) / 31)
+        throughput = (self.profile.sequential_read_bytes_per_second if operation == "read"
+                      else self.profile.sequential_write_bytes_per_second)
+        return throughput, max(1, modeled_iops)
 
     def estimate_latency_us(self, operation: str, size_bytes: int, outstanding: int = 1) -> float:
         if operation not in {"read", "write"} or size_bytes < 0:
