@@ -29,6 +29,31 @@ class ControlPlaneTests(unittest.TestCase):
             self.assertEqual(loaded["checkpoint"]["output"],{"asset":"scene-1"})
             self.assertEqual(loaded["status"],"ready")
 
+    def test_recovery_is_idempotent_and_preserves_live_leases(self):
+        with tempfile.TemporaryDirectory() as d:
+            cp=ControlPlane(d)
+            expired=cp.start_attempt(cp.create("expired",["build"]),lease_seconds=30)
+            live=cp.start_attempt(cp.create("live",["verify"]),lease_seconds=300)
+
+            # Simulate only the first job's lease expiring while the process is down.
+            lines=cp.jobs.read_text(encoding="utf-8").splitlines()
+            latest_by_id={}
+            for index,line in enumerate(lines):
+                row=json.loads(line)
+                latest_by_id[row["job_id"]]=(index,row)
+            index,row=latest_by_id[expired["job_id"]]
+            row["lease_expires_at"]=0
+            lines[index]=json.dumps(row,separators=(",",":"))
+            cp.jobs.write_text("\\n".join(lines)+"\\n",encoding="utf-8")
+
+            restarted=ControlPlane(d)
+            first=restarted.recover_expired_jobs()
+            second=restarted.recover_expired_jobs()
+            self.assertEqual([job["job_id"] for job in first],[expired["job_id"]])
+            self.assertEqual(second,[])
+            self.assertEqual(restarted.load(expired["job_id"])["status"],"ready")
+            self.assertEqual(restarted.load(live["job_id"])["status"],"running")
+
     def test_restart_recovers_expired_persisted_lease(self):
         with tempfile.TemporaryDirectory() as d:
             cp=ControlPlane(d)
