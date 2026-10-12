@@ -120,7 +120,8 @@ class VirtualStorage:
         if op in {"read", "write"}:
             self._modeled_latency_total_us += request["estimated_latency_us"]
             self.stats[f"{op}_ops"] += 1
-            self.stats[f"bytes_{op}"] += request["size_bytes"]
+            byte_counter = "bytes_read" if op == "read" else "bytes_written"
+            self.stats[byte_counter] += request["size_bytes"]
         return {"ok": True, **request, "queue_depth": len(self.inflight),
                 "timing_is_estimated": True, "physical_measurement": False}
 
