@@ -37,8 +37,8 @@ def assert_runtime_contract() -> dict:
     else:
         failures.append("MISSING_SELF_HEALING_WORKFLOW")
 
-    # Allowlisted unit-test/health tasks are safe on hosted infrastructure.
-    # Privileged supervisor repair remains in the separate protected workflow.
+    # Allowlisted software tasks and bounded supervisor recovery run on hosted infrastructure.
+    # Production provisioning and real Windows guest boot remain separately protected.
     cloud_path = ROOT / ".github/workflows/brain-github-cloud.yml"
     if cloud_path.exists():
         cloud_text = cloud_path.read_text(encoding="utf-8")
