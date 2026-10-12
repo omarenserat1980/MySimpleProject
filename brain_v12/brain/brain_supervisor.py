@@ -1,6 +1,8 @@
 """Brain Supervisor: bounded autonomous orchestration over the existing Control Plane."""
 from __future__ import annotations
 import json, os, time
+from dataclasses import asdict, is_dataclass
+from enum import Enum
 from pathlib import Path
 from .autonomy_control_plane import ControlPlane
 from .autonomous_reasoner import AutonomousReasoner
@@ -17,6 +19,16 @@ from ..self_healing.problem_completion_gate import CompletionContract, ProblemCo
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
 SAFE_EXTERNAL_ACTIONS={"submit_application","publish_external","move_money","withdraw"}
+
+def _event_json_default(value):
+    """Serialize structured values included in durable supervisor event records."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 class BrainSupervisor:
     """Single authoritative orchestrator. V13 primitives are policy/state layers only."""
@@ -49,7 +61,7 @@ class BrainSupervisor:
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
-        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False)+"\n")
+        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False,default=_event_json_default)+"\n")
 
     def create(self,task,steps=None,budget=8):
         steps=steps or ["discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver"]
