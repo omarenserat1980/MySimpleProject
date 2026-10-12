@@ -38,7 +38,6 @@ class InternalRunner:
     def capabilities(self) -> set[str]:
         return {
             "brain-internal-execution",
-            "windows-server-2025-real-boot",
             "qemu",
         }
 

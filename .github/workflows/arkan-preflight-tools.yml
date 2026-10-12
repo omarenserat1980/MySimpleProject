@@ -1,0 +1,133 @@
+name: Arkan Preflight Tool Tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/arkan_windows_real_boot_diagnostic.ps1"
+      - "tools/run_arkan_windows_real_boot_diagnostic_wsl.sh"
+      - "tools/summarize_arkan_preflight.py"
+      - "tools/test_summarize_arkan_preflight.py"
+      - "tools/arkan_hyperv_root_cause_gate.py"
+      - "tools/test_windows_contract_workflow.py"
+      - "tools/test_fetch_windows_execution_contract.py"
+      - "tools/windows_contract_control_plane_preflight.py"
+      - "tools/test_windows_contract_control_plane_preflight.py"
+      - "tools/test_windows_contract_control_plane_replay.py"
+      - "tools/windows_control_plane_api_preflight.py"
+      - "tools/test_windows_control_plane_api_preflight.py"
+      - "brain_v12/brain/windows_real_boot_closed_loop_gate.py"
+      - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - "brain_v12/tests/test_windows_contract_fetch.py"
+      - ".github/workflows/brain-windows-real-boot.yml"
+      - ".github/workflows/arkan-preflight-tools.yml"
+      - ".github/workflows/brain-control-plane-readonly-preflight.yml"
+  push:
+    branches:
+      - "tool/windows-real-boot-preflight-20261011"
+      - "tool/live-control-plane-readonly-check-20261011"
+      - "tool/windows-control-plane-preflight-v2-20261011"
+    paths:
+      - ".github/workflows/brain-control-plane-readonly-preflight.yml"
+      - "tools/windows_control_plane_api_preflight.py"
+      - "tools/test_windows_control_plane_api_preflight.py"
+      - "tools/arkan_windows_real_boot_diagnostic.ps1"
+      - "tools/run_arkan_windows_real_boot_diagnostic_wsl.sh"
+      - "tools/summarize_arkan_preflight.py"
+      - "tools/test_summarize_arkan_preflight.py"
+      - "tools/arkan_hyperv_root_cause_gate.py"
+      - "tools/test_windows_contract_workflow.py"
+      - "tools/test_fetch_windows_execution_contract.py"
+      - "tools/windows_contract_control_plane_preflight.py"
+      - "tools/test_windows_contract_control_plane_preflight.py"
+      - "tools/test_windows_contract_control_plane_replay.py"
+      - "brain_v12/brain/windows_real_boot_closed_loop_gate.py"
+      - "brain_v12/brain/fetch_windows_execution_contract.py"
+      - "brain_v12/tests/test_windows_contract_fetch.py"
+      - ".github/workflows/brain-windows-real-boot.yml"
+      - ".github/workflows/arkan-preflight-tools.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-read-only-diagnostic-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate launcher syntax
+        run: bash -n tools/run_arkan_windows_real_boot_diagnostic_wsl.sh
+
+      - name: Install contract verifier test dependency
+        run: python -m pip install --disable-pip-version-check cryptography
+
+      - name: Compile Python tools
+        run: python -m py_compile tools/summarize_arkan_preflight.py tools/test_summarize_arkan_preflight.py tools/arkan_hyperv_root_cause_gate.py tools/test_windows_contract_workflow.py tools/test_fetch_windows_execution_contract.py tools/windows_contract_control_plane_preflight.py tools/test_windows_contract_control_plane_preflight.py tools/windows_control_plane_api_preflight.py tools/test_windows_control_plane_api_preflight.py tools/test_windows_contract_control_plane_replay.py
+
+      - name: Run summarizer regression tests
+        run: python -m unittest -v tools/test_summarize_arkan_preflight.py
+
+      - name: Test contract workflow wiring
+        run: python -m unittest -v tools/test_windows_contract_workflow.py
+
+      - name: Test contract fetcher with mocked Control Plane responses
+        run: python -m unittest -v tools/test_fetch_windows_execution_contract.py
+
+      - name: Test Control Plane contract readiness gate with synthetic approvals
+        run: python -m unittest -v tools/test_windows_contract_control_plane_preflight.py
+
+      - name: Test read-only Control Plane OpenAPI discovery
+        run: python -m unittest -v tools/test_windows_control_plane_api_preflight.py
+
+      - name: Test consumed owner-approval replay rejection
+        run: python -m unittest -v tools/test_windows_contract_control_plane_replay.py
+
+      - name: Test sanitized contract issuance diagnostics
+        run: python -m unittest -v brain_v12.tests.test_windows_contract_fetch
+
+      - name: Test root-cause gate against synthetic virtualization blocker
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp)"
+          trap 'rm -f "$tmp"' EXIT
+          cat > "$tmp" <<'JSON'
+          {
+            "machine": "SYNTHETIC-TEST-ONLY",
+            "warnings": ["hyperv_host : type=UnauthorizedAccessException; category=PermissionDenied; id=TestId"],
+            "checks": {
+              "identity": {"IsAdministrator": false},
+              "cpu_virtualization": [{"VirtualizationFirmwareEnabled": false, "VMMonitorModeExtensions": false}],
+              "hyperv_module": [],
+              "hyperv_feature": {"State": "Disabled"},
+              "hyperv_commands": {"GetVM": true, "GetVMHost": true},
+              "hyperv_host": null,
+              "vms": []
+            }
+          }
+          JSON
+          set +e
+          python tools/arkan_hyperv_root_cause_gate.py "$tmp" | tee root-cause-gate-test.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+          test "$rc" -eq 1
+          grep -q 'WINDOWS_BOOT_VERIFIED=false' root-cause-gate-test.txt
+          grep -q 'FIRMWARE_VIRTUALIZATION_DISABLED' root-cause-gate-test.txt
+          grep -q 'GET_VMHOST_QUERY_FAILED' root-cause-gate-test.txt
+          grep -q 'No system settings were changed' root-cause-gate-test.txt
+
+      - name: Upload synthetic test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arkan-preflight-tool-test-output
+          path: root-cause-gate-test.txt
+          if-no-files-found: ignore

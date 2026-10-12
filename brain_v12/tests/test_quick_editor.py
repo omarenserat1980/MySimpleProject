@@ -3,7 +3,10 @@ import json
 import os
 import unittest
 
-os.environ.setdefault("BRAIN_DB", "/tmp/brain_quick_editor_test.db")
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+TEST_DB = os.path.join(ROOT, ".brain", "test", "brain-quick-editor-test.db")
+os.makedirs(os.path.dirname(TEST_DB), exist_ok=True)
+os.environ["BRAIN_DB"] = TEST_DB
 
 from brain_v12.app import _quick_editor_path, _quick_editor_validate, _github_config
 

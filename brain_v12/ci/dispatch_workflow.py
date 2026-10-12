@@ -23,6 +23,7 @@ ALLOWED_WORKFLOWS = {
     "brain-github-cloud": ".github/workflows/brain-github-cloud.yml",
     "brain-reasoning-loop": ".github/workflows/brain-reasoning-loop.yml",
     "reflection-e2e": ".github/workflows/reflection-e2e.yml",
+    "brain-revenue-conversion-tests": ".github/workflows/brain-revenue-conversion-tests.yml",
 }
 
 

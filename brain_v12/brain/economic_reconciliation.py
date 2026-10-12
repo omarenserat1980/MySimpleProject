@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -34,6 +35,7 @@ class ReconciliationStore:
     def __init__(self, path: str):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.lock = threading.RLock()
 
     def _load(self) -> Dict[str, Any]:
         if not self.path.exists():
@@ -55,11 +57,18 @@ class ReconciliationStore:
         if body.payment_currency != body.currency or body.payment_amount_usd != body.amount_usd:
             raise ValueError("payment amount/currency mismatch")
 
-        data = self._load()
-        if body.order_id in data["records"]:
-            return data["records"][body.order_id]
+        with self.lock:
+            data = self._load()
+            existing = data["records"].get(body.order_id)
+            if existing is not None:
+                incoming_fingerprint = hashlib.sha256(
+                    json.dumps(body.dict(), sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                if existing.get("audit_fingerprint") == incoming_fingerprint:
+                    return existing
+                raise ValueError("RECONCILIATION_CONFLICT_FOR_ORDER")
 
-        record = {
+            record = {
             "order_id": body.order_id,
             "state": "REVENUE_REALIZED",
             "amount_usd": body.amount_usd,
@@ -76,9 +85,9 @@ class ReconciliationStore:
                 json.dumps(body.dict(), sort_keys=True).encode("utf-8")
             ).hexdigest(),
         }
-        data["records"][body.order_id] = record
-        self._save(data)
-        return record
+            data["records"][body.order_id] = record
+            self._save(data)
+            return record
 
 
 def router(path: str) -> APIRouter:

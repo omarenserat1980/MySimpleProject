@@ -1,0 +1,104 @@
+name: Brain Runner Registration Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-runner-registration-diagnostic.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/brain-runner-registration-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect registered runner state
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REPO: omarenserat1980/MySimpleProject
+      RUNNER_NAME: brain-internal-arkan
+      RUNNER_ID: "23"
+      # The runner-list API requires a token with repository Administration: read.
+      # GITHUB_TOKEN is retained as a fallback so the workflow records the actual
+      # permission failure instead of silently hiding it.
+      GH_TOKEN: ${{ secrets.BRAIN_RUNNER_WATCH_TOKEN || github.token }}
+    steps:
+      - name: Query registered runners and record permission failures
+        shell: bash
+        run: |
+          set -u
+          mkdir -p evidence
+          if [ -n "${{ secrets.BRAIN_RUNNER_WATCH_TOKEN }}" ]; then
+            token_source="BRAIN_RUNNER_WATCH_TOKEN"
+          else
+            token_source="GITHUB_TOKEN_FALLBACK"
+          fi
+          echo "RUNNER_DIAGNOSTIC_TOKEN_SOURCE=$token_source"
+          if json="$(gh api "/repos/${REPO}/actions/runners?per_page=100" 2>evidence/runner-api-error.txt)"; then
+            printf '%s' "$json" | jq --arg name "$RUNNER_NAME" --arg id "$RUNNER_ID" '
+              {
+                status: "API_QUERY_OK",
+                total_count,
+                target_name: $name,
+                target_id: $id,
+                runners: [
+                  .runners[]
+                  | select(.name == $name or ((.id|tostring) == $id))
+                  | {id,name,status,busy,labels:[.labels[].name],os,architecture}
+                ]
+              }
+            ' > evidence/runner-registration-diagnostic.json
+            count="$(jq '.runners | length' evidence/runner-registration-diagnostic.json)"
+            if [ "$count" -eq 0 ]; then
+              jq '.status = "TARGET_RUNNER_NOT_FOUND"' evidence/runner-registration-diagnostic.json > evidence/result.json
+              mv evidence/result.json evidence/runner-registration-diagnostic.json
+            else
+              jq '.status = "TARGET_RUNNER_REGISTERED"' evidence/runner-registration-diagnostic.json > evidence/result.json
+              mv evidence/result.json evidence/runner-registration-diagnostic.json
+            fi
+          else
+            # Preserve a safe, actionable diagnosis without exposing tokens.
+            jq -n --arg token_source "$token_source" '
+              {
+                status: "RUNNER_API_QUERY_FAILED",
+                token_source: $token_source,
+                required_permission: "Repository Administration: read",
+                likely_remediation: "Set BRAIN_RUNNER_WATCH_TOKEN to a least-privilege token that can read repository self-hosted runners."
+              }
+            ' > evidence/runner-registration-diagnostic.json
+            echo "RUNNER_API_QUERY=FAILED; see evidence JSON for the required permission."
+          fi
+          cat evidence/runner-registration-diagnostic.json
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-runner-registration-diagnostic-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Apply diagnostic result gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s evidence/runner-registration-diagnostic.json
+          status="$(jq -r '.status // "MISSING_STATUS"' evidence/runner-registration-diagnostic.json)"
+          if [ "$status" != "TARGET_RUNNER_REGISTERED" ]; then
+            echo "RUNNER_REGISTRATION_GATE=BLOCKED"
+            echo "RUNNER_REGISTRATION_DIAGNOSIS=$status"
+            exit 1
+          fi
+          online="$(jq -r '[.runners[] | select(.status == "online")] | length' evidence/runner-registration-diagnostic.json)"
+          if [ "$online" -eq 0 ]; then
+            echo "RUNNER_REGISTRATION_GATE=BLOCKED"
+            echo "RUNNER_REGISTRATION_DIAGNOSIS=TARGET_RUNNER_OFFLINE"
+            exit 1
+          fi
+          echo "RUNNER_REGISTRATION_GATE=PASS"
+          jq -r '.runners[] | "RUNNER name=\(.name) id=\(.id) status=\(.status) busy=\(.busy) os=\(.os) arch=\(.architecture) labels=\(.labels|join(","))"' evidence/runner-registration-diagnostic.json

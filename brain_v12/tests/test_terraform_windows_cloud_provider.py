@@ -30,7 +30,7 @@ def test_status_maps_terraform_outputs(tmp_path: Path) -> None:
         "brain_vm_id": {"value": "vm-123"},
         "brain_provider": {"value": "azure"},
         "brain_region": {"value": "test-region"},
-        "brain_state": {"value": "RUNNING"},
+        "brain_state": {"value": "PROVISIONED"},
         "brain_os": {"value": "Windows Server 2025"},
         "brain_architecture": {"value": "x86_64"},
     }

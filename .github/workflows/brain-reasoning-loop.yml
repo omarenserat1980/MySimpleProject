@@ -15,6 +15,10 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: brain-brain-reasoning-loop-main
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: read

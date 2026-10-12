@@ -17,6 +17,18 @@ class EvidenceVerificationTests(unittest.TestCase):
             self.assertEqual(store.verify_hash(item["evidence_id"])["status"],"VERIFIED")
             store.close()
 
+    def test_digest_is_canonical_for_cognitive_payload(self):
+        payload = {
+            "run_id": "r1",
+            "task_id": "t1",
+            "action": "observe",
+            "tool": "memory.read",
+            "tool_result": {"ok": True, "data": ["أ"]},
+        }
+        digest = EvidenceStore.digest(payload)
+        self.assertEqual(digest, "10022d3de1045513a5b14d453c276d27b4c9145e5e722036afada521a71bb02e")
+
+
     def test_tamper_is_detected(self):
         with tempfile.TemporaryDirectory() as d:
             store=EvidenceStore(Path(d)/"evidence.db")

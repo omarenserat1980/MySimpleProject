@@ -13,7 +13,8 @@ services:
       - brain-state:/opt/brain/.brain
       - brain-data:/opt/brain/brain_data
     environment:
-      BRAIN_INTERNAL_RUNNER_FLAG: "1"
+      # Trusted runner identity is intentionally not set here; provision it
+      # only on the authorized runner host, outside workflow/container config.
       BRAIN_RUNTIME_ROOT: /var/lib/brain/runtime
       BRAIN_CLOUD_MODE: "1"
       BRAIN_DB: /opt/brain/brain_data/brain_v12.db
@@ -38,7 +39,7 @@ services:
       - brain-state:/opt/brain/.brain
       - brain-data:/opt/brain/brain_data
     environment:
-      BRAIN_INTERNAL_RUNNER_FLAG: "1"
+      # Trusted runner identity is intentionally not set here.
       BRAIN_RUNTIME_ROOT: /var/lib/brain/runtime
       BRAIN_CLOUD_MODE: "1"
       BRAIN_WORKER_POLL_SECONDS: "2"

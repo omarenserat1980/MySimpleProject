@@ -50,6 +50,17 @@ class EconomicReconciliationTests(unittest.TestCase):
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()["audit_fingerprint"], r.json()["audit_fingerprint"])
 
+    def test_conflicting_reconciliation_for_same_order_is_rejected(self):
+        payload = self._payload()
+        headers = {"X-Brain-Control-Key": "test-control"}
+        first = self.client.post("/api/economic-reconciliation/reconcile", json=payload, headers=headers)
+        self.assertEqual(first.status_code, 200)
+        conflicting = dict(payload)
+        conflicting["payment_transaction_id"] = "tx:DIFFERENT"
+        r = self.client.post("/api/economic-reconciliation/reconcile", json=conflicting, headers=headers)
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["detail"], "RECONCILIATION_CONFLICT_FOR_ORDER")
+
 
 if __name__ == "__main__":
     unittest.main()

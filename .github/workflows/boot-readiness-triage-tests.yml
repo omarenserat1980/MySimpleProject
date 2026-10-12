@@ -1,0 +1,31 @@
+name: Boot Readiness Triage Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/boot_readiness_triage.py"
+      - "brain_v12/tests/test_boot_readiness_triage.py"
+      - ".github/workflows/boot-readiness-triage-tests.yml"
+  push:
+    branches: [main, feat/boot-readiness-triage-v1]
+    paths:
+      - "brain_v12/tools/boot_readiness_triage.py"
+      - "brain_v12/tests/test_boot_readiness_triage.py"
+      - ".github/workflows/boot-readiness-triage-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  boot-readiness-triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run fail-closed triage tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_boot_readiness_triage -v
