@@ -66,7 +66,7 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
     zero_cost = body.hardware_cost_jod == 0 and body.other_daily_cost_jod == 0
     return {
         "ok": True,
-        "status": "DRY_RUN_READY" if profitable_on_inputs and zero_cost else "BLOCKED",
+        "status": "BLOCKED_REVENUE_UNVERIFIED" if profitable_on_inputs and zero_cost else "BLOCKED",
         "mode": "DRY_RUN",
         "stages": [
             {"name": "INPUT_VALIDATION", "status": "PASS"},
@@ -80,5 +80,5 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
         "spend_authorized": False,
         "real_mining_started": False,
         "verified_revenue_jod": 0.0,
-        "next_step": "Connect a real, independently verified ASIC and reliable market/pool data before reconsidering execution; never use paid cloud resources under the zero-capital policy.",
+        "next_step": "Revenue remains unverified; this endpoint is analysis-only and never authorizes real mining execution.",
     }
