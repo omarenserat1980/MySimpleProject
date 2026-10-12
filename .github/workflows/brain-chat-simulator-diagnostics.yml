@@ -81,7 +81,7 @@ jobs:
                   print("URL_CHECK="+url+" ERROR="+type(exc).__name__+":"+str(exc)[:300])
           PY
             echo "=== RECENT BRAIN LOG FILE INVENTORY (NO CONTENTS) ==="
-            for root in "$GITHUB_WORKSPACE" "$HOME" /var/log /opt/brain /srv/brain; do
+            for root in "$GITHUB_WORKSPACE" "${HOME:-/home/brain}" /var/log /opt/brain /srv/brain; do
               if test -d "$root"; then
                 find "$root" -maxdepth 4 -type f \( -iname '*brain*.log' -o -iname '*windows*boot*.log' -o -iname 'windows-boot-evidence.json' -o -iname 'windows-boot-proof.json' \) -printf '%TY-%Tm-%TdT%TH:%TM:%TSZ %s %p\n' 2>/dev/null | head -80
               fi
