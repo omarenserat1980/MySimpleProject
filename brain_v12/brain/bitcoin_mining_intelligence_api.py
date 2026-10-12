@@ -67,6 +67,7 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
     return {
         "ok": True,
         "status": "BLOCKED_REVENUE_UNVERIFIED" if profitable_on_inputs and zero_cost else "BLOCKED",
+        "profit_gate": analysis.get("profit_gate", engine.profit_gate()),
         "mode": "DRY_RUN",
         "stages": [
             {"name": "INPUT_VALIDATION", "status": "PASS"},
