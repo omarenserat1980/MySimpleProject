@@ -31,7 +31,7 @@ class DeviceBridge:
     def configured(self):
         if os.getenv(AGENT_KEYS_JSON_ENV, "").strip():
             return True
-        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY"):
+        if os.getenv(AGENT_KEY_ENV) or os.getenv(AGENT_KEY_SHA256_ENV) or os.getenv("BRAIN_EMULATOR_KEY") or os.getenv("BRAIN_EMULATOR_AGENT_KEY"):
             return True
         key_file = self._key_file()
         try:
@@ -55,6 +55,7 @@ class DeviceBridge:
         if os.getenv(AGENT_KEY_ENV,""): return "DIRECT_KEY"
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
+        if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY (legacy documented alias)"
         return "NOT_CONFIGURED"
     def authenticate(self, supplied, agent_id=None):
         if not self.enabled() or not supplied:
@@ -76,7 +77,7 @@ class DeviceBridge:
                 return False
             expected = registry.get(str(agent_id or "").strip())
             return bool(expected) and hmac.compare_digest(supplied, expected)
-        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","")
+        expected=os.getenv(AGENT_KEY_ENV,"") or os.getenv("BRAIN_EMULATOR_KEY","") or os.getenv("BRAIN_EMULATOR_AGENT_KEY","")
         if not expected:
             key_file=os.path.expanduser(os.getenv("BRAIN_AGENT_KEY_FILE") or os.getenv("V12_AGENT_KEY_FILE") or "~/v12-agent/agent.key")
             if key_file and os.path.isfile(key_file):
