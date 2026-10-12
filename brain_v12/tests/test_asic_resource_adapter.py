@@ -79,3 +79,26 @@ def test_invalid_modes_and_costs_are_rejected():
         ASICResource("bad", execution_mode="REAL")
     with pytest.raises(ValueError, match="INVALID_POWER_COST"):
         ASICResource("bad-cost", power_cost=-1)
+
+
+def test_register_simulator_fleet_uses_deterministic_ids_and_shared_config():
+    brain = ASICResourceAdapter()
+    fleet = brain.register_simulator_fleet(
+        3, prefix="fleet", config={"hashrate": 2, "hashrate_unit": "TH", "power_watts": 1000}
+    )
+    assert [item["resource_id"] for item in fleet] == ["fleet-001", "fleet-002", "fleet-003"]
+    assert all(item["execution_mode"] == "SIMULATOR" for item in fleet)
+    assert all(item["verification_status"] == "SIMULATED" for item in fleet)
+    assert len(brain.select({"asic.simulate"})) == 3
+
+
+def test_register_simulator_fleet_rejects_unsafe_or_conflicting_config_before_registration():
+    brain = ASICResourceAdapter()
+    with pytest.raises(ValueError, match="FLEET_COUNT_OUT_OF_RANGE"):
+        brain.register_simulator_fleet(0)
+    with pytest.raises(ValueError, match="UNSUPPORTED_FLEET_CONFIG"):
+        brain.register_simulator_fleet(2, config={"execution_mode": "PHYSICAL_DEVICE"})
+    brain.register(ASICResource("fleet-001"))
+    with pytest.raises(ValueError, match="FLEET_RESOURCE_ID_CONFLICT"):
+        brain.register_simulator_fleet(2, prefix="fleet")
+    assert list(brain.resources) == ["fleet-001"]
