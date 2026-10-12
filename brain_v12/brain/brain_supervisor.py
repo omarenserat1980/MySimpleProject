@@ -164,6 +164,19 @@ class BrainSupervisor:
         self._event(job_id,"evidence_verification",{"verified":result.verified,"evidence_ids":list(result.evidence_ids),"reasons":list(result.reasons)})
         return result
 
+    def evaluate_pathway(self,pathway_id,evidence,expected_run_id=None,job_id=None):
+        """Evaluate a declared cross-system pathway and persist its blocker trace."""
+        from .pathway_engine import evaluate_pathway
+        result=evaluate_pathway(pathway_id,evidence,expected_run_id=expected_run_id)
+        self._event(job_id or "pathway-planner","pathway_evaluation",{
+            "pathway":pathway_id,
+            "status":result["status"],
+            "next_gate":result["next_gate"],
+            "blockers":result["blockers"],
+            "expected_run_id":expected_run_id,
+        })
+        return result
+
     def reason(self,evidence):
         decision=self.reasoner.next(evidence);self._event(evidence.get("job_id","unknown"),"reasoning_decision",self.reasoner.explain(decision));return decision
 
