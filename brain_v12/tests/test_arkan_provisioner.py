@@ -18,6 +18,7 @@ class ArkanProvisionerTests(unittest.TestCase):
             self.assertEqual(record["device_name"], "Arkan")
             self.assertEqual(record["readiness"], "SIMULATION_READY")
             self.assertTrue(result["machine"].powered)
+            result["machine"].cpu.reset()
             workload = result["machine"].execute([("MOVI", 0, 42), ("OUT", 0), ("HALT",)], max_cycles=10)
             self.assertEqual(workload["output"], [42])
             self.assertEqual(workload["halted"], True)
