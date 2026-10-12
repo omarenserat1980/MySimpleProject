@@ -165,6 +165,18 @@ def restore_virtual_machine(machine_id: str, request: Request, body: dict):
         raise HTTPException(status_code=422, detail={"code": "CHECKPOINT_REJECTED", "error": str(exc)}) from exc
 
 
+@router.post("/machines/{machine_id}/faults")
+def inject_virtual_machine_fault(machine_id: str, request: Request, body: dict):
+    _authorized(request)
+    machine = _machine_or_404(machine_id)
+    try:
+        return {"ok": True, "machine_id": machine_id,
+                "result": machine.inject_fault(str(body["component"]), str(body["fault"]),
+                                               int(body["address"]) if body.get("address") is not None else None)}
+    except (KeyError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "FAULT_INJECTION_REJECTED", "error": str(exc)}) from exc
+
+
 @router.post("/machines/{machine_id}/shutdown")
 def shutdown_virtual_machine(machine_id: str, request: Request):
     _authorized(request)
