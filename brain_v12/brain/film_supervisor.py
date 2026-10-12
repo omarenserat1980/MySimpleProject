@@ -36,13 +36,28 @@ class FilmSupervisor:
             trace.append({"attempt":attempt,"phase":"verify","ok":ok,"details":details})
             if ok:
                 manifest={
-                    "title":"آخر ضوء في المدينة","status":"VERIFIED_COMPLETED",
+                    "title":"آخر ضوء في المدينة","status":"ARTIFACT_READY_PENDING_GOLDEN_ACCEPTANCE",
                     "renderer":"Python/Pillow + FFmpeg","control_plane":"brain_supervisor",
-                    "attempts":attempt,"verified":True
+                    "attempts":attempt,"verified":False
                 }
                 (self.work/"film_manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
-                (self.work/"VERIFIED_COMPLETED").write_text("verified\n",encoding="utf-8")
                 final=supervisor.transition(job,"deliver",status="completed",details={"attempts":attempt})
+                if final.get("status") != "completed":
+                    manifest["status"]="BLOCKED_GOLDEN_ACCEPTANCE"
+                    manifest["verified"]=False
+                    manifest["acceptance_gate"]=final.get("details",{})
+                    (self.work/"film_manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+                    marker=self.work/"VERIFIED_COMPLETED"
+                    if marker.exists():
+                        marker.unlink()
+                    trace.append({"attempt":attempt,"phase":"golden_acceptance","ok":False,"status":"blocked","details":final.get("details",{})})
+                    supervisor.snapshot(final,{"verified":False,"attempts":attempt,"trace":trace})
+                    (self.artifacts/"film_supervisor_trace.json").write_text(json.dumps(trace,ensure_ascii=False,indent=2),encoding="utf-8")
+                    return 1
+                manifest["status"]="VERIFIED_COMPLETED"
+                manifest["verified"]=True
+                (self.work/"film_manifest.json").write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding="utf-8")
+                (self.work/"VERIFIED_COMPLETED").write_text("verified\n",encoding="utf-8")
                 supervisor.snapshot(final,{"verified":True,"attempts":attempt,"trace":trace})
                 (self.artifacts/"film_supervisor_trace.json").write_text(json.dumps(trace,ensure_ascii=False,indent=2),encoding="utf-8")
                 return 0
