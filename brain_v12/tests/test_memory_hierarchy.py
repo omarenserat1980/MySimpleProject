@@ -9,6 +9,7 @@ from brain_v12.virtual_hardware.memory import VirtualRAM
 from brain_v12.virtual_hardware.computer import VirtualComputer
 from brain_v12.blade_server import BladeChassis
 from brain_v12.brain.resource_manager import ResourceManager
+from brain_v12.virtual_hardware.memory_benchmark import run_memory_workload
 
 
 class MemoryHierarchyTests(unittest.TestCase):
