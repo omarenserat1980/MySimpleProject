@@ -54,7 +54,6 @@ RUNTIME_WORKFLOWS = (
     Path(".github/workflows/brain-github-cloud.yml"),
     Path(".github/workflows/brain-local-cinema-smoke.yml"),
     Path(".github/workflows/brain-continuous-self-healing.yml"),
-    Path(".github/workflows/brain-human-intermediary-autopilot.yml"),
     Path(".github/workflows/brain-supervisor.yml"),
 )
 
@@ -71,6 +70,16 @@ def test_remaining_runtime_workloads_are_brain_owned():
         assert "runs-on: ubuntu-latest" not in text, workflow
         assert "brain-internal" in text, workflow
         assert "internal_runner_preflight" in text, workflow
+
+
+def test_human_intermediary_autopilot_uses_hosted_runner_for_bounded_state_only():
+    text = Path(".github/workflows/brain-human-intermediary-autopilot.yml").read_text(encoding="utf-8")
+    assert "runs-on: ubuntu-latest" in text
+    assert "RUNNER_ENVIRONMENT" in text
+    assert "BRAIN_EXECUTION_MODE=GITHUB_HOSTED_SOFTWARE" in text
+    assert "internal_runner_preflight" not in text
+    assert '"automatic_production_code_mutation": False' in text
+    assert '"automatic_financial_or_external_side_effects": False' in text
 
 
 def test_brain_iso_qemu_verification_uses_hosted_runner():
