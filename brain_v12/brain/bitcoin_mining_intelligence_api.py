@@ -46,7 +46,7 @@ def bitcoin_mining_status() -> dict[str, Any]:
 def bitcoin_mining_analyze(body: MiningAnalysisRequest) -> dict[str, Any]:
     """Calculate economics from explicitly supplied assumptions; never imply live data."""
     try:
-        result = engine.analyze(body.model_dump())
+        result = engine.analyze(body.dict())
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     result["intelligence"] = {
