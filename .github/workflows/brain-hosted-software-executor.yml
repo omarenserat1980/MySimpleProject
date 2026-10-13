@@ -1,0 +1,62 @@
+name: Brain Hosted Software Executor
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/hosted_software_executor.py"
+      - "brain_v12/brain/arkan_software_executor.py"
+      - "brain_v12/tests/test_hosted_software_executor.py"
+      - ".github/workflows/brain-hosted-software-executor.yml"
+      - "docs/BRAIN_HOSTED_SOFTWARE_EXECUTOR.md"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/hosted_software_executor.py"
+      - "brain_v12/brain/arkan_software_executor.py"
+      - "brain_v12/tests/test_hosted_software_executor.py"
+      - ".github/workflows/brain-hosted-software-executor.yml"
+      - "docs/BRAIN_HOSTED_SOFTWARE_EXECUTOR.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-software-task:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install "fastapi>=0.110,<1"
+      - name: Compile executor
+        run: python -m py_compile brain_v12/brain/hosted_software_executor.py
+      - name: Test hosted executor boundary and recovery
+        run: python -m unittest brain_v12.tests.test_hosted_software_executor brain_v12.tests.test_arkan_software_executor -v
+      - name: Run bounded hosted software task
+        run: |
+          mkdir -p evidence
+          python -m brain_v12.brain.hosted_software_executor --task-type cpu_smoke > evidence/hosted-software-executor.json
+          python - <<'PY'
+          import json
+          p=json.load(open("evidence/hosted-software-executor.json", encoding="utf-8"))
+          assert p["ok"] is True, p
+          assert p["node"]["id"] == "brain-hosted-ci-01", p
+          assert p["runtime_mode"] == "EPHEMERAL_CI_JOB", p
+          assert p["reality"] == "SIMULATED", p
+          assert p["windows_server_2025"]["native_os_boot_verified"] is False, p
+          print("HOSTED_SOFTWARE_EXECUTOR=PASS")
+          print("EXECUTION_REALITY=SIMULATED")
+          print("NATIVE_WINDOWS_BOOT=NOT_VERIFIED")
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-hosted-software-executor-evidence-${{ github.run_id }}
+          path: evidence/hosted-software-executor.json
+          if-no-files-found: error
+          retention-days: 30
