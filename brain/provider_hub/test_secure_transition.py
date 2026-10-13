@@ -29,6 +29,6 @@ def test_integrity_failure_rolls_back_state():
     with pytest.raises(ValueError, match="DUPLICATE"):
         c.transition(order, "REVENUE_REALIZED", "e1", evidence_refs=("r1",))
 
-    assert order.state == "PAYMENT_VERIFIED"
+    assert order.state == "DELIVERY_VERIFIED"
     assert len(ledger.for_order("o2")) == 2
     assert len(integrity.entries()) == 2
