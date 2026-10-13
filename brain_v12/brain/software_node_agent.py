@@ -316,6 +316,7 @@ class SoftwareNodeAgent:
             "queue": self.queue.counts(),
             "family_policy_gate": "ENFORCED_BY_AGENT_ENQUEUE_FACADE",
             "family_policy_audit_events": len(self.task_service.audit_log),
+            "family_policy_audit_chain": self.task_service.audit_status(),
             "queue_storage": "LOCAL_SQLITE_DURABLE_ON_THIS_FILESYSTEM",
             "distributed_queue": False,
             "physical_host_contacted": False,

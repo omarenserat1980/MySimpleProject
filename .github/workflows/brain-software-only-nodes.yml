@@ -3,6 +3,7 @@ name: Brain Software-Only Node Verification
 on:
   pull_request:
     paths:
+      - "brain_v12/brain/family_policy_audit.py"
       - "brain_v12/brain/worker_registry.py"
       - "brain_v12/brain/workload_router.py"
       - "brain_v12/brain/workload_controller.py"
@@ -15,7 +16,10 @@ on:
       - "brain_v12/brain/initial_software_node.py"
       - "brain_v12/brain/family_governance.py"
       - "brain_v12/brain/family_governed_tasks.py"
+      - "brain_v12/brain/family_policy_audit.py"
       - "brain_v12/tests/test_family_governed_tasks.py"
+      - "brain_v12/docs/FAMILY_GOVERNED_TASKS.md"
+      - "brain_v12/docs/FAMILY_POLICY_AUDIT.md"
       - "brain_v12/tests/test_family_governance.py"
       - "brain_v12/docs/FAMILY_GOVERNANCE.md"
       - "brain_v12/brain/software_node_agent.py"
@@ -29,6 +33,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "brain_v12/brain/family_policy_audit.py"
       - "brain_v12/brain/worker_registry.py"
       - "brain_v12/brain/workload_router.py"
       - "brain_v12/brain/workload_controller.py"
@@ -41,8 +46,10 @@ on:
       - "brain_v12/brain/initial_software_node.py"
       - "brain_v12/brain/family_governance.py"
       - "brain_v12/brain/family_governed_tasks.py"
+      - "brain_v12/brain/family_policy_audit.py"
       - "brain_v12/tests/test_family_governed_tasks.py"
       - "brain_v12/docs/FAMILY_GOVERNED_TASKS.md"
+      - "brain_v12/docs/FAMILY_POLICY_AUDIT.md"
       - "brain_v12/tests/test_family_governance.py"
       - "brain_v12/docs/FAMILY_GOVERNANCE.md"
       - "brain_v12/brain/software_node_agent.py"
@@ -80,7 +87,7 @@ jobs:
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check -r brain_v12/requirements.txt
       - name: Compile relevant modules
-        run: python -m py_compile brain_v12/brain/worker_registry.py brain_v12/brain/workload_router.py brain_v12/brain/workload_controller.py brain_v12/app.py brain_v12/tools/ci_preflight.py brain_v12/brain/initial_software_node.py brain_v12/brain/software_node_hardware.py brain_v12/brain/software_node_agent.py brain_v12/brain/family_governance.py brain_v12/brain/family_governed_tasks.py
+        run: python -m py_compile brain_v12/brain/worker_registry.py brain_v12/brain/workload_router.py brain_v12/brain/workload_controller.py brain_v12/app.py brain_v12/tools/ci_preflight.py brain_v12/brain/initial_software_node.py brain_v12/brain/software_node_hardware.py brain_v12/brain/software_node_agent.py brain_v12/brain/family_governance.py brain_v12/brain/family_governed_tasks.py brain_v12/brain/family_policy_audit.py
       - name: Run software-only node tests
         run: python -m pytest -q brain_v12/test_worker_registry.py brain_v12/test_workload_router.py brain_v12/test_workload_integration.py brain_v12/tests/test_initial_software_node.py brain_v12/tests/test_software_node_agent.py brain_v12/tests/test_family_governance.py brain_v12/tests/test_family_governed_tasks.py
       - name: Prove Brain Core starts without hardware configuration
