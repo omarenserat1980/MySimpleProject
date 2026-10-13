@@ -91,31 +91,39 @@ jobs:
         run: |
           set -euo pipefail
           qemu-img create -f qcow2 windows-server-2025.qcow2 64G
-          rm -f qemu-monitor.sock qemu.log
-          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot order=d -display none -vnc 127.0.0.1:1 -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
+          rm -f qemu-monitor.sock qemu.log windows-boot.ppm
+          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot order=d -display none -vga std -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
           qemu_pid=$!
           echo "$qemu_pid" > qemu.pid
-          for i in $(seq 1 90); do if ! kill -0 "$qemu_pid" 2>/dev/null; then cat qemu.log; exit 1; fi; if [ -S qemu-monitor.sock ]; then break; fi; sleep 2; done
+          for i in $(seq 1 90); do
+            if ! kill -0 "$qemu_pid" 2>/dev/null; then cat qemu.log; exit 1; fi
+            if [ -S qemu-monitor.sock ]; then break; fi
+            sleep 2
+          done
           test -S qemu-monitor.sock
           sleep 120
-            python3 - <<'PY'
-from PIL import Image
-Image.open('/tmp/windows-boot.ppm').save('windows-boot-screen.png')
-PY
-          fi
           python3 - <<'PY'
           import json, socket, time
-          s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(5); s.connect('qemu-monitor.sock')
-          time.sleep(1); banner=s.recv(4096).decode('utf-8','replace')
-          s.sendall(b'screendump windows-boot.ppm\n'); time.sleep(2)
-          s.sendall(b'info status\n'); time.sleep(1)
-          try: status=s.recv(4096).decode('utf-8','replace')
-          except Exception as e: status=str(e)
-          report={'qemu_process_running': True, 'monitor_connected': True, 'monitor_banner': banner[-500:], 'guest_status': status[-1000:], 'iso_sha256_verified': True, 'windows_guest_boot_verified': False, 'note':'QEMU running with Windows installer ISO; guest installation and in-guest proof are not yet confirmed.'}
-          open('windows-qemu-boot-evidence.json','w').write(json.dumps(report,indent=2)+'\n')
+          s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+          s.settimeout(10)
+          s.connect("qemu-monitor.sock")
+          time.sleep(1)
+          banner=s.recv(4096).decode("utf-8","replace")
+          s.sendall(b"screendump windows-boot.ppm\n")
+          time.sleep(3)
+          s.sendall(b"info status\n")
+          time.sleep(1)
+          try:
+              status=s.recv(4096).decode("utf-8","replace")
+          except Exception as e:
+              status=str(e)
+          report={"qemu_process_running":True,"monitor_connected":True,"monitor_banner":banner[-500:],"guest_status":status[-1000:],"iso_sha256_verified":True,"windows_guest_boot_verified":False,"boot_screen_capture":"windows-boot.ppm","note":"QEMU ran the Windows Server 2025 installer ISO; this capture proves the VM display state but does not by itself prove a completed Windows installation."}
+          open("windows-qemu-boot-evidence.json","w").write(json.dumps(report,indent=2)+"\n")
           print(json.dumps(report,indent=2))
-          s.sendall(b'quit\n'); s.close()
+          s.sendall(b"quit\n")
+          s.close()
           PY
+          test -s windows-boot.ppm
           kill "$qemu_pid" 2>/dev/null || true
           wait "$qemu_pid" 2>/dev/null || true
       - name: Upload executor evidence
