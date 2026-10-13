@@ -1,8 +1,12 @@
 #pragma once
 
 #include <array>
+#include <filesystem>
 #include <functional>
+#include <string>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 
 namespace brain6 {
 
@@ -19,8 +23,22 @@ struct PointerResolution {
     std::string_view selected_entry;
     std::string_view status;
     ExecutionMode mode = ExecutionMode::TestSimulation;
-
     explicit operator bool() const noexcept { return pointer != nullptr; }
+};
+
+struct PointerFinding {
+    std::string id;
+    std::string pointer_kind;
+    std::string target;
+    std::string status;
+};
+
+struct PointerAuditReport {
+    std::vector<std::string> active_simulator_ids;
+    std::vector<std::string> active_real_executor_ids;
+    std::vector<PointerFinding> inactive_pointers;
+
+    bool clean() const noexcept { return inactive_pointers.empty(); }
 };
 
 // Empty real_executor_entry is intentional until a real adapter is explicitly
@@ -52,6 +70,56 @@ inline PointerResolution resolve_simulator_pointer(
         return {&candidate, candidate.real_executor_entry, "REAL_EXECUTOR_POINTER_RESOLVED", mode};
     }
     return {nullptr, {}, "SIMULATOR_ID_UNKNOWN", mode};
+}
+
+// Audit is deliberately non-destructive: bad pointers are excluded from the
+// active lists and reported, but simulator source files and registry entries
+// are not deleted. A real executor is active only with both a real target file
+// and an explicit independently-verified identity supplied by the caller.
+inline PointerAuditReport audit_simulator_pointers(
+    const std::filesystem::path& repository_root,
+    const std::unordered_set<std::string>& independently_verified_real_ids = {}) {
+    PointerAuditReport report;
+    std::unordered_set<std::string> seen_ids;
+    std::unordered_set<std::string> seen_simulator_targets;
+
+    for (const auto& candidate : simulator_pointers) {
+        const std::string id(candidate.id);
+        const std::string simulator_target(candidate.simulator_entry);
+        if (!seen_ids.insert(id).second) {
+            report.inactive_pointers.push_back(
+                {id, "simulator", simulator_target, "DUPLICATE_SIMULATOR_ID"});
+            continue;
+        }
+
+        if (simulator_target.empty()) {
+            report.inactive_pointers.push_back(
+                {id, "simulator", simulator_target, "SIMULATOR_TARGET_NOT_CONFIGURED"});
+        } else if (!std::filesystem::is_regular_file(repository_root / simulator_target)) {
+            report.inactive_pointers.push_back(
+                {id, "simulator", simulator_target, "SIMULATOR_TARGET_MISSING"});
+        } else if (!seen_simulator_targets.insert(simulator_target).second) {
+            report.inactive_pointers.push_back(
+                {id, "simulator", simulator_target, "DUPLICATE_SIMULATOR_TARGET"});
+        } else {
+            report.active_simulator_ids.push_back(id);
+        }
+
+        const std::string real_target(candidate.real_executor_entry);
+        if (real_target.empty()) {
+            report.inactive_pointers.push_back(
+                {id, "real_executor", real_target, "REAL_EXECUTOR_NOT_CONFIGURED"});
+        } else if (!std::filesystem::is_regular_file(repository_root / real_target)) {
+            report.inactive_pointers.push_back(
+                {id, "real_executor", real_target, "REAL_EXECUTOR_TARGET_MISSING"});
+        } else if (independently_verified_real_ids.find(id) == independently_verified_real_ids.end()) {
+            report.inactive_pointers.push_back(
+                {id, "real_executor", real_target, "REAL_EXECUTOR_NOT_INDEPENDENTLY_VERIFIED"});
+        } else {
+            report.active_real_executor_ids.push_back(id);
+        }
+    }
+    return report;
 }
 
 }  // namespace brain6
