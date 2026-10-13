@@ -1,0 +1,44 @@
+name: Brain Integration Diagnostics
+
+on:
+  push:
+    branches:
+      - brain-diagnostics-live-mcp-asic-2026-10-13
+  pull_request:
+    paths:
+      - "brain_v12/tools/brain_integration_diagnostics.py"
+      - "brain_v12/tools/DIAGNOSTICS.md"
+      - ".github/workflows/brain-integration-diagnostics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile diagnostic tool
+        run: python -m py_compile brain_v12/tools/brain_integration_diagnostics.py
+      - name: Run local software-only ASIC checks
+        run: |
+          python brain_v12/tools/brain_integration_diagnostics.py > diagnostics-report.json
+          cat diagnostics-report.json
+      - name: Verify report does not claim hardware execution
+        run: |
+          python - <<'PY'
+          import json
+          with open("diagnostics-report.json", encoding="utf-8") as f:
+              report = json.load(f)
+          assert report["local_asic"]["status"] == "PASS", report
+          assert report["local_asic"]["cases"] == 4, report
+          assert report["local_asic"]["real_hardware_measurement"] is False, report
+          assert "live_mcp" not in report, report
+          PY
