@@ -63,6 +63,32 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
                 },
             )
 
+    def test_real_boot_is_blocked_from_cloud_task_executor(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            runtime = InternalTaskRuntime(root=root, gateway=self.gateway)
+            runtime.enqueue(
+                "windows-real-boot",
+                ["qemu-system-x86_64"],
+                capability="windows-server-2025-real-boot",
+                metadata={
+                    "executor": "windows-server-2025-cloud",
+                    "vm": self.vm,
+                    "node": self.node,
+                    "contract_path": "must-not-be-used-here",
+                },
+            )
+            with patch(
+                "brain_v12.brain.internal_task_runtime.WindowsCloudTaskExecutor.run"
+            ) as cloud_run:
+                result = runtime.run_one()
+            self.assertEqual(result["state"], "BLOCKED")
+            self.assertIn(
+                "WINDOWS_REAL_BOOT_REQUIRES_DEDICATED_QEMU_WORKFLOW",
+                result["error"],
+            )
+            cloud_run.assert_not_called()
+
     def test_local_runtime_routes_windows_task_to_cloud_adapter(self):
         runtime = InternalTaskRuntime(
             root=".brain/test-windows-cloud-routing",
