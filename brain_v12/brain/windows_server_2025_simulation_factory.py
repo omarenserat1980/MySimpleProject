@@ -71,15 +71,33 @@ class VirtualHardwareModel:
 
     def validate(self) -> list[str]:
         errors = []
-        if not 1 <= self.vcpu_count <= 256:
+        numeric_fields = {
+            "vcpu_count": self.vcpu_count,
+            "ram_mib": self.ram_mib,
+            "disk_gib": self.disk_gib,
+            "disk_free_gib": self.disk_free_gib,
+        }
+        for name, value in numeric_fields.items():
+            if isinstance(value, bool) or not isinstance(value, int):
+                errors.append(name.upper() + "_MUST_BE_INTEGER")
+        for name, value in {
+            "network_attached": self.network_attached,
+            "dns_available": self.dns_available,
+            "boot_disk_present": self.boot_disk_present,
+            "boot_config_valid": self.boot_config_valid,
+        }.items():
+            if not isinstance(value, bool):
+                errors.append(name.upper() + "_MUST_BE_BOOLEAN")
+        if isinstance(self.vcpu_count, int) and not isinstance(self.vcpu_count, bool) and not 1 <= self.vcpu_count <= 256:
             errors.append("VCPU_COUNT_OUT_OF_RANGE")
-        if not 512 <= self.ram_mib <= 1_048_576:
+        if isinstance(self.ram_mib, int) and not isinstance(self.ram_mib, bool) and not 512 <= self.ram_mib <= 1_048_576:
             errors.append("RAM_MIB_OUT_OF_RANGE")
-        if not 1 <= self.disk_gib <= 65_536:
+        if isinstance(self.disk_gib, int) and not isinstance(self.disk_gib, bool) and not 1 <= self.disk_gib <= 65_536:
             errors.append("DISK_GIB_OUT_OF_RANGE")
-        if not 0 <= self.disk_free_gib <= self.disk_gib:
-            errors.append("DISK_FREE_SPACE_INVALID")
-        if not self.firmware_version.strip():
+        if isinstance(self.disk_free_gib, int) and not isinstance(self.disk_free_gib, bool):
+            if not isinstance(self.disk_gib, int) or isinstance(self.disk_gib, bool) or not 0 <= self.disk_free_gib <= self.disk_gib:
+                errors.append("DISK_FREE_SPACE_INVALID")
+        if not isinstance(self.firmware_version, str) or not self.firmware_version.strip():
             errors.append("FIRMWARE_VERSION_REQUIRED")
         return errors
 
