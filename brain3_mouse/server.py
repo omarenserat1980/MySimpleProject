@@ -13,6 +13,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
 from urllib.parse import urlparse
 
+from .unified_kernel import KERNEL
+
 
 ALLOWED_SOURCES = {"legacy_brain", "brain_v12"}
 ALLOWED_ACTIONS = {"inspect", "test", "plan"}
@@ -81,7 +83,10 @@ class MouseHandler(BaseHTTPRequestHandler):
                 "external_network": False, "physical_devices": False,
                 "windows_boot_verified": False,
                 "persistence": "memory-only",
+                "unified_kernel": KERNEL.health(),
             })
+        if path == "/api/brain3/kernel":
+            return self._send(200, KERNEL.health())
         if path == "/api/brain/compatibility":
             return self._send(200, {
                 "ok": True,
@@ -94,8 +99,7 @@ class MouseHandler(BaseHTTPRequestHandler):
                 "note": "Compatibility metadata only; no remote Brain is contacted.",
             })
         if path == "/api/brain/tasks":
-            with STATE.lock:
-                return self._send(200, list(STATE.tasks))
+            return self._send(200, KERNEL.tasks())
         if path == "/api/repos":
             with STATE.lock:
                 return self._send(200, [
@@ -136,22 +140,18 @@ class MouseHandler(BaseHTTPRequestHandler):
                 return self._send(400, {"message": "action must be inspect, test, or plan"})
             if not description or len(description) > 2000:
                 return self._send(400, {"message": "description is required and must be at most 2000 characters"})
-            with STATE.lock:
-                task = {
-                    "id": STATE.next_task,
-                    "source": source,
-                    "action": action,
-                    "description": description,
-                    "state": "SIMULATED_QUEUED",
-                    "emulated": True,
-                    "executed": False,
-                    "remote_calls": False,
-                    "render": False,
-                    "physical_devices": False,
-                    "windows_boot_verified": False,
-                }
-                STATE.next_task += 1
-                STATE.tasks.append(task)
+            try:
+                task = KERNEL.submit(action, description, requested_by=source)
+            except (ValueError, PermissionError) as exc:
+                return self._send(403 if isinstance(exc, PermissionError) else 400, {"message": str(exc), "executed": False})
+            task.update({
+                "source": source,
+                "emulated": True,
+                "remote_calls": False,
+                "render": False,
+                "physical_devices": False,
+                "windows_boot_verified": False,
+            })
             return self._send(202, task)
 
         if path == "/api/repos":
