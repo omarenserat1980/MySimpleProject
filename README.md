@@ -5,8 +5,18 @@
 ## البنية
 - `brain_v12/` — النواة والخدمات والواجهة.
 - `brain_v12/web/index.html` — واجهة V12 العربية RTL.
-- `brain_v12/start_brain.sh` — تشغيل الخدمة محليًا.
+- `brain_v12/start_brain.sh` — تشغيل خدمة MCP محليًا.
 - `.github/workflows/brain-v12-pages.yml` — نشر واجهة V12 على GitHub Pages.
+
+## المسار التشغيلي القانوني
+
+النواة الحالية هي `brain_v12`. نقطة تشغيل API الأساسية هي:
+
+```bash
+python3 -m brain_v12.app
+```
+
+مسارات Brain 6 القديمة لا تُعد مسارات تشغيل بديلة. مشغّل `scripts/brain6_168h.sh` معطّل عمدًا، وحالة حملة `production/BRAIN6_168H.json` متوقفة، ومثبت الخدمة القديم يزيل خدمة المستخدم القديمة بدلًا من تشغيلها. تفاصيل الترحيل: [BRAIN Runtime Cutover](docs/BRAIN_RUNTIME_CUTOVER.md).
 
 ## الحلقة المعرفية
 Perceive → Understand → Memory → Goal → Plan → Decide → Act → Observe → Learn
@@ -35,4 +45,3 @@ Brain يعمل بوضع **software-only**. معاملات التوافق الق�
 - السياسة والقيود: [Software-only nodes](brain_v12/docs/SOFTWARE_ONLY_NODES.md)
 - فحوص CI: [Brain Software-Only Node Verification](.github/workflows/brain-software-only-nodes.yml)
 - هذا يزيل اعتماد الأجهزة من سجل التنفيذ، لكنه لا يعني أن موارد المحاكاة غير محدودة أو أن كل تكامل خارجي قد اجتاز التحقق.
-
