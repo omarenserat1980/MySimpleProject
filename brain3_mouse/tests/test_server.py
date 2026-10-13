@@ -159,9 +159,12 @@ class MouseEmulatorTests(unittest.TestCase):
         self.assertEqual(status, 400)
 
     def test_z_actual_runtime_adapters_and_cross_runtime_memory_bridge(self):
+        status, integration = request(self.server, "POST", "/api/brain3/integrate", {})
+        self.assertEqual(status, 200)
         manager = manager_for(KERNEL)
-        runtime_status = manager.initialize()
-        health = KERNEL.health()
+        runtime_status = integration["runtimes"]
+        health = integration["kernel"]
+        self.assertTrue(integration["integration_complete"], runtime_status)
         self.assertTrue(health["legacy_brain_integrated"], runtime_status)
         self.assertTrue(health["brain_v12_integrated"], runtime_status)
 
