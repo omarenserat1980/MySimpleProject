@@ -100,7 +100,7 @@ jobs:
               "scenarios": rows,
           }
           Path("artifacts/windows-server-2025-scenario-matrix.json").write_text(
-              json.dumps(matrix, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+              json.dumps(matrix, indent=2, sort_keys=True) + "\n", encoding="utf-8"
           )
           lines = [
               "# Windows Server 2025 — Synthetic Scenario Matrix",
@@ -119,7 +119,7 @@ jobs:
               )
           lines += ["", "All rows are software-model outcomes, not real Windows execution."]
           Path("artifacts/windows-server-2025-scenario-matrix.md").write_text(
-              "\\n".join(lines) + "\\n", encoding="utf-8"
+              "\n".join(lines) + "\n", encoding="utf-8"
           )
           print(f"SCENARIO_MATRIX_COUNT={len(rows)}")
           print("SIMULATION_ONLY_BOUNDARY=PASS")
