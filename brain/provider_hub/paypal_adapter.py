@@ -129,3 +129,32 @@ class PayPalAdapter:
             {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             {},
         )
+
+    def verify_webhook_event(self, *, webhook_id: str, headers: dict,
+                             event: dict) -> dict:
+        """Ask PayPal to verify a received webhook; callers must pass the raw event
+        parsed as JSON and the exact PayPal transmission headers.
+        """
+        if not webhook_id.strip():
+            raise ValueError("PAYPAL_WEBHOOK_ID_REQUIRED")
+        required = {
+            "auth_algo": headers.get("PAYPAL-AUTH-ALGO") or headers.get("paypal-auth-algo"),
+            "cert_url": headers.get("PAYPAL-CERT-URL") or headers.get("paypal-cert-url"),
+            "transmission_id": headers.get("PAYPAL-TRANSMISSION-ID") or headers.get("paypal-transmission-id"),
+            "transmission_sig": headers.get("PAYPAL-TRANSMISSION-SIG") or headers.get("paypal-transmission-sig"),
+            "transmission_time": headers.get("PAYPAL-TRANSMISSION-TIME") or headers.get("paypal-transmission-time"),
+        }
+        if not all(isinstance(value, str) and value.strip() for value in required.values()):
+            raise ValueError("PAYPAL_WEBHOOK_HEADERS_MISSING")
+        if not isinstance(event, dict) or not event.get("id") or not event.get("event_type"):
+            raise ValueError("PAYPAL_WEBHOOK_EVENT_INVALID")
+        token = self._access_token()
+        result = self.transport(
+            f"{self.config.base_url}/v1/notifications/verify-webhook-signature",
+            "POST",
+            {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            {**required, "webhook_id": webhook_id, "webhook_event": event},
+        )
+        if result.get("verification_status") != "SUCCESS":
+            raise ValueError("PAYPAL_WEBHOOK_SIGNATURE_INVALID")
+        return result
