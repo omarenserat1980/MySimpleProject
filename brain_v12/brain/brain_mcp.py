@@ -174,9 +174,12 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         method = str(body.get("method", ""))
         # MCP clients negotiate the protocol version in initialize's JSON-RPC
         # params; the HTTP protocol-version header is required only afterward.
-        version = supplied_version or (
-            PROTOCOL_VERSION if method == "initialize" else None
+        requested_version = (
+            (body.get("params") or {}).get("protocolVersion")
+            if method == "initialize" and isinstance(body.get("params") or {}, dict)
+            else None
         )
+        version = supplied_version or requested_version
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse(
                 {"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"},
