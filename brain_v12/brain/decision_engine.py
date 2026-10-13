@@ -19,7 +19,7 @@ class DecisionEngine:
     def __init__(self):
         self.history=[]
 
-    def generate(self,goal):
+    def generate(self,goal,memories=None):
         text=(goal or "").lower()
         code=any(x in text for x in ("كود","برمج","ملف","github","github","code","تطوير","إصلاح"))
         device=any(x in text for x in ("termux","redmi","هاتف","جهاز","موبايل","جوال","android","device","agent"))
@@ -36,16 +36,29 @@ class DecisionEngine:
             options.append(asdict(Candidate("verify_code","التحقق من الكود","نتيجة اختبار/تحقق موثقة","low",[],True,["code"],.84,"code.verify")))
             options.append(asdict(Candidate("apply_code","تطبيق تحسين برمجي","تغيير قابل للتراجع مع تحقق","high",["developer_approval"],True,["code","approval"],.65,"code.apply")))
         options.append(asdict(Candidate("act","تنفيذ خطوة حساسة","نتيجة خارجية قابلة للتحقق","high",["agent_approval"],True,["goal","approval"],.55,"agent.execute")))
+        memories = memories or []
+        memory_keys = [str(item.get("key", "")) for item in memories if isinstance(item, dict)]
+        # Preserve memory provenance for inspection; memory never grants permissions.
+        for option in options:
+            option["memory_keys"] = memory_keys[:12]
         return options
 
-    def choose(self,goal,options,permissions=None):
+    def choose(self,goal,options,permissions=None,memories=None):
         permissions=permissions or set()
+        memories = memories or []
         ranked=[]
         for o in options:
             req=o.get("requirements",[])
             missing=[r for r in req if r not in permissions]
             blocked=bool(missing)
             score=float(o.get("confidence",.5))
+            # Bounded memory relevance may inform ranking but cannot bypass risk/permissions.
+            goal_terms={word for word in str(goal or "").lower().split() if len(word) >= 4}
+            memory_text=" ".join(str(item.get("key",""))+" "+str(item.get("value","")) for item in memories if isinstance(item,dict)).lower()
+            candidate_text=(str(o.get("id",""))+" "+str(o.get("action",""))+" "+str(o.get("expected",""))).lower()
+            memory_relevant=bool(goal_terms and any(term in memory_text for term in goal_terms))
+            if memory_relevant and any(term in candidate_text for term in goal_terms):
+                score += 0.03
             if o.get("risk")=="high": score-=.30
             if not o.get("reversible",True): score-=.15
             if blocked: score-=.50

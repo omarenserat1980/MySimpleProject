@@ -29,5 +29,36 @@ class BrainCoreTests(unittest.TestCase):
         self.assertEqual(result["state"]["prediction_error"],0.0)
         self.assertEqual(store.active_goal(),None)
 
+    def test_cognitive_loop_passes_recent_memories_into_decision(self):
+        from brain_v12.brain.cognitive_loop import CognitiveLoop
+
+        fd = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        fd.close()
+        store = MemoryStore(fd.name)
+        store.init()
+        store.save_memory("old", "older context")
+        store.save_memory("recent", "recent context")
+        loop = CognitiveLoop(store)
+
+        seen = {}
+        original_generate = loop.decisions.generate
+        original_choose = loop.decisions.choose
+
+        def generate(goal, memories=None):
+            seen["generate"] = memories
+            return original_generate(goal, memories=memories)
+
+        def choose(goal, options, permissions=None, memories=None):
+            seen["choose"] = memories
+            return original_choose(goal, options, permissions, memories=memories)
+
+        loop.decisions.generate = generate
+        loop.decisions.choose = choose
+        result = loop.run("اقرأ الذاكرة")
+
+        self.assertEqual([item["key"] for item in seen["generate"]], ["recent", "old"])
+        self.assertEqual(seen["generate"], seen["choose"])
+        self.assertEqual(result["memory_count"], 2)
+
 if __name__=="__main__":
     unittest.main()
