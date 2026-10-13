@@ -32,6 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/brain-cloudflare-mode.sh
+          bash -n scripts/brain-cloudflare-devkit.sh
           bash scripts/brain-cloudflare-mode.sh status | tee /tmp/brain-mode.log
           grep -Fq 'BRAIN_CLOUDFLARE_MODE=emulator' /tmp/brain-mode.log
           grep -Fq 'CREDENTIALS_REQUIRED=FALSE' /tmp/brain-mode.log
@@ -45,5 +46,6 @@ jobs:
           node test/cloudflare_deploy_static.test.js
           node test/commercial_worker_static.test.js
           node test/cinema_worker_static.test.js
+          node test/devkit_static.test.js
           echo "BRAIN_CLOUDFLARE_EMULATOR_GATE=PASS"
           echo "LIVE_CLOUDFLARE_USED=FALSE"
