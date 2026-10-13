@@ -127,6 +127,22 @@ class PayPalAdapterTests(unittest.TestCase):
             expected_amount="12.50", expected_currency="USD",
         )
         self.assertEqual(evidence["capture_id"], "CAPTURE-1")
+        ambiguous = {
+            **response,
+            "purchase_units": [{
+                **response["purchase_units"][0],
+                "payments": {"captures": [
+                    response["purchase_units"][0]["payments"]["captures"][0],
+                    {**response["purchase_units"][0]["payments"]["captures"][0], "id": "CAPTURE-2"},
+                ]},
+            }],
+        }
+        with self.assertRaisesRegex(ValueError, "PAYPAL_CAPTURE_EVIDENCE_MISSING_OR_AMBIGUOUS"):
+            PayPalAdapter.validate_capture(
+                response=ambiguous, expected_order_id="EB-200",
+                expected_paypal_order_id="PAYPAL-ORDER-1",
+                expected_amount="12.50", expected_currency="USD",
+            )
         for kwargs, error in (
             ({"expected_amount": "12.51"}, "PAYPAL_CAPTURE_AMOUNT_MISMATCH"),
             ({"expected_currency": "EUR"}, "PAYPAL_CAPTURE_CURRENCY_MISMATCH"),
