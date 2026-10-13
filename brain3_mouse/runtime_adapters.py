@@ -72,6 +72,9 @@ class RuntimeAdapterManager:
                 self._sync_v12_memory(store)
                 return {"ok": True, **result}
 
+            probe_result = handle("inspect", {})
+            if not isinstance(probe_result, dict) or probe_result.get("ok") is not True:
+                raise TypeError("V12 adapter inspect probe failed")
             self.kernel.register_adapter(ComponentAdapter(
                 name="brain_v12",
                 capabilities=frozenset({"inspect", "test", "plan"}),
@@ -120,6 +123,9 @@ class RuntimeAdapterManager:
                 self._sync_legacy_memory(brain)
                 return {"ok": True, **result}
 
+            probe_result = handle("inspect", {})
+            if not isinstance(probe_result, dict) or probe_result.get("ok") is not True:
+                raise TypeError("legacy adapter inspect probe failed")
             self.kernel.register_adapter(ComponentAdapter(
                 name="legacy_brain",
                 capabilities=frozenset({"inspect", "test", "plan"}),
