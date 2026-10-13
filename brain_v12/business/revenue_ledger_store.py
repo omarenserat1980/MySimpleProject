@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from .revenue_ledger import RevenueRecord
@@ -20,7 +21,7 @@ class RevenueLedgerStore:
         self.path = str(path)
         if self.path != ":memory:":
             Path(self.path).expanduser().parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS revenue_records (
