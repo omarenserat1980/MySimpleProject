@@ -45,3 +45,9 @@ Brain يعمل بوضع **software-only**. معاملات التوافق الق�
 - السياسة والقيود: [Software-only nodes](brain_v12/docs/SOFTWARE_ONLY_NODES.md)
 - فحوص CI: [Brain Software-Only Node Verification](.github/workflows/brain-software-only-nodes.yml)
 - هذا يزيل اعتماد الأجهزة من سجل التنفيذ، لكنه لا يعني أن موارد المحاكاة غير محدودة أو أن كل تكامل خارجي قد اجتاز التحقق.
+
+## Legacy-runtime cutover (in progress)
+
+Active cloud entrypoints and compatibility containers are being redirected away from the Brain V7 factory. The former media worker is not silently substituted: until a V12-native renderer is implemented and tested, film generation returns `BRAIN_V12_RENDERER_NOT_INTEGRATED`. This is intentional fail-closed behavior, not a successful render.
+
+The Windows Server 2025 state remains **NO-GO / NOT PROVEN** until a real installed guest boots and emits guest-origin evidence that passes the Windows completion gate. Neither a workflow success nor running the installer in QEMU TCG is sufficient. No Arkan or Redmi 3 availability is assumed by the cloud runtime.
