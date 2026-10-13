@@ -14,7 +14,8 @@ class WindowsBootProofTests(unittest.TestCase):
         self.evidence = {
             "schema": "BRAIN-WINDOWS-BOOT-EVIDENCE-1",
             "status": "WINDOWS_BOOT_VERIFIED",
-            "guest": {"os": "Windows Server 2025", "architecture": "x86_64", "boot_verified": True},
+            "guest": {"os": "Windows Server 2025", "architecture": "x86_64", "boot_verified": True,
+                       "boot_time": "2026-10-13T12:00:00Z", "version": "10.0", "build": "26100"},
             "media": {"sha256": "a" * 64},
             "uefi": {"ready": True},
             "cpu": {"x86_64": True},
@@ -104,6 +105,13 @@ class WindowsBootProofTests(unittest.TestCase):
         result = self._verify()
         self.assertFalse(result["verified"])
         self.assertIn("RAW_GUEST_OS_BOOT_NOT_PROVEN", result["reasons"])
+
+    def test_combined_guest_fields_must_match_raw_guest_file(self):
+        self.evidence["guest"]["boot_time"] = "2026-10-13T13:00:00Z"
+        self._write("evidence.json", self.evidence)
+        result = self._verify()
+        self.assertFalse(result["verified"])
+        self.assertIn("RAW_GUEST_BINDING_MISMATCH:boot_time", result["reasons"])
 
     def test_trusted_iso_hash_must_match_combined_evidence(self):
         result = self._verify(trusted_iso_sha256="b" * 64)
