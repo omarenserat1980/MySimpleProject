@@ -411,15 +411,11 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
     env.BRAIN_DB.prepare("UPDATE cinema_entitlements SET state = 'GRANTED', granted_at = CURRENT_TIMESTAMP WHERE order_id = ?").bind(orderId),
   ]);
-  const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
-  await env.BRAIN_DB.prepare(
-    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'REVENUE_REALIZED', ?)"
-  ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
   const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)"
   ).bind(jobId, orderId).run();
-  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, revenue_state: "REVENUE_REALIZED", revenue_id: revenueId });
+  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, payment_evidence: "PAYTABS_SIGNATURE_AND_ORDER_AMOUNT_CURRENCY_VERIFIED", revenue_state: "NOT_REALIZED_PENDING_DELIVERY" });
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
@@ -438,14 +434,45 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   ).bind(deliveryId, client.email).first();
   if (!delivery) return json({ ok: false, error: "DELIVERY_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (delivery.state !== "READY") return json({ ok: false, error: "DELIVERY_NOT_READY" }, 409, requestOrigin, allowedOrigin);
-  await env.BRAIN_DB.prepare(
-    "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
-  ).bind(deliveryId).run();
-  await env.BRAIN_DB.prepare(
-    "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
-  ).bind(delivery.order_id).run();
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email });
-  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
+
+  // A client delivery confirmation alone cannot realize revenue: require a matching,
+  // independently verified PayTabs transaction for this exact order, amount and currency.
+  const payment = await env.BRAIN_DB.prepare(
+    "SELECT p.tran_ref, p.amount, p.currency, p.raw_evidence FROM payments p JOIN orders o ON o.order_id = p.order_id WHERE p.order_id = ? AND p.provider = 'paytabs' AND p.state = 'PAYMENT_VERIFIED' AND p.amount = o.amount AND p.currency = o.currency ORDER BY p.verified_at DESC LIMIT 1"
+  ).bind(delivery.order_id).first();
+  if (!payment) return json({ ok: false, error: "VERIFIED_PAYMENT_EVIDENCE_REQUIRED" }, 409, requestOrigin, allowedOrigin);
+
+  const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
+  const revenueEvidence = JSON.stringify({
+    source: "paytabs_verified_payment_plus_client_delivery_confirmation",
+    order_id: delivery.order_id,
+    delivery_id: deliveryId,
+    tran_ref: payment.tran_ref,
+    amount: Number(payment.amount),
+    currency: String(payment.currency),
+    payment_evidence: payment.raw_evidence,
+    delivery_confirmed_by: client.email,
+    confirmed_at: new Date().toISOString(),
+  });
+  await env.BRAIN_DB.batch([
+    env.BRAIN_DB.prepare(
+      "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
+    ).bind(deliveryId),
+    env.BRAIN_DB.prepare(
+      "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
+    ).bind(delivery.order_id),
+    env.BRAIN_DB.prepare(
+      "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'REVENUE_REALIZED', ?)"
+    ).bind(revenueId, delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency), revenueEvidence),
+  ]);
+  const ledger = await env.BRAIN_DB.prepare(
+    "SELECT revenue_id, amount, currency, state FROM revenue_ledger WHERE order_id = ? AND tran_ref = ?"
+  ).bind(delivery.order_id, payment.tran_ref).first();
+  if (!ledger || ledger.state !== "REVENUE_REALIZED" || Number(ledger.amount) !== Number(payment.amount) || String(ledger.currency) !== String(payment.currency)) {
+    return json({ ok: false, error: "REVENUE_LEDGER_VERIFICATION_FAILED" }, 500, requestOrigin, allowedOrigin);
+  }
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_id: ledger.revenue_id, revenue_state: ledger.state });
+  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_state: ledger.state, revenue_id: ledger.revenue_id }, 200, requestOrigin, allowedOrigin);
 }
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
