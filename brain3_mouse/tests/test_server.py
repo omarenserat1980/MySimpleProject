@@ -74,6 +74,19 @@ class MouseEmulatorTests(unittest.TestCase):
             self.assertIs(task["render"], False)
             self.assertIs(task["physical_devices"], False)
             self.assertIs(task["windows_boot_verified"], False)
+        status, tasks = request(self.server, "GET", "/api/brain/tasks")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual({item["queue"] for item in tasks}, {"brain3_shared"})
+
+    def test_unified_kernel_health_does_not_claim_runtime_integration(self):
+        status, health = request(self.server, "GET", "/api/brain3/kernel")
+        self.assertEqual(status, 200)
+        self.assertTrue(health["shared_memory"])
+        self.assertTrue(health["shared_task_queue"])
+        self.assertFalse(health["legacy_brain_integrated"])
+        self.assertFalse(health["brain_v12_integrated"])
+        self.assertFalse(health["production_ready"])
 
     def test_real_execution_deploy_and_boot_are_blocked(self):
         for action in ("execute", "deploy", "render", "windows_boot", "device_setup", "publish"):
