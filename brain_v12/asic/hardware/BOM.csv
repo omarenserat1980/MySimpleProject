@@ -1,0 +1,8 @@
+item_id,category,component_or_work,required_purpose,status,evidence,approval_or_gate
+ASIC-001,Prototype platform,FPGA development board,Validate RTL behavior on programmable logic,NOT_ASSESSED,None recorded,Choose compatible board only after requirements and budget review
+ASIC-002,Power,Regulated power supply and protection,Provide board-specific safe power,NOT_ASSESSED,None recorded,Use selected board manufacturer specifications
+ASIC-003,Thermal,Thermal solution,Keep selected platform within rated limits,NOT_ASSESSED,None recorded,Determine after platform and power envelope are known
+ASIC-004,Measurement,Logic analyzer or oscilloscope,Observe clocks and digital signals,NOT_ASSESSED,None recorded,Select bandwidth and voltage compatibility after interface definition
+ASIC-005,Interconnect,PCB/connectors/cables,Connect prototype components safely,NOT_ASSESSED,None recorded,Define pinout and electrical standards first
+ASIC-006,ASIC fabrication,Foundry shuttle and package,Manufacture custom silicon if approved,NOT_ASSESSED,None recorded,Requires design signoff, budget approval, and external fabrication partner
+ASIC-007,Assembly,Assembly and bring-up,Populate and validate a physical prototype,NOT_ASSESSED,None recorded,Requires a selected platform or fabricated package
