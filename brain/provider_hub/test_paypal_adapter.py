@@ -1,6 +1,9 @@
 import os
 import unittest
 from unittest.mock import patch
+from io import BytesIO
+
+from brain.provider_hub.paypal_adapter import http_transport
 
 from brain.provider_hub.paypal_adapter import PayPalAdapter, PayPalConfig
 
@@ -64,6 +67,24 @@ class PayPalAdapterTests(unittest.TestCase):
         self.assertEqual(result["status"], "COMPLETED")
         self.assertTrue(self.transport.calls[-1][0].endswith(
             "/v2/checkout/orders/ORDER-SANDBOX-1/capture"))
+
+    def test_capture_order_id_is_url_encoded(self):
+        self.adapter.capture_order(paypal_order_id="ORDER/with space")
+        self.assertTrue(self.transport.calls[-1][0].endswith(
+            "/v2/checkout/orders/ORDER%2Fwith%20space/capture"))
+
+    def test_http_transport_encodes_oauth_form_body(self):
+        response = BytesIO(b'{"access_token":"safe-test-token"}')
+        with patch("brain.provider_hub.paypal_adapter.urlopen", return_value=response) as open_url:
+            result = http_transport(
+                "https://api-m.sandbox.paypal.com/v1/oauth2/token", "POST",
+                {"Content-Type": "application/x-www-form-urlencoded"},
+                {"grant_type": "client_credentials"},
+            )
+        self.assertEqual(result["access_token"], "safe-test-token")
+        request = open_url.call_args.args[0]
+        self.assertEqual(request.data, b"grant_type=client_credentials")
+        self.assertEqual(request.get_header("Content-type"), "application/x-www-form-urlencoded")
 
     def test_environment_requires_both_secrets(self):
         with patch.dict(os.environ, {"PAYPAL_CLIENT_ID": "", "PAYPAL_CLIENT_SECRET": ""}):
