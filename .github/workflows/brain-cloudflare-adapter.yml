@@ -21,3 +21,5 @@ jobs:
           test -f cloudflare/brain-api/src/index.js
           test -f cloudflare/brain-api/README.md
           node --check cloudflare/brain-api/src/index.js
+          (cd cloudflare/brain-api && node test/cloudflare_deploy_static.test.js)
+          (cd cloudflare/brain-api && node test/commercial_worker_static.test.js)
