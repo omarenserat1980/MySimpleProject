@@ -81,6 +81,13 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
         self.assertEqual(result["reason_code"], "VCPU_COUNT_MUST_BE_INTEGER")
 
+    def test_success_scenario_respects_virtual_hardware_faults(self):
+        result = simulate_windows_server_2025(
+            hardware=VirtualHardwareModel(boot_disk_present=False)
+        )
+        self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
+        self.assertEqual(result["reason_code"], "NO_BOOT_DISK")
+
     def test_evidence_verifier_detects_mutation_and_reordering(self):
         recorder = EvidenceRecorder()
         recorder.record("PREFLIGHT", "PASS")
