@@ -23,8 +23,8 @@ def cycle():
     # Repository state and tests are observable; no credentials or arbitrary
     # remote execution are introduced by this loop.
     if run(["git","status","--short"]): return
-    run(["python","-m","compileall","-q","cloud","brain_v7"])
-    run(["python","-m","pytest","-q","brain_v7/tests"])
+    run(["python","-m","compileall","-q","cloud","brain_v12"])
+    run(["python","-m","pytest","-q","brain_v12/tests"])
     print("BRAIN_SELF_IMPROVEMENT_VALIDATION_COMPLETE=1",flush=True)
     if AUTO_MERGE:
         print("AUTO_MERGE_REQUESTED_BUT_DISABLED_BY_DEFAULT=1",flush=True)
