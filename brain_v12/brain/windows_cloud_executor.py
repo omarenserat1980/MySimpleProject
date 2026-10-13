@@ -61,6 +61,7 @@ class WindowsCloudExecutor:
         }
 
     def provision(self, **kwargs: Any) -> CloudWindowsVM:
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         if self.provider is None:
             raise RuntimeError("CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED")
         vm = self.provider.provision_windows_server_2025(**kwargs)
