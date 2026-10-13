@@ -15,12 +15,25 @@ int main() {
 
     const ConsentingPair consenting{"pair-a", "parent-a", "parent-b", true, true};
     const ConsentingPair not_consented{"pair-b", "parent-c", "parent-d", true, false};
+    const ConsentingPair ineligible{"pair-c", "parent-e", "parent-f", true, true};
+    const auto eligibility = [](const ConsentingPair& pair) {
+        // Test stand-in for the Brain family policy's adult/married/kinship checks.
+        return pair.pair_id == "pair-a" || pair.pair_id == "pair-fail";
+    };
 
     {
-        FamilyCloudWorker worker(path, 5ms);
+        FamilyCloudWorker missing_policy(path, {}, 5ms);
+        std::string error;
+        assert(!missing_policy.start(&error));
+        assert(error == "FAMILY_ELIGIBILITY_CHECK_REQUIRED");
+    }
+
+    {
+        FamilyCloudWorker worker(path, eligibility, 5ms);
         std::string error;
         assert(worker.register_pair(consenting, &error));
         assert(worker.register_pair(not_consented, &error));
+        assert(worker.register_pair(ineligible, &error));
         assert(worker.start(&error));
         assert(worker.running());
 
@@ -37,8 +50,8 @@ int main() {
         }
     }
 
-    const auto previous_size = [&path]() {
-        FamilyCloudWorker worker(path, 5ms);
+    const auto previous_size = [&path, &eligibility]() {
+        FamilyCloudWorker worker(path, eligibility, 5ms);
         std::string error;
         assert(worker.register_pair(ConsentingPair{"pair-a", "parent-a", "parent-b", true, true}, &error));
         assert(worker.start(&error));
@@ -52,7 +65,7 @@ int main() {
     assert(previous_size[0].birth_cycle != previous_size[1].birth_cycle);
 
     const std::string bad_path = "/tmp/brain-family-missing-dir-for-test/memory.log";
-    FamilyCloudWorker failing_worker(bad_path, 5ms);
+    FamilyCloudWorker failing_worker(bad_path, eligibility, 5ms);
     std::string error;
     assert(failing_worker.register_pair(
         ConsentingPair{"pair-fail", "parent-x", "parent-y", true, true}, &error));
