@@ -6,7 +6,10 @@ agent deliberately does not expose an API for self-asserting verified identity.
 from __future__ import annotations
 
 from typing import Any
+import hashlib
+import json
 
+from .family_policy_audit import FamilyPolicyAudit
 from .family_governance import FamilyApproval, FamilyGovernance
 from .initial_software_node import ALLOWED_TASKS
 
@@ -24,6 +27,7 @@ class FamilyGovernedTaskService:
     def __init__(self, queue: Any, governance: FamilyGovernance | None = None):
         self.queue = queue
         self.governance = governance or FamilyGovernance()
+        self.audit = FamilyPolicyAudit(queue.database_path)
         self.audit_log: list[dict[str, Any]] = []
 
     def enqueue(
@@ -45,11 +49,7 @@ class FamilyGovernedTaskService:
             irreversible=irreversible,
             approval=approval,
         )
-        self.audit_log.append({
-            "event": "FAMILY_POLICY_DECISION",
-            "task_type": kind,
-            "decision": decision,
-        })
+        event = {"event": "FAMILY_POLICY_DECISION", "task_type": kind, "decision": decision}\n        self._record(event)
         if not decision["ok"]:
             return {
                 "ok": False,
@@ -58,18 +58,36 @@ class FamilyGovernedTaskService:
                 "family_policy": decision,
                 "queued": False,
             }
+        if decision.get("approval_required"):
+            fingerprint = hashlib.sha256(
+                json.dumps(task, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+            ).hexdigest()
+            if approval is None or not self.audit.consume_approval(
+                approval.consent_reference, action, fingerprint
+            ):
+                replay = self.governance.evaluate(action, risk="high")
+                event = {"event": "FAMILY_APPROVAL_REPLAY_OR_INVALID", "task_type": kind,
+                         "action": action, "task_fingerprint": fingerprint}
+                self._record(event)
+                return {"ok": False, "status": "FAMILY_APPROVAL_REPLAY_BLOCKED",
+                        "task_type": kind, "family_policy": replay, "queued": False}
         queued = self.queue.enqueue(task, idempotency_key=idempotency_key)
         queued["family_policy"] = decision
         queued["queued"] = True
         return queued
 
+    def _record(self, event: dict[str, Any]) -> None:
+        # Fail closed if the durable policy audit cannot be written.
+        persisted = self.audit.append(event)
+        event["audit"] = persisted
+        self.audit_log.append(event)
+
+    def audit_status(self) -> dict[str, Any]:
+        return self.audit.verify()
+
     def _deny(self, status: str, task_type: str) -> dict[str, Any]:
         decision = self.governance.evaluate("invalid_task", risk="high")
-        self.audit_log.append({
-            "event": "FAMILY_POLICY_DENIAL",
-            "task_type": task_type,
-            "status": status,
-        })
+        self._record({"event": "FAMILY_POLICY_DENIAL", "task_type": task_type, "status": status})
         return {
             "ok": False,
             "status": status,
