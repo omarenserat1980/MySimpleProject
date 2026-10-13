@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brain · Windows Server 2025 Simulation Factory</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#10141c;color:#e9eef7}
+body{margin:0 auto;max-width:1100px;padding:24px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+h1{font-size:clamp(1.5rem,4vw,2.3rem);margin:0}
+small,.muted{color:#a7b3c8}
+.badge{border:1px solid #58647a;border-radius:999px;padding:6px 10px;font-size:.8rem;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:18px 0}
+.card{background:#1a2230;border:1px solid #2b374a;border-radius:14px;padding:16px;min-width:0}
+label{display:block;font-size:.9rem;margin:10px 0 6px}
+input,select,button{font:inherit;border-radius:8px;border:1px solid #42516a;padding:10px;background:#111824;color:#f2f6fc;width:100%;box-sizing:border-box}
+button{background:#315da8;border-color:#4f7cc7;font-weight:650;cursor:pointer;margin-top:12px}
+button:disabled{opacity:.5;cursor:wait}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:460px;overflow:auto;background:#0d1118;padding:12px;border-radius:8px;font-size:.82rem}
+ul{padding-left:20px}li{margin:8px 0}
+.pass{color:#82e0a0}.fail{color:#ff9e9e}.warn{color:#ffd27c}
+@media(max-width:560px){body{padding:14px}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Windows Server 2025</h1><p class="muted">Electronic Brain · Simulation Factory</p></div>
+<span class="badge">SIMULATION ONLY · REAL BOOT NOT VERIFIED</span>
+</header>
+<div class="grid">
+<section class="card">
+<h2>Start a run</h2>
+<label for="key">Brain control key (held in this page only)</label>
+<input id="key" type="password" autocomplete="off" placeholder="X-Brain-Control-Key">
+<label for="scenario">Scenario</label>
+<select id="scenario">
+<option value="success">Successful modeled boot</option>
+<option value="no_boot_disk">No virtual boot disk</option>
+<option value="invalid_boot_config">Invalid boot configuration</option>
+<option value="low_disk_space">Insufficient virtual disk</option>
+<option value="service_failure">Service failure</option>
+<option value="missing_dependency">Missing service dependency</option>
+<option value="dns_failure">DNS failure</option>
+<option value="network_down">Virtual network down</option>
+<option value="out_of_memory">Virtual memory exhaustion</option>
+<option value="cancel_during_boot">Cancel during boot</option>
+<option value="restart">Logical restart</option>
+<option value="power_loss_recovery">Simulated power-loss recovery</option>
+<option value="stage_crash">Stage crash</option>
+<option value="corrupt_evidence">Evidence tampering test</option>
+<option value="duplicate_request">Duplicate request guard</option>
+<option value="timeout">Simulated timeout</option>
+<option value="driver_failure">Driver model failure</option>
+<option value="verification_failure">Verification gate failure</option>
+<option value="invalid_executor_pointer">Invalid executor pointer</option>
+<option value="real_executor_route">Real executor routing guard</option>
+</select>
+<div class="row">
+<div><label for="cpu">Virtual vCPU</label><input id="cpu" type="number" min="1" max="256" value="2"></div>
+<div><label for="ram">Virtual RAM (MiB)</label><input id="ram" type="number" min="512" max="1048576" value="4096"></div>
+</div>
+<div class="row">
+<div><label for="disk">Virtual disk (GiB)</label><input id="disk" type="number" min="1" max="65536" value="64"></div>
+<div><label for="free">Free disk (GiB)</label><input id="free" type="number" min="0" max="64" value="48"></div>
+</div>
+<button id="run">Run simulated boot</button>
+<p id="message" class="muted" role="status">No session started.</p>
+</section>
+<section class="card">
+<h2>Run status</h2>
+<p id="status" class="warn">NOT RUN</p>
+<p><small>Run ID</small><br><code id="runid">—</code></p>
+<p><small>Execution mode</small><br><strong>SIMULATION_ONLY</strong></p>
+<p><small>Real Windows boot verified</small><br><strong class="fail">false</strong></p>
+<p><small>Evidence verification</small><br><strong id="verify">—</strong></p>
+<p><small>Recovery status</small><br><strong id="recovery">—</strong></p>
+</section>
+</div>
+<div class="grid">
+<section class="card"><h2>Boot stages</h2><ul id="stages"><li class="muted">Run a scenario to inspect stages.</li></ul></section>
+<section class="card"><h2>Virtual resources</h2><pre id="resources">No run data.</pre></section>
+</div>
+<section class="card">
+<h2>Evidence report</h2>
+<p class="muted">Events are synthetic model outputs with a SHA-256 hash chain, not proof of an actual Windows boot.</p>
+<pre id="report">No report available.</pre>
+</section>
+<script>
+(() => {
+  const api = window.location.pathname.replace(/\/dashboard\/?$/, "");
+  const el = id => document.getElementById(id);
+  const set = (id, value) => { el(id).textContent = value == null ? "—" : String(value); };
+  el("run").addEventListener("click", async () => {
+    const button = el("run");
+    const key = el("key").value;
+    if (!key) { set("message", "Enter the Brain control key; it is not stored by this page."); return; }
+    button.disabled = true;
+    set("message", "Running an isolated software simulation…");
+    try {
+      const response = await fetch(api, {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-Brain-Control-Key":key},
+        body: JSON.stringify({scenario_id:el("scenario").value,hardware:{
+          vcpu_count:Number(el("cpu").value),ram_mib:Number(el("ram").value),
+          disk_gib:Number(el("disk").value),disk_free_gib:Number(el("free").value)
+        }})
+      });
+      const created = await response.json();
+      if (!response.ok) throw new Error(created.detail || "SIMULATION_REQUEST_FAILED");
+      const reportResponse = await fetch(api + "/" + encodeURIComponent(created.run_id) + "/report",
+        {headers:{"X-Brain-Control-Key":key}});
+      const report = await reportResponse.json();
+      if (!reportResponse.ok) throw new Error(report.detail || "REPORT_FETCH_FAILED");
+      set("status", report.status);
+      el("status").className = report.status === "SIMULATED_BOOT_SUCCESS" ? "pass" : "warn";
+      set("runid", report.run_id);
+      set("verify", report.verification && report.verification.status);
+      set("recovery", report.recovery_status);
+      el("resources").textContent = JSON.stringify({
+        simulated_resources:report.simulated_resources,
+        host_observed_resources:report.host_observed_resources
+      },null,2);
+      const list = el("stages"); list.replaceChildren();
+      for (const event of report.events || []) {
+        const item = document.createElement("li");
+        item.textContent = event.stage + " — " + event.status + (event.reason_code ? " ("+event.reason_code+")" : "");
+        item.className = event.status === "PASS" ? "pass" : (event.status === "FAILED" ? "fail" : "warn");
+        list.appendChild(item);
+      }
+      el("report").textContent = JSON.stringify(report,null,2);
+      set("message", "Completed. Result is synthetic; no VM or cloud resource was created.");
+    } catch (error) {
+      set("message", String(error.message || error));
+    } finally { button.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>
