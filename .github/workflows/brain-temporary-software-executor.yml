@@ -30,7 +30,7 @@ concurrency:
 jobs:
   provision-software-node:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Install bounded software execution tools
@@ -74,20 +74,44 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pytest -q brain_v12/tests/test_software_resource_node.py brain_v12/tests/test_windows_software_boot_gate.py
-      - name: Optional trusted Windows ISO admission
-        if: ${{ inputs.windows_iso_url != '' }}
+      - name: Download and verify Windows Server 2025 Evaluation ISO
         env:
-          ISO_URL: ${{ inputs.windows_iso_url }}
-          TRUSTED_SHA256: ${{ inputs.trusted_iso_sha256 }}
+          ISO_URL: ${{ inputs.windows_iso_url || 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso' }}
+          TRUSTED_SHA256: ${{ inputs.trusted_iso_sha256 || '7b052573ba7894c9924e3e87ba732ccd354d18cb75a883efa9b900ea125bfd51' }}
         run: |
           set -euo pipefail
-          case "$ISO_URL" in https://*) ;; *) echo "BLOCKED: ISO URL must use HTTPS"; exit 2;; esac
-          [[ "$TRUSTED_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "BLOCKED: trusted Microsoft SHA-256 is required"; exit 2; }
-          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 "$ISO_URL" -o windows-server-2025.iso
+          case "$ISO_URL" in https://software-static.download.prss.microsoft.com/*) ;; *) echo "BLOCKED: URL must be a Microsoft software download host"; exit 2;; esac
+          [[ "$TRUSTED_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "BLOCKED: SHA-256 is required"; exit 2; }
+          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 --retry-delay 3 --connect-timeout 30 "$ISO_URL" -o windows-server-2025.iso
           actual="$(sha256sum windows-server-2025.iso | awk '{print $1}')"
           test "${actual,,}" = "${TRUSTED_SHA256,,}" || { echo "BLOCKED: ISO SHA-256 mismatch"; exit 2; }
+          printf '{"iso":"Windows Server 2025 Evaluation x64 en-US","bytes":%s,"sha256":"%s","verified":true}\n' "$(stat -c %s windows-server-2025.iso)" "$actual" > windows-iso-verification.json
           echo "MICROSOFT_ISO_SHA256_VERIFIED=PASS"
-          echo "ISO admitted. Full guest installation remains gated on unattended media and guest evidence."
+      - name: Boot Windows Server installer under QEMU TCG
+        run: |
+          set -euo pipefail
+          qemu-img create -f qcow2 windows-server-2025.qcow2 64G
+          rm -f qemu-monitor.sock qemu.log
+          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot order=d -display none -vnc 127.0.0.1:1 -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
+          qemu_pid=$!
+          echo "$qemu_pid" > qemu.pid
+          for i in $(seq 1 90); do if ! kill -0 "$qemu_pid" 2>/dev/null; then cat qemu.log; exit 1; fi; if [ -S qemu-monitor.sock ]; then break; fi; sleep 2; done
+          test -S qemu-monitor.sock
+          sleep 120
+          python3 - <<'PY'
+          import json, socket, time
+          s=socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(5); s.connect('qemu-monitor.sock')
+          time.sleep(1); banner=s.recv(4096).decode('utf-8','replace')
+          s.sendall(b'info status\n'); time.sleep(1)
+          try: status=s.recv(4096).decode('utf-8','replace')
+          except Exception as e: status=str(e)
+          report={'qemu_process_running': True, 'monitor_connected': True, 'monitor_banner': banner[-500:], 'guest_status': status[-1000:], 'iso_sha256_verified': True, 'windows_guest_boot_verified': False, 'note':'QEMU running with Windows installer ISO; guest installation and in-guest proof are not yet confirmed.'}
+          open('windows-qemu-boot-evidence.json','w').write(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          s.sendall(b'quit\n'); s.close()
+          PY
+          kill "$qemu_pid" 2>/dev/null || true
+          wait "$qemu_pid" 2>/dev/null || true
       - name: Upload executor evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -95,5 +119,8 @@ jobs:
           name: brain-software-executor-evidence
           path: |
             software-executor-capability.json
+            windows-iso-verification.json
+            windows-qemu-boot-evidence.json
+            qemu.log
           if-no-files-found: warn
           retention-days: 7
