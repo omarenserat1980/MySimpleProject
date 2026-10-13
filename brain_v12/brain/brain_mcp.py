@@ -161,13 +161,7 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
-        version = request.headers.get("MCP-Protocol-Version")
-        if version not in SUPPORTED_PROTOCOL_VERSIONS:
-            return JSONResponse(
-                {"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"},
-                status_code=400,
-                headers={"MCP-Protocol-Version": PROTOCOL_VERSION},
-            )
+        supplied_version = request.headers.get("MCP-Protocol-Version")
 
         try:
             body = await request.json()
@@ -178,6 +172,18 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             return rpc_error(None, -32600, "Invalid Request")
 
         method = str(body.get("method", ""))
+        # MCP clients negotiate the protocol version in initialize's JSON-RPC
+        # params; the HTTP protocol-version header is required only afterward.
+        version = supplied_version or (
+            PROTOCOL_VERSION if method == "initialize" else None
+        )
+        if version not in SUPPORTED_PROTOCOL_VERSIONS:
+            return JSONResponse(
+                {"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"},
+                status_code=400,
+                headers={"MCP-Protocol-Version": PROTOCOL_VERSION},
+            )
+
         request_id = body.get("id")
         params = body.get("params") or {}
 
