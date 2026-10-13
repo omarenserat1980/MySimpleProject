@@ -104,6 +104,10 @@ assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
 
 
 assert.match(worker, /createPayPalPayment/);
+assert.match(worker, /\/api\/payments\/paypal\/capture/);
+assert.match(worker, /capturePayPalPayment/);
+assert.match(worker, /CAPTURE_COMPLETED_AWAITING_VERIFIED_WEBHOOK/);
+assert.match(worker, /webhook_authoritative: true/);
 assert.match(worker, /handlePayPalWebhook/);
 assert.match(worker, /PAYPAL_CLIENT_ID/);
 assert.match(worker, /PAYPAL_CLIENT_SECRET/);
