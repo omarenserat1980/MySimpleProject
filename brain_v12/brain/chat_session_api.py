@@ -167,7 +167,7 @@ def router(brain_ai, store=None, context_limit=24):
             instructions = body.instructions
             if body.partner_mode:
                 from .brain_partner import PARTNER_INSTRUCTIONS
-                instructions = (instructions + "\\n\\n" if instructions else "") + PARTNER_INSTRUCTIONS
+                instructions = (instructions + "\n\n" if instructions else "") + PARTNER_INSTRUCTIONS
             if memory and memory.get("summary"):
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_MEMORY]\n" + memory["summary"]
             if session_context:
