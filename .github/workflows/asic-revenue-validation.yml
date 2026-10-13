@@ -1,0 +1,60 @@
+name: ASIC Revenue Baseline Validation
+
+on:
+  push:
+    branches:
+      - "brain/asic-revenue-baseline-*"
+    paths:
+      - "brain_v12/brain/asic_hardware_simulator.py"
+      - "brain_v12/tests/test_asic_independent_truth_tables.py"
+      - "tools/benchmark_asic_simulator.py"
+      - ".github/workflows/asic-revenue-validation.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/asic_hardware_simulator.py"
+      - "brain_v12/tests/test_asic_independent_truth_tables.py"
+      - "tools/benchmark_asic_simulator.py"
+      - ".github/workflows/asic-revenue-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asic-revenue-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  independent-oracle-and-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Run ASIC baseline and independent truth-table tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_asic_hardware_simulator.py \
+            brain_v12/tests/test_asic_independent_truth_tables.py
+      - name: Run repeated software-only benchmark
+        env:
+          PYTHONPATH: .
+        run: |
+          python tools/benchmark_asic_simulator.py \
+            --cycles 256 --repeats 30 --gates 32 --seed 20261013 \
+            > asic-benchmark.json
+          python -c "import json; d=json.load(open('asic-benchmark.json')); print(json.dumps(d, indent=2)); assert d['measurements']['total_cycles'] == 7680"
+      - name: Upload benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: asic-software-benchmark
+          path: asic-benchmark.json
+          if-no-files-found: error
