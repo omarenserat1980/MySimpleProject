@@ -15,7 +15,7 @@ Mouse is not a real GitHub client and never proxies to GitHub. It has no Render 
 
 Policy gates:
 - The runtime bridge exposes only inspect/test/plan operations; the wider legacy cycle and all V12 external integrations remain outside the bridge.
-- Runtime-specific memory snapshots are synchronized through the Brain 3 shared ledger at adapter boundaries; this does not merge the runtimes' storage internals into one Python object or durable database.
+- The supported legacy and V12 memory interfaces are backed by the same in-process Brain 3 kernel ledger, with type-aware namespaced views; other runtime state such as V12 goals/events remains in its local runtime store.
 - Queueing remains non-executing by default. A task runs only after explicit dispatch to a verified local adapter.
 - Render and all external network calls are disabled.
 - Arkan and Redmi 3 setup are prohibited.
