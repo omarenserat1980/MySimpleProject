@@ -134,7 +134,7 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
         self.service = FamilyGovernedTaskService(self.queue, approval_verifier=TestOnlyApprovalVerifier())
         result = self.service.enqueue({"type": "read_text", "path": "notes.txt"}, approval=approval)
         self.assertFalse(result["ok"])
-        self.assertEqual(result["status"], "FAMILY_APPROVAL_INVALID_OR_OUT_OF_SCOPE")
+        self.assertEqual(result["status"], "FAMILY_APPROVAL_REQUIRED")
         self.assertEqual(self.queue.counts()["PENDING"], 0)
 
 
