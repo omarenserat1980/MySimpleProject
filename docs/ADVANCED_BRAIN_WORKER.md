@@ -1,13 +1,16 @@
 # Advanced Brain Worker v1
 
 ## Purpose
-An isolated worker lifecycle/admission primitive for Electronic Brain. It provides bounded leases, heartbeats, capability checks, fail-closed real-boot admission, and public status without a last-heartbeat timestamp.
+An isolated worker lifecycle/admission primitive for Electronic Brain. It provides bounded leases, heartbeat renewal, capability checks, fail-closed real-boot admission, and public status without a last-heartbeat timestamp.
 
 ## Modes
 - `simulator`: default and safe for tests; cannot advertise `windows-server-2025-real-boot`.
-- `real_executor`: explicit opt-in. This mode does not create trust or authorizations; it only accepts independently verified host facts.
+- `real_executor`: explicit opt-in. This mode does not create trust, authorizations, signatures, or attestations.
 
-## Real-boot admission gates
+## Trusted real-boot gate verification
+Real-boot admission requires an injected `gate_verifier` implementation supplied by trusted integration code. Each gate receives a proof object, the requested task, and worker identity. Missing verifier, missing proof, boolean claims, verifier exceptions, and any failed verification deny admission.
+
+Required gates:
 - `host_identity_verified`
 - `kvm_runtime_verified`
 - `executor_attestation_verified`
@@ -15,19 +18,19 @@ An isolated worker lifecycle/admission primitive for Electronic Brain. It provid
 - `owner_authorized`
 - `source_commit_matches`
 
-Every gate must be explicitly true in the current host observation. A missing, false, or stale fact fails closed. This module does not manufacture facts, credentials, approvals, signatures, or attestations.
+The verifier must validate cryptographic signatures, expiry, audience, worker identity, task/commit binding, and authority using trusted keys and existing authorization services. Never implement the verifier by merely checking caller-provided booleans. The unit-test verifier is deliberately fake and must not be used in production.
 
 ## Lifecycle
-1. Create worker with a stable ID, declared capabilities, and explicit mode.
-2. Register with an initial host observation.
-3. Renew a bounded lease with heartbeat.
-4. Evaluate task admission against a live lease and declared capability.
+1. Create worker with a stable ID, declared capabilities, explicit mode, and trusted verifier for real execution.
+2. Register with fresh proof objects from trusted host and authority sources.
+3. Renew a bounded lease with fresh proof objects.
+4. Evaluate task admission against a live lease, declared capability, and verified evidence.
 5. Send an admitted task to the existing authorized executor/gateway. This module itself never starts processes or VMs.
 
 ## Evidence boundaries
 - Registration and heartbeat prove only worker lifecycle.
 - `admitted=true` means policy gates passed, not that execution happened.
-- `windows_boot_verified` is always false here. Real success requires guest-written Windows Server 2025 evidence and the repository's independent completion/proof gates.
+- `windows_boot_verified` is always false here. Real success requires guest-written Windows Server 2025 evidence and independent completion/proof gates.
 - No cloud resources, paid services, physical devices, Windows VMs, or production credentials are created or touched by this module.
 
 ## Tests
