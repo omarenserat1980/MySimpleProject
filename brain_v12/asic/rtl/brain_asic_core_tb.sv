@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 module brain_asic_core_tb;
     logic clk = 1'b0;
-    logic rst_n = 1'b0;
+    logic rst_n = 1'b1;
     logic [2:0] opcode = '0;
     logic [31:0] operand_a = '0;
     logic [31:0] operand_b = '0;
@@ -42,6 +42,7 @@ module brain_asic_core_tb;
     endtask
 
     initial begin
+        #1 rst_n = 1'b0;
         #1;
         if (result !== 32'b0 || zero !== 1'b1)
             $fatal(1, "asynchronous reset did not initialize outputs");
