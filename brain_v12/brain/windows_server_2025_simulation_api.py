@@ -9,6 +9,8 @@ import threading
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
+from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .control_auth import require_control_key
@@ -60,6 +62,15 @@ def _get_run(run_id: str) -> dict[str, Any]:
     if result is None:
         raise HTTPException(status_code=404, detail="SIMULATION_RUN_NOT_FOUND")
     return result
+
+
+@router.get("/dashboard", include_in_schema=False)
+def simulation_dashboard() -> FileResponse:
+    """Serve the local dashboard; API data endpoints still require control-key auth."""
+    page = Path(__file__).resolve().parents[1] / "web" / "windows_server_2025_simulation.html"
+    if not page.is_file():
+        raise HTTPException(status_code=404, detail="SIMULATION_DASHBOARD_NOT_FOUND")
+    return FileResponse(page, media_type="text/html")
 
 
 @router.get("/{run_id}")
