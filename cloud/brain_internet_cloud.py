@@ -30,23 +30,8 @@ while not STOP:
         except Exception as exc:
             print(f"INTERNET_FETCH_ERROR url={url} error={exc}", flush=True)
 
-    env = os.environ.copy()
-    env.setdefault("PYTHONPATH", str(ROOT))
-    env.setdefault("FACTORY_ALLOW_PRODUCTION", "1")
-    env.setdefault("FACTORY_REQUIRE_REAL_MEDIA", "1")
-    env.setdefault("FACTORY_ONE_SHOT", "1")
-
-    print("BRAIN_CLOUD_CYCLE_START=1", flush=True)
-    try:
-        p = subprocess.run(
-            ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
-            cwd=ROOT, env=env, timeout=max(INTERVAL, 300)
-        )
-        print(f"BRAIN_CLOUD_CYCLE_EXIT={p.returncode}", flush=True)
-    except subprocess.TimeoutExpired:
-        print("BRAIN_CLOUD_CYCLE_TIMEOUT=1", flush=True)
-    except Exception as exc:
-        print(f"BRAIN_CLOUD_CYCLE_ERROR={type(exc).__name__}:{exc}", flush=True)
+    print("BRAIN_CLOUD_LEGACY_FACTORY=DISABLED", flush=True)
+    print("BRAIN_CLOUD_MEDIA_RENDERER=NOT_INTEGRATED", flush=True)
 
     for _ in range(INTERVAL):
         if STOP:
