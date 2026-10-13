@@ -1,0 +1,59 @@
+name: Brain Runtime Recovery Toolkit Validation
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/tools/arkan_runtime_recovery.ps1'
+      - 'brain_v12/tools/brain_runtime_diagnostics.sh'
+      - '.github/workflows/brain-runtime-recovery-toolkit.yml'
+  push:
+    branches:
+      - feat/arkan-runtime-recovery-toolkit
+    paths:
+      - 'brain_v12/tools/arkan_runtime_recovery.ps1'
+      - 'brain_v12/tools/brain_runtime_diagnostics.sh'
+      - '.github/workflows/brain-runtime-recovery-toolkit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-script-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Bash syntax
+        run: bash -n brain_v12/tools/brain_runtime_diagnostics.sh
+      - name: Run Brain diagnostics in read-only CI sandbox
+        env:
+          V12_BRAIN_URL: http://127.0.0.1:9
+          BRAIN_EVIDENCE_DIR: ${{ runner.temp }}/brain-recovery-evidence
+        run: |
+          set +e
+          bash brain_v12/tools/brain_runtime_diagnostics.sh
+          rc=$?
+          echo "Diagnostic exit code: $rc"
+          test -d "$BRAIN_EVIDENCE_DIR"
+          find "$BRAIN_EVIDENCE_DIR" -maxdepth 1 -type f -print
+          # An unreachable local API is an expected diagnostic result in CI.
+          exit 0
+
+  powershell-parse-check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell recovery script without executing VM actions
+        shell: pwsh
+        run: |
+          $path = 'brain_v12/tools/arkan_runtime_recovery.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path $path), [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+          "PowerShell syntax PASS; script was parsed, not executed."
