@@ -42,7 +42,7 @@ The Worker now exposes:
 
 - `POST /api/payments/paypal/create`: requires an authenticated BRAIN client, an existing D1 order owned by that client, and server-side order amount/currency. It creates a PayPal Sandbox order and stores the provider order ID in D1 before returning the approval URL.
 - `POST /api/payments/paypal/capture`: requires the authenticated owner of the stored PayPal order and requests capture through PayPal Sandbox. Its response is informational only; the verified PayPal webhook remains the sole authority for changing payment state or creating pending-delivery ledger evidence.
-- `POST /api/payments/paypal/webhook`: verifies the PayPal transmission headers and event with PayPal's Sandbox verification endpoint, reconciles completed capture amount/currency against the stored D1 payment, and records payment evidence. Repeated verified captures do not create a second payment ledger entry.
+- `POST /api/payments/paypal/webhook`: verifies the PayPal transmission headers and event with PayPal's Sandbox verification endpoint, then fetches the provider order and reconciles its completed status, `reference_id`, `invoice_id`, capture ID, amount, and currency against the stored D1 payment before recording payment evidence. Repeated verified captures do not create a second payment ledger entry.
 
 Required Worker secrets:
 
