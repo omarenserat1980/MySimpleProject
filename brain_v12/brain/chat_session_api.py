@@ -4,13 +4,16 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from .chat_session_store import ChatSessionStore
 from .chat_request_ledger import ChatRequestLedger
+from .brain_card_preflight import run_chat_preflight, stable_chat_trace_id
 import hashlib
 import json
+
 
 class SessionCreateIn(BaseModel):
     title: str = "New Brain Chat"
     account_id: str | None = None
     device_id: str | None = None
+
 
 class MessageIn(BaseModel):
     message: str = Field(min_length=1)
@@ -19,12 +22,15 @@ class MessageIn(BaseModel):
     client_message_id: str | None = None
     device_id: str | None = None
 
+
 class MemoryIn(BaseModel):
     summary: str = ""
+
 
 class CompactIn(BaseModel):
     keep_recent: int = 24
     max_summary_chars: int = 12000
+
 
 def router(brain_ai, store=None, context_limit=24):
     store = store or ChatSessionStore()
@@ -84,6 +90,28 @@ def router(brain_ai, store=None, context_limit=24):
             return {"ok": False, "status": "SESSION_NOT_FOUND"}
 
         request_key = (body.client_message_id or "").strip()
+        trace_id = stable_chat_trace_id(session_id, request_key or None)
+
+        # This gate is deliberately before idempotency recovery, message writes,
+        # context/memory assembly, model calls, and tool dispatch.
+        preflight = run_chat_preflight(
+            brain_ai, store, r.routes, trace_id=trace_id, input_kind="chat_message"
+        )
+        if not preflight["ok"]:
+            return {
+                "ok": False,
+                "status": "BRAIN_PREFLIGHT_BLOCKED",
+                "trace_id": trace_id,
+                "preflight": preflight,
+                "response": {
+                    "ok": False,
+                    "status": "BRAIN_PREFLIGHT_BLOCKED",
+                    "content": "Brain Card preflight failed; request processing was blocked.",
+                    "trace_id": trace_id,
+                },
+                "idempotent_replay": False,
+            }
+
         request_hash = hashlib.sha256(json.dumps({
             "message": body.message,
             "instructions": body.instructions,
@@ -94,9 +122,11 @@ def router(brain_ai, store=None, context_limit=24):
             if claimed["status"] == "COMPLETED":
                 cached = claimed["response"]
                 return {"ok": bool(cached.get("ok")), "session": store.get(session_id),
-                        "response": cached, "idempotent_replay": True}
+                        "response": cached, "idempotent_replay": True,
+                        "trace_id": trace_id, "preflight": preflight}
             if claimed["status"] == "ID_CONFLICT":
-                return {"ok": False, "status": "CLIENT_MESSAGE_ID_CONFLICT", "retryable": False}
+                return {"ok": False, "status": "CLIENT_MESSAGE_ID_CONFLICT", "retryable": False,
+                        "trace_id": trace_id, "preflight": preflight}
 
             # Recover the crash window where the assistant message was persisted
             # but the idempotency ledger was not marked COMPLETED. The assistant
@@ -113,14 +143,22 @@ def router(brain_ai, store=None, context_limit=24):
                 if recovered is not None:
                     ledger.complete(session_id, request_key, recovered)
                     return {"ok": bool(recovered.get("ok")), "session": store.get(session_id),
-                            "response": recovered, "idempotent_replay": True}
+                            "response": recovered, "idempotent_replay": True,
+                            "trace_id": trace_id, "preflight": preflight}
                 if claimed["status"] == "IN_PROGRESS":
-                    return {"ok": False, "status": "REQUEST_IN_PROGRESS", "retryable": True}
+                    return {"ok": False, "status": "REQUEST_IN_PROGRESS", "retryable": True,
+                            "trace_id": trace_id, "preflight": preflight}
 
         try:
-            store.add_message(session_id, "user", body.message,
-                              client_message_id=body.client_message_id,
-                              metadata={"device_id": body.device_id} if body.device_id else None)
+            store.add_message(
+                session_id, "user", body.message,
+                client_message_id=body.client_message_id,
+                metadata={
+                    **({"device_id": body.device_id} if body.device_id else {}),
+                    "trace_id": trace_id,
+                    "brain_card_version": preflight["brain_card"]["registry_version"],
+                },
+            )
             history = store.context_messages(session_id, limit=context_limit)
             memory = store.get_memory(session_id)
             context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
@@ -132,16 +170,20 @@ def router(brain_ai, store=None, context_limit=24):
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
             result = brain_ai.chat(body.message, instructions, approved=body.approved)
             model_routing = next((e for e in result.evidence if e.get("type") == "model_routing"), None)
-            assistant = {"role":"assistant","content":result.reply,"ok":result.ok,"mode":result.mode,
-                         "model":result.model,"tool_calls":result.tool_calls,
-                         "evidence":result.evidence,"model_routing":model_routing,"error":result.error}
+            assistant = {
+                "role": "assistant", "content": result.reply, "ok": result.ok, "mode": result.mode,
+                "model": result.model, "tool_calls": result.tool_calls,
+                "evidence": result.evidence, "model_routing": model_routing, "error": result.error,
+                "trace_id": trace_id, "brain_card_version": preflight["brain_card"]["registry_version"],
+                "preflight_status": preflight["status"],
+            }
             if request_key:
                 assistant["client_message_id"] = request_key
             store.add_message(session_id, "assistant", result.reply, assistant)
             if request_key:
                 ledger.complete(session_id, request_key, assistant)
             return {"ok": result.ok, "session": store.get(session_id), "response": assistant,
-                    "idempotent_replay": False}
+                    "idempotent_replay": False, "trace_id": trace_id, "preflight": preflight}
         except Exception:
             if request_key:
                 ledger.fail(session_id, request_key)
