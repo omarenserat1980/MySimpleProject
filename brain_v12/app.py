@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .brain.error_logs import BrainErrorLogStore, BrainErrorLoggingMiddleware
 from .brain.suggestions_engine import BrainSuggestionsEngine
+from .brain.suggestion_worker_policy import evaluate_suggestion_handoff, SuggestionWorkerCandidateStore
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -209,6 +210,7 @@ app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 error_log_store = BrainErrorLogStore()
 app.add_middleware(BrainErrorLoggingMiddleware, store=error_log_store)
 suggestions_engine = BrainSuggestionsEngine(openai_provider, error_log_store)
+suggestion_worker_candidates = SuggestionWorkerCandidateStore(os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")))
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(error_recovery_router)
 app.include_router(universal_simulator_router)
@@ -340,6 +342,41 @@ def brain_suggestion_approve(request: Request, suggestion_id: str, body: dict | 
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/brain/suggestions/{suggestion_id}/worker-candidate")
+def brain_suggestion_worker_candidate(request: Request, suggestion_id: str, body: dict | None = None):
+    """Persist a reviewed candidate from a ChatGPT suggestion; never enqueue it."""
+    require_control_key(request)
+    item = suggestions_engine._get(suggestion_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="SUGGESTION_NOT_FOUND")
+    body = body or {}
+    capability = str(body.get("capability") or "").strip()
+    result = evaluate_suggestion_handoff(item, requested_capability=capability)
+    if not result["ok"]:
+        return {"ok": False, "status": "HANDOFF_DENIED", **result}
+    recorded = suggestion_worker_candidates.record(result["candidate"])
+    if not recorded.get("ok"):
+        raise HTTPException(status_code=409, detail=recorded.get("status", "CANDIDATE_RECORD_FAILED"))
+    return {
+        "ok": True,
+        "status": recorded["status"],
+        "candidate_record": recorded,
+        "execution_authorized": False,
+        "windows_boot_verified": False,
+        "queued": False,
+    }
+
+
+@app.get("/api/brain/suggestions/worker-candidates/{candidate_id}")
+def brain_suggestion_worker_candidate_detail(request: Request, candidate_id: str):
+    """Read a durable worker candidate; no execution or queue side effects."""
+    require_control_key(request)
+    item = suggestion_worker_candidates.get(candidate_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="WORKER_CANDIDATE_NOT_FOUND")
+    return {"ok": True, "candidate_record": item, "execution_authorized": False}
 
 
 @app.post("/api/brain/suggestions/{suggestion_id}/reject")
