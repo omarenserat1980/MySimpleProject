@@ -1,11 +1,19 @@
 name: Brain Cloudflare Emulator Gate
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/brain-api/**"
+      - "docs/architecture/BRAIN_CLOUDFLARE_EMULATOR_FIRST.md"
+      - "docs/prompts/CHATGPT_CLOUDFLARE_EMULATOR_PROMPTS_AR.md"
+      - ".github/workflows/brain-cloudflare-emulator.yml"
   push:
     branches: [main]
     paths:
       - "cloudflare/brain-api/**"
       - "docs/architecture/BRAIN_CLOUDFLARE_EMULATOR_FIRST.md"
+      - "docs/prompts/CHATGPT_CLOUDFLARE_EMULATOR_PROMPTS_AR.md"
       - ".github/workflows/brain-cloudflare-emulator.yml"
   workflow_dispatch:
 
