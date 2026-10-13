@@ -12,12 +12,10 @@ execution, Render availability, MCP reachability, or OAuth compliance.
 For an explicit read-only probe against a deployed Brain service:
 
 ```sh
-python brain_v12/tools/brain_integration_diagnostics.py --base-url https://YOUR-BRAIN-HOST
+python brain_v12/tools/brain_integration_diagnostics.py --base-url https://YOUR-BRAIN-HOST --timeout 10
 ```
 
-The live probe attempts `GET /mcp`, then JSON-RPC `initialize`,
-`tools/list`, and the read-only `tools/call` for `brain.status`. It reports
-HTTP status and a redacted response summary. It does not print arbitrary tool
+The live probe records `GET /mcp` as informational because Streamable HTTP servers may return 405 for GET, then attempts JSON-RPC `initialize`, the required `notifications/initialized` handshake, `tools/list`, and the read-only `tools/call` for `brain.status` in order. It verifies that `brain.status` appears in the tool list and that the tool result is not marked `isError`. The `--timeout` option applies to each HTTP request. The report includes HTTP status and a redacted response summary. It does not print arbitrary tool
 output or authorization headers. If the endpoint requires a bearer token, set
 `BRAIN_DIAGNOSTICS_BEARER_TOKEN` in the process environment; do not put the
 token in command-line arguments or commit it to source control.
