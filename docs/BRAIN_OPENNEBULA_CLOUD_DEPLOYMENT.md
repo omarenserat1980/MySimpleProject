@@ -4,7 +4,7 @@
 
 Arkan must never be used by the new Brain or Huda cloud, directly or indirectly. Do not use it as a host, hypervisor, bootstrap device, GitHub Actions runner, executor, network hop, recovery target, or fallback. Do not enroll or reconnect its Desktop Commander device for this project. If any execution route resolves to Arkan or its identity, stop and report `ARKAN_FORBIDDEN`; never retry through Arkan.
 
-The Huda deployment must use an independently provisioned and positively identified host. The preflight now fails closed unless the current hostname exactly matches `BRAIN_HUDA_ALLOWED_HOSTNAME` and the SHA-256 digest of the current Linux machine ID matches `BRAIN_HUDA_MACHINE_ID_SHA256`. Provision both expected values through a trusted, out-of-band operator process; never store raw machine IDs or credentials in Git. This local check is a defense-in-depth gate, not hardware-backed remote attestation: the deployment controller must independently verify the host identity before any apply. Reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
+The Huda deployment must use an independently provisioned and positively identified host. Both the read-only preflight and the OpenNebula provider's provision/destroy mutation paths fail closed unless the current hostname exactly matches `BRAIN_HUDA_ALLOWED_HOSTNAME` and the SHA-256 digest of the current Linux machine ID matches `BRAIN_HUDA_MACHINE_ID_SHA256`. Provision both expected values through a trusted, out-of-band operator process; never store raw machine IDs or credentials in Git. This local check is a defense-in-depth gate, not hardware-backed remote attestation: the deployment controller must independently verify the host identity before any apply. Reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
 
 ## Identity and independence
 
@@ -39,7 +39,7 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
    ```
 
    A nonzero exit code means a required check is blocked. Resolve the reported blockers first.
-7. **Select the existing provider** in the Brain runtime environment:
+7. **Select the existing provider** in the Brain runtime environment. The provider itself enforces the Huda identity gate before provisioning or destruction:
 
    ```bash
    export BRAIN_WINDOWS_CLOUD_PROVIDER=opennebula
