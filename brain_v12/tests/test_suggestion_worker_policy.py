@@ -64,3 +64,30 @@ def test_invalid_suggestion_is_denied():
     assert result["ok"] is False
     assert "SUGGESTION_ID_REQUIRED" in result["reasons"]
     assert "TARGET_CAPABILITY_REQUIRED" in result["reasons"]
+
+
+def test_candidate_store_is_durable_and_idempotent(tmp_path):
+    from brain_v12.brain.suggestion_worker_policy import SuggestionWorkerCandidateStore
+
+    store = SuggestionWorkerCandidateStore(tmp_path / "worker-candidates.db")
+    result = evaluate_suggestion_handoff(approved_suggestion(), requested_capability="diagnostics")
+    first = store.record(result["candidate"])
+    second = store.record(result["candidate"])
+    assert first["status"] == "CANDIDATE_RECORDED_NOT_QUEUED"
+    assert second["status"] == "CANDIDATE_ALREADY_RECORDED"
+    assert first["queued"] is False and second["queued"] is False
+    assert store.get("suggestion:sug-123")["candidate"]["execution_authorized"] is False
+
+
+def test_candidate_store_rejects_conflicting_capability_for_same_suggestion(tmp_path):
+    from brain_v12.brain.suggestion_worker_policy import SuggestionWorkerCandidateStore
+
+    store = SuggestionWorkerCandidateStore(tmp_path / "worker-candidates.db")
+    candidate = evaluate_suggestion_handoff(
+        approved_suggestion(), requested_capability="diagnostics"
+    )["candidate"]
+    assert store.record(candidate)["ok"] is True
+    conflicting = dict(candidate, capability="code-review")
+    result = store.record(conflicting)
+    assert result["ok"] is False
+    assert result["status"] == "CANDIDATE_ALREADY_RECORDED_DIFFERENT_REQUEST"
