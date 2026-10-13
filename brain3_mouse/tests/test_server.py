@@ -10,6 +10,7 @@ from http.server import ThreadingHTTPServer
 from unittest.mock import patch
 
 from brain3_mouse.server import MouseHandler, STATE, main
+from brain3_mouse.unified_kernel import KERNEL
 
 
 def request(server, method, path, payload=None):
@@ -30,6 +31,7 @@ def request(server, method, path, payload=None):
 class MouseEmulatorTests(unittest.TestCase):
     def setUp(self):
         STATE.reset()
+        KERNEL.reset()
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), MouseHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
