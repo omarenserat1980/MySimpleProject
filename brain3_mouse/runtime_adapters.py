@@ -49,7 +49,6 @@ class RuntimeAdapterManager:
 
             store = MemoryStore(":memory:")
             store.init()
-            store.add_goal("Brain 3 local integration contract check", priority=1.0)
             core = BrainCore(store)
             builder = SoftwareBuilder()
             orchestrator = CognitiveOrchestrator(store, core, builder)
@@ -64,11 +63,9 @@ class RuntimeAdapterManager:
                               "goal_count": len(store.goals())}
                 elif action == "plan":
                     objective = str(payload.get("objective") or payload.get("description") or "Brain 3 safe plan")
-                    result = orchestrator.run(project="brain3",) 
-                    # Use the actual V12 planner for the requested objective.
-                    if result.get("status") == "IDLE":
-                        store.add_goal(objective, priority=1.0)
-                        result = orchestrator.run(project="brain3")
+                    goal_id = store.add_goal(objective, priority=1.0)
+                    result = orchestrator.run(project="brain3")
+                    store.set_goal_status(goal_id, "DONE")
                     result = {**result, "requested_objective": objective}
                 else:
                     result = {"runtime": "brain_v12", "test": "in_process_contract_passed"}
@@ -108,12 +105,16 @@ class RuntimeAdapterManager:
                     }
                 elif action == "plan":
                     objective = str(payload.get("objective") or payload.get("description") or "Brain 3 safe plan")
-                    result = brain.cycle(objective, outcome="unknown",
-                                         outcome_evidence="Brain 3 local adapter; no external execution")
-                    result = {"runtime": "legacy_brain", "cycle": result.get("cycle"),
-                              "objective": result.get("objective"),
-                              "selected_internal_focus": result.get("selected_internal_focus"),
-                              "external_side_effects": result.get("external_side_effects", False)}
+                    # Run the legacy reasoning component only; avoid its wider
+                    # workforce/media/development cycle at this integration boundary.
+                    reasoning = brain.reasoning_engine.reason(
+                        objective, context={"source": "brain3", "safe_plan_only": True},
+                        evidence=[], observations=[],
+                    )
+                    result = {"runtime": "legacy_brain", "objective": objective,
+                              "selected_strategy": getattr(reasoning, "selected_strategy", ""),
+                              "confidence": getattr(reasoning, "confidence", 0.0),
+                              "external_side_effects": False}
                 else:
                     result = {"runtime": "legacy_brain", "test": "in_process_contract_passed"}
                 self._sync_legacy_memory(brain)
@@ -132,21 +133,23 @@ class RuntimeAdapterManager:
             self._errors["legacy_brain"] = type(exc).__name__
 
     def _hydrate_v12_memory(self, store: Any) -> None:
-        for key, value in self.kernel.memory_items(prefix="shared:"):
-            store.save_memory(key, value if isinstance(value, str) else __import__("json").dumps(value, ensure_ascii=False))
+        import json
+        for key, value in self.kernel.memory_items(prefix="shared:legacy:"):
+            store.save_memory(f"brain3:shared:legacy:{key.removeprefix('shared:legacy:')}",
+                              json.dumps(value, ensure_ascii=False))
 
     def _sync_v12_memory(self, store: Any) -> None:
         for item in store.memories():
+            if item["key"].startswith("brain3:shared:legacy:"):
+                continue
             self.kernel.memory_set(f"shared:v12:{item['key']}", item["value"])
 
     def _hydrate_legacy_memory(self, brain: Any) -> None:
         from brain_v7.braincore_v2.long_term_cognitive_memory import MemoryNode
-        for key, value in self.kernel.memory_items(prefix="shared:legacy:"):
-            if isinstance(value, dict):
-                try:
-                    brain.memory[key] = MemoryNode(**value)
-                except (TypeError, ValueError):
-                    continue
+        for key, value in self.kernel.memory_items(prefix="shared:v12:"):
+            node_key = f"v12:{key.removeprefix('shared:v12:')}"
+            concept = str(value)
+            brain.memory.setdefault(node_key, MemoryNode(key=node_key, concept=concept))
 
     def _sync_legacy_memory(self, brain: Any) -> None:
         for key, node in brain.memory.items():
