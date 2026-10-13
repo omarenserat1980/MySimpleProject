@@ -95,6 +95,7 @@ from . import media_engine
 from . import visual_engine
 from . import short_video_factory
 from .cloud_bootstrap import bootstrap_status
+from . import cloud_worker_agent
 from .brain.windows_cloud_discovery import discover_windows_cloud_nodes
 from .brain.windows_cloud_secret_gate import check_windows_cloud_secret_readiness
 from .brain import internal_clients
@@ -3267,12 +3268,28 @@ class ArkanSimulationCommand(BaseModel):
     command: str
 
 
+_cloud_worker_thread = None
+
 @app.on_event("startup")
 def background_work_startup():
+    global _cloud_worker_thread
+    # Start the software-only worker in this existing service process so its
+    # verified local heartbeat is produced for /health. No extra Render service.
+    if os.getenv("BRAIN_CLOUD_WORKER_ENABLED", "1").strip() == "1":
+        _cloud_worker_thread = threading.Thread(
+            target=cloud_worker_agent.main,
+            kwargs={"install_signals": False},
+            name="brain-cloud-software-worker",
+            daemon=True,
+        )
+        _cloud_worker_thread.start()
     return background_work.resume_pending()
 
 @app.on_event("shutdown")
 def background_work_shutdown():
+    cloud_worker_agent.request_stop()
+    if _cloud_worker_thread is not None:
+        _cloud_worker_thread.join(timeout=10)
     background_work.shutdown(wait=True)
     close_executor_for_shutdown()
 
