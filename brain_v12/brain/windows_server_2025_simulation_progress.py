@@ -47,7 +47,7 @@ MILESTONES: tuple[dict[str, Any], ...] = (
     {"id": "reproducible_ci_matrix", "weight": 6, "status": "pending",
      "title": "Reproducible CI matrix for simulation scenarios",
      "evidence": "Pending implementation and tests."},
-    {"id": "simulation_contract_audit", "weight": 6, "status": "pending",
+    {"id": "simulation_contract_audit", "weight": 8, "status": "pending",
      "title": "Full simulation contract audit and acceptance gate",
      "evidence": "Pending implementation and tests."},
 )
