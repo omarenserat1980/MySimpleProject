@@ -5,6 +5,8 @@ on:
     paths:
       - "brain/provider_hub/paypal_adapter.py"
       - "brain/provider_hub/test_paypal_adapter.py"
+      - "brain/provider_hub/paypal_evidence_bridge.py"
+      - "brain/provider_hub/test_paypal_evidence_bridge.py"
       - ".github/workflows/brain-paypal-sandbox.yml"
   push:
     branches: ["feat/paypal-sandbox-adapter"]
@@ -25,10 +27,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run isolated PayPal adapter tests
-        run: python -m unittest brain.provider_hub.test_paypal_adapter -v
+      - name: Run isolated PayPal adapter and evidence bridge tests
+        run: python -m unittest brain.provider_hub.test_paypal_adapter brain.provider_hub.test_paypal_evidence_bridge -v
       - name: Record verification boundary
         run: |
-          echo "PAYPAL_ADAPTER_UNIT_TESTS=PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "PAYPAL_ADAPTER_AND_EVIDENCE_BRIDGE_UNIT_TESTS=PASS" >> "$GITHUB_STEP_SUMMARY"
           echo "NETWORK_SANDBOX_TRANSACTION=NOT_PERFORMED" >> "$GITHUB_STEP_SUMMARY"
           echo "LIVE_PAYMENT=NOT_PERFORMED" >> "$GITHUB_STEP_SUMMARY"
