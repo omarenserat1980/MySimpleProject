@@ -156,3 +156,12 @@ jobs:
             brain6_artifacts/supervisor/state.json
             brain6_artifacts/film_supervisor_trace.json
           if-no-files-found: error
+
+
+      - name: Upload dedicated private cinema master
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-cinema-master-private
+          path: /tmp/last-light/last_light_city.mp4
+          if-no-files-found: error
+          retention-days: 7
