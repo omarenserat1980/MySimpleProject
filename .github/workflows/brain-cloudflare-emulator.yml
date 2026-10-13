@@ -1,0 +1,49 @@
+name: Brain Cloudflare Emulator Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare/brain-api/**"
+      - "docs/architecture/BRAIN_CLOUDFLARE_EMULATOR_FIRST.md"
+      - ".github/workflows/brain-cloudflare-emulator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloudflare-emulator
+  cancel-in-progress: true
+
+jobs:
+  emulator-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRAIN_CLOUDFLARE_MODE: emulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify emulator-first mode
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          bash -n scripts/brain-cloudflare-mode.sh
+          bash scripts/brain-cloudflare-mode.sh status | tee /tmp/brain-mode.log
+          grep -Fq 'BRAIN_CLOUDFLARE_MODE=emulator' /tmp/brain-mode.log
+          grep -Fq 'CREDENTIALS_REQUIRED=FALSE' /tmp/brain-mode.log
+      - name: Run isolated static gates without cloud credentials
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          test -z "${CLOUDFLARE_API_TOKEN:-}"
+          test -z "${CLOUDFLARE_ACCOUNT_ID:-}"
+          node --check src/index.js
+          node test/cloudflare_deploy_static.test.js
+          node test/commercial_worker_static.test.js
+          node test/cinema_worker_static.test.js
+          echo "BRAIN_CLOUDFLARE_EMULATOR_GATE=PASS"
+          echo "LIVE_CLOUDFLARE_USED=FALSE"
