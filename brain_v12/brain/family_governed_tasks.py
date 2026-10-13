@@ -25,7 +25,8 @@ TASK_POLICY = {
 class FamilyGovernedTaskService:
     """Policy-aware facade for enqueuing work and recording policy decisions."""
 
-    def __init__(self, queue: Any, governance: FamilyGovernance | None = None,\n                 approval_verifier: FamilyApprovalVerifier | None = None):
+    def __init__(self, queue: Any, governance: FamilyGovernance | None = None,
+                 approval_verifier: FamilyApprovalVerifier | None = None):
         self.queue = queue
         self.governance = governance or FamilyGovernance()
         self.approval_verifier = approval_verifier or DenyAllFamilyApprovalVerifier()
