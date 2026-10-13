@@ -15,6 +15,10 @@ on:
     paths:
       - "brain/provider_hub/paypal_adapter.py"
       - "brain/provider_hub/test_paypal_adapter.py"
+      - "brain/provider_hub/paypal_evidence_bridge.py"
+      - "brain/provider_hub/test_paypal_evidence_bridge.py"
+      - "brain/provider_hub/paypal_commercial_flow.py"
+      - "brain/provider_hub/test_paypal_commercial_flow.py"
       - ".github/workflows/brain-paypal-sandbox.yml"
   workflow_dispatch:
 
