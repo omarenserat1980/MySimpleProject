@@ -2,7 +2,7 @@
 module tb_brain_asic_core;
   localparam int WIDTH = 32;
   logic clk = 0;
-  logic rst_n = 0;
+  logic rst_n = 1;
   logic [2:0] opcode;
   logic [WIDTH-1:0] operand_a, operand_b;
   logic [WIDTH-1:0] result;
@@ -39,6 +39,7 @@ module tb_brain_asic_core;
 
   initial begin
     opcode = 0; operand_a = 0; operand_b = 0;
+    #1 rst_n = 0;
     #2;
     if (result !== '0 || zero !== 1'b1) $fatal(1, "reset failed");
     rst_n = 1;
