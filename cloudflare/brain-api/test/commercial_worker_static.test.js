@@ -46,6 +46,7 @@ assert.match(auditMigration, /CREATE TABLE IF NOT EXISTS order_events/);
 
 assert.match(worker, /REVENUE_REALIZED/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "payment callback must not report revenue realized before delivery");
 assert.match(worker, /Realize revenue only after a verified payment and a delivery confirmation/);
 assert.match(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/);
 
