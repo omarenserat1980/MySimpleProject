@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 import threading
 import time
 import uuid
@@ -37,7 +38,7 @@ class PersistentTaskQueue:
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.execute(
                 """CREATE TABLE IF NOT EXISTS tasks (
@@ -92,7 +93,7 @@ class PersistentTaskQueue:
         now = time.time()
         task_id = str(uuid.uuid4())
         payload = json.dumps(task, separators=(",", ":"), allow_nan=False)
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
                 if idempotency_key:
@@ -120,7 +121,7 @@ class PersistentTaskQueue:
         """Claim the oldest task; expired RUNNING leases return to PENDING."""
         now = time.time()
         token = str(uuid.uuid4())
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute("BEGIN IMMEDIATE")
             try:
                 db.execute(
@@ -156,7 +157,7 @@ class PersistentTaskQueue:
         now = time.time()
         payload = json.dumps(result, separators=(",", ":"), allow_nan=False)
         status = "COMPLETED" if result.get("ok") else "FAILED"
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             changed = db.execute(
                 """UPDATE tasks SET status=?, result_json=?, updated_at=?,
                           lease_until=NULL, lease_token=NULL
@@ -166,7 +167,7 @@ class PersistentTaskQueue:
         return changed == 1
 
     def get(self, task_id: str) -> dict[str, Any] | None:
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             row = db.execute(
                 "SELECT task_id, task_json, status, created_at, updated_at, attempts, result_json "
                 "FROM tasks WHERE task_id=?", (task_id,)
@@ -181,7 +182,7 @@ class PersistentTaskQueue:
         }
 
     def counts(self) -> dict[str, int]:
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             rows = db.execute("SELECT status, COUNT(*) AS n FROM tasks GROUP BY status").fetchall()
         result = {key: 0 for key in ("PENDING", "RUNNING", "COMPLETED", "FAILED")}
         result.update({row["status"]: int(row["n"]) for row in rows})
@@ -189,7 +190,7 @@ class PersistentTaskQueue:
 
     def record_heartbeat(self, state: str) -> dict[str, Any]:
         now = time.time()
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             db.execute(
                 """UPDATE node_state SET heartbeat_sequence=heartbeat_sequence+1,
                           heartbeat_at=?, state=? WHERE node_id=?""",
@@ -203,7 +204,7 @@ class PersistentTaskQueue:
                 "timestamp": float(row["heartbeat_at"]), "state": row["state"]}
 
     def heartbeat_status(self) -> dict[str, Any]:
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             row = db.execute(
                 "SELECT heartbeat_sequence, heartbeat_at, state FROM node_state WHERE node_id=?",
                 (NODE_ID,),
