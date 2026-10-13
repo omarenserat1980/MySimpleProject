@@ -27,6 +27,15 @@ jobs:
         run: python -m pip install --disable-pip-version-check pytest
       - name: Test Huda identity and safety boundaries
         run: python -m pytest -q brain_v12/tests/test_opennebula_cloud_preflight.py
+      - name: Enforce Huda host identity exclusion
+        run: |
+          python - <<'PY'
+          import platform
+          host = platform.node().strip().lower()
+          if "arkan" in host or "ark-an" in host:
+              raise SystemExit("ARKAN_FORBIDDEN: refusing to run Huda cloud operations on Arkan")
+          print("Huda CI host identity exclusion passed")
+          PY
       - name: Confirm this runner is not a provisioned cloud
         run: |
           python - <<'PY'
