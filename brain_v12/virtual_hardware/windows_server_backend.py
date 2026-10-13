@@ -33,87 +33,25 @@ class QemuWindowsBackend:
     def prepare_iso(self) -> dict:
         """Real media preparation is disabled; use the software simulator."""
         raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
-        if self.iso_path and Path(self.iso_path).is_file():
-            return {"ok": True, "status": "LOCAL_ISO_PRESENT", "path": self.iso_path}
-        if not self.iso_url:
-            raise ValueError("ISO_PATH_OR_OFFICIAL_URL_REQUIRED")
-        if not self.iso_sha256:
-            raise ValueError("ISO_SHA256_REQUIRED")
-        cache_dir = Path(self.iso_cache_dir).expanduser()
-        destination = Path(self.iso_path).expanduser() if self.iso_path else (
-            cache_dir / "WindowsServer2025.iso"
-        )
-        result = download_official_windows_iso(
-            self.iso_url, destination, expected_sha256=self.iso_sha256
-        )
-        self.iso_path = str(destination)
-        return result
 
     def command(self, install: bool = True) -> list[str]:
         raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
-        if not self.disk_path:
-            raise ValueError("DISK_PATH_REQUIRED")
-        cmd = [
-            self.qemu_binary, "-machine", self.machine, "-m", self.memory,
-            "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd",
-            "-smp", str(self.cpus), "-drive", f"file={self.disk_path},format=qcow2,if=virtio",
-            "-netdev", "user,id=net0", "-device", "virtio-net-pci,netdev=net0",
-            "-display", "none", "-serial", "stdio",
-        ]
-        if install:
-            if not self.iso_path:
-                raise ValueError("ISO_PATH_REQUIRED")
-            cmd += ["-cdrom", self.iso_path, "-boot", "order=d"]
-        return cmd
 
     def inspect(self) -> dict:
         return {
             "ok": True,
-            "backend": "qemu-system-x86_64",
-            "available": self.available(),
-            "binary": shutil.which(self.qemu_binary),
-            "memory": self.memory,
-            "cpus": self.cpus,
-            "machine": self.machine,
-            "disk": self.disk_path,
-            "iso": self.iso_path,
-            "iso_url_configured": bool(self.iso_url),
-            "iso_sha256_configured": bool(self.iso_sha256),
-            "iso_source_policy": "https-microsoft-hosts-only",
+            "backend": "software-simulator-only",
+            "available": False,
+            "binary": None,
+            "execution_mode": "SIMULATION_ONLY",
+            "real_windows_boot_verified": False,
+            "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
         }
 
     def run(self, install: bool = True, timeout: int = 300) -> dict:
-        return {"ok": False, "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY", "execution_mode": "SIMULATION_ONLY", "real_windows_boot_verified": False}
-        if not self.available():
-            return {"ok": False, "status": "QEMU_NOT_AVAILABLE", "inspection": self.inspect()}
-        media = None
-        if install:
-            try:
-                media = self.prepare_iso()
-            except (OSError, RuntimeError, ValueError) as exc:
-                # Helper errors are deliberately token-free and do not expose
-                # the direct download URL.
-                return {
-                    "ok": False,
-                    "status": "WINDOWS_MEDIA_PREPARATION_FAILED",
-                    "reason": str(exc),
-                    "inspection": self.inspect(),
-                }
-        cmd = self.command(install)
-        try:
-            p = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout, check=False)
-        except subprocess.TimeoutExpired as exc:
-            return {
-                "ok": False, "status": "QEMU_TIMEOUT",
-                "stdout": exc.stdout or "", "stderr": exc.stderr or "",
-                "command": cmd, "media": media,
-            }
         return {
-            "ok": p.returncode == 0,
-            "status": "QEMU_EXITED" if p.returncode == 0 else "QEMU_FAILED",
-            "returncode": p.returncode,
-            "stdout": p.stdout,
-            "stderr": p.stderr,
-            "command": cmd,
-            "media": media,
+            "ok": False,
+            "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+            "execution_mode": "SIMULATION_ONLY",
+            "real_windows_boot_verified": False,
         }
