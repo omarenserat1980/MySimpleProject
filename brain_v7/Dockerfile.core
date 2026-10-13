@@ -1,10 +1,12 @@
+# Compatibility image name retained for existing deployment references.
+# Runtime is Brain V12 only; the retired V7 factory is not an entrypoint.
 FROM python:3.12-slim
 WORKDIR /app
 COPY . .
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir -r brain_v7/requirements.txt
+    && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir -r brain_v12/requirements.txt
 ENV PYTHONPATH=/app
-ENV BRAIN_SLEEP_SECONDS=60
-CMD ["python","-c","from brain_v7.braincore_v2.fully_autonomous_runtime import run_forever; run_forever()"]
+ENV PORT=8012
+CMD ["python", "-m", "brain_v12.app"]
