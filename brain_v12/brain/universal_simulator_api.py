@@ -62,7 +62,7 @@ _SIMULATOR_CATALOG: dict[str, dict[str, Any]] = {
     "powershell-brain": {
         "name": "PowerShell Brain Simulator",
         "kind": "virtual_execution",
-        "evidence_paths": ["brain_v12/brain/remote_fabric.py", "brain_v12/brain/virtual_hardware/windows_server_backend.py"],
+        "evidence_paths": ["brain_v12/brain/powershell_emulator.py", "brain_v12/tests/test_powershell_emulator.py"],
         "capabilities": ["simulated_commands", "diagnostics", "script_proposals"],
     },
     "virtual-hardware-brain": {
