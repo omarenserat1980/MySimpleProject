@@ -76,6 +76,8 @@ ul{padding-left:20px}li{margin:8px 0}
 <p><small>Real Windows boot verified</small><br><strong class="fail">false</strong></p>
 <p><small>Evidence verification</small><br><strong id="verify">—</strong></p>
 <p><small>Recovery status</small><br><strong id="recovery">—</strong></p>
+<p><small>Simulation implementation progress</small><br><strong id="progress">18% · weighted roadmap</strong></p>
+<p><small>Progress meaning</small><br><span class="muted">Implementation coverage only; not proof of real Windows boot.</span></p>
 </section>
 </div>
 <div class="grid">
@@ -119,6 +121,8 @@ ul{padding-left:20px}li{margin:8px 0}
       set("runid", report.run_id);
       set("verify", report.verification && report.verification.status);
       set("recovery", report.recovery_status);
+      const progress = report.implementation_progress;
+      set("progress", progress ? (progress.percent + "% · weighted roadmap") : "18% · weighted roadmap");
       el("resources").textContent = JSON.stringify({
         simulated_resources:report.simulated_resources,
         host_observed_resources:report.host_observed_resources
