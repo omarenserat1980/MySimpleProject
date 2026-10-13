@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from threading import RLock
 from typing import Any
+from pathlib import Path
+import tempfile
 
 from .unified_kernel import ComponentAdapter, UnifiedBrainKernel
 
@@ -47,7 +49,8 @@ class RuntimeAdapterManager:
             from brain_v12.brain.builder import SoftwareBuilder
             from brain_v12.brain.orchestrator import CognitiveOrchestrator
 
-            store = MemoryStore(":memory:")
+            tempdir = tempfile.TemporaryDirectory(prefix="brain3-v12-")
+            store = MemoryStore(str(Path(tempdir.name) / "memory.sqlite3"))
             store.init()
             core = BrainCore(store)
             builder = SoftwareBuilder()
@@ -81,11 +84,11 @@ class RuntimeAdapterManager:
                 handler=handle,
                 verified=True,
             ))
-            self._instances["brain_v12"] = {"store": store, "core": core, "orchestrator": orchestrator}
+            self._instances["brain_v12"] = {"store": store, "core": core, "orchestrator": orchestrator, "tempdir": tempdir}
             self._errors.pop("brain_v12", None)
             self._sync_v12_memory(store)
         except Exception as exc:
-            self._errors["brain_v12"] = type(exc).__name__
+            self._errors["brain_v12"] = f"{type(exc).__name__}: {exc}"
 
     def _initialize_legacy(self) -> None:
         if "legacy_brain" in self._instances:
@@ -136,7 +139,7 @@ class RuntimeAdapterManager:
             self._errors.pop("legacy_brain", None)
             self._sync_legacy_memory(brain)
         except Exception as exc:
-            self._errors["legacy_brain"] = type(exc).__name__
+            self._errors["legacy_brain"] = f"{type(exc).__name__}: {exc}"
 
     def _hydrate_v12_memory(self, store: Any) -> None:
         import json
