@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from .initial_software_node import ALLOWED_TASKS, InitialSoftwareNode, NODE_ID
+from .family_governed_tasks import FamilyGovernedTaskService
+from .family_governance import FamilyApproval
 
 SCHEMA = "electronic-brain.software-node-agent.v1"
 DEFAULT_LEASE_SECONDS = 60.0
@@ -234,6 +236,7 @@ class SoftwareNodeAgent:
         self.root.mkdir(parents=True, exist_ok=True)
         default_db = self.root.parent / f".{self.root.name}-brain-agent.sqlite3"
         self.queue = PersistentTaskQueue(database_path or default_db, lease_seconds=lease_seconds)
+        self.task_service = FamilyGovernedTaskService(self.queue)
         self.node = InitialSoftwareNode(self.root)
         self.heartbeat_interval = float(heartbeat_interval)
         self.poll_interval = float(poll_interval)
@@ -275,6 +278,18 @@ class SoftwareNodeAgent:
                 self._last_worker_error = f"WORKER_LOOP_ERROR:{type(exc).__name__}"
             self._stop_event.wait(self.poll_interval)
 
+    def enqueue(
+        self,
+        task: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+        approval: FamilyApproval | None = None,
+    ) -> dict[str, Any]:
+        """Enqueue via the family policy gate; use this instead of raw queue access."""
+        return self.task_service.enqueue(
+            task, idempotency_key=idempotency_key, approval=approval
+        )
+
     def run_once(self) -> dict[str, Any]:
         if not self._started:
             return {"ok": False, "status": "AGENT_NOT_STARTED", "node_id": NODE_ID}
@@ -299,6 +314,8 @@ class SoftwareNodeAgent:
             "execution_mode": "SANDBOXED_SOFTWARE_TASKS",
             "heartbeat": self.queue.heartbeat_status(),
             "queue": self.queue.counts(),
+            "family_policy_gate": "ENFORCED_BY_AGENT_ENQUEUE_FACADE",
+            "family_policy_audit_events": len(self.task_service.audit_log),
             "queue_storage": "LOCAL_SQLITE_DURABLE_ON_THIS_FILESYSTEM",
             "distributed_queue": False,
             "physical_host_contacted": False,
