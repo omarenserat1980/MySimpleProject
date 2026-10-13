@@ -10,20 +10,11 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
 MIN_RAM_GIB = 8
 MIN_FREE_DISK_GIB = 40
-
-
-def command_output(args: list[str]) -> tuple[bool, str]:
-    try:
-        result = subprocess.run(args, check=True, capture_output=True, text=True, timeout=10)
-        return True, (result.stdout or result.stderr).strip()
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, str(exc)
 
 
 def check(name: str, ok: bool, detail: str, required: bool = True) -> dict[str, Any]:
@@ -58,7 +49,7 @@ def main() -> int:
     else:
         disk_error = ""
     checks.append(check("free_disk", free_gib >= MIN_FREE_DISK_GIB,
-                        f"{free_gib:.2f} GiB free; required >= {MIN_FREE_DISK_GIB} GiB" + (f"; {disk_error}" if disk_error else "")))
+                        f"{free_gib:.2f} GiB free on the current working filesystem; required >= {MIN_FREE_DISK_GIB} GiB" + (f"; {disk_error}" if disk_error else "")))
 
     kvm = Path("/dev/kvm")
     checks.append(check("kvm_device", kvm.exists() and os.access(kvm, os.R_OK | os.W_OK),
@@ -68,8 +59,9 @@ def main() -> int:
         checks.append(check(f"cli_{binary}", bool(path), path or f"{binary} not found in PATH"))
 
     endpoint = os.environ.get("ONE_XMLRPC", "").strip()
+    # Never echo the endpoint: it may contain credentials or sensitive query parameters.
     checks.append(check("opennebula_endpoint", bool(endpoint),
-                        endpoint if endpoint else "ONE_XMLRPC is unset; configure the OpenNebula XML-RPC endpoint"))
+                        "ONE_XMLRPC configured (value redacted)" if endpoint else "ONE_XMLRPC is unset; configure the OpenNebula XML-RPC endpoint"))
     user = os.environ.get("ONE_AUTH", "").strip()
     auth_file = Path(user.split(":", 1)[0]).expanduser() if ":" not in user and user else None
     auth_configured = bool(user) and (":" in user or (auth_file is not None and auth_file.is_file()))
