@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
 import time
 from pathlib import Path
 
@@ -36,7 +37,9 @@ def _write_heartbeat(path: Path, state: str, **extra: object) -> None:
     tmp.replace(path)
 
 
-def run_forever() -> None:
+def run_forever(stop_event: threading.Event | None = None) -> None:
+    """Run until the service requests shutdown, preserving truthful heartbeat state."""
+    stop_event = stop_event or threading.Event()
     os.environ.setdefault("BRAIN_INTERNAL_RUNNER_FLAG", "1")
     runtime_home = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
     root = Path(os.getenv("BRAIN_RUNTIME_ROOT", str(runtime_home / "cloud-runtime"))).expanduser()
@@ -64,7 +67,7 @@ def run_forever() -> None:
         preflight=preflight.evidence(),
     )
     try:
-        while True:
+        while not stop_event.is_set():
             _write_heartbeat(
                 heartbeat,
                 "RUNNING",
@@ -79,7 +82,14 @@ def run_forever() -> None:
                     f"evidence={result.get('evidence_ref')}",
                     flush=True,
                 )
-            time.sleep(poll)
+            if stop_event.wait(poll):
+                break
+        _write_heartbeat(
+            heartbeat,
+            "STOPPED",
+            poll_seconds=poll,
+            preflight=preflight.evidence(),
+        )
     except BaseException as exc:
         _write_heartbeat(heartbeat, "FAILED", error=str(exc)[:1000])
         raise
