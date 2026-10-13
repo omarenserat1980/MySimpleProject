@@ -19,15 +19,15 @@ on:
       - "brain_v12/brain/bitcoin_mining_intelligence_api.py"
       - "brain_v12/tests/test_mining_engine.py"
       - "brain_v12/tests/test_bitcoin_mining_intelligence_api.py"
+      - "brain_v12/tests/test_asic_resource_adapter.py"
+      - "brain_v12/tests/test_asic_hardware_simulator.py"
+      - "brain_v12/tests/test_asic_prototype_toolchain.py"
       - "brain_v12/brain/capability_registry.py"
       - "brain_v12/brain/health_probe.py"
       - "brain_v12/brain/task_engine.py"
       - "brain_v12/brain/worker_registry.py"
       - "brain_v12/brain/evidence_store.py"
-      - "brain_v12/tests/test_asic_resource_adapter.py"
-      - "brain_v12/tests/test_asic_hardware_simulator.py"
       - "brain_v12/asic/**"
-      - "brain_v12/tests/test_asic_prototype_toolchain.py"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
   workflow_dispatch:
 
@@ -42,7 +42,7 @@ jobs:
   policy-and-evidence-tests:
     name: Policy, contract and evidence tests (no provisioning)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,10 +66,10 @@ jobs:
             brain_v12/asic/toolchain_probe.py
 
       - name: Install ASIC test runner
-        run: python -m pip install pytest
+        run: python -m pip install --disable-pip-version-check pytest
 
       - name: Install API test dependencies
-        run: python -m pip install fastapi pydantic
+        run: python -m pip install --disable-pip-version-check fastapi pydantic
 
       - name: Run mining economics and profit-gate tests
         env:
@@ -79,36 +79,39 @@ jobs:
             brain_v12.tests.test_mining_engine \
             brain_v12.tests.test_bitcoin_mining_intelligence_api -v
 
+      - name: Install open-source RTL simulator
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+          iverilog -V
+
       - name: Probe optional RTL toolchain
         env:
           PYTHONPATH: .
         run: python -m brain_v12.asic.toolchain_probe
 
-      - name: Run RTL testbench when a simulator is available
-        shell: bash
+      - name: Run mandatory RTL testbench
         run: |
-          if command -v iverilog >/dev/null 2>&1; then
-            iverilog -g2012 -s brain_asic_core_tb -o /tmp/brain_asic_core_tb.vvp \
-              brain_v12/asic/rtl/brain_asic_core.sv \
-              brain_v12/asic/rtl/brain_asic_core_tb.sv
-            vvp /tmp/brain_asic_core_tb.vvp
-          elif command -v verilator >/dev/null 2>&1; then
-            verilator --binary --timing -Wno-fatal --top-module brain_asic_core_tb \
-              brain_v12/asic/rtl/brain_asic_core.sv \
-              brain_v12/asic/rtl/brain_asic_core_tb.sv
-            ./obj_dir/Vbrain_asic_core_tb
-          else
-            echo "RTL_SIMULATION_BLOCKED: neither iverilog nor verilator is installed; no RTL pass is claimed."
-          fi
+          set -euo pipefail
+          mkdir -p artifacts/asic
+          iverilog -g2012 -Wall -s brain_asic_core_tb \
+            -o artifacts/asic/brain_asic_core_tb.vvp \
+            brain_v12/asic/rtl/brain_asic_core.sv \
+            brain_v12/asic/rtl/brain_asic_core_tb.sv
+          vvp artifacts/asic/brain_asic_core_tb.vvp | tee artifacts/asic/rtl-simulation.log
+          grep -q "ASIC_RTL_TB_PASS" artifacts/asic/rtl-simulation.log
 
       - name: Run ASIC simulator regression tests
         env:
           PYTHONPATH: .
         run: |
+          set -euo pipefail
           python -m pytest -q \
             brain_v12/tests/test_asic_hardware_simulator.py \
             brain_v12/tests/test_asic_resource_adapter.py \
             brain_v12/tests/test_asic_prototype_toolchain.py
+
       - name: Run focused tests
         env:
           PYTHONPATH: .
@@ -119,3 +122,11 @@ jobs:
             brain_v12.tests.test_run_evidence_store \
             brain_v12.tests.test_android_executor_adapter \
             brain_v12.tests.test_device_bridge_android_capacity -v
+
+      - name: Upload RTL simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-orchestrator-rtl-evidence
+          path: artifacts/asic/
+          if-no-files-found: warn
