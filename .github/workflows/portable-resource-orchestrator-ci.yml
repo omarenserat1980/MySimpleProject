@@ -79,6 +79,28 @@ jobs:
             brain_v12.tests.test_mining_engine \
             brain_v12.tests.test_bitcoin_mining_intelligence_api -v
 
+      - name: Probe optional RTL toolchain
+        env:
+          PYTHONPATH: .
+        run: python -m brain_v12.asic.toolchain_probe
+
+      - name: Run RTL testbench when a simulator is available
+        shell: bash
+        run: |
+          if command -v iverilog >/dev/null 2>&1; then
+            iverilog -g2012 -s brain_asic_core_tb -o /tmp/brain_asic_core_tb.vvp \
+              brain_v12/asic/rtl/brain_asic_core.sv \
+              brain_v12/asic/rtl/brain_asic_core_tb.sv
+            vvp /tmp/brain_asic_core_tb.vvp
+          elif command -v verilator >/dev/null 2>&1; then
+            verilator --binary --timing -Wno-fatal --top-module brain_asic_core_tb \
+              brain_v12/asic/rtl/brain_asic_core.sv \
+              brain_v12/asic/rtl/brain_asic_core_tb.sv
+            ./obj_dir/Vbrain_asic_core_tb
+          else
+            echo "RTL_SIMULATION_BLOCKED: neither iverilog nor verilator is installed; no RTL pass is claimed."
+          fi
+
       - name: Run ASIC simulator regression tests
         env:
           PYTHONPATH: .
