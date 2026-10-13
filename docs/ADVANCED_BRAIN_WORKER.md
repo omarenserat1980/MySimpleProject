@@ -41,7 +41,7 @@ python -m pytest brain_v12/tests/test_advanced_worker.py -q
 
 ## ChatGPT suggestion handoff
 
-The authenticated endpoint `POST /api/brain/suggestions/{suggestion_id}/worker-candidate` converts a persisted suggestion into a **candidate only**. The caller supplies a requested `capability`; the endpoint uses the existing suggestion store and `evaluate_suggestion_handoff` policy.
+The authenticated endpoint `POST /api/brain/suggestions/{suggestion_id}/worker-candidate` converts a persisted suggestion into a durable SQLite-backed **candidate only**. The caller supplies a requested `capability`; the endpoint uses the existing suggestion store and `evaluate_suggestion_handoff` policy.
 
 Admission to this handoff requires:
 - a known suggestion in `APPROVED` status;
@@ -49,7 +49,7 @@ Admission to this handoff requires:
 - a test plan and rollback plan;
 - an explicit target capability.
 
-The endpoint does not enqueue or execute work, and always returns `execution_authorized=false` and `windows_boot_verified=false`. A request for `windows-server-2025-real-boot` is denied at this stage; it must go through the separate AdvancedWorker trusted-proof verifier and the existing authorized execution gateway. The ChatGPT model output itself is untrusted advisory data and never grants permission.
+The endpoint records one candidate per suggestion idempotently. A second request with the same capability reuses the record; a conflicting capability is rejected. Read it back through the authenticated `GET /api/brain/suggestions/worker-candidates/{candidate_id}` endpoint. The endpoint does not enqueue or execute work, and always returns `execution_authorized=false` and `windows_boot_verified=false`. A request for `windows-server-2025-real-boot` is denied at this stage; it must go through the separate AdvancedWorker trusted-proof verifier and the existing authorized execution gateway. The ChatGPT model output itself is untrusted advisory data and never grants permission.
 
 Example request body:
 ```json
