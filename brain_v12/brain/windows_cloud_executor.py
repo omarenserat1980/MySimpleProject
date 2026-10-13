@@ -46,18 +46,13 @@ class WindowsCloudExecutor:
         self.provider = provider
 
     def readiness(self) -> dict[str, Any]:
-        if self.provider is None:
-            return {
-                "status": "NOT_CONFIGURED",
-                "ready": False,
-                "executor": self.capability,
-                "reason": "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED",
-            }
         return {
-            "status": "CONFIGURED",
-            "ready": True,
+            "status": "DISABLED_SIMULATION_ONLY",
+            "ready": False,
             "executor": self.capability,
-            "provider": self.provider.name,
+            "reason": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+            "execution_mode": "SIMULATION_ONLY",
+            "real_windows_boot_verified": False,
         }
 
     def provision(self, **kwargs: Any) -> CloudWindowsVM:
