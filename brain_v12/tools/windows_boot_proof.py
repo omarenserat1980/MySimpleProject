@@ -29,10 +29,12 @@ def _json(path: Path) -> dict[str, Any]:
 
 def verify_boot(*, evidence_path: Path, marker_path: Path, phase_path: Path,
                 contract_gate_path: Path, executor_gate_path: Path,
-                expected_run_id: str) -> dict[str, Any]:
+                expected_run_id: str, guest_evidence_path: Path | None = None,
+                trusted_iso_sha256: str = "") -> dict[str, Any]:
     reasons: list[str] = []
     try:
         evidence = _json(evidence_path)
+        guest_evidence = _json(guest_evidence_path) if guest_evidence_path else {}
         contract_gate = _json(contract_gate_path)
         executor_gate = _json(executor_gate_path)
         marker = marker_path.read_text(encoding="utf-8-sig").strip()
@@ -40,6 +42,7 @@ def verify_boot(*, evidence_path: Path, marker_path: Path, phase_path: Path,
     except (ValueError, OSError) as exc:
         reasons.append(str(exc))
         evidence = {}
+        guest_evidence = {}
         contract_gate = {}
         executor_gate = {}
         marker = ""
@@ -56,6 +59,35 @@ def verify_boot(*, evidence_path: Path, marker_path: Path, phase_path: Path,
         reasons.append("INSTALLED_DISK_BOOT_PHASE_MISSING")
     if "BOOT_SOURCE=windows-installed-disk" not in phase:
         reasons.append("INSTALLED_DISK_SOURCE_MISSING")
+
+    # Validate the untouched guest-written file independently of the host-enriched
+    # combined evidence. Host-side fields must never substitute for guest evidence.
+    if guest_evidence_path is not None:
+        raw_guest = guest_evidence.get("guest") or {}
+        raw_network = guest_evidence.get("network") or {}
+        raw_storage = guest_evidence.get("storage") or {}
+        if guest_evidence.get("schema") != "BRAIN-WINDOWS-BOOT-EVIDENCE-1":
+            reasons.append("RAW_GUEST_EVIDENCE_SCHEMA_INVALID")
+        if guest_evidence.get("status") != "WINDOWS_BOOT_VERIFIED":
+            reasons.append("RAW_GUEST_EVIDENCE_STATUS_INVALID")
+        if raw_guest.get("os") != "Windows Server 2025" or raw_guest.get("boot_verified") is not True:
+            reasons.append("RAW_GUEST_OS_BOOT_NOT_PROVEN")
+        if raw_guest.get("architecture") not in {"AMD64", "x86_64"}:
+            reasons.append("RAW_GUEST_ARCHITECTURE_INVALID")
+        if not raw_guest.get("boot_time") or not raw_guest.get("version") or not raw_guest.get("build"):
+            reasons.append("RAW_GUEST_BOOT_METADATA_MISSING")
+        if raw_network.get("adapter_up") is not True or raw_network.get("internet_443") is not True:
+            reasons.append("RAW_GUEST_NETWORK_NOT_VERIFIED")
+        if not raw_storage.get("filesystem") or int(raw_storage.get("size_bytes") or 0) < 32 * 1024**3:
+            reasons.append("RAW_GUEST_SYSTEM_DISK_NOT_VERIFIED")
+
+    trusted_hash = str(trusted_iso_sha256 or "").strip().lower()
+    media_hash = str((evidence.get("media") or {}).get("sha256", "")).strip().lower()
+    if trusted_hash:
+        if len(trusted_hash) != 64 or any(c not in "0123456789abcdef" for c in trusted_hash):
+            reasons.append("TRUSTED_ISO_SHA256_INVALID")
+        elif media_hash != trusted_hash:
+            reasons.append("TRUSTED_ISO_SHA256_MISMATCH")
 
     guest = evidence.get("guest") or {}
     if evidence.get("schema") != "BRAIN-WINDOWS-BOOT-EVIDENCE-1":
@@ -128,6 +160,10 @@ def main() -> int:
     parser.add_argument("--contract-gate", default="windows-execution-contract-gate.json")
     parser.add_argument("--executor-gate", default="cloud-executor-gate.json")
     parser.add_argument("--run-id", default=os.environ.get("GITHUB_RUN_ID", ""))
+    parser.add_argument("--guest-evidence", default="windows-boot-evidence.json",
+                        help="Untouched JSON written by the Windows guest onto the evidence disk.")
+    parser.add_argument("--trusted-iso-sha256", default=os.environ.get("TRUSTED_ISO_SHA256_INPUT", ""),
+                        help="Independently verified Microsoft SHA-256 for the downloaded ISO.")
     parser.add_argument("--output", default="windows-boot-proof.json")
     args = parser.parse_args()
 
@@ -135,6 +171,8 @@ def main() -> int:
         evidence_path=Path(args.evidence), marker_path=Path(args.marker),
         phase_path=Path(args.phase), contract_gate_path=Path(args.contract_gate),
         executor_gate_path=Path(args.executor_gate), expected_run_id=args.run_id,
+        guest_evidence_path=Path(args.guest_evidence),
+        trusted_iso_sha256=args.trusted_iso_sha256,
     )
     Path(args.output).write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2, sort_keys=True))
