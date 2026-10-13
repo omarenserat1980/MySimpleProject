@@ -97,6 +97,7 @@ class BrainExecutionGateway:
         heartbeat_timeout: float = 120.0,
         now: float | None = None,
     ) -> ExecutionDecision:
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         verification = WindowsCloudExecutor().verify_runtime(
             vm,
             node,
@@ -121,6 +122,8 @@ class BrainExecutionGateway:
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionDecision:
         metadata = metadata or {}
+        if capability in {WINDOWS_REAL_BOOT, WINDOWS_NATIVE_EXECUTOR, WINDOWS_CLOUD, WINDOWS_CLOUD_NATIVE}:
+            raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         if capability == WINDOWS_NATIVE_EXECUTOR:
             contract = _native_contract_from_metadata(metadata)
             contract.validate()
