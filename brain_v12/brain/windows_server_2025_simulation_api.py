@@ -1,6 +1,6 @@
 """Authenticated API for isolated Windows Server 2025 simulation sessions.
 
-All results are process-local and explicitly synthetic. This router never invokes
+Run reports are persisted locally and explicitly synthetic. This router never invokes
 a real executor, hypervisor, cloud API, or host agent.
 """
 from __future__ import annotations
@@ -14,7 +14,6 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
-from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .control_auth import require_control_key
