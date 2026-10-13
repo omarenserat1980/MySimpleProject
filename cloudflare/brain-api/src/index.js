@@ -441,6 +441,7 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   if (!delivery) return json({ ok: false, error: "DELIVERY_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (delivery.state !== "READY") return json({ ok: false, error: "DELIVERY_NOT_READY" }, 409, requestOrigin, allowedOrigin);
 
+  // Realize revenue only after a verified payment and a delivery confirmation.
   // Verify the exact provider transaction and amount/currency before changing delivery state.
   const payment = await env.BRAIN_DB.prepare(
     "SELECT p.tran_ref, p.amount, p.currency, p.raw_evidence FROM payments p WHERE p.order_id = ? AND p.provider = 'paytabs' AND p.state = 'PAYMENT_VERIFIED' AND p.amount = ? AND p.currency = ? ORDER BY p.verified_at DESC LIMIT 1"
