@@ -46,11 +46,15 @@ class PersistentTaskQueueTests(unittest.TestCase):
                 idempotency_key="write-result",
             )
             self.assertEqual(agent.run_once()["status"], "AGENT_NOT_STARTED")
-            agent.start()
-            processed = agent.run_once()
-            self.assertTrue(processed["ok"], processed)
+            started = agent.start()
+            self.assertTrue(started["task_worker_alive"])
+            deadline = time.monotonic() + 2.0
             record = agent.queue.get(queued["task_id"])
-            self.assertEqual(record["status"], "COMPLETED")
+            while record["status"] not in ("COMPLETED", "FAILED") and time.monotonic() < deadline:
+                time.sleep(0.02)
+                record = agent.queue.get(queued["task_id"])
+            self.assertEqual(record["status"], "COMPLETED", record)
+            self.assertTrue(agent.status()["task_worker_alive"])
             self.assertTrue(record["result"]["ok"])
             self.assertEqual((root / "result.txt").read_text(encoding="utf-8"), "durable")
             self.assertEqual(agent.status()["queue"]["COMPLETED"], 1)
