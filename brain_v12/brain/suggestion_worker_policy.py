@@ -71,3 +71,91 @@ def evaluate_suggestion_handoff(
         "execution_authorized": False,
         "windows_boot_verified": False,
     }
+
+
+import json
+import sqlite3
+from pathlib import Path
+
+
+class SuggestionWorkerCandidateStore:
+    """Persist advisory work candidates without queuing or executing them."""
+
+    def __init__(self, db_path: str | Path):
+        self.db_path = str(db_path)
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as con:
+            con.execute(
+                """CREATE TABLE IF NOT EXISTS brain_worker_candidates (
+                    candidate_id TEXT PRIMARY KEY,
+                    suggestion_id TEXT NOT NULL UNIQUE,
+                    capability TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    candidate_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )"""
+            )
+            con.commit()
+
+    def _connect(self):
+        con = sqlite3.connect(self.db_path, timeout=10)
+        con.row_factory = sqlite3.Row
+        return con
+
+    def record(self, candidate: Mapping[str, Any]) -> dict[str, Any]:
+        """Record once per suggestion; conflicting capabilities are rejected."""
+        candidate_id = str(candidate.get("candidate_id") or "").strip()
+        suggestion_id = str(candidate.get("suggestion_id") or "").strip()
+        capability = str(candidate.get("capability") or "").strip()
+        if not candidate_id or not suggestion_id or not capability:
+            return {"ok": False, "status": "CANDIDATE_ID_OR_CAPABILITY_REQUIRED"}
+        encoded = json.dumps(dict(candidate), ensure_ascii=False, sort_keys=True)
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT * FROM brain_worker_candidates WHERE suggestion_id=?",
+                (suggestion_id,),
+            ).fetchone()
+            if row:
+                if row["capability"] != capability or row["candidate_id"] != candidate_id:
+                    return {"ok": False, "status": "CANDIDATE_ALREADY_RECORDED_DIFFERENT_REQUEST"}
+                return {
+                    "ok": True, "status": "CANDIDATE_ALREADY_RECORDED",
+                    "candidate": json.loads(row["candidate_json"]),
+                    "created_at": row["created_at"],
+                    "queued": False,
+                }
+            con.execute(
+                """INSERT INTO brain_worker_candidates
+                   (candidate_id, suggestion_id, capability, status, candidate_json)
+                   VALUES (?, ?, ?, 'RECORDED_NOT_QUEUED', ?)""",
+                (candidate_id, suggestion_id, capability, encoded),
+            )
+            con.commit()
+            row = con.execute(
+                "SELECT * FROM brain_worker_candidates WHERE candidate_id=?",
+                (candidate_id,),
+            ).fetchone()
+        return {
+            "ok": True, "status": "CANDIDATE_RECORDED_NOT_QUEUED",
+            "candidate": json.loads(row["candidate_json"]),
+            "created_at": row["created_at"],
+            "queued": False,
+        }
+
+    def get(self, candidate_id: str) -> dict[str, Any] | None:
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT * FROM brain_worker_candidates WHERE candidate_id=?",
+                (str(candidate_id),),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "candidate_id": row["candidate_id"],
+            "suggestion_id": row["suggestion_id"],
+            "capability": row["capability"],
+            "status": row["status"],
+            "candidate": json.loads(row["candidate_json"]),
+            "created_at": row["created_at"],
+            "queued": False,
+        }
