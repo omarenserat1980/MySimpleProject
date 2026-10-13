@@ -15,8 +15,11 @@ class QemuAdapterTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.status,"QEMU_EXITED")
 
-    def test_backend_command_contract_still_exists(self):
+    def test_real_backend_command_is_disabled(self):
         backend=QemuWindowsBackend(disk_path="disk.img",iso_path="server.iso")
-        self.assertEqual(backend.command()[-4:],["-cdrom","server.iso","-boot","order=d"])
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
+            backend.command()
 
 if __name__=="__main__": unittest.main()
