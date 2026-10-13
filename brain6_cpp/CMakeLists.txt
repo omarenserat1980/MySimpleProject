@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.16)
+project(brain6_simulator_pointer_registry LANGUAGES CXX)
+
+add_executable(test_simulator_pointer_registry test_simulator_pointer_registry.cpp)
+target_compile_features(test_simulator_pointer_registry PRIVATE cxx_std_17)
+target_compile_options(test_simulator_pointer_registry PRIVATE -Wall -Wextra -Werror)
+
+enable_testing()
+add_test(NAME simulator_pointer_registry COMMAND test_simulator_pointer_registry)
