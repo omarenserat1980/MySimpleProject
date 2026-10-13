@@ -26,7 +26,8 @@ if (-not $env:TF_VAR_allowed_source_ip -or $env:TF_VAR_allowed_source_ip -eq "0.
 if ($env:TF_VAR_allowed_source_ip -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|[12]\d|3[0-2])$') { Fail "TF_VAR_allowed_source_ip must be an IPv4 CIDR." }
 $compute = (az provider show --namespace Microsoft.Compute --query registrationState --output tsv 2>$null | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $compute -ne "Registered") { Fail "Microsoft.Compute is not Registered. Run bootstrap-state.ps1 -RegisterProviders and wait for registration." }
-$imageSkuCandidates = @("2025-datacenter-g2", "2025-datacenter", "2025-datacenter-core-g2", "2025-datacenter-core")
+# Terraform main.tf pins this exact SKU. Do not accept fallback SKUs unless Terraform is updated too.
+$imageSkuCandidates = @("2025-datacenter-g2")
 $image = $null
 $resolvedSku = $null
 $resolvedVersion = $null
@@ -83,7 +84,7 @@ if (-not $image) {
     }
     $availableText = if ($available2025.Count -gt 0) { $available2025 -join ", " } else { "none returned by Azure CLI (list exit=$listExitCode)" }
     $errorText = if ($imageLookupErrors.Count -gt 0) { $imageLookupErrors -join " | " } else { "Azure CLI returned no detailed image lookup error." }
-    Fail "Windows Server 2025 image lookup failed in $Location. Candidate SKUs tried: $($imageSkuCandidates -join ', '). Azure-listed 2025 SKUs: $availableText. Image lookup details: $errorText. Terraform SKU was not changed; no deployment was attempted."
+    Fail "Terraform requires Windows Server 2025 SKU 2025-datacenter-g2, but that exact image SKU could not be validated in $Location. Azure-listed 2025 SKUs: $availableText. Image lookup details: $errorText. No fallback SKU was accepted and no deployment was attempted."
 }
 Write-Host "Resolved Windows Server image SKU: $resolvedSku (validated version: $resolvedVersion)"
 if ($image -notmatch ":${resolvedSku}:") { Fail "Resolved image URN does not match requested Terraform SKU $resolvedSku." }
