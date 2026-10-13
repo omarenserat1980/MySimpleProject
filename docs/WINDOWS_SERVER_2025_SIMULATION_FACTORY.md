@@ -54,7 +54,7 @@ Content-Type: application/json
 {"scenario_id":"success","hardware":{"vcpu_count":2,"ram_mib":4096,"disk_gib":64}}
 ```
 
-The API rejects unknown scenario IDs and unknown virtual-hardware fields. It never accepts a caller-selected real executor or a real-boot capability. The dashboard is served at `/api/simulations/windows-server-2025/dashboard`; the page keeps the supplied control key in page memory only and does not store it in localStorage.
+The API rejects unknown scenario IDs and unknown virtual-hardware fields. It never accepts a caller-selected real executor or a real-boot capability. The dashboard is served at `/api/simulations/windows-server-2025/dashboard`; the page keeps the supplied control key in page memory only and does not store it in localStorage. JSON reports are available at `/{run_id}/report`, event streams at `/{run_id}/events`, and human-readable Markdown at `/{run_id}/report.md` beneath the API prefix. Reads re-verify the persisted event chain before returning evidence.
 
 ## Scenario semantics
 
