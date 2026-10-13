@@ -91,9 +91,15 @@ class RevenueRecord:
         if int(blockchain.get("confirmations", 0)) < 1:
             raise ValueError("blockchain confirmations required")
 
-        self.evidence.append(
-            f"mining:{verification['provider']}:{expected_txid}:{blockchain['explorer_url']}"
-        )
+        mining_marker = f"mining:{verification['provider']}:{expected_txid}:{blockchain['explorer_url']}"
+        if self.status == "REVENUE_REALIZED":
+            if mining_marker in self.evidence:
+                return self.snapshot()
+            raise ValueError("conflicting mining evidence for already realized revenue")
+        if self.status != "PAYMENT_PENDING":
+            raise ValueError("revenue record is not in a mining-realization state")
+
+        self.evidence.append(mining_marker)
         self.status = "REVENUE_REALIZED"
         return self.snapshot()
 
