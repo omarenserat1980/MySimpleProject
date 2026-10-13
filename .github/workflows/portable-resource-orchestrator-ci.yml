@@ -80,9 +80,12 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
           python -m unittest \
             brain_v12.tests.test_mining_engine \
-            brain_v12.tests.test_bitcoin_mining_intelligence_api -v
+            brain_v12.tests.test_bitcoin_mining_intelligence_api -v \
+            2>&1 | tee artifacts/asic/mining-economics-tests.log
 
       - name: Prepare RTL evidence directory
         if: always()
@@ -234,4 +237,16 @@ jobs:
           grep -q '"status": "PASS"' artifacts/asic/rtl-evidence.json
           grep -q 'ASIC_RTL_TB_PASS' artifacts/asic/rtl-simulation.log
           test "$(grep '^commit=' artifacts/asic/rtl-evidence.env | cut -d= -f2)" = "$(git rev-parse HEAD)"
+          # The acceptance marker must cover tool installation, synthesis, and every regression suite.
+          grep -qx 'apt_update_exit_code=0' artifacts/asic/tool-install-status.txt
+          grep -qx 'apt_install_exit_code=0' artifacts/asic/tool-install-status.txt
+          test -s artifacts/asic/yosys-synthesis.log
+          grep -Eq 'Found and reported 0 problems|Number of problems: 0' artifacts/asic/yosys-synthesis.log
+          test -s artifacts/asic/brain_asic_core_synth.json
+          test -s artifacts/asic/mining-economics-tests.log
+          grep -qx 'OK' artifacts/asic/mining-economics-tests.log
+          test -s artifacts/asic/software-simulator-tests.log
+          grep -Eq '[0-9]+ passed' artifacts/asic/software-simulator-tests.log
+          test -s artifacts/asic/focused-tests.log
+          grep -qx 'OK' artifacts/asic/focused-tests.log
           echo "ASIC_ACCEPTANCE_GATE_PASS"
