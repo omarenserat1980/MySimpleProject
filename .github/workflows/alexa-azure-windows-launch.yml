@@ -61,9 +61,12 @@ jobs:
           python3 - <<'PY'
           import ipaddress, os
           value = os.environ["CHECK_ALLOWED_SOURCE_IP"].strip()
-          network = ipaddress.ip_network(value, strict=False)
-          if network.version != 4 or network.prefixlen == 0:
-              raise SystemExit("BLOCKED: management access must use a narrow IPv4 CIDR; 0.0.0.0/0 is forbidden.")
+          try:
+              network = ipaddress.ip_network(value, strict=False)
+          except ValueError:
+              raise SystemExit("BLOCKED: BRAIN_ALLOWED_SOURCE_IP must be a valid IPv4 CIDR.")
+          if network.version != 4 or network.prefixlen < 24:
+              raise SystemExit("BLOCKED: management CIDR must be IPv4 /24 or narrower (for example, a single-address /32); broader ranges are forbidden.")
           print("Management source CIDR validation passed; value withheld.")
           PY
           if [[ "$APPROVE_APPLY" == "true" ]]; then
