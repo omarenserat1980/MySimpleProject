@@ -71,3 +71,10 @@ python -m unittest discover -s brain3_mouse/tests -v
 ```
 
 Mouse remains a local-only control surface. Runtime initialization is explicit rather than automatic. The supported legacy and V12 memory interfaces now read/write the same in-process Brain 3 kernel ledger, with type-aware namespaced views; unrelated runtime state such as V12 goals/events remains in its local runtime store. If a runtime import or contract probe fails, it remains unregistered and health stays false. The safe adapter surface is limited to inspect/test/plan; it does not clone or push repositories, merge pull requests, call GitHub, deploy applications, contact Render, configure devices, publish media, execute shell commands, or boot operating systems. Full unification must not be claimed unless both adapters initialize and cross-runtime memory visibility is verified.
+
+
+## Cloud worker inside Brain memory
+
+`cloud_worker_memory.py` defines the shared-memory boundary for a future authenticated cloud-worker transport. It reads Brain-owned context from the same `UnifiedBrainKernel` ledger, submits only `inspect`, `test`, and `plan` work to the single `brain3_shared` queue, and writes worker evidence back into that ledger under a worker/task namespace.
+
+The bridge is deliberately honest about its current scope: it is in-process only, does not connect to a remote cloud worker, does not authenticate a remote identity, and is not production-ready. A remote transport must be implemented separately and must authenticate/enroll the worker before calling the bridge. Worker evidence is never self-verified; Brain must independently verify it. Execution, deployment, Render, device setup, publishing, and Windows boot remain blocked.
