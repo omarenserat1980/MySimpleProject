@@ -159,3 +159,11 @@ def test_conflicting_mining_realization_evidence_is_rejected():
     conflicting = {**result, "provider": "DifferentProvider"}
     with pytest.raises(ValueError, match="conflicting mining evidence"):
         ledger.realize_from_mining_verification(conflicting)
+
+
+
+def test_revenue_snapshot_does_not_expose_mutable_internal_evidence():
+    ledger = RevenueRecord("commercial-snapshot-007", "100", "USD")
+    snapshot = ledger.snapshot()
+    snapshot["evidence"].append("forged-evidence")
+    assert ledger.evidence == []
