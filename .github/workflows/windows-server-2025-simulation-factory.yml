@@ -26,6 +26,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install API test dependencies
+        run: python -m pip install "fastapi>=0.100" "pydantic>=1.10"
       - name: Compile simulator and API
         run: |
           python -m py_compile \
