@@ -13,6 +13,11 @@ int main() {
 
     std::string error;
     {
+        FamilyMemoryStore first_start(path);
+        assert(first_start.restore(&error));
+        assert(first_start.size() == 0);
+    }
+    {
         FamilyMemoryStore store(path);
         assert(store.remember(ChildMemory{"child-1", "Virtual child", "parent-a", "parent-b", 1}, &error));
         assert(store.size() == 1);
