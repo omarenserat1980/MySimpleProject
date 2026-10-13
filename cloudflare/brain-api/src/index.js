@@ -31,6 +31,9 @@ export default {
     if (url.pathname === "/api/payments/paypal/create" && request.method === "POST") {
       return createPayPalPayment(request, env, url, requestOrigin, allowedOrigin);
     }
+    if (url.pathname === "/api/payments/paypal/capture" && request.method === "POST") {
+      return capturePayPalPayment(request, env, requestOrigin, allowedOrigin);
+    }
     if (url.pathname === "/api/payments/paypal/webhook" && request.method === "POST") {
       return handlePayPalWebhook(request, env, requestOrigin, allowedOrigin);
     }
@@ -419,6 +422,45 @@ async function createPayPalPayment(request, env, url, requestOrigin, allowedOrig
     return json({ ok: false, error: "PAYPAL_ORDER_PERSISTENCE_FAILED" }, 500, requestOrigin, allowedOrigin);
   }
   return json({ ok: true, provider: "paypal", paypal_order_id: data.id, approval_url: approve.href, state: "PAYMENT_PENDING" }, 201, requestOrigin, allowedOrigin);
+}
+
+async function capturePayPalPayment(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  let body;
+  try { body = await request.json(); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
+  const client = await requireClient(request, env);
+  if (!client.ok) return json({ ok: false, error: client.error }, client.status, requestOrigin, allowedOrigin);
+  const orderId = String(body.order_id || "").trim();
+  const paypalOrderId = String(body.paypal_order_id || "").trim();
+  if (!orderId || !paypalOrderId) return json({ ok: false, error: "ORDER_AND_PAYPAL_ORDER_IDS_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
+  if (!payment) return json({ ok: false, error: "PAYPAL_ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  const order = await env.BRAIN_DB.prepare("SELECT client_email FROM orders WHERE order_id = ?").bind(orderId).first();
+  if (!order) return json({ ok: false, error: "ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  if (String(order.client_email || "").toLowerCase() !== client.email.toLowerCase()) return json({ ok: false, error: "ORDER_ACCESS_DENIED" }, 403, requestOrigin, allowedOrigin);
+  if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY", capture_required: false }, 200, requestOrigin, allowedOrigin);
+  if (payment.state !== "PAYMENT_PENDING") return json({ ok: false, error: "PAYPAL_PAYMENT_NOT_PENDING" }, 409, requestOrigin, allowedOrigin);
+  let token;
+  try { token = await paypalAccessToken(env); } catch { return json({ ok: false, error: "PAYPAL_SANDBOX_UNAVAILABLE_OR_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin); }
+  const response = await fetch("https://api-m.sandbox.paypal.com/v2/checkout/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", "PayPal-Request-Id": "EB-CAPTURE-" + orderId },
+    body: "{}",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    if (response.status === 422 && /ORDER_ALREADY_CAPTURED|INSTRUMENT_ALREADY_CAPTURED/.test(JSON.stringify(data))) {
+      return json({ ok: true, state: "CAPTURE_ALREADY_REPORTED_AWAITING_WEBHOOK", webhook_authoritative: true }, 202, requestOrigin, allowedOrigin);
+    }
+    return json({ ok: false, error: "PAYPAL_CAPTURE_FAILED", provider_status: response.status }, 502, requestOrigin, allowedOrigin);
+  }
+  const captures = (data.purchase_units || []).flatMap(unit => unit.payments?.captures || []);
+  const completed = captures.find(capture => capture.status === "COMPLETED");
+  if (data.status !== "COMPLETED" || !completed || !completed.id) {
+    return json({ ok: false, error: "PAYPAL_CAPTURE_NOT_COMPLETED", provider_state: String(data.status || "UNKNOWN") }, 409, requestOrigin, allowedOrigin);
+  }
+  // The verified webhook remains the sole authority for the payment/ledger transition.
+  return json({ ok: true, state: "CAPTURE_COMPLETED_AWAITING_VERIFIED_WEBHOOK", paypal_order_id: paypalOrderId, capture_id: String(completed.id), webhook_authoritative: true }, 202, requestOrigin, allowedOrigin);
 }
 
 async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
