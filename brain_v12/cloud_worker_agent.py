@@ -12,6 +12,7 @@ import os
 import signal
 import tempfile
 import time
+import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -23,12 +24,15 @@ INTERVAL = max(5, int(os.getenv("BRAIN_CLOUD_WORKER_INTERVAL_SECONDS", "5")))
 LEASE = max(10, int(os.getenv("BRAIN_CLOUD_WORKER_LEASE_SECONDS", "30")))
 ROOT = Path(os.getenv("BRAIN_RUNTIME_ROOT", str(Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser().resolve() / "cloud-runtime"))).expanduser()
 HEARTBEAT = ROOT / "cloud-worker-heartbeat.json"
-STOP = False
+STOP_EVENT = threading.Event()
 
 
 def _stop(_signum, _frame):
-    global STOP
-    STOP = True
+    STOP_EVENT.set()
+
+
+def request_stop() -> None:
+    STOP_EVENT.set()
 
 
 def _https_origin(value: str) -> bool:
@@ -116,23 +120,23 @@ def tick(client: httpx.Client, origin: str) -> dict:
     return {"ok": True, "state": "RUNNING", "worker_id": WORKER_ID, "timestamp": now}
 
 
-def main() -> int:
-    origin = os.getenv("BRAIN_ORIGIN", "").strip().rstrip("/")
+def main(install_signals: bool = True) -> int:
+    origin = os.getenv(
+        "BRAIN_ORIGIN",
+        os.getenv("RENDER_EXTERNAL_URL", "https://brain-control-plane-main.onrender.com"),
+    ).strip().rstrip("/")
     if not _https_origin(origin):
-        print(json.dumps({"ok": False, "state": "BLOCKED_CONFIGURATION", "reason": "BRAIN_ORIGIN_HTTPS_REQUIRED"}))
+        print(json.dumps({"ok": False, "state": "BLOCKED_CONFIGURATION", "reason": "BRAIN_ORIGIN_HTTPS_REQUIRED"}), flush=True)
         return 2
-    signal.signal(signal.SIGTERM, _stop)
-    signal.signal(signal.SIGINT, _stop)
+    if install_signals and threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _stop)
+        signal.signal(signal.SIGINT, _stop)
     timeout = max(2.0, float(os.getenv("BRAIN_CLOUD_WORKER_HTTP_TIMEOUT_SECONDS", "8")))
     with httpx.Client(timeout=timeout, follow_redirects=False) as client:
-        while not STOP:
+        while not STOP_EVENT.is_set():
             result = tick(client, origin)
             print(json.dumps(result, sort_keys=True), flush=True)
-            if not result.get("ok"):
-                # Fail closed: retry without leaving a false live heartbeat.
-                time.sleep(INTERVAL)
-            else:
-                time.sleep(INTERVAL)
+            STOP_EVENT.wait(INTERVAL)
     try:
         HEARTBEAT.unlink()
     except FileNotFoundError:
