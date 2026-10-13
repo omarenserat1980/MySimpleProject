@@ -100,7 +100,7 @@ jobs:
           sudo apt-get update > artifacts/asic/rtl-tool-install.log 2>&1
           update_rc=$?
           if [ "$update_rc" -eq 0 ]; then
-            sudo apt-get install -y iverilog >> artifacts/asic/rtl-tool-install.log 2>&1
+            sudo apt-get install -y iverilog yosys >> artifacts/asic/rtl-tool-install.log 2>&1
             install_rc=$?
           else
             install_rc=125
@@ -108,6 +108,9 @@ jobs:
           printf 'apt_update_exit_code=%s\napt_install_exit_code=%s\n' "$update_rc" "$install_rc" > artifacts/asic/tool-install-status.txt
           if command -v iverilog >/dev/null 2>&1; then
             iverilog -V >> artifacts/asic/rtl-tool-install.log 2>&1
+          fi
+          if command -v yosys >/dev/null 2>&1; then
+            yosys -V >> artifacts/asic/rtl-tool-install.log 2>&1
           fi
           # Do not hide installation failure: the mandatory simulation and final gate record BLOCKED/FAIL.
 
@@ -170,6 +173,18 @@ jobs:
               f.write("\n")
           PY
           test "$status" = "PASS"
+
+      - name: Synthesize RTL with Yosys and save structural evidence
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
+          yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_asic_core.sv; hierarchy -top brain_asic_core; proc; opt; check; stat; write_json artifacts/asic/brain_asic_core_synth.json' \
+            2>&1 | tee artifacts/asic/yosys-synthesis.log
+          grep -Eq 'Found and reported 0 problems|Number of problems: 0' artifacts/asic/yosys-synthesis.log
+          test -s artifacts/asic/brain_asic_core_synth.json
+          echo "ASIC_YOSYS_SYNTHESIS_PASS"
 
       - name: Run ASIC simulator regression tests
         if: success()
