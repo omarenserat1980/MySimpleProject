@@ -6,12 +6,12 @@ This is a software-only simulation of the Electronic Brain virtual family. It cr
 
 From the repository root, with a C++17 compiler:
 
-\`\`\`sh
+```sh
 g++ -std=c++17 -Wall -Wextra -Werror -pedantic brain_v12/cpp/family_simulator.cpp brain_v12/cpp/test_family_simulator.cpp -o /tmp/family-simulator-test
 /tmp/family-simulator-test
-\`\`\`
+```
 
-Expected output: \`family simulator checks passed; descendants=2\`.
+Expected output: `family simulator checks passed; descendants=2`.
 
 ## Behavior and safeguards
 
@@ -33,8 +33,6 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thre
 /tmp/birth-thread-test
 ```
 
-The worker does not independently select couples or mutate the family tree: the supplied callback owns that operation and must preserve mutual consent and thread safety. This avoids silently creating descendants for couples that have not opted in.
-
 ## Persistent child memory
 
 `FamilyMemoryStore` appends each virtual child's identity, name, both parent IDs, and birth-cycle number to a file, then can restore the records after process restart. It rejects duplicate child IDs and protects in-process access with a mutex. The caller must choose a path on genuinely persistent writable storage and call `restore()` during worker startup before processing new events; an ephemeral container filesystem does not guarantee survival across redeploys.
@@ -46,11 +44,9 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/family_mem
 /tmp/family-memory-test
 ```
 
-This is a reusable memory component, not proof that the deployed cloud worker currently uses it. Production activation requires an authorized deployment and a runtime read-back check.
-
 ## Family cloud worker harness
 
-`FamilyCloudWorker` restores the file-backed memory before starting the dedicated timer thread. Every cycle (90 seconds by default), it records one virtual descendant for each registered pair only when both consent flags are true. Child IDs include the pair and cycle to prevent duplicate births across worker restarts; the cycle offset resumes from the highest restored cycle. The test uses a short interval and checks memory recovery plus consent gating.
+`FamilyCloudWorker` restores the file-backed memory before starting the dedicated timer thread. Every cycle (90 seconds by default), it records one virtual descendant for each registered pair only when both consent flags are true and a required eligibility callback returns true. The callback is the integration point for current Brain family-policy checks such as adult status, simulated marriage, and prohibited-kinship rules. The worker refuses to start without a callback and fails closed if that callback throws; a false result skips that pair for the cycle. Tests cover missing policy, ineligible pairs, consent gating, memory recovery, and write errors.
 
 Build and run:
 
@@ -59,4 +55,4 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thre
 /tmp/family-cloud-worker-test
 ```
 
-This worker harness is source code in the open draft PR, not an activated cloud process. To retain memories across container replacement, configure its memory path to a storage location that is already persistent in the deployment environment; no such runtime configuration or production activation is asserted here.
+This worker harness is source code in the open draft PR, not an activated cloud process. The test's eligibility callback is only a stand-in, not a production family-policy integration. To retain memories across container replacement, configure its memory path to a storage location that is already persistent in the deployment environment; no such runtime configuration or production activation is asserted here.
