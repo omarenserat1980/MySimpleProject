@@ -140,3 +140,22 @@ def test_conflicting_revenue_realization_evidence_is_rejected():
             "delivery_evidence_ref": "evidence://delivery/other",
             "reconciliation_ref": "evidence://reconciliation/other",
         })
+
+
+
+def test_repeated_mining_realization_is_idempotent():
+    result = _verified_cycle("cloudminecrypto-ledger-idempotent-005")
+    ledger = RevenueRecord("cloudminecrypto-ledger-idempotent-005", "verified mining payout", "BTC")
+    first = ledger.realize_from_mining_verification(result)
+    second = ledger.realize_from_mining_verification(result)
+    assert second == first
+    assert len(second["evidence"]) == 1
+
+
+def test_conflicting_mining_realization_evidence_is_rejected():
+    result = _verified_cycle("cloudminecrypto-ledger-conflict-006")
+    ledger = RevenueRecord("cloudminecrypto-ledger-conflict-006", "verified mining payout", "BTC")
+    ledger.realize_from_mining_verification(result)
+    conflicting = {**result, "provider": "DifferentProvider"}
+    with pytest.raises(ValueError, match="conflicting mining evidence"):
+        ledger.realize_from_mining_verification(conflicting)
