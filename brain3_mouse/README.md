@@ -36,6 +36,9 @@ Default port is `8787`. `MOUSE_PORT` can change the port, but the listener remai
 
 - `GET /api/brain/compatibility` — describes compatibility boundaries; it is not a remote connection.
 - `GET /api/brain3/kernel` — shared memory/task queue and adapter readiness status.
+- `GET /api/brain3/integration` — reports initialized real in-process adapters and any import/contract errors.
+- `POST /api/brain3/integrate` — explicitly attempts to initialize the actual Brain V7 and V12 runtime objects locally; integrations are marked ready only after their object-contract probes pass.
+- `POST /api/brain3/tasks/{id}/dispatch` with JSON `{"adapter":"brain_v12","description":"inspect the current state"}` — dispatches a queued `inspect`, `test`, or `plan` task to a verified local adapter. This is an actual in-process safe operation, not a simulated task. It does not permit external side effects.
 - `POST /api/brain/tasks` — accepts simulated `inspect`, `test`, or `plan` tasks from `legacy_brain` or `brain_v12`. Every task reports `executed: false`.
 - `GET /api/brain/tasks` — lists in-memory simulated tasks.
 
@@ -67,4 +70,4 @@ Unsupported mutation endpoints fail closed with HTTP 405. Unknown repositories a
 python -m unittest discover -s brain3_mouse/tests -v
 ```
 
-Mouse is still an emulator and integration foundation. It does not clone or push real repositories, merge pull requests, run GitHub Actions, deploy applications, automatically load the legacy or V12 runtime, or boot operating systems. Full runtime unification is not complete until verified in-process adapters for both actual runtimes are implemented and tested.
+Mouse remains a local-only control surface. Runtime initialization is explicit rather than automatic. The adapter bridge synchronizes runtime memory snapshots at safe operation boundaries; it does not make the two legacy storage implementations the same Python object or durable database. If a runtime import or contract probe fails, it remains unregistered and health stays false. The safe adapter surface is limited to inspect/test/plan; it does not clone or push repositories, merge pull requests, call GitHub, deploy applications, contact Render, configure devices, publish media, execute shell commands, or boot operating systems. Full unification must not be claimed unless both adapters initialize and cross-runtime memory visibility is verified.
