@@ -34,3 +34,16 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thre
 ```
 
 The worker does not independently select couples or mutate the family tree: the supplied callback owns that operation and must preserve mutual consent and thread safety. This avoids silently creating descendants for couples that have not opted in.
+
+## Persistent child memory
+
+`FamilyMemoryStore` appends each virtual child's identity, name, both parent IDs, and birth-cycle number to a file, then can restore the records after process restart. It rejects duplicate child IDs and protects in-process access with a mutex. The caller must choose a path on genuinely persistent writable storage and call `restore()` during worker startup before processing new events; an ephemeral container filesystem does not guarantee survival across redeploys.
+
+Build and run its test:
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/family_memory_store.cpp brain_v12/cpp/test_family_memory_store.cpp -o /tmp/family-memory-test
+/tmp/family-memory-test
+```
+
+This is a reusable memory component, not proof that the deployed cloud worker currently uses it. Production activation requires an authorized deployment and a runtime read-back check.
