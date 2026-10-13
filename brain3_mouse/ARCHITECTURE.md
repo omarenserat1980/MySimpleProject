@@ -9,13 +9,14 @@ Brain V12 request ─────┘             │
                                      └── fail-closed policy gate
 ```
 
-The compatibility endpoints describe and accept simulated requests from both legacy Brain and Brain V12. They do not connect to, launch, or modify either runtime. This keeps the third Brain isolated while allowing contract tests for both sides.
+The default compatibility endpoints only queue work. A separate explicit local integration endpoint can instantiate the actual Brain V7 and V12 in-process runtime objects and register safe inspect/test/plan adapters after object and handler probes pass. Initialization is not automatic; failed imports or failed probes leave that runtime unregistered and health false.
 
 Mouse is not a real GitHub client and never proxies to GitHub. It has no Render adapter. The listener is loopback-only, and all state is in memory. Its health response is emulator status only.
 
 Policy gates:
-- Legacy Brain is compatibility-only; old execution paths remain disabled.
-- Brain V12 can submit simulated inspect/test/plan tasks only; no remote execution.
+- The runtime bridge exposes only inspect/test/plan operations; the wider legacy cycle and all V12 external integrations remain outside the bridge.
+- Runtime-specific memory snapshots are synchronized through the Brain 3 shared ledger at adapter boundaries; this does not merge the runtimes' storage internals into one Python object or durable database.
+- Queueing remains non-executing by default. A task runs only after explicit dispatch to a verified local adapter.
 - Render and all external network calls are disabled.
 - Arkan and Redmi 3 setup are prohibited.
 - Windows Server 2025 boot proof must come from the real guest and independent completion gates; Mouse cannot produce or imply that proof.
@@ -24,4 +25,4 @@ Policy gates:
 
 ## Integration truth
 
-The shared kernel is implemented and the Mouse HTTP task endpoint now submits both source types to the same queue. This is real unification of Brain 3's coordination boundary, not yet full consolidation of the legacy and V12 runtime implementations. No verified in-process adapters for those actual runtime objects are registered by default. `/api/brain3/kernel` must report both integration flags as false until each runtime adapter is implemented and verified. Do not describe the whole Brain as fully unified until that gate passes.
+The shared kernel is implemented and both source types enter the same queue. Actual runtime adapters are now available through explicit initialization, and the integration endpoint reports which adapters passed their in-process probes. Integration is complete only if both flags are true and a cross-runtime memory-visibility test passes. The bridge is boundary synchronization, not shared object identity; do not overstate it as a single underlying database.
