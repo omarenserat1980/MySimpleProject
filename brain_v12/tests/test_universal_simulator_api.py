@@ -47,6 +47,26 @@ class UniversalSimulatorApiTests(unittest.TestCase):
         self.assertEqual(termux["connection_status"], "NOT_CONFIGURED")
         self.assertIn("Repository evidence is not proof", "Repository evidence is not proof of external connectivity or live execution.")
 
+    def test_termux_catalog_points_to_existing_runtime_and_bridge(self):
+        entry = api._SIMULATOR_CATALOG["termux-brain"]
+        expected = {
+            "brain_v12/brain/device_bridge.py",
+            "brain_v12/tools/brain_runtime_bootstrap.sh",
+        }
+        self.assertEqual(set(entry["evidence_paths"]), expected)
+        for relative_path in entry["evidence_paths"]:
+            self.assertTrue((api._ROOT / relative_path).is_file(), relative_path)
+
+    def test_desktop_commander_catalog_points_to_sandboxed_emulator(self):
+        entry = api._SIMULATOR_CATALOG["desktop-commander-brain"]
+        expected = {
+            "brain_v12/brain/desktop_commander_emulator.py",
+            "brain_v12/tests/test_desktop_commander_emulator.py",
+        }
+        self.assertEqual(set(entry["evidence_paths"]), expected)
+        for relative_path in entry["evidence_paths"]:
+            self.assertTrue((api._ROOT / relative_path).is_file(), relative_path)
+
     def test_register_custom_simulator_does_not_claim_connection(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
             "BRAIN_SIMULATOR_REGISTRY_PATH": str(Path(tmp) / "registry.json")
