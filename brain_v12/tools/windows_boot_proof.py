@@ -78,8 +78,28 @@ def verify_boot(*, evidence_path: Path, marker_path: Path, phase_path: Path,
             reasons.append("RAW_GUEST_BOOT_METADATA_MISSING")
         if raw_network.get("adapter_up") is not True or raw_network.get("internet_443") is not True:
             reasons.append("RAW_GUEST_NETWORK_NOT_VERIFIED")
-        if not raw_storage.get("filesystem") or int(raw_storage.get("size_bytes") or 0) < 32 * 1024**3:
+        try:
+            raw_disk_size = int(raw_storage.get("size_bytes") or 0)
+        except (TypeError, ValueError):
+            raw_disk_size = 0
+        if not raw_storage.get("filesystem") or raw_disk_size < 32 * 1024**3:
             reasons.append("RAW_GUEST_SYSTEM_DISK_NOT_VERIFIED")
+
+        # Bind the host-enriched fields back to the values actually written by
+        # Windows. AMD64 is normalized to x86_64 by the workflow; no other
+        # guest identity, network, or disk values may be silently rewritten.
+        combined_guest = evidence.get("guest") or {}
+        for field in ("os", "boot_verified", "boot_time", "version", "build", "computer_name"):
+            if raw_guest.get(field) != combined_guest.get(field):
+                reasons.append("RAW_GUEST_BINDING_MISMATCH:" + field)
+        combined_network = evidence.get("network") or {}
+        for field in ("adapter_up", "internet_443"):
+            if raw_network.get(field) != combined_network.get(field):
+                reasons.append("RAW_GUEST_BINDING_MISMATCH:network." + field)
+        combined_storage = evidence.get("storage") or {}
+        for field in ("filesystem", "size_bytes"):
+            if raw_storage.get(field) != combined_storage.get(field):
+                reasons.append("RAW_GUEST_BINDING_MISMATCH:storage." + field)
 
     trusted_hash = str(trusted_iso_sha256 or "").strip().lower()
     media_hash = str((evidence.get("media") or {}).get("sha256", "")).strip().lower()
