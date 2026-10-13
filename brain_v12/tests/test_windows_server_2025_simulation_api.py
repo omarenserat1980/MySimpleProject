@@ -1,10 +1,12 @@
 import os
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from brain_v12.brain import windows_server_2025_simulation_api as api
 
@@ -79,6 +81,25 @@ class WindowsServer2025SimulationApiTests(unittest.TestCase):
         self.assertIn("/api/simulations/windows-server-2025/dashboard", paths)
         response = api.simulation_dashboard()
         self.assertTrue(Path(response.path).is_file())
+
+    def test_top_level_executor_fields_are_forbidden(self):
+        with self.assertRaises(ValidationError):
+            api.SimulationRequest(capability="windows-server-2025-real-boot")
+
+    def test_tampered_persisted_evidence_is_rejected_on_read(self):
+        with patch.dict(os.environ, {"BRAIN_CONTROL_KEY": "expected"}, clear=False):
+            response = api.create_simulation(
+                api.SimulationRequest(scenario_id="success"),
+                DummyRequest("expected"),
+            )
+            report_path = Path(self.tempdir.name) / (response["run_id"] + ".json")
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["events"][0]["status"] = "FAILED"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaises(HTTPException) as caught:
+                api.get_simulation_report(response["run_id"], DummyRequest("expected"))
+        self.assertEqual(caught.exception.status_code, 503)
+        self.assertEqual(caught.exception.detail, "SIMULATION_EVIDENCE_INVALID")
 
 
 if __name__ == "__main__":
