@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from .windows_server_2025_simulation_progress import simulation_progress_snapshot
+
 SCHEMA = "electronic-brain.windows-server-2025-simulation.v1"
 SIMULATED_CAPABILITY = "windows-server-2025-simulated-boot"
 REAL_CAPABILITIES = {"windows-server-2025-real-boot", "windows-server-2025-cloud-native"}
@@ -281,6 +283,7 @@ class WindowsServer2025Simulator:
         verification = verification or EvidenceRecorder.verify(recorder.events)
         return {
             "schema": SCHEMA,
+            "implementation_progress": simulation_progress_snapshot(),
             "run_id": run_id,
             "scenario_id": scenario_id,
             "simulator_id": "windows-server-2025-behavior-model",
