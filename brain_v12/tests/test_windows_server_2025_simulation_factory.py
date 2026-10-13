@@ -58,6 +58,21 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         self.assertEqual(result["recovery_status"], "SIMULATED_RECOVERY_PASS")
         self.assertFalse(result["real_windows_boot_verified"])
 
+    def test_restart_scenario_is_logical_only(self):
+        result = simulate_windows_server_2025("restart")
+        self.assertEqual(result["status"], "SIMULATED_BOOT_SUCCESS")
+        self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
+        self.assertFalse(result["real_windows_boot_verified"])
+        self.assertFalse(result["side_effects_performed"])
+        self.assertFalse(result["external_resources_created"])
+        restart_events = [
+            event for event in result["events"]
+            if event["stage"] == "RESTART_SIMULATION"
+        ]
+        self.assertEqual(len(restart_events), 1)
+        self.assertEqual(restart_events[0]["details"]["restart_kind"], "logical_only")
+        self.assertTrue(result["verification"]["ok"])
+
     def test_tampered_evidence_fails_verification(self):
         result = simulate_windows_server_2025("corrupt_evidence")
         self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
