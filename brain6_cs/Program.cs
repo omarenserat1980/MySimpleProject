@@ -36,7 +36,7 @@ public sealed class Supervisor
                 return 78;
             }
         }
-        catch (Exception ex) when (ex is IOException or JsonException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or JsonException)
         {
             Console.Error.WriteLine("BRAIN6_STATE_INVALID execution_blocked");
             return 78;
