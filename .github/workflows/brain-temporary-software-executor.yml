@@ -90,7 +90,7 @@ jobs:
             ISO_URL="$DEFAULT_ISO_URL"
             TRUSTED_SHA256="$DEFAULT_SHA256"
           fi
-          python3 - <<'PY'
+          ISO_URL="$ISO_URL" python3 - <<'PY'
           import os, sys
           from urllib.parse import urlparse
           value = os.environ["ISO_URL"]
