@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg
-          python -m pip install --disable-pip-version-check Pillow cryptography
+          python -m pip install --disable-pip-version-check Pillow cryptography httpx
 
       - name: Initialize Brain control-plane job
         run: |
