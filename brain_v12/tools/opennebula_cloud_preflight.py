@@ -47,7 +47,7 @@ def huda_host_identity_allowed(
     if len(expected_digest) != 64 or any(c not in "0123456789abcdef" for c in expected_digest):
         return False
     actual_digest = hashlib.sha256(actual_machine_id.encode("utf-8")).hexdigest()
-    return hashlib.compare_digest(actual_digest, expected_digest)
+    return actual_digest == expected_digest
 
 
 def read_machine_id() -> str:
