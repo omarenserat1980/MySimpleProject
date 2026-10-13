@@ -8,11 +8,11 @@ using brain::family::Member;
 
 int main() {
     FamilySimulator family;
-    assert(family.add_member(Member{"parent-a", "Parent A", 45}));
-    assert(family.add_member(Member{"parent-b", "Parent B", 44}));
-    assert(family.add_member(Member{"adult-child", "Adult Child", 22, {"parent-a", "parent-b"}}));
-    assert(family.add_member(Member{"friend", "Adult Friend", 23}));
-    assert(family.add_member(Member{"minor", "Minor", 16}));
+    assert(family.add_member(Member{"parent-a", "Parent A", 45, {}, "", {}, 0}));
+    assert(family.add_member(Member{"parent-b", "Parent B", 44, {}, "", {}, 0}));
+    assert(family.add_member(Member{"adult-child", "Adult Child", 22, {"parent-a", "parent-b"}, "", {}, 0}));
+    assert(family.add_member(Member{"friend", "Adult Friend", 23, {}, "", {}, 0}));
+    assert(family.add_member(Member{"minor", "Minor", 16, {}, "", {}, 0}));
 
     std::string error;
     assert(!family.add_friendship("adult-child", "minor", true, true, &error));
@@ -29,7 +29,7 @@ int main() {
     assert(family.add_friendship("adult-child", "friend", true, true, &error));
     assert(family.simulate_marriage("adult-child", "friend", true, true, &error));
 
-    assert(!family.simulate_grandchildren("adult-child", "friend", 1, true, false, &error));
+    assert(family.simulate_grandchildren("adult-child", "friend", 1, true, false, &error).empty());
     assert(error == "MUTUAL_CHILD_SIMULATION_CONSENT_REQUIRED");
     const auto grandchildren = family.simulate_grandchildren("adult-child", "friend", 2, true, true, &error);
     assert(grandchildren.size() == 2);
