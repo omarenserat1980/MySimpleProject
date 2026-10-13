@@ -101,6 +101,10 @@ class WindowsServer2025SimulationApiTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 503)
         self.assertEqual(caught.exception.detail, "SIMULATION_EVIDENCE_INVALID")
 
+    def test_markdown_report_endpoint_is_registered(self):
+        paths = {route.path for route in api.router.routes}
+        self.assertIn("/api/simulations/windows-server-2025/{run_id}/report.md", paths)
+
 
 if __name__ == "__main__":
     unittest.main()
