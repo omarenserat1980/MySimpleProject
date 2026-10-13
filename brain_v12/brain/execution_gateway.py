@@ -165,7 +165,7 @@ class BrainExecutionGateway:
     def authorize(self, capability: str) -> ExecutionDecision:
         internal = Executor(
             name=BRAIN_INTERNAL,
-            capabilities=frozenset({"brain-internal-execution", "qemu"}),
+            capabilities=frozenset(self.runner.capabilities()),
             priority=0,
             external=False,
         )
