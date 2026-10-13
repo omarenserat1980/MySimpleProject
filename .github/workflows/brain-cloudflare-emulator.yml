@@ -41,6 +41,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/brain-cloudflare-mode.sh
           bash -n scripts/brain-cloudflare-devkit.sh
+          bash -n test/emulator_smoke.sh
           bash scripts/brain-cloudflare-mode.sh status | tee /tmp/brain-mode.log
           grep -Fq 'BRAIN_CLOUDFLARE_MODE=emulator' /tmp/brain-mode.log
           grep -Fq 'CREDENTIALS_REQUIRED=FALSE' /tmp/brain-mode.log
@@ -55,7 +56,17 @@ jobs:
           node test/commercial_worker_static.test.js
           node test/cinema_worker_static.test.js
           node test/devkit_static.test.js
-          bash -n test/emulator_smoke.sh
+      - name: Exercise in-memory D1, R2, and queue contracts
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node --test test/emulator/memory-bindings.test.mjs
+          echo "BRAIN_CLOUDFLARE_EMULATOR_BINDINGS=PASS"
+          echo "LIVE_CLOUDFLARE_USED=FALSE"
+      - name: Start local Wrangler and verify Worker health
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
           bash test/emulator_smoke.sh
-          echo "BRAIN_CLOUDFLARE_EMULATOR_GATE=PASS"
+          echo "BRAIN_CLOUDFLARE_EMULATOR_SMOKE=PASS"
           echo "LIVE_CLOUDFLARE_USED=FALSE"
