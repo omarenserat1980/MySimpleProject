@@ -49,7 +49,8 @@ class FamilyGovernedTaskService:
             irreversible=irreversible,
             approval=approval,
         )
-        event = {"event": "FAMILY_POLICY_DECISION", "task_type": kind, "decision": decision}\n        self._record(event)
+        event = {"event": "FAMILY_POLICY_DECISION", "task_type": kind, "decision": decision}
+        self._record(event)
         if not decision["ok"]:
             return {
                 "ok": False,
