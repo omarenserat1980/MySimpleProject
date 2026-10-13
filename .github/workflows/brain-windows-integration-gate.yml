@@ -43,6 +43,8 @@ jobs:
       - name: Compile Windows contract path
         run: |
           python -m py_compile             brain_v12/brain/windows_contract_service.py             brain_v12/brain/fetch_windows_execution_contract.py             brain_v12/brain/windows_execution_contract_issuer.py             brain_v12/brain/owner_cryptographic_approval.py             brain_v12/brain/authority_signature.py
+      - name: Test cloud direct action executor policy
+        run: python -m unittest brain_v12.tests.test_cloud_direct_action_executor
       - name: Run contract security tests
         run: |
           python -m unittest             brain_v12.tests.test_windows_contract_service             brain_v12.tests.test_windows_contract_fetch             brain_v12.tests.test_windows_owner_approval_replay             brain_v12.tests.test_windows_execution_contract_issuer             brain_v12.tests.test_windows_contract_issuer_replay_integration
