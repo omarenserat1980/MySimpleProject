@@ -113,7 +113,7 @@ async function createCinemaCheckout(request, env, url, requestOrigin, allowedOri
   const filmId = String(body.film_id || "").trim();
   const email = String(body.email || "").trim().toLowerCase();
   if (filmId !== "brain-last-light-city") return json({ ok: false, error: "FILM_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ ok: false, error: "VALID_EMAIL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ ok: false, error: "VALID_EMAIL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
 
   const orderId = "BRAIN-CIN-" + new Date().toISOString().slice(0,10).replaceAll("-","") + "-" + crypto.randomUUID().slice(0,8).toUpperCase();
   const accessToken = crypto.randomUUID().replaceAll("-","") + crypto.randomUUID().replaceAll("-","");
@@ -194,7 +194,7 @@ async function cinemaStream(request, env, requestOrigin, allowedOrigin) {
   if (filmId !== "brain-last-light-city") return json({ ok: false, error: "FILM_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
 
   const cookieHeader = String(request.headers.get("Cookie") || "");
-  const cookieMatch = cookieHeader.match(/(?:^|;\\s*)BRAIN_CINEMA_TOKEN=([^;]+)/);
+  const cookieMatch = cookieHeader.match(/(?:^|;\s*)BRAIN_CINEMA_TOKEN=([^;]+)/);
   const token = cookieMatch ? decodeURIComponent(cookieMatch[1]) : "";
   if (!token) return json({ ok: false, error: "ENTITLEMENT_REQUIRED" }, 401, requestOrigin, allowedOrigin);
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
