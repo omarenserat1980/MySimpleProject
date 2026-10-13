@@ -7,6 +7,7 @@ entries transactionally (for example in Cloudflare D1) before acknowledging.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from .commercial_ledger import CommercialLedger
@@ -31,6 +32,7 @@ class PayPalCommercialFlow:
         self.idempotency = PaymentIdempotencyGuard()
         self.ledger = CommercialLedger()
         self._orders: dict[str, CommercialOrderState] = {}
+        self._intent_by_order: dict[str, PaymentIntent] = {}
 
     def register_order(self, *, order_id: str, paypal_order_id: str,
                        amount_minor: int, currency: str,
@@ -40,13 +42,18 @@ class PayPalCommercialFlow:
         currency = currency.strip().upper()
         if len(currency) != 3 or not currency.isalpha():
             raise ValueError("INVALID_CURRENCY")
-        accepted = self.idempotency.register(PaymentIntent(
+        intent = PaymentIntent(
             order_id=order_id,
             idempotency_key=idempotency_key,
             provider_id=f"paypal:{paypal_order_id}",
             amount_minor=amount_minor,
             currency=currency,
-        ))
+        )
+        accepted = self.idempotency.register(intent)
+        existing = self._intent_by_order.get(order_id)
+        if existing is not None and existing != intent:
+            raise ValueError("ORDER_INTENT_MISMATCH")
+        self._intent_by_order[order_id] = intent
         if order_id not in self._orders:
             self._orders[order_id] = CommercialOrderState(order_id)
         return accepted
@@ -56,6 +63,15 @@ class PayPalCommercialFlow:
         state = self._orders.get(order_id)
         if state is None:
             return PayPalCommercialResult(order_id, "NEW", None, "PAYMENT_INTENT_REQUIRED")
+        intent = self._intent_by_order[order_id]
+        try:
+            expected_minor = int(Decimal(str(amount)) * 100)
+        except (InvalidOperation, ValueError):
+            raise ValueError("INVALID_CAPTURE_AMOUNT") from None
+        if expected_minor != intent.amount_minor or currency.strip().upper() != intent.currency:
+            raise ValueError("CAPTURE_DOES_NOT_MATCH_REGISTERED_INTENT")
+        if intent.provider_id != f"paypal:{paypal_order_id}":
+            raise ValueError("PAYPAL_ORDER_DOES_NOT_MATCH_REGISTERED_INTENT")
         verified = PayPalEvidenceBridge.from_capture(
             response=response, order_id=order_id,
             paypal_order_id=paypal_order_id, amount=amount, currency=currency,
@@ -73,7 +89,7 @@ class PayPalCommercialFlow:
             entry_id=f"paypal:{verified.capture_id}:payment",
             order_id=order_id, from_state="NEW", to_state="PAYMENT_VERIFIED",
             evidence_refs=(evidence.evidence_id,), provider_id="paypal",
-            amount_minor=int(round(float(amount) * 100)), currency=currency.upper(),
+            amount_minor=int(Decimal(amount) * 100), currency=currency.upper(),
             metadata={"paypal_order_id": paypal_order_id, "capture_id": verified.capture_id},
         )
         return PayPalCommercialResult(order_id, state.state, evidence.evidence_id, "PAYMENT_VERIFIED_PENDING_DELIVERY")
