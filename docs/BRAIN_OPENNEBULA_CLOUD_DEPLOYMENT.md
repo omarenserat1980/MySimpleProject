@@ -1,5 +1,11 @@
 # Electronic Brain — هدى (Huda) Independent Cloud
 
+## Non-negotiable prohibition: Arkan
+
+Arkan must never be used by the new Brain or Huda cloud, directly or indirectly. Do not use it as a host, hypervisor, bootstrap device, GitHub Actions runner, executor, network hop, recovery target, or fallback. Do not enroll or reconnect its Desktop Commander device for this project. If any execution route resolves to Arkan or its identity, stop and report `ARKAN_FORBIDDEN`; never retry through Arkan.
+
+The Huda deployment must use an independently provisioned and positively identified host. Before any apply, verify the target host identity against an explicit Huda allowlist and reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
+
 ## Identity and independence
 
 **Cloud name:** هدى  
