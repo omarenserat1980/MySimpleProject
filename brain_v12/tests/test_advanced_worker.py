@@ -1,8 +1,12 @@
 from brain_v12.brain.advanced_worker import AdvancedWorker, REAL_BOOT_CAPABILITY, REAL_BOOT_GATES
 
 
-def real_facts():
-    return {name: True for name in REAL_BOOT_GATES}
+def test_proof_bundle():
+    return {gate: {"proof_id": f"test-proof:{gate}"} for gate in REAL_BOOT_GATES}
+
+
+def test_verifier(gate, evidence, task, worker_id):
+    return evidence == {"proof_id": f"test-proof:{gate}"} and bool(task.get("task_id")) and bool(worker_id)
 
 
 def test_register_heartbeat_renews_lease_without_public_last_seen():
@@ -38,26 +42,34 @@ def test_simulator_cannot_advertise_real_boot_capability():
         raise AssertionError("simulator must not advertise real boot")
 
 
-def test_real_boot_admission_fails_closed_without_all_real_gates():
+def test_real_boot_denied_when_trusted_verifier_missing():
     worker = AdvancedWorker("real-01", {REAL_BOOT_CAPABILITY}, mode="real_executor")
-    worker.register(host_facts={"host_identity_verified": True}, now=100)
+    worker.register(gate_evidence=test_proof_bundle(), now=100)
     result = worker.admit_task({"task_id": "boot-01", "capability": REAL_BOOT_CAPABILITY}, now=101)
     assert result["admitted"] is False
-    assert "KVM_RUNTIME_VERIFIED_NOT_VERIFIED" in result["reasons"]
+    assert "TRUSTED_GATE_VERIFIER_NOT_CONFIGURED" in result["reasons"]
     assert result["windows_boot_verified"] is False
 
 
-def test_real_boot_admission_needs_every_gate_but_is_not_execution():
-    worker = AdvancedWorker("real-02", {REAL_BOOT_CAPABILITY}, mode="real_executor")
-    worker.register(host_facts=real_facts(), now=100)
+def test_boolean_claims_are_not_evidence():
+    worker = AdvancedWorker("real-02", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
+    worker.register(gate_evidence={gate: True for gate in REAL_BOOT_GATES}, now=100)
     result = worker.admit_task({"task_id": "boot-02", "capability": REAL_BOOT_CAPABILITY}, now=101)
+    assert result["admitted"] is False
+    assert "HOST_IDENTITY_VERIFIED_EVIDENCE_MISSING" in result["reasons"]
+
+
+def test_verified_proofs_allow_admission_but_not_execution_claim():
+    worker = AdvancedWorker("real-03", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
+    worker.register(gate_evidence=test_proof_bundle(), now=100)
+    result = worker.admit_task({"task_id": "boot-03", "capability": REAL_BOOT_CAPABILITY}, now=101)
     assert result["admitted"] is True
     assert result["decision"] == "ADMISSION_ONLY_NOT_EXECUTED"
     assert result["windows_boot_verified"] is False
 
 
 def test_missing_task_id_and_capability_are_rejected():
-    worker = AdvancedWorker("worker-03", {"python"})
+    worker = AdvancedWorker("worker-04", {"python"})
     worker.register(now=10)
     result = worker.admit_task({}, now=11)
     assert result["admitted"] is False
@@ -65,11 +77,11 @@ def test_missing_task_id_and_capability_are_rejected():
     assert "CAPABILITY_NOT_ADVERTISED" in result["reasons"]
 
 
-def test_heartbeat_replaces_stale_host_facts():
-    worker = AdvancedWorker("real-03", {REAL_BOOT_CAPABILITY}, mode="real_executor")
-    worker.register(host_facts=real_facts(), now=100)
-    updated = worker.heartbeat(host_facts={"host_identity_verified": True}, now=101)
-    result = worker.admit_task({"task_id": "boot-03", "capability": REAL_BOOT_CAPABILITY}, now=102)
+def test_heartbeat_replaces_stale_proofs():
+    worker = AdvancedWorker("real-04", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
+    worker.register(gate_evidence=test_proof_bundle(), now=100)
+    updated = worker.heartbeat(gate_evidence={"host_identity_verified": {"proof_id": "test-proof:host_identity_verified"}}, now=101)
+    result = worker.admit_task({"task_id": "boot-04", "capability": REAL_BOOT_CAPABILITY}, now=102)
     assert updated["online"] is True
     assert result["admitted"] is False
-    assert "KVM_RUNTIME_VERIFIED_NOT_VERIFIED" in result["reasons"]
+    assert "KVM_RUNTIME_VERIFIED_EVIDENCE_MISSING" in result["reasons"]
