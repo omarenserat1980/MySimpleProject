@@ -55,5 +55,7 @@ jobs:
           node test/commercial_worker_static.test.js
           node test/cinema_worker_static.test.js
           node test/devkit_static.test.js
+          bash -n test/emulator_smoke.sh
+          bash test/emulator_smoke.sh
           echo "BRAIN_CLOUDFLARE_EMULATOR_GATE=PASS"
           echo "LIVE_CLOUDFLARE_USED=FALSE"
