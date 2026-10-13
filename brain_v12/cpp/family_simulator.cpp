@@ -183,8 +183,8 @@ std::vector<std::string> FamilySimulator::simulate_grandchildren(
         child.parents = {first, second};
         members_.emplace(id, child);
         created.push_back(id);
-        ++a->second.simulated_children;
-        ++b->second.simulated_children;
+        ++members_.at(first).simulated_children;
+        ++members_.at(second).simulated_children;
     }
     return created;
 }
