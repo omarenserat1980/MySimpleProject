@@ -184,6 +184,23 @@ class MouseEmulatorTests(unittest.TestCase):
         legacy_memory = manager._instances["legacy_brain"]["brain"].memory
         self.assertIn("v12:integration_probe", legacy_memory)
 
+        # Verify both actual runtime handlers can perform a safe plan operation.
+        v12_plan = KERNEL.submit("plan", "make a bounded local verification plan", "brain_v12")
+        v12_result = KERNEL.dispatch(v12_plan["id"], "brain_v12", {
+            "description": "make a bounded local verification plan",
+        })
+        self.assertEqual(v12_result["state"], "COMPLETED")
+        self.assertTrue(v12_result["executed"])
+        self.assertEqual(v12_result["result"]["status"], "PLANNED")
+
+        legacy_plan = KERNEL.submit("plan", "analyze the safe integration plan", "legacy_brain")
+        legacy_result = KERNEL.dispatch(legacy_plan["id"], "legacy_brain", {
+            "description": "analyze the safe integration plan",
+        })
+        self.assertEqual(legacy_result["state"], "COMPLETED")
+        self.assertTrue(legacy_result["executed"])
+        self.assertEqual(legacy_result["result"]["runtime"], "legacy_brain")
+
     def test_non_loopback_bind_is_refused(self):
         with patch.dict(os.environ, {"MOUSE_HOST": "0.0.0.0"}):
             with self.assertRaisesRegex(SystemExit, "non-loopback"):
