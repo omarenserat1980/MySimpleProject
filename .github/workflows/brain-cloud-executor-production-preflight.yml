@@ -1,0 +1,95 @@
+name: Brain Cloud Executor Production Preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify_execution_substrate:
+        description: "Require real x86_64 + /dev/kvm + QEMU KVM initialization before declaring ready"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloud-executor-production-preflight
+  cancel-in-progress: false
+
+jobs:
+  production_attestation_preflight:
+    # Must run on the trusted, provisioned executor host. GitHub-hosted runners
+    # and a simulated local test are not substitutes for this identity boundary.
+    runs-on: [self-hosted, linux, x64, brain-internal, qemu, windows-real-boot, brain-cloud-executor]
+    environment:
+      name: windows-real-boot
+    timeout-minutes: 15
+    env:
+      BRAIN_CLOUD_EXECUTOR: ${{ vars.BRAIN_CLOUD_EXECUTOR }}
+      BRAIN_CLOUD_EXECUTOR_ID: ${{ vars.BRAIN_CLOUD_EXECUTOR_ID }}
+      BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
+      BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
+      BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate protected runner identity configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${BRAIN_CLOUD_EXECUTOR:-}" = "1" || { echo "PREFLIGHT_BLOCKED=TRUSTED_EXECUTOR_FLAG_MISSING"; exit 21; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_ID:-}" || { echo "PREFLIGHT_BLOCKED=EXECUTOR_ID_MISSING"; exit 22; }
+          case "${BRAIN_CLOUD_EXECUTOR_REGISTRY_URL:-}" in https://*) ;; *) echo "PREFLIGHT_BLOCKED=REGISTRY_HTTPS_REQUIRED"; exit 23;; esac
+          test -n "${BRAIN_CLOUD_EXECUTOR_TOKEN:-}" || { echo "PREFLIGHT_BLOCKED=EXECUTOR_TOKEN_MISSING"; exit 24; }
+          test -n "${BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64:-}" || { echo "PREFLIGHT_BLOCKED=ATTESTATION_TRUST_ANCHOR_MISSING"; exit 25; }
+          echo "PREFLIGHT_IDENTITY_CONFIGURATION=PASS"
+          echo "PREFLIGHT_EXECUTOR_ID_PRESENT=1"
+
+      - name: Install Python attestation dependency
+        run: python3 -m pip install --disable-pip-version-check cryptography
+
+      - name: Request fresh challenge and signed attestation
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/brain-cloud-preflight"
+          python3 tools/request_cloud_executor_attestation.py --output "$RUNNER_TEMP/brain-cloud-preflight/attestation.json"
+
+      - name: Verify signed identity and consume nonce centrally
+        shell: bash
+        env:
+          BRAIN_CLOUD_EXECUTOR_ATTESTATION_FILE: ${{ runner.temp }}/brain-cloud-preflight/attestation.json
+        run: |
+          set -euo pipefail
+          python3 brain_v12/brain/cloud_executor_gate.py --output "$RUNNER_TEMP/brain-cloud-preflight/gate.json" > "$RUNNER_TEMP/brain-cloud-preflight/gate-output.json"
+          python3 - "$RUNNER_TEMP/brain-cloud-preflight/gate.json" "${{ inputs.verify_execution_substrate }}" <<'PY'
+          import json, sys
+          path, require_substrate = sys.argv[1], sys.argv[2].lower() == "true"
+          with open(path, encoding="utf-8") as stream:
+              evidence = json.load(stream)
+          checks = evidence.get("checks", {})
+          required = ["cloud_executor_identity", "cloud_executor_attestation"]
+          if require_substrate:
+              required += ["x86_64", "kvm_device", "qemu", "qemu_version", "qemu_accel", "kvm_runtime", "python", "workdir"]
+          failed = [name for name in required if checks.get(name, {}).get("ok") is not True]
+          # Never print the full evidence or attestation; it contains host details.
+          for name in required:
+              print(f"PREFLIGHT_{name.upper()}={'PASS' if name not in failed else 'FAIL'}")
+          if failed:
+              print("PREFLIGHT_BLOCKED=REQUIRED_CHECK_FAILED")
+              raise SystemExit(1)
+          print("PREFLIGHT_SIGNED_ATTESTATION=VERIFIED")
+          print("PREFLIGHT_CENTRAL_NONCE_CONSUMPTION=VERIFIED")
+          if require_substrate:
+              print("PREFLIGHT_KVM_QEMU_SUBSTRATE=VERIFIED")
+          print("PREFLIGHT_WINDOWS_REAL_BOOT=NOT_RUN")
+          PY
+
+      - name: Remove temporary attestation material
+        if: always()
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/brain-cloud-preflight"
