@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Mouse: an offline GitHub-shaped API emulator for Brain 3.
+"""Mouse: an offline GitHub-shaped API and Brain compatibility emulator.
 
-This service is deliberately local-only, in-memory, and non-authoritative.
-It never calls GitHub, Render, or any remote service.
+This service is local-only, in-memory, and non-authoritative. It never calls
+GitHub, Render, devices, shell commands, or any remote service.
 """
 from __future__ import annotations
 
@@ -14,23 +14,32 @@ from threading import Lock
 from urllib.parse import urlparse
 
 
+ALLOWED_SOURCES = {"legacy_brain", "brain_v12"}
+ALLOWED_ACTIONS = {"inspect", "test", "plan"}
+BLOCKED_ACTIONS = {"execute", "deploy", "render", "windows_boot", "device_setup", "publish"}
+
+
 class MouseState:
     def __init__(self) -> None:
         self.lock = Lock()
         self.repositories: dict[str, dict] = {}
+        self.tasks: list[dict] = []
         self.next_issue = 1
+        self.next_task = 1
 
     def reset(self) -> None:
         with self.lock:
             self.repositories.clear()
+            self.tasks.clear()
             self.next_issue = 1
+            self.next_task = 1
 
 
 STATE = MouseState()
 
 
 class MouseHandler(BaseHTTPRequestHandler):
-    server_version = "MouseGitHubEmulator/0.1"
+    server_version = "MouseGitHubEmulator/0.2"
 
     def log_message(self, fmt: str, *args) -> None:
         if os.getenv("MOUSE_ACCESS_LOG", "0") == "1":
@@ -67,13 +76,32 @@ class MouseHandler(BaseHTTPRequestHandler):
         if path == "/health":
             return self._send(200, {
                 "ok": True, "name": "Mouse", "system": "Brain 3",
-                "mode": "offline-github-emulator",
+                "mode": "offline-emulator",
                 "real_github": False, "render": False,
+                "external_network": False, "physical_devices": False,
+                "windows_boot_verified": False,
                 "persistence": "memory-only",
             })
+        if path == "/api/brain/compatibility":
+            return self._send(200, {
+                "ok": True,
+                "bridge": "mouse-local-compatibility-contract",
+                "legacy_brain": {"accepted_as": "legacy_brain", "execution": False},
+                "brain_v12": {"accepted_as": "brain_v12", "execution": False},
+                "brain3": {"provider": "Mouse", "mode": "local-emulation"},
+                "real_github": False, "render": False,
+                "physical_devices": False, "windows_boot_verified": False,
+                "note": "Compatibility metadata only; no remote Brain is contacted.",
+            })
+        if path == "/api/brain/tasks":
+            with STATE.lock:
+                return self._send(200, list(STATE.tasks))
         if path == "/api/repos":
             with STATE.lock:
-                return self._send(200, list(STATE.repositories.values()))
+                return self._send(200, [
+                    {k: v for k, v in item.items() if k not in ("issues", "branches", "workflows")}
+                    for item in STATE.repositories.values()
+                ])
         match = re.fullmatch(r"/api/repos/([^/]+)/([^/]+)/(issues|branches|workflows)", path)
         if match:
             owner, repo, resource = match.groups()
@@ -82,11 +110,7 @@ class MouseHandler(BaseHTTPRequestHandler):
                 item = STATE.repositories.get(key)
                 if item is None:
                     return self._send(404, {"message": "Mouse repository not found"})
-                if resource == "issues":
-                    return self._send(200, item["issues"])
-                if resource == "branches":
-                    return self._send(200, item["branches"])
-                return self._send(200, item["workflows"])
+                return self._send(200, item[resource])
         return self._send(404, {"message": "Mouse endpoint not found"})
 
     def do_POST(self) -> None:
@@ -95,6 +119,40 @@ class MouseHandler(BaseHTTPRequestHandler):
             body = self._body()
         except ValueError as exc:
             return self._send(400, {"message": str(exc)})
+
+        if path == "/api/brain/tasks":
+            source = str(body.get("source", "")).strip().lower()
+            action = str(body.get("action", "")).strip().lower()
+            description = str(body.get("description", "")).strip()
+            if source not in ALLOWED_SOURCES:
+                return self._send(400, {"message": "source must be legacy_brain or brain_v12"})
+            if action in BLOCKED_ACTIONS:
+                return self._send(403, {
+                    "message": "action blocked by Brain 3 policy",
+                    "blocked_action": action,
+                    "executed": False,
+                })
+            if action not in ALLOWED_ACTIONS:
+                return self._send(400, {"message": "action must be inspect, test, or plan"})
+            if not description or len(description) > 2000:
+                return self._send(400, {"message": "description is required and must be at most 2000 characters"})
+            with STATE.lock:
+                task = {
+                    "id": STATE.next_task,
+                    "source": source,
+                    "action": action,
+                    "description": description,
+                    "state": "SIMULATED_QUEUED",
+                    "emulated": True,
+                    "executed": False,
+                    "remote_calls": False,
+                    "render": False,
+                    "physical_devices": False,
+                    "windows_boot_verified": False,
+                }
+                STATE.next_task += 1
+                STATE.tasks.append(task)
+            return self._send(202, task)
 
         if path == "/api/repos":
             owner = str(body.get("owner", "mouse-local")).strip()
@@ -156,7 +214,7 @@ def main() -> None:
     if host not in ("127.0.0.1", "::1", "localhost"):
         raise SystemExit("Mouse refuses non-loopback binding by default")
     server = ThreadingHTTPServer((host, port), MouseHandler)
-    print(f"MOUSE_READY=1 name=Mouse host={host} port={port} real_github=false render=false", flush=True)
+    print(f"MOUSE_READY=1 name=Mouse host={host} port={port} real_github=false render=false external_network=false", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
