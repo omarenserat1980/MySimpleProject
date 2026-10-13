@@ -42,7 +42,7 @@ def build_router(brain_ai):
             "ok": True,
             "id": "brain-partner-v1",
             "name": "Brain Partner",
-            "state": "AVAILABLE" if provider else "REGISTERED",
+            "state": "AVAILABLE" if (provider.get("configured") is True or provider.get("available") is True) else "REGISTERED_PROVIDER_UNAVAILABLE",
             "mode": "software-only",
             "capabilities": [
                 "warm_arabic_persona",
