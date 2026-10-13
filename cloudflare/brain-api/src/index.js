@@ -504,6 +504,22 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
   const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND provider = 'paypal'").bind(paypalOrderId).first();
   if (!payment) return json({ ok: false, error: "PAYPAL_ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, duplicate_capture: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY" }, 200, requestOrigin, allowedOrigin);
+  const providerOrderResponse = await fetch("https://api-m.sandbox.paypal.com/v2/checkout/orders/" + encodeURIComponent(paypalOrderId), {
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+  });
+  const providerOrder = await providerOrderResponse.json().catch(() => ({}));
+  if (!providerOrderResponse.ok || providerOrder.status !== "COMPLETED") return json({ ok: false, error: "PAYPAL_ORDER_STATUS_NOT_VERIFIED" }, 409, requestOrigin, allowedOrigin);
+  const matchingUnit = (providerOrder.purchase_units || []).find(unit =>
+    String(unit.reference_id || "") === String(payment.order_id) &&
+    String(unit.invoice_id || "") === String(payment.order_id)
+  );
+  if (!matchingUnit) return json({ ok: false, error: "PAYPAL_MERCHANT_REFERENCE_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  const providerCapture = (matchingUnit.payments?.captures || []).find(capture => String(capture.id || "") === captureId);
+  if (!providerCapture || providerCapture.status !== "COMPLETED" ||
+      String(providerCapture.amount?.value || "") !== String(captureAmount.value) ||
+      String(providerCapture.amount?.currency_code || "") !== String(captureAmount.currency_code)) {
+    return json({ ok: false, error: "PAYPAL_PROVIDER_CAPTURE_RECONCILIATION_FAILED" }, 409, requestOrigin, allowedOrigin);
+  }
   if (Number(payment.amount).toFixed(2) !== String(captureAmount.value) || String(payment.currency) !== String(captureAmount.currency_code)) return json({ ok: false, error: "PAYPAL_CAPTURE_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
   const order = await env.BRAIN_DB.prepare("SELECT order_id, state FROM orders WHERE order_id = ?").bind(payment.order_id).first();
   if (!order) return json({ ok: false, error: "PAYPAL_MERCHANT_ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
