@@ -1,0 +1,29 @@
+name: Brain C++ Simulator Pointer Registry
+
+on:
+  pull_request:
+    paths:
+      - "brain6_cpp/**"
+      - "brain_v12/brain/termux_emulator.py"
+      - "brain_v12/brain/universal_simulator_api.py"
+      - "brain_v12/tests/test_termux_emulator.py"
+      - "brain_v12/tests/test_universal_simulator_api.py"
+      - ".github/workflows/brain-cpp-simulator-pointers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-pointer-registry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure C++17 pointer tests
+        run: cmake -S brain6_cpp -B build/brain6-cpp-pointers
+      - name: Build pointer registry tests
+        run: cmake --build build/brain6-cpp-pointers --parallel 2
+      - name: Run pointer registry tests
+        run: ctest --test-dir build/brain6-cpp-pointers --output-on-failure
+      - name: Run Python simulator pointer tests
+        run: python -m unittest brain_v12.tests.test_termux_emulator brain_v12.tests.test_universal_simulator_api
