@@ -27,6 +27,13 @@ def main() -> int:
     arch = platform.machine().lower()
     is_x86_64 = arch in {"x86_64", "amd64"}
     checks.append(check("linux_host", is_linux, platform.platform()))
+
+    # Arkan is forbidden for Huda; reject known Arkan host identity strings.
+    hostname = platform.node().strip().lower()
+    forbidden_tokens = ("arkan", "ark-an")
+    identity_ok = not any(token in hostname for token in forbidden_tokens)
+    checks.append(check("huda_host_identity_not_arkan", identity_ok,
+                        "host identity accepted (hostname redacted)" if identity_ok else "ARKAN_FORBIDDEN: host hostname matches a forbidden Arkan identity"))
     checks.append(check("x86_64_architecture", is_x86_64, arch))
 
     mem_total_kib = 0
