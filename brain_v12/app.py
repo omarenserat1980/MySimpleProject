@@ -2326,23 +2326,22 @@ def brain_git_cinema_status(workflow_id:str):
 @app.post("/api/brain/windows/provision")
 def brain_windows_provision(request:Request, body:dict):
     require_control_key(request)
-    count=int(body.get("blades",1))
-    capabilities=body.get("capabilities")
-    provision=brain_datacenter.provision(count,capabilities)
-    blade_id=body.get("blade_id")
-    result=brain_datacenter.provision_windows_server_2025(
-        blade_id=blade_id,
-        image_path=body.get("image_path"),
-        sha256=body.get("sha256"),
-        ram_bytes=int(body.get("ram_bytes",4*1024*1024*1024)),
-        disk_bytes=int(body.get("disk_bytes",64*1024*1024*1024))
-    )
-    return {"ok":True,"provision":provision,"windows":result}
+    return {
+        "ok": False,
+        "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+        "execution_mode": "SIMULATION_ONLY",
+        "real_windows_boot_verified": False,
+    }
 
 @app.post("/api/brain/windows/boot/{vm_name}")
 def brain_windows_boot(request:Request, vm_name:str):
     require_control_key(request)
-    return brain_datacenter.boot_windows_server_2025(vm_name)
+    return {
+        "ok": False,
+        "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+        "execution_mode": "SIMULATION_ONLY",
+        "real_windows_boot_verified": False,
+    }
 
 @app.get("/api/brain/windows/cloud/readiness")
 def brain_windows_cloud_readiness():
