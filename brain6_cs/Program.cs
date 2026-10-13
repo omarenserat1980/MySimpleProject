@@ -22,6 +22,26 @@ public sealed class Supervisor
             return 20;
         }
 
+        try
+        {
+            using var state = JsonDocument.Parse(await File.ReadAllTextAsync("production/BRAIN6_168H.json", cancellationToken));
+            var root = state.RootElement;
+            var enabled = root.TryGetProperty("enabled", out var enabledValue) &&
+                          enabledValue.ValueKind == JsonValueKind.True;
+            var retired = root.TryGetProperty("retired", out var retiredValue) &&
+                          retiredValue.ValueKind == JsonValueKind.True;
+            if (!enabled || retired)
+            {
+                Console.Error.WriteLine("BRAIN6_RETIRED execution_blocked");
+                return 78;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or OperationCanceledException)
+        {
+            Console.Error.WriteLine("BRAIN6_STATE_INVALID execution_blocked");
+            return 78;
+        }
+
         var retries = ReadNonNegativeInt("BRAIN6_CS_RETRIES", 0);
         for (var attempt = 1; attempt <= retries + 1; attempt++)
         {
