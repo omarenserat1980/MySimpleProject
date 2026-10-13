@@ -1,6 +1,12 @@
 name: Brain Cloudflare Staging PR592
 
 on:
+  push:
+    branches:
+      - fix/revenue-after-delivery-gate-main-2026-10-13
+    paths:
+      - ".github/workflows/brain-cloudflare-staging-pr592.yml"
+      - "cloudflare/brain-api/**"
   workflow_dispatch:
 
 permissions:
