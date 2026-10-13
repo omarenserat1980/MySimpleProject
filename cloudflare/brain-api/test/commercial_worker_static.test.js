@@ -48,6 +48,10 @@ assert.match(worker, /REVENUE_REALIZED/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.match(worker, /Realize revenue only after a verified payment and a delivery confirmation/);
 assert.match(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/);
+assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/);
+assert.match(worker, /const revenueRealized = Boolean\(payment\) && Number\(results\[2\]\?\.meta\?\.changes \|\| 0\) === 1/);
+assert.match(worker, /revenue_state: revenueRealized \? "REVENUE_REALIZED" : "PAYMENT_VERIFIED_PENDING_DELIVERY"/);
+assert.match(worker, /const results = await env\.BRAIN_DB\.batch\(statements\)/);
 
 assert.match(worker, /revenue_ledger/);
 assert.match(worker, /revenue_state/);
