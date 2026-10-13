@@ -310,3 +310,43 @@ def simulate_windows_server_2025(scenario_id: str = "success",
     return WindowsServer2025Simulator(hardware or VirtualHardwareModel()).run(
         scenario_id, capability=capability
     )
+
+
+def render_markdown_report(report: dict[str, Any]) -> str:
+    """Render a human-readable report without upgrading synthetic evidence."""
+    verification = report.get("verification") or {}
+    lines = [
+        "# Windows Server 2025 Simulation Report",
+        "",
+        f"- Run ID: {report.get('run_id', 'unknown')}",
+        f"- Status: {report.get('status', 'UNKNOWN')}",
+        f"- Scenario: {report.get('scenario_id', 'unknown')}",
+        f"- Simulator: {report.get('simulator_id', 'unknown')}@{report.get('simulator_version', 'unknown')}",
+        "- Execution mode: SIMULATION_ONLY",
+        "- Real Windows boot verified: false",
+        f"- Evidence verification: {verification.get('status', 'NOT_CHECKED')}",
+        f"- Recovery status: {report.get('recovery_status', 'NOT_REQUESTED')}",
+        "",
+        "## Modeled resources",
+        "",
+        "~~~json",
+        json.dumps(report.get("simulated_resources", {}), indent=2, sort_keys=True),
+        "~~~",
+        "",
+        "## Events",
+        "",
+        "| Stage | Status | Reason | Evidence hash |",
+        "|---|---|---|---|",
+    ]
+    for event in report.get("events", []):
+        stage = str(event.get("stage", "")).replace("|", "\\|")
+        status = str(event.get("status", "")).replace("|", "\\|")
+        reason = str(event.get("reason_code") or "—").replace("|", "\\|")
+        digest = str(event.get("evidence_hash", "")).replace("|", "\\|")
+        lines.append(f"| {stage} | {status} | {reason} | {digest} |")
+    lines.extend([
+        "",
+        "> This report contains synthetic model events only. It is not evidence that Windows Server 2025 booted on real hardware or in a real VM.",
+        "",
+    ])
+    return "\n".join(lines)
