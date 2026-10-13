@@ -34,6 +34,14 @@ class UnifiedBrainKernel:
     _adapters: dict[str, ComponentAdapter] = field(default_factory=dict, init=False, repr=False)
     _next_id: int = field(default=1, init=False, repr=False)
 
+    def reset(self) -> None:
+        """Reset in-memory state; intended for deterministic tests and local dev."""
+        with self._lock:
+            self._memory.clear()
+            self._tasks.clear()
+            self._adapters.clear()
+            self._next_id = 1
+
     def register_adapter(self, adapter: ComponentAdapter) -> None:
         """Register a real in-process adapter after its caller verifies the contract."""
         if not adapter.name.strip() or not adapter.capabilities:
