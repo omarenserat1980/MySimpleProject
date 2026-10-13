@@ -1,14 +1,22 @@
 # Brain 3 architecture boundary
 
 ```text
-Brain 3
-  └── Mouse (local GitHub API emulator)
-       ├── In-memory repository catalogue
-       ├── In-memory issue tracker
-       ├── Simulated branches and workflow list
-       └── Local health endpoint
+Legacy Brain ── simulated contract ──┐
+                                     ├── Brain 3 / Mouse (local only)
+Brain V12 ───── simulated contract ──┘       ├── GitHub-shaped API emulator
+                                             ├── In-memory repository/issues
+                                             ├── Simulated inspect/test/plan queue
+                                             └── Policy gate: no execution/deploy/boot
 ```
 
-Mouse is a development/test adapter, not a real GitHub client. It never proxies to GitHub and does not run GitHub Actions. No Render adapter exists in this Brain 3 package. The default network listener is loopback-only. Its health response is an emulator status only, never a claim that Brain 3 has production access or is ready for deployment.
+The compatibility endpoints describe and accept simulated requests from both legacy Brain and Brain V12. They do not connect to, launch, or modify either runtime. This keeps the third Brain isolated while allowing contract tests for both sides.
 
-Future expansion must keep the provider boundary explicit: if a real provider is ever added, it must be a separate adapter behind an explicit opt-in; it must not silently replace Mouse or call Render.
+Mouse is not a real GitHub client and never proxies to GitHub. It has no Render adapter. The listener is loopback-only, and all state is in memory. Its health response is emulator status only.
+
+Policy gates:
+- Legacy Brain is compatibility-only; old execution paths remain disabled.
+- Brain V12 can submit simulated inspect/test/plan tasks only; no remote execution.
+- Render and all external network calls are disabled.
+- Arkan and Redmi 3 setup are prohibited.
+- Windows Server 2025 boot proof must come from the real guest and independent completion gates; Mouse cannot produce or imply that proof.
+- A future real provider would require a separate explicitly authorized adapter; it must not silently replace Mouse or call Render.
