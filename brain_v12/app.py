@@ -1983,7 +1983,7 @@ def workforce_health():
     return workforce.health()
 
 def _cloud_worker_attestation() -> dict:
-    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
+    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", str(RUNTIME_STATE_ROOT / "cloud-runtime")))
     heartbeat = root / "cloud-worker-heartbeat.json"
     if not heartbeat.exists():
         return {"state": "NOT_RUNNING", "verified": False, "reason": "HEARTBEAT_MISSING"}
