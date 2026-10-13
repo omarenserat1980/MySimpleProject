@@ -18,6 +18,8 @@ class FakeTransport:
             return {"access_token": "test-token"}
         if url.endswith("/v2/checkout/orders"):
             return {"id": "ORDER-SANDBOX-1", "status": "CREATED"}
+        if url.endswith("/v1/notifications/verify-webhook-signature"):
+            return {"verification_status": "SUCCESS"}
         if url.endswith("/capture"):
             return {"id": "ORDER-SANDBOX-1", "status": "COMPLETED"}
         raise AssertionError("unexpected endpoint")
@@ -95,10 +97,6 @@ class PayPalAdapterTests(unittest.TestCase):
             "PAYPAL-TRANSMISSION-TIME": "2026-10-13T17:00:00Z",
         }
         event = {"id": "WH-1", "event_type": "PAYMENT.CAPTURE.COMPLETED"}
-        self.transport.__class__.__call__ = lambda self, url, method, headers, payload: (
-            {"access_token": "test-token"} if url.endswith("/v1/oauth2/token")
-            else {"verification_status": "SUCCESS"}
-        )
         result = self.adapter.verify_webhook_event(
             webhook_id="WH-ID", headers=headers, event=event
         )
