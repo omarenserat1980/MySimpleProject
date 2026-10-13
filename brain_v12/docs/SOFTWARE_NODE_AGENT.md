@@ -10,7 +10,7 @@ The `SoftwareNodeAgent` builds on `InitialSoftwareNode` with a local SQLite-back
 - Transactional claims with lease tokens; an expired lease returns a task to `PENDING` and permits another attempt.
 - Persisted task status/results (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`) and attempt counts.
 - A stoppable heartbeat thread records a monotonically increasing sequence, timestamp, and simulated node state in SQLite.
-- `run_once()` performs one bounded queue poll and task execution. A supervisor may call it periodically; this module does not create an unbounded task loop automatically.
+- `run_once()` performs one bounded queue poll and task execution. The autonomous worker thread repeatedly claims and executes allowlisted tasks until stop() is called; run_once() remains available for one explicit poll.
 
 ## Example
 
@@ -21,11 +21,13 @@ from brain_v12.brain.software_node_agent import SoftwareNodeAgent
 agent = SoftwareNodeAgent(
     Path("./brain-node-workspace"),
     database_path=Path("./brain-node-state/queue.sqlite3"),
+    heartbeat_interval=5.0,
+    poll_interval=0.25,
 )
 agent.queue.enqueue({"type": "health_check"}, idempotency_key="initial-health-check")
 agent.start()
 try:
-    print(agent.run_once())
+    # The worker thread drains the local queue automatically.
     print(agent.status())
 finally:
     agent.stop()
