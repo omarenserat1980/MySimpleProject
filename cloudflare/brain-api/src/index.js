@@ -420,7 +420,7 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)"
   ).bind(jobId, orderId).run();
-  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, revenue_state: "REVENUE_REALIZED", revenue_id: revenueId });
+  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYMENT_WEBHOOK_VERIFIED", { tran_ref: tranRef, revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY", revenue_id: revenueId });
 
   return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
 }
@@ -439,23 +439,33 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   ).bind(deliveryId, client.email).first();
   if (!delivery) return json({ ok: false, error: "DELIVERY_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (delivery.state !== "READY") return json({ ok: false, error: "DELIVERY_NOT_READY" }, 409, requestOrigin, allowedOrigin);
-  await env.BRAIN_DB.prepare(
-    "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
-  ).bind(deliveryId).run();
-  await env.BRAIN_DB.prepare(
-    "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
-  ).bind(delivery.order_id).run();
-
-  // Realize revenue only after a verified payment and a delivery confirmation for the same order.
+  // Resolve payment before committing delivery and accounting state. Keep the delivery
+  // and ledger transition in one D1 batch so a database failure cannot half-commit them.
   const payment = await env.BRAIN_DB.prepare(
     "SELECT tran_ref, amount, currency, state FROM payments WHERE order_id = ? AND provider = 'paytabs' AND state = 'PAYMENT_VERIFIED' LIMIT 1"
   ).bind(delivery.order_id).first();
+
+  const statements = [
+    env.BRAIN_DB.prepare(
+      "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
+    ).bind(deliveryId),
+    env.BRAIN_DB.prepare(
+      "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
+    ).bind(delivery.order_id),
+  ];
+
   if (payment) {
-    await env.BRAIN_DB.prepare(
+    statements.push(env.BRAIN_DB.prepare(
       "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ?"
-    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
+    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)));
   }
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });
+
+  const results = await env.BRAIN_DB.batch(statements);
+  const revenueRealized = Boolean(payment) && Number(results[2]?.meta?.changes || 0) === 1;
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", {
+    delivery_id: deliveryId, client: client.email, revenue_realized: revenueRealized,
+    revenue_state: revenueRealized ? "REVENUE_REALIZED" : "PAYMENT_VERIFIED_PENDING_DELIVERY"
+  });
   return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
 }
 
