@@ -1,9 +1,11 @@
 {
-  "enabled": true,
+  "enabled": false,
+  "retired": true,
   "campaign": "BRAIN6_168H",
   "started_epoch": 1790531685,
   "duration_seconds": 604800,
   "chunk_seconds": 21600,
   "free_only": true,
-  "youtube_publish": false
+  "youtube_publish": false,
+  "retirement_reason": "Replaced as an execution path by the canonical Brain V12 runtime"
 }
