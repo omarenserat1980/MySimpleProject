@@ -1,15 +1,17 @@
 # Brain 3 — Mouse
 
-Mouse is a **local GitHub-shaped API emulator** for Brain 3. It is a sandbox for testing orchestration and repository workflows without using a real GitHub API, a real GitHub repository as a runtime dependency, or Render.
+Mouse is a local GitHub-shaped API emulator and compatibility boundary for Brain 3. It can accept simulated requests from the legacy Brain and Brain V12 without contacting either runtime, GitHub, Render, or a device.
 
-## Safety and scope
+## Non-negotiable policy
 
-- **No Render:** no Render SDK, service definition, deployment workflow, or Render credentials.
-- **No real GitHub calls:** endpoints are implemented locally; the emulator never makes outbound requests.
+- **No real Render:** no Render SDK, service definition, deployment workflow, or Render credentials.
+- **No real GitHub API calls:** Mouse's API is implemented locally and makes no outbound requests.
+- **No Arkan or Redmi 3:** device setup and device execution are blocked.
+- **No false Windows boot:** health, task responses, tests, and simulation cannot claim Windows Server 2025 boot success.
 - **Loopback only:** default bind is `127.0.0.1:8787`; startup refuses non-loopback addresses.
-- **No credentials:** do not add GitHub tokens or secrets. Mouse has no authentication because it must remain local-only.
-- **Memory-only state:** repositories and issues disappear when the process exits. It is not a source of truth or a production GitHub replacement.
-- **Explicitly simulated:** all resources are marked `emulated: true`; health reports `real_github: false` and `render: false`.
+- **No credentials:** never add GitHub tokens or secrets. Mouse has no authentication because it must remain local-only.
+- **Memory-only state:** repositories and tasks disappear when the process exits. Mouse is not a source of truth or a production replacement.
+- **Fail closed:** actual execution, deployment, Render, Windows boot, device setup, and publishing tasks are rejected.
 
 ## Run
 
@@ -19,15 +21,32 @@ From the repository root:
 python -m brain3_mouse.server
 ```
 
-Then check:
+Check health and compatibility:
 
 ```bash
 curl http://127.0.0.1:8787/health
+curl http://127.0.0.1:8787/api/brain/compatibility
 ```
 
-Default port: `8787`. Override with `MOUSE_PORT`. The host remains loopback-only.
+Default port is `8787`. `MOUSE_PORT` can change the port, but the listener remains loopback-only.
 
-## Supported routes
+## Brain compatibility API
+
+- `GET /api/brain/compatibility` — describes the legacy Brain and V12 compatibility contract. This is metadata, not a remote connection.
+- `POST /api/brain/tasks` — accepts simulated `inspect`, `test`, or `plan` tasks from `legacy_brain` or `brain_v12`. Every task reports `executed: false`.
+- `GET /api/brain/tasks` — lists in-memory simulated tasks.
+
+Example request:
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/brain/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"source":"brain_v12","action":"inspect","description":"inspect a proposed change"}'
+```
+
+Blocked actions return HTTP 403: `execute`, `deploy`, `render`, `windows_boot`, `device_setup`, and `publish`.
+
+## Mouse GitHub-shaped API
 
 - `GET /health`
 - `GET /api/repos`
@@ -45,4 +64,4 @@ Unsupported mutation endpoints fail closed with HTTP 405. Unknown repositories a
 python -m unittest discover -s brain3_mouse/tests -v
 ```
 
-This is an initial emulator, not a complete implementation of the GitHub REST API. It does not clone, push, merge, run Actions, deploy applications, or boot operating systems.
+Mouse is an initial emulator. It does not clone or push real repositories, merge pull requests, run GitHub Actions, deploy applications, invoke old/new Brain processes, or boot operating systems.
