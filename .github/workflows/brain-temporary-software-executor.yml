@@ -76,15 +76,43 @@ jobs:
           python3 -m pytest -q brain_v12/tests/test_software_resource_node.py brain_v12/tests/test_windows_software_boot_gate.py
       - name: Download and verify Windows Server 2025 Evaluation ISO
         env:
-          ISO_URL: ${{ inputs.windows_iso_url || 'https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso' }}
-          TRUSTED_SHA256: ${{ inputs.trusted_iso_sha256 || '7b052573ba7894c9924e3e87ba732ccd354d18cb75a883efa9b900ea125bfd51' }}
+          ISO_URL_INPUT: ${{ inputs.windows_iso_url }}
+          TRUSTED_SHA256_INPUT: ${{ inputs.trusted_iso_sha256 }}
         run: |
           set -euo pipefail
-          case "$ISO_URL" in https://software-static.download.prss.microsoft.com/*) ;; *) echo "BLOCKED: URL must be a Microsoft software download host"; exit 2;; esac
-          [[ "$TRUSTED_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "BLOCKED: SHA-256 is required"; exit 2; }
-          curl --fail --location --proto '=https' --proto-redir '=https' --retry 3 --retry-delay 3 --connect-timeout 30 "$ISO_URL" -o windows-server-2025.iso
+          DEFAULT_ISO_URL='https://software-static.download.prss.microsoft.com/dbazure/998969d5-f34g-4e03-ac9d-1f9786c66749/26100.32230.260111-0550.lt_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso'
+          DEFAULT_SHA256='7b052573ba7894c9924e3e87ba732ccd354d18cb75a883efa9b900ea125bfd51'
+          if [ -n "$ISO_URL_INPUT" ]; then
+            ISO_URL="$ISO_URL_INPUT"
+            TRUSTED_SHA256="$TRUSTED_SHA256_INPUT"
+            [ -n "$TRUSTED_SHA256" ] || { echo "BLOCKED: when supplying a custom ISO URL, also supply its independently verified SHA-256"; exit 2; }
+          else
+            ISO_URL="$DEFAULT_ISO_URL"
+            TRUSTED_SHA256="$DEFAULT_SHA256"
+          fi
+          ISO_URL="$ISO_URL" python3 - <<'PY'
+          import os, sys
+          from urllib.parse import urlparse
+          value = os.environ["ISO_URL"]
+          parsed = urlparse(value)
+          allowed = {
+              "software-static.download.prss.microsoft.com",
+              "download.microsoft.com",
+              "software-download.microsoft.com",
+          }
+          if parsed.scheme != "https" or parsed.hostname not in allowed or parsed.username or parsed.password or parsed.port not in (None, 443):
+              print("BLOCKED: ISO URL must use HTTPS on an explicitly approved Microsoft ISO-download host.")
+              print("Allowed hosts: " + ", ".join(sorted(allowed)))
+              print("For the built-in verified ISO, leave windows_iso_url and trusted_iso_sha256 blank.")
+              sys.exit(2)
+          if not parsed.path.lower().endswith(".iso"):
+              print("BLOCKED: URL must point directly to an .iso file, not an Evaluation Center landing page.")
+              sys.exit(2)
+          PY
+          [[ "$TRUSTED_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "BLOCKED: trusted SHA-256 must be exactly 64 hexadecimal characters"; exit 2; }
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-redirs 5 --retry 3 --retry-delay 3 --connect-timeout 30 "$ISO_URL" -o windows-server-2025.iso
           actual="$(sha256sum windows-server-2025.iso | awk '{print $1}')"
-          test "${actual,,}" = "${TRUSTED_SHA256,,}" || { echo "BLOCKED: ISO SHA-256 mismatch"; exit 2; }
+          test "${actual,,}" = "${TRUSTED_SHA256,,}" || { echo "BLOCKED: ISO SHA-256 mismatch; downloaded bytes will not be booted"; exit 2; }
           printf '{"iso":"Windows Server 2025 Evaluation x64 en-US","bytes":%s,"sha256":"%s","verified":true}\n' "$(stat -c %s windows-server-2025.iso)" "$actual" > windows-iso-verification.json
           echo "MICROSOFT_ISO_SHA256_VERIFIED=PASS"
       - name: Boot Windows Server installer under QEMU TCG
