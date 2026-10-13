@@ -28,7 +28,7 @@ class SoftwareResourceNodeTests(unittest.TestCase):
         self.assertIn("-m", cmd)
         self.assertIn(str(plan.guest_memory_mib), cmd)
         self.assertIn("-accel", cmd)
-        self.assertIn("kvm" if plan.kvm_available else "tcg", cmd)
+        self.assertIn("kvm" if plan.kvm_available else "tcg", " ".join(cmd))
 
 
 if __name__ == "__main__":
