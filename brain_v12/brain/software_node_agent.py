@@ -296,6 +296,26 @@ class SoftwareNodeAgent:
         claimed = self.queue.claim()
         if claimed is None:
             return {"ok": True, "status": "QUEUE_EMPTY", "node_id": NODE_ID}
+        policy = self.task_service.authorize_execution(claimed["task"])
+        if not policy.get("ok"):
+            # A claimed task is still untrusted: legacy/raw-queue writes and
+            # post-enqueue database edits must not bypass the execution gate.
+            result = {
+                "ok": False,
+                "status": policy.get("status", "EXECUTION_POLICY_DENIED"),
+                "family_policy": policy.get("family_policy"),
+                "executed": False,
+            }
+            persisted = self.queue.finish(
+                claimed["task_id"], claimed["lease_token"], result
+            )
+            return {
+                "ok": False,
+                "status": "TASK_DENIED_BY_EXECUTION_POLICY" if persisted else "LEASE_LOST",
+                "task_id": claimed["task_id"], "attempt": claimed["attempt"],
+                "task_result": result,
+            }
+
         result = self.node.execute(claimed["task"])
         persisted = self.queue.finish(claimed["task_id"], claimed["lease_token"], result)
         return {"ok": persisted and result.get("ok", False),
@@ -314,7 +334,7 @@ class SoftwareNodeAgent:
             "execution_mode": "SANDBOXED_SOFTWARE_TASKS",
             "heartbeat": self.queue.heartbeat_status(),
             "queue": self.queue.counts(),
-            "family_policy_gate": "ENFORCED_BY_AGENT_ENQUEUE_FACADE",
+            "family_policy_gate": "ENFORCED_AT_ADMISSION_AND_EXECUTION",
             "family_policy_audit_events": len(self.task_service.audit_log),
             "family_policy_audit_chain": self.task_service.audit_status(),
             "queue_storage": "LOCAL_SQLITE_DURABLE_ON_THIS_FILESYSTEM",

@@ -96,6 +96,55 @@ class FamilyGovernedTaskService:
         queued["queued"] = True
         return queued
 
+    def authorize_execution(self, task: dict[str, Any]) -> dict[str, Any]:
+        """Recheck a claimed task immediately before execution.
+
+        Approval metadata is deliberately not carried inside task JSON. Until a
+        trusted execution-authorization record is persisted and independently
+        verified, high-risk tasks are denied here even if admission used a
+        test-only verifier. This also catches tasks inserted through the raw
+        queue or altered in SQLite after admission.
+        """
+        if not isinstance(task, dict):
+            status, kind = "INVALID_TASK", ""
+            decision = self.governance.evaluate("invalid_task", risk="high")
+            self._record({"event": "FAMILY_EXECUTION_POLICY_DENIAL",
+                          "task_type": kind, "status": status})
+            return {"ok": False, "status": status, "family_policy": decision}
+
+        kind = task.get("type")
+        if kind not in ALLOWED_TASKS or kind not in TASK_POLICY:
+            status = "TASK_TYPE_NOT_ALLOWED"
+            decision = self.governance.evaluate("invalid_task", risk="high")
+            self._record({"event": "FAMILY_EXECUTION_POLICY_DENIAL",
+                          "task_type": str(kind or ""), "status": status})
+            return {"ok": False, "status": status, "family_policy": decision}
+
+        action, risk, irreversible = TASK_POLICY[kind]
+        if risk in {"high", "critical"} or irreversible:
+            decision = self.governance.evaluate(
+                action, risk=risk, irreversible=irreversible, approval=None
+            )
+            status = "EXECUTION_APPROVAL_EVIDENCE_NOT_PERSISTED"
+            self._record({"event": "FAMILY_EXECUTION_POLICY_DENIAL",
+                          "task_type": kind, "action": action, "status": status,
+                          "task_fingerprint": hashlib.sha256(
+                              json.dumps(task, sort_keys=True, separators=(",", ":"),
+                                         allow_nan=False).encode("utf-8")
+                          ).hexdigest()})
+            return {"ok": False, "status": status, "family_policy": decision}
+
+        decision = self.governance.evaluate(
+            action, risk=risk, irreversible=irreversible, approval=None
+        )
+        self._record({"event": "FAMILY_EXECUTION_POLICY_DECISION",
+                      "task_type": kind, "decision": decision})
+        if not decision.get("ok"):
+            return {"ok": False, "status": decision.get("status", "POLICY_DENY"),
+                    "family_policy": decision}
+        return {"ok": True, "status": "EXECUTION_POLICY_ALLOWED",
+                "family_policy": decision}
+
     def _record(self, event: dict[str, Any]) -> None:
         # Fail closed if the durable policy audit cannot be written.
         persisted = self.audit.append(event)
