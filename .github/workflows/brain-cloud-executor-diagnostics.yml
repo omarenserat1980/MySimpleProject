@@ -1,0 +1,54 @@
+name: Brain Cloud Executor Diagnostics Tests
+
+on:
+  push:
+    branches:
+      - feat/cloud-executor-max-diagnostics-2026-10-13
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/request_cloud_executor_attestation.py"
+      - "brain_v12/brain/cloud_executor_attestation.py"
+      - "brain_v12/brain/cloud_executor_attestation_api.py"
+      - "brain_v12/brain/cloud_executor_attestation_issuer.py"
+      - "brain_v12/brain/cloud_executor_gate.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_client.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_api.py"
+      - "brain_v12/tests/test_cloud_executor_attestation_issuer.py"
+      - "brain_v12/tests/test_cloud_executor_gate.py"
+      - ".github/workflows/brain-cloud-executor-diagnostics.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  attestation-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check cryptography fastapi pydantic pytest
+      - name: Compile Cloud Executor attestation modules
+        run: |
+          python -m py_compile \
+            tools/request_cloud_executor_attestation.py \
+            brain_v12/brain/cloud_executor_attestation.py \
+            brain_v12/brain/cloud_executor_attestation_api.py \
+            brain_v12/brain/cloud_executor_attestation_issuer.py \
+            brain_v12/brain/cloud_executor_gate.py
+      - name: Run attestation client diagnostics tests
+        run: python -m unittest brain_v12.tests.test_cloud_executor_attestation_client
+      - name: Run API and issuer security tests
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_cloud_executor_attestation_api \
+            brain_v12.tests.test_cloud_executor_attestation_issuer
+      - name: Run Cloud Executor gate tests
+        run: python -m unittest brain_v12.tests.test_cloud_executor_gate
