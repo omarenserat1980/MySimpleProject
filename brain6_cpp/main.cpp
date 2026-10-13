@@ -90,10 +90,10 @@ public:
         std::ifstream state_file("production/BRAIN6_168H.json");
         const std::string state_text((std::istreambuf_iterator<char>(state_file)),
                                      std::istreambuf_iterator<char>());
-        const bool enabled = state_text.find("\\"enabled\\": true") != std::string::npos ||
-                             state_text.find("\\"enabled\\":true") != std::string::npos;
-        const bool retired = state_text.find("\\"retired\\": true") != std::string::npos ||
-                             state_text.find("\\"retired\\":true") != std::string::npos;
+        const bool enabled = state_text.find("\"enabled\": true") != std::string::npos ||
+                             state_text.find("\"enabled\":true") != std::string::npos;
+        const bool retired = state_text.find("\"retired\": true") != std::string::npos ||
+                             state_text.find("\"retired\":true") != std::string::npos;
         if (!enabled || retired) {
             log("BRAIN6_RETIRED execution_blocked");
             return 78;
