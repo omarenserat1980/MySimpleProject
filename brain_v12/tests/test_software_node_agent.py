@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sqlite3
 import tempfile
 import time
 import unittest
@@ -59,6 +61,63 @@ class PersistentTaskQueueTests(unittest.TestCase):
             self.assertEqual((root / "result.txt").read_text(encoding="utf-8"), "durable")
             self.assertEqual(agent.status()["queue"]["COMPLETED"], 1)
             agent.stop()
+
+    def test_raw_queue_private_read_is_denied_before_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "workspace"
+            root.mkdir()
+            (root / "private.txt").write_text("secret", encoding="utf-8")
+            db = Path(tmp) / "state.sqlite3"
+            agent = SoftwareNodeAgent(root, database_path=db, poll_interval=0.01)
+            queued = agent.queue.enqueue({"type": "read_text", "path": "private.txt"})
+            calls = []
+            original_execute = agent.node.execute
+
+            def tracked_execute(task):
+                calls.append(task)
+                return original_execute(task)
+
+            agent.node.execute = tracked_execute
+            agent.start()
+            try:
+                deadline = time.monotonic() + 2.0
+                record = agent.queue.get(queued["task_id"])
+                while record["status"] not in ("COMPLETED", "FAILED") and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                    record = agent.queue.get(queued["task_id"])
+                self.assertEqual(record["status"], "FAILED", record)
+                self.assertEqual(record["result"]["status"],
+                                 "EXECUTION_APPROVAL_EVIDENCE_NOT_PERSISTED")
+                self.assertFalse(record["result"]["executed"])
+                self.assertEqual(calls, [])
+                self.assertTrue(agent.status()["family_policy_audit_chain"]["ok"])
+            finally:
+                agent.stop()
+
+    def test_tampered_unknown_task_is_denied_before_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / "state.sqlite3"
+            agent = SoftwareNodeAgent(Path(tmp) / "workspace", database_path=db, poll_interval=0.01)
+            queued = agent.queue.enqueue({"type": "health_check"})
+            with sqlite3.connect(db) as connection:
+                connection.execute(
+                    "UPDATE tasks SET task_json=? WHERE task_id=?",
+                    (json.dumps({"type": "shell", "command": "whoami"}), queued["task_id"]),
+                )
+            calls = []
+            agent.node.execute = lambda task: calls.append(task) or {"ok": True}
+            agent.start()
+            try:
+                deadline = time.monotonic() + 2.0
+                record = agent.queue.get(queued["task_id"])
+                while record["status"] not in ("COMPLETED", "FAILED") and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                    record = agent.queue.get(queued["task_id"])
+                self.assertEqual(record["status"], "FAILED", record)
+                self.assertEqual(record["result"]["status"], "TASK_TYPE_NOT_ALLOWED")
+                self.assertEqual(calls, [])
+            finally:
+                agent.stop()
 
     def test_continuous_heartbeat_is_persisted_and_stop_is_cooperative(self):
         with tempfile.TemporaryDirectory() as tmp:
