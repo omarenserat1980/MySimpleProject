@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .brain.error_logs import BrainErrorLogStore, BrainErrorLoggingMiddleware
 from .brain.suggestions_engine import BrainSuggestionsEngine
+from .brain.suggestion_worker_policy import evaluate_suggestion_handoff
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from .brain.memory import MemoryStore
@@ -340,6 +341,25 @@ def brain_suggestion_approve(request: Request, suggestion_id: str, body: dict | 
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/brain/suggestions/{suggestion_id}/worker-candidate")
+def brain_suggestion_worker_candidate(request: Request, suggestion_id: str, body: dict | None = None):
+    """Create a reviewed, non-executable worker candidate from a ChatGPT suggestion."""
+    require_control_key(request)
+    item = suggestions_engine._get(suggestion_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="SUGGESTION_NOT_FOUND")
+    body = body or {}
+    capability = str(body.get("capability") or "").strip()
+    result = evaluate_suggestion_handoff(item, requested_capability=capability)
+    if not result["ok"]:
+        return {"ok": False, "status": "HANDOFF_DENIED", **result}
+    return {
+        "ok": True,
+        "status": "CANDIDATE_CREATED_NOT_QUEUED",
+        **result,
+    }
 
 
 @app.post("/api/brain/suggestions/{suggestion_id}/reject")
