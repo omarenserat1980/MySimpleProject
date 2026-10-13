@@ -69,6 +69,12 @@ class UnifiedBrainKernel:
         with self._lock:
             self._memory[key] = value
 
+    def memory_items(self, prefix: str = "") -> list[tuple[str, Any]]:
+        """Return a stable snapshot of shared memory entries, optionally by prefix."""
+        with self._lock:
+            return [(key, value) for key, value in sorted(self._memory.items())
+                    if key.startswith(prefix)]
+
     def submit(self, action: str, description: str, requested_by: str = "brain3") -> dict[str, Any]:
         """Create work in the one shared queue; safe actions only, never auto-executed."""
         action = action.strip().lower()
