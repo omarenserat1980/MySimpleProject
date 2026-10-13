@@ -74,7 +74,7 @@ class BrainMCPCommunicationChannelTests(unittest.TestCase):
         self.assertEqual(by_id["render-cat"]["status"], "NOT_CONFIGURED")
 
     def test_render_cat_probe_fails_closed_without_configuration(self):
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {"BRAIN_RENDER_CAT_BASE_URL": ""}):
             result = self._call_tool("brain.render_cat_probe", {"path": "/health"})
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "NOT_CONFIGURED")
