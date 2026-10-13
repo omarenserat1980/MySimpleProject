@@ -31,3 +31,16 @@ systemctl --user is-active brain6-168h.service
 ```
 
 The expected service state is disabled/inactive (the first command may report that the unit is not found because the retirement script removes it). Start the canonical Brain only after its own configuration, readiness, and authentication checks pass.
+
+## Cloud and media migration
+
+- `cloud/autonomous_software_factory.py` now compiles and tests `brain_v12` and `cloud`, not Brain V7.
+- `cloud/brain_cloud.py` and `cloud/brain_internet_cloud.py` no longer invoke the legacy background factory worker.
+- The cloud Dockerfiles no longer install Brain V7 requirements; compatibility Dockerfiles and compose start `python -m brain_v12.app`.
+- `cloud/self_improvement_loop.py` validates Brain V12.
+- `cloud/film_reliability.py` fails closed with `BRAIN_V12_RENDERER_NOT_INTEGRATED`; a real V12 renderer still needs implementation and independent media QC before film generation can be re-enabled.
+- This PR does not delete the old source tree or every historical reference. Those remain for tests/recovery, but active entrypoints must not route execution back to them.
+
+## Windows Server 2025 evidence policy
+
+Current status remains **NO-GO**. Do not report a real boot based on installer startup, simulated boot, or QEMU TCG. Acceptance requires Windows booted from the installed virtual system disk, guest-origin boot evidence tied to the same run/VM/executor, authenticated executor/guest communication, and a passing completion gate. This repository change does not itself start or prove a Windows guest.
