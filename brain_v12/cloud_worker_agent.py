@@ -21,7 +21,7 @@ SERVICE = "brain-cloud-runtime"
 WORKER_ID = os.getenv("BRAIN_CLOUD_WORKER_ID", "brain-cloud-software-worker-v1")
 INTERVAL = max(5, int(os.getenv("BRAIN_CLOUD_WORKER_INTERVAL_SECONDS", "5")))
 LEASE = max(10, int(os.getenv("BRAIN_CLOUD_WORKER_LEASE_SECONDS", "30")))
-ROOT = Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime")).expanduser()
+ROOT = Path(os.getenv("BRAIN_RUNTIME_ROOT", str(Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser().resolve() / "cloud-runtime"))).expanduser()
 HEARTBEAT = ROOT / "cloud-worker-heartbeat.json"
 STOP = False
 
