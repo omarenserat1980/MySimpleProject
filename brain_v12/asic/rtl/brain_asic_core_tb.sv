@@ -47,6 +47,8 @@ module brain_asic_core_tb;
         if (result !== 32'b0 || zero !== 1'b1)
             $fatal(1, "asynchronous reset did not initialize outputs");
         rst_n = 1'b1;
+
+        // One representative vector for every opcode.
         check_op(3'b000, 32'd7, 32'd5, 32'd12);
         check_op(3'b001, 32'd7, 32'd7, 32'd0);
         check_op(3'b010, 32'hF0, 32'h0F, 32'h00);
@@ -55,6 +57,25 @@ module brain_asic_core_tb;
         check_op(3'b101, 32'h0, 32'h0, 32'hFFFFFFFF);
         check_op(3'b110, 32'd123, 32'd456, 32'd123);
         check_op(3'b111, 32'd123, 32'd456, 32'd456);
+
+        // Boundary vectors: modulo-2^32 arithmetic and zero-flag transitions.
+        check_op(3'b000, 32'hFFFFFFFF, 32'h00000001, 32'h00000000);
+        check_op(3'b001, 32'h00000000, 32'h00000001, 32'hFFFFFFFF);
+        check_op(3'b010, 32'hFFFFFFFF, 32'h00000000, 32'h00000000);
+        check_op(3'b011, 32'h80000000, 32'h00000001, 32'h80000001);
+        check_op(3'b100, 32'hDEADBEEF, 32'hDEADBEEF, 32'h00000000);
+        check_op(3'b101, 32'hFFFFFFFF, 32'h00000000, 32'h00000000);
+        check_op(3'b110, 32'h80000000, 32'hFFFFFFFF, 32'h80000000);
+        check_op(3'b111, 32'h00000000, 32'hFFFFFFFF, 32'hFFFFFFFF);
+
+        // Assert asynchronous reset between active clock edges.
+        @(negedge clk);
+        #1 rst_n = 1'b0;
+        #1;
+        if (result !== 32'b0 || zero !== 1'b1)
+            $fatal(1, "asynchronous reset failed while running");
+        rst_n = 1'b1;
+
         $display("ASIC_RTL_TB_PASS");
         $finish;
     end
