@@ -10,6 +10,7 @@ import hashlib
 import json
 
 from .family_policy_audit import FamilyPolicyAudit
+from .family_approval_verifier import DenyAllFamilyApprovalVerifier, FamilyApprovalVerifier
 from .family_governance import FamilyApproval, FamilyGovernance
 from .initial_software_node import ALLOWED_TASKS
 
@@ -24,9 +25,11 @@ TASK_POLICY = {
 class FamilyGovernedTaskService:
     """Policy-aware facade for enqueuing work and recording policy decisions."""
 
-    def __init__(self, queue: Any, governance: FamilyGovernance | None = None):
+    def __init__(self, queue: Any, governance: FamilyGovernance | None = None,
+                 approval_verifier: FamilyApprovalVerifier | None = None):
         self.queue = queue
         self.governance = governance or FamilyGovernance()
+        self.approval_verifier = approval_verifier or DenyAllFamilyApprovalVerifier()
         self.audit = FamilyPolicyAudit(queue.database_path)
         self.audit_log: list[dict[str, Any]] = []
 
@@ -43,13 +46,32 @@ class FamilyGovernedTaskService:
         if kind not in ALLOWED_TASKS or kind not in TASK_POLICY:
             return self._deny("TASK_TYPE_NOT_ALLOWED", str(kind or ""))
         action, risk, irreversible = TASK_POLICY[kind]
+        fingerprint = hashlib.sha256(
+            json.dumps(task, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        ).hexdigest()
+        verified_approval = None
+        if approval is not None:
+            try:
+                if self.approval_verifier.verify(
+                    approval=approval, action=action, task_fingerprint=fingerprint
+                ):
+                    verified_approval = approval
+            except Exception:
+                # Verifier errors fail closed and never unlock a sensitive task.
+                verified_approval = None
         decision = self.governance.evaluate(
             action,
             risk=risk,
             irreversible=irreversible,
-            approval=approval,
+            approval=verified_approval,
         )
-        event = {"event": "FAMILY_POLICY_DECISION", "task_type": kind, "decision": decision}
+        event = {
+            "event": "FAMILY_POLICY_DECISION",
+            "task_type": kind,
+            "decision": decision,
+            "approval_verifier": "TRUSTED_VERIFIER_ACCEPTED" if verified_approval else
+                                 ("DENY_ALL_DEFAULT" if approval is not None else "NO_APPROVAL_SUPPLIED"),
+        }
         self._record(event)
         if not decision["ok"]:
             return {
@@ -60,11 +82,8 @@ class FamilyGovernedTaskService:
                 "queued": False,
             }
         if decision.get("approval_required"):
-            fingerprint = hashlib.sha256(
-                json.dumps(task, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
-            ).hexdigest()
-            if approval is None or not self.audit.consume_approval(
-                approval.consent_reference, action, fingerprint
+            if verified_approval is None or not self.audit.consume_approval(
+                verified_approval.consent_reference, action, fingerprint
             ):
                 replay = self.governance.evaluate(action, risk="high")
                 event = {"event": "FAMILY_APPROVAL_REPLAY_OR_INVALID", "task_type": kind,

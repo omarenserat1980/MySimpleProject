@@ -11,6 +11,19 @@ from brain_v12.brain.family_policy_audit import FamilyPolicyAudit
 from brain_v12.brain.software_node_agent import PersistentTaskQueue, SoftwareNodeAgent
 
 
+class TestOnlyApprovalVerifier:
+    """Test seam only; never use as a production identity provider."""
+    def verify(self, *, approval, action, task_fingerprint):
+        return (
+            approval.approved
+            and approval.approver_role == "FAMILY_GUARDIAN"
+            and approval.identity_verified
+            and bool(approval.consent_reference)
+            and approval.scope == action
+            and bool(task_fingerprint)
+        )
+
+
 class FamilyGovernedTaskServiceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -40,10 +53,22 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
             consent_reference="consent-read-1", identity_verified=True,
             scope="read_private_data",
         )
+        self.service = FamilyGovernedTaskService(self.queue, approval_verifier=TestOnlyApprovalVerifier())
         allowed = self.service.enqueue(task, approval=approval)
         self.assertTrue(allowed["ok"], allowed)
         self.assertTrue(allowed["queued"])
         self.assertEqual(self.queue.counts()["PENDING"], 1)
+
+    def test_default_verifier_rejects_self_asserted_identity(self):
+        approval = FamilyApproval(
+            approver_role="FAMILY_GUARDIAN", approved=True,
+            consent_reference="self-asserted", identity_verified=True,
+            scope="read_private_data",
+        )
+        result = self.service.enqueue({"type": "read_text", "path": "private.txt"}, approval=approval)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "FAMILY_APPROVAL_REQUIRED")
+        self.assertEqual(self.queue.counts()["PENDING"], 0)
 
     def test_audit_chain_survives_service_recreation(self):
         self.service.enqueue({"type": "health_check"})
@@ -66,6 +91,7 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
             consent_reference="one-time-consent", identity_verified=True,
             scope="read_private_data",
         )
+        self.service = FamilyGovernedTaskService(self.queue, approval_verifier=TestOnlyApprovalVerifier())
         first = self.service.enqueue(task, approval=approval)
         second = self.service.enqueue(task, approval=approval)
         self.assertTrue(first["ok"], first)
@@ -105,9 +131,10 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
             consent_reference="consent-publish-1", identity_verified=True,
             scope="publish",
         )
+        self.service = FamilyGovernedTaskService(self.queue, approval_verifier=TestOnlyApprovalVerifier())
         result = self.service.enqueue({"type": "read_text", "path": "notes.txt"}, approval=approval)
         self.assertFalse(result["ok"])
-        self.assertEqual(result["status"], "FAMILY_APPROVAL_INVALID_OR_OUT_OF_SCOPE")
+        self.assertEqual(result["status"], "FAMILY_APPROVAL_REQUIRED")
         self.assertEqual(self.queue.counts()["PENDING"], 0)
 
 
