@@ -50,62 +50,6 @@ class WindowsCloudTaskExecutor:
         poll_interval: float = 2.0,
     ) -> dict[str, Any]:
         raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
-        if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
-            raise ValueError("WINDOWS_CLOUD_ARGV_REQUIRED")
-        if not self.fabric_url:
-            raise RuntimeError("BRAIN_FABRIC_URL_REQUIRED")
-        if not self.control_token:
-            raise RuntimeError("BRAIN_CONTROL_TOKEN_REQUIRED")
-
-        decision = WindowsCloudExecutor().verify_runtime(
-            vm, node, heartbeat_timeout=heartbeat_timeout, now=now
-        )
-        if not decision.get("runtime_verified"):
-            raise RuntimeError(
-                "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED:" + str(decision.get("reason", "UNKNOWN"))
-            )
-
-        bounded_timeout = max(1, min(int(timeout or 300), 3600))
-        payload: dict[str, Any] = {"argv": argv, "timeout": bounded_timeout}
-        if cwd:
-            payload["cwd"] = cwd
-
-        created = self.http(
-            "POST",
-            f"{self.fabric_url}/v1/fabric/jobs",
-            {"kind": "windows-command", "payload": payload,
-             "required_capabilities": WINDOWS_CAPABILITIES},
-            self.control_token,
-        )
-        job = created.get("job")
-        if not isinstance(job, dict) or not job.get("job_id"):
-            raise RuntimeError("WINDOWS_CLOUD_JOB_CREATE_INVALID_RESPONSE")
-
-        job_id = str(job["job_id"])
-        deadline = time.monotonic() + bounded_timeout + 30
-        while True:
-            current_response = self.http(
-                "GET",
-                f"{self.fabric_url}/v1/fabric/jobs/{job_id}",
-                None,
-                self.control_token,
-            )
-            current = current_response.get("job")
-            if not isinstance(current, dict):
-                raise RuntimeError("WINDOWS_CLOUD_JOB_STATUS_INVALID_RESPONSE")
-            state = str(current.get("state", "")).upper()
-            if state in {"SUCCESS", "FAILED", "CANCELLED"}:
-                return {
-                    "ok": state == "SUCCESS",
-                    "state": state,
-                    "job_id": job_id,
-                    "executor": "windows-server-2025-cloud",
-                    "verified_runtime": True,
-                    "evidence": current.get("evidence", []),
-                }
-            if time.monotonic() >= deadline:
-                raise TimeoutError("WINDOWS_CLOUD_JOB_TIMEOUT")
-            self.sleep(max(0.1, min(float(poll_interval), 10.0)))
 
     @staticmethod
     def _http_json(
