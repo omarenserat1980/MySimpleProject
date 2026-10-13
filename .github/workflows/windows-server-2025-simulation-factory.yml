@@ -136,6 +136,34 @@ jobs:
           print(f"SCENARIO_MATRIX_COUNT={len(rows)}")
           print("SIMULATION_ONLY_BOUNDARY=PASS")
           PY
+      - name: Build unified evidence summary
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+          p = Path("artifacts")
+          boot = json.loads((p / "windows-server-2025-simulated-boot.json").read_text())
+          matrix = json.loads((p / "windows-server-2025-scenario-matrix.json").read_text())
+          rows = matrix["scenarios"]
+          ids = {r["scenario_id"]: r for r in rows}
+          assert boot["execution_mode"] == "SIMULATION_ONLY"
+          assert boot["real_windows_boot_verified"] is False
+          assert matrix["real_windows_boot_verified"] is False
+          assert all(r["execution_mode"] == "SIMULATION_ONLY" and r["real_windows_boot_verified"] is False for r in rows)
+          assert ids["corrupt_evidence"]["reason_code"] == "EVIDENCE_CHAIN_INVALID"
+          assert ids["corrupt_evidence"]["verification_ok"] is False
+          assert ids["real_executor_route"]["status"] == "BLOCKED"
+          assert ids["power_loss_recovery"]["recovery_status"] == "SIMULATED_RECOVERY_PASS"
+          counts = dict(sorted(Counter(r["status"] for r in rows).items()))
+          report = {"schema":"electronic-brain.windows-server-2025-unified-evidence.v1","execution_mode":"SIMULATION_ONLY","real_windows_boot_verified":False,"scenario_count":len(rows),"status_counts":counts,"scenario_ids":sorted(ids),"corrupt_evidence_rejected":True,"real_executor_route_blocked":True,"power_loss_recovery_simulated":True,"interpretation":"Synthetic model evidence only; not proof of a real Windows boot."}
+          (p / "windows-server-2025-unified-evidence.json").write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
+          lines = ["# Windows Server 2025 — Unified Synthetic Evidence","","- Execution mode: **SIMULATION_ONLY**","- Real Windows boot verified: **false**",f"- Scenarios evaluated: **{len(rows)}**","","| Status | Count |","|---|---:|"]
+          lines += [f"| {k} | {v} |" for k,v in counts.items()]
+          lines += ["","- Corrupt evidence is rejected.","- Real-executor route remains blocked.","- Power-loss recovery is simulated only.","","> Synthetic model outputs only; this report does not prove Windows booted on real hardware, a real VM, or a cloud host.",""]
+          (p / "windows-server-2025-unified-evidence.md").write_text("\n".join(lines))
+          print("UNIFIED_EVIDENCE_SAFETY=PASS")
+          PY
       - name: Upload synthetic evidence reports
         uses: actions/upload-artifact@v4
         with:
