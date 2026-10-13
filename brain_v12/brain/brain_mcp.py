@@ -6,6 +6,8 @@ from typing import Any, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .asic_simulator_api import ASICRunRequest, asic_simulator_run
+
 
 PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, "2025-11-25", "2025-06-18"}
@@ -117,6 +119,34 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         },
         evidence_handler,
     )
+
+    def asic_simulate_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        """Run the same bounded software ASIC simulation used by Brain's REST API."""
+        try:
+            request = ASICRunRequest(
+                netlist=arguments.get("netlist"),
+                vectors=arguments.get("vectors"),
+                max_cycles=arguments.get("max_cycles", 10000),
+            )
+            result = asic_simulator_run(request)
+            # The REST handler returns the simulator result directly. Preserve it
+            # as structured MCP content and explicitly label the execution mode.
+            payload = dict(result)
+            payload.setdefault("ok", True)
+            payload["source"] = "brain-api:/api/asic-sim/run"
+            payload["execution_mode"] = "SOFTWARE_SIMULATOR"
+            payload["physical_hardware_access"] = False
+            return payload
+        except Exception as exc:
+            detail = getattr(exc, "detail", None)
+            return {
+                "ok": False,
+                "status": "ASIC_SIMULATION_REJECTED",
+                "error": str(detail if detail is not None else exc)[:500],
+                "source": "brain-api:/api/asic-sim/run",
+                "execution_mode": "SOFTWARE_SIMULATOR",
+            }
+
     register(
         "brain.chat",
         "Ask Electronic Brain through its governed BrainAI chat loop.",
@@ -127,6 +157,27 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "additionalProperties": False,
         },
         chat_handler,
+    )
+
+    register(
+        "brain.asic_simulate",
+        "Run a bounded, software-only ASIC netlist simulation through Brain's existing ASIC simulator API handler. This does not access physical hardware.",
+        {
+            "type": "object",
+            "properties": {
+                "netlist": {"type": "object"},
+                "vectors": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 10000,
+                    "items": {"type": "object"},
+                },
+                "max_cycles": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 10000},
+            },
+            "required": ["netlist", "vectors"],
+            "additionalProperties": False,
+        },
+        asic_simulate_handler,
     )
 
     def rpc_result(request_id: Any, result: dict[str, Any]) -> JSONResponse:
