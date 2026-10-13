@@ -71,3 +71,22 @@ A scenario named `power_loss_recovery` means a state-model recovery path passed;
 The simulator is separate from `windows-server-2025-real-boot` and `windows-server-2025-cloud-native`. Attempting to select either capability is blocked. The behavior model does not execute a Windows kernel, Windows Boot Manager, Windows drivers, or actual Windows services.
 
 The dashboard, durable run history, Brain Memory integration, and broader end-to-end workflow are not claimed complete by this increment. Verify the API routes and all CI checks before merging. Never interpret this simulator's result as real-boot evidence.
+
+
+## Weighted implementation progress
+
+Simulation reports now include `implementation_progress`, produced by
+`brain_v12/brain/windows_server_2025_simulation_progress.py`. The roadmap is
+weighted to 100 points and currently reports **18% implementation coverage**:
+three implemented, six-point milestones are complete:
+
+1. Simulation-only safety boundary.
+2. Virtual hardware model and preflight validation.
+3. Boot-stage state machine and failure injection.
+
+The remaining 82 points are explicitly pending and listed in the report. This is
+a transparent project checklist, not an estimate of the probability of booting,
+not a Windows compatibility score, and not real boot evidence. The simulator
+continues to report `real_windows_boot_verified: false`. Future percentage
+increases must follow implementation, tests, and evidence for additional
+milestones; do not manually raise the displayed value.

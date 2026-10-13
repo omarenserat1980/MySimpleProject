@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from .windows_server_2025_simulation_progress import simulation_progress_snapshot
+
 SCHEMA = "electronic-brain.windows-server-2025-simulation.v1"
 SIMULATED_CAPABILITY = "windows-server-2025-simulated-boot"
 REAL_CAPABILITIES = {"windows-server-2025-real-boot", "windows-server-2025-cloud-native"}
@@ -281,6 +283,7 @@ class WindowsServer2025Simulator:
         verification = verification or EvidenceRecorder.verify(recorder.events)
         return {
             "schema": SCHEMA,
+            "implementation_progress": simulation_progress_snapshot(),
             "run_id": run_id,
             "scenario_id": scenario_id,
             "simulator_id": "windows-server-2025-behavior-model",
@@ -323,6 +326,8 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- Scenario: {report.get('scenario_id', 'unknown')}",
         f"- Simulator: {report.get('simulator_id', 'unknown')}@{report.get('simulator_version', 'unknown')}",
         "- Execution mode: SIMULATION_ONLY",
+        f"- Simulation implementation progress: {(report.get('implementation_progress') or {}).get('percent', 0)}% (weighted roadmap coverage)",
+        "- Progress is not a boot probability or real Windows boot evidence.",
         "- Real Windows boot verified: false",
         f"- Evidence verification: {verification.get('status', 'NOT_CHECKED')}",
         f"- Recovery status: {report.get('recovery_status', 'NOT_REQUESTED')}",
