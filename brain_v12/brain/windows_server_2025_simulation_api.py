@@ -21,6 +21,7 @@ from .windows_server_2025_simulation_factory import (
     SCENARIOS,
     VirtualHardwareModel,
     WindowsServer2025Simulator,
+    EvidenceRecorder,
 )
 
 router = APIRouter(prefix="/api/simulations/windows-server-2025",
@@ -55,6 +56,9 @@ class SimulationRequest(BaseModel):
     scenario_id: str = "success"
     hardware: dict[str, Any] = Field(default_factory=dict)
 
+    class Config:
+        extra = "forbid"
+
 
 @router.post("")
 def create_simulation(payload: SimulationRequest, request: Request) -> dict[str, Any]:
@@ -86,10 +90,6 @@ def create_simulation(payload: SimulationRequest, request: Request) -> dict[str,
 
 
 def _get_run(run_id: str) -> dict[str, Any]:
-    with _LOCK:
-        result = _RUNS.get(run_id)
-    if result is not None:
-        return result
     path = _run_path(run_id)
     try:
         result = json.loads(path.read_text(encoding="utf-8"))
@@ -98,6 +98,11 @@ def _get_run(run_id: str) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_UNREADABLE") from exc
     if not isinstance(result, dict) or result.get("run_id") != run_id:
+        raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_INVALID")
+    if result.get("execution_mode") != "SIMULATION_ONLY" or result.get("real_windows_boot_verified") is not False:
+        raise HTTPException(status_code=503, detail="SIMULATION_REALITY_BOUNDARY_INVALID")
+    verification = EvidenceRecorder.verify(result.get("events", []))
+    if not verification.get("ok"):
         raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_INVALID")
     with _LOCK:
         _RUNS[run_id] = result
