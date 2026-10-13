@@ -86,6 +86,31 @@ class PayPalAdapterTests(unittest.TestCase):
         self.assertEqual(request.data, b"grant_type=client_credentials")
         self.assertEqual(request.get_header("Content-type"), "application/x-www-form-urlencoded")
 
+    def test_webhook_verification_requires_paypal_success(self):
+        headers = {
+            "PAYPAL-AUTH-ALGO": "SHA256withRSA",
+            "PAYPAL-CERT-URL": "https://api-m.sandbox.paypal.com/cert",
+            "PAYPAL-TRANSMISSION-ID": "transmission-1",
+            "PAYPAL-TRANSMISSION-SIG": "signature",
+            "PAYPAL-TRANSMISSION-TIME": "2026-10-13T17:00:00Z",
+        }
+        event = {"id": "WH-1", "event_type": "PAYMENT.CAPTURE.COMPLETED"}
+        self.transport.__class__.__call__ = lambda self, url, method, headers, payload: (
+            {"access_token": "test-token"} if url.endswith("/v1/oauth2/token")
+            else {"verification_status": "SUCCESS"}
+        )
+        result = self.adapter.verify_webhook_event(
+            webhook_id="WH-ID", headers=headers, event=event
+        )
+        self.assertEqual(result["verification_status"], "SUCCESS")
+
+    def test_webhook_verification_rejects_missing_headers(self):
+        with self.assertRaisesRegex(ValueError, "PAYPAL_WEBHOOK_HEADERS_MISSING"):
+            self.adapter.verify_webhook_event(
+                webhook_id="WH-ID", headers={}, event={"id": "WH-1", "event_type": "TEST"}
+            )
+        self.assertEqual(self.transport.calls, [])
+
     def test_environment_requires_both_secrets(self):
         with patch.dict(os.environ, {"PAYPAL_CLIENT_ID": "", "PAYPAL_CLIENT_SECRET": ""}):
             with self.assertRaisesRegex(RuntimeError, "PAYPAL_CLIENT_ID_MISSING"):
