@@ -88,3 +88,45 @@ This map is conceptual and based on inspected source contracts; it does not clai
 - `NOT_VERIFIED`: available evidence does not establish the claim.
 
 **Phase 1 result:** partial inventory documented; full repository-wide indicator and dependency enumeration remains NOT_RUN. No real OS boot or external execution is claimed.
+
+
+## Supplemental read-only audit (continuation)
+
+Additional files fetched from `main`:
+
+| Component | Path | What source establishes | Limitation |
+|---|---|---|---|
+| Device/cloud federation | `brain_v12/brain/device_cloud_federation.py` | Planning policy for device roles/offload; states it does not connect to devices or provision resources. | A plan is not execution evidence. |
+| Virtual Arkan provisioner | `brain_v12/virtual_hardware/arkan_provisioner.py` | Explicitly simulation-first; persists logical identity/configuration and does not start a hypervisor or native guest OS. | Logical capacity is not physical capacity. |
+| Virtual hardware API | `brain_v12/virtual_hardware/api.py` | API for the virtual-computer profile and persisted checkpoints. | Route presence does not prove a running guest. |
+| Device federation docs | `docs/BRAIN_DEVICE_CLOUD_FEDERATION.md` | Documents a software-defined Arkan indicator and explicitly labels it simulated; physical identity/execution eligibility are not established by a shared heartbeat alone. | Must preserve `identity_verified=false` and execution-ineligible states until independent evidence exists. |
+| Simulation-first remote fabric | `docs/SIMULATION_FIRST_REMOTE_FABRIC.md` | Describes virtual mode as the default for remote-device workflows and a separate explicit real probe. | Wiring and runtime behavior still need tests. |
+| Self-healing verification gate | `brain_v12/self_healing/verification_gate.py` | Runs named verification commands and writes a verification evidence file. | Audit must verify freshness, task association, and that callers reject stale evidence. |
+| Repair dispatcher | `brain_v12/self_healing/repair.py` | Evidence-driven repair dispatcher with candidate verification and rollback-related behavior. | Must be tested for bounded attempts and rejection on failed mandatory checks. |
+| Review loop | `brain_v12/self_healing/review_loop.py` | Documents a bounded review/run/verify/repair loop; does not accept a generated patch as success without verification. | Security review and main-branch protection need separate verification. |
+| Continuous evolution | `brain_v12/self_healing/continuous_evolution.py` | Supports bounded or persistent cycles, with review and post-repair verification. | Persistent mode needs explicit operational bounds and failure-loop controls. |
+| Future evolution | `brain_v12/self_healing/future_evolution.py` | Produces evidence-backed proposed evolution plans; says predictions are not success. | Recommendations must not bypass authorization or verification. |
+| Movie Summary Factory | `brain_v12/movie_summary_factory/engine.py` | Defines deterministic production stages and job structure. | A job plan is not a completed media artifact. |
+| Cinematic V3 | `brain_v12/movie_summary_factory/cinematic_v3.py` | Provides cinematic planning/quality logic. | A quality plan is not proof of cinematic QC passing. |
+| Simulator CI workflow | `.github/workflows/brain-error-recovery.yml` | Includes simulator API and related tests on relevant changes. | It is not the real Windows boot workflow. |
+| Arkan virtual-computer docs | `docs/ARKAN_VIRTUAL_COMPUTER.md` | Explicitly says simulator tests do not establish native guest OS boot. | Keep real-boot evidence gate independent. |
+
+### Current CI evidence observed during this audit
+
+For the inventory branch head commit `1b4c198aca3e221c180c8c1860ef24f797808d53`, the workflow lookup returned:
+- `Brain Fabric Tests`: `in_progress`
+- `Brain Cloud Mining Control Plane`: `in_progress`
+- `Brain Reflection E2E`: `success`
+- `Brain Reasoning Loop`: `success`
+
+These are workflow observations at audit time, not a complete required-check determination. The combined commit-status endpoint returned no status entries; that does not mean all required checks passed. The inventory change itself is documentation-only and runtime tests were not run locally.
+
+### Updated migration order
+
+1. **Keep simulation-first Arkan semantics explicit.** Reuse the existing virtual-computer profile instead of adding a duplicate simulator without evidence it is needed.
+2. **Audit the simulator registry against actual route/backend consumers.** Map catalog entries to real files, test adapters, and runtime status fields before editing selectors.
+3. **Audit evidence freshness and task binding.** Trace verification-gate output into completion/boot gates; stale or unbound evidence must be rejected.
+4. **Preserve the independent real Windows boot lane.** The real-boot workflow and execution-contract issuer remain untouched by simulation routing.
+5. **Audit self-healing and media after the common evidence contract is mapped.** These systems already have verification/planning components; prefer focused tests and adapters over broad rewrites.
+
+**Continuation result:** broader source coverage added to this document, but the repository-wide search is still partial. No runtime code changed, no executor was invoked, and no real OS boot is claimed.
