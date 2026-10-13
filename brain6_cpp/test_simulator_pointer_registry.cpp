@@ -30,6 +30,12 @@ int main() {
     assert(!real_without_proof);
     assert(real_without_proof.status == "REAL_EXECUTOR_NOT_VERIFIED");
 
+    auto real_termux = brain6::resolve_simulator_pointer(
+        "termux-brain", ExecutionMode::RealExecution, exists, true);
+    assert(real_termux);
+    assert(real_termux.selected_entry == "brain_v12/tools/brain_runtime_bootstrap.sh");
+    assert(real_termux.status == "REAL_EXECUTOR_POINTER_RESOLVED");
+
     auto real_missing_adapter = brain6::resolve_simulator_pointer(
         "powershell-brain", ExecutionMode::RealExecution, exists, true);
     assert(!real_missing_adapter);
