@@ -35,6 +35,7 @@
 <aside class="inspector">
   <h3>حالة العقل الحية</h3>
   <div class="statusCard"><div class="statusHead"><span>خدمة Brain API</span><span class="pill" id="apiPill">فحص</span></div><div class="statusValue" id="apiValue">لم تُستلم نتيجة بعد.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>نبضة المحاكي</span><span class="pill" id="heartbeatPill">بدء</span></div><div class="statusValue" id="heartbeatValue">بانتظار أول نبضة مؤكدة من المتصفح إلى الخادم.</div></div>
   <div class="statusCard"><div class="statusHead"><span>مزود النموذج</span><span class="pill" id="modelPill">فحص</span></div><div class="statusValue" id="modelValue">لن نفترض أن النموذج مهيأ قبل قراءة الحالة.</div></div>
   <div class="statusCard"><div class="statusHead"><span>الجلسة</span><span class="pill" id="sessionPill">محلية</span></div><div class="statusValue" id="sessionValue">لم تُنشأ جلسة بعد.</div></div>
   <h3 style="margin-top:22px">مسار المعالجة</h3>
@@ -156,7 +157,37 @@
   $("newChat").addEventListener("click",async()=>{try{await newSession();$("messageInput").focus();$("sidebar").classList.remove("open");}catch(e){appendMessage("assistant","تعذّر إنشاء جلسة: "+e.message);}});
   $("menuBtn").addEventListener("click",()=>$("sidebar").classList.toggle("open"));
   document.querySelectorAll("[data-prompt]").forEach(b=>b.addEventListener("click",()=>{ $("messageInput").value=b.dataset.prompt; $("messageInput").focus(); }));
-  refreshStatus();loadSessions();
+  // A real browser-to-server heartbeat, separate from the cloud worker attestation.
+  const simulatorClientId = (() => {
+    try {
+      const key = "brain-chat-simulator-client-id";
+      let value = sessionStorage.getItem(key);
+      if (!value) {
+        value = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : ("sim-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+        sessionStorage.setItem(key, value);
+      }
+      return value;
+    } catch (_) {
+      return "sim-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    }
+  })();
+  async function sendSimulatorHeartbeat() {
+    try {
+      const result = await api("/api/brain/chat-simulator/heartbeat", {
+        method: "POST",
+        body: JSON.stringify({client_id: simulatorClientId, source: "brain-chat-simulator"})
+      });
+      if (result.ok !== true || result.state !== "RUNNING") throw new Error("HEARTBEAT_NOT_CONFIRMED");
+      setPill("heartbeatPill", "نبضة حية", "ok");
+      $("heartbeatValue").textContent = "آخر نبضة وصلت للخادم · " + new Date(result.timestamp * 1000).toLocaleTimeString() + " · مهلة " + result.ttl_seconds + " ثانية";
+    } catch (e) {
+      setPill("heartbeatPill", "انقطاع", "bad");
+      $("heartbeatValue").textContent = "لم تصل النبضة إلى الخادم: " + e.message;
+    }
+  }
+  refreshStatus();loadSessions();sendSimulatorHeartbeat();
+  window.setInterval(sendSimulatorHeartbeat, 5000);
+  window.setInterval(refreshStatus, 15000);
 })();
 </script>
 </body>
