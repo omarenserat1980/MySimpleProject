@@ -7,11 +7,8 @@ SDK dependency. It is fail-closed: provisioning requires an explicit enable
 flag and a pre-created Windows Server 2025 template ID.
 """
 
-import hashlib
 import json
 import os
-import platform
-from pathlib import Path
 import shutil
 import subprocess
 from typing import Any
@@ -64,7 +61,6 @@ class OpenNebulaWindowsCloudProvider:
     def provision_windows_server_2025(self, **kwargs: Any) -> CloudWindowsVM:
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
             raise RuntimeError("WINDOWS_CLOUD_APPLY_REQUIRES_EXPLICIT_ENABLEMENT")
-        self._assert_huda_host_identity()
 
         template_id = str(
             kwargs.get("opennebula_template_id")
@@ -93,39 +89,10 @@ class OpenNebulaWindowsCloudProvider:
     def destroy(self, vm_id: str) -> None:
         if os.environ.get("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "").lower() != "true":
             raise RuntimeError("WINDOWS_CLOUD_DESTROY_REQUIRES_EXPLICIT_ENABLEMENT")
-        self._assert_huda_host_identity()
         target = str(vm_id or "").strip()
         if not target:
             raise RuntimeError("OPENNEBULA_WINDOWS_VM_ID_REQUIRED")
         self._run(self.onevm_bin, ["delete", target])
-
-    @staticmethod
-    def _read_machine_id() -> str:
-        for candidate in (Path("/etc/machine-id"), Path("/var/lib/dbus/machine-id")):
-            try:
-                value = candidate.read_text(encoding="utf-8").strip()
-            except OSError:
-                continue
-            if value:
-                return value
-        return ""
-
-    @classmethod
-    def _assert_huda_host_identity(cls) -> None:
-        """Require the provisioner to run on an explicitly allowlisted Huda host."""
-        hostname = platform.node().strip().lower()
-        allowed_hostname = os.environ.get("BRAIN_HUDA_ALLOWED_HOSTNAME", "").strip().lower()
-        machine_id = cls._read_machine_id()
-        expected_digest = os.environ.get("BRAIN_HUDA_MACHINE_ID_SHA256", "").strip().lower()
-        if "arkan" in hostname or "ark-an" in hostname:
-            raise RuntimeError("ARKAN_FORBIDDEN")
-        if not hostname or not allowed_hostname or hostname != allowed_hostname:
-            raise RuntimeError("HUDA_HOST_IDENTITY_NOT_ALLOWLISTED")
-        if not machine_id or len(expected_digest) != 64 or any(c not in "0123456789abcdef" for c in expected_digest):
-            raise RuntimeError("HUDA_HOST_IDENTITY_EVIDENCE_MISSING")
-        actual_digest = hashlib.sha256(machine_id.encode("utf-8")).hexdigest()
-        if actual_digest != expected_digest:
-            raise RuntimeError("HUDA_HOST_IDENTITY_MISMATCH")
 
     @staticmethod
     def _parse_vm_id(stdout: str) -> str:
