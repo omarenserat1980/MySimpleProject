@@ -1,0 +1,144 @@
+name: Alexa Azure Windows Server 2025 Launch
+
+on:
+  workflow_dispatch:
+    inputs:
+      approve_apply:
+        description: "Authorize creation of Alexa Azure resources (may incur charges)"
+        required: true
+        type: boolean
+        default: false
+      cost_reviewed:
+        description: "Confirm Azure pricing, quota, and free-benefit eligibility were reviewed"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: alexa-azure-windows-launch
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    environment: brain-windows-production
+    timeout-minutes: 90
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_admin_username: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+      TF_VAR_admin_password: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+      TF_VAR_allowed_source_ip: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+      BRAIN_TFSTATE_ACCOUNT: ${{ vars.ALEXA_TFSTATE_ACCOUNT }}
+      APPROVE_APPLY: ${{ inputs.approve_apply }}
+      COST_REVIEWED: ${{ inputs.cost_reviewed }}
+    steps:
+      - name: Gate authorization, cost review, and required configuration
+        shell: bash
+        env:
+          CHECK_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          CHECK_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          CHECK_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          CHECK_ALLOWED_SOURCE_IP: ${{ vars.BRAIN_ALLOWED_SOURCE_IP }}
+          CHECK_STATE_ACCOUNT: ${{ vars.ALEXA_TFSTATE_ACCOUNT }}
+          CHECK_ADMIN_USERNAME: ${{ secrets.BRAIN_WINDOWS_ADMIN_USERNAME }}
+          CHECK_ADMIN_PASSWORD: ${{ secrets.BRAIN_WINDOWS_ADMIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ "$APPROVE_APPLY" == "true" && "$COST_REVIEWED" != "true" ]]; then
+            echo "BLOCKED: cost_reviewed=true is required before any Azure resource creation."
+            exit 2
+          fi
+          for name in CHECK_CLIENT_ID CHECK_TENANT_ID CHECK_SUBSCRIPTION_ID CHECK_ALLOWED_SOURCE_IP; do
+            if [[ -z "${!name:-}" ]]; then echo "BLOCKED: missing required GitHub Environment variable: $name"; exit 2; fi
+          done
+          python3 - <<'PY'
+          import ipaddress, os
+          value = os.environ["CHECK_ALLOWED_SOURCE_IP"].strip()
+          network = ipaddress.ip_network(value, strict=False)
+          if network.version != 4 or network.prefixlen == 0:
+              raise SystemExit("BLOCKED: management access must use a narrow IPv4 CIDR; 0.0.0.0/0 is forbidden.")
+          print("Management source CIDR validation passed; value withheld.")
+          PY
+          if [[ "$APPROVE_APPLY" == "true" ]]; then
+            for name in CHECK_ADMIN_USERNAME CHECK_ADMIN_PASSWORD CHECK_STATE_ACCOUNT; do
+              if [[ -z "${!name:-}" ]]; then echo "BLOCKED: missing required secret/variable: $name"; exit 2; fi
+            done
+            if [[ ! "$CHECK_STATE_ACCOUNT" =~ ^[a-z0-9]{3,24}$ ]]; then
+              echo "BLOCKED: ALEXA_TFSTATE_ACCOUNT must be 3-24 lowercase letters/digits."
+              exit 2
+            fi
+          fi
+          echo "ALEXA_LAUNCH_AUTHORIZATION_GATE=PASS"
+          echo "APPROVE_APPLY=$APPROVE_APPLY"
+          echo "COST_REVIEWED=$COST_REVIEWED"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pwsh"
+          asset_url="$(python3 - <<'PY'
+          import json, urllib.request
+          req = urllib.request.Request(
+              "https://api.github.com/repos/PowerShell/PowerShell/releases/latest",
+              headers={"Accept": "application/vnd.github+json", "User-Agent": "ElectronicBrain-CI"}
+          )
+          with urllib.request.urlopen(req, timeout=20) as response:
+              release = json.load(response)
+          assets = [a["browser_download_url"] for a in release.get("assets", [])
+                    if a.get("name", "").startswith("powershell-") and a.get("name", "").endswith("-linux-x64.tar.gz")]
+          if not assets: raise SystemExit("No official PowerShell Linux x64 release found.")
+          print(assets[0])
+          PY
+          )"
+          curl --fail --location --silent --show-error --retry 3 "$asset_url" -o "$RUNNER_TEMP/pwsh/powershell.tar.gz"
+          tar -xzf "$RUNNER_TEMP/pwsh/powershell.tar.gz" -C "$RUNNER_TEMP/pwsh"
+          chmod +x "$RUNNER_TEMP/pwsh/pwsh"
+          echo "$RUNNER_TEMP/pwsh" >> "$GITHUB_PATH"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Azure OIDC login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Azure preflight (no VM or state storage creation)
+        shell: pwsh
+        run: |
+          $preflightArgs = @{ Location = "uaenorth"; VmSize = "Standard_D2s_v5" }
+          if ($env:APPROVE_APPLY -ne "true") { $preflightArgs["AllowMissingAdminCredentials"] = $true }
+          & ./scripts/windows-cloud/preflight.ps1 @preflightArgs
+
+      - name: Bootstrap Alexa-only state storage
+        if: ${{ inputs.approve_apply }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/bootstrap-state.ps1 -Location uaenorth -ResourceGroup alexa-tfstate-rg -RegisterProviders
+
+      - name: Create and verify Alexa Windows Server 2025
+        if: ${{ inputs.approve_apply }}
+        shell: pwsh
+        run: ./scripts/windows-cloud/deploy.ps1 -Apply -SkipConfirmation -Location uaenorth -ResourceGroup alexa-windows-rg -VmName alexa-windows-server-2025 -VmSize Standard_D2s_v5 -AllowedSourceIp "$env:TF_VAR_allowed_source_ip" -StateResourceGroup alexa-tfstate-rg
+
+      - name: Report preflight-only result
+        if: ${{ !inputs.approve_apply }}
+        shell: bash
+        run: |
+          echo "ALEXA_AZURE_PREFLIGHT_ONLY=COMPLETE"
+          echo "No VM or Terraform state storage was created by this run."
+          echo "Real Windows boot remains unverified."
