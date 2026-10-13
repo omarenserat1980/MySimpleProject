@@ -86,6 +86,8 @@ ul{padding-left:20px}li{margin:8px 0}
 <h2>Evidence report</h2>
 <p class="muted">Events are synthetic model outputs with a SHA-256 hash chain, not proof of an actual Windows boot.</p>
 <pre id="report">No report available.</pre>
+<button id="load-markdown" type="button">Load Markdown report</button>
+<pre id="markdown-report">Markdown report not loaded.</pre>
 </section>
 <script>
 (() => {
@@ -130,6 +132,10 @@ ul{padding-left:20px}li{margin:8px 0}
         list.appendChild(item);
       }
       el("report").textContent = JSON.stringify(report,null,2);
+      const markdownResponse = await fetch(api + "/" + encodeURIComponent(report.run_id) + "/report.md",
+        {headers:{"X-Brain-Control-Key":key}});
+      const markdownText = await markdownResponse.text();
+      el("markdown-report").textContent = markdownResponse.ok ? markdownText : "Markdown report unavailable: " + markdownText;
       set("message", "Completed. Result is synthetic; no VM or cloud resource was created.");
     } catch (error) {
       set("message", String(error.message || error));
