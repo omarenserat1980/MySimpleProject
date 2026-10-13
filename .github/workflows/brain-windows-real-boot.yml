@@ -52,6 +52,16 @@ jobs:
           BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY: ${{ secrets.BRAIN_WINDOWS_CONTRACT_DELIVERY_KEY_PROTECTED }}
         run: |
           set -euo pipefail
+          # Stable executor identity and trust flag must come from the trusted
+          # runner service/host environment, never from workflow YAML or a job step.
+          if [ "${BRAIN_CLOUD_EXECUTOR:-}" != "1" ]; then
+            echo "BLOCKED: trusted runner host must provide BRAIN_CLOUD_EXECUTOR=1"
+            exit 2
+          fi
+          if [ -z "${BRAIN_CLOUD_EXECUTOR_ID:-}" ]; then
+            echo "BLOCKED: trusted runner host must provide BRAIN_CLOUD_EXECUTOR_ID"
+            exit 2
+          fi
           missing=0
           for name in \
             BRAIN_CLOUD_EXECUTOR_REGISTRY_URL \
