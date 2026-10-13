@@ -14,6 +14,7 @@ on:
         default: false
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
@@ -143,13 +144,22 @@ jobs:
           echo "CINEMA_R2_BUCKET_READY=TRUE"
 
       - name: Acquire verified cinema master
-        if: ${{ github.event_name == 'workflow_run' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: brain-cinema-master-private
-          path: /tmp/brain-cinema-master
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Resolve the newest successful Brain Factory run; never fall back to a missing public path.
+          PRODUCTION_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow last-light-no-pay.yml --branch main --status success --limit 20 --json databaseId --jq '.[0].databaseId // empty')"
+          if [ -z "$PRODUCTION_RUN_ID" ]; then
+            echo "::error title=Missing verified film::No successful Brain Factory production run was found."
+            exit 1
+          fi
+          echo "CINEMA_SOURCE_RUN_ID=$PRODUCTION_RUN_ID"
+          mkdir -p /tmp/brain-cinema-master
+          gh run download "$PRODUCTION_RUN_ID" --repo "$GITHUB_REPOSITORY" --name brain-cinema-master-private --dir /tmp/brain-cinema-master
+          MASTER="/tmp/brain-cinema-master/last_light_city.mp4"
+          test -s "$MASTER"
+          echo "CINEMA_MASTER_ACQUIRED=PASS"
 
       - name: Upload verified cinema master to private R2
         working-directory: cloudflare/brain-api
@@ -158,11 +168,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            MASTER="/tmp/brain-cinema-master/brain-last-light-master.mp4"
-          else
-            MASTER="../../docs/assets/last_light_city.mp4"
-          fi
+          MASTER="/tmp/brain-cinema-master/last_light_city.mp4"
           test -s "$MASTER"
           npx wrangler r2 object put brain-cinema-media/films/last_light_city.mp4 --file "$MASTER" --content-type video/mp4 --cache-control "private, no-store" --remote
           echo "CINEMA_MASTER_R2_UPLOAD=PASS"
