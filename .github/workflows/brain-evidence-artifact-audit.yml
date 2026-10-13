@@ -1,0 +1,29 @@
+name: Brain Windows Evidence Artifact Auditor
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/audit_windows_boot_artifact.py"
+      - "brain_v12/tests/test_windows_boot_artifact_audit.py"
+      - ".github/workflows/brain-evidence-artifact-audit.yml"
+  push:
+    branches: [main, feat/brain-evidence-artifact-auditor]
+    paths:
+      - "brain_v12/tools/audit_windows_boot_artifact.py"
+      - "brain_v12/tests/test_windows_boot_artifact_audit.py"
+      - ".github/workflows/brain-evidence-artifact-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-auditor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test fail-closed artifact auditing
+        run: python -m unittest brain_v12.tests.test_windows_boot_artifact_audit -v
