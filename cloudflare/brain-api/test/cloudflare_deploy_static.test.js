@@ -6,6 +6,7 @@ const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 const cinema = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
 const cinemaPublish = fs.readFileSync("../../.github/workflows/brain-cinema-publish.yml", "utf8");
 const cinemaDeploy = fs.readFileSync("../../.github/workflows/brain-cloudflare-deploy.yml", "utf8");
+const production = fs.readFileSync("../../.github/workflows/last-light-no-pay.yml", "utf8");
 
 [
   "PAYTABS_SERVER_KEY","Signature","HMAC","PAYMENT_PENDING","PAYMENT_VERIFIED",
@@ -25,6 +26,11 @@ assert.match(cinemaPublish, /Paid master must never be published under docs\/ass
 assert.doesNotMatch(cinemaPublish, /git add .*last_light_city\.mp4/);
 assert.match(cinemaDeploy, /brain-cinema-master-private/);
 assert.match(cinemaDeploy, /brain-cinema-media\/films\/last_light_city\.mp4/);
+assert.match(production, /name: brain-cinema-master-private/);
+assert.match(production, /path: \/tmp\/last-light\/last_light_city\.mp4/);
+assert.match(cinemaDeploy, /gh run download/);
+assert.match(cinemaDeploy, /CINEMA_MASTER_ACQUIRED=PASS/);
+assert.doesNotMatch(cinemaDeploy, /docs\/assets\/last_light_city\.mp4/);
 console.log("BRAIN_CLOUDFLARE_DEPLOY_STATIC_GATE=PASS");
 console.log("PAYMENT_VERIFICATION=PASS");
 console.log("CINEMA_ENTITLEMENT=PASS");
