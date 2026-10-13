@@ -133,78 +133,15 @@ class FilmReliabilityEngine:
         }
 
     def run(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Fail closed until a Brain V12-native media renderer is integrated."""
         self.final.unlink(missing_ok=True)
         self.manifest.unlink(missing_ok=True)
-        history: list[dict[str, Any]] = []
-
-        for attempt in range(1, self.attempts + 1):
-            attempt_dir = self.work_dir / f"attempt-{attempt}"
-            if attempt_dir.exists():
-                shutil.rmtree(attempt_dir)
-            attempt_dir.mkdir(parents=True, exist_ok=True)
-            self._log(f"ATTEMPT {attempt}/{self.attempts}: start")
-
-            env = self._prepare_env(payload, attempt_dir)
-            log_path = attempt_dir / "factory.log"
-            started = time.time()
-            try:
-                with log_path.open("w", encoding="utf-8") as fh:
-                    proc = subprocess.run(
-                        [sys.executable, "-m", "brain_v7.braincore_v2.background_factory_worker"],
-                        cwd=ROOT, env=env, stdout=fh, stderr=subprocess.STDOUT,
-                        timeout=self.timeout, check=False,
-                    )
-                rc = proc.returncode
-            except subprocess.TimeoutExpired:
-                rc = 124
-                self._log(f"ATTEMPT {attempt}: renderer timeout")
-            candidate = attempt_dir / "final.mp4"
-            rendered = candidate.is_file() and candidate.stat().st_size >= 1024
-            qc = self._qc(candidate)
-            sensory_qc = self._sensory_qc(payload)
-            stage_history = ["QUEUED", "RUNNING"]
-            if rendered:
-                stage_history.append("RENDERED")
-            if qc.get("ok"):
-                stage_history.append("QC")
-            record = {"attempt": attempt, "return_code": rc, "stage_history": stage_history,
-                      "qc": qc, "sensory_qc": sensory_qc,
-                      "elapsed_seconds": round(time.time() - started, 2)}
-            history.append(record)
-            self._log(f"ATTEMPT {attempt}: rc={rc} media_qc={qc.get('ok')} sensory_qc={sensory_qc.get('ok')}")
-
-            if rc == 0 and qc.get("ok") and sensory_qc.get("ok"):
-                staging = self.output_dir / ".final.mp4.tmp"
-                shutil.copyfile(candidate, staging)
-                final_qc = self._qc(staging)
-                history[-1]["stage_history"].append("MASTER_QC")
-                if not final_qc.get("ok"):
-                    staging.unlink(missing_ok=True)
-                    history[-1]["promotion_qc"] = final_qc
-                    continue
-                os.replace(staging, self.final)
-                history[-1]["stage_history"].append("VERIFIED_COMPLETED")
-                manifest = {
-                    "status": "VERIFIED_COMPLETED",
-                    "stage_contract": ["QUEUED", "RUNNING", "RENDERED", "QC", "MASTER_QC", "VERIFIED_COMPLETED"],
-                    "profile": "BRAIN CLOUD FILM RELIABILITY ENGINE",
-                    "runtime": "brain_cloud",
-                    "device_required": False,
-                    "termux_required": False,
-                    "attempt": attempt,
-                    "max_attempts": self.attempts,
-                    "video": str(self.final),
-                    "bytes": self.final.stat().st_size,
-                    "verification": {"media": final_qc, "sensory": sensory_qc},
-                    "attempt_history": history,
-                }
-                self.manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-                self._log(f"SUCCESS: verified master promoted on attempt {attempt}")
-                return {"ok": True, "video_path": str(self.final),
-                        "manifest_path": str(self.manifest), "verification": {"media": final_qc, "sensory": sensory_qc},
-                        "attempt": attempt, "attempt_history": history}
-
-        self.final.unlink(missing_ok=True)
-        self.manifest.unlink(missing_ok=True)
-        self._log("FAILED: retry budget exhausted; no master promoted")
-        return {"ok": False, "error": "EXHAUSTED_RETRIES", "attempt_history": history}
+        self._log("BLOCKED: BRAIN_V12_RENDERER_NOT_INTEGRATED; legacy factory is disabled")
+        return {
+            "ok": False,
+            "error": "BRAIN_V12_RENDERER_NOT_INTEGRATED",
+            "legacy_factory_invoked": False,
+            "video_path": None,
+            "manifest_path": None,
+            "attempt_history": [],
+        }
