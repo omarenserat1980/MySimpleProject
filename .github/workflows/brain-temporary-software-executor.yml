@@ -1,31 +1,19 @@
 name: Brain Temporary Software Execution Node
 
 on:
-  push:
-    branches: [main, feat/software-resource-node]
-    paths:
-      - ".github/workflows/brain-temporary-software-executor.yml"
-      - "brain_v12/brain/software_resource_node.py"
-      - "brain_v12/brain/windows_software_boot_gate.py"
-      - "brain_v12/tests/test_software_resource_node.py"
-      - "brain_v12/tests/test_windows_software_boot_gate.py"
   workflow_dispatch:
     inputs:
       windows_iso_url:
-        description: "Direct HTTPS Windows Server 2025 ISO URL from Microsoft Evaluation Center (optional)"
+        description: Direct HTTPS Windows Server 2025 ISO URL from Microsoft Evaluation Center (optional)
         required: false
         type: string
       trusted_iso_sha256:
-        description: "Independently verified SHA-256 for that exact ISO (required if URL supplied)"
+        description: Independently verified SHA-256 for that exact ISO (required if URL supplied)
         required: false
         type: string
 
 permissions:
   contents: read
-
-concurrency:
-  group: brain-temporary-software-executor
-  cancel-in-progress: false
 
 jobs:
   provision-software-node:
@@ -37,8 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf
+          sudo apt-get install -y qemu-system-x86 qemu-utils ovmf python3-pytest
           qemu-system-x86_64 --version | head -n 1
+          python3 -m pytest --version
           test -x "$(command -v qemu-system-x86_64)"
       - name: Detect actual host capabilities
         run: |
@@ -87,13 +76,11 @@ jobs:
           actual="$(sha256sum windows-server-2025.iso | awk '{print $1}')"
           test "${actual,,}" = "${TRUSTED_SHA256,,}" || { echo "BLOCKED: ISO SHA-256 mismatch"; exit 2; }
           echo "MICROSOFT_ISO_SHA256_VERIFIED=PASS"
-          echo "ISO admitted. Full guest installation remains gated on unattended media and guest evidence."
       - name: Upload executor evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: brain-software-executor-evidence
-          path: |
-            software-executor-capability.json
+          path: software-executor-capability.json
           if-no-files-found: warn
           retention-days: 7
