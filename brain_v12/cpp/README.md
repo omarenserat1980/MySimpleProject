@@ -21,3 +21,16 @@ Expected output: \`family simulator checks passed; descendants=2\`.
 - Simulated descendants are created only for an already-married pair after both explicitly consent.
 - Each request is capped at eight simulated children.
 - The simulation is in-memory only. It does not persist a real family tree or contact people.
+
+## Dedicated birth-cycle thread
+
+`BirthThread` emits a virtual birth-cycle event on a dedicated `std::thread` every 90 seconds by default. Its callback runs on that worker thread; the callback is where an application can process an eligible couple's simulated birth. The owner must ensure the callback safely synchronizes access to shared family state. The worker can be stopped promptly and is stopped by its destructor. Tests use a short interval to verify cycle delivery and shutdown without waiting 90 seconds.
+
+Build and run the worker test:
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thread.cpp brain_v12/cpp/test_birth_thread.cpp -o /tmp/birth-thread-test
+/tmp/birth-thread-test
+```
+
+The worker does not independently select couples or mutate the family tree: the supplied callback owns that operation and must preserve mutual consent and thread safety. This avoids silently creating descendants for couples that have not opted in.
