@@ -3,6 +3,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <iostream>
 #include <memory>
 #include <string>
