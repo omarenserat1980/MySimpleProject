@@ -45,7 +45,55 @@ class MouseEmulatorTests(unittest.TestCase):
         self.assertEqual(payload["name"], "Mouse")
         self.assertIs(payload["real_github"], False)
         self.assertIs(payload["render"], False)
+        self.assertIs(payload["external_network"], False)
+        self.assertIs(payload["physical_devices"], False)
+        self.assertIs(payload["windows_boot_verified"], False)
         self.assertEqual(payload["persistence"], "memory-only")
+
+    def test_legacy_and_v12_compatibility_contract(self):
+        status, payload = request(self.server, "GET", "/api/brain/compatibility")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["legacy_brain"]["execution"], False)
+        self.assertEqual(payload["brain_v12"]["execution"], False)
+        self.assertIs(payload["render"], False)
+        self.assertIs(payload["physical_devices"], False)
+
+    def test_old_and_new_brain_can_submit_simulated_non_execution_tasks(self):
+        for source in ("legacy_brain", "brain_v12"):
+            status, task = request(
+                self.server, "POST", "/api/brain/tasks",
+                {"source": source, "action": "inspect", "description": "inspect in sandbox"},
+            )
+            self.assertEqual(status, 202)
+            self.assertEqual(task["source"], source)
+            self.assertEqual(task["state"], "SIMULATED_QUEUED")
+            self.assertIs(task["emulated"], True)
+            self.assertIs(task["executed"], False)
+            self.assertIs(task["remote_calls"], False)
+            self.assertIs(task["render"], False)
+            self.assertIs(task["physical_devices"], False)
+            self.assertIs(task["windows_boot_verified"], False)
+
+    def test_real_execution_deploy_and_boot_are_blocked(self):
+        for action in ("execute", "deploy", "render", "windows_boot", "device_setup", "publish"):
+            status, payload = request(
+                self.server, "POST", "/api/brain/tasks",
+                {"source": "brain_v12", "action": action, "description": "must be blocked"},
+            )
+            self.assertEqual(status, 403)
+            self.assertIs(payload["executed"], False)
+
+    def test_bad_source_or_action_is_rejected(self):
+        status, _ = request(
+            self.server, "POST", "/api/brain/tasks",
+            {"source": "unknown", "action": "inspect", "description": "bad source"},
+        )
+        self.assertEqual(status, 400)
+        status, _ = request(
+            self.server, "POST", "/api/brain/tasks",
+            {"source": "brain_v12", "action": "unknown", "description": "bad action"},
+        )
+        self.assertEqual(status, 400)
 
     def test_create_local_repo_and_issue(self):
         status, repo = request(
