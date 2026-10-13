@@ -45,6 +45,22 @@ assert.match(worker, /PAYMENT_WEBHOOK_VERIFIED/);
 assert.match(auditMigration, /CREATE TABLE IF NOT EXISTS order_events/);
 
 assert.match(worker, /REVENUE_REALIZED/);
+// Payment callbacks may record a pending ledger row, but never realize revenue.
+const callbackStart = worker.indexOf("async function handlePayTabsCallback");
+const deliveryStart = worker.indexOf("async function confirmDelivery");
+const completeStart = worker.indexOf("async function completeJob", deliveryStart);
+const callbackSource = worker.slice(callbackStart, deliveryStart);
+const deliverySource = worker.slice(deliveryStart, completeStart);
+assert.ok(callbackStart >= 0 && deliveryStart > callbackStart, "payment callback and delivery handlers must exist");
+assert.doesNotMatch(callbackSource, /state: "REVENUE_REALIZED"/, "payment callback must not claim realized revenue");
+assert.match(callbackSource, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+assert.match(deliverySource, /VERIFIED_PAYMENT_EVIDENCE_REQUIRED/);
+assert.match(deliverySource, /PENDING_REVENUE_EVIDENCE_REQUIRED/);
+assert.match(deliverySource, /p\.amount = \?/);
+assert.match(deliverySource, /p\.currency = \?/);
+assert.match(deliverySource, /state = 'REVENUE_REALIZED'/);
+assert.match(deliverySource, /REVENUE_DELIVERY_VERIFICATION_FAILED/);
+assert.match(deliverySource, /CLIENT_DELIVERY_CONFIRMED/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.match(worker, /Realize revenue only after a verified payment and a delivery confirmation/);
 assert.match(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/);
