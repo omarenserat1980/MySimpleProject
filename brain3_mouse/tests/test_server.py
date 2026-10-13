@@ -52,6 +52,22 @@ class MouseEmulatorTests(unittest.TestCase):
         self.assertIs(payload["windows_boot_verified"], False)
         self.assertEqual(payload["persistence"], "memory-only")
 
+    def test_integration_status_is_truthful_before_initialization(self):
+        status, payload = request(self.server, "GET", "/api/brain3/integration")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["runtimes"]["initialized"], [])
+        self.assertIs(payload["runtimes"]["external_side_effects"], False)
+        self.assertFalse(payload["kernel"]["legacy_brain_integrated"])
+        self.assertFalse(payload["kernel"]["brain_v12_integrated"])
+
+    def test_dispatch_requires_explicit_runtime_initialization(self):
+        status, payload = request(
+            self.server, "POST", "/api/brain3/tasks/1/dispatch",
+            {"adapter": "brain_v12", "description": "safe inspect"},
+        )
+        self.assertEqual(status, 503)
+        self.assertIs(payload["executed"], False)
+
     def test_legacy_and_v12_compatibility_contract(self):
         status, payload = request(self.server, "GET", "/api/brain/compatibility")
         self.assertEqual(status, 200)
