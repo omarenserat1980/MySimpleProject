@@ -1,4 +1,4 @@
-name: ASIC RTL validation
+name: ASIC RTL validation and cloud worker
 
 on:
   pull_request:
@@ -42,6 +42,20 @@ jobs:
             brain_v12/asic/rtl/tb_brain_asic_core.sv
           vvp artifacts/asic/brain_asic_tb.vvp | tee artifacts/asic/rtl-simulation.log
           grep -q "ALL_RTL_TESTS_PASSED" artifacts/asic/rtl-simulation.log
+
+      - name: Prepare Python software-model worker
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cloud ASIC worker — run software simulator regression
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check pytest
+          mkdir -p artifacts/asic
+          python -m pytest brain_v12/tests/test_asic_hardware_simulator.py -q \
+            | tee artifacts/asic/software-simulator-tests.log
+          grep -Eq "[0-9]+ passed" artifacts/asic/software-simulator-tests.log
 
       - name: Synthesize RTL with Yosys
         run: |
