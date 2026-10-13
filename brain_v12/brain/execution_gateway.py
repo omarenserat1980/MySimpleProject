@@ -104,48 +104,13 @@ class BrainExecutionGateway:
         capability: str,
         metadata: dict[str, Any] | None = None,
     ) -> ExecutionDecision:
-        metadata = metadata or {}
-        if capability in {WINDOWS_REAL_BOOT, WINDOWS_NATIVE_EXECUTOR, WINDOWS_CLOUD, WINDOWS_CLOUD_NATIVE}:
+        if capability in {
+            WINDOWS_REAL_BOOT,
+            WINDOWS_NATIVE_EXECUTOR,
+            WINDOWS_CLOUD,
+            WINDOWS_CLOUD_NATIVE,
+        }:
             raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
-        if capability == WINDOWS_NATIVE_EXECUTOR:
-            contract = _native_contract_from_metadata(metadata)
-            contract.validate()
-            return ExecutionDecision(
-                executor=WINDOWS_NATIVE_EXECUTOR,
-                capability=WINDOWS_NATIVE_EXECUTOR,
-                verified=True,
-                reason="WINDOWS_NATIVE_EXECUTOR_CONTRACT_VERIFIED",
-            )
-        if capability == WINDOWS_REAL_BOOT:
-            executor_type = str(metadata.get("executor", "")).strip().lower()
-            if executor_type != "windows-real-boot-qemu":
-                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_QEMU_CLOUD_EXECUTOR")
-            adapter = WindowsRealBootQemuAdapter(self.runner)
-            adapter.authorize(metadata.get("contract_path"))
-            return ExecutionDecision(executor="windows-real-boot-qemu", capability=WINDOWS_REAL_BOOT, verified=True, reason="WINDOWS_REAL_BOOT_QEMU_ADAPTER_VERIFIED")
-        if capability == WINDOWS_CLOUD_NATIVE:
-            executor_type = str(metadata.get("executor", "")).strip().lower()
-            if executor_type != WINDOWS_CLOUD:
-                raise RuntimeError("WINDOWS_CLOUD_NATIVE_REQUIRES_NATIVE_CLOUD_EXECUTOR")
-            vm_data = metadata.get("vm")
-            node = metadata.get("node")
-            if not isinstance(vm_data, dict) or not isinstance(node, dict):
-                raise RuntimeError("WINDOWS_CLOUD_RUNTIME_EVIDENCE_REQUIRED")
-            vm = CloudWindowsVM(
-                vm_id=str(vm_data.get("vm_id", "")),
-                provider=str(vm_data.get("provider", "")),
-                region=str(vm_data.get("region", "")),
-                state=str(vm_data.get("state", "")),
-                os=str(vm_data.get("os", "Windows Server 2025")),
-                architecture=str(vm_data.get("architecture", "x86_64")),
-                metadata=vm_data.get("metadata", {}),
-            )
-            return self.authorize_windows_cloud(
-                vm,
-                node,
-                heartbeat_timeout=float(metadata.get("heartbeat_timeout", 120.0)),
-                now=metadata.get("now"),
-            )
         return self.authorize(capability)
 
     def authorize(self, capability: str) -> ExecutionDecision:
