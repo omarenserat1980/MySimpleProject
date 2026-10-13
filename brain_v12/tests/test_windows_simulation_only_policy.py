@@ -2,7 +2,8 @@
 import unittest
 
 from brain_v12.brain.execution_gateway import BrainExecutionGateway
-from brain_v12.brain.windows_cloud_executor import WindowsCloudExecutor
+from brain_v12.brain.windows_cloud_executor import CloudWindowsVM, WindowsCloudExecutor
+from brain_v12.brain.windows_cloud_task_executor import WindowsCloudTaskExecutor
 from brain_v12.brain.windows_real_boot_qemu_adapter import WindowsRealBootQemuAdapter
 from brain_v12.virtual_hardware.windows_server_backend import QemuWindowsBackend
 
@@ -56,6 +57,30 @@ class WindowsSimulationOnlyPolicyTests(unittest.TestCase):
             RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
         ):
             executor.provision(name="must-not-be-created")
+
+    def test_direct_cloud_task_executor_is_blocked_before_network(self):
+        def must_not_call_http(*args, **kwargs):
+            raise AssertionError("network call must not happen")
+        executor = WindowsCloudTaskExecutor(
+            fabric_url="https://invalid.example",
+            control_token="test-only",
+            http=must_not_call_http,
+        )
+        vm = CloudWindowsVM("vm", "provider", "region", "RUNNING")
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
+            executor.run(vm, {}, ["whoami"])
+
+    def test_simulator_provider_remains_allowed(self):
+        class FakeSimulator:
+            name = "brain-emulated-azure"
+            def provision_windows_server_2025(self, **kwargs):
+                return CloudWindowsVM("sim-vm", self.name, "emulated", "READY")
+        simulator = WindowsCloudExecutor(provider=FakeSimulator())
+        self.assertTrue(simulator.readiness()["ready"])
+        vm = simulator.provision(name="simulated-only")
+        self.assertEqual(vm.provider, "brain-emulated-azure")
 
 
 if __name__ == "__main__":
