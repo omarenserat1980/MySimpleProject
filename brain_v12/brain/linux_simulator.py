@@ -17,19 +17,31 @@ def evaluate_linux_simulation(profile: dict[str, Any] | None = None) -> dict[str
 
     Expected optional profile keys: name, architecture, vcpus, memory_mib, disk_gib,
     qemu_expected, kvm_expected, uefi_expected. These are modeled inputs only.
+    Invalid profile shapes and resource types fail closed.
     """
-    p = dict(profile or {})
-    name = str(p.get("name", "brain-linux-sandbox")).strip()
-    architecture = str(p.get("architecture", "x86_64")).lower()
-    try:
-        vcpus = int(p.get("vcpus", 2))
-        memory_mib = int(p.get("memory_mib", 4096))
-        disk_gib = int(p.get("disk_gib", 32))
-    except (TypeError, ValueError):
-        vcpus, memory_mib, disk_gib = 0, 0, 0
+    profile_is_mapping = profile is None or isinstance(profile, dict)
+    p = profile.copy() if isinstance(profile, dict) else {}
+
+    raw_name = p.get("name", "brain-linux-sandbox")
+    name_is_valid = isinstance(raw_name, str) and bool(raw_name.strip())
+    name = raw_name.strip() if isinstance(raw_name, str) else ""
+
+    raw_architecture = p.get("architecture", "x86_64")
+    architecture_is_valid = isinstance(raw_architecture, str)
+    architecture = raw_architecture.lower() if architecture_is_valid else ""
+
+    def strict_int(key: str, default: int) -> int:
+        value = p.get(key, default)
+        # bool is a subclass of int, and floats/strings must not be silently coerced.
+        return value if type(value) is int else 0
+
+    vcpus = strict_int("vcpus", 2)
+    memory_mib = strict_int("memory_mib", 4096)
+    disk_gib = strict_int("disk_gib", 32)
 
     checks = {
-        "profile_name": bool(name),
+        "profile_is_mapping": profile_is_mapping,
+        "profile_name": name_is_valid,
         "architecture_supported_by_model": architecture in {"x86_64", "amd64"},
         "positive_vcpus": vcpus >= 1,
         "positive_memory": memory_mib >= 128,
