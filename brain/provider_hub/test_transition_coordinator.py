@@ -29,7 +29,8 @@ def test_duplicate_ledger_entry_rolls_back_state():
     ledger = CommercialLedger()
     c = CommercialTransitionCoordinator(ledger)
     c.transition(order, "PAYMENT_VERIFIED", "l1", evidence_refs=("p1",))
+    c.transition(order, "DELIVERY_VERIFIED", "d2", evidence_refs=("delivery-proof",))
     with pytest.raises(ValueError, match="DUPLICATE_LEDGER_ENTRY"):
         c.transition(order, "REVENUE_REALIZED", "l1", evidence_refs=("r1",))
     assert order.state == "PAYMENT_VERIFIED"
-    assert len(ledger.for_order("o3")) == 1
+    assert len(ledger.for_order("o3")) == 2
