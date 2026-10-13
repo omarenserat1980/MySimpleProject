@@ -27,7 +27,12 @@ class BrainMCPCommunicationChannelTests(unittest.TestCase):
         app = FastAPI()
         app.include_router(build_mcp_router(_BrainAI(), _DeviceBridge(), _Store()))
         self.client = TestClient(app)
-        self.headers = {"MCP-Protocol-Version": PROTOCOL_VERSION}
+        self._env = patch.dict("os.environ", {"BRAIN_MCP_TOKEN": "unit-test-token"})
+        self._env.start()
+        self.headers = {"MCP-Protocol-Version": PROTOCOL_VERSION, "Authorization": "Bearer unit-test-token"}
+
+    def tearDown(self):
+        self._env.stop()
 
     def _call_tool(self, name, arguments=None):
         response = self.client.post(
@@ -42,6 +47,12 @@ class BrainMCPCommunicationChannelTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         return response.json()["result"]["structuredContent"]
+
+    def test_mcp_requires_configured_bearer_token(self):
+        with patch.dict("os.environ", {}, clear=True):
+            response = self.client.get("/mcp")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "MCP_NOT_CONFIGURED")
 
     def test_tools_list_exposes_channel_inventory_and_render_cat_probe(self):
         response = self.client.post(
