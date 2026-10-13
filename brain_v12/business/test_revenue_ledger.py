@@ -1,5 +1,7 @@
 import pytest
 
+from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
 from brain_v12.business.crypto_mining_verification import BlockchainProof, VerificationState, start_cloud_mining_verification
 from brain_v12.business.revenue_ledger import RevenueRecord
@@ -167,3 +169,62 @@ def test_revenue_snapshot_does_not_expose_mutable_internal_evidence():
     snapshot = ledger.snapshot()
     snapshot["evidence"].append("forged-evidence")
     assert ledger.evidence == []
+
+
+
+def test_durable_revenue_store_survives_reopen_and_retries(tmp_path):
+    db_path = tmp_path / "revenue.db"
+    payment = {
+        "transaction_id": "durable-tx-001",
+        "evidence_ref": "evidence://payment/durable-tx-001",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    }
+    realization = {
+        "delivery_evidence_ref": "evidence://delivery/durable-001",
+        "reconciliation_ref": "evidence://reconciliation/durable-001",
+    }
+    store = RevenueLedgerStore(db_path)
+    store.create("durable-opportunity-001", "100", "USD")
+    first_payment = store.verify("durable-opportunity-001", payment)
+    store = RevenueLedgerStore(db_path)
+    assert store.get("durable-opportunity-001")["status"] == "PAYMENT_VERIFIED"
+    assert store.verify("durable-opportunity-001", payment) == first_payment
+    first_realization = store.realize("durable-opportunity-001", realization)
+    store = RevenueLedgerStore(db_path)
+    assert store.realize("durable-opportunity-001", realization) == first_realization
+    assert store.get("durable-opportunity-001")["status"] == "REVENUE_REALIZED"
+    assert len(store.get("durable-opportunity-001")["evidence"]) == 2
+
+
+def test_durable_revenue_store_rejects_conflicting_retries(tmp_path):
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    store.create("durable-opportunity-002", "100", "USD")
+    store.verify("durable-opportunity-002", {
+        "transaction_id": "durable-original",
+        "evidence_ref": "evidence://payment/durable-original",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    })
+    with pytest.raises(ValueError, match="conflicting payment evidence"):
+        store.verify("durable-opportunity-002", {
+            "transaction_id": "durable-other",
+            "evidence_ref": "evidence://payment/durable-other",
+            "source": "independent-bank-record",
+            "verification_status": "INDEPENDENTLY_VERIFIED",
+            "amount": "100",
+            "currency": "USD",
+        })
+    assert store.get("durable-opportunity-002")["status"] == "PAYMENT_VERIFIED"
+
+
+def test_durable_revenue_store_create_is_idempotent_and_rejects_identity_conflict(tmp_path):
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    first = store.create("durable-opportunity-003", "100", "USD")
+    assert store.create("durable-opportunity-003", "100", "USD") == first
+    with pytest.raises(ValueError, match="conflicting revenue record"):
+        store.create("durable-opportunity-003", "200", "USD")
