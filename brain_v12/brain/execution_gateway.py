@@ -98,23 +98,6 @@ class BrainExecutionGateway:
         now: float | None = None,
     ) -> ExecutionDecision:
         raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
-        verification = WindowsCloudExecutor().verify_runtime(
-            vm,
-            node,
-            heartbeat_timeout=heartbeat_timeout,
-            now=now,
-        )
-        if not verification.get("runtime_verified"):
-            raise RuntimeError(
-                "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED:"
-                + str(verification.get("reason", "UNKNOWN"))
-            )
-        return ExecutionDecision(
-            executor="windows-server-2025-cloud",
-            capability=WINDOWS_CLOUD_NATIVE,
-            verified=True,
-            reason="WINDOWS_CLOUD_NATIVE_RUNTIME_VERIFIED",
-        )
 
     def authorize_task(
         self,
