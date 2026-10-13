@@ -444,9 +444,16 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
   if (!verifyResponse.ok || verifyData.verification_status !== "SUCCESS") return json({ ok: false, error: "PAYPAL_WEBHOOK_SIGNATURE_INVALID" }, 401, requestOrigin, allowedOrigin);
   if (!event.id || !event.event_type) return json({ ok: false, error: "PAYPAL_EVENT_INVALID" }, 400, requestOrigin, allowedOrigin);
   const eventId = String(event.id);
-  const inserted = await env.BRAIN_DB.prepare("INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, ?, ?)").bind(eventId, "PENDING_RECONCILIATION", null, String(event.event_type), JSON.stringify({ provider: "paypal", event })).run();
-  if (Number(inserted.meta?.changes || 0) === 0) return json({ ok: true, duplicate: true, state: "EVENT_ALREADY_PROCESSED" }, 200, requestOrigin, allowedOrigin);
-  if (event.event_type !== "PAYMENT.CAPTURE.COMPLETED") return json({ ok: true, accepted: true, state: "EVENT_RECORDED_NO_STATE_CHANGE" }, 200, requestOrigin, allowedOrigin);
+  const initialEvidence = JSON.stringify({ provider: "paypal", event });
+  const inserted = await env.BRAIN_DB.prepare("INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, ?, ?)").bind(eventId, "PENDING_RECONCILIATION", null, String(event.event_type), initialEvidence).run();
+  const isDuplicate = Number(inserted.meta?.changes || 0) === 0;
+  if (event.event_type !== "PAYMENT.CAPTURE.COMPLETED") {
+    if (isDuplicate) return json({ ok: true, duplicate: true, state: "EVENT_ALREADY_RECORDED" }, 200, requestOrigin, allowedOrigin);
+    return json({ ok: true, accepted: true, state: "EVENT_RECORDED_NO_STATE_CHANGE" }, 200, requestOrigin, allowedOrigin);
+  }
+  // If an earlier attempt recorded this event but failed before persisting the
+  // payment transition, allow reconciliation to resume. Verified payments
+  // below are idempotent and will short-circuit safely.
   const resource = event.resource || {};
   const paypalOrderId = String((resource.supplementary_data || {}).related_ids?.order_id || "");
   const captureId = String(resource.id || "");
