@@ -1,0 +1,35 @@
+name: Brain Software Resource Node
+
+on:
+  workflow_dispatch:
+    inputs:
+      cpus:
+        description: "Virtual guest CPU count"
+        required: true
+        default: "2"
+      memory_mib:
+        description: "Virtual guest RAM in MiB"
+        required: true
+        default: "4096"
+
+permissions:
+  contents: read
+
+jobs:
+  resource_node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build software CPU/RAM resource plan
+        run: |
+          python3 brain_v12/brain/software_resource_node.py             --cpus "${{ inputs.cpus }}"             --memory-mib "${{ inputs.memory_mib }}"             > software-resource-node.json
+          cat software-resource-node.json
+      - name: Run focused tests
+        run: |
+          python3 -m unittest brain_v12/tests/test_software_resource_node.py -v
+      - name: Upload resource manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-software-resource-node-${{ github.run_id }}
+          path: software-resource-node.json
