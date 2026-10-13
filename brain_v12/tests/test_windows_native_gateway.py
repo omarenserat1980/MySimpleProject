@@ -6,7 +6,6 @@ from brain_v12.brain.windows_server_network_contract import (
     WINDOWS_SERVER_NATIVE,
     WINDOWS_SERVER_CLIENT_GATEWAY,
     NetworkZone,
-    NodeTrustState,
 )
 
 
@@ -42,27 +41,34 @@ def metadata(attested=True, fencing=19, state="READY"):
 
 
 class WindowsNativeGatewayTests(unittest.TestCase):
-    def test_gateway_requires_verified_native_contract(self):
-        decision = BrainExecutionGateway().authorize_task(
-            WINDOWS_NATIVE_EXECUTOR, metadata()
-        )
-        self.assertTrue(decision.verified)
-        self.assertEqual(WINDOWS_NATIVE_EXECUTOR, decision.executor)
+    def test_gateway_blocks_verified_native_contract_in_simulation_only_mode(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
+            BrainExecutionGateway().authorize_task(
+                WINDOWS_NATIVE_EXECUTOR, metadata()
+            )
 
-    def test_gateway_rejects_missing_agent_attestation(self):
-        with self.assertRaisesRegex(ValueError, "agent_attestation"):
+    def test_gateway_blocks_missing_agent_attestation_in_simulation_only_mode(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             BrainExecutionGateway().authorize_task(
                 WINDOWS_NATIVE_EXECUTOR, metadata(attested=False)
             )
 
-    def test_gateway_rejects_fencing_mismatch(self):
-        with self.assertRaisesRegex(ValueError, "fencing_mismatch"):
+    def test_gateway_blocks_fencing_mismatch_in_simulation_only_mode(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             BrainExecutionGateway().authorize_task(
                 WINDOWS_NATIVE_EXECUTOR, metadata(fencing=18)
             )
 
-    def test_gateway_rejects_non_ready_server(self):
-        with self.assertRaisesRegex(ValueError, "not_ready"):
+    def test_gateway_blocks_non_ready_server_in_simulation_only_mode(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             BrainExecutionGateway().authorize_task(
                 WINDOWS_NATIVE_EXECUTOR, metadata(state="ATTESTED")
             )
