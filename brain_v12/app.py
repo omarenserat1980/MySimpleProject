@@ -38,6 +38,7 @@ from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
 from .brain.chat_session_api import router as brain_chat_router
 from .brain.brain_partner import build_router as brain_partner_router
+from .brain.brain_family import build_router as brain_family_router
 from .brain.chat_session_store import ChatSessionStore
 from .brain.streaming_api import router as brain_stream_router
 from .brain.openai_provider import OpenAIProvider
@@ -240,6 +241,7 @@ app.include_router(brain_ai_router(brain_ai, chat_session_store))
 app.include_router(ai_fabric_router(fabric))
 app.include_router(brain_chat_router(brain_ai, chat_session_store))
 app.include_router(brain_partner_router(brain_ai))
+app.include_router(brain_family_router(brain_ai))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(revenue_conversion_router(income_lifecycle))
