@@ -6,7 +6,7 @@ from pathlib import Path
 
 from brain_v12.brain.family_governance import FamilyApproval
 from brain_v12.brain.family_governed_tasks import FamilyGovernedTaskService
-from brain_v12.brain.software_node_agent import PersistentTaskQueue
+from brain_v12.brain.software_node_agent import PersistentTaskQueue, SoftwareNodeAgent
 
 
 class FamilyGovernedTaskServiceTests(unittest.TestCase):
@@ -55,6 +55,19 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
         self.assertEqual(result["status"], "TASK_TYPE_NOT_ALLOWED")
         self.assertEqual(self.queue.counts()["PENDING"], 0)
         self.assertEqual(self.service.audit_log[-1]["event"], "FAMILY_POLICY_DENIAL")
+
+    def test_agent_public_enqueue_uses_family_gate(self):
+        agent = SoftwareNodeAgent(
+            Path(self.tmp.name) / "agent-workspace",
+            database_path=Path(self.tmp.name) / "agent.sqlite3",
+        )
+        accepted = agent.enqueue({"type": "health_check"})
+        denied = agent.enqueue({"type": "read_text", "path": "private.txt"})
+        self.assertTrue(accepted["ok"], accepted)
+        self.assertFalse(denied["ok"], denied)
+        self.assertEqual(denied["status"], "FAMILY_APPROVAL_REQUIRED")
+        self.assertEqual(agent.status()["family_policy_gate"], "ENFORCED_BY_AGENT_ENQUEUE_FACADE")
+        self.assertEqual(agent.queue.counts()["PENDING"], 1)
 
     def test_out_of_scope_approval_does_not_authorize_private_read(self):
         approval = FamilyApproval(
