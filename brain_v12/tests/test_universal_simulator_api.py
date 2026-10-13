@@ -50,6 +50,7 @@ class UniversalSimulatorApiTests(unittest.TestCase):
     def test_catalog_uses_effective_simulator_pointers(self):
         expected = {
             "termux-brain": {
+                "brain_v12/brain/termux_emulator.py",
                 "brain_v12/brain/device_bridge.py",
                 "brain_v12/tools/brain_runtime_bootstrap.sh",
             },
@@ -64,10 +65,18 @@ class UniversalSimulatorApiTests(unittest.TestCase):
         }
         for simulator_id, paths in expected.items():
             with self.subTest(simulator_id=simulator_id):
-                configured = set(api._SIMULATOR_CATALOG[simulator_id]["evidence_paths"])
+                definition = api._SIMULATOR_CATALOG[simulator_id]
+                configured = set(definition["evidence_paths"])
                 self.assertEqual(configured, paths)
                 for path in paths:
                     self.assertTrue((api._ROOT / path).is_file(), path)
+                self.assertEqual(definition["simulator_entry"], {
+                    "termux-brain": "brain_v12/brain/termux_emulator.py",
+                    "desktop-commander-brain": "brain_v12/brain/desktop_commander_emulator.py",
+                    "powershell-brain": "brain_v12/brain/powershell_emulator.py",
+                }[simulator_id])
+                if simulator_id != "termux-brain":
+                    self.assertIsNone(definition["real_executor_entry"])
 
     def test_register_custom_simulator_does_not_claim_connection(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
