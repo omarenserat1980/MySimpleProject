@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
 from .control_auth import require_control_key
@@ -22,6 +22,7 @@ from .windows_server_2025_simulation_factory import (
     VirtualHardwareModel,
     WindowsServer2025Simulator,
     EvidenceRecorder,
+    render_markdown_report,
 )
 
 router = APIRouter(prefix="/api/simulations/windows-server-2025",
@@ -137,3 +138,9 @@ def get_simulation_events(run_id: str, request: Request) -> dict[str, Any]:
 def get_simulation_report(run_id: str, request: Request) -> dict[str, Any]:
     require_control_key(request)
     return _get_run(run_id)
+
+@router.get("/{run_id}/report.md")
+def get_simulation_markdown_report(run_id: str, request: Request) -> PlainTextResponse:
+    require_control_key(request)
+    return PlainTextResponse(render_markdown_report(_get_run(run_id)),
+                             media_type="text/markdown")
