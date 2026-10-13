@@ -122,7 +122,7 @@ class FamilyGovernedTaskServiceTests(unittest.TestCase):
         self.assertTrue(accepted["ok"], accepted)
         self.assertFalse(denied["ok"], denied)
         self.assertEqual(denied["status"], "FAMILY_APPROVAL_REQUIRED")
-        self.assertEqual(agent.status()["family_policy_gate"], "ENFORCED_BY_AGENT_ENQUEUE_FACADE")
+        self.assertEqual(agent.status()["family_policy_gate"], "ENFORCED_AT_ADMISSION_AND_EXECUTION")
         self.assertEqual(agent.queue.counts()["PENDING"], 1)
 
     def test_out_of_scope_approval_does_not_authorize_private_read(self):
