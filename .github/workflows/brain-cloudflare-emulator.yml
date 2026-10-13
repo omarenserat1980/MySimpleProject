@@ -45,5 +45,10 @@ jobs:
           node test/cloudflare_deploy_static.test.js
           node test/commercial_worker_static.test.js
           node test/cinema_worker_static.test.js
-          echo "BRAIN_CLOUDFLARE_EMULATOR_GATE=PASS"
+      - name: Exercise in-memory D1, R2, and queue contracts
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node --test test/emulator/memory-bindings.test.mjs
+          echo "BRAIN_CLOUDFLARE_EMULATOR_BINDINGS=PASS"
           echo "LIVE_CLOUDFLARE_USED=FALSE"
