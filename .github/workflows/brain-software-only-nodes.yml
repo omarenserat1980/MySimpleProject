@@ -104,5 +104,9 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/family_memory_store.cpp brain_v12/cpp/test_family_memory_store.cpp -o /tmp/family-memory-test
           /tmp/family-memory-test
+      - name: Compile and test family cloud worker recovery
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thread.cpp brain_v12/cpp/family_memory_store.cpp brain_v12/cpp/family_cloud_worker.cpp brain_v12/cpp/test_family_cloud_worker.cpp -o /tmp/family-cloud-worker-test
+          /tmp/family-cloud-worker-test
       - name: Prove Brain Core starts without hardware configuration
         run: python brain_v12/tools/ci_preflight.py
