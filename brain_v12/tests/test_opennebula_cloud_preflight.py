@@ -25,6 +25,8 @@ def test_preflight_is_read_only_and_never_claims_provisioning() -> None:
     assert result.returncode in (0, 2), result.stderr
     payload = json.loads(result.stdout)
     assert payload["mode"] == "read_only"
+    assert payload["cloud_name"] == "الكسا"
+    assert payload["cloud_slug"] == "alksa"
     assert payload["provisioned"] is False
     assert payload["vm_created"] is False
     assert payload["status"] in {"READY_FOR_REVIEW", "BLOCKED"}
