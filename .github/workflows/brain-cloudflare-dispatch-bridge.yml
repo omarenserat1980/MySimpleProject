@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "ops/dispatch-cloudflare-deploy.txt"
+      - "ops/dispatch-cloudflare-deploy*.txt"
 
 permissions:
   actions: write
