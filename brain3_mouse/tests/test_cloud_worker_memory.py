@@ -18,6 +18,11 @@ class CloudWorkerMemoryBridgeTests(unittest.TestCase):
             {"brain:context:project": {"name": "Brain 3"}},
         )
 
+    def test_worker_cannot_read_other_worker_memory_namespaces(self):
+        self.kernel.memory_set("cloud_worker:cloud-worker-02:evidence:1", {"secret": "not shared"})
+        with self.assertRaises(PermissionError):
+            self.worker.read_context(prefix="cloud_worker:")
+
     def test_safe_worker_task_enters_brains_shared_queue(self):
         task = self.worker.submit_task("inspect", "inspect a proposed change")
         self.assertEqual(task["queue"], "brain3_shared")
