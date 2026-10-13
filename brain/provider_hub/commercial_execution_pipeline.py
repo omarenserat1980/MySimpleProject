@@ -50,6 +50,9 @@ class CommercialExecutionPipeline:
                 self._audit(result, action)
                 return result
             try:
+                approval = self.approvals.get_valid_record(approval_request_id)
+                if approval.order_id != order_id or approval.action != action:
+                    raise RuntimeError("APPROVAL_CONTEXT_MISMATCH")
                 AuditedSecureApprovalService(self.approvals, self.decisions).consume_for_action(approval_request_id, f"{decision_id}:approval")
             except (KeyError, RuntimeError) as exc:
                 result = IntegratedDecision(decision_id, order_id, False, str(exc), risk.score, risk.level)
