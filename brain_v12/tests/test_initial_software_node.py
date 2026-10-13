@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from brain_v12.brain.initial_software_node import InitialSoftwareNode, NODE_ID
+from brain_v12.brain.software_node_hardware import SoftwareNodeHardware
 
 
 class InitialSoftwareNodeTests(unittest.TestCase):
@@ -56,6 +57,47 @@ class InitialSoftwareNodeTests(unittest.TestCase):
             result = node.execute({"type": "write_text", "path": "escape/outside.txt", "content": "no"})
             self.assertFalse(result["ok"])
             self.assertFalse((Path(outside) / "outside.txt").exists())
+
+
+    def test_virtual_cpu_ram_network_and_gpu_boundary(self):
+        with tempfile.TemporaryDirectory() as root:
+            node = InitialSoftwareNode(root)
+            node.start()
+            hardware = node.status()["hardware"]
+            self.assertEqual(hardware["mode"], "SOFTWARE_ONLY")
+            self.assertFalse(hardware["physical_hardware_used"])
+            self.assertEqual(hardware["cpu"]["execution_isa"], "BrainVM-1 tuple ISA")
+            self.assertTrue(hardware["ram"]["logical_capacity_only"])
+            self.assertEqual(hardware["gpu"]["state"], "UNAVAILABLE")
+            net = node.execute({"type": "network_self_test"})
+            self.assertTrue(net["ok"], net)
+            self.assertFalse(net["result"]["external_network_used"])
+            self.assertFalse(net["result"]["physical_nic_used"])
+
+    def test_brainvm_program_executes_in_virtual_cpu_and_ram(self):
+        with tempfile.TemporaryDirectory() as root:
+            node = InitialSoftwareNode(root)
+            node.start()
+            program = [
+                ("MOVI", 0, 7),
+                ("STORE", 0, 3),
+                ("LOAD", 1, 3),
+                ("OUT", 1),
+                ("HALT",),
+            ]
+            result = node.execute({"type": "run_brainvm", "program": program})
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["result"]["result"]["output"], [7])
+            self.assertFalse(result["result"]["native_machine_code"])
+            self.assertEqual(result["result"]["ram"]["logical_capacity_cells"], 4096)
+
+    def test_virtual_storage_quota_is_enforced(self):
+        with tempfile.TemporaryDirectory() as root:
+            hardware = SoftwareNodeHardware(root, storage_quota_bytes=4)
+            hardware.write_text("small.txt", "1234")
+            with self.assertRaisesRegex(ValueError, "VIRTUAL_STORAGE_QUOTA_EXCEEDED"):
+                hardware.write_text("large.txt", "12345")
+            self.assertFalse((Path(root) / "large.txt").exists())
 
     def test_stopped_node_refuses_tasks(self):
         with tempfile.TemporaryDirectory() as root:
