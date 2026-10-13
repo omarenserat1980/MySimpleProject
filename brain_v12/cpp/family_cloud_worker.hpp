@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -20,11 +21,14 @@ struct ConsentingPair {
     bool parent_b_consents = false;
 };
 
-// In-process worker harness: restores child memory before starting the timed thread,
-// then records one virtual child per mutually consenting pair per cycle.
+// In-process worker harness. The eligibility callback must verify current family
+// policy (adult status, marriage, and prohibited-kinship rules) before a cycle
+// may record a virtual descendant.
 class FamilyCloudWorker {
 public:
-    explicit FamilyCloudWorker(std::string memory_path,
+    using EligibilityCheck = std::function<bool(const ConsentingPair&)>;
+
+    FamilyCloudWorker(std::string memory_path, EligibilityCheck eligibility_check,
         std::chrono::milliseconds interval = std::chrono::seconds(90));
     ~FamilyCloudWorker();
 
@@ -42,6 +46,7 @@ private:
     void on_cycle(std::uint64_t local_cycle);
 
     FamilyMemoryStore memory_;
+    EligibilityCheck eligibility_check_;
     std::chrono::milliseconds interval_;
     mutable std::mutex mutex_;
     std::vector<ConsentingPair> pairs_;
