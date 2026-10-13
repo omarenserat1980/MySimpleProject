@@ -45,7 +45,7 @@ jobs:
         run: |
           yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_asic_core.sv; hierarchy -top brain_asic_core; proc; opt; check; stat; write_json artifacts/asic/brain_asic_core.json' \
             2>&1 | tee artifacts/asic/yosys-synthesis.log
-          grep -q "Number of problems: 0" artifacts/asic/yosys-synthesis.log
+          grep -Eq "Found and reported 0 problems|Number of problems: 0" artifacts/asic/yosys-synthesis.log
 
       - name: Upload verification evidence
         if: always()
