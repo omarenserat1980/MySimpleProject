@@ -183,6 +183,19 @@ class WindowsServer2025Simulator:
             "simulator_version": self.simulator_version,
         })
         failure = FAILURE_STAGE.get(scenario_id)
+        if failure is None:
+            if not self.hardware.boot_disk_present:
+                failure = ("VIRTUAL_DISK_CHECK", "NO_BOOT_DISK")
+            elif not self.hardware.boot_config_valid:
+                failure = ("BOOT_CONFIGURATION_CHECK", "INVALID_BOOT_CONFIGURATION")
+            elif self.hardware.disk_gib < 32 or self.hardware.disk_free_gib < 8:
+                failure = ("VIRTUAL_DISK_CHECK", "INSUFFICIENT_VIRTUAL_DISK")
+            elif self.hardware.ram_mib < 2048:
+                failure = ("VIRTUAL_HARDWARE_READY", "INSUFFICIENT_VIRTUAL_RAM")
+            elif not self.hardware.network_attached:
+                failure = ("NETWORK_INITIALIZATION", "SIMULATED_NETWORK_DOWN")
+            elif not self.hardware.dns_available:
+                failure = ("NETWORK_INITIALIZATION", "SIMULATED_DNS_FAILED")
         recovery_status = None
         stages = list(STAGES[3:-1])
         for stage in stages:
