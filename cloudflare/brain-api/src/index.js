@@ -411,9 +411,10 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
     env.BRAIN_DB.prepare("UPDATE cinema_entitlements SET state = 'GRANTED', granted_at = CURRENT_TIMESTAMP WHERE order_id = ?").bind(orderId),
   ]);
+  // Payment verification alone is not revenue realization: delivery must be verified separately.
   const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
-    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'REVENUE_REALIZED', ?)"
+    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'PAYMENT_VERIFIED_PENDING_DELIVERY', ?)"
   ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
   const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
@@ -444,7 +445,17 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   await env.BRAIN_DB.prepare(
     "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
   ).bind(delivery.order_id).run();
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email });
+
+  // Realize revenue only after a verified payment and a delivery confirmation for the same order.
+  const payment = await env.BRAIN_DB.prepare(
+    "SELECT tran_ref, amount, currency, state FROM payments WHERE order_id = ? AND provider = 'paytabs' AND state = 'PAYMENT_VERIFIED' LIMIT 1"
+  ).bind(delivery.order_id).first();
+  if (payment) {
+    await env.BRAIN_DB.prepare(
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ?"
+    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
+  }
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });
   return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
 }
 
