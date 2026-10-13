@@ -57,8 +57,12 @@ def _cache() -> ShortTTLCache[RunnerPreflight]:
     return _PREFLIGHT_CACHE
 
 
-def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
-    binaries = {name: which(name) is not None for name in REQUIRED_BINARIES}
+def _inspect_runner_uncached(runner_id: str, capability: str) -> RunnerPreflight:
+    # Generic software execution must not depend on QEMU/Windows image tooling.
+    # Those binaries are required only for explicitly QEMU-backed capabilities.
+    qemu_capability = capability.lower() in {"qemu", "windows-real-boot", "windows-server-2025-real-boot"}
+    required_binaries = REQUIRED_BINARIES if qemu_capability else ()
+    binaries = {name: which(name) is not None for name in required_binaries}
     reasons: list[str] = []
 
     if os.environ.get("BRAIN_INTERNAL_RUNNER_FLAG") != "1":
@@ -80,14 +84,14 @@ def _inspect_runner_uncached(runner_id: str) -> RunnerPreflight:
     )
 
 
-def inspect_runner(runner_id: str = "brain-internal") -> RunnerPreflight:
+def inspect_runner(runner_id: str = "brain-internal", capability: str = "brain-internal-execution") -> RunnerPreflight:
     # Cache only verified substrate results. Failed probes always execute fresh,
     # so a transient failure cannot be hidden. Authority/contracts/evidence are
     # deliberately outside this cache and remain live on every execution.
-    key = f"{runner_id}:{os.environ.get('BRAIN_INTERNAL_RUNNER_FLAG', '')}"
+    key = f"{runner_id}:{capability}:{os.environ.get('BRAIN_INTERNAL_RUNNER_FLAG', '')}"
     return _cache().get_or_compute(
         key,
-        lambda: _inspect_runner_uncached(runner_id),
+        lambda: _inspect_runner_uncached(runner_id, capability),
         cacheable=lambda result: result.verified,
     )
 
