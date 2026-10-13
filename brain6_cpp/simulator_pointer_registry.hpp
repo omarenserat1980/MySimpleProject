@@ -1,11 +1,13 @@
 #pragma once
-
 #include <array>
+#include <filesystem>
 #include <functional>
+#include <string>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 
 namespace brain6 {
-
 enum class ExecutionMode { TestSimulation, RealExecution };
 
 struct SimulatorPointer {
@@ -13,18 +15,22 @@ struct SimulatorPointer {
     std::string_view simulator_entry;
     std::string_view real_executor_entry;
 };
-
 struct PointerResolution {
     const SimulatorPointer* pointer = nullptr;
     std::string_view selected_entry;
     std::string_view status;
     ExecutionMode mode = ExecutionMode::TestSimulation;
-
     explicit operator bool() const noexcept { return pointer != nullptr; }
 };
+struct PointerFinding {
+    std::string id, pointer_kind, target, status;
+};
+struct PointerAuditReport {
+    std::vector<std::string> active_simulator_ids, active_real_executor_ids;
+    std::vector<PointerFinding> inactive_pointers;
+    bool clean() const noexcept { return inactive_pointers.empty(); }
+};
 
-// Empty real_executor_entry is intentional until a real adapter is explicitly
-// registered and independently verified. It must never fall back to simulation.
 inline constexpr std::array<SimulatorPointer, 3> simulator_pointers{{
     {"termux-brain", "brain_v12/brain/termux_emulator.py", "brain_v12/tools/brain_runtime_bootstrap.sh"},
     {"desktop-commander-brain", "brain_v12/brain/desktop_commander_emulator.py", ""},
@@ -32,8 +38,7 @@ inline constexpr std::array<SimulatorPointer, 3> simulator_pointers{{
 }};
 
 inline PointerResolution resolve_simulator_pointer(
-    std::string_view id,
-    ExecutionMode mode,
+    std::string_view id, ExecutionMode mode,
     const std::function<bool(std::string_view)>& exists,
     bool real_executor_independently_verified = false) {
     for (const auto& candidate : simulator_pointers) {
@@ -54,4 +59,35 @@ inline PointerResolution resolve_simulator_pointer(
     return {nullptr, {}, "SIMULATOR_ID_UNKNOWN", mode};
 }
 
+// Non-destructive audit: invalid pointers are excluded from active results,
+// but useful emulator files are never deleted.
+inline PointerAuditReport audit_simulator_pointers(
+    const std::filesystem::path& root,
+    const std::unordered_set<std::string>& verified_real_ids = {}) {
+    PointerAuditReport report;
+    std::unordered_set<std::string> seen_ids, seen_simulator_targets;
+    for (const auto& candidate : simulator_pointers) {
+        const std::string id(candidate.id), sim(candidate.simulator_entry), real(candidate.real_executor_entry);
+        if (!seen_ids.insert(id).second) {
+            report.inactive_pointers.push_back({id, "simulator", sim, "DUPLICATE_SIMULATOR_ID"});
+            continue;
+        }
+        if (sim.empty())
+            report.inactive_pointers.push_back({id, "simulator", sim, "SIMULATOR_TARGET_NOT_CONFIGURED"});
+        else if (!std::filesystem::is_regular_file(root / sim))
+            report.inactive_pointers.push_back({id, "simulator", sim, "SIMULATOR_TARGET_MISSING"});
+        else if (!seen_simulator_targets.insert(sim).second)
+            report.inactive_pointers.push_back({id, "simulator", sim, "DUPLICATE_SIMULATOR_TARGET"});
+        else report.active_simulator_ids.push_back(id);
+
+        if (real.empty())
+            report.inactive_pointers.push_back({id, "real_executor", real, "REAL_EXECUTOR_NOT_CONFIGURED"});
+        else if (!std::filesystem::is_regular_file(root / real))
+            report.inactive_pointers.push_back({id, "real_executor", real, "REAL_EXECUTOR_TARGET_MISSING"});
+        else if (verified_real_ids.find(id) == verified_real_ids.end())
+            report.inactive_pointers.push_back({id, "real_executor", real, "REAL_EXECUTOR_NOT_INDEPENDENTLY_VERIFIED"});
+        else report.active_real_executor_ids.push_back(id);
+    }
+    return report;
+}
 }  // namespace brain6
