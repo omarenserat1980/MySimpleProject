@@ -326,6 +326,8 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"- Scenario: {report.get('scenario_id', 'unknown')}",
         f"- Simulator: {report.get('simulator_id', 'unknown')}@{report.get('simulator_version', 'unknown')}",
         "- Execution mode: SIMULATION_ONLY",
+        f"- Simulation implementation progress: {(report.get("implementation_progress") or {}).get("percent", 0)}% (weighted roadmap coverage)",
+        "- Progress is not a boot probability or real Windows boot evidence.",
         "- Real Windows boot verified: false",
         f"- Evidence verification: {verification.get('status', 'NOT_CHECKED')}",
         f"- Recovery status: {report.get('recovery_status', 'NOT_REQUESTED')}",
