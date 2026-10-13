@@ -54,6 +54,24 @@ class BrainMCPCommunicationChannelTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["status"], "MCP_NOT_CONFIGURED")
 
+    def test_initialize_negotiates_protocol_version_from_json_rpc_params(self):
+        response = self.client.post(
+            "/mcp",
+            headers={"Authorization": "Bearer unit-test-token"},
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": "unit-test", "version": "1"},
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["result"]["protocolVersion"], PROTOCOL_VERSION)
+
     def test_tools_list_exposes_channel_inventory_and_render_cat_probe(self):
         response = self.client.post(
             "/mcp",
