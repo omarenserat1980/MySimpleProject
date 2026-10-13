@@ -1,6 +1,7 @@
 """Safety tests for the read-only OpenNebula cloud preflight."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -10,6 +11,19 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PREFLIGHT = REPO_ROOT / "brain_v12" / "tools" / "opennebula_cloud_preflight.py"
+
+_SPEC = importlib.util.spec_from_file_location("opennebula_cloud_preflight", PREFLIGHT)
+assert _SPEC is not None and _SPEC.loader is not None
+_PREFLIGHT_MODULE = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(_PREFLIGHT_MODULE)
+
+
+def test_huda_host_identity_gate_rejects_arkan_and_empty_identity() -> None:
+    allowed = _PREFLIGHT_MODULE.huda_host_identity_allowed
+    assert allowed("huda-linux-worker-01") is True
+    assert allowed("ARKAN") is False
+    assert allowed("ark-an-runner") is False
+    assert allowed("   ") is False
 
 
 def test_preflight_is_read_only_and_never_claims_provisioning() -> None:
