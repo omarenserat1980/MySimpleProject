@@ -1,19 +1,18 @@
+# Compatibility compose file: the service runs the canonical Brain V12 API.
 services:
   brain-worker:
     build:
       context: ..
       dockerfile: brain_v7/Dockerfile
-    container_name: electronic-brain-worker
+    container_name: electronic-brain-v12-compat
     restart: unless-stopped
     environment:
-      BRAIN_SLEEP_SECONDS: "60"
-      STOP_BRAIN: "0"
+      PORT: "8012"
+    ports:
+      - "8012:8012"
     volumes:
       - brain_state:/app/runtime
-    command:
-      - python
-      - -c
-      - from brain_v7.braincore_v2.fully_autonomous_runtime import run_forever; run_forever()
+    command: ["python", "-m", "brain_v12.app"]
 
 volumes:
   brain_state:
