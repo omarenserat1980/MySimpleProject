@@ -1,0 +1,51 @@
+name: BRAIN PayPal Sandbox Adapter Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain/provider_hub/paypal_adapter.py"
+      - "brain/provider_hub/test_paypal_adapter.py"
+      - "brain/provider_hub/paypal_evidence_bridge.py"
+      - "brain/provider_hub/test_paypal_evidence_bridge.py"
+      - "brain/provider_hub/paypal_commercial_flow.py"
+      - "brain/provider_hub/test_paypal_commercial_flow.py"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/test/cloudflare_deploy_static.test.js"
+      - ".github/workflows/brain-paypal-sandbox.yml"
+  push:
+    branches: ["feat/paypal-sandbox-adapter"]
+    paths:
+      - "brain/provider_hub/paypal_adapter.py"
+      - "brain/provider_hub/test_paypal_adapter.py"
+      - "brain/provider_hub/paypal_evidence_bridge.py"
+      - "brain/provider_hub/test_paypal_evidence_bridge.py"
+      - "brain/provider_hub/paypal_commercial_flow.py"
+      - "brain/provider_hub/test_paypal_commercial_flow.py"
+      - ".github/workflows/brain-paypal-sandbox.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paypal-adapter-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run isolated PayPal adapter and evidence bridge tests
+        run: python -m unittest brain.provider_hub.test_paypal_adapter brain.provider_hub.test_paypal_evidence_bridge brain.provider_hub.test_paypal_commercial_flow -v
+      - name: Validate Cloudflare Worker PayPal routes
+        working-directory: cloudflare/brain-api
+        run: |
+          node --check src/index.js
+          node test/commercial_worker_static.test.js
+          node test/cloudflare_deploy_static.test.js
+      - name: Record verification boundary
+        run: |
+          echo "PAYPAL_ADAPTER_EVIDENCE_AND_COMMERCIAL_FLOW_UNIT_TESTS=PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "NETWORK_SANDBOX_TRANSACTION=NOT_PERFORMED" >> "$GITHUB_STEP_SUMMARY"
+          echo "LIVE_PAYMENT=NOT_PERFORMED" >> "$GITHUB_STEP_SUMMARY"

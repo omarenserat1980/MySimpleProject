@@ -101,3 +101,24 @@ assert.match(worker, /\/api\/supervisor\/tick/);
 assert.match(worker, /transitionClientOrder/);
 assert.match(worker, /INVALID_STATE_TRANSITION/);
 assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
+
+
+assert.match(worker, /createPayPalPayment/);
+assert.match(worker, /\/api\/payments\/paypal\/capture/);
+assert.match(worker, /capturePayPalPayment/);
+assert.match(worker, /CAPTURE_COMPLETED_AWAITING_VERIFIED_WEBHOOK/);
+assert.match(worker, /webhook_authoritative: true/);
+assert.match(worker, /handlePayPalWebhook/);
+assert.match(worker, /PAYPAL_CLIENT_ID/);
+assert.match(worker, /PAYPAL_CLIENT_SECRET/);
+assert.match(worker, /PAYPAL_WEBHOOK_ID/);
+assert.match(worker, /verify-webhook-signature/);
+assert.match(worker, /PAYPAL_WEBHOOK_SIGNATURE_INVALID/);
+assert.match(worker, /PAYPAL_CAPTURE_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /PAYPAL_MERCHANT_REFERENCE_MISMATCH/);
+assert.match(worker, /PAYPAL_PROVIDER_CAPTURE_RECONCILIATION_FAILED/);
+assert.match(worker, /v2\/checkout\/orders/);
+assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+assert.match(worker, /INSERT OR IGNORE INTO payment_events/);
+assert.match(worker, /provider = 'paypal'/);
+console.log("PAYPAL_SANDBOX_D1_WEBHOOK_GATES=PASS");

@@ -34,3 +34,9 @@ assert.match(worker, /supervisorTick/);
 assert.match(worker, /BRAIN_CONTROL_TOKEN/);
 assert.match(worker, /BRAIN_ORIGIN/);
 console.log("SUPERVISOR_CONTROL_GATE=PASS");
+
+assert.match(cinemaDeploy, /PAYPAL_CLIENT_ID/);
+assert.match(cinemaDeploy, /PAYPAL_CLIENT_SECRET/);
+assert.match(cinemaDeploy, /PAYPAL_WEBHOOK_ID/);
+assert.match(cinemaDeploy, /Configure PayPal Sandbox secrets/);
+console.log("PAYPAL_WORKER_SECRET_DEPLOYMENT_GATE=PASS");

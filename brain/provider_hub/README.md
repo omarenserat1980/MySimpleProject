@@ -34,3 +34,15 @@ The PayTabs adapter reads credentials only from runtime environment variables:
 Never paste a Server Key into source files, logs, artifacts, issues, or chat. Rotate any key that has been exposed.
 
 The adapter is fail-closed when the required environment variables are missing or the endpoint is not the approved Jordan endpoint. Unit tests use a fake transport and never contact PayTabs.
+
+## PayPal Sandbox adapter (PR #591)
+
+The isolated adapter uses the official PayPal Sandbox API origin only:
+
+- `PAYPAL_CLIENT_ID` — Sandbox app client ID.
+- `PAYPAL_CLIENT_SECRET` — Sandbox app secret; never commit or log it.
+- `PAYPAL_WEBHOOK_ID` — the webhook ID configured in the PayPal Developer Dashboard; pass it to webhook verification at runtime.
+
+The adapter can create/capture Orders and ask PayPal to verify a webhook signature. `paypal_evidence_bridge.py` converts a capture response into `PAYMENT_VERIFICATION` evidence only after strict reconciliation of the merchant order ID, PayPal order ID, completed capture, amount, currency, and capture ID. The caller must still fetch/validate authoritative provider data, enforce durable idempotency, persist evidence, and require delivery evidence before recognizing revenue. A signature verification response alone is not proof that the matching order was delivered or that revenue may be realized.
+
+Unit tests use an injected fake transport and do not contact PayPal. A real Sandbox end-to-end transaction, webhook delivery, Cloudflare/D1 deployment, and delivery/ledger reconciliation are **not yet evidenced**. Do not activate or merge the integration until those gates have reproducible run-linked evidence.
