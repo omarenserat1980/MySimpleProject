@@ -1,0 +1,30 @@
+name: Brain Windows Server 2025 Software Boot
+
+on:
+  workflow_dispatch:
+    inputs:
+      cpus:
+        description: Guest vCPUs
+        required: true
+        default: "2"
+      memory_mib:
+        description: Guest RAM in MiB
+        required: true
+        default: "4096"
+
+jobs:
+  software-boot-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU
+        run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 qemu-utils ovmf
+      - name: Plan software resources
+        run: python3 brain_v12/brain/software_resource_node.py --cpus "${{ inputs.cpus }}" --memory-mib "${{ inputs.memory_mib }}"
+      - name: Run focused gates
+        run: python3 -m pytest -q brain_v12/tests/test_software_resource_node.py brain_v12/tests/test_windows_software_boot_gate.py
+      - name: Explicit execution contract
+        run: |
+          echo "This workflow validates the software-emulation path."
+          echo "A Windows boot is only VERIFIED after guest evidence is collected."
+          echo "Status must be WINDOWS_BOOT_SOFTWARE_EMULATED, never WINDOWS_BOOT_VERIFIED."
