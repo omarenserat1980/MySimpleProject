@@ -6,8 +6,11 @@
 namespace brain::family {
 
 FamilyCloudWorker::FamilyCloudWorker(std::string memory_path,
+                                     EligibilityCheck eligibility_check,
                                      std::chrono::milliseconds interval)
-    : memory_(std::move(memory_path)), interval_(interval) {}
+    : memory_(std::move(memory_path)),
+      eligibility_check_(std::move(eligibility_check)),
+      interval_(interval) {}
 
 FamilyCloudWorker::~FamilyCloudWorker() {
     stop();
@@ -41,6 +44,10 @@ bool FamilyCloudWorker::start(std::string* error) {
             if (error) *error = "WORKER_ALREADY_STARTED";
             return false;
         }
+    }
+    if (!eligibility_check_) {
+        if (error) *error = "FAMILY_ELIGIBILITY_CHECK_REQUIRED";
+        return false;
     }
     if (!memory_.restore(error)) return false;
     const auto existing = memory_.children();
@@ -102,6 +109,16 @@ void FamilyCloudWorker::on_cycle(std::uint64_t local_cycle) {
     }
     for (const auto& pair : pairs) {
         if (!pair.parent_a_consents || !pair.parent_b_consents) continue;
+        bool eligible = false;
+        try {
+            eligible = eligibility_check_(pair);
+        } catch (...) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            last_error_ = "FAMILY_ELIGIBILITY_CHECK_FAILED";
+            continue;
+        }
+        if (!eligible) continue;
+
         ChildMemory child;
         child.child_id = "sim-child-" + pair.pair_id + "-cycle-" + std::to_string(global_cycle);
         child.name = "Virtual descendant " + pair.pair_id + " #" + std::to_string(global_cycle);
