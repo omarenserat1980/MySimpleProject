@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+SERVICE="brain6-168h.service"
 UNIT_DIR="$HOME/.config/systemd/user"
-mkdir -p "$UNIT_DIR"
-sed "s#%h/MySimpleProject#$ROOT#g" "$ROOT/deploy/brain6-168h.service" > "$UNIT_DIR/brain6-168h.service"
+
+# Retire the old service if present; do not start a replacement implicitly.
+systemctl --user disable --now "$SERVICE" >/dev/null 2>&1 || true
+rm -f "$UNIT_DIR/$SERVICE"
 systemctl --user daemon-reload
-systemctl --user enable --now brain6-168h.service
-echo "Brain 6 168H service started."
-echo "Status: systemctl --user status brain6-168h.service"
-echo "Live logs: journalctl --user -u brain6-168h.service -f"
+systemctl --user reset-failed "$SERVICE" >/dev/null 2>&1 || true
+
+echo "BRAIN6_RETIRED: legacy service disabled and removed from the user systemd unit directory."
+echo "No Brain runtime or workload was started."
+echo "Canonical Brain core entrypoint: python3 -m brain_v12.app"
