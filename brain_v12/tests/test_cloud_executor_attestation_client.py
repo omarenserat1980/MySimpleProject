@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from tools.request_cloud_executor_attestation import post
+from tools.request_cloud_executor_attestation import _safe_http_error, post
 
 
 class CloudExecutorAttestationClientTests(unittest.TestCase):
@@ -24,8 +24,31 @@ class CloudExecutorAttestationClientTests(unittest.TestCase):
                 post("https://example.invalid", "/path", "never-print-this", {"executor_id": "test"})
         self.assertNotIn("never-print-this", str(ctx.exception))
         self.assertNotIn(secret_like, str(ctx.exception))
-        # Untrusted detail must be dropped entirely, not replaced by a guessed code.
+        self.assertNotIn("example.invalid", str(ctx.exception))
         self.assertEqual(str(ctx.exception), "CLOUD_EXECUTOR_HTTP_403")
+
+    def test_safe_configuration_error_is_preserved_for_diagnosis(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED"}).encode()
+        error = HTTPError("https://example.invalid/attestation/challenge", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED",
+        )
+
+    def test_safe_host_inventory_error_is_preserved_for_diagnosis(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID"}).encode()
+        error = HTTPError("https://example.invalid/attestation/challenge", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID",
+        )
+
+    def test_unknown_server_detail_is_not_echoed(self):
+        private_like = "internal/path/with-secret-value"
+        body = json.dumps({"detail": private_like}).encode()
+        error = HTTPError("https://example.invalid/path", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(str(_safe_http_error(error)), "CLOUD_EXECUTOR_HTTP_503")
+        self.assertNotIn(private_like, str(_safe_http_error(error)))
 
 
 if __name__ == "__main__":
