@@ -5,5 +5,9 @@ add_executable(test_simulator_pointer_registry test_simulator_pointer_registry.c
 target_compile_features(test_simulator_pointer_registry PRIVATE cxx_std_17)
 target_compile_options(test_simulator_pointer_registry PRIVATE -Wall -Wextra -Werror)
 
+add_executable(brain6_pointer_audit pointer_audit.cpp)
+target_compile_features(brain6_pointer_audit PRIVATE cxx_std_17)
+target_compile_options(brain6_pointer_audit PRIVATE -Wall -Wextra -Werror)
+
 enable_testing()
 add_test(NAME simulator_pointer_registry COMMAND test_simulator_pointer_registry)
