@@ -12,6 +12,7 @@ class UnifiedKernelTests(unittest.TestCase):
     def test_one_memory_store_is_shared(self):
         self.kernel.memory_set("shared:goal", {"text": "unify"})
         self.assertEqual(self.kernel.memory_get("shared:goal"), {"text": "unify"})
+        self.assertEqual(self.kernel.memory_items(prefix="shared:"), [("shared:goal", {"text": "unify"})])
 
     def test_one_queue_accepts_tasks_without_separate_brain_queues(self):
         old_task = self.kernel.submit("inspect", "legacy request", "legacy_brain")
