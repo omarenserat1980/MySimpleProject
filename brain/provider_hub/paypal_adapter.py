@@ -158,3 +158,38 @@ class PayPalAdapter:
         if result.get("verification_status") != "SUCCESS":
             raise ValueError("PAYPAL_WEBHOOK_SIGNATURE_INVALID")
         return result
+
+    @staticmethod
+    def validate_capture(*, response: dict, expected_order_id: str,
+                        expected_paypal_order_id: str, expected_amount: str,
+                        expected_currency: str) -> dict:
+        """Fail closed unless PayPal's capture response matches the stored order."""
+        amount = PayPalAdapter._valid_amount(expected_amount)
+        currency = expected_currency.strip().upper()
+        if not isinstance(response, dict) or response.get("id") != expected_paypal_order_id:
+            raise ValueError("PAYPAL_ORDER_ID_MISMATCH")
+        if response.get("status") != "COMPLETED":
+            raise ValueError("PAYPAL_CAPTURE_NOT_COMPLETED")
+        units = response.get("purchase_units")
+        if not isinstance(units, list) or len(units) != 1 or not isinstance(units[0], dict):
+            raise ValueError("PAYPAL_PURCHASE_UNIT_INVALID")
+        unit = units[0]
+        if unit.get("invoice_id") != expected_order_id or unit.get("reference_id") != expected_order_id:
+            raise ValueError("PAYPAL_MERCHANT_ORDER_MISMATCH")
+        payments = unit.get("payments") or {}
+        captures = payments.get("captures") or []
+        if not captures or not isinstance(captures[0], dict):
+            raise ValueError("PAYPAL_CAPTURE_EVIDENCE_MISSING")
+        capture = captures[0]
+        if capture.get("status") != "COMPLETED":
+            raise ValueError("PAYPAL_CAPTURE_NOT_COMPLETED")
+        actual = capture.get("amount") or {}
+        if actual.get("value") != amount:
+            raise ValueError("PAYPAL_CAPTURE_AMOUNT_MISMATCH")
+        if actual.get("currency_code") != currency:
+            raise ValueError("PAYPAL_CAPTURE_CURRENCY_MISMATCH")
+        if not capture.get("id"):
+            raise ValueError("PAYPAL_CAPTURE_ID_MISSING")
+        return {"paypal_order_id": expected_paypal_order_id,
+                "capture_id": capture["id"], "order_id": expected_order_id,
+                "amount": amount, "currency": currency, "status": "COMPLETED"}
