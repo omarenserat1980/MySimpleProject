@@ -11,7 +11,7 @@ test("D1 adapter supports isolated inserts, reads, counts, and batch rollback", 
   await assert.rejects(db.batch([
     db.prepare("INSERT INTO events (name) VALUES (?)").bind("temporary"),
     db.prepare("UPDATE events SET name = ?").bind("unsupported"),
-  ]), /Unsupported/);
+  ]), /supports only INSERT and DELETE/);
   assert.equal((await db.prepare("SELECT COUNT(*) AS count FROM events").first()).count, 1);
 });
 
