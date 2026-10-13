@@ -25,7 +25,9 @@ class WindowsServer2025SimulationApiTests(unittest.TestCase):
         )
         self.state_patcher.start()
         self.addCleanup(self.state_patcher.stop)
-        os.environ.pop("BRAIN_CONTROL_KEY", None)
+        self.key_patcher = patch.dict(os.environ, {"BRAIN_CONTROL_KEY": ""}, clear=False)
+        self.key_patcher.start()
+        self.addCleanup(self.key_patcher.stop)
 
     def test_control_key_is_required(self):
         with self.assertRaises(HTTPException) as caught:
