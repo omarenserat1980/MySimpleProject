@@ -4,7 +4,7 @@
 
 Arkan must never be used by the new Brain or Huda cloud, directly or indirectly. Do not use it as a host, hypervisor, bootstrap device, GitHub Actions runner, executor, network hop, recovery target, or fallback. Do not enroll or reconnect its Desktop Commander device for this project. If any execution route resolves to Arkan or its identity, stop and report `ARKAN_FORBIDDEN`; never retry through Arkan.
 
-The Huda deployment must use an independently provisioned and positively identified host. Before any apply, verify the target host identity against an explicit Huda allowlist and reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
+The Huda deployment must use an independently provisioned and positively identified host. The preflight now fails closed unless the current hostname exactly matches `BRAIN_HUDA_ALLOWED_HOSTNAME` and the SHA-256 digest of the current Linux machine ID matches `BRAIN_HUDA_MACHINE_ID_SHA256`. Provision both expected values through a trusted, out-of-band operator process; never store raw machine IDs or credentials in Git. This local check is a defense-in-depth gate, not hardware-backed remote attestation: the deployment controller must independently verify the host identity before any apply. Reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
 
 ## Identity and independence
 
@@ -32,7 +32,7 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
 3. **Verify host virtualization**: `/dev/kvm` must exist and be accessible to the OpenNebula/KVM service account.
 4. **Configure CLI access**: install `onevm` and `onetemplate`; configure `ONE_XMLRPC` and `ONE_AUTH` in the host's protected environment or OpenNebula CLI config. Never commit credentials.
 5. **Create/import a Windows Server 2025 template**: use authorized installation media and a suitable virtual network and datastore. Respect Microsoft licensing and evaluation terms.
-6. **Run the read-only preflight**:
+6. **Provision the Huda identity allowlist out-of-band, then run the read-only preflight**. On the intended Linux host, obtain the machine ID locally and calculate its SHA-256 digest without printing or committing the raw ID. Configure `BRAIN_HUDA_ALLOWED_HOSTNAME` to the exact expected hostname and `BRAIN_HUDA_MACHINE_ID_SHA256` to that independently recorded digest in the protected runtime environment. Do not set these from an untrusted CI runner or automatically trust whatever host is currently running the script. GitHub-hosted CI intentionally lacks this allowlist and should report `BLOCKED` for host identity. Then run:
 
    ```bash
    python3 brain_v12/tools/opennebula_cloud_preflight.py
@@ -57,6 +57,7 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
 - It does not install OpenNebula, create a VM, or start Windows Server.
 - A cloud VM has not been proven running.
 - The existing OpenNebula provider adapter requires a real endpoint, CLI credentials, and a pre-created template.
+- Hostname plus machine-ID digest is not hardware-backed attestation and can be spoofed by a privileged attacker; the deployment controller must verify the target against a separately managed allowlist before provisioning.
 - If the host has less than 8 GiB RAM, treat it as blocked for this setup; do not claim readiness based on a simulator or GitHub Actions test.
 - Arkan is explicitly excluded and cannot be used as a fallback host.
 - Prefer a self-hosted host to avoid mandatory paid cloud usage. No paid Azure/AWS resources are created by these steps.
