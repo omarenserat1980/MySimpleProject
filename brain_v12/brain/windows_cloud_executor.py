@@ -46,6 +46,15 @@ class WindowsCloudExecutor:
         self.provider = provider
 
     def readiness(self) -> dict[str, Any]:
+        if self.provider is not None and self.provider.name == "brain-emulated-azure":
+            return {
+                "status": "SIMULATOR_READY",
+                "ready": True,
+                "executor": self.capability,
+                "provider": self.provider.name,
+                "execution_mode": "SIMULATION_ONLY",
+                "real_windows_boot_verified": False,
+            }
         return {
             "status": "DISABLED_SIMULATION_ONLY",
             "ready": False,
@@ -56,7 +65,13 @@ class WindowsCloudExecutor:
         }
 
     def provision(self, **kwargs: Any) -> CloudWindowsVM:
-        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
+        if self.provider is None:
+            raise RuntimeError("CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED")
+        if self.provider.name != "brain-emulated-azure":
+            raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
+        vm = self.provider.provision_windows_server_2025(**kwargs)
+        self._validate(vm)
+        return vm
 
     def status(self, vm_id: str) -> dict[str, Any]:
         if self.provider is None:
