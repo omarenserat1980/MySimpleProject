@@ -33,41 +33,44 @@ class WindowsCloudTaskExecutorTests(unittest.TestCase):
 
         self.http = http
 
-    def test_verified_runtime_submits_and_waits_for_success(self):
+    def test_verified_runtime_is_still_blocked_in_simulation_only_mode(self):
         runner = WindowsCloudTaskExecutor(
             fabric_url="https://fabric.example",
-            control_token="secret",
+            control_token="test-only",
             http=self.http,
             sleep=lambda _: None,
         )
-        result = runner.run(
-            self.vm, self.node, ["cmd.exe", "/c", "echo", "hello"],
-            timeout=30, now=1000.0,
-        )
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["state"], "SUCCESS")
-        self.assertEqual(result["executor"], "windows-server-2025-cloud")
-        self.assertEqual(self.calls[0][0], "POST")
-        self.assertNotIn("secret", str(result))
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
+            runner.run(
+                self.vm, self.node, ["cmd.exe", "/c", "echo", "hello"],
+                timeout=30, now=1000.0,
+            )
+        self.assertEqual(self.calls, [])
 
-    def test_stale_runtime_blocks_before_job_creation(self):
+    def test_stale_runtime_is_blocked_before_job_creation(self):
         runner = WindowsCloudTaskExecutor(
             fabric_url="https://fabric.example",
-            control_token="secret",
+            control_token="test-only",
             http=self.http,
         )
-        with self.assertRaisesRegex(RuntimeError, "WINDOWS_CLOUD_RUNTIME_NOT_VERIFIED"):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             runner.run(
                 self.vm, {**self.node, "last_heartbeat": 800.0},
                 ["cmd.exe"], now=1000.0,
             )
         self.assertEqual(self.calls, [])
 
-    def test_no_fabric_url_blocks(self):
-        runner = WindowsCloudTaskExecutor(control_token="secret", http=self.http)
-        with self.assertRaisesRegex(RuntimeError, "BRAIN_FABRIC_URL_REQUIRED"):
+    def test_missing_fabric_url_is_also_blocked_without_network(self):
+        runner = WindowsCloudTaskExecutor(control_token="test-only", http=self.http)
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             runner.run(self.vm, self.node, ["cmd.exe"], now=1000.0)
-
+        self.assertEqual(self.calls, [])
 
 if __name__ == "__main__":
     unittest.main()
