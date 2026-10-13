@@ -1,6 +1,6 @@
 # Brain 3 — Mouse
 
-Mouse is a local GitHub-shaped API emulator and compatibility boundary for Brain 3. It can accept simulated requests from the legacy Brain and Brain V12 without contacting either runtime, GitHub, Render, or a device.
+Mouse is a local GitHub-shaped API emulator for Brain 3. Brain 3 now has a shared in-process kernel foundation (`unified_kernel.py`) with one memory store and one task queue for requests attributed to legacy Brain or Brain V12. This removes queue/memory separation at the Brain 3 boundary, but it does not yet mean the actual legacy and V12 runtime objects have been mounted: health reports each runtime as not integrated until a verified in-process adapter is registered.
 
 ## Non-negotiable policy
 
@@ -10,7 +10,9 @@ Mouse is a local GitHub-shaped API emulator and compatibility boundary for Brain
 - **No false Windows boot:** health, task responses, tests, and simulation cannot claim Windows Server 2025 boot success.
 - **Loopback only:** default bind is `127.0.0.1:8787`; startup refuses non-loopback addresses.
 - **No credentials:** never add GitHub tokens or secrets. Mouse has no authentication because it must remain local-only.
-- **Memory-only state:** repositories and tasks disappear when the process exits. Mouse is not a source of truth or a production replacement.
+- **Memory-only state:** Mouse repositories, kernel memory, and tasks disappear when the process exits. Mouse is not a source of truth or a production replacement.
+- **Unified queue:** `POST /api/brain/tasks` from either source goes into the same `brain3_shared` queue. Source is provenance only, not a separate queue.
+- **Honest integration status:** `GET /api/brain3/kernel` reports shared-kernel status and separately reports whether real legacy/V12 adapters have been registered and verified. It must not report complete integration without those adapters.
 - **Fail closed:** actual execution, deployment, Render, Windows boot, device setup, and publishing tasks are rejected.
 
 ## Run
@@ -32,7 +34,8 @@ Default port is `8787`. `MOUSE_PORT` can change the port, but the listener remai
 
 ## Brain compatibility API
 
-- `GET /api/brain/compatibility` — describes the legacy Brain and V12 compatibility contract. This is metadata, not a remote connection.
+- `GET /api/brain/compatibility` — describes compatibility boundaries; it is not a remote connection.
+- `GET /api/brain3/kernel` — shared memory/task queue and adapter readiness status.
 - `POST /api/brain/tasks` — accepts simulated `inspect`, `test`, or `plan` tasks from `legacy_brain` or `brain_v12`. Every task reports `executed: false`.
 - `GET /api/brain/tasks` — lists in-memory simulated tasks.
 
@@ -64,4 +67,4 @@ Unsupported mutation endpoints fail closed with HTTP 405. Unknown repositories a
 python -m unittest discover -s brain3_mouse/tests -v
 ```
 
-Mouse is an initial emulator. It does not clone or push real repositories, merge pull requests, run GitHub Actions, deploy applications, invoke old/new Brain processes, or boot operating systems.
+Mouse is still an emulator and integration foundation. It does not clone or push real repositories, merge pull requests, run GitHub Actions, deploy applications, automatically load the legacy or V12 runtime, or boot operating systems. Full runtime unification is not complete until verified in-process adapters for both actual runtimes are implemented and tested.
