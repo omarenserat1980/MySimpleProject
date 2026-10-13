@@ -25,12 +25,12 @@ jobs:
       name: windows-real-boot
     timeout-minutes: 15
     env:
-      BRAIN_CLOUD_EXECUTOR: ${{ vars.BRAIN_CLOUD_EXECUTOR }}
-      BRAIN_CLOUD_EXECUTOR_ID: ${{ vars.BRAIN_CLOUD_EXECUTOR_ID }}
+      # Credentials are injected from the protected GitHub Environment.
+      # Executor identity/flag must be inherited from the trusted runner service;
+      # do not override them with repository variables that might be empty.
       BRAIN_CLOUD_EXECUTOR_REGISTRY_URL: ${{ secrets.BRAIN_CLOUD_EXECUTOR_REGISTRY_URL_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_TOKEN: ${{ secrets.BRAIN_CLOUD_EXECUTOR_TOKEN_PROTECTED }}
       BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64: ${{ secrets.BRAIN_CLOUD_EXECUTOR_ATTESTATION_PUBLIC_KEY_B64_PROTECTED }}
-      BRAIN_WINDOWS_EXECUTION_CONTRACT_FILE: ${{ github.workspace }}/windows-execution-contract.json
     steps:
       - name: Checkout
         uses: actions/checkout@v4
