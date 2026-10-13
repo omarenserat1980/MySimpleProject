@@ -223,18 +223,24 @@ class SoftwareNodeAgent:
         *,
         database_path: str | Path | None = None,
         heartbeat_interval: float = 5.0,
+        poll_interval: float = 0.25,
         lease_seconds: float = DEFAULT_LEASE_SECONDS,
     ):
         if heartbeat_interval <= 0:
             raise ValueError("HEARTBEAT_INTERVAL_MUST_BE_POSITIVE")
+        if poll_interval <= 0:
+            raise ValueError("POLL_INTERVAL_MUST_BE_POSITIVE")
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         default_db = self.root.parent / f".{self.root.name}-brain-agent.sqlite3"
         self.queue = PersistentTaskQueue(database_path or default_db, lease_seconds=lease_seconds)
         self.node = InitialSoftwareNode(self.root)
         self.heartbeat_interval = float(heartbeat_interval)
+        self.poll_interval = float(poll_interval)
         self._stop_event = threading.Event()
         self._heartbeat_thread: threading.Thread | None = None
+        self._worker_thread: threading.Thread | None = None
+        self._last_worker_error: str | None = None
         self._started = False
 
     def start(self) -> dict[str, Any]:
@@ -248,12 +254,26 @@ class SoftwareNodeAgent:
             target=self._heartbeat_loop, name="brain-node-heartbeat", daemon=True
         )
         self._heartbeat_thread.start()
+        self._worker_thread = threading.Thread(
+            target=self._worker_loop, name="brain-node-task-worker", daemon=True
+        )
+        self._worker_thread.start()
         return self.status()
 
     def _heartbeat_loop(self) -> None:
         while not self._stop_event.wait(self.heartbeat_interval):
             if self._started:
                 self.queue.record_heartbeat("READY_SIMULATED")
+
+    def _worker_loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self.run_once()
+                self._last_worker_error = None
+            except Exception as exc:
+                # Keep the agent alive, but expose a bounded diagnostic in status.
+                self._last_worker_error = f"WORKER_LOOP_ERROR:{type(exc).__name__}"
+            self._stop_event.wait(self.poll_interval)
 
     def run_once(self) -> dict[str, Any]:
         if not self._started:
@@ -274,6 +294,8 @@ class SoftwareNodeAgent:
             "schema": SCHEMA,
             "node_id": NODE_ID,
             "agent_state": "RUNNING_SIMULATED" if self._started else "STOPPED",
+            "task_worker_alive": bool(self._worker_thread and self._worker_thread.is_alive()),
+            "last_worker_error": self._last_worker_error,
             "execution_mode": "SANDBOXED_SOFTWARE_TASKS",
             "heartbeat": self.queue.heartbeat_status(),
             "queue": self.queue.counts(),
@@ -289,10 +311,15 @@ class SoftwareNodeAgent:
     def stop(self, *, timeout: float = 2.0) -> dict[str, Any]:
         self._started = False
         self._stop_event.set()
-        thread = self._heartbeat_thread
-        if thread is not None:
-            thread.join(timeout=max(0.0, timeout))
+        heartbeat_thread = self._heartbeat_thread
+        worker_thread = self._worker_thread
+        join_timeout = max(0.0, timeout)
+        if worker_thread is not None:
+            worker_thread.join(timeout=join_timeout)
+        if heartbeat_thread is not None:
+            heartbeat_thread.join(timeout=join_timeout)
         self.node.stop()
         self.queue.record_heartbeat("STOPPED")
         self._heartbeat_thread = None
+        self._worker_thread = None
         return self.status()
