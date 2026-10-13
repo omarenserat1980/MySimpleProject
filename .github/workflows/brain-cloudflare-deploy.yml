@@ -145,12 +145,25 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, subprocess
+          import json, os, subprocess
           name="brain-cinema-media"
-          p=subprocess.run(["npx","wrangler","r2","bucket","list","--json"],capture_output=True,text=True,check=True)
+          def run_wr(args):
+              p=subprocess.run(args,capture_output=True,text=True)
+              if p.returncode:
+                  safe=(p.stderr or p.stdout or "No diagnostic text returned")
+                  for key in ("CLOUDFLARE_API_TOKEN","CLOUDFLARE_ACCOUNT_ID"):
+                      secret=os.environ.get(key,"")
+                      if secret: safe=safe.replace(secret,"[REDACTED]")
+                  print("WRANGLER_COMMAND_FAILED=" + " ".join(args[:5]))
+                  print("WRANGLER_DIAGNOSTIC_BEGIN")
+                  print(safe[-6000:])
+                  print("WRANGLER_DIAGNOSTIC_END")
+                  raise SystemExit(p.returncode)
+              return p
+          p=run_wr(["npx","wrangler","r2","bucket","list","--json"])
           rows=json.loads(p.stdout)
           if not any(x.get("name")==name for x in rows):
-              subprocess.run(["npx","wrangler","r2","bucket","create",name],check=True)
+              run_wr(["npx","wrangler","r2","bucket","create",name])
           print("CINEMA_R2_BUCKET_READY=TRUE")
           PY
 
