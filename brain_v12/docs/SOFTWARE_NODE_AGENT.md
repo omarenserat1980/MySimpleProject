@@ -24,7 +24,7 @@ agent = SoftwareNodeAgent(
     heartbeat_interval=5.0,
     poll_interval=0.25,
 )
-agent.queue.enqueue({"type": "health_check"}, idempotency_key="initial-health-check")
+agent.enqueue({"type": "health_check"}, idempotency_key="initial-health-check")
 agent.start()
 try:
     # The worker thread drains the local queue automatically.
@@ -44,3 +44,7 @@ The SQLite database is durable only to the extent that the chosen local filesyst
 - CPU/RAM/network are software simulations; GPU remains unavailable and no acceleration is claimed.
 - This worker executes only the existing allowlisted sandbox tasks and BrainVM-1 programs. It does not execute native x86/ARM code.
 - `windows_server_2025_boot_verified` remains false. A real Windows Server 2025 boot is a separate milestone requiring an available execution backend and evidence collected inside the guest OS.
+
+## Family governance
+
+Use `agent.enqueue(...)` as the orchestration/API admission path. It routes requests through `FamilyGovernedTaskService`, rejects unknown task types, and requires a scoped guardian approval for high-risk private file reads. Do not expose `agent.queue.enqueue(...)` to untrusted callers: the raw SQLite queue is a low-level internal primitive and bypasses admission policy. The current policy audit list is in memory; durable audit and trusted identity/consent integration remain follow-up work. Until a trusted consent provider exists, never treat a user-supplied `identity_verified` flag as proof of identity.
