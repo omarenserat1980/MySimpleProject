@@ -14,6 +14,7 @@ from threading import Lock
 from urllib.parse import urlparse
 
 from .unified_kernel import KERNEL
+from .runtime_adapters import manager_for
 
 
 ALLOWED_SOURCES = {"legacy_brain", "brain_v12"}
@@ -87,6 +88,9 @@ class MouseHandler(BaseHTTPRequestHandler):
             })
         if path == "/api/brain3/kernel":
             return self._send(200, KERNEL.health())
+        if path == "/api/brain3/integration":
+            manager = manager_for(KERNEL)
+            return self._send(200, {"kernel": KERNEL.health(), "runtimes": manager.status()})
         if path == "/api/brain/compatibility":
             return self._send(200, {
                 "ok": True,
@@ -123,6 +127,38 @@ class MouseHandler(BaseHTTPRequestHandler):
             body = self._body()
         except ValueError as exc:
             return self._send(400, {"message": str(exc)})
+
+        if path == "/api/brain3/integrate":
+            manager = manager_for(KERNEL)
+            status = manager.initialize()
+            return self._send(200, {
+                "kernel": KERNEL.health(),
+                "runtimes": status,
+                "integration_complete": KERNEL.health()["legacy_brain_integrated"] and KERNEL.health()["brain_v12_integrated"],
+                "render": False, "external_network": False, "physical_devices": False,
+                "windows_boot_verified": False,
+            })
+
+        dispatch_match = re.fullmatch(r"/api/brain3/tasks/(\d+)/dispatch", path)
+        if dispatch_match:
+            manager = manager_for(KERNEL)
+            if not manager.status()["initialized"]:
+                return self._send(503, {"message": "runtime adapters are not initialized", "executed": False})
+            try:
+                task = KERNEL.dispatch(int(dispatch_match.group(1)),
+                                       str(body.get("adapter", "")).strip(),
+                                       {"description": str(body.get("description", "")),
+                                        "objective": str(body.get("objective", ""))})
+            except KeyError:
+                return self._send(404, {"message": "task not found", "executed": False})
+            except (PermissionError, ValueError) as exc:
+                return self._send(403, {"message": str(exc), "executed": False})
+            task["emulated"] = False
+            task["remote_calls"] = False
+            task["render"] = False
+            task["physical_devices"] = False
+            task["windows_boot_verified"] = False
+            return self._send(200, task)
 
         if path == "/api/brain/tasks":
             source = str(body.get("source", "")).strip().lower()
