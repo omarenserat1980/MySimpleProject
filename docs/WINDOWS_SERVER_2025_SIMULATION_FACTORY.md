@@ -42,7 +42,7 @@ PYTHONPATH=. python -m unittest brain_v12.tests.test_windows_server_2025_simulat
 
 The API is registered under `/api/simulations/windows-server-2025`. It requires the existing `X-Brain-Control-Key` control-plane header. Endpoints create a run, read its summary, inspect events, and retrieve the report.
 
-The initial registry is in-memory and process-local: restarting the API process loses its run lookup table. This first increment deliberately does not write runtime state to disk or claim durable Brain Memory integration. A follow-up should use the repository's approved evidence/memory store after its contracts and retention policy are verified.
+Reports are atomically persisted as local JSON files under `BRAIN_SIMULATION_STATE_DIR` (default: `.brain/state/windows_server_2025_simulations`) and can be reloaded after an API process restart. This is a local evidence store, not yet an integration with the canonical Brain Memory/EvidenceStore; do not claim cross-device synchronization or tamper-proof remote retention.
 
 Example request:
 
@@ -54,7 +54,7 @@ Content-Type: application/json
 {"scenario_id":"success","hardware":{"vcpu_count":2,"ram_mib":4096,"disk_gib":64}}
 ```
 
-The API rejects unknown scenario IDs and unknown virtual-hardware fields. It never accepts a caller-selected real executor or a real-boot capability.
+The API rejects unknown scenario IDs and unknown virtual-hardware fields. It never accepts a caller-selected real executor or a real-boot capability. The dashboard is served at `/api/simulations/windows-server-2025/dashboard`; the page keeps the supplied control key in page memory only and does not store it in localStorage.
 
 ## Scenario semantics
 
