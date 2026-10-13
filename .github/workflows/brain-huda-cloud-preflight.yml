@@ -5,6 +5,8 @@ on:
     paths:
       - "brain_v12/tools/opennebula_cloud_preflight.py"
       - "brain_v12/tests/test_opennebula_cloud_preflight.py"
+      - "brain_v12/brain/opennebula_windows_cloud_provider.py"
+      - "brain_v12/tests/test_opennebula_windows_cloud_provider.py"
       - "docs/BRAIN_OPENNEBULA_CLOUD_DEPLOYMENT.md"
       - ".github/workflows/brain-huda-cloud-preflight.yml"
   workflow_dispatch:
