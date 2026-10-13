@@ -42,6 +42,39 @@ jobs:
           PYTHONPATH=. python -m unittest \
             brain_v12.tests.test_windows_server_2025_simulation_factory \
             brain_v12.tests.test_windows_server_2025_simulation_api -v
+      - name: Generate synthetic boot evidence report
+        run: |
+          mkdir -p artifacts
+          PYTHONPATH=. python - <<'PY'
+          import json
+          from pathlib import Path
+          from brain_v12.brain.windows_server_2025_simulation_factory import (
+              simulate_windows_server_2025, render_markdown_report,
+          )
+          report = simulate_windows_server_2025("success")
+          assert report.get("status") == "SIMULATED_BOOT_SUCCESS", report.get("status")
+          assert report.get("execution_mode") == "SIMULATION_ONLY"
+          assert report.get("real_windows_boot_verified") is False
+          verification = report.get("verification") or {}
+          assert verification.get("ok") is True, verification
+          Path("artifacts/windows-server-2025-simulated-boot.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+          )
+          Path("artifacts/windows-server-2025-simulated-boot.md").write_text(
+              render_markdown_report(report), encoding="utf-8"
+          )
+          print("SIMULATED_BOOT_SUCCESS")
+          print("SIMULATION_ONLY_BOUNDARY=PASS")
+          print("REAL_WINDOWS_BOOT_VERIFIED=false")
+          print("REPORTS=artifacts/windows-server-2025-simulated-boot.{json,md}")
+          PY
+      - name: Upload synthetic evidence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-server-2025-simulated-boot-evidence
+          path: artifacts/windows-server-2025-simulated-boot.*
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify simulation-only source boundaries
         run: |
           python - <<'PY'
