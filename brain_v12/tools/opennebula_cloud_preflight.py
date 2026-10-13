@@ -6,6 +6,7 @@ packages, creates VMs, changes services, or applies cloud infrastructure.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import platform
@@ -21,11 +22,44 @@ def check(name: str, ok: bool, detail: str, required: bool = True) -> dict[str, 
     return {"name": name, "ok": bool(ok), "required": required, "detail": detail}
 
 
-def huda_host_identity_allowed(hostname: str) -> bool:
-    """Reject hostnames explicitly identifying the forbidden Arkan machine."""
+def huda_host_identity_allowed(
+    hostname: str,
+    machine_id: str,
+    allowed_hostname: str,
+    expected_machine_id_sha256: str,
+) -> bool:
+    """Require exact hostname allowlisting and a matching machine-ID digest.
+
+    The expected hostname and digest must be provisioned out-of-band on the
+    trusted operator side. Missing identity evidence fails closed. Raw machine
+    IDs and expected digests are never printed by this preflight.
+    """
     normalized = hostname.strip().lower()
-    forbidden_tokens = ("arkan", "ark-an")
-    return bool(normalized) and not any(token in normalized for token in forbidden_tokens)
+    allowed = allowed_hostname.strip().lower()
+    expected_digest = expected_machine_id_sha256.strip().lower()
+    actual_machine_id = machine_id.strip()
+    if not normalized or not allowed or not actual_machine_id or not expected_digest:
+        return False
+    if normalized in {"arkan", "ark-an"} or "arkan" in normalized or "ark-an" in normalized:
+        return False
+    if normalized != allowed:
+        return False
+    if len(expected_digest) != 64 or any(c not in "0123456789abcdef" for c in expected_digest):
+        return False
+    actual_digest = hashlib.sha256(actual_machine_id.encode("utf-8")).hexdigest()
+    return hashlib.compare_digest(actual_digest, expected_digest)
+
+
+def read_machine_id() -> str:
+    """Read a stable Linux machine identifier without exposing it in output."""
+    for candidate in (Path("/etc/machine-id"), Path("/var/lib/dbus/machine-id")):
+        try:
+            value = candidate.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if value:
+            return value
+    return ""
 
 
 def main() -> int:
@@ -35,10 +69,35 @@ def main() -> int:
     is_x86_64 = arch in {"x86_64", "amd64"}
     checks.append(check("linux_host", is_linux, platform.platform()))
 
-    # Arkan is forbidden for Huda; reject known Arkan host identity strings.
-    identity_ok = huda_host_identity_allowed(platform.node())
-    checks.append(check("huda_host_identity_not_arkan", identity_ok,
-                        "host identity accepted (hostname redacted)" if identity_ok else "ARKAN_FORBIDDEN: host hostname matches a forbidden Arkan identity"))
+    # Fail closed: an unlisted or unidentified host is never accepted as Huda.
+    identity_ok = huda_host_identity_allowed(
+        platform.node(),
+        read_machine_id(),
+        os.environ.get("BRAIN_HUDA_ALLOWED_HOSTNAME", ""),
+        os.environ.get("BRAIN_HUDA_MACHINE_ID_SHA256", ""),
+    )
+    checks.append(check(
+        "huda_host_identity_verified",
+        identity_ok,
+        "exact Huda hostname and machine identity verified"
+        if identity_ok else
+        "Huda identity not verified; configure the exact allowlisted hostname and machine-ID SHA-256 out-of-band",
+    ))
+    if not identity_ok and (
+        "arkan" in platform.node().strip().lower()
+        or "ark-an" in platform.node().strip().lower()
+    ):
+        checks.append(check(
+            "huda_host_identity_not_arkan",
+            False,
+            "ARKAN_FORBIDDEN: host hostname matches a forbidden Arkan identity",
+        ))
+    else:
+        checks.append(check(
+            "huda_host_identity_not_arkan",
+            identity_ok,
+            "identity allowlist passed" if identity_ok else "identity allowlist missing or mismatched; refusing this host",
+        ))
     checks.append(check("x86_64_architecture", is_x86_64, arch))
 
     mem_total_kib = 0
