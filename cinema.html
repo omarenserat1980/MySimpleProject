@@ -72,7 +72,7 @@
 </div>
 
 <script>
-const API='__BRAIN_CINEMA_API_URL__';
+const API='https://brain-cloud-api.oenserat.workers.dev';
 const movie=document.getElementById('movie'), gate=document.getElementById('gate');
 function preview(){document.getElementById('player').scrollIntoView({behavior:'smooth'});movie.currentTime=0;movie.play().catch(()=>{})}
 function openCheckout(){document.getElementById('checkout').classList.add('open')}
