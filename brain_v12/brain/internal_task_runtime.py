@@ -72,7 +72,11 @@ class InternalTaskRuntime:
                 if self.leadership_store is None:
                     raise RuntimeError("BRAIN_LEADERSHIP_STORE_REQUIRED")
                 self.leadership_store.assert_contract_fenced({"leadership_fencing_token": metadata.get("leadership_fencing_token")})
-            if item["capability"] in {"windows-server-2025-cloud-native", "windows-server-2025-real-boot"}:
+            if item["capability"] == "windows-server-2025-real-boot":
+                # Real OS boot must use the dedicated QEMU boot workflow and its
+                # signed execution contract. Never route it through the cloud task executor.
+                raise RuntimeError("WINDOWS_REAL_BOOT_REQUIRES_DEDICATED_QEMU_WORKFLOW")
+            if item["capability"] == "windows-server-2025-cloud-native":
                 metadata = item.get("metadata") or {}
                 vm_data = metadata.get("vm")
                 node = metadata.get("node")
