@@ -475,8 +475,8 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
       "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
     ).bind(delivery.order_id),
     env.BRAIN_DB.prepare(
-      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ?"
-    ).bind(deliveryEvidence, delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)),
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ? AND EXISTS (SELECT 1 FROM deliveries d JOIN orders o ON o.order_id = d.order_id WHERE d.delivery_id = ? AND d.order_id = ? AND d.state = 'DELIVERED' AND o.state = 'COMPLETED')"
+    ).bind(deliveryEvidence, delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency), deliveryId, delivery.order_id),
   ]);
 
   const ledger = await env.BRAIN_DB.prepare(
