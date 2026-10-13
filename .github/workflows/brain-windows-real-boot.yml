@@ -383,10 +383,21 @@ jobs:
           print("AUTOUNATTEND_PREFLIGHT=PASS")
           PY
           xorriso -indev brain-windows-server-2025-proof.iso -toc 2>&1 | tee proof-iso-toc.txt
-          xorriso -indev brain-windows-server-2025-proof.iso -find / -name Autounattend.xml -print 2>&1 | tee proof-iso-autounattend.txt
-          xorriso -indev brain-windows-server-2025-proof.iso -find / -name SetupComplete.cmd -print 2>&1 | tee proof-iso-setupcomplete.txt
-          grep -q 'Autounattend.xml' proof-iso-autounattend.txt
-          grep -q 'SetupComplete.cmd' proof-iso-setupcomplete.txt
+          # xorriso's -find does not support the GNU find-style -print action.
+          # Extract the exact required files instead of relying on unsupported listing syntax.
+          mkdir -p proof-media-validation
+          xorriso -osirrox on -indev brain-windows-server-2025-proof.iso \
+            -extract /Autounattend.xml proof-media-validation/Autounattend.xml
+          xorriso -osirrox on -indev brain-windows-server-2025-proof.iso \
+            -extract /sources proof-media-validation/sources
+          setup_complete="$(find proof-media-validation/sources -type f -name SetupComplete.cmd -print -quit)"
+          test -n "$setup_complete"
+          test -s proof-media-validation/Autounattend.xml
+          test -s "$setup_complete"
+          cmp /tmp/brain-ws-oem/Autounattend.xml proof-media-validation/Autounattend.xml
+          cmp "$oem_scripts/SetupComplete.cmd" "$setup_complete"
+          echo 'Autounattend.xml extracted and byte-verified' | tee proof-iso-autounattend.txt
+          echo 'SetupComplete.cmd extracted and byte-verified' | tee proof-iso-setupcomplete.txt
 
       - name: Prepare virtual blade storage
         run: |
