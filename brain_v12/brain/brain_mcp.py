@@ -6,6 +6,8 @@ from typing import Any, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .asic_hardware_simulator import ASICLogicSimulator, ASICSimulationError
+
 
 PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, "2025-11-25", "2025-06-18"}
@@ -78,6 +80,30 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "count": len(events),
         }
 
+    def asic_simulate_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        """Run the bounded software-only ASIC simulator; never touches hardware."""
+        netlist = arguments.get("netlist")
+        vectors = arguments.get("vectors")
+        max_cycles = arguments.get("max_cycles", 100)
+        if not isinstance(netlist, dict):
+            return {"ok": False, "status": "NETLIST_MUST_BE_OBJECT"}
+        if not isinstance(vectors, list) or not vectors:
+            return {"ok": False, "status": "INPUT_VECTORS_REQUIRED"}
+        if len(vectors) > 1000:
+            return {"ok": False, "status": "CYCLE_LIMIT_EXCEEDED", "limit": 1000}
+        if isinstance(max_cycles, bool) or not isinstance(max_cycles, int) or not 1 <= max_cycles <= 1000:
+            return {"ok": False, "status": "INVALID_MAX_CYCLES", "limit": 1000}
+        try:
+            simulator = ASICLogicSimulator(netlist)
+            report = simulator.run(vectors, max_cycles=max_cycles)
+        except ASICSimulationError as exc:
+            return {"ok": False, "status": "ASIC_SIMULATION_INVALID", "error": str(exc)[:300]}
+        except Exception as exc:
+            return {"ok": False, "status": "ASIC_SIMULATION_ERROR", "error": type(exc).__name__}
+        report["source"] = "electronic-brain-mcp"
+        report["real_hardware_measurement"] = False
+        return report
+
     def chat_handler(arguments: dict[str, Any]) -> dict[str, Any]:
         message = str(arguments.get("message", "")).strip()
         if not message:
@@ -116,6 +142,21 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "additionalProperties": False,
         },
         evidence_handler,
+    )
+    register(
+        "brain.asic_simulate",
+        "Run a bounded software-only digital ASIC netlist simulation. No hardware or network access.",
+        {
+            "type": "object",
+            "properties": {
+                "netlist": {"type": "object"},
+                "vectors": {"type": "array", "minItems": 1, "maxItems": 1000, "items": {"type": "object"}},
+                "max_cycles": {"type": "integer", "minimum": 1, "maximum": 1000}
+            },
+            "required": ["netlist", "vectors"],
+            "additionalProperties": False
+        },
+        asic_simulate_handler,
     )
     register(
         "brain.chat",
