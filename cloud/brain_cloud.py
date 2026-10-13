@@ -92,33 +92,9 @@ while not STOP:
         continue
 
     print("BRAIN_CLOUD_SOFTWARE_GATE=PASS", flush=True)
-    if SKIP_FACTORY:
-        while not STOP:
-            time.sleep(1)
-        break
-    try:
-        result = subprocess.run(
-            ["python", "-m", "brain_v7.braincore_v2.background_factory_worker"],
-            cwd=ROOT,
-            env=env,
-            timeout=max(INTERVAL, 300),
-        )
-        print(f"BRAIN_CLOUD_CYCLE_EXIT={result.returncode}", flush=True)
-        if result.returncode == 0:
-            failure_backoff = BACKOFF
-        else:
-            print(f"BRAIN_CLOUD_RETRY_IN={failure_backoff}", flush=True)
-            for _ in range(failure_backoff):
-                if STOP:
-                    break
-                time.sleep(1)
-            failure_backoff = min(failure_backoff * 2, MAX_BACKOFF)
-            continue
-    except subprocess.TimeoutExpired:
-        print("BRAIN_CLOUD_CYCLE_TIMEOUT=1", flush=True)
-    except Exception as exc:
-        print(f"BRAIN_CLOUD_CYCLE_ERROR={type(exc).__name__}:{exc}", flush=True)
-
+    print("BRAIN_CLOUD_LEGACY_FACTORY=DISABLED", flush=True)
+    print("BRAIN_CLOUD_MEDIA_RENDERER=NOT_INTEGRATED", flush=True)
+    # V12 verification is not proof of media rendering or Windows guest boot.
     for _ in range(INTERVAL):
         if STOP:
             break
