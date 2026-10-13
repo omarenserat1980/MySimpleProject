@@ -116,7 +116,7 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
                 },
                 {
                     "id": "render-cat",
-                    "status": "CONFIGURED_NOT_PROBED" if render_cat["configuration_valid"] and render_cat["configured"] else "NOT_CONFIGURED",
+                    "status": ("NOT_CONFIGURED" if not render_cat["configured"] else ("CONFIGURED_NOT_PROBED" if render_cat["configuration_valid"] else "INVALID_CONFIGURATION")),
                     "detail": "HTTPS GET-only diagnostics; HTTP response alone does not prove service identity.",
                     "configuration": render_cat,
                 },
