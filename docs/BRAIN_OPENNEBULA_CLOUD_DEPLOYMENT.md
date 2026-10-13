@@ -1,15 +1,15 @@
-# Electronic Brain — الكسا (Alksa) Independent Cloud
+# Electronic Brain — هدى (Huda) Independent Cloud
 
 ## Identity and independence
 
-**Cloud name:** الكسا  
-**Internal slug:** `alksa`  
+**Cloud name:** هدى  
+**Internal slug:** `huda`  
 **Primary backend:** OpenNebula + KVM/QEMU  
 **Arkan dependency:** none
 
 This cloud must be deployable and operable without Arkan. Arkan is not the cloud host, hypervisor, bootstrap machine, GitHub Actions runner, executor, or a required network hop. Do not register or depend on the Arkan Desktop Commander device. Cloud health must be measured from the chosen Linux/OpenNebula host and the Windows guest itself.
 
-The previous Arkan-dependent device cloud-pool proposal, PR #405, has been retired and closed. Do not revive or merge that proposal as the implementation for الكسا. Closing that PR does not delete its remote branch or remove any previously merged files; this change only retires that unmerged proposal.
+The previous Arkan-dependent device cloud-pool proposal, PR #405, has been retired and closed. Do not revive or merge that proposal as the implementation for هدى. Closing that PR does not delete its remote branch or remove any previously merged files; this change only retires that unmerged proposal.
 
 If no independent Linux x86-64 host is available, deployment remains blocked; do not silently route work through Arkan or claim the cloud is running. GitHub Actions can validate code but does not substitute for the real cloud host.
 
@@ -38,7 +38,7 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
    ```bash
    export BRAIN_WINDOWS_CLOUD_PROVIDER=opennebula
    export BRAIN_OPENNEBULA_TEMPLATE_ID='<reviewed-template-id>'
-   export BRAIN_OPENNEBULA_VM_NAME='alksa-windows-01'
+   export BRAIN_OPENNEBULA_VM_NAME='huda-windows-01'
    ```
 
 8. **Review before provisioning**: inspect the executor and provider contract, confirm template, network, storage, quota, and cost/energy impact. Provisioning and destruction remain disabled unless the operator explicitly sets `BRAIN_WINDOWS_CLOUD_ALLOW_APPLY=true`. Do not set that flag until the plan and target have been reviewed.
