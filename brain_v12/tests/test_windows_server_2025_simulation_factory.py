@@ -15,6 +15,8 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         result = simulate_windows_server_2025()
         self.assertEqual(result["status"], "SIMULATED_BOOT_SUCCESS")
         self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
+        self.assertEqual(result["implementation_progress"]["percent"], 18)
+        self.assertFalse(result["implementation_progress"]["real_windows_boot_verified"])
         self.assertFalse(result["real_windows_boot_verified"])
         self.assertFalse(result["side_effects_performed"])
         self.assertFalse(result["external_resources_created"])
