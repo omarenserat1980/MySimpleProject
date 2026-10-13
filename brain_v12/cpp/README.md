@@ -47,3 +47,16 @@ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/family_mem
 ```
 
 This is a reusable memory component, not proof that the deployed cloud worker currently uses it. Production activation requires an authorized deployment and a runtime read-back check.
+
+## Family cloud worker harness
+
+`FamilyCloudWorker` restores the file-backed memory before starting the dedicated timer thread. Every cycle (90 seconds by default), it records one virtual descendant for each registered pair only when both consent flags are true. Child IDs include the pair and cycle to prevent duplicate births across worker restarts; the cycle offset resumes from the highest restored cycle. The test uses a short interval and checks memory recovery plus consent gating.
+
+Build and run:
+
+```sh
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic -pthread brain_v12/cpp/birth_thread.cpp brain_v12/cpp/family_memory_store.cpp brain_v12/cpp/family_cloud_worker.cpp brain_v12/cpp/test_family_cloud_worker.cpp -o /tmp/family-cloud-worker-test
+/tmp/family-cloud-worker-test
+```
+
+This worker harness is source code in the open draft PR, not an activated cloud process. To retain memories across container replacement, configure its memory path to a storage location that is already persistent in the deployment environment; no such runtime configuration or production activation is asserted here.
