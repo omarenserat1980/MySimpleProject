@@ -1981,7 +1981,7 @@ def workforce_health():
     return workforce.health()
 
 def _cloud_worker_attestation() -> dict:
-    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
+    root = pathlib.Path(os.getenv("BRAIN_RUNTIME_ROOT", str(RUNTIME_STATE_ROOT / "cloud-runtime"))).expanduser()
     heartbeat = root / "cloud-worker-heartbeat.json"
     if not heartbeat.exists():
         return {"state": "NOT_RUNNING", "verified": False, "reason": "HEARTBEAT_MISSING"}
@@ -2792,6 +2792,21 @@ def start_background_services():
                 try: workforce.dispatch("scheduled_heartbeat", include_revenue=True)
                 except Exception as exc: store.event("WORKFORCE_HEARTBEAT_FAILED", {"error": str(exc)[:1000]})
         threading.Thread(target=workforce_loop, daemon=True).start()
+
+    # The API process owns the software-only Brain worker on this existing service.
+    # This avoids a second paid service and keeps heartbeat and API on one runtime path.
+    if os.getenv("BRAIN_CLOUD_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}:
+        if not any(t.name == "brain-cloud-runtime" and t.is_alive() for t in threading.enumerate()):
+            def cloud_worker_entry():
+                try:
+                    from .cloud_runtime.worker import run_forever
+                    run_forever()
+                except Exception as exc:
+                    try:
+                        store.event("BRAIN_CLOUD_WORKER_START_FAILED", {"error": str(exc)[:1000]})
+                    except Exception:
+                        pass
+            threading.Thread(target=cloud_worker_entry, name="brain-cloud-runtime", daemon=True).start()
 
 @app.get("/api/state")
 def state(): return brain.snapshot()
