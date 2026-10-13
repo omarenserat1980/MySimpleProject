@@ -80,9 +80,12 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
           python -m unittest \
             brain_v12.tests.test_mining_engine \
-            brain_v12.tests.test_bitcoin_mining_intelligence_api -v
+            brain_v12.tests.test_bitcoin_mining_intelligence_api -v \
+            2>&1 | tee artifacts/asic/mining-economics-tests.log
 
       - name: Prepare RTL evidence directory
         if: always()
@@ -97,10 +100,11 @@ jobs:
         run: |
           mkdir -p artifacts/asic
           set +e
-          sudo apt-get update > artifacts/asic/rtl-tool-install.log 2>&1
+          # Bound package-manager waits so the acceptance gate cannot hang indefinitely.
+          timeout 180s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update > artifacts/asic/rtl-tool-install.log 2>&1
           update_rc=$?
           if [ "$update_rc" -eq 0 ]; then
-            sudo apt-get install -y iverilog >> artifacts/asic/rtl-tool-install.log 2>&1
+            timeout 180s sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y iverilog yosys >> artifacts/asic/rtl-tool-install.log 2>&1
             install_rc=$?
           else
             install_rc=125
@@ -108,6 +112,9 @@ jobs:
           printf 'apt_update_exit_code=%s\napt_install_exit_code=%s\n' "$update_rc" "$install_rc" > artifacts/asic/tool-install-status.txt
           if command -v iverilog >/dev/null 2>&1; then
             iverilog -V >> artifacts/asic/rtl-tool-install.log 2>&1
+          fi
+          if command -v yosys >/dev/null 2>&1; then
+            yosys -V >> artifacts/asic/rtl-tool-install.log 2>&1
           fi
           # Do not hide installation failure: the mandatory simulation and final gate record BLOCKED/FAIL.
 
@@ -171,6 +178,18 @@ jobs:
           PY
           test "$status" = "PASS"
 
+      - name: Synthesize RTL with Yosys and save structural evidence
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
+          yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_asic_core.sv; hierarchy -top brain_asic_core; proc; opt; check; stat; write_json artifacts/asic/brain_asic_core_synth.json' \
+            2>&1 | tee artifacts/asic/yosys-synthesis.log
+          grep -Eq 'Found and reported 0 problems|Number of problems: 0' artifacts/asic/yosys-synthesis.log
+          test -s artifacts/asic/brain_asic_core_synth.json
+          echo "ASIC_YOSYS_SYNTHESIS_PASS"
+
       - name: Run ASIC simulator regression tests
         if: success()
         env:
@@ -218,4 +237,16 @@ jobs:
           grep -q '"status": "PASS"' artifacts/asic/rtl-evidence.json
           grep -q 'ASIC_RTL_TB_PASS' artifacts/asic/rtl-simulation.log
           test "$(grep '^commit=' artifacts/asic/rtl-evidence.env | cut -d= -f2)" = "$(git rev-parse HEAD)"
+          # The acceptance marker must cover tool installation, synthesis, and every regression suite.
+          grep -qx 'apt_update_exit_code=0' artifacts/asic/tool-install-status.txt
+          grep -qx 'apt_install_exit_code=0' artifacts/asic/tool-install-status.txt
+          test -s artifacts/asic/yosys-synthesis.log
+          grep -Eq 'Found and reported 0 problems|Number of problems: 0' artifacts/asic/yosys-synthesis.log
+          test -s artifacts/asic/brain_asic_core_synth.json
+          test -s artifacts/asic/mining-economics-tests.log
+          grep -qx 'OK' artifacts/asic/mining-economics-tests.log
+          test -s artifacts/asic/software-simulator-tests.log
+          grep -Eq '[0-9]+ passed' artifacts/asic/software-simulator-tests.log
+          test -s artifacts/asic/focused-tests.log
+          grep -qx 'OK' artifacts/asic/focused-tests.log
           echo "ASIC_ACCEPTANCE_GATE_PASS"
