@@ -1,5 +1,6 @@
 // Electronic Brain V12 — Advanced ASIC Complex
 // Initial RTL prototype. Simulation/design artifact only; not fabricated hardware.
+`timescale 1ns/1ps
 module brain_asic_core #(
     parameter int WIDTH = 32
 ) (
