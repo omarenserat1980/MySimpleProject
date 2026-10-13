@@ -68,11 +68,67 @@ jobs:
           print("REAL_WINDOWS_BOOT_VERIFIED=false")
           print("REPORTS=artifacts/windows-server-2025-simulated-boot.{json,md}")
           PY
-      - name: Upload synthetic evidence report
+      - name: Generate synthetic scenario matrix
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import json
+          from pathlib import Path
+          from brain_v12.brain.windows_server_2025_simulation_factory import (
+              SCENARIOS, simulate_windows_server_2025,
+          )
+          rows = []
+          for scenario in sorted(SCENARIOS):
+              report = simulate_windows_server_2025(scenario)
+              assert report.get("execution_mode") == "SIMULATION_ONLY", scenario
+              assert report.get("real_windows_boot_verified") is False, scenario
+              assert report.get("side_effects_performed") is False, scenario
+              assert report.get("external_resources_created") is False, scenario
+              rows.append({
+                  "scenario_id": scenario,
+                  "status": report.get("status"),
+                  "reason_code": report.get("reason_code"),
+                  "recovery_status": report.get("recovery_status"),
+                  "verification_ok": (report.get("verification") or {}).get("ok"),
+                  "execution_mode": report.get("execution_mode"),
+                  "real_windows_boot_verified": report.get("real_windows_boot_verified"),
+              })
+          matrix = {
+              "schema": "electronic-brain.windows-server-2025-scenario-matrix.v1",
+              "execution_mode": "SIMULATION_ONLY",
+              "real_windows_boot_verified": False,
+              "scenario_count": len(rows),
+              "scenarios": rows,
+          }
+          Path("artifacts/windows-server-2025-scenario-matrix.json").write_text(
+              json.dumps(matrix, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          lines = [
+              "# Windows Server 2025 — Synthetic Scenario Matrix",
+              "",
+              "**Execution mode:** SIMULATION_ONLY",
+              "**Real Windows boot verified:** false",
+              f"**Scenarios evaluated:** {len(rows)}",
+              "",
+              "| Scenario | Result | Reason | Evidence chain verified |",
+              "|---|---|---|---|",
+          ]
+          for row in rows:
+              lines.append(
+                  f"| {row['scenario_id']} | {row['status']} | "
+                  f"{row['reason_code'] or '—'} | {row['verification_ok']} |"
+              )
+          lines += ["", "All rows are software-model outcomes, not real Windows execution."]
+          Path("artifacts/windows-server-2025-scenario-matrix.md").write_text(
+              "\n".join(lines) + "\n", encoding="utf-8"
+          )
+          print(f"SCENARIO_MATRIX_COUNT={len(rows)}")
+          print("SIMULATION_ONLY_BOUNDARY=PASS")
+          PY
+      - name: Upload synthetic evidence reports
         uses: actions/upload-artifact@v4
         with:
-          name: windows-server-2025-simulated-boot-evidence
-          path: artifacts/windows-server-2025-simulated-boot.*
+          name: windows-server-2025-simulation-evidence
+          path: artifacts/windows-server-2025-*
           if-no-files-found: error
           retention-days: 30
       - name: Verify simulation-only source boundaries
