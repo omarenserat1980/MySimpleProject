@@ -32,13 +32,13 @@ _SIMULATOR_CATALOG: dict[str, dict[str, Any]] = {
     "termux-brain": {
         "name": "Termux Brain",
         "kind": "execution_environment",
-        "evidence_paths": ["brain_v12/brain/device_bridge.py", "brain_v12/tools/termux_runtime_bootstrap.sh"],
+        "evidence_paths": ["brain_v12/brain/device_bridge.py", "brain_v12/tools/brain_runtime_bootstrap.sh"],
         "capabilities": ["diagnostics", "error_reporting", "script_proposals"],
     },
     "desktop-commander-brain": {
         "name": "Desktop Commander Brain",
         "kind": "execution_adapter",
-        "evidence_paths": ["brain_v12/brain/device_cloud_federation.py", "docs/BRAIN_DEVICE_CLOUD_FEDERATION.md"],
+        "evidence_paths": ["brain_v12/brain/desktop_commander_emulator.py", "brain_v12/tests/test_desktop_commander_emulator.py"],
         "capabilities": ["diagnostics", "error_reporting"],
     },
     "azure-brain": {
@@ -62,7 +62,7 @@ _SIMULATOR_CATALOG: dict[str, dict[str, Any]] = {
     "powershell-brain": {
         "name": "PowerShell Brain Simulator",
         "kind": "virtual_execution",
-        "evidence_paths": ["brain_v12/brain/remote_fabric.py", "brain_v12/brain/virtual_hardware/windows_server_backend.py"],
+        "evidence_paths": ["brain_v12/brain/powershell_emulator.py", "brain_v12/tests/test_powershell_emulator.py"],
         "capabilities": ["simulated_commands", "diagnostics", "script_proposals"],
     },
     "virtual-hardware-brain": {
