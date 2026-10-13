@@ -41,7 +41,7 @@ def local_asic_check() -> dict[str, Any]:
 def http_json(url: str, method: str = "GET", body: dict[str, Any] | None = None,
               headers: dict[str, str] | None = None, timeout: float = 10.0
               ) -> tuple[int, Any]:
-    request_headers = {"Accept": "application/json"}
+    request_headers = {"Accept": "application/json, text/event-stream"}
     if headers:
         request_headers.update(headers)
     data = None
