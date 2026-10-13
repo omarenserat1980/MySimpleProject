@@ -26,6 +26,7 @@ jobs:
 
       - name: Install open-source RTL tools on the ephemeral runner
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y iverilog yosys
           iverilog -V
@@ -33,6 +34,7 @@ jobs:
 
       - name: Compile and run RTL self-test
         run: |
+          set -euo pipefail
           mkdir -p artifacts/asic
           iverilog -g2012 -Wall -s tb_brain_asic_core \
             -o artifacts/asic/brain_asic_tb.vvp \
@@ -43,6 +45,7 @@ jobs:
 
       - name: Synthesize RTL with Yosys
         run: |
+          set -euo pipefail
           yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_asic_core.sv; hierarchy -top brain_asic_core; proc; opt; check; stat; write_json artifacts/asic/brain_asic_core.json' \
             2>&1 | tee artifacts/asic/yosys-synthesis.log
           grep -Eq "Found and reported 0 problems|Number of problems: 0" artifacts/asic/yosys-synthesis.log
