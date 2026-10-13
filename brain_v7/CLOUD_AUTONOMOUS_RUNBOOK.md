@@ -1,24 +1,25 @@
-# Brain V7 cloud autonomous runtime
+# Retired Brain V7 Cloud Runbook
 
-Brain V7 now has a container entrypoint that runs its continuous autonomous
-runtime. A persistent cloud worker must still be created by the owner in a
-cloud compute account.
+**Status: RETIRED.** This document is preserved for historical traceability only. Do not deploy the former Brain V7 worker.
 
-## Deployment
-Use a persistent worker service that supports Docker. The container command is
-already defined in brain_v7/Dockerfile.
+## Canonical runtime
 
-The worker should keep BRAIN_SLEEP_SECONDS at a reasonable value and expose no
-public endpoint unless one is intentionally added.
+Use the Brain V12 API entrypoint:
 
-## Secrets
-Never commit payment credentials, wallet keys, API tokens, or private keys.
-Put secrets in the cloud provider secret/environment store.
+```bash
+python -m brain_v12.app
+```
 
-## Autonomy boundary
-The worker can autonomously research, plan, create, validate, package and learn.
-Existing governance and payment gates continue to block unauthorized external
-submissions and money movement.
+The compatibility Dockerfiles under this directory now start Brain V12 and do not invoke the V7 worker.
 
-## Emergency stop
-Set STOP_BRAIN=1 or create the STOP_BRAIN stop file in the runtime volume.
+## Media generation status
+
+The former V7 media worker is not an approved fallback. Brain V12-native rendering is not yet integrated into `cloud/film_reliability.py`; film jobs must fail closed with `BRAIN_V12_RENDERER_NOT_INTEGRATED` rather than generate a misleading completion record.
+
+## Device and Windows status
+
+The intended runtime is independent of Arkan, Redmi 3, Termux, and Hyper-V. This is an architecture goal, not proof that a cloud executor is authenticated or that Windows Server 2025 has booted. A real Windows boot requires guest-origin evidence from the installed disk and a passing completion gate. Installer-only/QEMU TCG evidence is not accepted as a real boot.
+
+## Secrets and stop controls
+
+Never commit tokens, payment credentials, wallet keys, or private keys. Configure credentials only through the authorized secret store. Historical stop flags are not evidence that an old service is still installed or stopped on a host.
