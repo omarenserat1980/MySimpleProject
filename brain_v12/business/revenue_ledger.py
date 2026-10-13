@@ -108,6 +108,6 @@ class RevenueRecord:
             "opportunity_id": self.opportunity_id,
             "amount_note": self.amount_note,
             "currency": self.currency,
-            "evidence": self.evidence,
+            "evidence": list(self.evidence),
             "status": self.status,
         }
