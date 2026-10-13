@@ -1,0 +1,29 @@
+name: Brain GitHub Simulator Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/github_simulator.py"
+      - "brain_v12/tests/test_github_simulator.py"
+      - "brain_v12/docs/GITHUB_SIMULATOR.md"
+      - ".github/workflows/brain-github-simulator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  github-simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run Brain GitHub simulator tests
+        run: python -m pytest -q brain_v12/tests/test_github_simulator.py
+      - name: Run deterministic self-test
+        run: python -c "from brain_v12.brain.github_simulator import self_test; result = self_test(); print(result); assert result['ok']"
