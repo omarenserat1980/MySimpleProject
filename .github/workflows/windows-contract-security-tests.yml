@@ -15,6 +15,7 @@ on:
       - "brain_v12/tests/test_authority_signature.py"
       - "brain_v12/tests/test_windows_owner_approval_replay.py"
       - "brain_v12/tests/test_windows_execution_contract_issuer.py"
+      - "brain_v12/tests/test_windows_contract_issuer_replay_integration.py"
       - "brain_v12/tests/test_windows_contract_fetch.py"
       - "brain_v12/tests/test_owner_cryptographic_approval.py"
       - "brain_v12/brain/cloud_executor_attestation.py"
@@ -79,3 +80,5 @@ jobs:
         run: python -m unittest brain_v12.tests.test_owner_cryptographic_approval -v
       - name: Test Windows execution contract issuer authorization
         run: python -m unittest brain_v12.tests.test_windows_execution_contract_issuer -v
+      - name: Test single-use approval through the issuer boundary
+        run: python -m unittest brain_v12.tests.test_windows_contract_issuer_replay_integration -v
