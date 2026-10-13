@@ -29,6 +29,11 @@ on:
       - "brain_v12/brain/evidence_store.py"
       - "brain_v12/asic/**"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/portable-resource-orchestrator-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -42,7 +47,7 @@ jobs:
   policy-and-evidence-tests:
     name: Policy, contract and evidence tests (no provisioning)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,30 +84,95 @@ jobs:
             brain_v12.tests.test_mining_engine \
             brain_v12.tests.test_bitcoin_mining_intelligence_api -v
 
-      - name: Install open-source RTL simulator
+      - name: Prepare RTL evidence directory
+        if: always()
         run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y iverilog
-          iverilog -V
-
-      - name: Probe optional RTL toolchain
-        env:
-          PYTHONPATH: .
-        run: python -m brain_v12.asic.toolchain_probe
-
-      - name: Run mandatory RTL testbench
-        run: |
-          set -euo pipefail
           mkdir -p artifacts/asic
-          iverilog -g2012 -Wall -s brain_asic_core_tb \
-            -o artifacts/asic/brain_asic_core_tb.vvp \
-            brain_v12/asic/rtl/brain_asic_core.sv \
-            brain_v12/asic/rtl/brain_asic_core_tb.sv
-          vvp artifacts/asic/brain_asic_core_tb.vvp | tee artifacts/asic/rtl-simulation.log
-          grep -q "ASIC_RTL_TB_PASS" artifacts/asic/rtl-simulation.log
+          git rev-parse HEAD | tee artifacts/asic/git-commit.txt
+          date -u +'%Y-%m-%dT%H:%M:%SZ' | tee artifacts/asic/started-at-utc.txt
+
+      - name: Install open-source RTL simulator
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/asic
+          set +e
+          sudo apt-get update > artifacts/asic/rtl-tool-install.log 2>&1
+          update_rc=$?
+          if [ "$update_rc" -eq 0 ]; then
+            sudo apt-get install -y iverilog >> artifacts/asic/rtl-tool-install.log 2>&1
+            install_rc=$?
+          else
+            install_rc=125
+          fi
+          printf 'apt_update_exit_code=%s\napt_install_exit_code=%s\n' "$update_rc" "$install_rc" > artifacts/asic/tool-install-status.txt
+          if command -v iverilog >/dev/null 2>&1; then
+            iverilog -V >> artifacts/asic/rtl-tool-install.log 2>&1
+          fi
+          # Do not hide installation failure: the mandatory simulation and final gate record BLOCKED/FAIL.
+
+      - name: Run mandatory RTL simulation and record evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/asic
+          commit="$(git rev-parse HEAD)"
+          simulator="iverilog"
+          compile_rc=127
+          simulation_rc=127
+          status="BLOCKED"
+          {
+            echo "RTL simulation evidence"
+            echo "commit=$commit"
+            echo "simulator=$simulator"
+          } > artifacts/asic/rtl-simulation.log
+
+          if ! command -v iverilog >/dev/null 2>&1 || ! command -v vvp >/dev/null 2>&1; then
+            echo "RTL_SIMULATION_BLOCKED: iverilog/vvp unavailable" | tee -a artifacts/asic/rtl-simulation.log
+          else
+            iverilog -g2012 -Wall -s brain_asic_core_tb \
+              -o artifacts/asic/brain_asic_core_tb.vvp \
+              brain_v12/asic/rtl/brain_asic_core.sv \
+              brain_v12/asic/rtl/brain_asic_core_tb.sv \
+              > artifacts/asic/rtl-compile.log 2>&1
+            compile_rc=$?
+            cat artifacts/asic/rtl-compile.log >> artifacts/asic/rtl-simulation.log
+            if [ "$compile_rc" -eq 0 ]; then
+              vvp artifacts/asic/brain_asic_core_tb.vvp 2>&1 | tee -a artifacts/asic/rtl-simulation.log
+              simulation_rc=${PIPESTATUS[0]}
+              if [ "$simulation_rc" -eq 0 ] && grep -q "ASIC_RTL_TB_PASS" artifacts/asic/rtl-simulation.log; then
+                status="PASS"
+              else
+                status="FAIL"
+              fi
+            else
+              simulation_rc=125
+              echo "RTL_COMPILE_FAILED" | tee -a artifacts/asic/rtl-simulation.log
+              status="FAIL"
+            fi
+          fi
+
+          printf 'commit=%s\nsimulator=%s\ncompile_exit_code=%s\nsimulation_exit_code=%s\nstatus=%s\n' \
+            "$commit" "$simulator" "$compile_rc" "$simulation_rc" "$status" \
+            > artifacts/asic/rtl-evidence.env
+          python - <<'PY'
+          import json, os
+          fields = {}
+          with open("artifacts/asic/rtl-evidence.env", encoding="utf-8") as f:
+              for line in f:
+                  key, value = line.rstrip("\n").split("=", 1)
+                  fields[key] = value
+          fields["evidence_schema"] = 1
+          fields["testbench"] = "brain_v12/asic/rtl/brain_asic_core_tb.sv"
+          fields["design"] = "brain_v12/asic/rtl/brain_asic_core.sv"
+          with open("artifacts/asic/rtl-evidence.json", "w", encoding="utf-8") as f:
+              json.dump(fields, f, indent=2, sort_keys=True)
+              f.write("\n")
+          PY
+          test "$status" = "PASS"
 
       - name: Run ASIC simulator regression tests
+        if: success()
         env:
           PYTHONPATH: .
         run: |
@@ -110,9 +180,11 @@ jobs:
           python -m pytest -q \
             brain_v12/tests/test_asic_hardware_simulator.py \
             brain_v12/tests/test_asic_resource_adapter.py \
-            brain_v12/tests/test_asic_prototype_toolchain.py
+            brain_v12/tests/test_asic_prototype_toolchain.py \
+            | tee artifacts/asic/software-simulator-tests.log
 
       - name: Run focused tests
+        if: success()
         env:
           PYTHONPATH: .
         run: |
@@ -121,12 +193,29 @@ jobs:
             brain_v12.tests.test_executor_contract \
             brain_v12.tests.test_run_evidence_store \
             brain_v12.tests.test_android_executor_adapter \
-            brain_v12.tests.test_device_bridge_android_capacity -v
+            brain_v12.tests.test_device_bridge_android_capacity -v \
+            2>&1 | tee artifacts/asic/focused-tests.log
 
       - name: Upload RTL simulation evidence
+        id: upload-rtl-evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: portable-orchestrator-rtl-evidence
+          name: rtl-simulation-evidence-${{ github.sha }}
           path: artifacts/asic/
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Final ASIC acceptance gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.upload-rtl-evidence.outcome }}" = "success"
+          test -s artifacts/asic/rtl-simulation.log
+          test -s artifacts/asic/rtl-evidence.json
+          test -s artifacts/asic/rtl-evidence.env
+          grep -q '"status": "PASS"' artifacts/asic/rtl-evidence.json
+          grep -q 'ASIC_RTL_TB_PASS' artifacts/asic/rtl-simulation.log
+          test "$(grep '^commit=' artifacts/asic/rtl-evidence.env | cut -d= -f2)" = "$(git rev-parse HEAD)"
+          echo "ASIC_ACCEPTANCE_GATE_PASS"
