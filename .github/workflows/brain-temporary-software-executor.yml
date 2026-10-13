@@ -120,7 +120,10 @@ jobs:
           set -euo pipefail
           qemu-img create -f qcow2 windows-server-2025.qcow2 64G
           rm -f qemu-monitor.sock qemu.log windows-boot.ppm
-          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot order=d -display none -vga std -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
+          OVMF_CODE="$(find /usr/share/OVMF /usr/share/qemu -type f \\( -name OVMF_CODE.fd -o -name OVMF_CODE_4M.fd -o -name OVMF.fd \\) 2>/dev/null | head -n 1)"
+          test -n "$OVMF_CODE" || { echo "BLOCKED: OVMF UEFI firmware not found"; exit 2; }
+          echo "UEFI_FIRMWARE=$OVMF_CODE"
+          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -bios "$OVMF_CODE" -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot menu=on,order=d -display none -vga std -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
           qemu_pid=$!
           echo "$qemu_pid" > qemu.pid
           for i in $(seq 1 90); do
