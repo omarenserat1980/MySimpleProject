@@ -58,7 +58,7 @@ jobs:
           verification = report.get("verification") or {}
           assert verification.get("ok") is True, verification
           Path("artifacts/windows-server-2025-simulated-boot.json").write_text(
-              json.dumps(report, indent=2, sort_keys=True) + "\\n", encoding="utf-8"
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
           )
           Path("artifacts/windows-server-2025-simulated-boot.md").write_text(
               render_markdown_report(report), encoding="utf-8"
