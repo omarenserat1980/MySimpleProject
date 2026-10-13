@@ -1,27 +1,17 @@
 name: Brain Cloudflare Deploy
 # Evidence gate: cinema checkout + protected R2 stream
-# Production trigger: keep Cloudflare deployment on the same main-branch gate as its source/tests.
+# Production Cloudflare writes are manual-only; emulator/CI is the default path.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "cloudflare/brain-api/src/index.js"
-      - "cloudflare/brain-api/src/supervisor.js"
-      - "cloudflare/brain-api/wrangler.toml"
-      - "cloudflare/brain-api/migrations/0001_commercial.sql"
-      - "cloudflare/brain-api/migrations/0002_order_client.sql"
-      - "cloudflare/brain-api/migrations/0003_order_audit.sql"
-      - "cloudflare/brain-api/migrations/0004_revenue_ledger.sql"
-      - "cloudflare/brain-api/migrations/0007_cinema_entitlements.sql"
-      - "cloudflare/brain-api/test/cloudflare_deploy_static.test.js"
-      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
-      - "cloudflare/brain-api/test/cinema_worker_static.test.js"
-      - ".github/workflows/brain-cloudflare-deploy.yml"
-  workflow_run:
-    workflows: ["Brain Cinema - Publish Film Page"]
-    types: [completed]
+  # Live Cloudflare changes are never triggered automatically.
+  # Default CI and emulator checks run in their own workflows.
   workflow_dispatch:
+    inputs:
+      real_cloudflare_deploy:
+        description: "Explicitly authorize real Cloudflare resource writes and Worker deployment"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -32,7 +22,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.real_cloudflare_deploy == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
