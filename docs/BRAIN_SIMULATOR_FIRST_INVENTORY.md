@@ -130,3 +130,32 @@ These are workflow observations at audit time, not a complete required-check det
 5. **Audit self-healing and media after the common evidence contract is mapped.** These systems already have verification/planning components; prefer focused tests and adapters over broad rewrites.
 
 **Continuation result:** broader source coverage added to this document, but the repository-wide search is still partial. No runtime code changed, no executor was invoked, and no real OS boot is claimed.
+
+
+## Execution-selector and acceptance-gate trace (read-only)
+
+The follow-up source trace identified these concrete control points:
+
+| Layer | Path | Observed behavior | Remaining verification |
+|---|---|---|---|
+| Capability policy | `brain_v12/brain/execution_policy.py` | Selects among explicitly supplied executors by capability and priority; CI is documented as evidence/control-plane, not an implicit real-runtime executor. | Review every capability and caller before changing priorities or adding simulator routing. |
+| Execution gateway | `brain_v12/brain/execution_gateway.py` | Windows real boot requires the explicit `windows-real-boot-qemu` executor and a QEMU adapter contract; Windows cloud-native execution requires an explicit cloud executor plus VM/node runtime evidence. | Validate the contract against the real runner and guest; source inspection alone cannot prove the executor is live. |
+| Durable task runtime | `brain_v12/brain/internal_task_runtime.py` | Routes the explicit Windows cloud-native/real-boot capabilities through authorization and records task/executor evidence. | Trace all task producers and terminal-state serializers, including failure paths and evidence persistence. |
+| Independent acceptance | `brain_v12/brain/golden_acceptance_gate.py` | Requires attempt-scoped, hash-valid evidence at the requested reality level and a separate independent-verification record. | Verify every delivery caller supplies explicit criteria and cannot downgrade a REAL requirement to SIMULATED. |
+| Acceptance tests | `brain_v12/tests/test_golden_acceptance_gate.py` | Includes tests that simulated evidence cannot satisfy a real-execution gate, CI evidence is insufficient for runtime criteria, and signed REAL evidence needs valid verification. | Run the full relevant test matrix in CI and inspect all required checks before merge. |
+| Device planner | `brain_v12/brain/device_cloud_federation.py` | Plans workload placement only; default fleet profiles are not assertions of live identity or online devices. | Preserve fail-closed blocking when no verified executor exists. |
+| Device bridge | `brain_v12/brain/device_bridge.py` | Uses configured credentials, enablement checks, and an allowlist for device tasks. | Live enrollment/heartbeat/identity and end-to-end task completion remain separate runtime proofs. |
+
+### Catalog-path verification snapshot
+
+A read-only existence check against `main` confirmed the majority of the catalog evidence paths resolve. It found stale PowerShell paths and a stale Termux bootstrap path, addressed by the isolated catalog-fix proposals #521 and #522. The Desktop Commander catalog was also pointed at the emulator implementation and its tests rather than relying on federation documentation as implementation evidence. No source changes from those PRs are assumed to be present on `main`.
+
+### CI observations for the focused catalog proposals
+
+At the time of this continuation, GitHub returned six completed successful workflow runs for each proposal head:
+- PR #521 head `239de4c84dfef52c2f33035943b2ce375c35558d`: Brain Reflection E2E, Brain Reasoning Loop, Brain Universal Simulator and ChatGPT Repair, Brain Fabric Tests, Brain AI Core, and Brain Cloud Mining Control Plane all reported `success`.
+- PR #522 head `ad7e999981eecfc6a663947385ee8ab6e12a9148`: the same six workflow names all reported `success`.
+
+The combined commit-status endpoint returned no status entries for either head. These observations are not a substitute for checking the repository's required-check rules or review requirements. No PR was merged during this audit.
+
+**Updated scope status:** execution selector and acceptance layers are now mapped at source-file level, but end-to-end caller coverage and repository-wide dependency enumeration remain partial. No real executor was invoked, and no native Linux or Windows Server 2025 boot is claimed.
