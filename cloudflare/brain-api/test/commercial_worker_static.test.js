@@ -48,6 +48,21 @@ assert.match(worker, /REVENUE_REALIZED/);
 assert.match(worker, /revenue_ledger/);
 assert.match(worker, /revenue_state/);
 assert.match(revenueMigration, /CREATE TABLE IF NOT EXISTS revenue_ledger/);
+// Payment callbacks may verify payment, but must never realize revenue before delivery.
+const callbackStart = worker.indexOf("async function handlePayTabsCallback");
+const deliveryStart = worker.indexOf("async function confirmDelivery");
+const callbackSource = worker.slice(callbackStart, deliveryStart);
+const deliverySource = worker.slice(deliveryStart, worker.indexOf("async function completeJob", deliveryStart));
+assert.ok(callbackStart >= 0 && deliveryStart > callbackStart, "payment callback and delivery handlers must exist");
+assert.doesNotMatch(callbackSource, /INSERT OR IGNORE INTO revenue_ledger/, "payment callback must not realize revenue");
+assert.match(callbackSource, /NOT_REALIZED_PENDING_DELIVERY/);
+assert.match(deliverySource, /VERIFIED_PAYMENT_EVIDENCE_REQUIRED/);
+assert.match(deliverySource, /p\.state = 'PAYMENT_VERIFIED'/);
+assert.match(deliverySource, /p\.amount = o\.amount/);
+assert.match(deliverySource, /p\.currency = o\.currency/);
+assert.match(deliverySource, /INSERT OR IGNORE INTO revenue_ledger/);
+assert.match(deliverySource, /CLIENT_DELIVERY_CONFIRMED/);
+assert.match(deliverySource, /REVENUE_LEDGER_VERIFICATION_FAILED/);
 assert.match(revenueMigration, /UNIQUE/);
 
 assert.match(worker, /createCinemaCheckout/);
