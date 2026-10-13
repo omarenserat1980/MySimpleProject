@@ -54,8 +54,10 @@ def test_windows_cloud_executor_rejects_missing_provider():
 def test_windows_cloud_executor_reports_unconfigured_without_provider():
     result = WindowsCloudExecutor().readiness()
     assert result["ready"] is False
-    assert result["status"] == "NOT_CONFIGURED"
-    assert result["reason"] == "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED"
+    assert result["status"] == "DISABLED_SIMULATION_ONLY"
+    assert result["reason"] == "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+    assert result["execution_mode"] == "SIMULATION_ONLY"
+    assert result["real_windows_boot_verified"] is False
 
 
 def test_windows_cloud_executor_requires_fresh_guest_heartbeat_for_runtime():
