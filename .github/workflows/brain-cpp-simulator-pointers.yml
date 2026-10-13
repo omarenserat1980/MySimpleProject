@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python test dependencies
+        run: python -m pip install --disable-pip-version-check "fastapi>=0.115,<1.0" "httpx<0.28"
       - name: Configure C++17 pointer tests
         run: cmake -S brain6_cpp -B build/brain6-cpp-pointers
       - name: Build pointer registry tests
