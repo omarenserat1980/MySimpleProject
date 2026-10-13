@@ -2,7 +2,7 @@ name: Brain Temporary Software Execution Node
 
 on:
   push:
-    branches: [feat/software-resource-node]
+    branches: [main, feat/software-resource-node]
     paths:
       - ".github/workflows/brain-temporary-software-executor.yml"
       - "brain_v12/brain/software_resource_node.py"
