@@ -1,0 +1,18 @@
+{
+  "system": "Brain 3",
+  "github_provider": "Mouse",
+  "github_mode": "local_emulator_only",
+  "real_github_enabled": false,
+  "render_enabled": false,
+  "external_network_calls": false,
+  "default_bind": "127.0.0.1",
+  "default_port": 8787,
+  "state_storage": "memory_only",
+  "production_authority": false,
+  "windows_boot_claims_allowed": false,
+  "notes": [
+    "Mouse is a test emulator and is not the real GitHub service.",
+    "Do not configure Render credentials or create Render services for Brain 3.",
+    "Do not interpret emulator health as production readiness or Windows boot evidence."
+  ]
+}
