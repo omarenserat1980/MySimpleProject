@@ -32,11 +32,13 @@ jobs:
             brain_v12/brain/windows_server_2025_simulation_factory.py \
             brain_v12/brain/windows_server_2025_simulation_api.py \
             brain_v12/tests/test_windows_server_2025_simulation_factory.py \
+            brain_v12/tests/test_windows_server_2025_simulation_api.py \
             brain_v12/app.py
       - name: Run isolated simulation tests
         run: |
           PYTHONPATH=. python -m unittest \
-            brain_v12.tests.test_windows_server_2025_simulation_factory -v
+            brain_v12.tests.test_windows_server_2025_simulation_factory \
+            brain_v12.tests.test_windows_server_2025_simulation_api -v
       - name: Verify simulation-only source boundaries
         run: |
           python - <<'PY'
