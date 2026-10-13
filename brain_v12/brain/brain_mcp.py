@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from typing import Any, Callable
 
 from fastapi import APIRouter, Request
@@ -205,6 +207,17 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         chat_handler,
     )
 
+    def auth_error(request: Request) -> JSONResponse | None:
+        """Protect the router itself, including when mounted by app.py directly."""
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse({"ok": False, "status": "MCP_NOT_CONFIGURED"}, status_code=503)
+        authorization = request.headers.get("authorization", "")
+        supplied = authorization.removeprefix("Bearer ").strip() if authorization.startswith("Bearer ") else ""
+        if not supplied or not hmac.compare_digest(supplied, expected):
+            return JSONResponse({"ok": False, "status": "MCP_AUTH_REQUIRED"}, status_code=401)
+        return None
+
     def rpc_result(request_id: Any, result: dict[str, Any]) -> JSONResponse:
         return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})
 
@@ -219,6 +232,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.get("/mcp")
     async def mcp_get(request: Request):
+        denied = auth_error(request)
+        if denied is not None:
+            return denied
         # Stateless MCP does not require an event stream for these read-only
         # request/response tools. A GET is kept for discovery/health clients.
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
@@ -237,6 +253,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
+        denied = auth_error(request)
+        if denied is not None:
+            return denied
         version = request.headers.get("MCP-Protocol-Version")
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse(
