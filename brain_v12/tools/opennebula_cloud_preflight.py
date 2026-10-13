@@ -21,6 +21,13 @@ def check(name: str, ok: bool, detail: str, required: bool = True) -> dict[str, 
     return {"name": name, "ok": bool(ok), "required": required, "detail": detail}
 
 
+def huda_host_identity_allowed(hostname: str) -> bool:
+    """Reject hostnames explicitly identifying the forbidden Arkan machine."""
+    normalized = hostname.strip().lower()
+    forbidden_tokens = ("arkan", "ark-an")
+    return bool(normalized) and not any(token in normalized for token in forbidden_tokens)
+
+
 def main() -> int:
     checks: list[dict[str, Any]] = []
     is_linux = platform.system() == "Linux"
@@ -29,9 +36,7 @@ def main() -> int:
     checks.append(check("linux_host", is_linux, platform.platform()))
 
     # Arkan is forbidden for Huda; reject known Arkan host identity strings.
-    hostname = platform.node().strip().lower()
-    forbidden_tokens = ("arkan", "ark-an")
-    identity_ok = not any(token in hostname for token in forbidden_tokens)
+    identity_ok = huda_host_identity_allowed(platform.node())
     checks.append(check("huda_host_identity_not_arkan", identity_ok,
                         "host identity accepted (hostname redacted)" if identity_ok else "ARKAN_FORBIDDEN: host hostname matches a forbidden Arkan identity"))
     checks.append(check("x86_64_architecture", is_x86_64, arch))
