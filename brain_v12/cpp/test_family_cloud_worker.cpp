@@ -51,6 +51,18 @@ int main() {
     assert(previous_size.size() >= 2);
     assert(previous_size[0].birth_cycle != previous_size[1].birth_cycle);
 
+    const std::string bad_path = "/tmp/brain-family-missing-dir-for-test/memory.log";
+    FamilyCloudWorker failing_worker(bad_path, 5ms);
+    std::string error;
+    assert(failing_worker.register_pair(
+        ConsentingPair{"pair-fail", "parent-x", "parent-y", true, true}, &error));
+    assert(failing_worker.start(&error));
+    for (unsigned i = 0; i < 100 && failing_worker.last_error().empty(); ++i) {
+        std::this_thread::sleep_for(2ms);
+    }
+    failing_worker.stop();
+    assert(failing_worker.last_error() == "MEMORY_FILE_NOT_WRITABLE");
+
     std::remove(path.c_str());
     return 0;
 }
