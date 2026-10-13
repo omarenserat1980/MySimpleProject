@@ -143,6 +143,13 @@ jobs:
           grep -q '"verified": true' windows-execution-contract-gate.json
           echo "WINDOWS_EXECUTION_CONTRACT=VERIFIED"
 
+      - name: Run Brain Windows boot contract and software gate tests
+        run: |
+          set -euo pipefail
+          python3 -m pytest -q \\
+            brain_v12/tests/test_windows_software_boot_gate.py \\
+            brain_v12/tests/test_software_resource_node.py
+
       - name: Install real VM tooling
         run: |
           # Brain-owned hosts are provisioned before registration.
