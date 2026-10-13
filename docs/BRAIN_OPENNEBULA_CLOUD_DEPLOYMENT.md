@@ -1,0 +1,70 @@
+# Electronic Brain — هدى (Huda) Independent Cloud
+
+## Non-negotiable prohibition: Arkan
+
+Arkan must never be used by the new Brain or Huda cloud, directly or indirectly. Do not use it as a host, hypervisor, bootstrap device, GitHub Actions runner, executor, network hop, recovery target, or fallback. Do not enroll or reconnect its Desktop Commander device for this project. If any execution route resolves to Arkan or its identity, stop and report `ARKAN_FORBIDDEN`; never retry through Arkan.
+
+The Huda deployment must use an independently provisioned and positively identified host. Both the read-only preflight and the OpenNebula provider's provision/destroy mutation paths fail closed unless the current hostname exactly matches `BRAIN_HUDA_ALLOWED_HOSTNAME` and the SHA-256 digest of the current Linux machine ID matches `BRAIN_HUDA_MACHINE_ID_SHA256`. Provision both expected values through a trusted, out-of-band operator process; never store raw machine IDs or credentials in Git. This local check is a defense-in-depth gate, not hardware-backed remote attestation: the deployment controller must independently verify the host identity before any apply. Reject Arkan-related hostnames, device IDs, runner labels, and enrollment identities. If identity cannot be verified, fail closed.
+
+## Identity and independence
+
+**Cloud name:** هدى  
+**Internal slug:** `huda`  
+**Primary backend:** OpenNebula + KVM/QEMU  
+**Arkan dependency:** none
+
+This cloud must be deployable and operable without Arkan. Arkan is not the cloud host, hypervisor, bootstrap machine, GitHub Actions runner, executor, or a required network hop. Do not register or depend on the Arkan Desktop Commander device. Cloud health must be measured from the chosen Linux/OpenNebula host and the Windows guest itself.
+
+The previous Arkan-dependent device cloud-pool proposal, PR #405, has been retired and closed. Do not revive or merge that proposal as the implementation for هدى. Closing that PR does not delete its remote branch or remove any previously merged files; this change only retires that unmerged proposal.
+
+If no independent Linux x86-64 host is available, deployment remains blocked; do not silently route work through Arkan or claim the cloud is running. GitHub Actions can validate code but does not substitute for the real cloud host.
+
+## Decision
+
+Use the already-integrated OpenNebula provider as the primary self-hosted cloud backend. Keep the existing Windows Cloud Executor, provider factory, guest verification gate, and Azure/Terraform adapter. Do not create a second cloud implementation or silently fall back to a paid provider.
+
+This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud software is not a substitute for physical CPU, RAM, disk, or a reachable hypervisor.
+
+## Deployment stages
+
+1. **Choose a real host independent of Arkan**: Linux x86-64, hardware virtualization enabled, at least 8 GiB RAM and 40 GiB free disk for a minimal lab; 16 GiB+ RAM is strongly preferred for a Windows Server guest. These are conservative project preflight thresholds, not vendor minimums.
+2. **Install OpenNebula**: follow the official installation guide for the chosen supported Linux release. Configure a frontend and KVM node; do not paste secrets into repository files.
+3. **Verify host virtualization**: `/dev/kvm` must exist and be accessible to the OpenNebula/KVM service account.
+4. **Configure CLI access**: install `onevm` and `onetemplate`; configure `ONE_XMLRPC` and `ONE_AUTH` in the host's protected environment or OpenNebula CLI config. Never commit credentials.
+5. **Create/import a Windows Server 2025 template**: use authorized installation media and a suitable virtual network and datastore. Respect Microsoft licensing and evaluation terms.
+6. **Provision the Huda identity allowlist out-of-band, then run the read-only preflight**. On the intended Linux host, obtain the machine ID locally and calculate its SHA-256 digest without printing or committing the raw ID. Configure `BRAIN_HUDA_ALLOWED_HOSTNAME` to the exact expected hostname and `BRAIN_HUDA_MACHINE_ID_SHA256` to that independently recorded digest in the protected runtime environment. Do not set these from an untrusted CI runner or automatically trust whatever host is currently running the script. GitHub-hosted CI intentionally lacks this allowlist and should report `BLOCKED` for host identity. Then run:
+
+   ```bash
+   python3 brain_v12/tools/opennebula_cloud_preflight.py
+   ```
+
+   A nonzero exit code means a required check is blocked. Resolve the reported blockers first.
+7. **Select the existing provider** in the Brain runtime environment. The provider itself enforces the Huda identity gate before provisioning or destruction:
+
+   ```bash
+   export BRAIN_WINDOWS_CLOUD_PROVIDER=opennebula
+   export BRAIN_OPENNEBULA_TEMPLATE_ID='<reviewed-template-id>'
+   export BRAIN_OPENNEBULA_VM_NAME='huda-windows-01'
+   ```
+
+8. **Review before provisioning**: inspect the executor and provider contract, confirm template, network, storage, quota, and cost/energy impact. Provisioning and destruction remain disabled unless the operator explicitly sets `BRAIN_WINDOWS_CLOUD_ALLOW_APPLY=true`. Do not set that flag until the plan and target have been reviewed.
+9. **Verify the guest**: a VM object or OpenNebula state of RUNNING is not proof Windows booted. Require guest-side Windows Server 2025 identity, agent heartbeat, and a fresh challenge/response before marking the cloud VM healthy.
+10. **Prove independence**: run deployment and guest verification while Arkan is offline/unregistered. Record OpenNebula host identity and guest heartbeat evidence; simulation or GitHub runner results are not enough.
+
+## Current limits / honest status
+
+- This change adds a host preflight, safety tests, and deployment runbook only.
+- It does not install OpenNebula, create a VM, or start Windows Server.
+- A cloud VM has not been proven running.
+- The existing OpenNebula provider adapter requires a real endpoint, CLI credentials, and a pre-created template.
+- Hostname plus machine-ID digest is not hardware-backed attestation and can be spoofed by a privileged attacker; the deployment controller must verify the target against a separately managed allowlist before provisioning.
+- If the host has less than 8 GiB RAM, treat it as blocked for this setup; do not claim readiness based on a simulator or GitHub Actions test.
+- Arkan is explicitly excluded and cannot be used as a fallback host.
+- Prefer a self-hosted host to avoid mandatory paid cloud usage. No paid Azure/AWS resources are created by these steps.
+
+## References
+
+- OpenNebula documentation: https://docs.opennebula.io/
+- Electronic Brain OpenNebula provider: `brain_v12/brain/opennebula_windows_cloud_provider.py`
+- Provider factory: `brain_v12/brain/windows_cloud_provider_factory.py`
+- Windows Cloud Executor and guest verification gate: `brain_v12/brain/windows_cloud_executor.py`

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
+
+import brain_v12.brain.opennebula_windows_cloud_provider as provider_module
 
 import pytest
 
@@ -60,8 +63,17 @@ def test_provision_is_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         provider.provision_windows_server_2025()
 
 
+def _configure_huda_identity(monkeypatch: pytest.MonkeyPatch, hostname: str = "huda-linux-worker-01") -> None:
+    machine_id = "test-machine-id-not-a-real-host-secret"
+    monkeypatch.setattr(provider_module.platform, "node", lambda: hostname)
+    monkeypatch.setattr(OpenNebulaWindowsCloudProvider, "_read_machine_id", staticmethod(lambda: machine_id))
+    monkeypatch.setenv("BRAIN_HUDA_ALLOWED_HOSTNAME", hostname)
+    monkeypatch.setenv("BRAIN_HUDA_MACHINE_ID_SHA256", hashlib.sha256(machine_id.encode("utf-8")).hexdigest())
+
+
 def test_provision_requires_template_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "true")
+    _configure_huda_identity(monkeypatch)
     monkeypatch.delenv("BRAIN_OPENNEBULA_TEMPLATE_ID", raising=False)
     provider = OpenNebulaWindowsCloudProvider(
         onevm_bin=str(tmp_path / "onevm"),
@@ -79,3 +91,27 @@ def test_destroy_is_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     )
     with pytest.raises(RuntimeError, match="DESTROY_REQUIRES_EXPLICIT_ENABLEMENT"):
         provider.destroy("42")
+
+
+def test_provision_fails_closed_without_huda_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "true")
+    monkeypatch.delenv("BRAIN_OPENNEBULA_TEMPLATE_ID", raising=False)
+    _configure_huda_identity(monkeypatch)
+    monkeypatch.delenv("BRAIN_HUDA_ALLOWED_HOSTNAME", raising=False)
+    provider = OpenNebulaWindowsCloudProvider(
+        onevm_bin=str(tmp_path / "onevm"),
+        onetemplate_bin=str(tmp_path / "onetemplate"),
+    )
+    with pytest.raises(RuntimeError, match="HUDA_HOST_IDENTITY_NOT_ALLOWLISTED"):
+        provider.provision_windows_server_2025()
+
+
+def test_provision_rejects_arkan_even_if_allowlisted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BRAIN_WINDOWS_CLOUD_ALLOW_APPLY", "true")
+    _configure_huda_identity(monkeypatch, hostname="arkan")
+    provider = OpenNebulaWindowsCloudProvider(
+        onevm_bin=str(tmp_path / "onevm"),
+        onetemplate_bin=str(tmp_path / "onetemplate"),
+    )
+    with pytest.raises(RuntimeError, match="ARKAN_FORBIDDEN"):
+        provider.provision_windows_server_2025()
