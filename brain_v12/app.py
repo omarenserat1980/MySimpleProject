@@ -2002,6 +2002,33 @@ def _cloud_worker_attestation() -> dict:
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         return {"state": "NOT_RUNNING", "verified": False, "reason": f"HEARTBEAT_INVALID:{str(exc)[:200]}"}
 
+# Browser simulator liveness is intentionally separate from cloud-worker attestation.
+_simulator_heartbeat_lock = threading.Lock()
+_simulator_heartbeats: dict[str, float] = {}
+
+@app.post("/api/brain/chat-simulator/heartbeat")
+def brain_chat_simulator_heartbeat(body: dict):
+    client_id = str(body.get("client_id") or "").strip()
+    if not client_id or len(client_id) > 100:
+        raise HTTPException(status_code=400, detail="SIMULATOR_CLIENT_ID_REQUIRED")
+    now = __import__("time").time()
+    with _simulator_heartbeat_lock:
+        expired = [key for key, timestamp in _simulator_heartbeats.items() if now - timestamp > 120]
+        for key in expired:
+            _simulator_heartbeats.pop(key, None)
+        if client_id not in _simulator_heartbeats and len(_simulator_heartbeats) >= 128:
+            raise HTTPException(status_code=429, detail="SIMULATOR_HEARTBEAT_CAPACITY")
+        _simulator_heartbeats[client_id] = now
+    return {
+        "ok": True,
+        "state": "RUNNING",
+        "verified": True,
+        "client_id": client_id,
+        "timestamp": now,
+        "ttl_seconds": 15,
+        "scope": "browser_simulator_only",
+    }
+
 @app.get("/health")
 def health():
     worker = _cloud_worker_attestation()
