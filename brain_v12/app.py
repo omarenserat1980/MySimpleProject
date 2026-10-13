@@ -2772,6 +2772,13 @@ def system_diagnostics():
 
 @app.on_event("startup")
 def start_background_services():
+    # Start the software-only worker in the existing Render Python service.
+    if os.getenv("BRAIN_CLOUD_WORKER_ENABLED", "true").strip().lower() == "true":
+        try:
+            from .cloud_worker_service import start_worker
+            start_worker()
+        except Exception as exc:
+            store.event("CLOUD_WORKER_START_FAILED", {"error": str(exc)[:500]})
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
