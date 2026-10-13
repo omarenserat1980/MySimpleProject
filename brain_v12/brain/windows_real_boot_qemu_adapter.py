@@ -27,6 +27,7 @@ class WindowsRealBootQemuAdapter:
         self.runner=runner or InternalRunner()
 
     def authorize(self, contract_path:str|None=None)->dict:
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         evidence=load_and_verify(contract_path)
         c=evidence["contract"]
         if c.get("capability")!=CAPABILITY:
