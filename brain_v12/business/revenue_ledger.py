@@ -29,21 +29,37 @@ class RevenueRecord:
             raise ValueError("verified payment amount/currency required")
         if str(verified_amount) != str(self.amount_note):
             raise ValueError("verified payment amount mismatch")
-        self.evidence.append(f"payment:{source}:{transaction_id}:{evidence_ref}")
+
+        payment_marker = f"payment:{source}:{transaction_id}:{evidence_ref}"
+        if self.status in {"PAYMENT_VERIFIED", "REVENUE_REALIZED"}:
+            if payment_marker in self.evidence:
+                return self.snapshot()
+            raise ValueError("conflicting payment evidence for already verified revenue record")
+        if self.status != "PAYMENT_PENDING":
+            raise ValueError("revenue record is not in a payment-verification state")
+
+        self.evidence.append(payment_marker)
         self.status = "PAYMENT_VERIFIED"
         return self.snapshot()
 
     def realize(self, evidence: dict) -> dict:
         """Recognize revenue only after verified payment plus delivery reconciliation."""
-        if self.status != "PAYMENT_VERIFIED":
-            raise ValueError("payment must be verified first")
         if not isinstance(evidence, dict):
             raise ValueError("structured realization evidence required")
         delivery_ref = str(evidence.get("delivery_evidence_ref", "")).strip()
         reconciliation_ref = str(evidence.get("reconciliation_ref", "")).strip()
         if not delivery_ref or not reconciliation_ref:
             raise ValueError("delivery_evidence_ref and reconciliation_ref required")
-        self.evidence.append(f"realization:{delivery_ref}:{reconciliation_ref}")
+
+        realization_marker = f"realization:{delivery_ref}:{reconciliation_ref}"
+        if self.status == "REVENUE_REALIZED":
+            if realization_marker in self.evidence:
+                return self.snapshot()
+            raise ValueError("conflicting realization evidence for already realized revenue")
+        if self.status != "PAYMENT_VERIFIED":
+            raise ValueError("payment must be verified first")
+
+        self.evidence.append(realization_marker)
         self.status = "REVENUE_REALIZED"
         return self.snapshot()
 
@@ -57,8 +73,6 @@ class RevenueRecord:
             raise ValueError("mining verification result required")
         if verification.get("opportunity_id") != self.opportunity_id:
             raise ValueError("opportunity_id mismatch")
-        if verification.get("state") != "REVENUE_REALIZED":
-            raise ValueError("mining verification must be REVENUE_REALIZED")
 
         evidence = verification.get("evidence", {})
         payout = evidence.get("payout_verification", {})
