@@ -78,9 +78,10 @@ class FamilyGovernance:
         if action in DENIED_ACTIONS:
             return self._result(False, "POLICY_DENY", action, risk)
 
-        # Family approval must never turn a prohibited action into an allowed one.
-        if action == "real_os_boot" and simulation_only:
-            return self._result(False, "SIMULATION_ONLY", action, risk)
+        # Family approval never bypasses the separate real-OS execution/evidence gate.
+        if action == "real_os_boot":
+            status = "SIMULATION_ONLY" if simulation_only else "SEPARATE_EXECUTION_GATE_REQUIRED"
+            return self._result(False, status, action, risk, approval_required=True)
 
         requires_approval = (
             action in APPROVAL_REQUIRED_ACTIONS
