@@ -28,7 +28,7 @@ jobs:
       - name: Install security test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest
+          python -m pip install pytest fastapi httpx pydantic
       - name: Compile
         run: python -m compileall -q brain_v12 cloud
       - name: Security unit tests
