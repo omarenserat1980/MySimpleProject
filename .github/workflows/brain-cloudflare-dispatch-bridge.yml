@@ -17,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Validate explicit deployment request
         env:
           REQUEST_FILE: ops/dispatch-cloudflare-deploy.txt
