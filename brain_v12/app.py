@@ -2794,13 +2794,14 @@ def start_background_services():
         threading.Thread(target=workforce_loop, daemon=True).start()
 
     # The API process owns the software-only Brain worker on this existing service.
-    # This avoids a second paid service and keeps heartbeat and API on one runtime path.
+    # Keep one stoppable worker and no extra paid service.
     if os.getenv("BRAIN_CLOUD_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}:
         if not any(t.name == "brain-cloud-runtime" and t.is_alive() for t in threading.enumerate()):
+            _cloud_worker_stop_event.clear()
             def cloud_worker_entry():
                 try:
                     from .cloud_runtime.worker import run_forever
-                    run_forever()
+                    run_forever(stop_event=_cloud_worker_stop_event)
                 except Exception as exc:
                     try:
                         store.event("BRAIN_CLOUD_WORKER_START_FAILED", {"error": str(exc)[:1000]})
@@ -3246,12 +3247,15 @@ class ArkanSimulationCommand(BaseModel):
     command: str
 
 
+_cloud_worker_stop_event = threading.Event()
+
 @app.on_event("startup")
 def background_work_startup():
     return background_work.resume_pending()
 
 @app.on_event("shutdown")
 def background_work_shutdown():
+    _cloud_worker_stop_event.set()
     background_work.shutdown(wait=True)
     close_executor_for_shutdown()
 
