@@ -467,7 +467,7 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
     amount: Number(payment.amount),
     currency: String(payment.currency),
   });
-  await env.BRAIN_DB.batch([
+  const deliveryBatch = await env.BRAIN_DB.batch([
     env.BRAIN_DB.prepare(
       "UPDATE deliveries SET state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP WHERE delivery_id = ? AND state = 'READY'"
     ).bind(deliveryId),
@@ -478,6 +478,14 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
       "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ? AND EXISTS (SELECT 1 FROM deliveries d JOIN orders o ON o.order_id = d.order_id WHERE d.delivery_id = ? AND d.order_id = ? AND d.state = 'DELIVERED' AND o.state = 'COMPLETED')"
     ).bind(deliveryEvidence, delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency), deliveryId, delivery.order_id),
   ]);
+
+  // D1 batches are transactional, but a conditional UPDATE affecting zero rows
+  // does not throw. Reject concurrent/replayed confirmations unless every gate
+  // changed exactly one row; this prevents a racing duplicate from returning success.
+  if (!Array.isArray(deliveryBatch) || deliveryBatch.length !== 3 ||
+      deliveryBatch.some((result) => Number(result?.meta?.changes) !== 1)) {
+    return json({ ok: false, error: "DELIVERY_CONFIRMATION_CONFLICT" }, 409, requestOrigin, allowedOrigin);
+  }
 
   const ledger = await env.BRAIN_DB.prepare(
     "SELECT revenue_id, amount, currency, state FROM revenue_ledger WHERE order_id = ? AND tran_ref = ?"
