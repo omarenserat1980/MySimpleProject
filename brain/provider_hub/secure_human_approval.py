@@ -70,6 +70,16 @@ class SecureHumanApprovalGate(HumanApprovalGate):
             raise RuntimeError(f"APPROVAL_EXPIRED:{request_id}")
         return record
 
+    def is_approved(self, request_id: str) -> bool:
+        try:
+            record = self._get_valid(request_id)
+        except (KeyError, RuntimeError):
+            return False
+        return record.approved and not record.consumed
+
+    def get_valid_record(self, request_id: str) -> ApprovalRecord:
+        return self._get_valid(request_id)
+
 
 class AuditedSecureApprovalService:
     def __init__(self, approvals: SecureHumanApprovalGate, decisions: DecisionAuditLog) -> None:
@@ -77,28 +87,13 @@ class AuditedSecureApprovalService:
         self.decisions = decisions
 
     def consume_for_action(self, request_id: str, decision_id: str) -> ApprovalRecord:
-        record = self.approvals._get_valid(request_id)
-        if not record.approved:
-            raise RuntimeError(f"HUMAN_APPROVAL_REQUIRED:{request_id}")
-        if record.consumed:
-            raise RuntimeError(f"APPROVAL_ALREADY_CONSUMED:{request_id}")
-        decision = next(
-            (event for event in reversed(self.decisions.for_order(record.order_id))
-             if event.decision_id == decision_id.split(":approval", 1)[0]
-             and event.reason == "HUMAN_APPROVAL_REQUIRED"),
-            None,
-        )
-        if decision is None:
-            raise RuntimeError(f"APPROVAL_CONTEXT_MISMATCH:{request_id}")
-        if decision.action != record.action:
-            raise RuntimeError(f"APPROVAL_ACTION_MISMATCH:{request_id}")
-        consumed = self.approvals.consume(request_id)
+        record = self.approvals.consume(request_id)
         self.decisions.record(
             decision_id,
-            consumed.order_id,
-            consumed.action,
+            record.order_id,
+            record.action,
             True,
             "HUMAN_APPROVAL_CONSUMED",
             metadata={"approval_request_id": request_id},
         )
-        return consumed
+        return record
