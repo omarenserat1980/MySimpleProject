@@ -37,6 +37,31 @@ class LinuxSimulatorTests(unittest.TestCase):
         self.assertEqual(result["simulation_status"], "SIMULATION_BLOCKED")
         self.assertFalse(result["real_execution_authorized"])
 
+    def test_non_mapping_profile_fails_closed_without_raising(self):
+        for profile in (["not", "key-value-pairs"], "invalid", 42):
+            with self.subTest(profile=profile):
+                result = evaluate_linux_simulation(profile)
+                self.assertEqual(result["simulation_status"], "SIMULATION_BLOCKED")
+                self.assertIn("PROFILE_IS_MAPPING_FAILED", result["blockers"])
+
+    def test_boolean_and_fractional_resources_are_rejected(self):
+        for profile in (
+            {"vcpus": True},
+            {"vcpus": 2.9},
+            {"memory_mib": False},
+            {"disk_gib": "32"},
+        ):
+            with self.subTest(profile=profile):
+                result = evaluate_linux_simulation(profile)
+                self.assertEqual(result["simulation_status"], "SIMULATION_BLOCKED")
+
+    def test_non_string_or_empty_name_is_rejected(self):
+        for name in (None, 123, "   "):
+            with self.subTest(name=name):
+                result = evaluate_linux_simulation({"name": name})
+                self.assertEqual(result["simulation_status"], "SIMULATION_BLOCKED")
+                self.assertIn("PROFILE_NAME_FAILED", result["blockers"])
+
 
 if __name__ == "__main__":
     unittest.main()
