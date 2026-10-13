@@ -1,8 +1,10 @@
 #include "family_memory_store.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <system_error>
 #include <utility>
 
 namespace brain::family {
@@ -15,6 +17,18 @@ void FamilyMemoryStore::set_error(std::string* error, const std::string& value) 
 
 bool FamilyMemoryStore::restore(std::string* error) {
     std::lock_guard<std::mutex> lock(mutex_);
+    std::error_code filesystem_error;
+    const bool file_exists = std::filesystem::exists(path_, filesystem_error);
+    if (filesystem_error) {
+        set_error(error, "MEMORY_FILE_STATUS_FAILED");
+        return false;
+    }
+    if (!file_exists) {
+        entries_.clear();
+        known_ids_.clear();
+        return true;
+    }
+
     std::ifstream input(path_);
     if (!input) {
         set_error(error, "MEMORY_FILE_NOT_READABLE");
