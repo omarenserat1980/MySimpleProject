@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - "ops/dispatch-cloudflare-deploy*.txt"
+      - "ops/dispatch-cloudflare-deploy-healthcheck.txt"
 
 permissions:
   actions: write
