@@ -2,6 +2,7 @@ import unittest
 
 from brain_v12.brain.windows_server_2025_simulation_factory import (
     EvidenceRecorder,
+    SCENARIOS,
     VirtualHardwareModel,
     WindowsServer2025Simulator,
     render_markdown_report,
@@ -129,6 +130,40 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
                 result = simulate_windows_server_2025(scenario)
                 self.assertIs(result["real_windows_boot_verified"], False)
                 self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
+
+
+    def test_every_declared_scenario_preserves_simulation_safety_invariants(self):
+        for scenario in sorted(SCENARIOS):
+            with self.subTest(scenario=scenario):
+                result = simulate_windows_server_2025(scenario)
+                self.assertEqual(result["scenario_id"], scenario)
+                self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
+                self.assertEqual(result["capability"], "windows-server-2025-simulated-boot")
+                self.assertIs(result["real_windows_boot_verified"], False)
+                self.assertIs(result["side_effects_performed"], False)
+                self.assertIs(result["external_resources_created"], False)
+                self.assertEqual(result["host_observed_resources"]["status"], "NOT_COLLECTED")
+                self.assertTrue(all(
+                    event["evidence_type"] == "SYNTHETIC_SIMULATION_EVENT"
+                    for event in result["events"]
+                ))
+                if scenario == "corrupt_evidence":
+                    self.assertFalse(result["verification"]["ok"])
+                    self.assertEqual(result["reason_code"], "EVIDENCE_CHAIN_INVALID")
+                else:
+                    self.assertTrue(result["verification"]["ok"])
+                if scenario in {
+                    "duplicate_request", "invalid_executor_pointer", "real_executor_route",
+                }:
+                    self.assertEqual(result["status"], "BLOCKED")
+                if scenario in {
+                    "no_boot_disk", "invalid_boot_config", "low_disk_space",
+                    "service_failure", "missing_dependency", "dns_failure",
+                    "network_down", "out_of_memory", "cancel_during_boot",
+                    "stage_crash", "timeout", "driver_failure", "verification_failure",
+                    "corrupt_evidence",
+                }:
+                    self.assertNotEqual(result["status"], "SIMULATED_BOOT_SUCCESS")
 
 
 if __name__ == "__main__":
