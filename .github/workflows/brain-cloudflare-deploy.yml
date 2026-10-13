@@ -243,6 +243,29 @@ jobs:
             echo "CINEMA_PAGE_WIRED=TRUE"
           fi
 
+      - name: Smoke test deployed Worker HTTP API
+        env:
+          WORKER_URL_FILE: /tmp/worker_url
+        run: |
+          set -euo pipefail
+          WORKER_URL="$(cat "$WORKER_URL_FILE")"
+          response="$(curl --silent --show-error --fail-with-body --max-time 20 "$WORKER_URL/health")"
+          printf '%s' "$response" | node -e '
+            let data = "";
+            process.stdin.setEncoding("utf8");
+            process.stdin.on("data", chunk => data += chunk);
+            process.stdin.on("end", () => {
+              let parsed;
+              try { parsed = JSON.parse(data); } catch { console.error("API_HEALTH_INVALID_JSON"); process.exit(1); }
+              if (parsed.ok !== true || parsed.service !== "brain-cloud-api" || parsed.d1 !== "CONFIGURED") {
+                console.error("API_HEALTH_CHECK_FAILED");
+                process.exit(1);
+              }
+              console.log("API_HTTP_HEALTH=PASS");
+              console.log("API_D1_BINDING=PASS");
+            });
+          '
+
       - name: Smoke test syntax and config
         working-directory: cloudflare/brain-api
         run: |
