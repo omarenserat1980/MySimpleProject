@@ -1,0 +1,38 @@
+name: Brain 3 Mouse CI
+
+on:
+  push:
+    paths:
+      - "brain3_mouse/**"
+      - ".github/workflows/brain3-mouse-ci.yml"
+  pull_request:
+    paths:
+      - "brain3_mouse/**"
+      - ".github/workflows/brain3-mouse-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-mouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify emulator policy
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("brain3_mouse/PROVIDER_POLICY.json").read_text())
+          assert p["github_provider"] == "Mouse"
+          assert p["real_github_enabled"] is False
+          assert p["render_enabled"] is False
+          assert p["external_network_calls"] is False
+          PY
+      - name: Run Mouse tests
+        run: python -m unittest discover -s brain3_mouse/tests -v
