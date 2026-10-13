@@ -2345,18 +2345,14 @@ def brain_windows_boot(request:Request, vm_name:str):
 
 @app.get("/api/brain/windows/cloud/readiness")
 def brain_windows_cloud_readiness():
-    from .brain.windows_cloud_executor import WindowsCloudExecutor
-    from .brain.windows_cloud_provider_factory import windows_cloud_provider_readiness
-
-    provider_readiness = windows_cloud_provider_readiness()
-    provider = None
-    if provider_readiness.get("ready"):
-        from .brain.windows_cloud_provider_factory import build_windows_cloud_provider
-        provider = build_windows_cloud_provider()
-
-    result = WindowsCloudExecutor(provider=provider).readiness()
-    result["provider_readiness"] = provider_readiness
-    return result
+    return {
+        "status": "DISABLED_SIMULATION_ONLY",
+        "ready": False,
+        "executor": "windows-server-2025-cloud",
+        "reason": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+        "execution_mode": "SIMULATION_ONLY",
+        "real_windows_boot_verified": False,
+    }
 
 @app.get("/api/brain/windows/status")
 def brain_windows_status():
