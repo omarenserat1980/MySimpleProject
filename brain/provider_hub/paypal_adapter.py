@@ -178,8 +178,10 @@ class PayPalAdapter:
             raise ValueError("PAYPAL_MERCHANT_ORDER_MISMATCH")
         payments = unit.get("payments") or {}
         captures = payments.get("captures") or []
-        if not captures or not isinstance(captures[0], dict):
-            raise ValueError("PAYPAL_CAPTURE_EVIDENCE_MISSING")
+        # This adapter accepts only one complete capture. Multiple/partial captures
+        # require explicit aggregation and idempotency rules; fail closed for now.
+        if not isinstance(captures, list) or len(captures) != 1 or not isinstance(captures[0], dict):
+            raise ValueError("PAYPAL_CAPTURE_EVIDENCE_MISSING_OR_AMBIGUOUS")
         capture = captures[0]
         if capture.get("status") != "COMPLETED":
             raise ValueError("PAYPAL_CAPTURE_NOT_COMPLETED")
