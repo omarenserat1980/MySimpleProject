@@ -1,11 +1,11 @@
 from brain_v12.brain.advanced_worker import AdvancedWorker, REAL_BOOT_CAPABILITY, REAL_BOOT_GATES
 
 
-def test_proof_bundle():
+def _proof_bundle():
     return {gate: {"proof_id": f"test-proof:{gate}"} for gate in REAL_BOOT_GATES}
 
 
-def test_verifier(gate, evidence, task, worker_id):
+def _test_gate_verifier(gate, evidence, task, worker_id):
     return evidence == {"proof_id": f"test-proof:{gate}"} and bool(task.get("task_id")) and bool(worker_id)
 
 
@@ -44,7 +44,7 @@ def test_simulator_cannot_advertise_real_boot_capability():
 
 def test_real_boot_denied_when_trusted_verifier_missing():
     worker = AdvancedWorker("real-01", {REAL_BOOT_CAPABILITY}, mode="real_executor")
-    worker.register(gate_evidence=test_proof_bundle(), now=100)
+    worker.register(gate_evidence=_proof_bundle(), now=100)
     result = worker.admit_task({"task_id": "boot-01", "capability": REAL_BOOT_CAPABILITY}, now=101)
     assert result["admitted"] is False
     assert "TRUSTED_GATE_VERIFIER_NOT_CONFIGURED" in result["reasons"]
@@ -52,7 +52,7 @@ def test_real_boot_denied_when_trusted_verifier_missing():
 
 
 def test_boolean_claims_are_not_evidence():
-    worker = AdvancedWorker("real-02", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
+    worker = AdvancedWorker("real-02", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=_test_gate_verifier)
     worker.register(gate_evidence={gate: True for gate in REAL_BOOT_GATES}, now=100)
     result = worker.admit_task({"task_id": "boot-02", "capability": REAL_BOOT_CAPABILITY}, now=101)
     assert result["admitted"] is False
@@ -60,8 +60,8 @@ def test_boolean_claims_are_not_evidence():
 
 
 def test_verified_proofs_allow_admission_but_not_execution_claim():
-    worker = AdvancedWorker("real-03", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
-    worker.register(gate_evidence=test_proof_bundle(), now=100)
+    worker = AdvancedWorker("real-03", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=_test_gate_verifier)
+    worker.register(gate_evidence=_proof_bundle(), now=100)
     result = worker.admit_task({"task_id": "boot-03", "capability": REAL_BOOT_CAPABILITY}, now=101)
     assert result["admitted"] is True
     assert result["decision"] == "ADMISSION_ONLY_NOT_EXECUTED"
@@ -78,8 +78,8 @@ def test_missing_task_id_and_capability_are_rejected():
 
 
 def test_heartbeat_replaces_stale_proofs():
-    worker = AdvancedWorker("real-04", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=test_verifier)
-    worker.register(gate_evidence=test_proof_bundle(), now=100)
+    worker = AdvancedWorker("real-04", {REAL_BOOT_CAPABILITY}, mode="real_executor", gate_verifier=_test_gate_verifier)
+    worker.register(gate_evidence=_proof_bundle(), now=100)
     updated = worker.heartbeat(gate_evidence={"host_identity_verified": {"proof_id": "test-proof:host_identity_verified"}}, now=101)
     result = worker.admit_task({"task_id": "boot-04", "capability": REAL_BOOT_CAPABILITY}, now=102)
     assert updated["online"] is True
