@@ -49,6 +49,7 @@ class WindowsCloudTaskExecutor:
         now: float | None = None,
         poll_interval: float = 2.0,
     ) -> dict[str, Any]:
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         if not isinstance(argv, list) or not argv or not all(isinstance(x, str) for x in argv):
             raise ValueError("WINDOWS_CLOUD_ARGV_REQUIRED")
         if not self.fabric_url:
