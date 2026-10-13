@@ -35,7 +35,7 @@ assert.match(worker, /\/api\/payments\/paypal\/webhook/);
 assert.match(worker, /verify-webhook-signature/);
 assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
-assert.match(worker, /provider IN \\(\x27paytabs\x27,\x27paypal\x27\\)/);
+assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
 assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
 console.log("PAYPAL_SANDBOX_STATIC_GATES=PASS");
 
