@@ -9,13 +9,13 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PREFLIGHT = REPO_ROOT / "tools" / "opennebula_cloud_preflight.py"
+PREFLIGHT = REPO_ROOT / "brain_v12" / "tools" / "opennebula_cloud_preflight.py"
 
 
 def test_preflight_is_read_only_and_never_claims_provisioning() -> None:
     result = subprocess.run(
         [sys.executable, str(PREFLIGHT)],
-        cwd=REPO_ROOT.parent,
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=15,
@@ -37,7 +37,7 @@ def test_preflight_redacts_opennebula_endpoint() -> None:
     env["ONE_XMLRPC"] = secret_endpoint
     result = subprocess.run(
         [sys.executable, str(PREFLIGHT)],
-        cwd=REPO_ROOT.parent,
+        cwd=REPO_ROOT,
         env=env,
         capture_output=True,
         text=True,
