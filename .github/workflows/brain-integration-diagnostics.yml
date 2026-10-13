@@ -27,6 +27,8 @@ jobs:
           python-version: "3.11"
       - name: Compile diagnostic tool
         run: python -m py_compile brain_v12/tools/brain_integration_diagnostics.py
+      - name: Run offline MCP diagnostic regression tests
+        run: python -m unittest brain_v12/tools/test_brain_integration_diagnostics.py -v
       - name: Run local software-only ASIC checks
         run: |
           python brain_v12/tools/brain_integration_diagnostics.py > diagnostics-report.json
