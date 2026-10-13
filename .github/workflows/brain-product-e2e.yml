@@ -9,7 +9,12 @@ on:
       - "brain_v12/brain/device_bridge.py"
       - "brain_v12/brain/evidence_store.py"
       - "brain_v12/brain/brain_ai.py"
+      - "brain_v12/brain/brain_mcp.py"
+      - "brain_v12/brain/render_cat_channel.py"
+      - "brain_v12/tests/test_brain_mcp_channels.py"
+      - "brain_v12/tests/test_render_cat_channel.py"
       - ".github/workflows/brain-product-e2e.yml"
+      - ".github/workflows/brain-communication-channels.yml"
   workflow_dispatch:
 
 permissions:
@@ -28,3 +33,5 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Run Brain product end-to-end verification gate
         run: python -m unittest brain_v12.tests.test_brain_ai_product_smoke -v
+      - name: Run protected MCP communication channel tests
+        run: python -m unittest brain_v12.tests.test_brain_mcp_channels brain_v12.tests.test_render_cat_channel -v
