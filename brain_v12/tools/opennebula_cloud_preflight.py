@@ -71,9 +71,9 @@ def main() -> int:
     required = [item for item in checks if item["required"]]
     result = {
         "schema_version": 1,
-        "component": "electronic-brain-alksa-cloud-preflight",
-        "cloud_name": "الكسا",
-        "cloud_slug": "alksa",
+        "component": "electronic-brain-huda-cloud-preflight",
+        "cloud_name": "هدى",
+        "cloud_slug": "huda",
         "mode": "read_only",
         "status": "READY_FOR_REVIEW" if all(item["ok"] for item in required) else "BLOCKED",
         "provisioned": False,
