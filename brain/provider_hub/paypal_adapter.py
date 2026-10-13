@@ -6,7 +6,11 @@ variables and must never be logged or committed.
 from __future__ import annotations
 
 import base64
+import json
 import os
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, quote, urlsplit
+from urllib.request import Request, urlopen
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Callable
@@ -35,10 +39,34 @@ class PayPalConfig:
         return cls(client_id, client_secret, base_url)
 
 
+def http_transport(url: str, method: str, headers: dict, payload: dict | None) -> dict:
+    """Perform one PayPal HTTPS request; never log credentials or response bodies."""
+    content_type = headers.get("Content-Type", "")
+    if content_type == "application/x-www-form-urlencoded":
+        body = urlencode(payload or {}).encode("ascii")
+    else:
+        body = json.dumps(payload or {}).encode("utf-8")
+    request = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=20) as response:
+            raw = response.read()
+    except HTTPError as exc:
+        raise RuntimeError(f"PAYPAL_HTTP_ERROR_{exc.code}") from None
+    except (URLError, TimeoutError, OSError):
+        raise RuntimeError("PAYPAL_NETWORK_ERROR") from None
+    try:
+        decoded = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise RuntimeError("PAYPAL_INVALID_JSON_RESPONSE") from None
+    if not isinstance(decoded, dict):
+        raise RuntimeError("PAYPAL_INVALID_RESPONSE")
+    return decoded
+
+
 class PayPalAdapter:
-    def __init__(self, config: PayPalConfig, transport: Transport) -> None:
+    def __init__(self, config: PayPalConfig, transport: Transport | None = None) -> None:
         self.config = config
-        self.transport = transport
+        self.transport = transport or http_transport
 
     @staticmethod
     def _valid_amount(amount: str) -> str:
@@ -67,14 +95,16 @@ class PayPalAdapter:
 
     def create_order(self, *, order_id: str, amount: str, currency: str,
                      return_url: str, cancel_url: str) -> dict:
-        if not order_id.strip():
-            raise ValueError("ORDER_ID_REQUIRED")
+        if not order_id.strip() or len(order_id) > 127:
+            raise ValueError("ORDER_ID_REQUIRED_OR_TOO_LONG")
         normalized_amount = self._valid_amount(amount)
         currency = currency.strip().upper()
         if len(currency) != 3 or not currency.isalpha():
             raise ValueError("INVALID_CURRENCY")
-        if not return_url.startswith("https://") or not cancel_url.startswith("https://"):
-            raise ValueError("HTTPS_RETURN_URLS_REQUIRED")
+        for candidate in (return_url, cancel_url):
+            parsed = urlsplit(candidate)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+                raise ValueError("HTTPS_RETURN_URLS_REQUIRED")
         token = self._access_token()
         return self.transport(
             f"{self.config.base_url}/v2/checkout/orders",
@@ -94,7 +124,7 @@ class PayPalAdapter:
             raise ValueError("PAYPAL_ORDER_ID_REQUIRED")
         token = self._access_token()
         return self.transport(
-            f"{self.config.base_url}/v2/checkout/orders/{paypal_order_id}/capture",
+            f"{self.config.base_url}/v2/checkout/orders/{quote(paypal_order_id, safe='')}/capture",
             "POST",
             {"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
             {},
