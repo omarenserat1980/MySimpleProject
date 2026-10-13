@@ -34,6 +34,16 @@ class WindowsBootProofTests(unittest.TestCase):
         }
         self.contract = {"verified": True, "contract": dict(self.evidence["control"])}
         self.executor = {"verified": True, "executor_id": "exec-1", "evidence_ref": "evidence-1"}
+        self.raw_guest = {
+            "schema": "BRAIN-WINDOWS-BOOT-EVIDENCE-1",
+            "status": "WINDOWS_BOOT_VERIFIED",
+            "guest": {"os": "Windows Server 2025", "architecture": "AMD64",
+                      "boot_verified": True, "boot_time": "2026-10-13T12:00:00Z",
+                      "version": "10.0", "build": "26100"},
+            "network": {"adapter_up": True, "internet_443": True},
+            "storage": {"filesystem": "NTFS", "size_bytes": 64 * 1024**3},
+        }
+        self._write("guest-evidence.json", self.raw_guest)
         self._write("evidence.json", self.evidence)
         self._write("contract.json", self.contract)
         self._write("executor.json", self.executor)
@@ -52,7 +62,9 @@ class WindowsBootProofTests(unittest.TestCase):
         args = dict(
             evidence_path=self.root / "evidence.json", marker_path=self.root / "marker.txt",
             phase_path=self.root / "phase.txt", contract_gate_path=self.root / "contract.json",
-            executor_gate_path=self.root / "executor.json", expected_run_id="123")
+            executor_gate_path=self.root / "executor.json", expected_run_id="123",
+            guest_evidence_path=self.root / "guest-evidence.json",
+            trusted_iso_sha256="a" * 64)
         args.update(overrides)
         return verify_boot(**args)
 
@@ -85,6 +97,18 @@ class WindowsBootProofTests(unittest.TestCase):
         result = self._verify()
         self.assertFalse(result["verified"])
         self.assertIn("EXECUTOR_ID_MISMATCH", result["reasons"])
+
+    def test_raw_guest_evidence_is_required_and_validated(self):
+        self.raw_guest["guest"]["boot_verified"] = False
+        self._write("guest-evidence.json", self.raw_guest)
+        result = self._verify()
+        self.assertFalse(result["verified"])
+        self.assertIn("RAW_GUEST_OS_BOOT_NOT_PROVEN", result["reasons"])
+
+    def test_trusted_iso_hash_must_match_combined_evidence(self):
+        result = self._verify(trusted_iso_sha256="b" * 64)
+        self.assertFalse(result["verified"])
+        self.assertIn("TRUSTED_ISO_SHA256_MISMATCH", result["reasons"])
 
     def test_completion_gate_failure_fails_closed(self):
         with patch("brain_v12.tools.windows_boot_proof.WindowsCompletionGate.verify",
