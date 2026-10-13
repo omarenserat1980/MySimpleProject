@@ -36,6 +36,7 @@ public:
     void stop();
     bool running() const;
     std::vector<ChildMemory> memories() const;
+    std::string last_error() const;
 
 private:
     void on_cycle(std::uint64_t local_cycle);
@@ -47,6 +48,7 @@ private:
     std::unique_ptr<BirthThread> birth_thread_;
     std::uint64_t cycle_offset_ = 0;
     bool started_ = false;
+    std::string last_error_;
 };
 
 }  // namespace brain::family
