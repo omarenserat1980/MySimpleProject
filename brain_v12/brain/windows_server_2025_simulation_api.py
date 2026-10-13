@@ -5,7 +5,11 @@ a real executor, hypervisor, cloud API, or host agent.
 """
 from __future__ import annotations
 
+import json
+import os
+import re
 import threading
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -26,6 +30,28 @@ _LOCK = threading.RLock()
 _RUNS: dict[str, dict[str, Any]] = {}
 
 
+def _state_dir() -> Path:
+    configured = os.getenv("BRAIN_SIMULATION_STATE_DIR", "").strip()
+    return Path(configured) if configured else (
+        Path(__file__).resolve().parents[2] / ".brain" / "state" /
+        "windows_server_2025_simulations"
+    )
+
+
+def _run_path(run_id: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", run_id):
+        raise HTTPException(status_code=400, detail="INVALID_SIMULATION_RUN_ID")
+    return _state_dir() / (run_id + ".json")
+
+
+def _save_run(result: dict[str, Any]) -> None:
+    path = _run_path(result["run_id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(result, sort_keys=True, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
 class SimulationRequest(BaseModel):
     scenario_id: str = "success"
     hardware: dict[str, Any] = Field(default_factory=dict)
@@ -44,6 +70,10 @@ def create_simulation(payload: SimulationRequest, request: Request) -> dict[str,
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="INVALID_VIRTUAL_HARDWARE") from exc
     result = WindowsServer2025Simulator(hardware).run(payload.scenario_id)
+    try:
+        _save_run(result)
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_WRITE_FAILED") from exc
     with _LOCK:
         _RUNS[result["run_id"]] = result
     return {
@@ -59,8 +89,19 @@ def create_simulation(payload: SimulationRequest, request: Request) -> dict[str,
 def _get_run(run_id: str) -> dict[str, Any]:
     with _LOCK:
         result = _RUNS.get(run_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="SIMULATION_RUN_NOT_FOUND")
+    if result is not None:
+        return result
+    path = _run_path(run_id)
+    try:
+        result = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="SIMULATION_RUN_NOT_FOUND") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_UNREADABLE") from exc
+    if not isinstance(result, dict) or result.get("run_id") != run_id:
+        raise HTTPException(status_code=503, detail="SIMULATION_EVIDENCE_INVALID")
+    with _LOCK:
+        _RUNS[run_id] = result
     return result
 
 
