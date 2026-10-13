@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from brain3_mouse.server import MouseHandler, STATE, main
 from brain3_mouse.unified_kernel import KERNEL
+from brain3_mouse.runtime_adapters import manager_for
 
 
 def request(server, method, path, payload=None):
@@ -156,6 +157,32 @@ class MouseEmulatorTests(unittest.TestCase):
         request(self.server, "POST", "/api/repos", {"owner": "brain3", "name": "demo"})
         status, _ = request(self.server, "POST", "/api/repos/brain3/demo/issues", {"title": ""})
         self.assertEqual(status, 400)
+
+    def test_z_actual_runtime_adapters_and_cross_runtime_memory_bridge(self):
+        manager = manager_for(KERNEL)
+        runtime_status = manager.initialize()
+        health = KERNEL.health()
+        self.assertTrue(health["legacy_brain_integrated"], runtime_status)
+        self.assertTrue(health["brain_v12_integrated"], runtime_status)
+
+        # Seed a legacy-shaped memory record and prove the real V12 store can see it.
+        KERNEL.memory_set("shared:legacy:integration_probe", {
+            "key": "integration_probe", "concept": "legacy-to-v12",
+            "belief": 0.7, "confidence": 0.6, "observations": 2,
+            "successes": 1, "failures": 0, "last_updated": 0.0,
+        })
+        v12_task = KERNEL.submit("inspect", "cross-runtime memory check", "brain_v12")
+        KERNEL.dispatch(v12_task["id"], "brain_v12", {"description": "cross-runtime memory check"})
+        v12_store = manager._instances["brain_v12"]["store"]
+        v12_keys = {item["key"] for item in v12_store.memories()}
+        self.assertIn("brain3:shared:legacy:integration_probe", v12_keys)
+
+        # And prove the real legacy memory receives V12 entries on its next boundary.
+        KERNEL.memory_set("shared:v12:integration_probe", "v12-to-legacy")
+        legacy_task = KERNEL.submit("inspect", "cross-runtime memory check", "legacy_brain")
+        KERNEL.dispatch(legacy_task["id"], "legacy_brain", {"description": "cross-runtime memory check"})
+        legacy_memory = manager._instances["legacy_brain"]["brain"].memory
+        self.assertIn("v12:integration_probe", legacy_memory)
 
     def test_non_loopback_bind_is_refused(self):
         with patch.dict(os.environ, {"MOUSE_HOST": "0.0.0.0"}):
