@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09111f">
+<title>Brain Windows 2010 | Control Center</title>
+<style>
+:root{color-scheme:dark;--bg:#09111f;--panel:#111e31;--line:#263852;--text:#edf4ff;--muted:#9fb0c9;--cyan:#66e3da;--amber:#f6c66b;--red:#ff8585}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0,#183452 0,transparent 48%),var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1120px;margin:auto;padding:24px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}.logo{display:grid;place-items:center;width:52px;height:52px;border:1px solid #38616e;border-radius:16px;background:#122b3b;font-size:26px}.eyebrow{font-size:12px;color:var(--cyan);letter-spacing:.08em}h1,h2,p{margin:0}h1{font-size:clamp(23px,4vw,34px)}.sub{color:var(--muted);font-size:14px}
+button{border:1px solid #397a83;border-radius:12px;background:#143b49;color:var(--text);padding:10px 16px;font:inherit;font-weight:700;cursor:pointer}button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.panel{background:linear-gradient(145deg,#142238,#0e192a);border:1px solid var(--line);border-radius:18px;padding:18px;min-width:0}.wide{grid-column:1/-1}.panel h2{font-size:17px;margin-bottom:10px}.metric{font-size:23px;font-weight:800;overflow-wrap:anywhere}.muted{color:var(--muted);font-size:13px}.status{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}.ok .dot{background:var(--cyan)}.bad .dot{background:var(--red)}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:390px;overflow:auto;background:#081321;border:1px solid #22334b;border-radius:12px;padding:14px;font:12px/1.6 ui-monospace,SFMono-Regular,monospace;color:#d4e5fa}.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.warning{border-right:3px solid var(--amber);padding:10px 13px;background:#342b1b;border-radius:8px;color:#ffe2a3;margin-bottom:14px}.foot{margin-top:16px;color:var(--muted);font-size:12px}
+@media(max-width:760px){main{padding:14px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{padding:15px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="brand"><div class="logo" aria-hidden="true">🧠</div><div><div class="eyebrow">ELECTRONIC BRAIN • CLOUD NODE</div><h1>Brain Windows 2010</h1><p class="sub">واجهة إدارة مخصّصة فوق Windows Server 2025</p></div></div>
+<button id="refresh" type="button">فحص الحالة الآن</button>
+</header>
+<div class="warning">هذه لوحة قراءة فقط. لا تنشئ خوادم ولا تنفّذ أوامر إدارية. لا تعتبر أي حالة جاهزة ما لم تصل أدلة حقيقية من Brain.</div>
+<section class="grid" aria-live="polite">
+<article class="panel"><h2>اتصال Brain</h2><div id="brainStatus" class="metric">لم يُفحص بعد</div><p id="brainDetail" class="muted">بانتظار استجابة API</p></article>
+<article class="panel"><h2>حالة Windows Cloud</h2><div id="vmStatus" class="metric">غير معروفة</div><p id="vmDetail" class="muted">لا يوجد تأكيد محلي مسبق</p></article>
+<article class="panel"><h2>توفر الوكيل</h2><div id="agentStatus" class="metric">غير متحقق</div><p id="agentDetail" class="muted">يتطلب نبضة مصادقة حديثة</p></article>
+<article class="panel wide"><div class="row"><h2>الأدلة الخام من واجهات Brain</h2><span id="checkedAt" class="muted">لم يبدأ الفحص</span></div><p class="muted" style="margin-bottom:10px">تعرض هذه المنطقة الاستجابات كما وصلت، وتفصل بين البيانات المتاحة والبيانات الغائبة.</p><pre id="evidence">لم تُطلب البيانات بعد.</pre></article>
+<article class="panel wide"><h2>حدود الإصدار</h2><p class="muted">Brain Windows 2010 هو اسم منتج مخصّص، وليس إصدارًا رسميًا من Microsoft. النظام الأساسي المقصود هو Windows Server 2025 x64. هذه الصفحة لا تثبت وحدها إقلاع الآلة الافتراضية أو نجاح تثبيت Windows؛ يلزم تحقق Azure وفحص الضيف ونبضة وكيل موثقة.</p></article>
+</section>
+<p class="foot">مصدر البيانات: واجهات Brain من نفس الأصل. عند تعذر الاتصال أو غياب الحقول، تظهر الحالة كغير متاحة بدل تخمينها.</p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const endpoints = [
+  ["/api/brain/windows/cloud/readiness","provider"],
+  ["/api/brain/windows/cloud/secrets/readiness","enrollment"],
+  ["/api/brain/windows/cloud/status","guest"],
+  ["/api/brain/windows/status","datacenter"]
+];
+async function readEndpoint(path) {
+  try {
+    const response = await fetch(path,{headers:{Accept:"application/json"},cache:"no-store",credentials:"same-origin"});
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {reason:"INVALID_JSON"}; }
+    return {http_status:response.status,reachable:response.ok,data};
+  } catch (error) {
+    return {http_status:null,reachable:false,reason:"UNREACHABLE_OR_BLOCKED"};
+  }
+}
+function showMetric(id,detailId,value,detail,kind) {
+  $(id).textContent = value;
+  $(detailId).textContent = detail;
+  const card = $(id).closest(".panel");
+  card.classList.toggle("ok",kind==="ok");
+  card.classList.toggle("bad",kind==="bad");
+}
+async function refresh() {
+  $("refresh").disabled = true;
+  $("refresh").textContent = "جارٍ الفحص…";
+  showMetric("brainStatus","brainDetail","جارٍ الفحص","طلب واجهات الحالة", "");
+  const results = await Promise.all(endpoints.map(async ([path,key]) => [key,await readEndpoint(path)]));
+  const data = Object.fromEntries(results);
+  const guest = data.guest?.data || {};
+  const guestVerified = data.guest?.reachable && guest.verified === true && guest.status === "WINDOWS_CLOUD_AVAILABLE";
+  const apiReachable = results.some(([,v])=>v.reachable);
+  showMetric("brainStatus","brainDetail",apiReachable?"API متاح":"غير متصل",apiReachable?"وصل رد من واجهة واحدة على الأقل":"تعذر الوصول إلى واجهات الحالة",""+(apiReachable?"ok":"bad"));
+  showMetric("vmStatus","vmDetail",guestVerified?"متاح ومتحقق":(data.guest?.reachable?"غير متحقق":"غير متاح"),guestVerified?"واجهة Brain تؤكد حالة التوفر":"لا يوجد إثبات كافٍ لتأكيد تشغيل الضيف",guestVerified?"ok":"bad");
+  const enrollment = data.enrollment?.data || {};
+  const agentVerified = guestVerified && (guest.heartbeat_fresh === true || guest.heartbeatFresh === true || guest.agent_heartbeat_fresh === true);
+  showMetric("agentStatus","agentDetail",agentVerified?"نبضة حديثة مؤكدة":(enrollment.ready===true?"الإعداد جاهز؛ النبضة غير مثبتة":"غير متحقق"),agentVerified?"مصدر الحالة أفاد بنبضة حديثة":"لا تُستنتج النبضة من جاهزية الإعداد وحدها",agentVerified?"ok":"");
+  $("evidence").textContent = JSON.stringify(Object.fromEntries(results),null,2);
+  $("checkedAt").textContent = "آخر فحص: "+new Date().toLocaleString();
+  $("refresh").disabled = false;
+  $("refresh").textContent = "فحص الحالة الآن";
+}
+$("refresh").addEventListener("click",refresh);
+refresh();
+</script>
+</body>
+</html>
