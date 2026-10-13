@@ -1,0 +1,26 @@
+{
+  "system": "Brain 3",
+  "github_provider": "Mouse",
+  "github_mode": "local_emulator_only",
+  "compatibility_sources": ["legacy_brain", "brain_v12"],
+  "real_github_enabled": false,
+  "render_enabled": false,
+  "external_network_calls": false,
+  "physical_devices_enabled": false,
+  "legacy_execution_enabled": false,
+  "v12_remote_execution_enabled": false,
+  "windows_boot_claims_allowed": false,
+  "allowed_simulated_actions": ["inspect", "test", "plan"],
+  "blocked_actions": ["execute", "deploy", "render", "windows_boot", "device_setup", "publish"],
+  "default_bind": "127.0.0.1",
+  "default_port": 8787,
+  "state_storage": "memory_only",
+  "production_authority": false,
+  "notes": [
+    "Mouse is a local emulator, not the real GitHub service.",
+    "Legacy Brain and Brain V12 may submit only simulated inspect, test, and plan tasks.",
+    "Do not configure Render credentials or create Render services for Brain 3.",
+    "Do not prepare Arkan or Redmi 3.",
+    "Never interpret emulator status as Windows Server 2025 boot evidence."
+  ]
+}
