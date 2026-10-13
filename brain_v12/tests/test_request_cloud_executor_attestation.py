@@ -30,6 +30,10 @@ class CloudExecutorHttpDiagnosticTests(unittest.TestCase):
         self.assertEqual(str(_safe_http_error(err)), "CLOUD_EXECUTOR_HTTP_403")
         self.assertNotIn("super-secret-value", str(_safe_http_error(err)))
 
+    def test_unrecognized_uppercase_code_is_not_emitted(self):
+        err = self.make_error(403, b'{"detail":"SUPER_SECRET_INTERNAL_CODE"}')
+        self.assertEqual(str(_safe_http_error(err)), "CLOUD_EXECUTOR_HTTP_403")
+
     def test_malformed_error_body_is_not_emitted(self):
         err = self.make_error(502, b"upstream body with internal information")
         self.assertEqual(str(_safe_http_error(err)), "CLOUD_EXECUTOR_HTTP_502")
