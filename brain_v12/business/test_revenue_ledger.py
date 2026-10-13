@@ -32,7 +32,7 @@ def test_mining_verification_is_the_gate_to_revenue_realized():
 def test_unverified_mining_result_cannot_realize_revenue():
     cycle = start_cloud_mining_verification("CloudMineCrypto", "cloudminecrypto-ledger-002")
     ledger = RevenueRecord("cloudminecrypto-ledger-002", "unverified mining payout", "BTC")
-    with pytest.raises(ValueError, match="REVENUE_REALIZED"):
+    with pytest.raises(ValueError, match="verified payout evidence required"):
         ledger.realize_from_mining_verification(cycle.snapshot())
 
 
