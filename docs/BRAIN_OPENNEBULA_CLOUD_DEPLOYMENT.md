@@ -1,10 +1,17 @@
-# Electronic Brain — Self-hosted OpenNebula Cloud
+# Electronic Brain — الكسا (Alksa) Independent Cloud
 
-## Independence requirement: no Arkan
+## Identity and independence
+
+**Cloud name:** الكسا  
+**Internal slug:** `alksa`  
+**Primary backend:** OpenNebula + KVM/QEMU  
+**Arkan dependency:** none
 
 This cloud must be deployable and operable without Arkan. Arkan is not the cloud host, hypervisor, bootstrap machine, GitHub Actions runner, executor, or a required network hop. Do not register or depend on the Arkan Desktop Commander device. Cloud health must be measured from the chosen Linux/OpenNebula host and the Windows guest itself.
 
-If no independent Linux x86-64 host is available, the deployment remains blocked; do not silently route work through Arkan or claim the cloud is running. GitHub Actions can validate code but does not substitute for the real cloud host.
+The previous Arkan-dependent device cloud-pool proposal, PR #405, has been retired and closed. Do not revive or merge that proposal as the implementation for الكسا. Closing that PR does not delete its remote branch or remove any previously merged files; this change only retires that unmerged proposal.
+
+If no independent Linux x86-64 host is available, deployment remains blocked; do not silently route work through Arkan or claim the cloud is running. GitHub Actions can validate code but does not substitute for the real cloud host.
 
 ## Decision
 
@@ -18,7 +25,7 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
 2. **Install OpenNebula**: follow the official installation guide for the chosen supported Linux release. Configure a frontend and KVM node; do not paste secrets into repository files.
 3. **Verify host virtualization**: `/dev/kvm` must exist and be accessible to the OpenNebula/KVM service account.
 4. **Configure CLI access**: install `onevm` and `onetemplate`; configure `ONE_XMLRPC` and `ONE_AUTH` in the host's protected environment or OpenNebula CLI config. Never commit credentials.
-5. **Create/import a Windows Server 2025 template**: use an authorized installation ISO/media and a suitable virtual network and datastore. Respect Microsoft licensing and evaluation terms.
+5. **Create/import a Windows Server 2025 template**: use authorized installation media and a suitable virtual network and datastore. Respect Microsoft licensing and evaluation terms.
 6. **Run the read-only preflight**:
 
    ```bash
@@ -31,21 +38,21 @@ This design uses open-source OpenNebula + KVM/QEMU on a Linux x86-64 host. Cloud
    ```bash
    export BRAIN_WINDOWS_CLOUD_PROVIDER=opennebula
    export BRAIN_OPENNEBULA_TEMPLATE_ID='<reviewed-template-id>'
-   export BRAIN_OPENNEBULA_VM_NAME='brain-windows-01'
+   export BRAIN_OPENNEBULA_VM_NAME='alksa-windows-01'
    ```
 
-8. **Review before provisioning**: inspect the current executor and provider contract, confirm the template, network, storage, resource quota, and cost/energy impact. Provisioning and destruction remain disabled unless the operator explicitly sets `BRAIN_WINDOWS_CLOUD_ALLOW_APPLY=true`. Do not set that flag until the plan and target have been reviewed.
+8. **Review before provisioning**: inspect the executor and provider contract, confirm template, network, storage, quota, and cost/energy impact. Provisioning and destruction remain disabled unless the operator explicitly sets `BRAIN_WINDOWS_CLOUD_ALLOW_APPLY=true`. Do not set that flag until the plan and target have been reviewed.
 9. **Verify the guest**: a VM object or OpenNebula state of RUNNING is not proof Windows booted. Require guest-side Windows Server 2025 identity, agent heartbeat, and a fresh challenge/response before marking the cloud VM healthy.
-10. **Prove independence**: run the deployment and guest verification while Arkan is offline/unregistered. Record the OpenNebula host identity and guest heartbeat evidence; a simulated test or GitHub runner result is not enough.
+10. **Prove independence**: run deployment and guest verification while Arkan is offline/unregistered. Record OpenNebula host identity and guest heartbeat evidence; simulation or GitHub runner results are not enough.
 
 ## Current limits / honest status
 
-- This change adds a host preflight and deployment runbook only.
+- This change adds a host preflight, safety tests, and deployment runbook only.
 - It does not install OpenNebula, create a VM, or start Windows Server.
-- A cloud VM has not been proven running by this documentation.
-- The previously merged OpenNebula provider adapter still requires a real OpenNebula endpoint, CLI credentials, and a pre-created template.
-- If the host has less than 8 GiB RAM, treat it as blocked for this setup; do not claim cloud readiness based on a simulator or GitHub Actions test.
-- Arkan is explicitly excluded from the architecture and cannot be used as a fallback host.
+- A cloud VM has not been proven running.
+- The existing OpenNebula provider adapter requires a real endpoint, CLI credentials, and a pre-created template.
+- If the host has less than 8 GiB RAM, treat it as blocked for this setup; do not claim readiness based on a simulator or GitHub Actions test.
+- Arkan is explicitly excluded and cannot be used as a fallback host.
 - Prefer a self-hosted host to avoid mandatory paid cloud usage. No paid Azure/AWS resources are created by these steps.
 
 ## References
