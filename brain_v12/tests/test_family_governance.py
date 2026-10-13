@@ -63,6 +63,9 @@ class FamilyGovernanceTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "SIMULATION_ONLY")
         self.assertFalse(result["real_windows_boot_verified"])
+        outside_simulation = self.gate.evaluate("real_os_boot", approval=approval, simulation_only=False)
+        self.assertFalse(outside_simulation["ok"])
+        self.assertEqual(outside_simulation["status"], "SEPARATE_EXECUTION_GATE_REQUIRED")
 
     def test_irreversible_action_requires_approval_even_if_low_risk_label(self):
         result = self.gate.evaluate("workspace_change", risk="low", irreversible=True)
