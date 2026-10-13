@@ -15,6 +15,9 @@ on:
     paths:
       - "brain_v12/brain/advanced_worker.py"
       - "brain_v12/tests/test_advanced_worker.py"
+      - "brain_v12/brain/suggestion_worker_policy.py"
+      - "brain_v12/tests/test_suggestion_worker_policy.py"
+      - "brain_v12/app.py"
       - "docs/ADVANCED_BRAIN_WORKER.md"
       - ".github/workflows/advanced-brain-worker-tests.yml"
 
