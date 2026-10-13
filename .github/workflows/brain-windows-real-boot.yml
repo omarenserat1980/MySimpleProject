@@ -389,13 +389,15 @@ jobs:
           xorriso -osirrox on -indev brain-windows-server-2025-proof.iso \
             -extract /Autounattend.xml proof-media-validation/Autounattend.xml
           xorriso -osirrox on -indev brain-windows-server-2025-proof.iso \
-            -extract '/sources/$OEM$/$/Setup/Scripts/SetupComplete.cmd' proof-media-validation/SetupComplete.cmd
+            -extract /sources proof-media-validation/sources
+          setup_complete="$(find proof-media-validation/sources -type f -name SetupComplete.cmd -print -quit)"
+          test -n "$setup_complete"
           test -s proof-media-validation/Autounattend.xml
-          test -s proof-media-validation/SetupComplete.cmd
+          test -s "$setup_complete"
           cmp /tmp/brain-ws-oem/Autounattend.xml proof-media-validation/Autounattend.xml
-          cmp "$oem_scripts/SetupComplete.cmd" proof-media-validation/SetupComplete.cmd
-          printf '%s\\n' 'Autounattend.xml extracted and byte-verified' | tee proof-iso-autounattend.txt
-          printf '%s\\n' 'SetupComplete.cmd extracted and byte-verified' | tee proof-iso-setupcomplete.txt
+          cmp "$oem_scripts/SetupComplete.cmd" "$setup_complete"
+          echo 'Autounattend.xml extracted and byte-verified' | tee proof-iso-autounattend.txt
+          echo 'SetupComplete.cmd extracted and byte-verified' | tee proof-iso-setupcomplete.txt
 
       - name: Prepare virtual blade storage
         run: |
