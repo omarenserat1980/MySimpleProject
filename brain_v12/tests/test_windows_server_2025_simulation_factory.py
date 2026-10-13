@@ -74,6 +74,13 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         self.assertEqual(simulate_windows_server_2025("not-a-scenario")["status"],
                          "BLOCKED")
 
+    def test_wrong_virtual_hardware_types_fail_closed(self):
+        result = simulate_windows_server_2025(
+            hardware=VirtualHardwareModel(vcpu_count="two")
+        )
+        self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
+        self.assertEqual(result["reason_code"], "VCPU_COUNT_MUST_BE_INTEGER")
+
     def test_evidence_verifier_detects_mutation_and_reordering(self):
         recorder = EvidenceRecorder()
         recorder.record("PREFLIGHT", "PASS")
