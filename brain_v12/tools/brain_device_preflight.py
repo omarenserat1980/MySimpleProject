@@ -20,6 +20,25 @@ DEFAULT_AGENT_ID = "redmi3-01"
 DEFAULT_KEY_FILE = "~/v12-agent/agent.key"
 
 
+def validate_brain_url(value: str) -> bool:
+    """Allow HTTP only for exact loopback hostnames; remote endpoints require HTTPS."""
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        # Accessing .port validates malformed and out-of-range port syntax.
+        _ = parsed.port
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    if parsed.fragment:
+        return False
+    if parsed.scheme == "https":
+        return True
+    return parsed.scheme == "http" and parsed.hostname.lower() in {"127.0.0.1", "localhost", "::1"}
+
+
 def request_json(url: str, *, method: str = "GET", headers: dict[str, str] | None = None,
                  payload: dict | None = None, timeout: int = 12) -> tuple[int, dict | None]:
     data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -54,10 +73,8 @@ def main() -> int:
     base_url = os.getenv("V12_BRAIN_URL", DEFAULT_BRAIN_URL).strip().rstrip("/")
     agent_id = os.getenv("V12_AGENT_ID", DEFAULT_AGENT_ID).strip()
     key_path = Path(os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", DEFAULT_KEY_FILE)))
-    if not base_url.startswith("https://") and not (
-        base_url.startswith("http://127.0.0.1") or base_url.startswith("http://localhost")
-    ):
-        print("CONFIG_ERROR: remote Brain URL must use HTTPS")
+    if not validate_brain_url(base_url):
+        print("CONFIG_ERROR: Brain URL must use HTTPS remotely; HTTP is allowed only for exact loopback hosts")
         return 2
     if not agent_id or any(c in agent_id for c in "\r\n"):
         print("CONFIG_ERROR: V12_AGENT_ID is empty or invalid")
@@ -91,7 +108,7 @@ def main() -> int:
         return 0 if health.get("ok") is True else 5
 
     if not configured or not enabled:
-        print("HEARTBEAT_NOT_SENT: configure the matching agent credential on Render first.")
+        print("HEARTBEAT_NOT_SENT: configure the matching agent credential on the control plane first.")
         return 6
     try:
         key = key_path.read_text(encoding="utf-8").strip()
