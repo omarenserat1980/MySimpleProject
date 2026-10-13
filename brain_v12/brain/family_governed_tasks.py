@@ -13,7 +13,7 @@ from .initial_software_node import ALLOWED_TASKS
 TASK_POLICY = {
     "health_check": ("health_check", "low", False),
     "write_text": ("workspace_change", "medium", False),
-    "read_text": ("read_private_data", "medium", False),
+    "read_text": ("read_private_data", "high", False),
     "run_brainvm": ("run_brainvm", "medium", False),
     "network_self_test": ("network_self_test", "low", False),
 }
