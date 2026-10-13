@@ -59,6 +59,8 @@ assert.match(deliverySource, /PENDING_REVENUE_EVIDENCE_REQUIRED/);
 assert.match(deliverySource, /p\.amount = \?/);
 assert.match(deliverySource, /p\.currency = \?/);
 assert.match(deliverySource, /state = 'REVENUE_REALIZED'/);
+assert.ok(deliverySource.includes("EXISTS (SELECT 1 FROM deliveries d JOIN orders o"), "revenue update must be conditional on the persisted delivery/order states");
+assert.ok(deliverySource.includes("d.state = 'DELIVERED' AND o.state = 'COMPLETED'"), "revenue update must require completed delivery and order");
 assert.match(deliverySource, /REVENUE_DELIVERY_VERIFICATION_FAILED/);
 assert.match(deliverySource, /CLIENT_DELIVERY_CONFIRMED/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
