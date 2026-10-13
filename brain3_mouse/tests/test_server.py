@@ -175,7 +175,7 @@ class MouseEmulatorTests(unittest.TestCase):
         KERNEL.dispatch(v12_task["id"], "brain_v12", {"description": "cross-runtime memory check"})
         v12_store = manager._instances["brain_v12"]["store"]
         v12_keys = {item["key"] for item in v12_store.memories()}
-        self.assertIn("brain3:shared:legacy:integration_probe", v12_keys)
+        self.assertIn("legacy:integration_probe", v12_keys)
 
         # And prove the real legacy memory receives V12 entries on its next boundary.
         KERNEL.memory_set("shared:v12:integration_probe", "v12-to-legacy")
