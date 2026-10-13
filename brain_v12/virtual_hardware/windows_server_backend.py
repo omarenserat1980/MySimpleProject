@@ -31,7 +31,8 @@ class QemuWindowsBackend:
         return shutil.which(self.qemu_binary) is not None
 
     def prepare_iso(self) -> dict:
-        """Materialize and verify Microsoft media on this remote executor."""
+        """Real media preparation is disabled; use the software simulator."""
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         if self.iso_path and Path(self.iso_path).is_file():
             return {"ok": True, "status": "LOCAL_ISO_PRESENT", "path": self.iso_path}
         if not self.iso_url:
@@ -49,6 +50,7 @@ class QemuWindowsBackend:
         return result
 
     def command(self, install: bool = True) -> list[str]:
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         if not self.disk_path:
             raise ValueError("DISK_PATH_REQUIRED")
         cmd = [
@@ -81,6 +83,7 @@ class QemuWindowsBackend:
         }
 
     def run(self, install: bool = True, timeout: int = 300) -> dict:
+        return {"ok": False, "status": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY", "execution_mode": "SIMULATION_ONLY", "real_windows_boot_verified": False}
         if not self.available():
             return {"ok": False, "status": "QEMU_NOT_AVAILABLE", "inspection": self.inspect()}
         media = None
