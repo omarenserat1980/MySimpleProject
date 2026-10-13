@@ -67,10 +67,14 @@ def gate(root: Path, source_commit: str) -> dict:
     integration = root / ".github/workflows/brain-windows-integration-gate.yml"
     if integration.is_file():
         text = integration.read_text(encoding="utf-8")
-        if "windows_contract_control_plane_preflight.py" not in text:
+        # The protected-host preflight needs owner approval, a live lease, and
+        # host-only secrets. CI verifies the read-only tool is present, but must
+        # not execute it on an untrusted hosted runner.
+        preflight = root / "tools/windows_contract_control_plane_preflight.py"
+        if not preflight.is_file():
             blockers.append("INTEGRATION_GATE_MISSING_CONTROL_PLANE_PREFLIGHT")
         else:
-            passed.append("CONTROL_PLANE_PREFLIGHT_WIRED")
+            passed.append("CONTROL_PLANE_PREFLIGHT_TOOL_PRESENT")
         if "test_windows_contract_issuer_replay_integration" not in text:
             blockers.append("INTEGRATION_GATE_MISSING_REPLAY_TEST")
         else:
