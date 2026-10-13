@@ -1,0 +1,52 @@
+name: Brain Cloudflare Dispatch Bridge
+# Narrow one-shot bridge for the protected production workflow.
+# Only changes to the explicit ops trigger file can invoke the dispatch API.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ops/dispatch-cloudflare-deploy.txt"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Validate explicit deployment request
+        env:
+          REQUEST_FILE: ops/dispatch-cloudflare-deploy.txt
+        run: |
+          set -euo pipefail
+          test -f "$REQUEST_FILE"
+          grep -Fxq "AUTHORIZE_REAL_CLOUDFLARE_DEPLOY=true" "$REQUEST_FILE"
+          echo "DEPLOY_REQUEST_VALIDATED=TRUE"
+
+      - name: Dispatch protected Cloudflare deployment through GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          status="$(curl --silent --show-error --output "$response_file" --write-out "%{http_code}" \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --header "Content-Type: application/json" \
+            --data '{"ref":"main","inputs":{"real_cloudflare_deploy":"true"}}' \
+            "https://api.github.com/repos/$REPOSITORY/actions/workflows/brain-cloudflare-deploy.yml/dispatches")"
+          if [ "$status" != "204" ]; then
+            echo "WORKFLOW_DISPATCH_HTTP_STATUS=$status"
+            cat "$response_file"
+            exit 1
+          fi
+          rm -f "$response_file"
+          echo "WORKFLOW_DISPATCH_API=PASS"
+          echo "TARGET_WORKFLOW=brain-cloudflare-deploy.yml"
+          echo "REAL_CLOUDFLARE_DEPLOY=true"
