@@ -23,7 +23,7 @@ INTERNAL_RUNNER_ID = os.environ.get("BRAIN_INTERNAL_RUNNER_ID", socket.gethostna
 INTERNAL_RUNNER_LABELS = frozenset(
     filter(None, os.environ.get(
         "BRAIN_INTERNAL_RUNNER_LABELS",
-        "brain-internal,linux,x64,qemu,windows-real-boot"
+        "brain-internal,software,linux,x64"
     ).split(","))
 )
 
@@ -36,14 +36,16 @@ class InternalRunner:
     metadata: dict[str, str] = field(default_factory=dict)
 
     def capabilities(self) -> set[str]:
-        return {
-            "brain-internal-execution",
-            "qemu",
-        }
+        from .internal_runner_preflight import inspect_runner
+        capabilities = {"brain-internal-execution"}
+        if inspect_runner(self.runner_id, capability="qemu").verified:
+            capabilities.add("qemu")
+        return capabilities
 
     def status(self) -> dict:
         from .internal_runner_preflight import inspect_runner
-        preflight = inspect_runner(self.runner_id)
+        preflight = inspect_runner(self.runner_id, capability="brain-internal-execution")
+        qemu_preflight = inspect_runner(self.runner_id, capability="qemu")
         return {
             "runner_id": self.runner_id,
             "state": "ONLINE" if preflight.verified else "OFFLINE",
@@ -52,8 +54,9 @@ class InternalRunner:
             "host_os": platform.system(),
             "host_arch": platform.machine(),
             "python": platform.python_version(),
-            "qemu": self._binary("qemu-system-x86_64"),
+            "qemu": qemu_preflight.verified and self._binary("qemu-system-x86_64"),
             "preflight": preflight.evidence(),
+            "qemu_preflight": qemu_preflight.evidence(),
         }
 
     @staticmethod
@@ -63,7 +66,7 @@ class InternalRunner:
 
     def require(self, capability: str) -> None:
         from .internal_runner_preflight import inspect_runner
-        preflight = inspect_runner(self.runner_id)
+        preflight = inspect_runner(self.runner_id, capability=capability)
         if not preflight.verified:
             raise RuntimeError("BRAIN_INTERNAL_RUNNER_NOT_VERIFIED:" + ",".join(preflight.reasons))
         if capability not in self.capabilities():

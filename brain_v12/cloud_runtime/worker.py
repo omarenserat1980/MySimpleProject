@@ -38,9 +38,10 @@ def _write_heartbeat(path: Path, state: str, **extra: object) -> None:
 
 def run_forever() -> None:
     os.environ.setdefault("BRAIN_INTERNAL_RUNNER_FLAG", "1")
-    root = Path(os.getenv("BRAIN_RUNTIME_ROOT", "/var/lib/brain/runtime"))
+    runtime_home = Path(os.getenv("BRAIN_RUNTIME_HOME", "~/.brain/runtime")).expanduser()
+    root = Path(os.getenv("BRAIN_RUNTIME_ROOT", str(runtime_home / "cloud-runtime"))).expanduser()
     heartbeat = _heartbeat_path(root)
-    preflight = inspect_runner("brain-cloud-runtime")
+    preflight = inspect_runner("brain-cloud-runtime", capability="brain-internal-execution")
     if not preflight.verified:
         _write_heartbeat(
             heartbeat,
