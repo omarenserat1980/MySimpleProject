@@ -145,6 +145,16 @@ class WindowsServer2025Simulator:
             return self._report(run_id, scenario_id, "SIMULATED_BOOT_FAILED",
                                 recorder, started, errors[0])
         recorder.record("CREATED", "PASS", details={"schema": SCHEMA})
+        preflight_failures = {
+            "duplicate_request": "DUPLICATE_REQUEST_REJECTED",
+            "invalid_executor_pointer": "INVALID_EXECUTOR_POINTER",
+            "real_executor_route": "REAL_EXECUTOR_ROUTE_BLOCKED",
+        }
+        if scenario_id in preflight_failures:
+            reason = preflight_failures[scenario_id]
+            recorder.record("PREFLIGHT", "BLOCKED", reason,
+                            {"execution_mode": "SIMULATION_ONLY"})
+            return self._report(run_id, scenario_id, "BLOCKED", recorder, started, reason)
         recorder.record("PREFLIGHT", "PASS", details={
             "execution_mode": "SIMULATION_ONLY",
             "side_effects_performed": False,
