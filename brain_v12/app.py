@@ -3268,28 +3268,22 @@ class ArkanSimulationCommand(BaseModel):
     command: str
 
 
-_cloud_worker_thread = None
-
 @app.on_event("startup")
 def background_work_startup():
-    global _cloud_worker_thread
-    # Start the software-only worker in this existing service process so its
-    # verified local heartbeat is produced for /health. No extra Render service.
-    if os.getenv("BRAIN_CLOUD_WORKER_ENABLED", "1").strip() == "1":
-        _cloud_worker_thread = threading.Thread(
-            target=cloud_worker_agent.main,
-            kwargs={"install_signals": False},
-            name="brain-cloud-software-worker",
-            daemon=True,
-        )
-        _cloud_worker_thread.start()
+    # cloud_worker_service.start_worker() is the single owner of the cloud
+    # worker lifecycle (started by start_background_services above). Avoid
+    # launching a second loop that races on the same heartbeat and registry.
     return background_work.resume_pending()
 
 @app.on_event("shutdown")
 def background_work_shutdown():
-    cloud_worker_agent.request_stop()
-    if _cloud_worker_thread is not None:
-        _cloud_worker_thread.join(timeout=10)
+    # Stop the same worker that startup owns; the agent's standalone STOP_EVENT
+    # is not the service wrapper's stop event.
+    try:
+        from .cloud_worker_service import stop_worker
+        stop_worker()
+    except Exception as exc:
+        store.event("CLOUD_WORKER_STOP_FAILED", {"error": str(exc)[:500]})
     background_work.shutdown(wait=True)
     close_executor_for_shutdown()
 
