@@ -98,7 +98,10 @@ jobs:
           for i in $(seq 1 90); do if ! kill -0 "$qemu_pid" 2>/dev/null; then cat qemu.log; exit 1; fi; if [ -S qemu-monitor.sock ]; then break; fi; sleep 2; done
           test -S qemu-monitor.sock
           sleep 120
-          printf 'screendump /tmp/windows-boot.ppm\n' | socat - UNIX-CONNECT:qemu-monitor.sock || true
+          python3 - <<'PY'
+import socket, time
+s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(5); s.connect('qemu-monitor.sock'); time.sleep(1); s.recv(4096); s.sendall(b'screendump /tmp/windows-boot.ppm\n'); time.sleep(2); s.close()
+PY
           if [ -f /tmp/windows-boot.ppm ]; then
             python3 - <<'PY'
 from PIL import Image
