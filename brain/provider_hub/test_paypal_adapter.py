@@ -109,6 +109,39 @@ class PayPalAdapterTests(unittest.TestCase):
             )
         self.assertEqual(self.transport.calls, [])
 
+
+    def test_validate_capture_requires_exact_order_amount_currency_and_capture(self):
+        response = {
+            "id": "PAYPAL-ORDER-1", "status": "COMPLETED",
+            "purchase_units": [{
+                "reference_id": "EB-200", "invoice_id": "EB-200",
+                "payments": {"captures": [{
+                    "id": "CAPTURE-1", "status": "COMPLETED",
+                    "amount": {"value": "12.50", "currency_code": "USD"},
+                }]},
+            }],
+        }
+        evidence = PayPalAdapter.validate_capture(
+            response=response, expected_order_id="EB-200",
+            expected_paypal_order_id="PAYPAL-ORDER-1",
+            expected_amount="12.50", expected_currency="USD",
+        )
+        self.assertEqual(evidence["capture_id"], "CAPTURE-1")
+        for kwargs, error in (
+            ({"expected_amount": "12.51"}, "PAYPAL_CAPTURE_AMOUNT_MISMATCH"),
+            ({"expected_currency": "EUR"}, "PAYPAL_CAPTURE_CURRENCY_MISMATCH"),
+            ({"expected_order_id": "EB-OTHER"}, "PAYPAL_MERCHANT_ORDER_MISMATCH"),
+            ({"expected_paypal_order_id": "OTHER"}, "PAYPAL_ORDER_ID_MISMATCH"),
+        ):
+            args = {
+                "response": response, "expected_order_id": "EB-200",
+                "expected_paypal_order_id": "PAYPAL-ORDER-1",
+                "expected_amount": "12.50", "expected_currency": "USD",
+            }
+            args.update(kwargs)
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                PayPalAdapter.validate_capture(**args)
+
     def test_environment_requires_both_secrets(self):
         with patch.dict(os.environ, {"PAYPAL_CLIENT_ID": "", "PAYPAL_CLIENT_SECRET": ""}):
             with self.assertRaisesRegex(RuntimeError, "PAYPAL_CLIENT_ID_MISSING"):
