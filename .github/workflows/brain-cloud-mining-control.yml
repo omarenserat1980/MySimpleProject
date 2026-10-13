@@ -12,7 +12,9 @@ on:
     - cron: "31 */6 * * *"
 
 concurrency:
-  group: brain-brain-cloud-mining-control-main
+  # Isolate PR validation from main-branch, scheduled, and manual runs so a higher-priority
+  # request on one ref cannot cancel the validation run on another ref.
+  group: brain-cloud-mining-control-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
