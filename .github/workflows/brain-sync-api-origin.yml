@@ -1,0 +1,84 @@
+name: Brain Sync API Origin Variable
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-sync-api-origin-variable
+  cancel-in-progress: false
+
+jobs:
+  sync-origin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Discover deployed Brain Worker URL
+        id: discover
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?Missing CLOUDFLARE_API_TOKEN repository secret}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Missing CLOUDFLARE_ACCOUNT_ID repository secret}"
+
+          api="https://api.cloudflare.com/client/v4"
+          headers=(-H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json")
+
+          scripts_json="$(curl --fail --silent --show-error "${headers[@]}" "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts")"
+          printf '%s' "$scripts_json" | jq -e '.success == true' >/dev/null
+          worker_name="$(printf '%s' "$scripts_json" | jq -r '[.result[]? | select(.id == "brain-cloud-api")][0].id // empty')"
+          if [[ -z "$worker_name" ]]; then
+            echo "::error::Cloudflare Worker brain-cloud-api was not found in this account. No GitHub variable was changed."
+            exit 1
+          fi
+
+          subdomain_json="$(curl --fail --silent --show-error "${headers[@]}" "${api}/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain")"
+          printf '%s' "$subdomain_json" | jq -e '.success == true' >/dev/null
+          subdomain="$(printf '%s' "$subdomain_json" | jq -r '.result.subdomain // empty')"
+          if [[ -z "$subdomain" ]]; then
+            echo "::error::This Cloudflare account has no workers.dev subdomain. No GitHub variable was changed."
+            exit 1
+          fi
+
+          origin="https://${worker_name}.${subdomain}.workers.dev"
+          if [[ ! "$origin" =~ ^https://[a-zA-Z0-9.-]+\.workers\.dev$ ]]; then
+            echo "::error::Discovered URL failed validation. No GitHub variable was changed."
+            exit 1
+          fi
+
+          # Confirm the deployed endpoint responds before publishing the URL to GitHub.
+          status="$(curl --silent --output /tmp/worker-response.txt --write-out '%{http_code}' --max-time 15 "${origin}/api/system/readiness" || true)"
+          if [[ ! "$status" =~ ^[23][0-9][0-9]$ ]]; then
+            echo "::error::Worker URL was discovered, but /api/system/readiness returned HTTP ${status:-no-response}. No GitHub variable was changed."
+            echo "Check the Worker health endpoint before retrying."
+            exit 1
+          fi
+
+          echo "origin=$origin" >> "$GITHUB_OUTPUT"
+          echo "WORKER_DISCOVERY=PASS"
+          echo "WORKER_HEALTH_HTTP_STATUS=$status"
+          echo "API_ORIGIN_DISCOVERED=TRUE"
+
+      - name: Set repository variable BRAIN_API_ORIGIN
+        env:
+          GH_TOKEN: ${{ secrets.BRAIN_GITHUB_VARIABLES_TOKEN }}
+          API_ORIGIN: ${{ steps.discover.outputs.origin }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?Missing BRAIN_GITHUB_VARIABLES_TOKEN secret. Add a fine-grained GitHub token scoped to this repository with Variables: write. The workflow will not print or store the token.}"
+          gh variable set BRAIN_API_ORIGIN --repo "$GH_REPO" --body "$API_ORIGIN"
+          saved="$(gh variable get BRAIN_API_ORIGIN --repo "$GH_REPO")"
+          if [[ "$saved" != "$API_ORIGIN" ]]; then
+            echo "::error::GitHub variable verification failed."
+            exit 1
+          fi
+          echo "BRAIN_API_ORIGIN_UPDATED=TRUE"
+          echo "BRAIN_API_ORIGIN_VERIFIED=TRUE"
+          echo "Value: $API_ORIGIN"
