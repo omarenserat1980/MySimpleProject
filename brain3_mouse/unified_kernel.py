@@ -77,8 +77,14 @@ class UnifiedBrainKernel:
                 "action": action,
                 "description": description,
                 "requested_by": requested_by,
+                "source": requested_by,
                 "state": "QUEUED",
                 "executed": False,
+                "emulated": True,
+                "remote_calls": False,
+                "render": False,
+                "physical_devices": False,
+                "windows_boot_verified": False,
                 "queue": "brain3_shared",
             }
             self._next_id += 1
