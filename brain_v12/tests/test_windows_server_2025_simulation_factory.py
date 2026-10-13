@@ -4,6 +4,7 @@ from brain_v12.brain.windows_server_2025_simulation_factory import (
     EvidenceRecorder,
     VirtualHardwareModel,
     WindowsServer2025Simulator,
+    render_markdown_report,
     simulate_windows_server_2025,
 )
 
@@ -87,6 +88,13 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
         self.assertEqual(result["reason_code"], "NO_BOOT_DISK")
+
+    def test_markdown_report_preserves_simulation_boundary(self):
+        report = simulate_windows_server_2025()
+        markdown = render_markdown_report(report)
+        self.assertIn("Execution mode: SIMULATION_ONLY", markdown)
+        self.assertIn("Real Windows boot verified: false", markdown)
+        self.assertIn("synthetic model events only", markdown)
 
     def test_evidence_verifier_detects_mutation_and_reordering(self):
         recorder = EvidenceRecorder()
