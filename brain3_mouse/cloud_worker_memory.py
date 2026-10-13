@@ -48,6 +48,8 @@ class CloudWorkerMemoryBridge:
         """Read Brain-owned context only; worker-private memory is not implicit."""
         if not isinstance(prefix, str) or len(prefix) > 256:
             raise ValueError("context prefix must be a string of at most 256 characters")
+        if not prefix.startswith("brain:context:"):
+            raise PermissionError("worker may read only Brain-approved context namespaces")
         return {key: value for key, value in self.kernel.memory_items(prefix=prefix)}
 
     def submit_task(
