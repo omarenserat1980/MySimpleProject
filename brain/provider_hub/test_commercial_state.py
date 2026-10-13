@@ -12,9 +12,15 @@ def test_forward_flow_requires_evidence():
             raise AssertionError("unsafe transition accepted")
 
     assert order.transition("PAYMENT_VERIFIED", evidence_ok=True) == "PAYMENT_VERIFIED"
-    assert order.transition("REVENUE_REALIZED", evidence_ok=True) == "REVENUE_REALIZED"
+    # Revenue cannot be realized before delivery evidence.
+    try:
+        order.transition("REVENUE_REALIZED", evidence_ok=True)
+    except ValueError as exc:
+        assert str(exc) == "INVALID_TRANSITION:PAYMENT_VERIFIED->REVENUE_REALIZED"
+    else:
+        raise AssertionError("revenue realized before delivery")
     assert order.transition("DELIVERY_VERIFIED", evidence_ok=True) == "DELIVERY_VERIFIED"
-    assert order.transition("COMPLETED", evidence_ok=True) == "COMPLETED"
+    assert order.transition("REVENUE_REALIZED", evidence_ok=True) == "REVENUE_REALIZED"
 
 
 def test_cannot_skip_states():
