@@ -5,20 +5,24 @@ HTTP failures expose only the server's allowlisted machine-readable error code;
 request headers, token values, response bodies, and URLs are never printed.
 """
 from __future__ import annotations
-import argparse, json, os, re, tempfile, urllib.error, urllib.request
+import argparse, json, os, tempfile, urllib.error, urllib.request
 from pathlib import Path
 
-_SAFE_DETAIL = re.compile(r"^[A-Z0-9_]{1,100}$")
+# Only fixed, documented server codes may cross into CI logs.
+_SAFE_ERROR_DETAILS = {
+    "CLOUD_EXECUTOR_AUTH_REJECTED",
+    "CLOUD_EXECUTOR_HOST_BINDING_REQUIRED",
+}
 
 
 def _safe_http_error(exc: urllib.error.HTTPError) -> RuntimeError:
-    """Return a non-secret diagnostic suitable for CI logs."""
-    detail = "UNKNOWN"
+    """Return a non-secret diagnostic; discard all non-allowlisted detail."""
+    detail = ""
     try:
         body = exc.read(16_384).decode("utf-8")
         payload = json.loads(body)
         candidate = payload.get("detail", "") if isinstance(payload, dict) else ""
-        if isinstance(candidate, str) and _SAFE_DETAIL.fullmatch(candidate):
+        if isinstance(candidate, str) and candidate in _SAFE_ERROR_DETAILS:
             detail = candidate
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         pass
