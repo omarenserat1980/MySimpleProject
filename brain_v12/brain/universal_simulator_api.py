@@ -32,13 +32,17 @@ _SIMULATOR_CATALOG: dict[str, dict[str, Any]] = {
     "termux-brain": {
         "name": "Termux Brain",
         "kind": "execution_environment",
-        "evidence_paths": ["brain_v12/brain/device_bridge.py", "brain_v12/tools/brain_runtime_bootstrap.sh"],
+        "evidence_paths": ["brain_v12/brain/termux_emulator.py", "brain_v12/brain/device_bridge.py", "brain_v12/tools/brain_runtime_bootstrap.sh"],
+        "simulator_entry": "brain_v12/brain/termux_emulator.py",
+        "real_executor_entry": "brain_v12/tools/brain_runtime_bootstrap.sh",
         "capabilities": ["diagnostics", "error_reporting", "script_proposals"],
     },
     "desktop-commander-brain": {
         "name": "Desktop Commander Brain",
         "kind": "execution_adapter",
         "evidence_paths": ["brain_v12/brain/desktop_commander_emulator.py", "brain_v12/tests/test_desktop_commander_emulator.py"],
+        "simulator_entry": "brain_v12/brain/desktop_commander_emulator.py",
+        "real_executor_entry": None,
         "capabilities": ["diagnostics", "error_reporting"],
     },
     "azure-brain": {
@@ -63,6 +67,8 @@ _SIMULATOR_CATALOG: dict[str, dict[str, Any]] = {
         "name": "PowerShell Brain Simulator",
         "kind": "virtual_execution",
         "evidence_paths": ["brain_v12/brain/powershell_emulator.py", "brain_v12/tests/test_powershell_emulator.py"],
+        "simulator_entry": "brain_v12/brain/powershell_emulator.py",
+        "real_executor_entry": None,
         "capabilities": ["simulated_commands", "diagnostics", "script_proposals"],
     },
     "virtual-hardware-brain": {
@@ -203,6 +209,14 @@ def discover_simulators() -> list[dict[str, Any]]:
             "kind": definition["kind"],
             "capabilities": list(definition["capabilities"]),
             "evidence_paths": evidence,
+            "simulator_entry": definition.get("simulator_entry"),
+            "real_executor_entry": definition.get("real_executor_entry"),
+            "pointer_status": (
+                "SIMULATOR_POINTER_READY"
+                if definition.get("simulator_entry") and (_ROOT / definition["simulator_entry"]).is_file()
+                else "SIMULATOR_POINTER_MISSING"
+            ),
+            "real_executor_status": "NOT_VERIFIED" if definition.get("real_executor_entry") else "NOT_CONFIGURED",
             "discovery_status": "DISCOVERED" if evidence else "NOT_FOUND",
             "registration_status": "REGISTERED" if saved else "DISCOVERED",
             "execution_mode": saved.get("execution_mode", "UNVERIFIED"),
