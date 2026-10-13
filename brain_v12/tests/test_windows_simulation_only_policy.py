@@ -73,11 +73,11 @@ class WindowsSimulationOnlyPolicyTests(unittest.TestCase):
             executor.run(vm, {}, ["whoami"])
 
     def test_simulator_provider_remains_allowed(self):
-        class FakeSimulator:
-            name = "brain-emulated-azure"
-            def provision_windows_server_2025(self, **kwargs):
-                return CloudWindowsVM("sim-vm", self.name, "emulated", "READY")
-        simulator = WindowsCloudExecutor(provider=FakeSimulator())
+        from brain_v12.azure_emulator.service import AzureEmulator
+        from brain_v12.azure_emulator.windows_provider import EmulatorWindowsProvider
+        simulator = WindowsCloudExecutor(
+            provider=EmulatorWindowsProvider(AzureEmulator(free_only=True))
+        )
         self.assertTrue(simulator.readiness()["ready"])
         vm = simulator.provision(name="simulated-only")
         self.assertEqual(vm.provider, "brain-emulated-azure")
