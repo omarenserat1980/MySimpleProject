@@ -26,7 +26,13 @@ def main():
         try: text=p.read_text(encoding="utf-8")
         except Exception: continue
         for i,line in enumerate(text.splitlines(),1):
-            if re.search(r"(?i)\b(TODO|FIXME|XXX|NOT_IMPLEMENTED)\b",line):
+            # NOT_IMPLEMENTED is a legitimate runtime state for discovered, unverified
+            # adapters; it is not an unfinished-code marker when used as adapter_status.
+            intentional_adapter_state = re.search(
+                r"""^\s*["']?adapter_status["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
+                line,
+            )
+            if not intentional_adapter_state and re.search(r"(?i)\b(TODO|FIXME|XXX|NOT_IMPLEMENTED)\b",line):
                 findings.append({"kind":"marker","file":str(p.relative_to(ROOT)),"line":i,"text":line.strip()[:240]})
         if p.name.startswith("test_"): continue
         if "def " in text and "pytest" not in text and "test_" not in p.name:
