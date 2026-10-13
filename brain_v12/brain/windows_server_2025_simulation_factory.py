@@ -47,13 +47,13 @@ FAILURE_STAGE = {
     "out_of_memory": ("VIRTUAL_HARDWARE_READY", "SIMULATED_OUT_OF_MEMORY"),
     "cancel_during_boot": ("BOOT_MANAGER_SIMULATION", "SIMULATION_CANCELLED"),
     "stage_crash": ("KERNEL_PHASE_SIMULATION", "SIMULATED_STAGE_CRASH"),
+    "power_loss_recovery": ("BOOT_MANAGER_SIMULATION", "POWER_LOSS_INJECTED"),
     "timeout": ("DRIVER_PHASE_SIMULATION", "SIMULATED_TIMEOUT"),
     "driver_failure": ("DRIVER_PHASE_SIMULATION", "SIMULATED_DRIVER_FAILED"),
     "duplicate_request": ("PREFLIGHT", "DUPLICATE_REQUEST_REJECTED"),
     "invalid_executor_pointer": ("PREFLIGHT", "INVALID_EXECUTOR_POINTER"),
     "real_executor_route": ("PREFLIGHT", "REAL_EXECUTOR_ROUTE_BLOCKED"),
     "verification_failure": ("HEALTH_CHECK", "VERIFICATION_GATE_FAILED"),
-    "corrupt_evidence": ("HEALTH_CHECK", "EVIDENCE_CHAIN_INVALID"),
 }
 
 
@@ -165,6 +165,7 @@ class WindowsServer2025Simulator:
             "simulator_version": self.simulator_version,
         })
         failure = FAILURE_STAGE.get(scenario_id)
+        recovery_status = None
         stages = list(STAGES[3:-1])
         for stage in stages:
             if scenario_id == "out_of_memory" and stage == "VIRTUAL_HARDWARE_READY":
@@ -177,12 +178,13 @@ class WindowsServer2025Simulator:
                 status = "CANCELLED" if scenario_id == "cancel_during_boot" else "FAILED"
                 recorder.record(stage, status, reason, {"scenario_id": scenario_id})
                 if scenario_id == "power_loss_recovery":
+                    recovery_status = "SIMULATED_RECOVERY_PASS"
                     recorder.record("RECOVERY_IN_PROGRESS", "PASS",
                                     details={"recovery_mode": "STATE_MODEL_ONLY"})
-                    recorder.record("HEALTH_CHECK", "PASS",
-                                    details={"recovered_state": "SIMULATED"})
-                    return self._report(run_id, scenario_id, "SIMULATED_BOOT_SUCCESS",
-                                        recorder, started, recovery="SIMULATED_RECOVERY_PASS")
+                    recorder.record(stage, "PASS",
+                                    details={"recovered_after": reason,
+                                             "recovery_mode": "STATE_MODEL_ONLY"})
+                    continue
                 final = "CANCELLED" if status == "CANCELLED" else "SIMULATED_BOOT_FAILED"
                 if scenario_id == "verification_failure":
                     final = "SIMULATED_BOOT_FAILED"
@@ -198,13 +200,15 @@ class WindowsServer2025Simulator:
             verification = EvidenceRecorder.verify(recorder.events)
         if scenario_id == "verification_failure" or not verification["ok"]:
             return self._report(run_id, scenario_id, "SIMULATED_BOOT_FAILED",
-                                recorder, started, "VERIFICATION_GATE_FAILED",
+                                recorder, started,
+                                "EVIDENCE_CHAIN_INVALID" if not verification["ok"] else "VERIFICATION_GATE_FAILED",
                                 verification=verification)
         recorder.record("SIMULATED_BOOT_COMPLETE", "PASS",
                         details={"real_windows_boot_verified": False})
         verification = EvidenceRecorder.verify(recorder.events)
         return self._report(run_id, scenario_id, "SIMULATED_BOOT_SUCCESS",
-                            recorder, started, verification=verification)
+                            recorder, started, verification=verification,
+                            recovery=recovery_status)
 
     def _stage_details(self, stage: str, scenario_id: str) -> dict[str, Any]:
         details: dict[str, Any] = {"scenario_id": scenario_id}
