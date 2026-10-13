@@ -51,6 +51,7 @@ bool FamilyCloudWorker::start(std::string* error) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         cycle_offset_ = highest_cycle;
+        last_error_.clear();
         birth_thread_ = std::make_unique<BirthThread>(
             [this](std::uint64_t cycle) { on_cycle(cycle); }, interval_);
         started_ = birth_thread_->start();
@@ -86,6 +87,11 @@ std::vector<ChildMemory> FamilyCloudWorker::memories() const {
     return memory_.children();
 }
 
+std::string FamilyCloudWorker::last_error() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return last_error_;
+}
+
 void FamilyCloudWorker::on_cycle(std::uint64_t local_cycle) {
     std::vector<ConsentingPair> pairs;
     std::uint64_t global_cycle = 0;
@@ -102,8 +108,11 @@ void FamilyCloudWorker::on_cycle(std::uint64_t local_cycle) {
         child.parent_a = pair.parent_a;
         child.parent_b = pair.parent_b;
         child.birth_cycle = global_cycle;
-        std::string ignored_error;
-        memory_.remember(child, &ignored_error);
+        std::string write_error;
+        if (!memory_.remember(child, &write_error)) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            last_error_ = write_error.empty() ? "CHILD_MEMORY_WRITE_FAILED" : write_error;
+        }
     }
 }
 
