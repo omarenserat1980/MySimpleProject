@@ -9,9 +9,11 @@ from pathlib import Path
 from typing import Any
 import time
 
+from .software_node_hardware import SoftwareNodeHardware
+
 SCHEMA = "electronic-brain.initial-software-node.v1"
 NODE_ID = "brain-software-node-01"
-ALLOWED_TASKS = frozenset({"health_check", "write_text", "read_text"})
+ALLOWED_TASKS = frozenset({"health_check", "write_text", "read_text", "run_brainvm", "network_self_test"})
 
 
 class InitialSoftwareNode:
@@ -20,6 +22,7 @@ class InitialSoftwareNode:
     def __init__(self, root: str | Path):
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
+        self.hardware = SoftwareNodeHardware(self.root)
         self.state = "STOPPED"
         self.started_at: float | None = None
         self.heartbeat_count = 0
@@ -52,6 +55,7 @@ class InitialSoftwareNode:
             "heartbeat_count": self.heartbeat_count,
             "completed_tasks": self.completed_tasks,
             "workspace": str(self.root),
+            "hardware": self.hardware.status(),
         }
 
     def heartbeat(self) -> dict[str, Any]:
@@ -92,21 +96,19 @@ class InitialSoftwareNode:
             if kind == "health_check":
                 result: dict[str, Any] = {"health": "OK", "state": self.state}
             elif kind == "write_text":
-                path = self._safe_path(task.get("path"))
-                content = task.get("content")
-                if not isinstance(content, str):
-                    return {"ok": False, "status": "INVALID_CONTENT", "node_id": NODE_ID}
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-                result = {"path": str(path.relative_to(self.root)), "bytes_written": len(content.encode("utf-8"))}
-            else:  # read_text
-                path = self._safe_path(task.get("path"))
-                if not path.is_file():
-                    return {"ok": False, "status": "FILE_NOT_FOUND", "node_id": NODE_ID}
-                result = {"path": str(path.relative_to(self.root)), "content": path.read_text(encoding="utf-8")}
+                result = self.hardware.write_text(task.get("path"), task.get("content"))
+            elif kind == "read_text":
+                result = self.hardware.read_text(task.get("path"))
+            elif kind == "run_brainvm":
+                result = self.hardware.run_program(task.get("program"), max_cycles=task.get("max_cycles", 10000))
+            else:  # network_self_test
+                result = self.hardware.network_self_test()
 
-        except (OSError, ValueError) as exc:
-            return {"ok": False, "status": str(exc) if isinstance(exc, ValueError) else "WORKSPACE_IO_ERROR", "node_id": NODE_ID}
+        except (OSError, ValueError, IndexError, RuntimeError) as exc:
+            message = str(exc)
+            if isinstance(exc, OSError):
+                message = "WORKSPACE_IO_ERROR"
+            return {"ok": False, "status": message, "node_id": NODE_ID}
 
         self.completed_tasks += 1
         return {
