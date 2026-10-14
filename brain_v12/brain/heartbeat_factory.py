@@ -213,6 +213,7 @@ class HeartbeatFactory:
         mode: str = "test", source: str = "local_protocol",
         sequence: int | None = None, correlation_id: str | None = None,
         payload: dict[str, Any] | None = None, now: float | None = None,
+        authorization_ref: str | None = None,
     ) -> dict[str, Any]:
         definition = self.get_function(function_id)
         if definition is None:
@@ -221,6 +222,8 @@ class HeartbeatFactory:
             raise ValueError("WORKER_AND_NODE_ID_REQUIRED")
         if mode not in MODES:
             raise ValueError("HEARTBEAT_MODE_INVALID")
+        if definition["auth_required"] and not (authorization_ref and authorization_ref.strip()):
+            raise PermissionError("AUTHORIZATION_REFERENCE_REQUIRED")
         instant = time.time() if now is None else float(now)
         if sequence is None:
             row = self.db.execute(
@@ -244,10 +247,13 @@ class HeartbeatFactory:
                   instant, "CREATED", mode, source[:120], correlation_id, raw, digest))
         except sqlite3.IntegrityError as exc:
             existing = self.db.execute(
-                "SELECT payload_sha256 FROM heartbeat_events WHERE heartbeat_id=?",
+                "SELECT payload_sha256,node_id,mode,source,correlation_id FROM heartbeat_events WHERE heartbeat_id=?",
                 (heartbeat_id,),
             ).fetchone()
-            if existing and existing["payload_sha256"] == digest:
+            if (existing and existing["payload_sha256"] == digest
+                    and existing["node_id"] == node_id and existing["mode"] == mode
+                    and existing["source"] == source[:120]
+                    and existing["correlation_id"] == correlation_id):
                 return self.get_heartbeat(heartbeat_id)
             raise HeartbeatConflict("HEARTBEAT_ID_OR_SEQUENCE_CONFLICT") from exc
         self.db.execute(
