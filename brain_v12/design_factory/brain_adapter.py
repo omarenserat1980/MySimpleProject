@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .plan import prepare_design_plan
 from .execution import initialize_execution, execute_next_step
+from .simulator import simulate_step
 
 TOOL_CATALOG_ITEM = {
     "id": "design.plan",
@@ -53,24 +54,36 @@ class DesignFactoryAdapter:
         }
 
     def _step(self, params: dict) -> dict:
-        """Advance a caller-supplied ledger by one step, plan-only by default."""
+        """Advance one step. Simulation requires explicit mode and authorization."""
         state = params.get("execution_ledger")
         if not isinstance(state, dict):
             return {
                 "ok": False, "status": "BLOCKED", "tool": TOOL_CATALOG_ITEM["id"],
                 "error": "EXECUTION_LEDGER_REQUIRED", "data": None,
             }
-        # No external executor is injected by this adapter. dry_run defaults true;
-        # an attempted non-dry-run call therefore fails closed as BLOCKED.
+
+        dry_run = params.get("dry_run", True) is not False
+        authorize = params.get("authorize") is True
+        executor_mode = params.get("executor_mode", "none")
+        executor = None
+        if not dry_run and authorize and executor_mode == "simulation":
+            executor = simulate_step
+        elif executor_mode not in {"none", "simulation"}:
+            return {
+                "ok": False, "status": "BLOCKED", "tool": TOOL_CATALOG_ITEM["id"],
+                "error": "UNSUPPORTED_EXECUTOR_MODE", "data": None,
+            }
+
         result = execute_next_step(
             state,
-            executor=None,
-            authorize=params.get("authorize") is True,
-            dry_run=params.get("dry_run", True) is not False,
+            executor=executor,
+            authorize=authorize,
+            dry_run=dry_run,
         )
+        status = result.get("status", "BLOCKED")
         return {
-            "ok": result.get("status") not in {"BLOCKED", "FAILED"},
-            "status": result.get("status", "BLOCKED"),
+            "ok": status not in {"BLOCKED", "FAILED"},
+            "status": status,
             "tool": TOOL_CATALOG_ITEM["id"],
             "execution_ledger": result,
             "execution_started": bool(result.get("execution_started")),
