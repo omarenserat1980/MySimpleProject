@@ -79,14 +79,82 @@ jobs:
             echo "GDSII_GENERATED=false" | tee artifacts/asic/physical-design-status.txt
           fi
 
-      - name: Enforce physical-output gate
+      - name: Verify GDSII structure and design evidence
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path("artifacts/asic/physical-design")
+          gds = root / "brain_asic_core.gds"
+          route_log = root / "logs/base/5_2_route.log"
+          lec_log = root / "logs/base/6_report.log"
+
+          if not gds.is_file() or gds.stat().st_size < 1000:
+              raise SystemExit("FAIL: GDSII file missing or implausibly small")
+
+          data = gds.read_bytes()
+          offset = 0
+          record_types = set()
+          record_count = 0
+          while offset < len(data):
+              if offset + 4 > len(data):
+                  raise SystemExit(f"FAIL: truncated GDSII record header at byte {offset}")
+              length = int.from_bytes(data[offset:offset + 2], "big")
+              record_type = data[offset + 2]
+              if length < 4 or offset + length > len(data):
+                  raise SystemExit(f"FAIL: invalid GDSII record length at byte {offset}")
+              record_types.add(record_type)
+              record_count += 1
+              offset += length
+
+          required_records = {0x00, 0x04, 0x05, 0x07}
+          if offset != len(data) or not required_records.issubset(record_types):
+              raise SystemExit("FAIL: GDSII record structure or required records are invalid")
+
+          if not route_log.is_file():
+              raise SystemExit("FAIL: detailed-route log is missing")
+          route_text = route_log.read_text(errors="replace")
+          counts = re.findall(r"Number of violations\\s*=\\s*(\\d+)", route_text)
+          if not counts or int(counts[-1]) != 0:
+              raise SystemExit("FAIL: final detailed-routing violation count is not proven zero")
+
+          if not lec_log.is_file() or "Global output passed lec test" not in lec_log.read_text(errors="replace").lower():
+              raise SystemExit("FAIL: expected final LEC pass message is missing")
+
+          manifest = {
+              "status": "GDSII_STRUCTURE_AND_FLOW_EVIDENCE_VERIFIED",
+              "gds_file": str(gds),
+              "gds_size_bytes": len(data),
+              "gds_sha256": hashlib.sha256(data).hexdigest(),
+              "gds_record_count": record_count,
+              "required_record_types_present": True,
+              "final_detailed_route_violations": int(counts[-1]),
+              "final_lec_pass_message_present": True,
+              "foundry_drc_lvs_signoff": "NOT_ESTABLISHED_BY_THIS_WORKFLOW",
+              "fabrication_status": "NOT_PERFORMED_OR_VERIFIED",
+              "silicon_status": "NOT_FABRICATED_OR_VERIFIED"
+          }
+          out = root / "evidence-manifest.json"
+          out.write_text(json.dumps(manifest, indent=2) + "\\n")
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Enforce evidence gate
         if: success()
         shell: bash
         run: |
           set -euo pipefail
           test -s artifacts/asic/physical-design/brain_asic_core.gds
-          echo "RTL_TO_GDSII_OUTPUT_PRESENT"
-          echo "Note: GDSII presence is not foundry acceptance, DRC/LVS signoff, fabrication, or silicon validation."
+          test -s artifacts/asic/physical-design/evidence-manifest.json
+          echo "RTL_TO_GDSII_AND_EVIDENCE_GATE_PASS"
+          echo "This proves a validated design artifact only, not foundry signoff, fabrication, or physical silicon."
 
       - name: Upload ASIC evidence
         if: always()
