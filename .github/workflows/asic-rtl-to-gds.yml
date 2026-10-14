@@ -125,7 +125,7 @@ jobs:
           if not counts or int(counts[-1]) != 0:
               raise SystemExit("FAIL: final detailed-routing violation count is not proven zero")
 
-          if not lec_log.is_file() or "Global output passed lec test" not in lec_log.read_text(errors="replace").lower():
+          if not lec_log.is_file() or "global output passed lec test" not in lec_log.read_text(errors="replace").lower():
               raise SystemExit("FAIL: expected final LEC pass message is missing")
 
           manifest = {
