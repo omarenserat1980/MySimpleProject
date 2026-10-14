@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .mining_engine import MiningEngine
+from .bitcoin_hash_benchmark import benchmark_header_hashing
 
 router = APIRouter(prefix="/api/bitcoin-mining", tags=["Bitcoin Mining Intelligence"])
 engine = MiningEngine()
@@ -83,3 +84,22 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
         "verified_revenue_jod": 0.0,
         "next_step": "Revenue remains unverified; this endpoint is analysis-only and never authorizes real mining execution.",
     }
+
+
+
+class HashBenchmarkRequest(BaseModel):
+    duration_seconds: float = Field(default=1.0, ge=0.05, le=3.0)
+    max_hashes: int = Field(default=100000, ge=1, le=100000)
+
+
+@router.post("/benchmark")
+def bitcoin_mining_benchmark(body: HashBenchmarkRequest) -> dict[str, Any]:
+    """Run a bounded local SHA-256d CPU benchmark; never starts live mining."""
+    try:
+        result = benchmark_header_hashing(
+            duration_seconds=body.duration_seconds,
+            max_hashes=body.max_hashes,
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return result
