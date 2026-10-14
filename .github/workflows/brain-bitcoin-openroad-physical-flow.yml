@@ -12,6 +12,10 @@ on:
       - feat/bitcoin-openroad-physical-flow
   workflow_dispatch:
 
+concurrency:
+  group: brain-bitcoin-openroad-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -43,6 +47,7 @@ jobs:
 
       - name: Stage RTL and run OpenROAD-flow-scripts in official container
         shell: bash
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           ORFS=/tmp/OpenROAD-flow-scripts
