@@ -218,7 +218,7 @@ class CollaborationCoordinator:
         task.transition(CollaborationState.RUNNING, actor=implementer_id, reason="implementation_started")
         return task
 
-    def submit_for_review(self, task_id: str, *, implementer_id: str, head_commit: str) -> CollaborationTask:
+    def submit_for_review(self, task_id: str, *, implementer_id: str, head_commit: str, changed_paths: Iterable[str]) -> CollaborationTask:
         task = self._get(task_id)
         if task.state != CollaborationState.RUNNING:
             raise ValueError("task_not_running")
@@ -226,6 +226,14 @@ class CollaborationCoordinator:
             raise ValueError("implementer_identity_mismatch")
         if not head_commit.strip():
             raise ValueError("head_commit_required")
+        paths = tuple(changed_paths)
+        if not paths:
+            raise ValueError("changed_paths_required")
+        denied = [path for path in paths if not self.authorize_path(
+            AgentRole.IMPLEMENTER, path, task.envelope.allowed_paths
+        )]
+        if denied:
+            raise ValueError("changed_path_outside_allowlist:" + ",".join(denied))
         task.head_commit = head_commit
         task.transition(CollaborationState.REVIEW_PENDING, actor=implementer_id, reason="patch_submitted")
         return task
