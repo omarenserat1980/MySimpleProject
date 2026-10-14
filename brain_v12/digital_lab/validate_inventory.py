@@ -18,6 +18,7 @@ REQUIRED_ASSET_FIELDS = {
     "asset_id", "path", "domain", "size_bytes", "modified_utc",
     "lifecycle_status", "verification_status", "evidence",
 }
+REQUIRED_EVIDENCE_FIELDS = {"source", "reference", "observed_utc", "result"}
 LIFECYCLE_STATES = {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "ACCEPTED", "REJECTED", "QUARANTINED"}
 VERIFICATION_STATES = {"NOT_RUN", "PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"}
 
@@ -71,10 +72,30 @@ def validate_inventory(report: Any) -> list[str]:
             errors.append(f"{prefix}.lifecycle_status is not recognized")
         if not isinstance(verification, str) or verification not in VERIFICATION_STATES:
             errors.append(f"{prefix}.verification_status is not recognized")
+        evidence = asset["evidence"]
+        if not isinstance(evidence, list):
+            errors.append(f"{prefix}.evidence must be a list")
+            evidence = []
+        for evidence_index, item in enumerate(evidence):
+            ep = f"{prefix}.evidence[{evidence_index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{ep} must be an object")
+                continue
+            missing_evidence = sorted(REQUIRED_EVIDENCE_FIELDS - item.keys())
+            if missing_evidence:
+                errors.append(f"{ep} missing fields: {', '.join(missing_evidence)}")
+                continue
+            for field in REQUIRED_EVIDENCE_FIELDS:
+                if not isinstance(item[field], str) or not item[field].strip():
+                    errors.append(f"{ep}.{field} must be a non-empty string")
         if lifecycle == "DISCOVERED_NOT_TESTED" and verification != "NOT_RUN":
             errors.append(f"{prefix} cannot claim verification before leaving DISCOVERED_NOT_TESTED")
-        if not isinstance(asset["evidence"], list):
-            errors.append(f"{prefix}.evidence must be a list")
+        if verification in {"PASS", "FAIL"} and not evidence:
+            errors.append(f"{prefix} cannot claim {verification} without evidence")
+        if lifecycle == "ACCEPTED" and (verification != "PASS" or not evidence):
+            errors.append(f"{prefix} cannot be ACCEPTED without PASS verification and evidence")
+        if lifecycle == "REJECTED" and (verification != "FAIL" or not evidence):
+            errors.append(f"{prefix} cannot be REJECTED without FAIL verification and evidence")
         if not isinstance(asset["domain"], str) or not asset["domain"].strip():
             errors.append(f"{prefix}.domain must be a non-empty string")
         if not isinstance(asset["modified_utc"], str) or not asset["modified_utc"].strip():
