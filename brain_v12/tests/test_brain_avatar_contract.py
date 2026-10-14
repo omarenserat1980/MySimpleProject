@@ -1,5 +1,8 @@
 import unittest
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
+
+from brain_v12.brain.avatar_state import resolve_avatar_event
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app.py"
@@ -22,9 +25,49 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertIn('assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)', route)
         self.assertNotIn('run_execution_probe', route)
         self.assertIn('store.events(50)', route)
-        self.assertIn('"BRAIN_SUPERVISOR_RUN_REQUESTED": ("THINKING", 120)', route)
-        self.assertIn('"BRAIN_SUPERVISOR_VERIFY": ("SUCCESS", 15)', route)
+        self.assertIn("resolve_avatar_event(store.events(50))", route)
         self.assertIn('"source": event_source', route)
+
+    def test_recent_supervisor_event_drives_thinking_expression(self):
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        result = resolve_avatar_event([{
+            "kind": "BRAIN_SUPERVISOR_RUN_REQUESTED",
+            "payload": '{"job_id":"job-1"}',
+            "created_at": (now - timedelta(seconds=5)).isoformat(),
+        }], now=now)
+        self.assertEqual(result["state"], "THINKING")
+        self.assertEqual(result["event_type"], "BRAIN_SUPERVISOR_RUN_REQUESTED")
+        self.assertEqual(result["source"], "recent_runtime_event")
+
+    def test_verification_event_maps_truthfully_and_stale_events_decay(self):
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        success = resolve_avatar_event([{
+            "kind": "BRAIN_SUPERVISOR_VERIFY",
+            "payload": {"verified": True},
+            "created_at": now.isoformat(),
+        }], now=now)
+        failure = resolve_avatar_event([{
+            "kind": "BRAIN_SUPERVISOR_VERIFY",
+            "payload": {"verified": False},
+            "created_at": now.isoformat(),
+        }], now=now)
+        stale = resolve_avatar_event([{
+            "kind": "BRAIN_SUPERVISOR_RUN_REQUESTED",
+            "payload": {},
+            "created_at": (now - timedelta(minutes=5)).isoformat(),
+        }], now=now)
+        self.assertEqual(success["state"], "SUCCESS")
+        self.assertEqual(failure["state"], "ERROR")
+        self.assertEqual(stale["state"], "IDLE")
+        self.assertEqual(stale["source"], "no_recent_runtime_event")
+
+    def test_malformed_or_unrelated_events_are_ignored(self):
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        result = resolve_avatar_event([
+            {"kind": "BRAIN_SUPERVISOR_VERIFY", "payload": "{bad json", "created_at": now.isoformat()},
+            {"kind": "UNRELATED_EVENT", "payload": {}, "created_at": now.isoformat()},
+        ], now=now)
+        self.assertEqual(result["state"], "IDLE")
 
     def test_ui_polls_real_endpoint_and_does_not_claim_connection_on_failure(self):
         self.assertIn("fetch('/api/brain-avatar/state'", self.html)
