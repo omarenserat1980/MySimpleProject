@@ -224,3 +224,24 @@ def test_rejects_fail_evidence_with_zero_exit_status():
     report["assets"][0]["evidence"] = evidence
     assert any("FAIL evidence requires a non-zero exit_status" in error
                for error in validate_inventory(report))
+
+
+
+def test_rejects_evidence_when_inventory_commit_is_missing():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    report["commit_sha"] = None
+    report["assets"][0]["evidence"] = valid_evidence()
+    assert any("evidence requires a non-empty inventory commit_sha" in error
+               for error in validate_inventory(report))
+
+
+def test_rejects_evidence_when_inventory_commit_is_blank():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    report["commit_sha"] = "  "
+    report["assets"][0]["evidence"] = valid_evidence()
+    assert any("evidence requires a non-empty inventory commit_sha" in error
+               for error in validate_inventory(report))
