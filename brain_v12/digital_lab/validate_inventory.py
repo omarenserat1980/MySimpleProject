@@ -94,6 +94,13 @@ def validate_inventory(report: Any) -> list[str]:
                 errors.append(f"{ep}.result must be one of {sorted(EVIDENCE_RESULTS)}")
             if not isinstance(item["exit_status"], int) or isinstance(item["exit_status"], bool):
                 errors.append(f"{ep}.exit_status must be an integer")
+            if isinstance(report.get("commit_sha"), str) and report["commit_sha"].strip():
+                if item["source_revision"] != report["commit_sha"]:
+                    errors.append(f"{ep}.source_revision does not match inventory commit_sha")
+            if item["result"] == "PASS" and item["exit_status"] != 0:
+                errors.append(f"{ep} PASS evidence requires exit_status 0")
+            if item["result"] == "FAIL" and item["exit_status"] == 0:
+                errors.append(f"{ep} FAIL evidence requires a non-zero exit_status")
             artifact_fields_present = ARTIFACT_EVIDENCE_FIELDS.intersection(item)
             if artifact_fields_present and artifact_fields_present != ARTIFACT_EVIDENCE_FIELDS:
                 errors.append(f"{ep} must provide artifact_path, artifact_size_bytes, and artifact_sha256 together")
