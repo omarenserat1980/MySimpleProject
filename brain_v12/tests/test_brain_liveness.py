@@ -54,5 +54,13 @@ class ExecutionProbeVerificationTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "PROBE_VERIFICATION_FAILED")
 
+    def test_malformed_verification_fails_closed(self):
+        for payload in (None, [], "verified"):
+            with self.subTest(payload=payload):
+                result = run_execution_probe(self.Device(payload))
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["status"], "PROBE_VERIFICATION_FAILED")
+                self.assertFalse(result["verification"]["verified"])
+
 
 if __name__ == "__main__": unittest.main()
