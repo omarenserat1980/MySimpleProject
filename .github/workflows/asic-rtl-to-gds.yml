@@ -103,20 +103,28 @@ jobs:
           offset = 0
           record_types = set()
           record_count = 0
+          first_record_type = None
+          last_record_type = None
           while offset < len(data):
               if offset + 4 > len(data):
                   raise SystemExit(f"FAIL: truncated GDSII record header at byte {offset}")
               length = int.from_bytes(data[offset:offset + 2], "big")
               record_type = data[offset + 2]
-              if length < 4 or offset + length > len(data):
+              if length < 4 or length % 2 != 0 or offset + length > len(data):
                   raise SystemExit(f"FAIL: invalid GDSII record length at byte {offset}")
+              if first_record_type is None:
+                  first_record_type = record_type
+              last_record_type = record_type
               record_types.add(record_type)
               record_count += 1
               offset += length
 
-          required_records = {0x00, 0x04, 0x05, 0x07}
-          if offset != len(data) or not required_records.issubset(record_types):
-              raise SystemExit("FAIL: GDSII record structure or required records are invalid")
+          # GDSII record types: HEADER, BGNLIB, LIBNAME, UNITS, ENDLIB,
+          # BGNSTR, STRNAME, ENDSTR. Validate the envelope as well as presence.
+          required_records = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+          if (offset != len(data) or first_record_type != 0x00 or last_record_type != 0x04
+                  or not required_records.issubset(record_types)):
+              raise SystemExit("FAIL: GDSII record structure, boundaries, or required records are invalid")
 
           if not route_log.is_file():
               raise SystemExit("FAIL: detailed-route log is missing")
