@@ -20,6 +20,7 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check pytest
           python3 -m pytest -q brain_v12/tests/test_brain_physical_asic_agent.py
+          python3 -m pytest -q brain_v12/tests/test_physical_asic_api.py
       - name: Verify SHA-256 compression known vector
         run: |
           set -o pipefail
