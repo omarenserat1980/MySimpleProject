@@ -1,0 +1,31 @@
+name: Brain Bitcoin PoW Reference Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain_v12/brain/bitcoin_pow_reference.py'
+      - 'brain_v12/tests/test_bitcoin_pow_reference.py'
+      - '.github/workflows/brain-bitcoin-pow-reference.yml'
+  push:
+    branches: [plan/brain-bitcoin-asic-lab]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run independent proof-of-work reference tests
+        run: python -m unittest -v brain_v12.tests.test_bitcoin_pow_reference
+      - name: Compile reference and tests
+        run: python -m py_compile brain_v12/brain/bitcoin_pow_reference.py brain_v12/tests/test_bitcoin_pow_reference.py
