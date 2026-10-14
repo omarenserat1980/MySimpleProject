@@ -124,6 +124,47 @@ class CognitiveLoop:
         decision["run_id"]=run_id
         self.events.publish("DECISION_MADE",decision)
 
+        if decision.get("status") == "MISSION_ALIGNMENT_REQUIRED" or not isinstance(decision.get("selected"), dict):
+            self._state("EXECUTE",goal=goal,run_id=run_id)
+            execution={
+                "status":"BLOCKED_MISSION_ALIGNMENT",
+                "action":"none",
+                "task_id":None,
+                "tool":None,
+                "tool_result":None,
+                "result":"لم يُنفّذ أي إجراء لأن البوصلة لم تثبت ارتباط الهدف بمهمة البيتكوين.",
+                "run_id":run_id,
+            }
+            self.events.publish("EXECUTION_BLOCKED_MISSION_ALIGNMENT",execution)
+            self._state("VERIFY",goal=goal,run_id=run_id)
+            verification={
+                "status":"BLOCKED",
+                "task_status":"NOT_CREATED",
+                "evidence":"تم منع التنفيذ لغياب توافق المهمة مع البوصلة.",
+                "result_verified":False,
+                "run_id":run_id,
+            }
+            self.events.publish("VERIFIED",verification)
+            self._state("LEARN",status="WAITING",goal=goal,run_id=run_id)
+            lesson="تم إيقاف المهمة قبل التنفيذ لعدم ثبوت توافقها مع هدف Bitcoin North Star."
+            self.store.save_memory("cognitive.last_verified_run",f"{run_id} | {lesson}")
+            self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
+            return {
+                "run_id":run_id,
+                "goal":goal,
+                "stages":self.STAGES,
+                "stage_count":len(self.STAGES),
+                "memory_count":len(memories),
+                "options":options,
+                "decision":decision,
+                "execution":execution,
+                "verification":verification,
+                "learning":{"status":"RECORDED","lesson":lesson},
+                "tool_result":None,
+                "world":self.world.snapshot(),
+                "tasks":self.tasks.snapshot(),
+            }
+
         selected=decision.get("selected",{})
         action=selected.get("id","observe") if isinstance(selected,dict) else "observe"
 
