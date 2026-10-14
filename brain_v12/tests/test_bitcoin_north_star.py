@@ -7,6 +7,10 @@ from brain_v12.brain.run_evidence_store import RunEvidenceStore
 
 
 class BitcoinNorthStarTests(unittest.TestCase):
+    def _compass(self, temp):
+        store = RunEvidenceStore(Path(temp) / "north-star.jsonl")
+        return BitcoinNorthStar(evidence_store=store), store
+
     def test_direct_bitcoin_work_advances(self):
         result = BitcoinNorthStar().assess({
             "task_id": "stratum-contract",
@@ -29,8 +33,7 @@ class BitcoinNorthStarTests(unittest.TestCase):
         self.assertEqual(result.direction, "DEPRIORITIZE")
 
     def test_high_risk_and_live_mining_require_approval(self):
-        compass = BitcoinNorthStar()
-        result = compass.assess({
+        result = BitcoinNorthStar().assess({
             "task_id": "enable-pool-mining",
             "tags": ["REAL_BTC_MINING", "LIVE_MINING"],
             "risk": "CRITICAL",
@@ -53,19 +56,83 @@ class BitcoinNorthStarTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TASK_ID_REQUIRED"):
             BitcoinNorthStar().assess({"tags": ["REAL_BTC_MINING"]})
 
-    def test_assessments_are_written_to_existing_evidence_store(self):
+    def test_assessment_event_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temp:
-            store = RunEvidenceStore(Path(temp) / "north-star.jsonl")
-            compass = BitcoinNorthStar(evidence_store=store)
-            first = compass.assess({
+            compass, store = self._compass(temp)
+            task = {
                 "task_id": "economic-gate",
                 "tags": ["MINING_ECONOMICS"],
                 "expected_progress": 0.8,
-            })
+            }
+            compass.assess(task)
+            compass.assess(task)
             events = store.read_all()
             self.assertEqual(len(events), 1)
             self.assertEqual(events[0]["event_type"], "BITCOIN_NORTH_STAR_ASSESSMENT")
-            self.assertEqual(events[0]["payload"]["task_id"], first.task_id)
+
+    def test_repeated_blocker_reuses_stable_identity_and_does_not_open_a_new_cycle(self):
+        with tempfile.TemporaryDirectory() as temp:
+            compass, store = self._compass(temp)
+            task = {
+                "task_id": "stratum-gate",
+                "component": "stratum",
+                "blocker_key": "POOL_SHARE_PROOF_MISSING",
+                "blocker": "No independently verified accepted share",
+                "blocker_next_action": "Obtain pool-side accepted-share evidence",
+                "tags": ["ACCEPTED_SHARE_PROOF"],
+            }
+            compass.assess(task)
+            first = compass.blocker_snapshot(task)
+            count_after_first = len(store.read_all())
+            compass.assess(task)
+            second = compass.blocker_snapshot(task)
+            self.assertEqual(first["blocker_id"], second["blocker_id"])
+            self.assertEqual(first["state"], "ACTION_REQUIRED")
+            self.assertEqual(second["state"], "ACTION_REQUIRED")
+            self.assertEqual(len(store.read_all()), count_after_first)
+
+    def test_blocker_requires_ordered_transitions_and_verified_closure_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            compass, _ = self._compass(temp)
+            task = {
+                "task_id": "stratum-gate",
+                "component": "stratum",
+                "blocker_key": "POOL_SHARE_PROOF_MISSING",
+                "blocker": "Accepted share not independently proven",
+                "next_action": "Collect pool-side evidence",
+            }
+            compass.record_blocker(task, state="ACTION_REQUIRED")
+            with self.assertRaisesRegex(ValueError, "INVALID_BLOCKER_TRANSITION"):
+                compass.record_blocker(task, state="CLOSED", evidence_status="VERIFIED",
+                                        evidence_ref="pool-dashboard:share-1",
+                                        evidence_source="authenticated-pool-dashboard")
+            with self.assertRaisesRegex(ValueError, "CLOSURE_REQUIRES_VERIFIED"):
+                compass.record_blocker(task, state="VERIFYING")
+                compass.record_blocker(task, state="CLOSED", evidence_ref="share-1",
+                                        evidence_source="pool-dashboard", evidence_status="MISSING")
+            closed = compass.record_blocker(
+                task, state="CLOSED", evidence_ref="pool-dashboard:share-1",
+                evidence_source="authenticated-pool-dashboard", evidence_status="VERIFIED",
+            )
+            self.assertEqual(closed["state"], "CLOSED")
+            self.assertEqual(compass.blocker_snapshot(task)["state"], "CLOSED")
+
+    def test_closure_requires_reference_and_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            compass, _ = self._compass(temp)
+            task = {"task_id": "payout", "component": "revenue", "blocker_key": "PAYOUT_UNVERIFIED"}
+            compass.record_blocker(task, state="ACTION_REQUIRED")
+            compass.record_blocker(task, state="VERIFYING")
+            with self.assertRaisesRegex(ValueError, "CLOSURE_REQUIRES_EVIDENCE_REFERENCE_AND_SOURCE"):
+                compass.record_blocker(task, state="CLOSED", evidence_status="VERIFIED",
+                                       evidence_ref="txid-only")
+
+    def test_no_store_cannot_claim_persistent_blocker_state(self):
+        with self.assertRaisesRegex(RuntimeError, "EVIDENCE_STORE_REQUIRED"):
+            BitcoinNorthStar().record_blocker(
+                {"task_id": "stratum", "component": "stratum", "blocker_key": "POOL_PROOF"},
+                state="ACTION_REQUIRED",
+            )
 
 
 if __name__ == "__main__":
