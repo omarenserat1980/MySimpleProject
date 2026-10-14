@@ -34,7 +34,8 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 <div class="field"><label for="label">اسم العرض الاختياري</label><input id="label" type="text" maxlength="48" placeholder="Electronic Brain"></div>
 <div class="row"><button id="apply" type="button">تطبيق الحالة</button><button id="reset" type="button">إعادة الضبط</button></div>
 <div class="notice"><strong>HUMAN_PRESENCE</strong><br>الحالة الحالية: <span class="state-line" id="stateText">IDLE</span><br>مصدر الحالة: اختيار يدوي داخل هذه الصفحة، وليس من محرك Brain.</div>
-<div class="notice">لا تستخدم الصفحة الكاميرا أو الميكروفون أو التعرف على الوجوه، ولا تتصل بأي خدمة خارجية. حفظ الإعدادات الدائمة وربطها بمحرك النبضات غير مفعّل بعد.</div>
+<div class="notice">نبضة HUMAN_PRESENCE: <strong id="pulseText">بانتظار التحقق</strong><br>تُحفظ حالة النبضة في ذاكرة Brain، ويُقيّد التقييم بدقيقة واحدة على الأكثر. نجاح النبضة لا يعني أن عرض الوجه على الشاشة قد تم التحقق منه مستقلًا.</div>
+<div class="notice">لا تستخدم الصفحة الكاميرا أو الميكروفون أو التعرف على الوجوه، ولا تتصل بأي خدمة خارجية.</div>
 </div>
 </section>
 </div>
@@ -42,7 +43,7 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 </main>
 <script>
 (function(){
-const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label'),connection=document.getElementById('connection'),liveMode=document.getElementById('liveMode'),applyButton=document.getElementById('apply');
+const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label'),connection=document.getElementById('connection'),liveMode=document.getElementById('liveMode'),applyButton=document.getElementById('apply'),pulseText=document.getElementById('pulseText');
 let lastLiveState=null, polling=false;
 function readPref(key,fallback){try{const value=window.localStorage.getItem(key);return value===null?fallback:value;}catch(_error){return fallback;}}
 function savePref(key,value){try{window.localStorage.setItem(key,value);}catch(_error){/* private browsing/storage-disabled mode remains usable */}}
@@ -64,9 +65,11 @@ async function pollLiveState(){
   lastLiveState=data.state;render(data.state);
   connection.textContent='Brain: '+(data.brain_status||'UNKNOWN')+' · API متصلة';
   connection.style.color=data.brain_alive?'var(--green)':'var(--amber)';
+  const pulse=data.human_presence_pulse;
+  if(pulseText)pulseText.textContent=pulse?(pulse.visual_state||pulse.last_render_status||'حالة غير معروفة'):'لم تُرجع API حالة النبضة';
  }catch(_error){
   lastLiveState=null;connection.textContent='Brain: تعذّر التحقق من الحالة الحية';
-  connection.style.color='var(--amber)';render('UNCERTAIN');
+  connection.style.color='var(--amber)';if(pulseText)pulseText.textContent='تعذّر التحقق';render('UNCERTAIN');
  }finally{polling=false;}
 }
 function syncControls(){
