@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +44,8 @@ class FakeMemoryStore:
 
 class BrainMcpAppsWidgetTests(unittest.TestCase):
     def setUp(self):
+        self.original_mcp_token = os.environ.get("BRAIN_MCP_TOKEN")
+        os.environ["BRAIN_MCP_TOKEN"] = "test-mcp-token"
         self.temp = tempfile.TemporaryDirectory()
         self.chat_store = ChatSessionStore(Path(self.temp.name) / "chat.db")
         self.chat_store.init()
@@ -61,8 +64,12 @@ class BrainMcpAppsWidgetTests(unittest.TestCase):
 
     def tearDown(self):
         self.temp.cleanup()
+        if self.original_mcp_token is None:
+            os.environ.pop("BRAIN_MCP_TOKEN", None)
+        else:
+            os.environ["BRAIN_MCP_TOKEN"] = self.original_mcp_token
 
-    def rpc(self, payload):
+    def rpc(self, payload, authorization="Bearer test-mcp-token"):
         async def run():
             body = json.dumps(payload).encode("utf-8")
             sent = False
@@ -83,13 +90,21 @@ class BrainMcpAppsWidgetTests(unittest.TestCase):
                     "path": "/mcp",
                     "raw_path": b"/mcp",
                     "query_string": b"",
-                    "headers": [(b"mcp-protocol-version", b"2026-07-28")],
+                    "headers": [
+                        (b"mcp-protocol-version", b"2026-07-28"),
+                        *(
+                            [(b"authorization", authorization.encode("latin-1"))]
+                            if authorization is not None
+                            else []
+                        ),
+                    ],
                     "server": ("testserver", 443),
                     "client": ("testclient", 1234),
                 },
                 receive,
             )
             response = await self.post(request)
+            self.last_status_code = response.status_code
             return json.loads(response.body.decode("utf-8"))
 
         return asyncio.run(run())
@@ -103,6 +118,26 @@ class BrainMcpAppsWidgetTests(unittest.TestCase):
                 "params": {"name": name, "arguments": arguments or {}},
             }
         )["result"]["structuredContent"]
+
+    def test_mcp_router_rejects_missing_and_invalid_bearer_tokens(self):
+        payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+
+        self.assertEqual(
+            self.rpc(payload, authorization=None)["status"], "MCP_AUTH_REQUIRED"
+        )
+        self.assertEqual(self.last_status_code, 401)
+
+        self.assertEqual(
+            self.rpc(payload, authorization="Bearer wrong-token")["status"],
+            "MCP_AUTH_REQUIRED",
+        )
+        self.assertEqual(self.last_status_code, 401)
+
+    def test_mcp_router_fails_closed_when_token_is_not_configured(self):
+        os.environ.pop("BRAIN_MCP_TOKEN", None)
+        result = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        self.assertEqual(result["status"], "MCP_NOT_CONFIGURED")
+        self.assertEqual(self.last_status_code, 503)
 
     def test_tools_list_exposes_render_tool_with_mcp_apps_metadata(self):
         response = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
