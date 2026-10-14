@@ -21,7 +21,10 @@ class BrainAvatarContractTests(unittest.TestCase):
         route = self.app[start:end]
         self.assertIn('assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)', route)
         self.assertNotIn('run_execution_probe', route)
-        self.assertIn('"source": "live_brain_liveness_assessment"', route)
+        self.assertIn('store.events(50)', route)
+        self.assertIn('"BRAIN_SUPERVISOR_RUN_REQUESTED": ("THINKING", 120)', route)
+        self.assertIn('"BRAIN_SUPERVISOR_VERIFY": ("SUCCESS", 15)', route)
+        self.assertIn('"source": event_source', route)
 
     def test_ui_polls_real_endpoint_and_does_not_claim_connection_on_failure(self):
         self.assertIn("fetch('/api/brain-avatar/state'", self.html)
