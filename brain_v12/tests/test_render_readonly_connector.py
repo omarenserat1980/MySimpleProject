@@ -28,7 +28,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
 
     def test_service_uses_fixed_https_api_and_get_only_transport_contract(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport
+            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
         )
         result = client.service("srv-abc123")
         self.assertEqual(len(self.calls), 1)
@@ -40,7 +40,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
 
     def test_deploy_list_is_bounded_and_encoded(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport
+            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
         )
         client.deploys("srv-abc123", limit=7)
         query = parse_qs(urlparse(self.calls[0][0]).query)
@@ -50,7 +50,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
 
     def test_logs_requires_service_id_and_bounded_window(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport
+            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
         )
         client.logs(
             "srv-abc123", start_time="2026-10-14T00:00:00Z",
@@ -67,7 +67,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
             )
 
     def test_missing_key_fails_before_transport(self):
-        client = RenderReadOnlyClient(enabled=True, transport=self.fake_transport)
+        client = RenderReadOnlyClient(enabled=True, transport=self.fake_transport, policy_check=lambda: True)
         with self.assertRaisesRegex(RenderConnectorError, "credential"):
             client.service("srv-abc123")
         self.assertEqual(self.calls, [])
@@ -77,7 +77,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
             return 403, '{"message":"Bearer secret-value","api_key":"secret-key"}'
 
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=failing_transport
+            enabled=True, api_key="test-key", transport=failing_transport, policy_check=lambda: True
         )
         with self.assertRaises(RenderConnectorError) as caught:
             client.service("srv-abc123")
@@ -93,7 +93,16 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         self.assertNotIn("do-not-show", rendered)
         self.assertNotIn("hidden-value", rendered)
 
-    def test_timeout_is_bounded(self):
+
+    def test_repository_policy_blocks_live_requests_even_when_enabled(self):
+        client = RenderReadOnlyClient(
+            enabled=True, api_key="test-key", transport=self.fake_transport,
+            policy_check=lambda: False,
+        )
+        with self.assertRaisesRegex(RenderConnectorError, "policy blocks"):
+            client.service("srv-abc123")
+        self.assertEqual(self.calls, [])
+\n    def test_timeout_is_bounded(self):
         with self.assertRaises(ValueError):
             RenderReadOnlyClient(timeout=60)
 
