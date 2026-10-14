@@ -129,14 +129,16 @@ def audit_record(record: dict[str, Any], *, now: datetime | None = None,
     return {
         "schema": "brain.mining-evidence-audit.v1",
         "status": "EVIDENCE_COMPLETE_REQUIRES_HUMAN_REVIEW" if gates_passed else "UNVERIFIED",
-        "real_mining_proven": gates_passed,
+        # Offline input validation cannot independently prove physical reality.
+        "real_mining_proven": False,
+        "evidence_bundle_complete": gates_passed,
         "checks": checks,
         "failures": failures,
         "telemetry_age_seconds": round(age, 3) if age is not None else None,
         "input_record_sha256": hashlib.sha256(
             json.dumps(record, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
-        "note": "Evidence references and supplied booleans require independent source review; this offline tool does not establish network/device truth.",
+        "note": "This offline tool never declares real mining proven. Evidence references and supplied booleans require independent source review against authoritative device, pool, payout, and cost sources.",
     }
 
 
