@@ -45,7 +45,7 @@ class BitcoinPowSimulatorTests(unittest.TestCase):
             + "ffff001d"
             + "1dac2b7c"
         )
-        target = 0xFFFF << (8 * (0x1D - 3))
+        target = decode_compact_target(0x1D00FFFF)
         result = simulate_pow(
             header, target, start_nonce=2083236893, max_attempts=1
         )
