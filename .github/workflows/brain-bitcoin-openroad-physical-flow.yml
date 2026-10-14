@@ -7,7 +7,9 @@ on:
 
 concurrency:
   group: brain-bitcoin-openroad-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  # Physical synthesis can take a long time; do not cancel a useful run
+  # just because another run for this branch is queued.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -61,9 +63,10 @@ jobs:
           cd /tmp/orfs-work/flow
           command -v openroad
           command -v yosys
-          # config.mk declares VERILOG_FILES using a sorted source wildcard.
-          # Avoid building a whitespace-delimited list through shell/tr quoting.
-          make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad
+          RTL_FILES="$(find designs/sky130hd/brain_bitcoin_nonce_search/src -type f -name '*.sv' -print | sort | tr '\n' ' ')"
+          test -n "$RTL_FILES"
+          printf 'RTL_FILES=%s\n' "$RTL_FILES"
+          make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk VERILOG_FILES="$RTL_FILES" YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad
           BRAIN_OPENROAD_SCRIPT
           mkdir -p "$WORK"
           docker run --rm \
