@@ -187,6 +187,22 @@ class VirtualTaskQueue:
             self._scale_in_idle_virtual_capacity()
             self.pump()
 
+    def reserve_federated_resource(self, resource_id, task_id, required_capacity=None,
+                                  required_capabilities=None, permission="simulate",
+                                  lease_seconds=60, physical_execution=False):
+        """Reserve an explicitly registered fabric resource; never auto-promote a simulator."""
+        return self.resources.reserve_hybrid_resource(
+            resource_id, task_id, required_capacity, required_capabilities,
+            permission, lease_seconds, physical_execution
+        )
+
+    def release_federated_resource(self, task_id):
+        """Release a fabric lease independently of the virtual blade reservation."""
+        return self.resources.release_hybrid_resource(task_id)
+
+    def federated_resource_status(self):
+        return self.resources.hybrid_resource_status()
+
     def heartbeat(self,task_id,lease_id):
         with self.lock:
             task=self.tasks.get(task_id)
