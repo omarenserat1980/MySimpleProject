@@ -49,7 +49,7 @@ class GENPhysicalProofTests(unittest.TestCase):
             "challenge_nonce_digest": "digest",
             "result_digest": "digest",
         }, now=now)
-        self.assertEqual(result.status, "CHALLENGE_FAILED")
+        self.assertEqual(result.status, "NOT_PROVEN")
         self.assertFalse(result.accepted)
         self.assertIn("VALID_TRUSTED_SIGNATURE_REQUIRED", result.blocked_reasons)
 
