@@ -24,8 +24,18 @@ def valid_report():
 
 
 def valid_evidence():
-    return [{"source": "github_actions", "reference": "https://github.com/example/repo/actions/runs/1",
-             "observed_utc": "2026-10-14T00:00:00Z", "result": "PASS"}]
+    return [{
+        "source": "github_actions",
+        "tool_version": "actions/checkout@v4 + Python 3.12",
+        "source_revision": "abc123",
+        "reference": "https://github.com/example/repo/actions/runs/1",
+        "observed_utc": "2026-10-14T00:00:00Z",
+        "result": "PASS",
+        "check_id": "unit-tests",
+        "exit_status": 0,
+        "scope": "focused validator tests",
+        "limitations": "does not prove runtime health",
+    }]
 
 
 def test_accepts_metadata_only_inventory():
@@ -119,3 +129,32 @@ def test_rejects_blocked_verification_in_testing_lifecycle():
     report["assets"][0]["verification_status"] = "BLOCKED"
     assert any("requires BLOCKED or QUARANTINED" in error
                for error in validate_inventory(report))
+
+def test_rejects_evidence_missing_tool_and_revision_identity():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    report["assets"][0]["evidence"] = [{"source": "ci", "reference": "run", "observed_utc": "now", "result": "PASS"}]
+    errors = validate_inventory(report)
+    assert any("tool_version" in error for error in errors)
+    assert any("source_revision" in error for error in errors)
+
+
+def test_rejects_partial_artifact_digest_metadata():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()[0]
+    evidence["artifact_path"] = "out/report.json"
+    report["assets"][0]["evidence"] = [evidence]
+    assert any("provide artifact_path" in error for error in validate_inventory(report))
+
+
+def test_rejects_invalid_artifact_sha256():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()[0]
+    evidence.update({"artifact_path": "out/report.json", "artifact_size_bytes": 10, "artifact_sha256": "bad"})
+    report["assets"][0]["evidence"] = [evidence]
+    assert any("64-character hexadecimal SHA-256" in error for error in validate_inventory(report))
