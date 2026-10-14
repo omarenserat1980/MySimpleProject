@@ -3235,8 +3235,6 @@ def brain_liveness():
 @app.get("/api/brain-avatar/state")
 def brain_avatar_state():
     """Read-only liveness plus recent runtime events; never triggers execution."""
-    import json as _json
-    from datetime import datetime as _datetime, timezone as _timezone
     try:
         assessment = assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
         checks = assessment.get("checks", {})
