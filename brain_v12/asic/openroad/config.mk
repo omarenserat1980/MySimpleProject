@@ -3,7 +3,8 @@
 export DESIGN_NAME = brain_asic_core
 export PLATFORM = sky130hd
 export VERILOG_FILES = $(DESIGN_HOME)/src/brain_asic_core.sv
-export SDC_FILE = $(DESIGN_HOME)/constraint.sdc
+# ORFS resolves DESIGN_HOME to flow/designs; the SDC is copied into this design directory.
+export SDC_FILE = $(DESIGN_HOME)/sky130hd/$(DESIGN_NAME)/constraint.sdc
 
 # Conservative starting values for an early prototype; refine after reports.
 export CORE_UTILIZATION = 35
