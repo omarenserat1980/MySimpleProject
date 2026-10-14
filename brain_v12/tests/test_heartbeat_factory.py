@@ -110,6 +110,17 @@ class HeartbeatFactoryTests(unittest.TestCase):
         self.assertEqual(verified["status"], "VERIFIED")
         self.assertEqual(verified["evidence_ref"], "test-receiver:ack-1")
 
+    def test_arbitrary_error_text_is_not_persisted(self):
+        self.register()
+        heartbeat = self.create()
+        failed = self.factory.transition(
+            heartbeat["heartbeat_id"], "FAILED", now=102.0,
+            error_code="API_KEY=secret-value",
+        )
+        self.assertEqual(failed["error_code"], "UNCLASSIFIED_ERROR")
+        raw = self.path.read_bytes()
+        self.assertNotIn(b"secret-value", raw)
+
     def test_delayed_heartbeat_can_be_resent_without_duplicate_record(self):
         self.register()
         heartbeat = self.create()
