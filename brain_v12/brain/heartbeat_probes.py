@@ -151,7 +151,7 @@ _PROBES: dict[str, Probe] = {
 
 def run_local_probe(factory: HeartbeatFactory, function_id: str, context: dict[str, Any], *,
                     worker_id: str = "brain-process", node_id: str | None = None,
-                    now: float | None = None) -> dict[str, Any]:
+                    now: float | None = None, authorization_ref: str | None = None) -> dict[str, Any]:
     """Execute one bounded local probe and store its result as CREATED local evidence.
 
     CREATED is deliberately retained as the delivery state. This local execution
@@ -182,6 +182,7 @@ def run_local_probe(factory: HeartbeatFactory, function_id: str, context: dict[s
         source="local_read_only_probe",
         payload={"probe_result": result, "latency_ms": latency_ms},
         now=instant,
+        authorization_ref=authorization_ref,
     )
     return {
         "function_id": function_id,
@@ -196,12 +197,14 @@ def run_local_probe(factory: HeartbeatFactory, function_id: str, context: dict[s
 
 
 def run_core_probes(factory: HeartbeatFactory, context: dict[str, Any], *,
-                    function_ids: list[str] | None = None, now: float | None = None) -> dict[str, Any]:
+                    function_ids: list[str] | None = None, now: float | None = None,
+                    authorization_ref: str | None = None) -> dict[str, Any]:
     """Run selected local probes sequentially; never starts a background loop."""
     selected = function_ids if function_ids is not None else [item[0] for item in CORE_PROBE_SPECS]
     if len(selected) > len(CORE_PROBE_SPECS):
         raise ValueError("LOCAL_PROBE_BATCH_LIMIT_EXCEEDED")
-    results = [run_local_probe(factory, function_id, context, now=now) for function_id in selected]
+    results = [run_local_probe(factory, function_id, context, now=now,
+                               authorization_ref=authorization_ref) for function_id in selected]
     passed = sum(item["probe_status"] == "PASS" for item in results)
     failed = sum(item["probe_status"] == "FAIL" for item in results)
     unknown = sum(item["probe_status"] == "UNKNOWN" for item in results)
