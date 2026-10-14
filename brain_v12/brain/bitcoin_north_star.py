@@ -178,7 +178,7 @@ class BitcoinNorthStar:
         event_id = "north-star-blocker-" + self._digest(payload)
         saved = self.evidence_store.append(
             event_id=event_id,
-            task_id=str(task.get("task_id", blocker_id)).strip(),
+            task_id=blocker_id,  # Stable issue identity, not a transient task/run ID.
             event_type="BITCOIN_NORTH_STAR_BLOCKER",
             payload=payload,
         )
