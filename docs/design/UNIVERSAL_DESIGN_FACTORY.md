@@ -16,7 +16,7 @@ A single governed workflow for software, architecture, digital logic, hardware, 
 Security and verification are cross-cutting, not final-only phases.
 
 ## Specialist prompts
-The canonical prompt set lives in `prompts/universal_design_factory/`, numbered 00–15. Use `brain_v12.design_factory.task_router` to map task descriptions to relevant domains.
+The canonical prompt set lives in `prompts/universal_design_factory/`, numbered 00–15. Use `brain_v12.design_factory.task_router.route_task` to map task descriptions to relevant domains and `brain_v12.design_factory.plan.prepare_design_plan` to produce an evidence-aware plan. These helpers plan only; they do not invoke executors or claim that a specialist tool is available.
 
 ## Operating constraints
 Zero-budget first, simulation first, Termux/Linux portability when applicable, least privilege, preserve legacy requirements, and no claims beyond evidence. No automatic merge, deployment, purchase, secret mutation, or physical manufacturing.
