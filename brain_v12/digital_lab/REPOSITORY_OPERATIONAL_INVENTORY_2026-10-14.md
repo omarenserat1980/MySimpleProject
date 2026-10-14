@@ -19,6 +19,8 @@ The repository tree is readable and contains a large multi-generation codebase. 
 | Python files under `brain_v12/` | 1,156 | Source/test Python files combined |
 | Candidate test files | 699 | Filename-pattern count only; not a count of test cases or passing tests |
 | GitHub Actions workflow YAML files | 171 | Configured workflow files, not active workers/nodes |
+| Software hardware-catalog nodes | 354 | Static catalog only: 319 family/component nodes across 18 device families plus 35 logical network-device kinds; not live machines or running workers |
+| Physical/Termux workers exposed by `WorkerRegistry` | 0 | The current registry explicitly disables device adapters and returns an empty device-worker list |
 | Current-main-SHA workflow runs in recent 100-run window | 21 | 20 success, 1 cancelled, 0 failed in this returned window |
 | Independently verified live software/device nodes in this audit | 0 | No fresh per-node heartbeat or runtime attestation was collected; this does **not** mean zero nodes exist |
 | Components with current, commit-bound runtime evidence manifest | 0 found in tracked paths | The validator and manifest documentation exist, but no populated runtime evidence JSON was found in the tracked tree scan |
@@ -30,6 +32,12 @@ The latest observed scheduled workflow, [Brain Autonomous Cloud Cycle run 385608
 The recent Actions API page returned 100 runs across multiple commits: 92 success, 4 cancelled, and 4 failure. This is a mixed-commit history and must not be reported as the current branch's pass rate. For the inspected main SHA, 20 of 21 returned runs succeeded and one was cancelled.
 
 The tracked `verification/latest.json` is a stored snapshot, not a fresh test run tied to this inventory commit. It records successful compile checks and earlier test output (14 speed tests, 4 cinema tests, and a Brain V12 test run reporting 53 tests). These historical counts are not used as proof of a current full-suite pass.
+
+## Additional code-level finding: catalog nodes versus execution nodes
+
+The existing `brain_v12/virtual_hardware/software_hardware_nodes.py` catalog is complete against its own declared families: source inspection counted 18 device families and 319 family/component pairs, plus 35 logical network-device kinds, for **354 catalog entries**. Its own tests assert catalog coverage. These are logical software inventory entries; they do not mean 354 independent processes, full device emulators, physical devices, or live workers.
+
+The current `brain_v12/brain/worker_registry.py` explicitly forces `include_device_adapters=False`, sets `device_bridge=None`, rejects `termux`, `android`, `physical`, and `hardware` worker kinds, and returns empty `device_workers` / `_device_records`. This is a concrete integration boundary preventing Termux/physical agents from appearing in that worker registry. It may be an intentional software-only safety boundary, so it must not be bypassed blindly. The next implementation should keep simulated software workers separate from externally authenticated device agents and require per-agent authentication, capability allowlists, expiring heartbeats, and evidence before any real device is counted as live.
 
 ## Missing proof and blockers
 
