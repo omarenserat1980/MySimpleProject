@@ -87,5 +87,46 @@ class BoundedExecutionTests(unittest.TestCase):
         self.assertEqual(result["steps"][0]["evidence"]["kind"], "EXECUTOR_ERROR")
 
 
+    def test_failure_on_later_step_preserves_prior_evidence_and_stops(self):
+        first = execute_next_step(
+            self.state,
+            lambda step: {
+                "status": "SIMULATED",
+                "evidence": {"kind": "SIMULATION", "step_id": step["step_id"],
+                             "sha256": "a" * 64, "marker": {"retained": True}},
+            },
+            authorize=True,
+            dry_run=False,
+        )
+        first_evidence = first["steps"][0]["evidence"].copy()
+        self.assertEqual(first["next_step_index"], 1)
+
+        failed = execute_next_step(
+            first,
+            lambda step: {"status": "FAILED",
+                           "evidence": {"kind": "TEST_FAILURE", "reason": "synthetic"}},
+            authorize=True,
+            dry_run=False,
+        )
+        self.assertTrue(failed["stopped"])
+        self.assertEqual(failed["status"], "FAILED")
+        self.assertEqual(failed["steps"][0]["evidence"], first_evidence)
+        self.assertEqual(failed["steps"][1]["status"], "FAILED")
+        self.assertEqual(failed["next_step_index"], 2)
+
+        calls = []
+        refused = execute_next_step(
+            failed,
+            lambda step: calls.append(step),
+            authorize=True,
+            dry_run=False,
+        )
+        self.assertEqual(calls, [])
+        self.assertTrue(refused["stopped"])
+        self.assertEqual(refused["steps"][0]["evidence"], first_evidence)
+        self.assertEqual(refused["steps"][1]["evidence"]["reason"], "synthetic")
+        self.assertEqual(refused["next_step_index"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()
