@@ -1,0 +1,42 @@
+name: Bitcoin SHA-256 compression RTL
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/rtl/sha256_compress.sv"
+      - "brain_v12/asic/rtl/tb_sha256_compress.sv"
+      - ".github/workflows/bitcoin-sha256-rtl.yml"
+  push:
+    branches:
+      - "feat/bitcoin-sha256-compress-rtl"
+    paths:
+      - "brain_v12/asic/rtl/sha256_compress.sv"
+      - "brain_v12/asic/rtl/tb_sha256_compress.sv"
+      - ".github/workflows/bitcoin-sha256-rtl.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sha256-compression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+          iverilog -V
+      - name: Compile and verify compression against known digest
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/sha256-rtl
+          iverilog -g2012 -Wall -s tb_sha256_compress -o artifacts/sha256-rtl/tb.vvp brain_v12/asic/rtl/sha256_compress.sv brain_v12/asic/rtl/tb_sha256_compress.sv
+          vvp artifacts/sha256-rtl/tb.vvp | tee artifacts/sha256-rtl/simulation.log
+          grep -q ALL_SHA256_RTL_TESTS_PASSED artifacts/sha256-rtl/simulation.log
+      - name: Upload simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-sha256-rtl-evidence
+          path: artifacts/sha256-rtl/
+          if-no-files-found: warn
