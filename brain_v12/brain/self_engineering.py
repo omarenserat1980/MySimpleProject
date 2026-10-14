@@ -140,12 +140,15 @@ class SelfEngineeringEngine:
     ) -> EngineeringRun:
         findings_list = [str(item).strip() for item in findings if str(item).strip()]
         inspection_ok = bool(source and source.strip() and findings_list)
+        inspection_details = dict(details or {})
+        # Caller metadata must not override the findings used to decide inspection_ok.
+        inspection_details["findings"] = findings_list
         run.add_evidence(Evidence.create(
             EvidenceKind.SOURCE_INSPECTION,
             "Repository/source inspection completed",
             "passed" if inspection_ok else "failed",
             source.strip() if source and source.strip() else "unspecified",
-            {"findings": findings_list, **(details or {})},
+            inspection_details,
         ))
         run.plan = [
             "Confirm current source and runtime authority",
