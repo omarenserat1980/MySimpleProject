@@ -36,7 +36,7 @@ try {
   assert.equal(revenueUpdate.values[2],"T1");
   assert.equal(revenueUpdate.values[3],9);
   assert.equal(revenueUpdate.values[4],"JOD");
-  assert.ok(calls.some(x=>x.sql.includes("CLIENT_DELIVERY_CONFIRMED")),"delivery audit event is written");
+  assert.ok(calls.some(x=>x.sql.includes("INSERT OR IGNORE INTO order_events") && x.values[4] === "CLIENT_DELIVERY_CONFIRMED"),"delivery audit event is written");
   console.log("DYNAMIC_DELIVERY_HANDLER=PASS");
   console.log("VERIFIED_PAYMENT_AND_AMOUNT_CURRENCY_SCOPING=PASS");
   console.log("DELIVERY_AUDIT_EVENT=PASS");
