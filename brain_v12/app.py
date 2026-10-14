@@ -3253,42 +3253,12 @@ def brain_avatar_state():
             avatar_state = "UNCERTAIN"
             event_source = "liveness_assessment"
         else:
-            # Only explicit, recent, recorded events may drive an activity expression.
-            event_states = {
-                "BRAIN_SUPERVISOR_RUN_REQUESTED": ("THINKING", 120),
-                "BACKGROUND_WORK_SUBMITTED": ("THINKING", 60),
-                "BRAIN_SUPERVISOR_VERIFY": ("SUCCESS", 15),
-                "REMOTE_FABRIC_SIMULATION_COMMAND": ("SUCCESS", 15),
-            }
-            for event in store.events(50):
-                kind = str(event.get("kind", ""))
-                if kind not in event_states:
-                    continue
-                try:
-                    payload = event.get("payload", {})
-                    if isinstance(payload, str):
-                        payload = _json.loads(payload or "{}")
-                    if not isinstance(payload, dict):
-                        continue
-                    if kind == "BRAIN_SUPERVISOR_VERIFY":
-                        visual_state = "SUCCESS" if payload.get("verified") is True else "ERROR"
-                    elif kind == "REMOTE_FABRIC_SIMULATION_COMMAND":
-                        visual_state = "SUCCESS" if payload.get("ok") is True else "ERROR"
-                    else:
-                        visual_state = event_states[kind][0]
-                    stamp = _datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
-                    if stamp.tzinfo is None:
-                        stamp = stamp.replace(tzinfo=_timezone.utc)
-                    age = max(0.0, (_datetime.now(_timezone.utc) - stamp.astimezone(_timezone.utc)).total_seconds())
-                    if age > event_states[kind][1]:
-                        continue
-                    avatar_state = visual_state
-                    event_type = kind
-                    event_age_seconds = round(age, 2)
-                    event_source = "recent_runtime_event"
-                    break
-                except (TypeError, ValueError, _json.JSONDecodeError):
-                    continue
+            from .brain.avatar_state import resolve_avatar_event
+            event_result = resolve_avatar_event(store.events(50))
+            avatar_state = event_result["state"]
+            event_type = event_result["event_type"]
+            event_age_seconds = event_result["event_age_seconds"]
+            event_source = event_result["source"]
         return {
             "ok": True,
             "source": event_source,
