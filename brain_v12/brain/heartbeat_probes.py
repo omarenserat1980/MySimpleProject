@@ -174,6 +174,9 @@ def run_local_probe(factory: HeartbeatFactory, function_id: str, context: dict[s
         result = _result(False, "FAIL", error_code=f"PROBE_{type(exc).__name__.upper()[:48]}")
     latency_ms = round((time.monotonic() - started) * 1000, 3)
     instant = time.time() if now is None else float(now)
+    factory.record_execution_result(
+        function_id, result["status"], latency_ms=latency_ms, now=instant
+    )
     heartbeat = factory.create_heartbeat(
         function_id,
         worker_id=worker_id,
