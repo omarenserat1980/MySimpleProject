@@ -1,6 +1,13 @@
 name: Brain Product Factory
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/brain_product_factory.py"
+      - "scripts/brain_revenue_strategy.py"
+      - "scripts/test_brain_product_factory.py"
+      - ".github/workflows/brain-product-factory.yml"
   workflow_dispatch:
   schedule:
     - cron: "31 */6 * * *"
