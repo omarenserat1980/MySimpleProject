@@ -6,8 +6,8 @@
 - Baseline branch: `main`
 - Baseline commit inspected: `a14e0db199c1cb3d991db30b16eea43a2150f41e`
 - Working branch: `brain/universal-proof-evolution-v1`
-- Implemented on the working branch: a minimal fail-closed evaluator at `brain_v12/brain/proof_gate_engine.py`, focused unit tests, and a branch-scoped GitHub Actions workflow.
-- CI/runtime result must be read from the actual workflow run; code being committed is not itself proof that tests passed.
+- Implemented on the working branch: `brain_v12/brain/proof_gate_engine.py`, declarative contracts in `brain_v12/brain/proof_registry.py`, focused unit tests, and a branch-scoped GitHub Actions workflow.
+- Focused workflow run `38559663864` completed its test job successfully on commit `2bac3d7340a6a02d018e003fe4a80e73eeaa1546`; its run-level finalization was still in progress when last queried.
 
 ## Design principles
 
@@ -23,7 +23,7 @@
 
 The baseline already contains `brain_v12/brain/verification_gate.py`, a `VerificationGate` that distinguishes action completion from objective verification and hashes evidence references. It also contains `brain_v12/digital_lab/UNIVERSAL_ENGINEERING_GATE_CONTRACT.md`, which defines lifecycle states, evidence minimums, domain checks, and fail-closed acceptance. The master specification already separates engineering health from commercial outcomes.
 
-The new `ProofGateEngine` is deliberately a small evidence-envelope evaluator, not a replacement for `VerificationGate`, `EvidenceStore`, or the domain-specific gates. It validates required proof types, status, freshness, optional source allowlists, synthetic/test markers, optional artifact SHA-256 formatting, and expected commit association. Its limitations explicitly state that envelope validation does not independently authenticate the source. Integrations should adapt existing evidence into this contract rather than duplicating runtime checks or ledgers.
+The new `ProofGateEngine` is deliberately a small evidence-envelope evaluator, not a replacement for `VerificationGate`, `EvidenceStore`, or the domain-specific gates. `ProofGateRegistry` declares eight distinct gate contracts and delegates decisions to the evaluator; it does not imply that evidence collectors or authenticated external connections exist. It validates required proof types, status, freshness, optional source allowlists, synthetic/test markers, optional artifact SHA-256 formatting, and expected commit association. Its limitations explicitly state that envelope validation does not independently authenticate the source. Integrations should adapt existing evidence into this contract rather than duplicating runtime checks or ledgers.
 
 ## Implemented evaluator contract
 
@@ -105,8 +105,8 @@ The repair mechanism must not be the sole approver of its own changes or change 
 1. Inventory existing proof, mining, revenue, ASIC, runtime, and self-healing components.
 2. Map existing evidence schemas and APIs; identify overlap before creating new abstractions.
 3. Define gate contracts and evidence provenance.
-4. **Done on this branch:** add a minimal shared evaluator, nine focused unit tests, and a low-cost GitHub Actions test workflow.
-5. Next: verify the workflow run, refine failure semantics from test feedback, and connect one existing domain adapter without changing its current authorization behavior.
+4. **Done on this branch:** add the shared evaluator, an eight-gate declarative registry, fifteen focused unit tests, and a low-cost GitHub Actions test workflow.
+5. Next: finish checking workflow-level status, refine failure semantics from test feedback, and connect one existing domain adapter without changing its current authorization behavior.
 6. Integrate mining/revenue and ASIC gates through adapters, preserving current behavior.
 7. Add device and self-healing integrations.
 8. Add dashboard/API views only after stable underlying contracts exist.
