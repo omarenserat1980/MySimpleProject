@@ -191,6 +191,17 @@ class HeartbeatFactoryTests(unittest.TestCase):
         self.assertFalse(summary["remote_delivery_proven"])
         self.assertEqual(summary["functions_enabled"], 1)
 
+    def test_execution_result_is_separate_from_delivery_verification(self):
+        self.register(function_id="local.probe", enabled=True, implementation="local_read_only_probe")
+        updated = self.factory.record_execution_result(
+            "local.probe", "PASS", latency_ms=2.5, now=105.0
+        )
+        self.assertEqual(updated["last_execution_status"], "PASS")
+        self.assertEqual(updated["last_execution_at"], 105.0)
+        self.assertEqual(updated["last_execution_latency_ms"], 2.5)
+        self.assertIsNone(updated["last_success_at"])
+        self.assertEqual(updated["status"], "REGISTERED")
+
     def test_delayed_detection_only_reports_enabled_functions(self):
         self.register(function_id="enabled.one", enabled=True)
         self.register(function_id="disabled.one", enabled=False)
