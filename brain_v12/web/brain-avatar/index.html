@@ -46,13 +46,13 @@ const face=document.getElementById('face'),state=document.getElementById('state'
 let lastLiveState=null, polling=false;
 function readPref(key,fallback){try{const value=window.localStorage.getItem(key);return value===null?fallback:value;}catch(_error){return fallback;}}
 function savePref(key,value){try{window.localStorage.setItem(key,value);}catch(_error){/* private browsing/storage-disabled mode remains usable */}}
+const names={IDLE:'مستعد',LISTENING:'استماع',THINKING:'تفكير',SPEAKING:'تحدث',SUCCESS:'نجاح',UNCERTAIN:'عدم يقين',ERROR:'خطأ'};
 label.value=readPref('brain.avatar.label','');
 state.value=readPref('brain.avatar.manualState','IDLE');
-if(!names[state.value])state.value='IDLE';
+if(!Object.prototype.hasOwnProperty.call(names,state.value))state.value='IDLE';
 liveMode.checked=readPref('brain.avatar.liveMode','true')!=='false';
-const names={IDLE:'مستعد',LISTENING:'استماع',THINKING:'تفكير',SPEAKING:'تحدث',SUCCESS:'نجاح',UNCERTAIN:'عدم يقين',ERROR:'خطأ'};
 function render(s){face.dataset.state=s;chip.textContent=s+' · '+names[s];stateText.textContent=s;}
-function apply(){const s=state.value;render(s);savePref('brain.avatar.manualState',s);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
+function apply(){const s=state.value;render(s);savePref('brain.avatar.manualState',s);savePref('brain.avatar.label',label.value);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
 async function pollLiveState(){
  if(!liveMode.checked||polling)return;
  polling=true;
@@ -75,7 +75,7 @@ function syncControls(){
  if(liveMode.checked)pollLiveState();else{connection.textContent='الوضع اليدوي · لا توجد مزامنة حية';connection.style.color='var(--muted)';apply();}
 }
 document.getElementById('apply').addEventListener('click',apply);
-document.getElementById('reset').addEventListener('click',()=>{state.value='IDLE';label.value='';apply();});
+document.getElementById('reset').addEventListener('click',()=>{state.value='IDLE';label.value='';liveMode.checked=false;savePref('brain.avatar.liveMode','false');syncControls();apply();});
 state.addEventListener('change',apply);label.addEventListener('input',()=>{savePref('brain.avatar.label',label.value);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';});
 liveMode.addEventListener('change',()=>{savePref('brain.avatar.liveMode',String(liveMode.checked));syncControls();});
 apply();syncControls();window.setInterval(pollLiveState,5000);
