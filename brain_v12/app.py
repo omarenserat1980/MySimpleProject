@@ -3232,6 +3232,41 @@ def brain_liveness():
     """Read-only evidence-based Brain liveness assessment."""
     return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
 
+@app.get("/api/brain-avatar/state")
+def brain_avatar_state():
+    """Read-only live status for the avatar; never runs a device probe or external action."""
+    try:
+        assessment = assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+        checks = assessment.get("checks", {})
+        core_alive = bool(assessment.get("brain_alive"))
+        device = checks.get("device_bridge", {})
+        if not core_alive:
+            avatar_state = "ERROR"
+        elif assessment.get("status") == "DEGRADED" or not device.get("ok"):
+            avatar_state = "UNCERTAIN"
+        else:
+            # No active task/event evidence is queried here; idle is the honest default.
+            avatar_state = "IDLE"
+        return {
+            "ok": True,
+            "source": "live_brain_liveness_assessment",
+            "state": avatar_state,
+            "brain_status": assessment.get("status", "UNKNOWN"),
+            "brain_alive": core_alive,
+            "device_bridge_configured": bool(device.get("configured")),
+            "agents_online": bool(device.get("agents_online")),
+            "checked_at": assessment.get("checked_at"),
+            "note": "Avatar expression reflects only this read-only status snapshot; it does not imply feelings or consciousness.",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "source": "live_brain_liveness_assessment",
+            "state": "ERROR",
+            "brain_status": "UNKNOWN",
+            "error": str(exc)[:240],
+        }
+
 # Simulation-first remote fabric. All routes operate on the virtual twin unless a
 # separately configured, independently validated real-device probe is supplied.
 from .brain.arkan_failover_gateway import ArkanFailoverGateway
