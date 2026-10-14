@@ -13,7 +13,7 @@ class BitcoinPoolEvidenceTests(unittest.TestCase):
             "mode": "live",
             "worker_id": "user-owned-worker-01",
             "pool": {
-                "host": "pool.example.invalid",
+                "host": "stratum.pool.example.com",
                 "port": 3333,
                 "protocol": "stratum",
                 "connected": True,
@@ -69,6 +69,11 @@ class BitcoinPoolEvidenceTests(unittest.TestCase):
         result = validate_pool_evidence(self.record, now=self.now)
         self.assertIn("EVIDENCE_DIGEST_MISMATCH", result["errors"])
 
+    def test_placeholder_pool_host_is_rejected(self):
+        self.record["pool"]["host"] = "pool.example.invalid"
+        self.record["evidence_artifact_sha256"] = evidence_digest(self.record)
+        result = validate_pool_evidence(self.record, now=self.now)
+        self.assertIn("PLACEHOLDER_POOL_HOST_FORBIDDEN", result["errors"])
     def test_worker_log_alone_is_not_pool_side_share_proof(self):
         self.record["shares"]["source"] = "worker"
         self.record["evidence_artifact_sha256"] = evidence_digest(self.record)
