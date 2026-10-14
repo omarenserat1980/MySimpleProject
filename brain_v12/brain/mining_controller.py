@@ -49,6 +49,7 @@ class MiningPlan:
 
 
 MINER_REGISTRY = {
+    "sha256d": ("external-sha256d-worker", "external-asic/stratum"),
     "randomx": ("xmrig", "cpu"),
     "kawpow": ("xmrig", "cpu/gpu"),
     "cryptonight": ("xmrig", "cpu/gpu"),
@@ -94,12 +95,18 @@ def choose_plan(
         raise RuntimeError(f"{miner} is not installed on this worker")
 
     mode = "fast" if hardware.ram_gb >= 3.0 else "light"
+    reason = (
+        "External Bitcoin SHA-256d worker and verified Stratum integration required; "
+        "plan metadata only, no live worker or mining session is verified"
+        if algorithm == "sha256d"
+        else "CPU-first RandomX-compatible plan; actual execution is opt-in"
+    )
     return MiningPlan(
         algorithm=algorithm,
         miner=miner,
         backend=backend,
-        mode=mode,
-        reason="CPU-first RandomX-compatible plan; actual execution is opt-in",
+        mode="external-only" if algorithm == "sha256d" else mode,
+        reason=reason,
     )
 
 
