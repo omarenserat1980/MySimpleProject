@@ -9,12 +9,36 @@ from brain_v12.brain.bitcoin_pow_reference import (
 )
 
 
+GENESIS_HEADER = bytes.fromhex(
+    "01000000"
+    "0000000000000000000000000000000000000000000000000000000000000000"
+    "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"
+    "29ab5f49"
+    "ffff001d"
+    "1dac2b7c"
+)
+
+
 class BitcoinPowReferenceTests(unittest.TestCase):
     def test_sha256d_known_empty_vector(self):
         self.assertEqual(
             sha256d(b"").hex(),
             "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456",
         )
+
+    def test_genesis_header_hash_and_proof_of_work(self):
+        self.assertEqual(len(GENESIS_HEADER), 80)
+        self.assertEqual(
+            sha256d(GENESIS_HEADER)[::-1].hex(),
+            "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+        )
+        result = check_proof_of_work(GENESIS_HEADER, 0x1D00FFFF)
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["hash_display"],
+                         "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
+        self.assertFalse(result["live_mining"])
+        self.assertFalse(result["pool_acceptance"])
+        self.assertFalse(result["revenue_verified"])
 
     def test_header_is_exactly_80_bytes_and_hash_fields_reverse(self):
         prev = "11" * 32
