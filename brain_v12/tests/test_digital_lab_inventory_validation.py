@@ -180,3 +180,13 @@ def test_rejects_blocked_state_without_blocked_evidence():
     report["assets"][0]["verification_status"] = "BLOCKED"
     report["assets"][0]["evidence"] = valid_evidence()
     assert any("requires matching evidence result" in error for error in validate_inventory(report))
+
+def test_rejects_non_string_evidence_result_without_crashing():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()[0]
+    evidence["result"] = ["PASS"]
+    report["assets"][0]["evidence"] = [evidence]
+    errors = validate_inventory(report)
+    assert any(".result must be one of" in error for error in errors)
