@@ -90,7 +90,7 @@ def validate_inventory(report: Any) -> list[str]:
             for field in REQUIRED_EVIDENCE_FIELDS - {"exit_status"}:
                 if not isinstance(item[field], str) or not item[field].strip():
                     errors.append(f"{ep}.{field} must be a non-empty string")
-            if item["result"] not in EVIDENCE_RESULTS:
+            if not isinstance(item["result"], str) or item["result"] not in EVIDENCE_RESULTS:
                 errors.append(f"{ep}.result must be one of {sorted(EVIDENCE_RESULTS)}")
             if not isinstance(item["exit_status"], int) or isinstance(item["exit_status"], bool):
                 errors.append(f"{ep}.exit_status must be an integer")
@@ -107,7 +107,10 @@ def validate_inventory(report: Any) -> list[str]:
                     errors.append(f"{ep}.artifact_sha256 must be a 64-character hexadecimal SHA-256")
         if lifecycle == "DISCOVERED_NOT_TESTED" and verification != "NOT_RUN":
             errors.append(f"{prefix} cannot claim verification before leaving DISCOVERED_NOT_TESTED")
-        evidence_results = {item.get("result") for item in evidence if isinstance(item, dict)}
+        evidence_results = {
+            item.get("result") for item in evidence
+            if isinstance(item, dict) and isinstance(item.get("result"), str)
+        }
         if verification in {"PASS", "FAIL", "BLOCKED"} and not evidence:
             errors.append(f"{prefix} cannot claim {verification} without evidence")
         if verification in {"PASS", "FAIL", "BLOCKED"} and verification not in evidence_results:
