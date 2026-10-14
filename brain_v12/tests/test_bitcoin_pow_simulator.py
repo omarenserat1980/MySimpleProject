@@ -14,6 +14,28 @@ class BitcoinPowSimulatorTests(unittest.TestCase):
             "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456",
         )
 
+
+    def test_bitcoin_genesis_header_pow_vector(self):
+        # Canonical Bitcoin genesis block header (wire serialization).
+        header = bytes.fromhex(
+            "01000000"
+            + "00" * 32
+            + "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"
+            + "29ab5f49"
+            + "ffff001d"
+            + "1dac2b7c"
+        )
+        target = 0xFFFF << (8 * (0x1D - 3))
+        result = simulate_pow(
+            header, target, start_nonce=2083236893, max_attempts=1
+        )
+        self.assertTrue(result.found)
+        self.assertEqual(result.nonce, 2083236893)
+        self.assertEqual(
+            result.hash_hex,
+            "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+        )
+
     def test_easy_target_finds_nonce_and_marks_simulation_only(self):
         result = simulate_pow(bytes(80), (1 << 256) - 1, start_nonce=7, max_attempts=1)
         self.assertTrue(result.found)
