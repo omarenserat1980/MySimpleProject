@@ -1,7 +1,12 @@
 import json
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
+from fastapi import HTTPException
+
+from brain_v12.brain import render_readonly_api
 from brain_v12.brain.render_readonly_connector import (
     RenderConnectorError,
     RenderReadOnlyClient,
@@ -26,9 +31,10 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
             client.service("srv-abc123")
         self.assertEqual(self.calls, [])
 
-    def test_service_uses_fixed_https_api_and_get_only_transport_contract(self):
+    def test_service_uses_fixed_https_api_and_redacts_response(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
+            enabled=True, api_key="test-key", transport=self.fake_transport,
+            policy_check=lambda: True,
         )
         result = client.service("srv-abc123")
         self.assertEqual(len(self.calls), 1)
@@ -40,7 +46,8 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
 
     def test_deploy_list_is_bounded_and_encoded(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
+            enabled=True, api_key="test-key", transport=self.fake_transport,
+            policy_check=lambda: True,
         )
         client.deploys("srv-abc123", limit=7)
         query = parse_qs(urlparse(self.calls[0][0]).query)
@@ -50,7 +57,8 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
 
     def test_logs_requires_service_id_and_bounded_window(self):
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=self.fake_transport, policy_check=lambda: True
+            enabled=True, api_key="test-key", transport=self.fake_transport,
+            policy_check=lambda: True,
         )
         client.logs(
             "srv-abc123", start_time="2026-10-14T00:00:00Z",
@@ -67,7 +75,9 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
             )
 
     def test_missing_key_fails_before_transport(self):
-        client = RenderReadOnlyClient(enabled=True, transport=self.fake_transport, policy_check=lambda: True)
+        client = RenderReadOnlyClient(
+            enabled=True, transport=self.fake_transport, policy_check=lambda: True
+        )
         with self.assertRaisesRegex(RenderConnectorError, "credential"):
             client.service("srv-abc123")
         self.assertEqual(self.calls, [])
@@ -77,7 +87,8 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
             return 403, '{"message":"Bearer secret-value","api_key":"secret-key"}'
 
         client = RenderReadOnlyClient(
-            enabled=True, api_key="test-key", transport=failing_transport, policy_check=lambda: True
+            enabled=True, api_key="test-key", transport=failing_transport,
+            policy_check=lambda: True,
         )
         with self.assertRaises(RenderConnectorError) as caught:
             client.service("srv-abc123")
@@ -93,8 +104,6 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         self.assertNotIn("do-not-show", rendered)
         self.assertNotIn("hidden-value", rendered)
 
-
-
     def test_current_repository_policy_blocks_live_requests(self):
         client = RenderReadOnlyClient(
             enabled=True, api_key="test-key", transport=self.fake_transport
@@ -102,7 +111,8 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         with self.assertRaisesRegex(RenderConnectorError, "policy blocks"):
             client.service("srv-abc123")
         self.assertEqual(self.calls, [])
-\n    def test_repository_policy_blocks_live_requests_even_when_enabled(self):
+
+    def test_explicit_policy_denial_blocks_live_requests(self):
         client = RenderReadOnlyClient(
             enabled=True, api_key="test-key", transport=self.fake_transport,
             policy_check=lambda: False,
@@ -110,9 +120,40 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         with self.assertRaisesRegex(RenderConnectorError, "policy blocks"):
             client.service("srv-abc123")
         self.assertEqual(self.calls, [])
-\n    def test_timeout_is_bounded(self):
+
+    def test_timeout_is_bounded(self):
         with self.assertRaises(ValueError):
             RenderReadOnlyClient(timeout=60)
+
+
+class RenderReadOnlyApiTests(unittest.TestCase):
+    def setUp(self):
+        self.request = SimpleNamespace(headers={"X-Brain-Control-Key": "control-test"})
+
+    def test_status_reports_policy_block_without_probing(self):
+        with patch.dict("os.environ", {"BRAIN_CONTROL_KEY": "control-test"}, clear=False):
+            status = render_readonly_api.render_readonly_status(self.request)
+        self.assertEqual(status["connection_status"], "NOT_PROBED")
+        self.assertFalse(status["policy_allows_external_render"])
+        self.assertFalse(status["network_request_made"])
+        self.assertFalse(status["write_operations_available"])
+        self.assertEqual(status["reason"], "POLICY_BLOCKED")
+
+    def test_status_requires_brain_control_key(self):
+        request = SimpleNamespace(headers={})
+        with patch.dict("os.environ", {"BRAIN_CONTROL_KEY": "control-test"}, clear=False):
+            with self.assertRaises(HTTPException) as caught:
+                render_readonly_api.render_readonly_status(request)
+        self.assertEqual(caught.exception.status_code, 403)
+
+    def test_service_route_is_fail_closed_when_feature_disabled(self):
+        with patch.dict("os.environ", {
+            "BRAIN_CONTROL_KEY": "control-test",
+            "BRAIN_RENDER_READONLY_ENABLED": "false",
+        }, clear=False):
+            with self.assertRaises(HTTPException) as caught:
+                render_readonly_api.render_readonly_service("srv-abc123", self.request)
+        self.assertEqual(caught.exception.status_code, 423)
 
 
 if __name__ == "__main__":
