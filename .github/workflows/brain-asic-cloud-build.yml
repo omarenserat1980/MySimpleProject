@@ -27,6 +27,11 @@ jobs:
           iverilog -g2012 -s brain_sha256d_header_tb -o hardware/brain_asic_v1/build/sha256d-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv hardware/brain_asic_v1/tb/brain_sha256d_header_tb.sv
           vvp hardware/brain_asic_v1/build/sha256d-vector | tee hardware/brain_asic_v1/build/sha256d-vector.log
           grep -q 'BRAIN_SHA256D_GENESIS=PASS' hardware/brain_asic_v1/build/sha256d-vector.log
+      - name: Verify nonce search and target gate
+        run: |
+          iverilog -g2012 -s brain_sha256d_nonce_search_tb -o hardware/brain_asic_v1/build/nonce-search hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv hardware/brain_asic_v1/rtl/brain_sha256d_nonce_search.sv hardware/brain_asic_v1/tb/brain_sha256d_nonce_search_tb.sv
+          vvp hardware/brain_asic_v1/build/nonce-search | tee hardware/brain_asic_v1/build/nonce-search.log
+          grep -q 'BRAIN_NONCE_SEARCH_GENESIS=PASS' hardware/brain_asic_v1/build/nonce-search.log
       - name: RTL control-path smoke test (not SHA256 proof)
         run: |
           iverilog -g2012 -o hardware/brain_asic_v1/build/smoke hardware/brain_asic_v1/rtl/brain_sha256_core.sv hardware/brain_asic_v1/tb/brain_sha256_core_tb.sv
