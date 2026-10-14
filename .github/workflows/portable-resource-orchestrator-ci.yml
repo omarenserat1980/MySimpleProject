@@ -80,10 +80,15 @@ jobs:
       - name: Test hardware node compiler
         env:
           PYTHONPATH: .
-        run: python -m pytest -q brain_v12/tests/test_asic_node_compiler.py brain_v12/tests/test_brain_mcp_hardware_design.py
+        run: python -m pytest -q brain_v12/tests/test_asic_node_compiler.py
 
       - name: Install API test dependencies
         run: python -m pip install --disable-pip-version-check fastapi pydantic
+
+      - name: Test Brain MCP hardware design integration
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q brain_v12/tests/test_brain_mcp_hardware_design.py
 
       - name: Run mining economics and profit-gate tests
         env:
