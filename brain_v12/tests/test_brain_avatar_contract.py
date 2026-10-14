@@ -26,7 +26,7 @@ class BrainAvatarContractTests(unittest.TestCase):
     def test_ui_polls_real_endpoint_and_does_not_claim_connection_on_failure(self):
         self.assertIn("fetch('/api/brain-avatar/state'", self.html)
         self.assertIn("window.setInterval(pollLiveState,5000)", self.html)
-        self.assertIn("Brain: غير متصل — عرض الحالة اليدوية", self.html)
+        self.assertIn("Brain: تعذّر التحقق من الحالة الحية", self.html)
         self.assertIn('id="liveMode"', self.html)
 
     def test_avatar_has_accessible_arabic_mobile_and_reduced_motion_support(self):
