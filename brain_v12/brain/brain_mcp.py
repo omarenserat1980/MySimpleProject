@@ -6,6 +6,8 @@ from typing import Any, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from ..asic.node_compiler import NodeCompileError, compile_graph
+
 
 PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, "2025-11-25", "2025-06-18"}
@@ -78,6 +80,31 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "count": len(events),
         }
 
+    def hardware_design_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        """Compile a declarative graph; never claims execution on physical hardware."""
+        try:
+            rtl = compile_graph(arguments)
+        except NodeCompileError as exc:
+            return {
+                "ok": False,
+                "status": "INVALID_HARDWARE_GRAPH",
+                "error": str(exc),
+            }
+        return {
+            "ok": True,
+            "source": "electronic-brain",
+            "status": "DESIGN_GENERATED",
+            "rtl": rtl,
+            "verification": {
+                "graph_validated": True,
+                "rtl_simulation": "NOT_RUN",
+                "synthesis": "NOT_RUN",
+                "device_programming": "NOT_RUN",
+                "physical_hardware": "NOT_VERIFIED",
+                "fabrication": "NOT_VERIFIED",
+            },
+        }
+
     def chat_handler(arguments: dict[str, Any]) -> dict[str, Any]:
         message = str(arguments.get("message", "")).strip()
         if not message:
@@ -116,6 +143,23 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "additionalProperties": False,
         },
         evidence_handler,
+    )
+    register(
+        "brain.hardware_design",
+        "Compile a validated hardware-node graph to combinational SystemVerilog. This creates design text only; it does not simulate, synthesize, program, or fabricate a device.",
+        {
+            "type": "object",
+            "properties": {
+                "module": {"type": "string"},
+                "width": {"type": "integer", "minimum": 1, "maximum": 256},
+                "inputs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "nodes": {"type": "array", "items": {"type": "object"}},
+                "outputs": {"type": "object", "additionalProperties": {"type": "string"}},
+            },
+            "required": ["module", "width", "inputs", "nodes", "outputs"],
+            "additionalProperties": False,
+        },
+        hardware_design_handler,
     )
     register(
         "brain.chat",
