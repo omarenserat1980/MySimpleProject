@@ -62,6 +62,33 @@ class DeviceBridgeTests(unittest.TestCase):
         })
         self.assertFalse(self.bridge.authenticate("same-secret", "redmi3-01"))
 
+
+    def test_authenticated_agent_heartbeat_is_recorded_and_expires(self):
+        agent_id = "redmi3-01"
+        self.assertTrue(self.bridge.authenticate("test-device-key", agent_id))
+
+        heartbeat = self.bridge.heartbeat(agent_id, {
+            "source": "termux-agent",
+            "reality": "REAL_DEVICE_CLAIM",
+            "test_run_id": "heartbeat-proof-test",
+        })
+        self.assertTrue(heartbeat["ok"])
+        self.assertEqual(heartbeat["status"], "HEARTBEAT")
+
+        status = self.bridge.agent_status()
+        record = next(item for item in status["agents"] if item["agent_id"] == agent_id)
+        self.assertTrue(record["online"])
+        self.assertEqual(record["state"], "ONLINE")
+        self.assertLessEqual(record["age_seconds"], status["ttl_seconds"])
+
+    def test_wrong_agent_key_does_not_authorize_heartbeat_claim(self):
+        os.environ["BRAIN_AGENT_KEYS_JSON"] = json.dumps({
+            "redmi3-01": "redmi-secret-test",
+            "realme-01": "realme-secret-test",
+        })
+        self.assertFalse(self.bridge.authenticate("realme-secret-test", "redmi3-01"))
+        self.assertFalse(self.bridge.authenticate("wrong-key", "redmi3-01"))
+
     def test_queue_poll_report(self):
         queued = self.bridge.enqueue("status")
         self.assertTrue(queued["ok"])
