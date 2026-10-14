@@ -23,37 +23,61 @@ permissions:
 jobs:
   nonce-search-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install open-source RTL simulator
+      - name: Install open-source RTL simulator and synthesis tool
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y iverilog
+          sudo apt-get install -y iverilog yosys
       - name: Compile bounded nonce search and dependencies
         run: |
+          set -euo pipefail
           iverilog -g2012 -s tb_brain_bitcoin_nonce_search -o /tmp/brain-nonce-search.vvp \
             brain_v12/asic/rtl/brain_sha256_compress.sv \
             brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv \
             brain_v12/asic/rtl/brain_bitcoin_target_check.sv \
             brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv \
             brain_v12/asic/rtl/tb_brain_bitcoin_nonce_search.sv
-      - name: Verify bounded nonce search on genesis vector
-        run: vvp /tmp/brain-nonce-search.vvp
-      - name: Install open-source synthesis tool
+          test -s /tmp/brain-nonce-search.vvp
+      - name: Verify known vector, attempt bounds, nonce wrap, and zero budget
         run: |
-          sudo apt-get update
-          sudo apt-get install -y yosys
-      - name: Synthesize bounded nonce-search RTL
+          set -euo pipefail
+          vvp /tmp/brain-nonce-search.vvp | tee /tmp/brain-bitcoin-nonce-search-simulation.log
+          grep -F "PASS: bounded nonce search finds Bitcoin genesis header in one attempt" /tmp/brain-bitcoin-nonce-search-simulation.log
+          grep -F "PASS: bounded nonce search stops after three unsuccessful attempts" /tmp/brain-bitcoin-nonce-search-simulation.log
+          grep -F "PASS: nonce wrap boundary is handled within the configured attempt bound" /tmp/brain-bitcoin-nonce-search-simulation.log
+          grep -F "PASS: zero-attempt request completes without hashing a nonce" /tmp/brain-bitcoin-nonce-search-simulation.log
+      - name: Synthesize bounded nonce-search RTL and fail closed on tool errors
+        shell: bash
         run: |
+          set -euo pipefail
           yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_sha256_compress.sv brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv brain_v12/asic/rtl/brain_bitcoin_target_check.sv brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv; hierarchy -check -top brain_bitcoin_nonce_search; proc; opt; check; stat; write_json /tmp/brain-bitcoin-nonce-search.json; write_verilog -noattr -noexpr /tmp/brain-bitcoin-nonce-search-netlist.v' 2>&1 | tee /tmp/brain-bitcoin-nonce-search-yosys.log
+          test -s /tmp/brain-bitcoin-nonce-search.json
+          test -s /tmp/brain-bitcoin-nonce-search-netlist.v
+          test -s /tmp/brain-bitcoin-nonce-search-yosys.log
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          netlist = json.loads(Path("/tmp/brain-bitcoin-nonce-search.json").read_text(encoding="utf-8"))
+          modules = netlist.get("modules", {})
+          if "brain_bitcoin_nonce_search" not in modules:
+              raise SystemExit("FAIL: synthesized top module is absent from JSON netlist")
+          cells = modules["brain_bitcoin_nonce_search"].get("cells", {})
+          if not cells:
+              raise SystemExit("FAIL: synthesized top module has no cells")
+          print(f"PASS: Yosys netlist contains top module and {len(cells)} cells")
+          PY
       - name: Create reproducible evidence manifest
         shell: bash
         run: |
           set -euo pipefail
           {
             printf 'schema_version=1\n'
+            printf 'status=PASS\n'
+            printf 'gate=G3_RTL_SIMULATION_AND_G4_SYNTHESIS\n'
             printf 'repository=%s\n' "$GITHUB_REPOSITORY"
             printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
             printf 'run_id=%s\n' "$GITHUB_RUN_ID"
@@ -62,15 +86,24 @@ jobs:
             printf 'checkout_sha=%s\n' "$(git rev-parse HEAD)"
             printf 'iverilog_version=%s\n' "$(iverilog -V 2>&1 | head -n 1)"
             printf 'yosys_version=%s\n' "$(yosys -V)"
+            printf 'claim_limit=RTL_SIMULATION_AND_SYNTHESIS_ONLY_NO_FABRICATION_OR_MINING_PROOF\n'
           } > /tmp/brain-bitcoin-nonce-search-manifest.txt
-          sha256sum /tmp/brain-bitcoin-nonce-search.json /tmp/brain-bitcoin-nonce-search-netlist.v /tmp/brain-bitcoin-nonce-search-yosys.log >> /tmp/brain-bitcoin-nonce-search-manifest.txt
-      - name: Upload synthesis evidence
+          sha256sum \
+            /tmp/brain-nonce-search.vvp \
+            /tmp/brain-bitcoin-nonce-search-simulation.log \
+            /tmp/brain-bitcoin-nonce-search.json \
+            /tmp/brain-bitcoin-nonce-search-netlist.v \
+            /tmp/brain-bitcoin-nonce-search-yosys.log >> /tmp/brain-bitcoin-nonce-search-manifest.txt
+      - name: Upload simulation and synthesis evidence
         uses: actions/upload-artifact@v4
         with:
           name: brain-bitcoin-nonce-search-synthesis
           path: |
+            /tmp/brain-nonce-search.vvp
+            /tmp/brain-bitcoin-nonce-search-simulation.log
             /tmp/brain-bitcoin-nonce-search.json
             /tmp/brain-bitcoin-nonce-search-netlist.v
             /tmp/brain-bitcoin-nonce-search-yosys.log
             /tmp/brain-bitcoin-nonce-search-manifest.txt
           if-no-files-found: error
+          retention-days: 14
