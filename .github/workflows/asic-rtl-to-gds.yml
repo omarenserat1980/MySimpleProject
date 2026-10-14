@@ -121,7 +121,7 @@ jobs:
           if not route_log.is_file():
               raise SystemExit("FAIL: detailed-route log is missing")
           route_text = route_log.read_text(errors="replace")
-          counts = re.findall(r"Number of violations\\s*=\\s*(\\d+)", route_text)
+          counts = re.findall(r"Number of violations\s*=\s*(\d+)", route_text)
           if not counts or int(counts[-1]) != 0:
               raise SystemExit("FAIL: final detailed-routing violation count is not proven zero")
 
@@ -142,7 +142,7 @@ jobs:
               "silicon_status": "NOT_FABRICATED_OR_VERIFIED"
           }
           out = root / "evidence-manifest.json"
-          out.write_text(json.dumps(manifest, indent=2) + "\\n")
+          out.write_text(json.dumps(manifest, indent=2) + "\n")
           print(json.dumps(manifest, indent=2))
           PY
 
