@@ -21,6 +21,52 @@ class IssueRequest(ExecutorRequest):
 class ConsumeRequest(ExecutorRequest):
     nonce: str = Field(min_length=32, max_length=256)
 
+@router.get("/status")
+def attestation_readiness():
+    """Expose configuration readiness only; never claim a live executor is attested."""
+    try:
+        enrollments = json.loads(os.environ.get("BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON", "{}"))
+        bindings = json.loads(os.environ.get("BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON", "{}"))
+        enrollments_valid = isinstance(enrollments, dict) and any(
+            isinstance(k, str) and isinstance(v, str) and len(v) == 64
+            for k, v in enrollments.items()
+        )
+        bindings_valid = isinstance(bindings, dict) and any(
+            isinstance(k, str) and isinstance(v, dict)
+            and isinstance(v.get("hostname"), str) and bool(v["hostname"].strip())
+            and str(v.get("architecture", "")).strip().lower() in {"x86_64", "amd64"}
+            for k, v in bindings.items()
+        )
+        config_valid = True
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        enrollments_valid = False
+        bindings_valid = False
+        config_valid = False
+
+    registry = os.environ.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_DB", os.environ.get("BRAIN_DB", "/var/lib/brain/cloud-executor-registry.sqlite3")).strip()
+    registry_configured = bool(registry)
+    if registry and not registry.startswith(("postgres://", "postgresql://")):
+        registry_path = Path(registry)
+        registry_configured = not registry_path.is_symlink() and registry_path.parent.is_dir()
+
+    checks = {
+        "enrollment_inventory_configured": enrollments_valid,
+        "trusted_host_bindings_configured": bindings_valid,
+        "signing_key_configured": bool(os.environ.get("BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64")),
+        "registry_path_configured": registry_configured,
+        "configuration_parseable": config_valid,
+    }
+    ready = all(checks.values())
+    return {
+        "status": "CONFIGURED_NOT_LIVE" if ready else "UNVERIFIED",
+        "configuration_ready": ready,
+        "live_attestation_verified": False,
+        "executor_connected": False,
+        "physical_hardware_verified": False,
+        "checks": checks,
+        "evidence_note": "Configuration readiness is not proof of a connected or currently attested executor.",
+    }
+
 def _registry_db() -> str:
     path = os.environ.get("BRAIN_CLOUD_EXECUTOR_REGISTRY_DB", os.environ.get("BRAIN_DB", "/var/lib/brain/cloud-executor-registry.sqlite3")).strip()
     if path.startswith(("postgres://", "postgresql://")):
