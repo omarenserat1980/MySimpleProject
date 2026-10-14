@@ -9,6 +9,8 @@ on:
       - "brain_v12/brain/run_evidence_store.py"
       - "brain_v12/brain/bitcoin_north_star.py"
       - "brain_v12/brain/bitcoin_pool_evidence.py"
+      - "brain_v12/brain/engineering_factory.py"
+      - "brain_v12/tests/test_engineering_factory.py"
       - "brain_v12/brain/decision_engine.py"
       - "brain_v12/brain/cognitive_loop.py"
       - "brain_v12/brain/mining_controller.py"
@@ -72,7 +74,9 @@ jobs:
             brain_v12/brain/executor_contract.py \
             brain_v12/brain/run_evidence_store.py \
             brain_v12/brain/bitcoin_north_star.py \
-            brain_v12/brain/bitcoin_pool_evidence.py \
+            brain_v12/brain/bitcoin_pool_evidence.py \\
+            brain_v12/brain/engineering_factory.py \\
+            brain_v12/tests/test_engineering_factory.py \
             brain_v12/brain/decision_engine.py \
             brain_v12/brain/cognitive_loop.py \
             brain_v12/brain/mining_controller.py \
@@ -99,7 +103,7 @@ jobs:
             brain_v12/tests/test_mining_controller.py \
             brain_v12/tests/test_bitcoin_north_star.py
 
-      - name: Run Bitcoin pool evidence gate tests
+      - name: Run engineering factory tests\n        env:\n          PYTHONPATH: .\n        run: python -m unittest brain_v12.tests.test_engineering_factory -v\n\n      - name: Run Bitcoin pool evidence gate tests
         env:
           PYTHONPATH: .
         run: python -m unittest brain_v12.tests.test_bitcoin_pool_evidence -v

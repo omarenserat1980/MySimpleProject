@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .bitcoin_north_star import BitcoinNorthStar
 from .run_evidence_store import RunEvidenceStore
+from .engineering_factory import EngineeringFactory
 
 
 @dataclass
@@ -42,6 +43,7 @@ class DecisionEngine:
 
     def __init__(self, north_star: BitcoinNorthStar | None = None):
         self.history = []
+        self.engineering_factory = EngineeringFactory()
         if north_star is None:
             evidence_path = Path(os.environ.get(
                 "BRAIN_NORTH_STAR_EVIDENCE_PATH",
@@ -74,6 +76,7 @@ class DecisionEngine:
         device = any(x in text for x in ("termux", "redmi", "هاتف", "جهاز", "موبايل", "جوال", "android", "device", "agent", "عامل"))
         memory = any(x in text for x in ("ذاكرة", "تذكر", "memory", "سجل"))
         options = [
+            asdict(Candidate("engineering_proposal", "إنشاء اقتراح هندسي قابل للاختبار", "خطة مرتبطة بالأدلة والاختبارات والتكامل", "low", [], True, ["goal"], .99, "engineering.propose")),
             asdict(Candidate("observe", "قراءة وفهم الحالة", "بيانات قابلة للتحقق", "low", [], True, ["goal"], .82,
                              "memory.read" if memory else "state.read")),
             asdict(Candidate("plan", "بناء خطة متعددة الخطوات", "خطة قابلة للتحقق", "low", [], True, ["goal"], .80, "tasks.create")),

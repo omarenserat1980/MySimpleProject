@@ -5,6 +5,7 @@ from .task_engine import TaskEngine
 from .world_model import WorldModel
 from uuid import uuid4
 from .evidence_store import EvidenceStore
+from .engineering_factory import EngineeringFactory
 
 class CognitiveLoop:
     """Traceable V12 cognitive pipeline. Exposes high-level state, never private chain-of-thought."""
@@ -16,6 +17,7 @@ class CognitiveLoop:
         {"id":"tasks.complete","name":"إكمال مهمة","risk":"low","permission":None},
         {"id":"code.inspect","name":"فحص الكود","risk":"low","permission":"developer"},
         {"id":"code.verify","name":"التحقق من الكود","risk":"low","permission":"developer"},
+        {"id":"engineering.propose","name":"إنشاء اقتراح هندسي واختبارات قبول","risk":"low","permission":None},
         {"id":"device.enqueue","name":"إرسال مهمة إلى Termux","risk":"medium","permission":"device_agent"},
         {"id":"code.apply","name":"تعديل الكود","risk":"high","permission":"developer_approval"},
         {"id":"agent.execute","name":"تنفيذ معزول","risk":"high","permission":"agent_approval"},
@@ -29,6 +31,7 @@ class CognitiveLoop:
         self.tasks=TaskEngine()
         self.world=WorldModel()
         self.code_tool=None
+        self.engineering_factory=EngineeringFactory()
 
     def _state(self,stage,status="RUNNING",**extra):
         current=self.store.state()
@@ -61,6 +64,9 @@ class CognitiveLoop:
             result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.create(str(params.get("title","مهمة جديدة")))}
         elif tool_id=="tasks.complete":
             result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.update(str(params.get("task_id")),"COMPLETED")}
+        elif tool_id=="engineering.propose":
+            result=self.engineering_factory.propose(str(params.get("problem", params.get("goal", ""))), evidence=params.get("evidence", []))
+            result={"ok":result.get("status")=="COMPLETED","status":result.get("status"),"tool":tool_id,"data":result.get("proposal"),"error":result.get("error")}
         elif tool_id=="code.inspect":
             if not self.code_tool:
                 result={"ok":False,"status":"UNAVAILABLE","tool":tool_id}
