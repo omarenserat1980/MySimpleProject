@@ -43,6 +43,27 @@ module tb_brain_mac_accelerator;
     apply_mac(-7, -3, 23);
     apply_mac(127, 127, 16152);
 
+    // Deterministic-length randomized differential sequence against integer reference.
+    // Keep the expected value in a signed 32-bit testbench integer.
+    begin : randomized_reference_checks
+      integer expected_acc;
+      integer rand_a;
+      integer rand_b;
+      integer i;
+      expected_acc = 0;
+      @(negedge clk);
+      clear = 1;
+      enable = 0;
+      @(posedge clk); #1;
+      if ($signed(accumulator) !== 0) $fatal(1, "random test initialization clear failed");
+      for (i = 0; i < 128; i = i + 1) begin
+        rand_a = $urandom_range(0, 255) - 128;
+        rand_b = $urandom_range(0, 255) - 128;
+        expected_acc = expected_acc + (rand_a * rand_b);
+        apply_mac(rand_a, rand_b, expected_acc);
+      end
+    end
+
     // Disabled unit must hold the accumulated result.
     @(negedge clk);
     enable = 0;
