@@ -27,7 +27,7 @@ def encode_probe_request(request_id: int, method: str, params: list[Any]) -> byt
     if not isinstance(params, list):
         raise ValueError("INVALID_PARAMS")
     return (json.dumps({"id": request_id, "method": method, "params": params},
-                       separators=(",", ":")) + "\\n").encode("utf-8")
+                       separators=(",", ":")) + "\n").encode("utf-8")
 
 
 def _parse_response(line: bytes, expected_id: int) -> dict[str, Any]:
@@ -79,16 +79,16 @@ def probe_stratum_v1(
     """
     if enabled is not True:
         raise RuntimeError("LIVE_POOL_PROBE_DISABLED")
-    if not isinstance(host, str) or not host.strip() or any(c in host for c in "\\r\\n"):
+    if not isinstance(host, str) or not host.strip() or any(c in host for c in "\r\n"):
         raise ValueError("INVALID_POOL_HOST")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError("INVALID_POOL_PORT")
     if not isinstance(worker_name, str) or not worker_name.strip() or any(
-        c in worker_name for c in "\\r\\n"
+        c in worker_name for c in "\r\n"
     ):
         raise ValueError("INVALID_WORKER_NAME")
     if not isinstance(worker_password, str) or not worker_password or any(
-        c in worker_password for c in "\\r\\n"
+        c in worker_password for c in "\r\n"
     ):
         raise ValueError("INVALID_WORKER_PASSWORD")
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
