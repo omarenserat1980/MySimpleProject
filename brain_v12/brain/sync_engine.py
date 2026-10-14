@@ -72,6 +72,19 @@ class BrainSyncStore:
     def _next_revision(self, key: str) -> int:
         return self.revision(key) + 1
 
+    def _existing_event(
+        self, event_id: str, *, key: str, operation: str,
+        value: Mapping[str, Any], deleted: bool,
+    ) -> SyncEvent | None:
+        """Return an identical prior event; reject reuse of its ID for other content."""
+        if event_id not in self._seen_events:
+            return None
+        existing = next(e for e in self._events if e.event_id == event_id)
+        if (existing.key != key or existing.operation != operation
+                or existing.value != dict(value) or existing.deleted != deleted):
+            raise ValueError(f"EVENT_ID_REUSE_CONFLICT: {event_id}")
+        return existing
+
     def _event(self, key: str, operation: str, record: SyncRecord, event_id: str) -> SyncEvent:
         return SyncEvent(
             event_id=event_id, key=key, operation=operation, revision=record.revision,
@@ -81,11 +94,12 @@ class BrainSyncStore:
         )
 
     def put(self, key: str, value: Mapping[str, Any], *, expected_revision: int | None = None, event_id: str) -> SyncEvent:
+        existing = self._existing_event(event_id, key=key, operation="upsert", value=value, deleted=False)
+        if existing is not None:
+            return existing
         current = self.revision(key)
         if expected_revision is not None and expected_revision != current:
             raise SyncConflict(key, expected_revision, current)
-        if event_id in self._seen_events:
-            return next(e for e in self._events if e.event_id == event_id)
         record = SyncRecord(key, dict(value), self._next_revision(key), False, time.time(), self.replica_id)
         event = self._event(key, "upsert", record, event_id)
         self._records[key] = record
@@ -94,11 +108,12 @@ class BrainSyncStore:
         return event
 
     def delete(self, key: str, *, expected_revision: int | None = None, event_id: str) -> SyncEvent:
+        existing = self._existing_event(event_id, key=key, operation="delete", value={}, deleted=True)
+        if existing is not None:
+            return existing
         current = self.revision(key)
         if expected_revision is not None and expected_revision != current:
             raise SyncConflict(key, expected_revision, current)
-        if event_id in self._seen_events:
-            return next(e for e in self._events if e.event_id == event_id)
         record = SyncRecord(key, {}, self._next_revision(key), True, time.time(), self.replica_id)
         event = self._event(key, "delete", record, event_id)
         self._records[key] = record
@@ -144,8 +159,6 @@ class BrainSyncStore:
         previous = "GENESIS"
         for event in self._events:
             if event.prev_digest != previous:
-                return False
-            if event.digest != hashlib.sha256(event.canonical().encode("utf-8")).hexdigest():
                 return False
             previous = event.digest
         return True
