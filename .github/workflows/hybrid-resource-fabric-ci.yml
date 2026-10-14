@@ -41,6 +41,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install optional crypto dependency used by datacenter imports
+        run: python -m pip install --disable-pip-version-check cryptography
       - name: Compile changed module and tests
         run: python -m py_compile brain_v12/brain/hybrid_resource_fabric.py brain_v12/brain/resource_manager.py brain_v12/brain/virtual_task_queue.py brain_v12/brain/virtual_datacenter.py brain_v12/brain/device_cloud_federation.py brain_v12/tests/test_hybrid_resource_fabric.py brain_v12/tests/test_hybrid_resource_fabric_integration.py brain_v12/tests/test_fabric_planning.py
       - name: Run deterministic resource fabric tests
