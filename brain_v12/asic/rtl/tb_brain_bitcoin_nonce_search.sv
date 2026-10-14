@@ -82,6 +82,21 @@ module tb_brain_bitcoin_nonce_search;
         if (nonce !== 32'h00000000) $fatal(1, "FAIL: nonce did not wrap to zero, got %08h", nonce);
         if (busy) $fatal(1, "FAIL: search remained busy after wrap-boundary bound");
         $display("PASS: nonce wrap boundary is handled within the configured attempt bound");
+
+        // Zero-budget path: complete immediately without evaluating a nonce.
+        target = GENESIS_TARGET;
+        nonce_start = 32'h7c2bac1d;
+        max_attempts = 0;
+        @(posedge clk);
+        start <= 1'b1;
+        @(posedge clk);
+        start <= 1'b0;
+        #1;
+        if (!done) $fatal(1, "FAIL: zero-attempt request did not complete immediately");
+        if (busy) $fatal(1, "FAIL: zero-attempt request incorrectly remained busy");
+        if (found) $fatal(1, "FAIL: zero-attempt request reported a nonce hit");
+        if (attempts !== 0) $fatal(1, "FAIL: zero-attempt request evaluated a nonce");
+        $display("PASS: zero-attempt request completes without hashing a nonce");
         $finish;
     end
 endmodule
