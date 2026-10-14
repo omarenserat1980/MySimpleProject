@@ -9,7 +9,7 @@ module tb_sha256d_header_hash;
   initial begin
     // Bitcoin mainnet genesis header, serialized in wire byte order.
     // Prefix bytes 0..63: version, previous hash, first 28 bytes of merkle root.
-    header_prefix = 512'h0100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa;
+    header_prefix = 512'h0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa;
     // Tail bytes 64..75: last 4 merkle-root bytes, timestamp, and nBits.
     header_tail = 128'h4b1e5e4a29ab5f49ffff001d00000000;
     // Genesis nonce numeric value 0x7c2bac1d serializes as 1d ac 2b 7c.
