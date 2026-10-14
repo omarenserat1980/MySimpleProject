@@ -1,0 +1,100 @@
+name: ASIC RTL-to-GDSII (open-source, zero-budget gate)
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/asic-rtl-to-gds.yml"
+  push:
+    branches:
+      - "feature/asic-rtl-to-gds-zero-cost"
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/asic-rtl-to-gds.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rtl-to-gds:
+    # Public GitHub-hosted runner; no paid cloud resources or external fabrication orders.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "rtl=brain_v12/asic/rtl/brain_asic_core.sv"
+            sha256sum brain_v12/asic/rtl/brain_asic_core.sv
+          } | tee artifacts/asic/source-identity.txt
+
+      - name: Fetch open-source OpenROAD Flow Scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git orfs
+          mkdir -p orfs/flow/designs/sky130hd/brain_asic_core/src
+          cp brain_v12/asic/rtl/brain_asic_core.sv \
+            orfs/flow/designs/sky130hd/brain_asic_core/src/brain_asic_core.sv
+          cp brain_v12/asic/openroad/config.mk \
+            orfs/flow/designs/sky130hd/brain_asic_core/config.mk
+          cp brain_v12/asic/openroad/constraint.sdc \
+            orfs/flow/designs/sky130hd/brain_asic_core/constraint.sdc
+          git -C orfs rev-parse HEAD | tee artifacts/asic/openroad-flow-scripts-commit.txt
+
+      - name: Run RTL-to-GDSII in the official OpenROAD container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull openroad/orfs:latest
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/orfs/flow:/OpenROAD-flow-scripts/flow" \
+            -w /OpenROAD-flow-scripts \
+            openroad/orfs:latest \
+            bash -lc 'source ./env.sh && cd flow && make DESIGN_CONFIG=./designs/sky130hd/brain_asic_core/config.mk' \
+            2>&1 | tee artifacts/asic/openroad-flow.log
+
+      - name: Collect physical-design evidence
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          mkdir -p artifacts/asic/physical-design
+          for d in results reports logs; do
+            if [ -d "orfs/flow/$d/sky130hd/brain_asic_core" ]; then
+              cp -a "orfs/flow/$d/sky130hd/brain_asic_core" "artifacts/asic/physical-design/$d"
+            fi
+          done
+          if [ -s orfs/flow/results/sky130hd/brain_asic_core/base/6_final.gds ]; then
+            cp orfs/flow/results/sky130hd/brain_asic_core/base/6_final.gds artifacts/asic/physical-design/brain_asic_core.gds
+            echo "GDSII_GENERATED=true" | tee artifacts/asic/physical-design-status.txt
+          else
+            echo "GDSII_GENERATED=false" | tee artifacts/asic/physical-design-status.txt
+          fi
+
+      - name: Enforce physical-output gate
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/asic/physical-design/brain_asic_core.gds
+          echo "RTL_TO_GDSII_OUTPUT_PRESENT"
+          echo "Note: GDSII presence is not foundry acceptance, DRC/LVS signoff, fabrication, or silicon validation."
+
+      - name: Upload ASIC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electronic-brain-asic-rtl-to-gds-evidence
+          path: artifacts/asic/
+          if-no-files-found: warn
+          retention-days: 14
