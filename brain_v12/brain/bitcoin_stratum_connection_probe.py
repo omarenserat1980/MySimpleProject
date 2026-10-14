@@ -45,6 +45,13 @@ def _parse_response(line: bytes, expected_id: int) -> dict[str, Any]:
     return message
 
 
+def _validate_subscribe_result(result: Any) -> bool:
+    """Require the three mandatory fields in a Stratum V1 subscribe result."""
+    if not isinstance(result, list) or len(result) < 3:
+        raise StratumConnectionProbeError("SUBSCRIBE_REJECTED_OR_MALFORMED")
+    return True
+
+
 def _read_response(stream, expected_id: int, timeout_seconds: float) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
@@ -106,8 +113,10 @@ def probe_stratum_v1(
                 stream.write(encode_probe_request(1, "mining.subscribe", ["ElectronicBrainV12/1.0"]))
                 stream.flush()
                 subscribed = _read_response(stream, 1, float(timeout_seconds))
-                if not subscribed["result"]:
-                    raise StratumConnectionProbeError("SUBSCRIBE_REJECTED")
+                subscribe_result = subscribed["result"]
+                # Stratum V1 subscribe result must include subscriptions,
+                # extranonce1, and extranonce2_size; truthiness alone is not proof.
+                _validate_subscribe_result(subscribe_result)
                 stream.write(encode_probe_request(2, "mining.authorize", [worker_name, worker_password]))
                 stream.flush()
                 authorized = _read_response(stream, 2, float(timeout_seconds))
