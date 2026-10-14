@@ -7,6 +7,7 @@ This module adds a small, deterministic software lab for the SHA-256d proof-of-w
 - Accepts an 80-byte candidate block header and a 256-bit target.
 - Replaces the four-byte nonce at header offset 76 using Bitcoin's little-endian nonce encoding.
 - Computes SHA256(SHA256(header)) and compares the hash as a little-endian integer with the supplied target.
+- Decodes Bitcoin compact `nBits` targets with rejection of negative, zero, and overflowing encodings; this is a representation check, not full consensus validation.
 - Stops after a caller-specified bound; the implementation rejects bounds above 1,000,000 attempts.
 - Emits explicit evidence scope: `BOUNDED_OFFLINE_SOFTWARE_SIMULATION`.
 
