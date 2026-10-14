@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from .hybrid_resource_fabric import HybridResourceFabric, ResourceRecord
 
 @dataclass(frozen=True)
 class ResourceRequirement:
@@ -19,6 +20,25 @@ class ResourceReservation:
 class ResourceManager:
     """Resource accounting with explicit, immutable reservations."""
     reservations:dict[str,ResourceReservation]=field(default_factory=dict)
+    hybrid_fabric: HybridResourceFabric = field(default_factory=HybridResourceFabric, repr=False)
+
+    def register_hybrid_resource(self, record: ResourceRecord) -> dict:
+        """Register a separately evidenced resource without re-labeling virtual blades."""
+        return self.hybrid_fabric.register(record)
+
+    def hybrid_resource_status(self) -> dict:
+        return self.hybrid_fabric.list_resources()
+
+    def reserve_hybrid_resource(self, resource_id: str, task_id: str, required_capacity=None,
+                                required_capabilities=None, permission="simulate",
+                                lease_seconds=60, physical_execution=False) -> dict:
+        return self.hybrid_fabric.reserve(
+            resource_id, task_id, required_capacity, required_capabilities,
+            permission, lease_seconds, physical_execution
+        )
+
+    def release_hybrid_resource(self, task_id: str) -> dict:
+        return self.hybrid_fabric.release(task_id)
 
     @staticmethod
     def _ram_used(computer)->int:
