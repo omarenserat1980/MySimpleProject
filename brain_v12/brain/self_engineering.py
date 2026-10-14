@@ -45,6 +45,25 @@ class Evidence:
     details: dict[str, Any] = field(default_factory=dict)
     digest: str = ""
 
+    def _canonical_payload(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "claim": self.claim,
+            "outcome": self.outcome,
+            "source": self.source,
+            "observed_at": self.observed_at,
+            "details": self.details,
+        }
+
+    def verify_digest(self) -> bool:
+        """Recompute the digest so changed evidence cannot be accepted silently."""
+        canonical = json.dumps(
+            self._canonical_payload(), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"),
+        )
+        expected = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return bool(self.digest) and hashlib.compare_digest(self.digest, expected)
+
     @classmethod
     def create(
         cls, kind: EvidenceKind | str, claim: str, outcome: str,
@@ -75,6 +94,8 @@ class EngineeringRun:
     def add_evidence(self, evidence: Evidence) -> None:
         if not evidence.digest:
             raise ValueError("EVIDENCE_DIGEST_REQUIRED")
+        if not evidence.verify_digest():
+            raise ValueError("EVIDENCE_DIGEST_MISMATCH")
         self.evidence.append(evidence)
 
     def report(self) -> dict[str, Any]:
@@ -99,7 +120,10 @@ class EngineeringRun:
         }
 
     def _has(self, kind: EvidenceKind, outcome: str) -> bool:
-        return any(e.kind == kind.value and e.outcome.lower() == outcome for e in self.evidence)
+        return any(
+            e.verify_digest() and e.kind == kind.value and e.outcome.lower() == outcome
+            for e in self.evidence
+        )
 
 
 class SelfEngineeringEngine:
@@ -115,11 +139,12 @@ class SelfEngineeringEngine:
         details: dict[str, Any] | None = None,
     ) -> EngineeringRun:
         findings_list = [str(item).strip() for item in findings if str(item).strip()]
+        inspection_ok = bool(source and source.strip() and findings_list)
         run.add_evidence(Evidence.create(
             EvidenceKind.SOURCE_INSPECTION,
             "Repository/source inspection completed",
-            "passed" if source and findings_list is not None else "unknown",
-            source or "unspecified",
+            "passed" if inspection_ok else "failed",
+            source.strip() if source and source.strip() else "unspecified",
             {"findings": findings_list, **(details or {})},
         ))
         run.plan = [
@@ -129,7 +154,13 @@ class SelfEngineeringEngine:
             "Run targeted tests and relevant regression tests",
             "Review evidence and report verified, failed, or blocked",
         ]
-        run.state = RunState.PLANNED
+        if inspection_ok:
+            run.state = RunState.PLANNED
+            run.blockers = [b for b in run.blockers if b != "SOURCE_INSPECTION_INCOMPLETE"]
+        else:
+            run.state = RunState.BLOCKED
+            if "SOURCE_INSPECTION_INCOMPLETE" not in run.blockers:
+                run.blockers.append("SOURCE_INSPECTION_INCOMPLETE")
         return run
 
     def authorize_changes(self, run: EngineeringRun, *, approved: bool, scope: str = "") -> EngineeringRun:
