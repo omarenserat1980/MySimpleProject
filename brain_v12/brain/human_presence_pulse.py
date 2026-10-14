@@ -6,7 +6,7 @@ background worker and never claims that a browser actually rendered a frame.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 MEMORY_KEY = "brain.pulse.HUMAN_PRESENCE"
 MIN_TICK_INTERVAL_SECONDS = 60
@@ -103,7 +103,7 @@ def evaluate_pulse(store, *, display_target="brain-avatar-ui", now=None):
         "intensity": 0.25,
         "confidence": 0.5,
         "last_tick_at": instant.isoformat(),
-        "next_tick_at": (instant.replace(microsecond=0) + __import__("datetime").timedelta(seconds=MIN_TICK_INTERVAL_SECONDS)).isoformat(),
+        "next_tick_at": (instant + timedelta(seconds=MIN_TICK_INTERVAL_SECONDS)).isoformat(),
         "display_targets": targets,
         "visual_state": "PENDING_RENDER_CONFIRMATION",
         "last_render_status": "API_POLLED_RENDER_NOT_INDEPENDENTLY_VERIFIED",
