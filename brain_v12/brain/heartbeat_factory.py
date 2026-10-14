@@ -147,6 +147,9 @@ class HeartbeatFactory:
             last_success_at REAL,
             last_error_code TEXT,
             evidence_ref TEXT,
+            last_execution_at REAL,
+            last_execution_status TEXT,
+            last_execution_latency_ms REAL,
             created_at REAL NOT NULL,
             updated_at REAL NOT NULL
         );
@@ -176,6 +179,15 @@ class HeartbeatFactory:
         CREATE INDEX IF NOT EXISTS idx_heartbeat_status_time
             ON heartbeat_events(status, generated_at DESC);
         """)
+        # Forward-compatible SQLite migration for databases created by earlier versions.
+        existing_columns = {row["name"] for row in self.db.execute("PRAGMA table_info(heartbeat_functions)")}
+        for column, declaration in (
+            ("last_execution_at", "REAL"),
+            ("last_execution_status", "TEXT"),
+            ("last_execution_latency_ms", "REAL"),
+        ):
+            if column not in existing_columns:
+                self.db.execute(f"ALTER TABLE heartbeat_functions ADD COLUMN {column} {declaration}")
 
     @_serialized
     def register_function(self, definition: FunctionDefinition | dict[str, Any], *, now: float | None = None) -> dict[str, Any]:
@@ -225,6 +237,25 @@ class HeartbeatFactory:
             "SELECT * FROM heartbeat_functions WHERE function_id=?", (function_id,)
         ).fetchone()
         return dict(row) if row else None
+
+    @_serialized
+    def record_execution_result(self, function_id: str, status: str, *, latency_ms: float,
+                                now: float | None = None) -> dict[str, Any]:
+        """Record execution outcome separately from delivery/acknowledgement state."""
+        if status not in {"PASS", "FAIL", "UNKNOWN"}:
+            raise ValueError("EXECUTION_STATUS_INVALID")
+        latency = float(latency_ms)
+        if latency < 0 or latency != latency:
+            raise ValueError("EXECUTION_LATENCY_INVALID")
+        instant = time.time() if now is None else float(now)
+        updated = self.db.execute(
+            "UPDATE heartbeat_functions SET last_execution_at=?,last_execution_status=?,"
+            "last_execution_latency_ms=?,updated_at=? WHERE function_id=?",
+            (instant, status, latency, instant, function_id),
+        )
+        if updated.rowcount != 1:
+            raise KeyError("FUNCTION_NOT_REGISTERED")
+        return self.get_function(function_id)
 
     @_serialized
     def list_functions(self) -> list[dict[str, Any]]:
@@ -350,7 +381,12 @@ class HeartbeatFactory:
         for function in self.list_functions():
             if not function["enabled"]:
                 continue
-            last = function["last_success_at"]
+            # Local probe execution and remote delivery verification are separate facts.
+            # A recent local execution satisfies the probe cadence without pretending it was delivered.
+            if function["implementation"] == "local_read_only_probe":
+                last = function.get("last_execution_at")
+            else:
+                last = function["last_success_at"]
             reference = last if last is not None else function["created_at"]
             age = instant - float(reference)
             if age > int(function["interval_seconds"]):
