@@ -161,8 +161,13 @@ class HeartbeatFactoryTests(unittest.TestCase):
         self.assertIsNotNone(reopened.get_function("brain.api"))
         self.assertEqual(reopened.get_heartbeat(heartbeat_id)["status"], "CREATED")
 
-    def test_disabled_and_simulated_functions_are_not_claimed_as_remote(self):
-        self.register(function_id="asic.hashrate", enabled=False, category="simulation",
+    def test_disabled_function_cannot_emit_heartbeat(self):
+        self.register(function_id="disabled.probe", enabled=False)
+        with self.assertRaisesRegex(RuntimeError, "FUNCTION_DISABLED"):
+            self.create("disabled.probe")
+
+    def test_simulated_functions_are_not_claimed_as_remote(self):
+        self.register(function_id="asic.hashrate", enabled=True, category="simulation",
                       implementation="protocol_only", source_of_truth="simulated_fixture")
         self.factory.create_heartbeat(
             "asic.hashrate", worker_id="sim-worker", node_id="sim-node",
@@ -171,7 +176,7 @@ class HeartbeatFactoryTests(unittest.TestCase):
         summary = self.factory.summary()
         self.assertEqual(summary["mode"], "local_protocol_only")
         self.assertFalse(summary["remote_delivery_proven"])
-        self.assertEqual(summary["functions_enabled"], 0)
+        self.assertEqual(summary["functions_enabled"], 1)
 
     def test_delayed_detection_only_reports_enabled_functions(self):
         self.register(function_id="enabled.one", enabled=True)
