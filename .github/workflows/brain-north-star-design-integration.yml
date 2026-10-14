@@ -1,0 +1,59 @@
+name: Brain North Star + Design Factory Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/bitcoin_north_star.py"
+      - "brain_v12/brain/bitcoin_pool_evidence.py"
+      - "brain_v12/brain/engineering_factory.py"
+      - "brain_v12/brain/decision_engine.py"
+      - "brain_v12/brain/cognitive_loop.py"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_bitcoin_north_star.py"
+      - "brain_v12/tests/test_bitcoin_pool_evidence.py"
+      - "brain_v12/tests/test_engineering_factory.py"
+      - "brain_v12/tests/test_mining_controller.py"
+      - "tests/design_factory/**"
+      - "brain_v12/design_factory/**"
+      - ".github/workflows/brain-north-star-design-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest fastapi pydantic
+      - name: Compile integrated modules
+        run: |
+          python -m py_compile \
+            brain_v12/brain/bitcoin_north_star.py \
+            brain_v12/brain/bitcoin_pool_evidence.py \
+            brain_v12/brain/engineering_factory.py \
+            brain_v12/brain/decision_engine.py \
+            brain_v12/brain/cognitive_loop.py \
+            brain_v12/brain/mining_controller.py
+      - name: Run design factory and North Star regression tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            tests/design_factory \
+            brain_v12/tests/test_bitcoin_north_star.py \
+            brain_v12/tests/test_mining_controller.py
+      - name: Run pool evidence and engineering factory contracts
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_bitcoin_pool_evidence \
+            brain_v12.tests.test_engineering_factory -v
