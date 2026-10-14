@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Callable
@@ -23,8 +25,10 @@ WIDGET_MIME_TYPE = "text/html;profile=mcp-app"
 def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIRouter:
     """Expose Brain tools and an MCP Apps-compatible embedded chat widget.
 
-    The existing HTTP authentication boundary remains owned by mcp_server.py.
-    The widget uses MCP tools only; it never receives server credentials.
+    Enforce the MCP bearer boundary here so every FastAPI entrypoint is protected,
+    including deployments that import brain_v12.app:app directly. The wrapper may
+    retain its duplicate guard; ChatGPT OAuth must replace/extend this boundary
+    before public Apps integration. The widget never receives server credentials.
     """
 
     router = APIRouter()
@@ -317,8 +321,29 @@ def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIR
             {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
         )
 
+    def authorize_mcp_request(request: Request) -> JSONResponse | None:
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse(
+                {"ok": False, "status": "MCP_NOT_CONFIGURED"},
+                status_code=503,
+            )
+        authorization = request.headers.get("authorization", "")
+        if not authorization.startswith("Bearer ") or not hmac.compare_digest(
+            authorization[7:], expected
+        ):
+            return JSONResponse(
+                {"ok": False, "status": "MCP_AUTH_REQUIRED"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
     @router.get("/mcp")
     async def mcp_get(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse({"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"}, status_code=400)
@@ -328,6 +353,9 @@ def build_mcp_router(brain_ai, device_bridge, store, chat_sessions=None) -> APIR
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         version = request.headers.get("MCP-Protocol-Version")
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse(
