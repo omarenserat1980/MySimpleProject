@@ -32,7 +32,7 @@ class CompactIn(BaseModel):
     max_summary_chars: int = 12000
 
 
-def router(brain_ai, store=None, context_limit=24):
+def router(brain_ai, store=None, context_limit=24, event_sink=None):
     store = store or ChatSessionStore()
     store.init()
     ledger = ChatRequestLedger(store.path)
@@ -168,6 +168,11 @@ def router(brain_ai, store=None, context_limit=24):
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_MEMORY]\n" + memory["summary"]
             if session_context:
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
+            if event_sink:
+                try:
+                    event_sink("BRAIN_CHAT_REQUEST_STARTED", {"session_id": session_id, "trace_id": trace_id})
+                except Exception:
+                    pass
             result = brain_ai.chat(body.message, instructions, approved=body.approved)
             model_routing = next((e for e in result.evidence if e.get("type") == "model_routing"), None)
             assistant = {
@@ -180,11 +185,24 @@ def router(brain_ai, store=None, context_limit=24):
             if request_key:
                 assistant["client_message_id"] = request_key
             store.add_message(session_id, "assistant", result.reply, assistant)
+            if event_sink:
+                try:
+                    event_sink("BRAIN_CHAT_RESPONSE_COMPLETED", {
+                        "session_id": session_id, "trace_id": trace_id,
+                        "ok": bool(result.ok), "mode": str(result.mode),
+                    })
+                except Exception:
+                    pass
             if request_key:
                 ledger.complete(session_id, request_key, assistant)
             return {"ok": result.ok, "session": store.get(session_id), "response": assistant,
                     "idempotent_replay": False, "trace_id": trace_id, "preflight": preflight}
         except Exception:
+            if event_sink:
+                try:
+                    event_sink("BRAIN_CHAT_REQUEST_FAILED", {"session_id": session_id, "trace_id": trace_id})
+                except Exception:
+                    pass
             if request_key:
                 ledger.fail(session_id, request_key)
             raise
