@@ -16,9 +16,19 @@ module brain_mac_accelerator #(
     logic signed [(2*DATA_WIDTH)-1:0] product;
     logic signed [ACC_WIDTH-1:0] product_extended;
 
+    // Assignment between signed vectors performs sign extension when ACC_WIDTH
+    // exceeds the full product width, without a negative replication count for
+    // unsupported parameter combinations.
     always_comb begin
         product = operand_a * operand_b;
-        product_extended = {{(ACC_WIDTH-(2*DATA_WIDTH)){product[(2*DATA_WIDTH)-1]}}, product};
+        product_extended = product;
+    end
+
+    initial begin
+        if (DATA_WIDTH < 1)
+            $fatal(1, "DATA_WIDTH must be at least 1");
+        if (ACC_WIDTH < (2*DATA_WIDTH))
+            $fatal(1, "ACC_WIDTH must be at least twice DATA_WIDTH");
     end
 
     always_ff @(posedge clk or negedge rst_n) begin
