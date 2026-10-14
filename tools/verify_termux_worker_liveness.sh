@@ -11,6 +11,20 @@ if [[ -z "$AGENT_ID" ]]; then
   echo "NOT_VERIFIED: set V12_AGENT_ID to the enrolled real worker ID." >&2
   exit 2
 fi
+# These values are interpolated into curl's config format. Reject characters
+# that could alter config directives or HTTP headers instead of trying to escape them.
+if [[ ! "$AGENT_ID" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "NOT_VERIFIED: agent ID contains unsupported characters." >&2
+  exit 2
+fi
+if [[ ! "$BRAIN_URL" =~ ^https?://[^[:space:]\"\\]+$ ]]; then
+  echo "NOT_VERIFIED: BRAIN URL must be a valid-looking HTTP(S) URL without spaces, quotes, or backslashes." >&2
+  exit 2
+fi
+if [[ ! "$TTL_SECONDS" =~ ^[0-9]+$ ]] || (( TTL_SECONDS < 1 )); then
+  echo "NOT_VERIFIED: TERMUX_AGENT_TTL_SECONDS must be a positive integer." >&2
+  exit 2
+fi
 if [[ ! -s "$KEY_FILE" ]]; then
   echo "NOT_VERIFIED: agent key file missing or empty: $KEY_FILE" >&2
   exit 2
@@ -23,6 +37,11 @@ fi
 AGENT_KEY="$(<"$KEY_FILE")"
 if [[ -z "$AGENT_KEY" ]]; then
   echo "NOT_VERIFIED: agent key is empty." >&2
+  exit 2
+fi
+if [[ ! "$AGENT_KEY" =~ ^[A-Za-z0-9._~:/+=-]+$ ]]; then
+  unset AGENT_KEY
+  echo "NOT_VERIFIED: key contains unsupported characters for safe curl-config transport; no request was sent." >&2
   exit 2
 fi
 TMP="$(mktemp -d)"
