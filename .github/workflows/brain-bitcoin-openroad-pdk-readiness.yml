@@ -1,0 +1,75 @@
+name: Brain Bitcoin OpenROAD PDK Readiness
+on:
+  push:
+    branches:
+      - feat/bitcoin-openroad-pdk-readiness
+  pull_request:
+    branches:
+      - feat/bitcoin-asic-physical-design-gate
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-bitcoin-openroad-pdk-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pdk-readiness-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned OpenROAD-flow-scripts platform metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORFS_COMMIT=9c431405a71909ca9aa5b9000d3d11fa36b2a32a
+          git init /tmp/OpenROAD-flow-scripts
+          git -C /tmp/OpenROAD-flow-scripts remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C /tmp/OpenROAD-flow-scripts fetch --depth 1 origin "$ORFS_COMMIT"
+          git -C /tmp/OpenROAD-flow-scripts checkout --detach FETCH_HEAD
+          test "$(git -C /tmp/OpenROAD-flow-scripts rev-parse HEAD)" = "$ORFS_COMMIT"
+          test -s /tmp/OpenROAD-flow-scripts/flow/platforms/sky130hd/config.mk
+          test -s /tmp/OpenROAD-flow-scripts/flow/platforms/sky130hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib
+          test -d /tmp/OpenROAD-flow-scripts/flow/platforms/sky130hd/lef
+          test -d /tmp/OpenROAD-flow-scripts/flow/platforms/sky130hd/gds
+          mkdir -p evidence
+          {
+            printf 'schema_version=1\n'
+            printf 'gate=G5_OPENROAD_PDK_READINESS_AUDIT\n'
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'source_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'orfs_repository=https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts\n'
+            printf 'orfs_commit=%s\n' "$ORFS_COMMIT"
+            printf 'platform=sky130hd\n'
+            printf 'platform_config=present\n'
+            printf 'standard_cell_liberty=present\n'
+            printf 'lef_directory=present\n'
+            printf 'gds_directory=present\n'
+          } > evidence/pdk_readiness_manifest.txt
+          if command -v openroad >/dev/null 2>&1; then
+            printf 'openroad_binary=available\n' >> evidence/pdk_readiness_manifest.txt
+            openroad -version > evidence/openroad_version.txt 2>&1 || true
+          else
+            printf 'openroad_binary=missing_on_runner\n' >> evidence/pdk_readiness_manifest.txt
+            printf 'implementation_status=BLOCKED_NO_OPENROAD_EXECUTABLE\n' >> evidence/pdk_readiness_manifest.txt
+          fi
+          if command -v yosys >/dev/null 2>&1; then
+            printf 'yosys_binary=available\n' >> evidence/pdk_readiness_manifest.txt
+            yosys -V >> evidence/pdk_readiness_manifest.txt 2>&1
+          else
+            printf 'yosys_binary=missing_on_runner\n' >> evidence/pdk_readiness_manifest.txt
+          fi
+          sha256sum evidence/* >> evidence/SHA256SUMS
+          cat evidence/pdk_readiness_manifest.txt
+
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-bitcoin-openroad-pdk-readiness
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
