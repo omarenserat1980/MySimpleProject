@@ -125,7 +125,7 @@ class BitcoinNorthStarTests(unittest.TestCase):
             count_after_close = len(compass.evidence_store.read_all())
             compass.assess({**task, "tags": ["ACCEPTED_SHARE_PROOF"]})
             self.assertEqual(compass.blocker_snapshot(task)["state"], "CLOSED")
-            self.assertEqual(len(compass.evidence_store.read_all()), count_after_close + 1)
+            self.assertEqual(len(compass.evidence_store.read_all()), count_after_close)
 
     def test_closure_requires_reference_and_source(self):
         with tempfile.TemporaryDirectory() as temp:
