@@ -26,3 +26,9 @@ PLANNED, DESIGNED, IMPLEMENTED, SIMULATED, TESTED, VERIFIED, BLOCKED, FAILED, HA
 
 ## Completion
 Prompt files being present only proves the prompt library exists. Runtime capability requires implemented adapters, tools, tests, and evidence for each domain.
+
+
+## Brain tool adapter
+`brain_v12.design_factory.brain_adapter.DesignFactoryAdapter` exposes the low-risk `design.plan` tool contract. It accepts `{"task":"..."}` (or `{"goal":"..."}`) and returns a `PLANNED` payload with selected prompt files and required gates. Empty input returns `BLOCKED`. The adapter is side-effect-free: it does not execute commands, change files, dispatch agents, merge pull requests, deploy services, or claim real-world outcomes.
+
+The adapter is deliberately separate from `CognitiveLoop.TOOL_CATALOG` for now. Runtime registration requires a reviewed integration change to the active CognitiveLoop, including its permission checks and event/evidence reporting. This avoids claiming that a separately tested adapter is already wired into the running Brain.
