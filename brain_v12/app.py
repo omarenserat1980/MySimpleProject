@@ -237,7 +237,7 @@ from .integration.api import build_router as mission_router_builder
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai, chat_session_store))
 app.include_router(ai_fabric_router(fabric))
-app.include_router(brain_chat_router(brain_ai, chat_session_store))
+app.include_router(brain_chat_router(brain_ai, chat_session_store, event_sink=store.event))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(revenue_conversion_router(income_lifecycle))
