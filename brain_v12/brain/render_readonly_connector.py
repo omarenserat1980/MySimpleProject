@@ -8,13 +8,14 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 import urllib.error
 import urllib.request
 from typing import Any, Callable
 from urllib.parse import urlencode
 
 _API_BASE = "https://api.render.com/v1"
-_POLICY_PATH = __import__("pathlib").Path(__file__).resolve().parents[2] / "brain3_mouse" / "PROVIDER_POLICY.json"
+_POLICY_PATH = Path(__file__).resolve().parents[2] / "brain3_mouse" / "PROVIDER_POLICY.json"
 _SERVICE_ID = re.compile(r"^srv-[A-Za-z0-9]+$")
 _SECRET_KEYS = re.compile(r"(token|secret|password|api[_-]?key|authorization)", re.I)
 _BEARER = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
