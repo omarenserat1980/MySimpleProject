@@ -12,7 +12,8 @@ on:
     - cron: "31 */6 * * *"
 
 concurrency:
-  group: brain-brain-cloud-mining-control-main
+  # Keep runs isolated by branch so another branch cannot cancel this validation.
+  group: brain-cloud-mining-control-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
