@@ -125,7 +125,8 @@ class BitcoinNorthStar:
         )
         if self.evidence_store is not None:
             canonical = json.dumps(result.as_dict(), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-            event_id = "north-star-" + hashlib.sha256((task_id + ":" + canonical).encode("utf-8")).hexdigest()
+            observed_at = time.time()
+            event_id = "north-star-" + hashlib.sha256((task_id + ":" + canonical + ":" + str(observed_at)).encode("utf-8")).hexdigest()
             self.evidence_store.append(
                 event_id=event_id,
                 task_id=task_id,
