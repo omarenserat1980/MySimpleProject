@@ -18,6 +18,14 @@ on:
     paths:
       - "brain_v12/asic/rtl/sha256_compress.sv"
       - "brain_v12/asic/rtl/tb_sha256_compress.sv"
+      - "brain_v12/asic/rtl/sha256d_header_hash.sv"
+      - "brain_v12/asic/rtl/tb_sha256d_header_hash.sv"
+      - "brain_v12/asic/rtl/bitcoin_pow_target_check.sv"
+      - "brain_v12/asic/rtl/tb_bitcoin_pow_target_check.sv"
+      - "brain_v12/asic/rtl/bitcoin_nonce_sweep.sv"
+      - "brain_v12/asic/rtl/tb_bitcoin_nonce_sweep.sv"
+      - "brain_v12/asic/rtl/tb_bitcoin_genesis_nonce_search.sv"
+      - "docs/BITCOIN_SHA256_COMPRESSION_RTL.md"
       - ".github/workflows/bitcoin-sha256-rtl.yml"
   workflow_dispatch:
 permissions:
