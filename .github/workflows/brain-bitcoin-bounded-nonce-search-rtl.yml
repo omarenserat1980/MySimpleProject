@@ -53,15 +53,15 @@ jobs:
         run: |
           set -euo pipefail
           {
-            printf 'schema_version=1\\n'
-            printf 'repository=%s\\n' "$GITHUB_REPOSITORY"
-            printf 'workflow=%s\\n' "$GITHUB_WORKFLOW"
-            printf 'run_id=%s\\n' "$GITHUB_RUN_ID"
-            printf 'run_attempt=%s\\n' "$GITHUB_RUN_ATTEMPT"
-            printf 'event=%s\\n' "$GITHUB_EVENT_NAME"
-            printf 'checkout_sha=%s\\n' "$(git rev-parse HEAD)"
-            printf 'iverilog_version=%s\\n' "$(iverilog -V 2>&1 | head -n 1)"
-            printf 'yosys_version=%s\\n' "$(yosys -V)"
+            printf 'schema_version=1\n'
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'event=%s\n' "$GITHUB_EVENT_NAME"
+            printf 'checkout_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'iverilog_version=%s\n' "$(iverilog -V 2>&1 | head -n 1)"
+            printf 'yosys_version=%s\n' "$(yosys -V)"
           } > /tmp/brain-bitcoin-nonce-search-manifest.txt
           sha256sum /tmp/brain-bitcoin-nonce-search.json /tmp/brain-bitcoin-nonce-search-netlist.v /tmp/brain-bitcoin-nonce-search-yosys.log >> /tmp/brain-bitcoin-nonce-search-manifest.txt
       - name: Upload synthesis evidence
@@ -71,4 +71,6 @@ jobs:
           path: |
             /tmp/brain-bitcoin-nonce-search.json
             /tmp/brain-bitcoin-nonce-search-netlist.v
+            /tmp/brain-bitcoin-nonce-search-yosys.log
+            /tmp/brain-bitcoin-nonce-search-manifest.txt
           if-no-files-found: error
