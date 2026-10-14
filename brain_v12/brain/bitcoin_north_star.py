@@ -262,16 +262,20 @@ class BitcoinNorthStar:
             desired_state = task.get("blocker_state") or (
                 snapshot["state"] if snapshot["known"] else "ACTION_REQUIRED"
             )
-            self.record_blocker(
-                task,
-                state=str(desired_state),
-                blocker=str(task.get("blocker", "")),
-                next_action=str(task.get("blocker_next_action", next_action)),
-                evidence_ref=task.get("resolution_evidence_ref"),
-                evidence_source=task.get("resolution_evidence_source"),
-                evidence_status=str(task.get("resolution_evidence_status", "MISSING")),
-                reopen=bool(task.get("reopen_blocker", False)),
-            )
+            # A closed blocker stays closed on ordinary reassessment. Do not
+            # require the caller to resend old closure evidence or append a new event.
+            if not (snapshot["known"] and snapshot["state"] == "CLOSED"
+                    and not task.get("blocker_state")):
+                self.record_blocker(
+                    task,
+                    state=str(desired_state),
+                    blocker=str(task.get("blocker", "")),
+                    next_action=str(task.get("blocker_next_action", next_action)),
+                    evidence_ref=task.get("resolution_evidence_ref"),
+                    evidence_source=task.get("resolution_evidence_source"),
+                    evidence_status=str(task.get("resolution_evidence_status", "MISSING")),
+                    reopen=bool(task.get("reopen_blocker", False)),
+                )
         return result
 
     def mission_snapshot(self) -> dict[str, Any]:
