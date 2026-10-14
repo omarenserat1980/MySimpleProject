@@ -1,0 +1,168 @@
+{
+  "version": "2.0",
+  "factory": "Electronic Brain Universal Design Factory",
+  "domains": [
+    "architecture",
+    "requirements",
+    "detailed_design",
+    "software",
+    "digital_logic_hardware",
+    "physical_design",
+    "simulation_digital_twin",
+    "security_safety",
+    "verification_validation",
+    "infrastructure_operations",
+    "manufacturing_assembly",
+    "reliability_self_evolution",
+    "integration_acceptance",
+    "new_domain"
+  ],
+  "prompts": [
+    {
+      "id": "00",
+      "name": "Master Orchestrator",
+      "path": "prompts/universal_design_factory/00_master_orchestrator.md",
+      "domains": [
+        "all"
+      ]
+    },
+    {
+      "id": "01",
+      "name": "Project Discovery",
+      "path": "prompts/universal_design_factory/01_project_discovery.md",
+      "domains": [
+        "discovery"
+      ]
+    },
+    {
+      "id": "02",
+      "name": "Requirements",
+      "path": "prompts/universal_design_factory/02_requirements.md",
+      "domains": [
+        "requirements"
+      ]
+    },
+    {
+      "id": "03",
+      "name": "Architecture",
+      "path": "prompts/universal_design_factory/03_architecture.md",
+      "domains": [
+        "architecture"
+      ]
+    },
+    {
+      "id": "04",
+      "name": "Detailed Design",
+      "path": "prompts/universal_design_factory/04_detailed_design.md",
+      "domains": [
+        "detailed_design"
+      ]
+    },
+    {
+      "id": "05",
+      "name": "Software",
+      "path": "prompts/universal_design_factory/05_software_design.md",
+      "domains": [
+        "software",
+        "api",
+        "database",
+        "ui"
+      ]
+    },
+    {
+      "id": "06",
+      "name": "Digital Logic and Hardware",
+      "path": "prompts/universal_design_factory/06_digital_logic_hardware.md",
+      "domains": [
+        "digital_logic",
+        "rtl",
+        "hardware",
+        "asic"
+      ]
+    },
+    {
+      "id": "07",
+      "name": "Physical Design",
+      "path": "prompts/universal_design_factory/07_physical_design.md",
+      "domains": [
+        "physical_design",
+        "eda"
+      ]
+    },
+    {
+      "id": "08",
+      "name": "Simulation and Digital Twin",
+      "path": "prompts/universal_design_factory/08_simulation_digital_twin.md",
+      "domains": [
+        "simulation",
+        "digital_twin"
+      ]
+    },
+    {
+      "id": "09",
+      "name": "Security and Safety",
+      "path": "prompts/universal_design_factory/09_security_safety.md",
+      "domains": [
+        "security",
+        "safety"
+      ]
+    },
+    {
+      "id": "10",
+      "name": "Verification and Validation",
+      "path": "prompts/universal_design_factory/10_verification_validation.md",
+      "domains": [
+        "verification",
+        "testing",
+        "validation"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Infrastructure and Operations",
+      "path": "prompts/universal_design_factory/11_infrastructure_operations.md",
+      "domains": [
+        "infrastructure",
+        "operations",
+        "deployment"
+      ]
+    },
+    {
+      "id": "12",
+      "name": "Manufacturing and Assembly",
+      "path": "prompts/universal_design_factory/12_manufacturing_assembly.md",
+      "domains": [
+        "manufacturing",
+        "assembly"
+      ]
+    },
+    {
+      "id": "13",
+      "name": "Reliability and Self-Evolution",
+      "path": "prompts/universal_design_factory/13_reliability_evolution.md",
+      "domains": [
+        "reliability",
+        "self_evolution",
+        "recovery"
+      ]
+    },
+    {
+      "id": "14",
+      "name": "Integration and Acceptance",
+      "path": "prompts/universal_design_factory/14_integration_acceptance.md",
+      "domains": [
+        "integration",
+        "acceptance",
+        "release"
+      ]
+    },
+    {
+      "id": "15",
+      "name": "New Domain Designer",
+      "path": "prompts/universal_design_factory/15_new_domain_designer.md",
+      "domains": [
+        "new_domain"
+      ]
+    }
+  ]
+}
