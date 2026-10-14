@@ -56,7 +56,10 @@ module tb_brain_bitcoin_nonce_search;
         start <= 1'b1;
         @(posedge clk);
         start <= 1'b0;
-        wait(done);
+        // done is still high from the prior successful run until the new start
+        // is sampled by the DUT. Wait for it to clear before waiting for completion.
+        wait (!done);
+        wait (done);
         #1;
         if (found) $fatal(1, "FAIL: zero target unexpectedly accepted a hash");
         if (attempts !== 3) $fatal(1, "FAIL: expected exactly three attempts, got %0d", attempts);
