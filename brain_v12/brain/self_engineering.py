@@ -62,7 +62,7 @@ class Evidence:
             separators=(",", ":"),
         )
         expected = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        return bool(self.digest) and hashlib.compare_digest(self.digest, expected)
+        return bool(self.digest) and self.digest == expected
 
     @classmethod
     def create(
