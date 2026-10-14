@@ -59,7 +59,7 @@ async function pollLiveState(){
   connection.textContent='Brain: '+(data.brain_status||'UNKNOWN')+' · API متصلة';
   connection.style.color=data.brain_alive?'var(--green)':'var(--amber)';
  }catch(_error){
-  lastLiveState=null;connection.textContent='Brain: غير متصل — عرض الحالة اليدوية';
+  lastLiveState=null;connection.textContent='Brain: تعذّر التحقق من الحالة الحية';
   connection.style.color='var(--amber)';render('UNCERTAIN');
  }finally{polling=false;}
 }
