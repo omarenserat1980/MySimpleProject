@@ -190,3 +190,37 @@ def test_rejects_non_string_evidence_result_without_crashing():
     report["assets"][0]["evidence"] = [evidence]
     errors = validate_inventory(report)
     assert any(".result must be one of" in error for error in errors)
+
+
+def test_rejects_evidence_from_stale_source_revision():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()
+    evidence[0]["source_revision"] = "older-commit"
+    report["assets"][0]["evidence"] = evidence
+    assert any("source_revision does not match inventory commit_sha" in error
+               for error in validate_inventory(report))
+
+
+def test_rejects_pass_evidence_with_nonzero_exit_status():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()
+    evidence[0]["exit_status"] = 1
+    report["assets"][0]["evidence"] = evidence
+    assert any("PASS evidence requires exit_status 0" in error
+               for error in validate_inventory(report))
+
+
+def test_rejects_fail_evidence_with_zero_exit_status():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "REJECTED"
+    report["assets"][0]["verification_status"] = "FAIL"
+    evidence = valid_evidence()
+    evidence[0]["result"] = "FAIL"
+    evidence[0]["exit_status"] = 0
+    report["assets"][0]["evidence"] = evidence
+    assert any("FAIL evidence requires a non-zero exit_status" in error
+               for error in validate_inventory(report))
