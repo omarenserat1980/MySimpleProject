@@ -44,7 +44,7 @@ class MultiAgentCollaborationTests(unittest.TestCase):
         c.mark_planned("task-1", planner_id="planner-A")
         c.mark_ready("task-1")
         c.start_implementation("task-1", implementer_id="coder-A", head_commit="base123")
-        c.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456")
+        c.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456", changed_paths=("brain_v12/brain/example.py",))
         with self.assertRaisesRegex(ValueError, "reviewer_must_be_independent"):
             c.record_review("task-1", reviewer_id="coder-A", approved=True)
 
