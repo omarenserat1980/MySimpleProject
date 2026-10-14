@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# Keep one physical-design run per source branch; avoid duplicate push/PR builds.
+concurrency:
+  group: asic-rtl-to-gds-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   rtl-to-gds:
     # Public GitHub-hosted runner; no paid cloud resources or external fabrication orders.
