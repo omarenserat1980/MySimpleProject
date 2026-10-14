@@ -122,4 +122,42 @@ def verify_gen_attestation(
     }
 
 
-__all__ = ["AUDIENCE", "MAX_VALIDITY_SECONDS", "SCHEMA", "signing_payload", "verify_gen_attestation"]
+def verify_gen_attestation_with_trust_store(
+    document: Mapping[str, Any],
+    *,
+    trusted_issuers: Mapping[str, str],
+    expected_nonce: str,
+    expected_issuer_id: str,
+    expected_subject_id: str,
+    expected_subject_type: str,
+    expected_operation: str,
+    now: float | None = None,
+) -> dict[str, Any]:
+    """Resolve the signing key only from an operator-provisioned issuer allowlist.
+
+    Never use a public key supplied by the attestation document itself. The
+    trust store must be provisioned out-of-band; this helper does not enroll keys.
+    """
+    if not isinstance(document, Mapping):
+        raise ValueError("GEN_ATTESTATION_INVALID")
+    if not isinstance(trusted_issuers, Mapping) or not trusted_issuers:
+        raise ValueError("GEN_TRUST_STORE_REQUIRED")
+    issuer_id = document.get("issuer_id")
+    if not isinstance(issuer_id, str) or issuer_id != expected_issuer_id:
+        raise ValueError("GEN_ATTESTATION_ISSUER_MISMATCH")
+    public_key_b64 = trusted_issuers.get(issuer_id)
+    if not isinstance(public_key_b64, str) or not public_key_b64.strip():
+        raise ValueError("GEN_ISSUER_NOT_TRUSTED")
+    return verify_gen_attestation(
+        document,
+        public_key_b64=public_key_b64,
+        expected_nonce=expected_nonce,
+        expected_issuer_id=expected_issuer_id,
+        expected_subject_id=expected_subject_id,
+        expected_subject_type=expected_subject_type,
+        expected_operation=expected_operation,
+        now=now,
+    )
+
+
+__all__ = ["AUDIENCE", "MAX_VALIDITY_SECONDS", "SCHEMA", "signing_payload", "verify_gen_attestation", "verify_gen_attestation_with_trust_store"]
