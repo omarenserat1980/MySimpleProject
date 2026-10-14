@@ -1,0 +1,111 @@
+name: Brain Component Contract Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/brain/**"
+      - "brain_v12/tests/test_core.py"
+      - "brain_v12/tests/test_memory_hierarchy.py"
+      - "brain_v12/tests/test_orchestrator.py"
+      - "brain_v12/tests/test_device_bridge.py"
+      - "brain_v12/tests/test_brain_v13_evidence_lineage.py"
+      - "brain_v12/tests/test_revenue_realization_gate.py"
+      - "brain_v12/tests/test_media_engine.py"
+      - "brain_v12/tests/test_asic_hardware_simulator.py"
+      - ".github/workflows/brain-component-contract-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/**"
+      - "brain_v12/tests/test_core.py"
+      - "brain_v12/tests/test_memory_hierarchy.py"
+      - "brain_v12/tests/test_orchestrator.py"
+      - "brain_v12/tests/test_device_bridge.py"
+      - "brain_v12/tests/test_brain_v13_evidence_lineage.py"
+      - "brain_v12/tests/test_revenue_realization_gate.py"
+      - "brain_v12/tests/test_media_engine.py"
+      - "brain_v12/tests/test_asic_hardware_simulator.py"
+      - ".github/workflows/brain-component-contract-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-component-contract-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  component-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: core
+            test: brain_v12.tests.test_core
+          - component: memory
+            test: brain_v12.tests.test_memory_hierarchy
+          - component: orchestrator
+            test: brain_v12.tests.test_orchestrator
+          - component: device_bridge
+            test: brain_v12.tests.test_device_bridge
+          - component: evidence_lineage
+            test: brain_v12.tests.test_brain_v13_evidence_lineage
+          - component: revenue_realization_gate
+            test: brain_v12.tests.test_revenue_realization_gate
+          - component: media_engine
+            test: brain_v12.tests.test_media_engine
+          - component: asic_software_simulator
+            test: brain_v12.tests.test_asic_hardware_simulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Prepare component evidence
+        run: mkdir -p "artifacts/component-contracts/${{ matrix.component }}"
+      - name: Run component contract tests
+        env:
+          BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
+          BRAIN_WORKFORCE_ENABLED: "false"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -o pipefail
+          python -m unittest "${{ matrix.test }}" -v 2>&1 | tee "artifacts/component-contracts/${{ matrix.component }}/test.log"
+      - name: Record component result
+        if: always()
+        env:
+          COMPONENT: ${{ matrix.component }}
+          TEST_MODULE: ${{ matrix.test }}
+          TESTED_COMMIT: ${{ github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python - <<'PY'
+          import datetime, json, os, pathlib
+          component = os.environ["COMPONENT"]
+          root = pathlib.Path("artifacts/component-contracts") / component
+          root.mkdir(parents=True, exist_ok=True)
+          result = {
+              "schema_version": "1.0",
+              "component": component,
+              "test_module": os.environ["TEST_MODULE"],
+              "commit_sha": os.environ["TESTED_COMMIT"],
+              "job_status": os.environ["JOB_STATUS"],
+              "recorded_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "evidence": "test.log",
+              "claim_boundary": "Unit/contract test evidence only; does not establish persistent deployment, physical ASIC fabrication, or real revenue settlement."
+          }
+          (root / "result.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+          PY
+      - name: Upload component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-component-contract-${{ matrix.component }}
+          path: artifacts/component-contracts/${{ matrix.component }}/
+          if-no-files-found: error
+          retention-days: 30
