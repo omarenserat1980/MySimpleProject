@@ -59,7 +59,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
         run: |
           python - <<'PY'
-          import datetime, hashlib, json, os, pathlib, sys
+          import datetime, hashlib, json, os, pathlib, shutil, sys
           root = pathlib.Path(".")
           artifact_root = pathlib.Path("artifacts/asic-gdsii")
           artifact_root.mkdir(parents=True, exist_ok=True)
@@ -75,15 +75,31 @@ jobs:
               if size > 0:
                   candidates.append(p)
           gds_records = []
-          for p in sorted(set(candidates)):
+          layout_dir = artifact_root / "layouts"
+          layout_dir.mkdir(parents=True, exist_ok=True)
+          for index, p in enumerate(sorted(set(candidates)), start=1):
               digest = hashlib.sha256(p.read_bytes()).hexdigest()
+              retained = layout_dir / f"{index:02d}-{p.name}"
+              shutil.copy2(p, retained)
               gds_records.append({
                   "path": str(p),
+                  "artifact_path": str(retained),
                   "size_bytes": p.stat().st_size,
                   "sha256": digest,
               })
           logs = sorted(str(p) for p in root.glob("**/openlane.log") if ".git" not in p.parts)
           reports = sorted(str(p) for pattern in ("**/*sta*.rpt", "**/*drc*.rpt", "**/*lvs*.rpt", "**/*synthesis*.json", "**/*metrics*.json") for p in root.glob(pattern) if ".git" not in p.parts)
+          report_dir = artifact_root / "reports"
+          report_dir.mkdir(parents=True, exist_ok=True)
+          retained_reports = []
+          for index, report_path in enumerate(reports, start=1):
+              src = pathlib.Path(report_path)
+              dest = report_dir / f"{index:02d}-{src.name}"
+              try:
+                  shutil.copy2(src, dest)
+                  retained_reports.append(str(dest))
+              except OSError:
+                  pass
           errors = []
           if os.environ["JOB_STATUS"] != "success":
               errors.append("OpenLane job status is " + os.environ["JOB_STATUS"])
@@ -100,6 +116,7 @@ jobs:
               "flow": "OpenLane 2 Classic RTL-to-GDSII",
               "gdsii_outputs": gds_records,
               "report_paths": reports,
+              "retained_report_paths": retained_reports,
               "log_paths": logs,
               "passed": not errors,
               "errors": errors,
@@ -118,7 +135,10 @@ jobs:
           name: brain-asic-rtl-to-gdsii-evidence
           path: |
             artifacts/asic-gdsii/
+            **/*.gds
+            **/*sta*.rpt
+            **/*drc*.rpt
+            **/*lvs*.rpt
             runs/
-            designs/brain_asic_core/
           if-no-files-found: warn
           retention-days: 30
