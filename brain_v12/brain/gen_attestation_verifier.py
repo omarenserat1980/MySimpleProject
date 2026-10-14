@@ -41,6 +41,7 @@ def verify_gen_attestation(
     *,
     public_key_b64: str,
     expected_nonce: str,
+    expected_issuer_id: str,
     expected_subject_id: str,
     expected_subject_type: str,
     expected_operation: str,
@@ -67,6 +68,10 @@ def verify_gen_attestation(
     for field in ("issuer_id", "subject_id", "evidence_id", "operation", "nonce", "result_digest"):
         if not isinstance(doc[field], str) or not doc[field].strip():
             raise ValueError("GEN_ATTESTATION_FIELD_INVALID:" + field)
+    if not isinstance(expected_issuer_id, str) or not expected_issuer_id.strip():
+        raise ValueError("GEN_EXPECTED_ISSUER_REQUIRED")
+    if doc["issuer_id"] != expected_issuer_id:
+        raise ValueError("GEN_ATTESTATION_ISSUER_MISMATCH")
     if doc["subject_id"] != expected_subject_id or doc["subject_type"] != expected_subject_type:
         raise ValueError("GEN_ATTESTATION_SUBJECT_MISMATCH")
     if doc["operation"] != expected_operation:
