@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install RTL tools
         run: sudo apt-get update && sudo apt-get install -y iverilog yosys python3
-      - name: Bitcoin SHA256d reference tests
+      - name: Bitcoin SHA256d software reference tests
         working-directory: hardware/brain_asic_v1/reference
         run: python3 -m unittest -v test_bitcoin_sha256d.py
       - name: Verify SHA-256 compression known vector
@@ -22,6 +22,11 @@ jobs:
           iverilog -g2012 -s brain_sha256_compress_tb -o hardware/brain_asic_v1/build/sha256-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/tb/brain_sha256_compress_tb.sv
           vvp hardware/brain_asic_v1/build/sha256-vector | tee hardware/brain_asic_v1/build/sha256-vector.log
           grep -q 'BRAIN_SHA256_COMPRESS_VECTOR=PASS' hardware/brain_asic_v1/build/sha256-vector.log
+      - name: Verify Bitcoin genesis SHA256d RTL vector
+        run: |
+          iverilog -g2012 -s brain_sha256d_header_tb -o hardware/brain_asic_v1/build/sha256d-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv hardware/brain_asic_v1/tb/brain_sha256d_header_tb.sv
+          vvp hardware/brain_asic_v1/build/sha256d-vector | tee hardware/brain_asic_v1/build/sha256d-vector.log
+          grep -q 'BRAIN_SHA256D_GENESIS=PASS' hardware/brain_asic_v1/build/sha256d-vector.log
       - name: RTL control-path smoke test (not SHA256 proof)
         run: |
           iverilog -g2012 -o hardware/brain_asic_v1/build/smoke hardware/brain_asic_v1/rtl/brain_sha256_core.sv hardware/brain_asic_v1/tb/brain_sha256_core_tb.sv
@@ -30,6 +35,9 @@ jobs:
       - name: Synthesize SHA-256 compression datapath
         run: |
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv; hierarchy -top brain_sha256_compress; proc; opt; check; synth -top brain_sha256_compress; stat; write_json hardware/brain_asic_v1/build/brain_sha256_compress.json" | tee hardware/brain_asic_v1/build/yosys-compress.log
+      - name: Synthesize SHA256d header datapath
+        run: |
+          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv; hierarchy -top brain_sha256d_header; proc; opt; check; synth -top brain_sha256d_header; stat; write_json hardware/brain_asic_v1/build/brain_sha256d_header.json" | tee hardware/brain_asic_v1/build/yosys-sha256d.log
       - name: Synthesize control shell (not a miner)
         run: |
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
