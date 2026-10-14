@@ -14,6 +14,7 @@ from typing import Any, Callable
 from urllib.parse import urlencode
 
 _API_BASE = "https://api.render.com/v1"
+_POLICY_PATH = __import__("pathlib").Path(__file__).resolve().parents[2] / "brain3_mouse" / "PROVIDER_POLICY.json"
 _SERVICE_ID = re.compile(r"^srv-[A-Za-z0-9]+$")
 _SECRET_KEYS = re.compile(r"(token|secret|password|api[_-]?key|authorization)", re.I)
 _BEARER = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
@@ -21,6 +22,15 @@ _KEY_VALUE = re.compile(
     r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|authorization)"
     r"(\s*[:=]\s*)([^\s,;]+)"
 )
+
+
+def _policy_allows_render() -> bool:
+    """Fail closed unless the repository policy explicitly permits Render and external calls."""
+    try:
+        policy = json.loads(_POLICY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return policy.get("render_enabled") is True and policy.get("external_network_calls") is True
 
 
 class RenderConnectorError(RuntimeError):
@@ -70,6 +80,7 @@ class RenderReadOnlyClient:
         api_key: str | None = None,
         timeout: float = 5.0,
         transport: Callable[[str, dict[str, str], float], tuple[int, str]] | None = None,
+        policy_check: Callable[[], bool] | None = None,
     ) -> None:
         if not 0 < timeout <= 15:
             raise ValueError("timeout must be greater than 0 and at most 15 seconds")
@@ -77,6 +88,7 @@ class RenderReadOnlyClient:
         self._api_key = api_key
         self._timeout = timeout
         self._transport = transport or _default_transport
+        self._policy_check = policy_check or _policy_allows_render
 
     @classmethod
     def from_environment(cls, *, enabled: bool = False, timeout: float = 5.0) -> "RenderReadOnlyClient":
@@ -124,6 +136,8 @@ class RenderReadOnlyClient:
     def _get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         if not self.enabled:
             raise RenderConnectorError("Render connector is disabled; no network request was made.")
+        if not self._policy_check():
+            raise RenderConnectorError("Repository policy blocks Render or external network access; no request was made.")
         if not self._api_key:
             raise RenderConnectorError("Render API credential is not configured.")
         # Paths are constructed internally from allowlisted read-only methods.
