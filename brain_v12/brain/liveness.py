@@ -8,7 +8,6 @@ the Brain itself look dead.
 import time
 
 
-
 def run_execution_probe(device_bridge, timeout=8):
     """Queue a harmless python_version probe and wait briefly for its result."""
     try:
@@ -19,21 +18,20 @@ def run_execution_probe(device_bridge, timeout=8):
         deadline = time.time() + timeout
         while time.time() < deadline:
             result = device_bridge.result(task_id)
-            # DeviceBridge.result() returns {"ok": True, "task": <task row>};
-            # read the task state from that nested row, while retaining
-            # compatibility with bridges that return a flat result.
             task_result = result.get("task")
             if not isinstance(task_result, dict):
                 task_result = result
             task_status = task_result.get("status", result.get("status"))
             if task_status == "COMPLETED":
                 verified = device_bridge.verify_result(task_id)
+                # Fail closed: missing, malformed, or non-true verification is not proof.
+                verified_ok = isinstance(verified, dict) and verified.get("verified") is True
                 return {
-                    "ok": bool(verified.get("verified", True)),
-                    "status": "PROBE_COMPLETED",
+                    "ok": verified_ok,
+                    "status": "PROBE_COMPLETED" if verified_ok else "PROBE_VERIFICATION_FAILED",
                     "task_id": task_id,
                     "agent_id": task_result.get("agent_id", result.get("agent_id")),
-                    "verification": verified,
+                    "verification": verified if isinstance(verified, dict) else {"verified": False, "reason": "invalid_verification_payload"},
                 }
             if task_status == "FAILED":
                 return {
@@ -46,6 +44,7 @@ def run_execution_probe(device_bridge, timeout=8):
         return {"ok": False, "status": "PROBE_TIMEOUT", "task_id": task_id}
     except Exception as exc:
         return {"ok": False, "status": "PROBE_ERROR", "error": str(exc)[:300]}
+
 
 def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
     checked_at = time.time()
@@ -83,11 +82,7 @@ def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
 
     try:
         stage = getattr(cognitive, "STAGES", [])
-        checks["cognitive"] = {
-            "ok": True,
-            "status": "READY",
-            "stage_count": len(stage),
-        }
+        checks["cognitive"] = {"ok": True, "status": "READY", "stage_count": len(stage)}
     except Exception as exc:
         checks["cognitive"] = {"ok": False, "status": "ERROR", "error": str(exc)[:300]}
 
@@ -112,6 +107,7 @@ def assess(*, store, device_bridge, cognitive, probe_result=None) -> dict:
         },
     }
 
+
 def assess_full(*, store, device_bridge, cognitive, probe_timeout=8):
     """Run the evidence-based Brain life certificate, including a safe execution probe."""
     probe = run_execution_probe(device_bridge, timeout=probe_timeout)
@@ -131,7 +127,6 @@ def assess_full(*, store, device_bridge, cognitive, probe_timeout=8):
     result["life_certificate"] = {
         "status": truth,
         "verified": truth == "FULLY_ALIVE",
-        "checks": ["process","database","runtime","cognitive","device_bridge","agent","safe_execution_probe","result_verification"],
+        "checks": ["process", "database", "runtime", "cognitive", "device_bridge", "agent", "safe_execution_probe", "result_verification"],
     }
     return result
-
