@@ -6,13 +6,13 @@
 - Baseline commit inspected: `a14e0db199c1cb3d991db30b16eea43a2150f41e`
 - Working branch: `brain/universal-proof-evolution-v1`
 - Scope: read-only inspection of selected repository metadata and files through GitHub, followed by a small implementation on the working branch.
-- The new focused tests have been committed, but no successful workflow result is claimed until the actual GitHub Actions run is inspected. Live external services were not contacted.
+- The focused GitHub Actions test job succeeded for commit `2bac3d7340a6a02d018e003fe4a80e73eeaa1546`; the workflow run-level finalization was still in progress when last queried. Live external services were not contacted.
 
 ## Evidence observed
 
 ### Shared proof evaluator
 
-The working branch now contains `brain_v12/brain/proof_gate_engine.py`, nine focused unit tests in `brain_v12/tests/test_proof_gate_engine.py`, and `.github/workflows/proof-gate-engine-tests.yml`. Tests cover valid evidence, missing evidence, stale evidence, synthetic evidence, commit mismatch, disallowed source, malformed SHA-256, naive timestamps, and non-verified evidence status.
+The working branch now contains `brain_v12/brain/proof_gate_engine.py`, `brain_v12/brain/proof_registry.py`, ten engine tests, five registry tests, and `.github/workflows/proof-gate-engine-tests.yml`. The registry declares separate runtime, mining, revenue, GDSII, foundry, manufacturing, silicon-test, and device gates. Tests cover missing/stale/synthetic evidence, commit mismatch, source allowlists, malformed SHA-256, timestamps, unverified status, duplicate IDs, unknown gate IDs, and separation of financial/physical proof contracts.
 
 The evaluator is an envelope validator. It does not independently authenticate source identity, connect to external services, store an append-only ledger, or establish that a physical/financial event occurred. CI must pass before treating this implementation as test-verified.
 
@@ -43,7 +43,7 @@ The current `PROJECT_MASTER_SPEC.md` already distinguishes engineering health fr
 | Gate | Status | Reason |
 |---|---|---|
 | Repository baseline inventory | PASS_WITH_LIMITED_SCOPE | Main commit and selected source files inspected; not a complete code/runtime audit |
-| Shared proof evaluator | IMPLEMENTED_CI_PENDING | Code, tests, and workflow committed to branch; actual workflow result must be inspected |
+| Shared proof evaluator and registry | IMPLEMENTED_TEST_JOB_PASS | Focused compile and unit-test job succeeded; final workflow status was still being finalized at last query |
 | Live mining pool connection | BLOCKED | No live connection evidence reviewed |
 | Accepted mining shares | BLOCKED | No real pool-origin share evidence reviewed |
 | Realized mining revenue | BLOCKED | No independently verified real payout reviewed |
@@ -56,9 +56,9 @@ These statuses describe evidence reviewed during this limited inspection, not a 
 
 ## Next steps
 
-1. Inspect the GitHub Actions run for `proof-gate-engine-tests.yml` and correct any failures.
-2. Review the evaluator's status semantics and extend duplicate/conflicting evidence tests.
-3. Map an existing evidence store or domain verifier to the shared contract without duplicating storage.
+1. Confirm the final workflow conclusion and inspect any broader pull-request check failures.
+2. Review evaluator status semantics, especially conflicting records and absent proof types.
+3. Map the existing evidence store or domain verifier to the shared contract without treating hash integrity as proof of the underlying event.
 4. Add one read-only domain adapter at a time, starting with a software/runtime check.
 5. Keep live pool connection, payout, GDSII, foundry, silicon, and device claims blocked until their respective external/runtime evidence is collected.
 
