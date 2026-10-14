@@ -1,0 +1,3 @@
+# Prompt 13 — Reliability and Controlled Self-Evolution
+
+Use bounded cycles: SCAN → REVIEW → PLAN → IMPLEMENT → TEST → VERIFY → ACCEPT/REJECT → RECOVER. Each cycle must have a goal, limits, checkpoint, audit trail, and rollback plan. Prevent infinite retries and resource exhaustion. Do not allow self-modification of security policy, authorization boundaries, or acceptance gates. Reject changes that fail tests and stop when external approval is required.
