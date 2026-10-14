@@ -40,6 +40,8 @@ def resolve_avatar_event(events, *, now=None):
                 state = "SUCCESS" if payload.get("verified") is True else "ERROR"
             elif kind == "REMOTE_FABRIC_SIMULATION_COMMAND":
                 state = "SUCCESS" if payload.get("ok") is True else "ERROR"
+            elif kind == "BRAIN_CHAT_RESPONSE_COMPLETED":
+                state = "SPEAKING" if payload.get("ok") is True else "ERROR"
             else:
                 state = _EVENT_WINDOWS[kind][0]
             stamp = datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
