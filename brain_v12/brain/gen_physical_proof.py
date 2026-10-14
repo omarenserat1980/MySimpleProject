@@ -121,7 +121,15 @@ def evaluate_physical_proof(
         status = "CHALLENGE_FAILED" if any("CHALLENGE" in reason or "SIGNATURE" in reason for reason in reasons) else "NOT_PROVEN"
         return GENProofResult(status, False, tuple(dict.fromkeys(reasons)), canonical_digest(dict(evidence)))
 
-    return GENProofResult("PHYSICALLY_ATTESTED", True, (), canonical_digest(dict(evidence)))
+    # Fail closed until a cryptographic verifier is implemented and wired in.
+    # Evidence fields (including booleans and digests) are caller-controlled data;
+    # accepting them here would let forged JSON claim a physical device.
+    return GENProofResult(
+        "NOT_PROVEN",
+        False,
+        ("TRUSTED_CRYPTOGRAPHIC_VERIFIER_NOT_IMPLEMENTED",),
+        canonical_digest(dict(evidence)),
+    )
 
 
 __all__ = ["GENProofResult", "canonical_digest", "evaluate_physical_proof", "STATUSES"]
