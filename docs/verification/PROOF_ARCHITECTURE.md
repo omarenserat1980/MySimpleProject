@@ -18,6 +18,12 @@
 6. Simulated and test evidence must be explicitly labelled and must never enter realized-revenue accounting.
 7. Keep evidence provenance, timestamps, run identifiers, and commit association wherever available.
 
+## Existing primitives discovered — reuse before extending
+
+The baseline already contains `brain_v12/brain/verification_gate.py`, a `VerificationGate` that distinguishes action completion from objective verification and hashes evidence references. It also contains `brain_v12/digital_lab/UNIVERSAL_ENGINEERING_GATE_CONTRACT.md`, which defines lifecycle states, evidence minimums, domain checks, and fail-closed acceptance. The master specification already separates engineering health from commercial outcomes.
+
+Therefore, do not create a parallel verification gate or replace these contracts. The implementation should first map their current semantics and tests, then add only missing shared evidence provenance, freshness, source validation, audit persistence, and domain adapters. Preserve existing response contracts unless a reviewed migration proves a compatible change is required.
+
 ## Proposed logical components
 
 - **Proof Registry:** declarative definitions of gates, required evidence, freshness windows, and acceptance policies.
