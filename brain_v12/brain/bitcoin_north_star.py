@@ -131,7 +131,7 @@ class BitcoinNorthStar:
                 event_id=event_id,
                 task_id=task_id,
                 event_type="BITCOIN_NORTH_STAR_ASSESSMENT",
-                payload={**result.as_dict(), "observed_at_unix": time.time()},
+                payload={**result.as_dict(), "observed_at_unix": observed_at},
             )
         return result
 
