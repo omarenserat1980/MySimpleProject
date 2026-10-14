@@ -73,6 +73,12 @@ class ProofGateEngineTests(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL")
         self.assertEqual(result["rejected_evidence"][0]["reason"], "INVALID_OBSERVED_AT")
 
+    def test_duplicate_evidence_id_revokes_acceptance(self):
+        result = self.evaluate([evidence(), evidence(proof_type="runtime_health", status="NOT_RUN")])
+        self.assertEqual(result["status"], "FAIL")
+        self.assertEqual(result["accepted_evidence_ids"], [])
+        self.assertIn("DUPLICATE_EVIDENCE_ID", [item["reason"] for item in result["rejected_evidence"]])
+
     def test_non_pass_evidence_status_is_rejected(self):
         result = self.evaluate([evidence(status="NOT_RUN")])
         self.assertEqual(result["status"], "FAIL")
