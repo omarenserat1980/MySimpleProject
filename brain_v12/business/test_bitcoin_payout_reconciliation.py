@@ -55,7 +55,6 @@ def test_reconciles_pool_payout_with_independent_chain_output():
         (pool(), chain(source_url="https://untrusted.example/tx/" + TXID), "recognized public"),
         (pool(), chain(outputs=[{"address": "bc1qrealwallet", "value_sats": 124999}]), "does not match"),
         (pool(), chain(network="testnet"), "bitcoin network"),
-        (pool(), chain(source_url="https://pool.example/account/payouts/payout-123"), "distinct source URLs"),
         (pool(status="pending"), chain(), "completed/confirmed"),
     ],
 )
@@ -74,4 +73,13 @@ def test_rejects_missing_pool_identity_and_non_https_sources():
         audit_realized_bitcoin_payout(
             pool_payout=pool(),
             chain_transaction=chain(source_url="http://mempool.space/tx/" + TXID),
+        )
+
+
+def test_rejects_same_source_url_for_pool_and_chain_evidence():
+    url = f"https://mempool.space/tx/{TXID}"
+    with pytest.raises(ValueError, match="distinct source URLs"):
+        audit_realized_bitcoin_payout(
+            pool_payout=pool(source_url=url),
+            chain_transaction=chain(source_url=url),
         )
