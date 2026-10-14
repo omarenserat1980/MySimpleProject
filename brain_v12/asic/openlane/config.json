@@ -1,7 +1,7 @@
 {
   "DESIGN_NAME": "brain_asic_core",
   "VERILOG_FILES": [
-    "dir::../../brain_v12/asic/rtl/brain_asic_core.sv"
+    "dir::../rtl/brain_asic_core.sv"
   ],
   "CLOCK_PORT": "clk",
   "CLOCK_PERIOD": 10,
