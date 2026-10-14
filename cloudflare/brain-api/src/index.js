@@ -411,11 +411,17 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
     env.BRAIN_DB.prepare("UPDATE cinema_entitlements SET state = 'GRANTED', granted_at = CURRENT_TIMESTAMP WHERE order_id = ?").bind(orderId),
   ]);
-  // Payment verification alone is not revenue realization: delivery must be verified separately.
+  // Sandbox evidence must never become realized revenue, even after a delivery test.
+  // PAYTABS_MODE defaults to test (fail-safe); production must explicitly set it to "live".
+  const paymentMode = String(env.PAYTABS_MODE || "test").trim().toLowerCase();
+  const revenueEnvironment = paymentMode === "live" ? "live" : "test";
+  const pendingRevenueState = revenueEnvironment === "live"
+    ? "PAYMENT_VERIFIED_PENDING_DELIVERY"
+    : "SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY";
   const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
-    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'PAYMENT_VERIFIED_PENDING_DELIVERY', ?)"
-  ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
+    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(revenueId, orderId, tranRef, amount, currency, pendingRevenueState, evidence, revenueEnvironment).run();
   const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)"
@@ -452,7 +458,7 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   ).bind(delivery.order_id).first();
   if (payment) {
     await env.BRAIN_DB.prepare(
-      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ?"
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
     ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
   }
   await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });
