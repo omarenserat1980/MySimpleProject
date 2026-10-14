@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/multi_agent_collaboration.py"
+      - "brain_v12/brain/brain_supervisor.py"
       - "brain_v12/tests/test_multi_agent_collaboration.py"
       - "brain_v12/docs/BRAIN_MULTI_AGENT_COLLABORATION_*.md"
       - ".github/workflows/brain-multi-agent-collaboration.yml"
