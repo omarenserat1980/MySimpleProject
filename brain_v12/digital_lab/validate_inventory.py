@@ -107,12 +107,15 @@ def validate_inventory(report: Any) -> list[str]:
                     errors.append(f"{ep}.artifact_sha256 must be a 64-character hexadecimal SHA-256")
         if lifecycle == "DISCOVERED_NOT_TESTED" and verification != "NOT_RUN":
             errors.append(f"{prefix} cannot claim verification before leaving DISCOVERED_NOT_TESTED")
-        if verification in {"PASS", "FAIL"} and not evidence:
+        evidence_results = {item.get("result") for item in evidence if isinstance(item, dict)}
+        if verification in {"PASS", "FAIL", "BLOCKED"} and not evidence:
             errors.append(f"{prefix} cannot claim {verification} without evidence")
-        if lifecycle == "ACCEPTED" and (verification != "PASS" or not evidence):
-            errors.append(f"{prefix} cannot be ACCEPTED without PASS verification and evidence")
-        if lifecycle == "REJECTED" and (verification != "FAIL" or not evidence):
-            errors.append(f"{prefix} cannot be REJECTED without FAIL verification and evidence")
+        if verification in {"PASS", "FAIL", "BLOCKED"} and verification not in evidence_results:
+            errors.append(f"{prefix} verification status {verification} requires matching evidence result")
+        if lifecycle == "ACCEPTED" and (verification != "PASS" or "PASS" not in evidence_results):
+            errors.append(f"{prefix} cannot be ACCEPTED without PASS verification and matching evidence")
+        if lifecycle == "REJECTED" and (verification != "FAIL" or "FAIL" not in evidence_results):
+            errors.append(f"{prefix} cannot be REJECTED without FAIL verification and matching evidence")
         if lifecycle == "BLOCKED" and verification != "BLOCKED":
             errors.append(f"{prefix} cannot be BLOCKED without BLOCKED verification status")
         if verification == "BLOCKED" and lifecycle not in {"BLOCKED", "QUARANTINED"}:
