@@ -9,14 +9,13 @@ SPEC.loader.exec_module(MODULE)
 
 
 class Sha256dBenchmarkTests(unittest.TestCase):
-    def test_genesis_header_nonce_zero_digest_is_deterministic(self):
-        header = MODULE.HEADER_PREFIX + (0).to_bytes(4, "little")
+    def test_genesis_known_nonce_matches_known_raw_digest(self):
+        header = MODULE.HEADER_PREFIX + (0x7C2BAC1D).to_bytes(4, "little")
         self.assertEqual(len(header), 80)
         self.assertEqual(
             MODULE.double_sha256(header).hex(),
-            "8a7a3f7c9e5e9e4a2c7f6f3a0a3f1d4e"
-            "00000000000000000000000000000000"
-            if False else MODULE.double_sha256(header).hex(),
+            "6fe28c0ab6f1b372c1a6a246ae63f74f"
+            "931e8365e15a089c68d6190000000000",
         )
 
     def test_benchmark_reports_software_only_and_count(self):
