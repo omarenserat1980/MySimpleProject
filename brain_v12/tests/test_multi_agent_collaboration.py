@@ -30,7 +30,11 @@ class MultiAgentCollaborationTests(unittest.TestCase):
 
     def test_reviewer_must_be_independent(self):
         c = CollaborationCoordinator()
-        ready_to_verify(c)
+        c.create_task(make_envelope())
+        c.mark_planned("task-1", planner_id="planner-A")
+        c.mark_ready("task-1")
+        c.start_implementation("task-1", implementer_id="coder-A", head_commit="base123")
+        c.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456")
         with self.assertRaisesRegex(ValueError, "reviewer_must_be_independent"):
             c.record_review("task-1", reviewer_id="coder-A", approved=True)
 
