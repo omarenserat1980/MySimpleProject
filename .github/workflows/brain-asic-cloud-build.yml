@@ -18,7 +18,7 @@ jobs:
         run: python3 -m unittest -v test_bitcoin_sha256d.py
       - name: Validate physical ASIC bridge protocol and proof boundary
         run: |
-          python3 -m pip install --disable-pip-version-check pytest
+          python3 -m pip install --disable-pip-version-check pytest 'fastapi>=0.115,<1.0'
           python3 -m pytest -q brain_v12/tests/test_brain_physical_asic_agent.py
           python3 -m pytest -q brain_v12/tests/test_physical_asic_api.py
       - name: Verify SHA-256 compression known vector
