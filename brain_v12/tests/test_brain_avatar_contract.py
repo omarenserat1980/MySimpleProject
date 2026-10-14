@@ -55,7 +55,7 @@ class BrainAvatarContractTests(unittest.TestCase):
         cls.app = APP.read_text(encoding="utf-8")
         cls.html = UI.read_text(encoding="utf-8")
 
-    def test_live_state_endpoint_uses_read_only_liveness_assessment(self):
+    def test_live_state_endpoint_documents_bounded_pulse_side_effect(self):
         self.assertIn('@app.get("/api/brain-avatar/state")', self.app)
         start = self.app.index('def brain_avatar_state():')
         end = self.app.find('\n@app.', start + 1)
@@ -63,6 +63,7 @@ class BrainAvatarContractTests(unittest.TestCase):
             end = len(self.app)
         route = self.app[start:end]
         self.assertIn('assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)', route)
+        self.assertIn('rate-limited persisted pulse', route)
         self.assertNotIn('run_execution_probe', route)
         self.assertIn('store.events(50)', route)
         self.assertIn("resolve_avatar_event(store.events(50))", route)
