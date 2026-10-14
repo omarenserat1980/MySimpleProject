@@ -69,6 +69,8 @@ def validate_pool_evidence(
         pool = {}
     if not isinstance(pool.get("host"), str) or not pool["host"].strip():
         errors.append("POOL_HOST_REQUIRED")
+    elif pool["host"].strip().lower().endswith((".invalid", ".example", ".test", ".localhost")):
+        errors.append("PLACEHOLDER_POOL_HOST_FORBIDDEN")
     if not isinstance(pool.get("port"), int) or isinstance(pool.get("port"), bool) or not 1 <= pool["port"] <= 65535:
         errors.append("INVALID_POOL_PORT")
     if pool.get("protocol") != "stratum":
