@@ -80,5 +80,46 @@ class BitcoinNorthStarTests(unittest.TestCase):
         self.assertEqual(result["north_star"]["mission"], MISSION)
 
 
+class _CognitiveLoopStore:
+    def __init__(self):
+        self._state = {}
+        self._events = []
+        self._memories = []
+
+    def state(self):
+        return dict(self._state)
+
+    def set_state(self, value):
+        self._state = dict(value)
+
+    def event(self, event_type, payload):
+        self._events.append((event_type, payload))
+
+    def memories(self):
+        return list(self._memories)
+
+    def save_memory(self, key, value):
+        self._memories.append({"key": key, "value": value})
+
+
+class BitcoinNorthStarCognitiveLoopTests(unittest.TestCase):
+    def test_off_course_goal_is_blocked_before_task_or_tool_execution(self):
+        from brain_v12.brain.cognitive_loop import CognitiveLoop
+        from brain_v12.brain.decision_engine import DecisionEngine
+
+        store = _CognitiveLoopStore()
+        loop = CognitiveLoop(store)
+        loop.decisions = DecisionEngine(north_star=BitcoinNorthStar())
+        result = loop.run("Polish an unrelated website")
+
+        self.assertEqual(result["decision"]["status"], "MISSION_ALIGNMENT_REQUIRED")
+        self.assertEqual(result["execution"]["status"], "BLOCKED_MISSION_ALIGNMENT")
+        self.assertIsNone(result["execution"]["task_id"])
+        self.assertIsNone(result["tool_result"])
+        self.assertFalse(result["verification"]["result_verified"])
+        self.assertEqual(result["tasks"]["tasks"], [])
+        self.assertIn("EXECUTION_BLOCKED_MISSION_ALIGNMENT", [event[0] for event in store._events])
+
+
 if __name__ == "__main__":
     unittest.main()
