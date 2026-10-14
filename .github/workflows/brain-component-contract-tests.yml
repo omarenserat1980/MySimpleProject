@@ -84,7 +84,11 @@ jobs:
           set -o pipefail
           case "${{ matrix.component }}" in
             revenue_realization_gate|asic_software_simulator)
-              python -m pytest "${{ matrix.test }}" -q 2>&1 | tee "artifacts/component-contracts/${{ matrix.component }}/test.log"
+              case "${{ matrix.component }}" in
+                revenue_realization_gate) TEST_PATH="brain_v12/tests/test_revenue_realization_gate.py" ;;
+                asic_software_simulator) TEST_PATH="brain_v12/tests/test_asic_hardware_simulator.py" ;;
+              esac
+              python -m pytest "$TEST_PATH" -q 2>&1 | tee "artifacts/component-contracts/${{ matrix.component }}/test.log"
               ;;
             *)
               python -m unittest "${{ matrix.test }}" -v 2>&1 | tee "artifacts/component-contracts/${{ matrix.component }}/test.log"
