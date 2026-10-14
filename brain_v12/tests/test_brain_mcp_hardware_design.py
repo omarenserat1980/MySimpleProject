@@ -1,5 +1,7 @@
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+import asyncio
+import json
+
+from starlette.requests import Request
 
 from brain_v12.brain.brain_mcp import PROTOCOL_VERSION, build_mcp_router
 
@@ -18,28 +20,51 @@ class _Store:
     pass
 
 
-def _client():
-    app = FastAPI()
-    app.include_router(build_mcp_router(_BrainAI(), _DeviceBridge(), _Store()))
-    return TestClient(app)
-
-
-def _rpc(client, method, params=None, request_id=1):
-    return client.post(
-        "/mcp",
-        headers={"MCP-Protocol-Version": PROTOCOL_VERSION},
-        json={"jsonrpc": "2.0", "id": request_id, "method": method, "params": params or {}},
+def _rpc(method, params=None, request_id=1):
+    router = build_mcp_router(_BrainAI(), _DeviceBridge(), _Store())
+    endpoint = next(
+        route.endpoint
+        for route in router.routes
+        if route.path == "/mcp" and "POST" in route.methods
     )
+    body = json.dumps({
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "method": method,
+        "params": params or {},
+    }).encode("utf-8")
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/mcp",
+        "raw_path": b"/mcp",
+        "query_string": b"",
+        "root_path": "",
+        "headers": [
+            (b"mcp-protocol-version", PROTOCOL_VERSION.encode("ascii")),
+            (b"content-type", b"application/json"),
+        ],
+        "server": ("testserver", 80),
+        "client": ("testclient", 12345),
+    }
+
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    request = Request(scope, receive)
+    response = asyncio.run(endpoint(request))
+    return json.loads(response.body.decode("utf-8"))
 
 
 def test_mcp_lists_hardware_design_tool_and_returns_generated_rtl():
-    client = _client()
-    listed = _rpc(client, "tools/list").json()["result"]["tools"]
+    listed = _rpc("tools/list")["result"]["tools"]
     tool = next(item for item in listed if item["name"] == "brain.hardware_design")
     assert "SystemVerilog" in tool["description"]
 
     response = _rpc(
-        client,
         "tools/call",
         {
             "name": "brain.hardware_design",
@@ -51,7 +76,7 @@ def test_mcp_lists_hardware_design_tool_and_returns_generated_rtl():
                 "outputs": {"result": "sum_node"},
             },
         },
-    ).json()["result"]
+    )["result"]
 
     assert response["isError"] is False
     result = response["structuredContent"]
@@ -62,9 +87,7 @@ def test_mcp_lists_hardware_design_tool_and_returns_generated_rtl():
 
 
 def test_mcp_hardware_design_tool_rejects_invalid_graph_and_never_claims_success():
-    client = _client()
     response = _rpc(
-        client,
         "tools/call",
         {
             "name": "brain.hardware_design",
@@ -76,7 +99,7 @@ def test_mcp_hardware_design_tool_rejects_invalid_graph_and_never_claims_success
                 "outputs": {"result": "x"},
             },
         },
-    ).json()["result"]
+    )["result"]
 
     assert response["isError"] is True
     assert response["structuredContent"]["status"] == "INVALID_HARDWARE_GRAPH"
