@@ -54,12 +54,13 @@ class ResourceRecord:
     metadata: dict[str, str] = field(default_factory=dict)
     leases: dict[str, ResourceLease] = field(default_factory=dict)
 
-    def public(self, now: float | None = None, evidence_ttl_seconds: int = 120) -> dict:
+    def public(self, now: float | None = None, evidence_ttl_seconds: int = 120, trusted_evidence_sources: frozenset[str] = frozenset()) -> dict:
         now = time() if now is None else now
         evidence_fresh = bool(
             self.evidence
             and self.evidence.verified
             and self.evidence.source.strip()
+            and self.evidence.source in trusted_evidence_sources
             and self.evidence.evidence_id.strip()
             and 0 <= now - self.evidence.observed_at <= evidence_ttl_seconds
         )
@@ -96,11 +97,13 @@ class ResourceRecord:
 class HybridResourceFabric:
     """Thread-safe registry, evidence gate, and lease manager."""
 
-    def __init__(self, evidence_ttl_seconds: int = 120, clock=time) -> None:
+    def __init__(self, evidence_ttl_seconds: int = 120, clock=time, trusted_evidence_sources: set[str] | frozenset[str] | None = None) -> None:
         if evidence_ttl_seconds < 1:
             raise FabricError("INVALID_EVIDENCE_TTL")
         self.evidence_ttl_seconds = evidence_ttl_seconds
         self._clock = clock
+        # Fail closed by default: a caller-supplied `verified=True` is not enough.
+        self._trusted_evidence_sources = frozenset(trusted_evidence_sources or ())
         self._lock = RLock()
         self._resources: dict[str, ResourceRecord] = {}
         self._task_leases: dict[str, str] = {}
@@ -124,18 +127,18 @@ class HybridResourceFabric:
             if existing:
                 record.leases = existing.leases
             self._resources[resource_id] = record
-            return {"ok": True, "status": "REGISTERED", "resource": record.public(self._clock(), self.evidence_ttl_seconds)}
+            return {"ok": True, "status": "REGISTERED", "resource": record.public(self._clock(), self.evidence_ttl_seconds, self._trusted_evidence_sources)}
 
     def get(self, resource_id: str) -> dict:
         with self._lock:
             record = self._resources.get(resource_id)
             if record is None:
                 return {"ok": False, "status": "RESOURCE_NOT_FOUND", "resource_id": resource_id}
-            return {"ok": True, "resource": record.public(self._clock(), self.evidence_ttl_seconds)}
+            return {"ok": True, "resource": record.public(self._clock(), self.evidence_ttl_seconds, self._trusted_evidence_sources)}
 
     def list_resources(self) -> dict:
         with self._lock:
-            values = [r.public(self._clock(), self.evidence_ttl_seconds) for r in sorted(self._resources.values(), key=lambda x: x.resource_id)]
+            values = [r.public(self._clock(), self.evidence_ttl_seconds, self._trusted_evidence_sources) for r in sorted(self._resources.values(), key=lambda x: x.resource_id)]
         return {"count": len(values), "resources": values}
 
     def reserve(
@@ -170,7 +173,7 @@ class HybridResourceFabric:
                     return {"ok": False, "status": "TASK_ALREADY_LEASED", "resource_id": prior_resource}
                 self._task_leases.pop(task_id, None)
 
-            status = record.public(now, self.evidence_ttl_seconds)
+            status = record.public(now, self.evidence_ttl_seconds, self._trusted_evidence_sources)
             if physical_execution and not status["eligible_for_physical_work"]:
                 return {"ok": False, "status": "PHYSICAL_EVIDENCE_GATE_BLOCKED", "resource_id": resource_id}
             if permission not in record.permissions:
