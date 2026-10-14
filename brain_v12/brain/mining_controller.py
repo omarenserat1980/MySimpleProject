@@ -166,6 +166,61 @@ def evidence_record(
     }
 
 
+
+def bitcoin_sha256d_preflight(
+    policy: MiningPolicy,
+    *,
+    worker_id: str = "",
+    worker_identity_verified: bool = False,
+    stratum_session_id: str = "",
+    stratum_session_verified: bool = False,
+    accepted_share_proof_ref: str = "",
+    accepted_share_proof_verified: bool = False,
+    profitability_evidence_ref: str = "",
+    profitability_verified: bool = False,
+    explicit_approval: bool = False,
+    worker_is_user_owned: bool = False,
+    running_on_github_actions: bool = False,
+    current_temperature_c: float | None = None,
+) -> dict[str, Any]:
+    """Fail-closed readiness gate for real Bitcoin SHA-256d on an external worker.
+
+    The caller-supplied flags and references are assertions, not independently
+    authenticated evidence. PASS means only that the declared prerequisites are
+    present; it does not start mining or prove accepted shares/revenue.
+    """
+    missing: list[str] = []
+    if not policy.enabled:
+        missing.append("MINING_DISABLED_BY_DEFAULT")
+    if running_on_github_actions and not policy.allow_github_actions:
+        missing.append("GITHUB_ACTIONS_MINING_FORBIDDEN")
+    if policy.require_user_owned_worker and not worker_is_user_owned:
+        missing.append("WORKER_NOT_REGISTERED_AS_USER_OWNED")
+    if not worker_id.strip() or not worker_identity_verified:
+        missing.append("VERIFIED_WORKER_IDENTITY_REQUIRED")
+    if not stratum_session_id.strip() or not stratum_session_verified:
+        missing.append("VERIFIED_STRATUM_SESSION_REQUIRED")
+    if not accepted_share_proof_ref.strip() or not accepted_share_proof_verified:
+        missing.append("INDEPENDENT_ACCEPTED_SHARE_PROOF_REQUIRED")
+    if not profitability_evidence_ref.strip() or not profitability_verified:
+        missing.append("VERIFIED_PROFITABILITY_EVIDENCE_REQUIRED")
+    if not explicit_approval:
+        missing.append("EXPLICIT_USER_APPROVAL_REQUIRED")
+    if current_temperature_c is not None and current_temperature_c >= policy.max_temperature_c:
+        missing.append("THERMAL_LIMIT_REACHED")
+
+    return {
+        "algorithm": "sha256d",
+        "status": "BLOCKED" if missing else "PREFLIGHT_PASS_NOT_MINING_PROOF",
+        "ready_for_review": not missing,
+        "missing_requirements": missing,
+        "execution_started": False,
+        "accepted_shares_independently_verified": False,
+        "revenue_verified": False,
+        "evidence_limit": "Caller-provided flags/references are not independently authenticated by this function.",
+    }
+
+
 def status() -> dict[str, Any]:
     return {
         "controller": "Brain Mining Controller",
