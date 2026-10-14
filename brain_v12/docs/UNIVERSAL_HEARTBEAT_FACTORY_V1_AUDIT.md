@@ -32,9 +32,13 @@ The repository already has several partial heartbeat, lease, queue, liveness, an
 
 Files added/changed on this branch:
 
-- `brain_v12/brain/heartbeat_factory.py`: SQLite-backed idempotent function registry, versioned heartbeat records, sequence uniqueness, safe payload redaction, explicit state transitions, delayed-function detection, and truthful summary flags.
-- `brain_v12/tests/test_heartbeat_factory.py`: contract tests including persistence/reopen, duplicate registration, duplicate sequence, invalid transitions, separate SENT/ACKNOWLEDGED/VERIFIED stages, secret-like payload redaction, simulated-vs-remote labeling, delayed detection, protected-function authorization-reference guard, and synthetic 10/25/50/100 catalog smoke tests.
-- This report records the pre-change audit and implementation boundaries.
+- `brain_v12/brain/heartbeat_factory.py`: SQLite-backed idempotent function registry, versioned heartbeat records, sequence uniqueness, safe payload redaction, explicit delivery state transitions, delayed-function detection, and truthful summary flags.
+- `brain_v12/brain/heartbeat_probes.py`: ten concrete local, read-only probes for Python runtime, memory, cognitive loop, sync queue/store, software worker registry, self-monitor, evidence store, optional device bridge, and API route map. Probes execute sequentially and never call remote providers or enqueue device tasks.
+- `brain_v12/app.py`: protected `GET /api/heartbeats/summary`, `GET /api/heartbeats/functions`, and `POST /api/heartbeats/diagnostic` routes. The POST requires the Brain control key and persists probe results; the checks themselves are read-only.
+- `brain_v12/tests/test_heartbeat_factory.py`: protocol tests for persistence/reopen, duplicate registration/sequence, invalid transitions, separate SENT/ACKNOWLEDGED/VERIFIED stages, secret redaction, simulated-vs-remote labeling, delayed detection, authorization guard, and synthetic 10/25/50/100 catalog smoke tests.
+- `brain_v12/tests/test_heartbeat_probes.py`: probe registration, sequential execution, auth guard, bounded batch size, optional-agent UNKNOWN state, and exception redaction.
+- `.github/workflows/brain-fabric-tests.yml`: includes both heartbeat test files.
+- This report records the audit and implementation boundaries.
 
 ## State-machine rules
 
@@ -50,14 +54,15 @@ Files added/changed on this branch:
 ## Not yet implemented or proven
 
 - The scheduler/background loop is deliberately **not running**; summary reports `scheduler_running: false`.
-- The core does not send network traffic and does not claim remote delivery.
-- No API routes have been added; production/API integration requires a separately reviewed adapter and authentication integration.
-- The 100 requested heartbeat categories have **not** been represented as 100 operational functions. Synthetic load tests exercise the protocol at 10/25/50/100 catalog entries only; they do not claim the requested production checks are implemented.
-- Resource consumption, latency, throughput, and failure rates have not yet been measured on a real production runtime.
+- The scheduler/background loop is deliberately **not running**; diagnostics are manually triggered by an authorized API request.
+- The core and ten local probes do not send network traffic and do not claim remote delivery. Probe result status is separate from heartbeat delivery status; each locally recorded event remains `CREATED` until a real adapter records sending/acknowledgement.
+- The API endpoints are protected by the existing Brain control-key check. The factory's authorization reference is not itself credential validation; the API route validates the caller before passing the reference.
+- The 100 requested heartbeat categories have **not** been represented as 100 operational functions. Ten local probes are implemented; synthetic load tests exercise the protocol at 10/25/50/100 catalog entries only.
+- Resource consumption, latency, throughput, and failure rates have not yet been benchmarked beyond CI wall time and per-probe diagnostic latency; no production metrics are claimed.
 - No live worker, provider, GitHub account, mining pool, payment source, or revenue source was contacted by this feature.
 
 ## Validation status
 
-The Brain Fabric CI command on final code commit `e5bd64d1c640e3d7d368250c50abea498fc59117` completed successfully: **113 passed, 1 warning in 2.14 seconds**. Run: https://github.com/omarenserat1980/MySimpleProject/actions/runs/38551693982
+The Brain Fabric CI command on commit `71cdca28ff367dce10250f7a85ab1e1cb3a8f57b` completed successfully: **119 passed, 1 warning in 1.52 seconds**. Run: https://github.com/omarenserat1980/MySimpleProject/actions/runs/38552096462
 
-The workflow includes `brain_v12/tests/test_heartbeat_factory.py` plus the listed existing integration/security tests. The warning is a Starlette deprecation warning from the test-client/httpx integration, not a heartbeat test failure. This test evidence proves the exercised CI contracts only; it does not prove a scheduler, remote delivery, or production deployment. This audit-report update itself creates a new commit, so rerun CI on the resulting latest PR head before acceptance.
+The workflow includes both heartbeat test files and the existing listed integration/security tests. The warning is a Starlette deprecation warning from the test-client/httpx integration, not a heartbeat test failure. This test evidence proves the exercised CI contracts only; it does not prove a background scheduler, remote delivery, or production deployment. This documentation update itself creates a new commit, so rerun CI on the resulting latest PR head before acceptance.
