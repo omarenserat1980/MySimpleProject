@@ -5,6 +5,7 @@ from .task_engine import TaskEngine
 from .world_model import WorldModel
 from uuid import uuid4
 from .evidence_store import EvidenceStore
+from .engineering_factory import EngineeringFactory
 from ..design_factory.brain_adapter import DesignFactoryAdapter
 
 class CognitiveLoop:
@@ -17,6 +18,7 @@ class CognitiveLoop:
         {"id":"tasks.complete","name":"إكمال مهمة","risk":"low","permission":None},
         {"id":"code.inspect","name":"فحص الكود","risk":"low","permission":"developer"},
         {"id":"code.verify","name":"التحقق من الكود","risk":"low","permission":"developer"},
+        {"id":"engineering.propose","name":"إنشاء اقتراح هندسي واختبارات قبول","risk":"low","permission":None},
         {"id":"design.plan","name":"إعداد خطة هندسية موثقة","risk":"low","permission":None},
         {"id":"device.enqueue","name":"إرسال مهمة إلى Termux","risk":"medium","permission":"device_agent"},
         {"id":"code.apply","name":"تعديل الكود","risk":"high","permission":"developer_approval"},
@@ -31,6 +33,7 @@ class CognitiveLoop:
         self.tasks=TaskEngine()
         self.world=WorldModel()
         self.code_tool=None
+        self.engineering_factory=EngineeringFactory()
         self.design_factory_adapter=DesignFactoryAdapter()
 
     def _state(self,stage,status="RUNNING",**extra):
@@ -64,6 +67,9 @@ class CognitiveLoop:
             result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.create(str(params.get("title","مهمة جديدة")))}
         elif tool_id=="tasks.complete":
             result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.update(str(params.get("task_id")),"COMPLETED")}
+        elif tool_id=="engineering.propose":
+            result=self.engineering_factory.propose(str(params.get("problem", params.get("goal", ""))), evidence=params.get("evidence", []))
+            result={"ok":result.get("status")=="COMPLETED","status":result.get("status"),"tool":tool_id,"data":result.get("proposal"),"error":result.get("error")}
         elif tool_id=="design.plan":
             result=self.design_factory_adapter.execute(params)
         elif tool_id=="code.inspect":
@@ -129,6 +135,47 @@ class CognitiveLoop:
         decision["run_id"]=run_id
         self.events.publish("DECISION_MADE",decision)
 
+        if decision.get("status") == "MISSION_ALIGNMENT_REQUIRED" or not isinstance(decision.get("selected"), dict):
+            self._state("EXECUTE",goal=goal,run_id=run_id)
+            execution={
+                "status":"BLOCKED_MISSION_ALIGNMENT",
+                "action":"none",
+                "task_id":None,
+                "tool":None,
+                "tool_result":None,
+                "result":"لم يُنفّذ أي إجراء لأن البوصلة لم تثبت ارتباط الهدف بمهمة البيتكوين.",
+                "run_id":run_id,
+            }
+            self.events.publish("EXECUTION_BLOCKED_MISSION_ALIGNMENT",execution)
+            self._state("VERIFY",goal=goal,run_id=run_id)
+            verification={
+                "status":"BLOCKED",
+                "task_status":"NOT_CREATED",
+                "evidence":"تم منع التنفيذ لغياب توافق المهمة مع البوصلة.",
+                "result_verified":False,
+                "run_id":run_id,
+            }
+            self.events.publish("VERIFIED",verification)
+            self._state("LEARN",status="WAITING",goal=goal,run_id=run_id)
+            lesson="تم إيقاف المهمة قبل التنفيذ لعدم ثبوت توافقها مع هدف Bitcoin North Star."
+            self.store.save_memory("cognitive.last_verified_run",f"{run_id} | {lesson}")
+            self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
+            return {
+                "run_id":run_id,
+                "goal":goal,
+                "stages":self.STAGES,
+                "stage_count":len(self.STAGES),
+                "memory_count":len(memories),
+                "options":options,
+                "decision":decision,
+                "execution":execution,
+                "verification":verification,
+                "learning":{"status":"RECORDED","lesson":lesson},
+                "tool_result":None,
+                "world":self.world.snapshot(),
+                "tasks":self.tasks.snapshot(),
+            }
+
         selected=decision.get("selected",{})
         action=selected.get("id","observe") if isinstance(selected,dict) else "observe"
 
@@ -138,16 +185,18 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
+        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","engineering_proposal":"engineering.propose","design_plan":"design.plan","device":"device.enqueue"}.get(action)
         tool_params = (
-            {"title":task_title} if tool_id=="tasks.create"
+            {"problem":goal,"evidence":[]} if tool_id=="engineering.propose"
+            else {"goal":goal} if tool_id=="design.plan"
+            else {"title":task_title} if tool_id=="tasks.create"
             else {"path":"brain_v12/app.py"} if tool_id=="code.inspect"
             else {"task":"status","params":{}} if tool_id=="device.enqueue"
             else {}
         )
         tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
         device_success = bool(action == "device" and tool_result and tool_result.get("ok") and tool_result.get("status") == "COMPLETED" and isinstance(tool_result.get("result"), dict))
-        if (action in {"observe","plan"} and tool_result and tool_result.get("ok")) or device_success:
+        if (action in {"observe","plan","engineering_proposal","design_plan"} and tool_result and tool_result.get("ok")) or device_success:
             evidence_payload = {
                 "run_id": run_id,
                 "task_id": task["id"],
@@ -174,7 +223,7 @@ class CognitiveLoop:
         verification={
             "status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" and (action!="device" or device_success) else "PENDING",
             "task_status":verified_task["status"] if verified_task else "UNKNOWN",
-            "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else "تم فحص حالة المهمة بعد التنفيذ الداخلي.",
+            "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else ("تم التحقق من إنشاء الاقتراح الهندسي المنظم." if action=="engineering_proposal" and tool_result and tool_result.get("ok") else ("تم التحقق من مسار إعداد خطة التصميم." if action=="design_plan" and tool_result and tool_result.get("ok") else "تم فحص حالة المهمة بعد التنفيذ الداخلي.")),
             "result_verified":bool(action!="device" or device_success),
             "run_id":run_id
         }
