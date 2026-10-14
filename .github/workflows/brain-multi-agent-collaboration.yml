@@ -40,6 +40,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install runtime dependencies required by BrainSupervisor imports
+        run: python -m pip install --disable-pip-version-check "cryptography>=42"
       - name: Run collaboration policy tests and write evidence
         env:
           PYTHONPATH: .
