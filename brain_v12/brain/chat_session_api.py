@@ -170,7 +170,7 @@ def router(brain_ai, store=None, context_limit=24, event_sink=None):
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
             if event_sink:
                 try:
-                    event_sink("BRAIN_CHAT_REQUEST_STARTED", {"session_id": session_id, "trace_id": trace_id})
+                    event_sink("BRAIN_CHAT_REQUEST_STARTED", {})
                 except Exception:
                     pass
             result = brain_ai.chat(body.message, instructions, approved=body.approved)
@@ -188,7 +188,6 @@ def router(brain_ai, store=None, context_limit=24, event_sink=None):
             if event_sink:
                 try:
                     event_sink("BRAIN_CHAT_RESPONSE_COMPLETED", {
-                        "session_id": session_id, "trace_id": trace_id,
                         "ok": bool(result.ok), "mode": str(result.mode),
                     })
                 except Exception:
@@ -200,7 +199,7 @@ def router(brain_ai, store=None, context_limit=24, event_sink=None):
         except Exception:
             if event_sink:
                 try:
-                    event_sink("BRAIN_CHAT_REQUEST_FAILED", {"session_id": session_id, "trace_id": trace_id})
+                    event_sink("BRAIN_CHAT_REQUEST_FAILED", {})
                 except Exception:
                     pass
             if request_key:
