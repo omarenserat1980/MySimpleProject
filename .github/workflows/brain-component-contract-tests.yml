@@ -127,3 +127,104 @@ jobs:
           path: artifacts/component-contracts/${{ matrix.component }}/
           if-no-files-found: error
           retention-days: 30
+
+  component-evidence-summary:
+    if: always()
+    needs: component-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download component evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: brain-component-contract-*
+          path: artifacts/downloaded
+          merge-multiple: false
+
+      - name: Validate and summarize component evidence
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          MATRIX_RESULT: ${{ needs.component-contracts.result }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, sys
+          root = pathlib.Path("artifacts/downloaded")
+          expected = {
+              "core", "memory", "orchestrator", "device_bridge",
+              "evidence_lineage", "revenue_realization_gate",
+              "media_engine", "asic_software_simulator",
+          }
+          records = []
+          errors = []
+          found = set()
+          for path in sorted(root.glob("**/result.json")):
+              try:
+                  item = json.loads(path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  errors.append(f"{path}: invalid JSON ({exc})")
+                  continue
+              component = item.get("component")
+              if component in found:
+                  errors.append(f"duplicate evidence for component: {component}")
+                  continue
+              found.add(component)
+              if item.get("commit_sha") != os.environ["EXPECTED_COMMIT"]:
+                  errors.append(f"{component}: commit SHA mismatch")
+              if item.get("job_status") != "success":
+                  errors.append(f"{component}: job status is {item.get('job_status')!r}")
+              records.append(item)
+          missing = sorted(expected - found)
+          unexpected = sorted(found - expected)
+          if missing:
+              errors.append("missing components: " + ", ".join(missing))
+          if unexpected:
+              errors.append("unexpected components: " + ", ".join(unexpected))
+          if os.environ["MATRIX_RESULT"] != "success":
+              errors.append("matrix job result is " + os.environ["MATRIX_RESULT"])
+          summary = {
+              "schema_version": "1.0",
+              "expected_commit": os.environ["EXPECTED_COMMIT"],
+              "matrix_result": os.environ["MATRIX_RESULT"],
+              "expected_components": sorted(expected),
+              "found_components": sorted(found),
+              "component_count": len(records),
+              "passed": not errors,
+              "errors": errors,
+              "components": sorted(records, key=lambda x: str(x.get("component", ""))),
+              "claim_boundary": "CI contract evidence only; not proof of persistent device deployment, physical ASIC fabrication, or actual revenue settlement."
+          }
+          out = pathlib.Path("artifacts/component-evidence-summary")
+          out.mkdir(parents=True, exist_ok=True)
+          (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\\n", encoding="utf-8")
+          lines = [
+              "# Brain component evidence summary",
+              "",
+              f"- Commit: `{summary['expected_commit']}`",
+              f"- Matrix result: **{summary['matrix_result']}**",
+              f"- Components with evidence: **{len(records)}/{len(expected)}**",
+              f"- Summary verdict: **{'PASS' if summary['passed'] else 'FAIL'}**",
+              "",
+              "| Component | Job status | Commit matches |",
+              "|---|---|---|",
+          ]
+          for item in sorted(records, key=lambda x: str(x.get("component", ""))):
+              lines.append(f"| {item.get('component')} | {item.get('job_status')} | {'yes' if item.get('commit_sha') == summary['expected_commit'] else 'no'} |")
+          if errors:
+              lines.extend(["", "## Errors", *[f"- {e}" for e in errors]])
+          lines.extend(["", summary["claim_boundary"]])
+          report = "\\n".join(lines) + "\\n"
+          pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(report, encoding="utf-8")
+          (out / "summary.md").write_text(report, encoding="utf-8")
+          print(json.dumps({"passed": summary["passed"], "component_count": len(records), "errors": errors}, indent=2))
+          if errors:
+              sys.exit(1)
+          PY
+
+      - name: Upload consolidated evidence summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-component-evidence-summary
+          path: artifacts/component-evidence-summary/
+          if-no-files-found: error
+          retention-days: 30
