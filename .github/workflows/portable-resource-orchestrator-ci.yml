@@ -68,10 +68,17 @@ jobs:
             brain_v12/brain/asic_hardware_simulator.py \
             brain_v12/brain/mining_engine.py \
             brain_v12/brain/bitcoin_mining_intelligence_api.py \
-            brain_v12/asic/toolchain_probe.py
+            brain_v12/asic/toolchain_probe.py \\
+            brain_v12/asic/node_compiler.py \\
+            brain_v12/tests/test_asic_node_compiler.py
 
       - name: Install ASIC test runner
         run: python -m pip install --disable-pip-version-check pytest
+
+      - name: Test hardware node compiler
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q brain_v12/tests/test_asic_node_compiler.py
 
       - name: Install API test dependencies
         run: python -m pip install --disable-pip-version-check fastapi pydantic
