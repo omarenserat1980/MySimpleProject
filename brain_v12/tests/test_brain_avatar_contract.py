@@ -96,6 +96,9 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertIn('id="liveMode"', self.html)
         self.assertIn("brain.avatar.liveMode", self.html)
         self.assertIn("brain.avatar.label", self.html)
+        self.assertLess(self.html.index("const names={"), self.html.index("if(!Object.prototype.hasOwnProperty.call(names,state.value))"))
+        self.assertIn("savePref('brain.avatar.label',label.value)", self.html)
+        self.assertIn("savePref('brain.avatar.liveMode','false')", self.html)
 
     def test_avatar_has_accessible_arabic_mobile_and_reduced_motion_support(self):
         self.assertIn('<html lang="ar" dir="rtl">', self.html)
