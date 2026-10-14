@@ -38,19 +38,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run collaboration policy tests
+      - name: Run collaboration policy tests and write evidence
         env:
           PYTHONPATH: .
           PYTHONDONTWRITEBYTECODE: "1"
+        shell: bash
         run: |
           mkdir -p artifacts
           set +e
           python -m unittest brain_v12.tests.test_multi_agent_collaboration -v 2>&1 | tee artifacts/collaboration-tests.log
           test_status=${PIPESTATUS[0]}
           set -e
-          python - <<'PY'
+          TEST_STATUS="$test_status" python - <<'PY'
           import json, os, subprocess, time
-          status = int(os.environ.get("TEST_STATUS", "0"))
+          status = int(os.environ["TEST_STATUS"])
           sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           record = {
               "schema_version": "1.0",
@@ -66,10 +67,6 @@ jobs:
               json.dump(record, f, indent=2)
           PY
           exit "$test_status"
-        env:
-          PYTHONPATH: .
-          PYTHONDONTWRITEBYTECODE: "1"
-          TEST_STATUS: ${{ steps.tests.outputs.test_status }}
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
