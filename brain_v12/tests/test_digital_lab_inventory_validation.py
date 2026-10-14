@@ -116,10 +116,14 @@ def test_requires_blocked_verification_for_blocked_lifecycle():
     assert any("cannot be BLOCKED" in error for error in validate_inventory(report))
 
 
-def test_accepts_explicit_blocked_state_without_claiming_success():
+def test_accepts_explicit_blocked_state_with_matching_evidence():
     report = valid_report()
     report["assets"][0]["lifecycle_status"] = "BLOCKED"
     report["assets"][0]["verification_status"] = "BLOCKED"
+    evidence = valid_evidence()[0]
+    evidence["result"] = "BLOCKED"
+    evidence["exit_status"] = 1
+    report["assets"][0]["evidence"] = [evidence]
     assert validate_inventory(report) == []
 
 
