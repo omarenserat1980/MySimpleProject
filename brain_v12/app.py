@@ -3236,6 +3236,18 @@ def brain_liveness():
 def brain_avatar_state():
     """Read-only liveness plus recent runtime events; never triggers execution."""
     try:
+        from .brain.human_presence_pulse import evaluate_pulse
+        pulse_status = None
+        try:
+            pulse_status = evaluate_pulse(store, display_target="brain-avatar-ui")
+        except Exception as pulse_exc:
+            pulse_status = {
+                "pulse_id": "HUMAN_PRESENCE",
+                "enabled": False,
+                "visual_state": "UNCERTAIN",
+                "last_render_status": "PULSE_EVALUATION_FAILED",
+                "error": str(pulse_exc)[:160],
+            }
         assessment = assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
         checks = assessment.get("checks", {})
         core_alive = bool(assessment.get("brain_alive"))
@@ -3267,6 +3279,7 @@ def brain_avatar_state():
             "brain_alive": core_alive,
             "device_bridge_configured": bool(device.get("configured")),
             "agents_online": bool(device.get("agents_online")),
+            "human_presence_pulse": pulse_status,
             "checked_at": assessment.get("checked_at"),
             "note": "Expressions reflect recorded runtime status/events, not subjective feelings or consciousness.",
         }
