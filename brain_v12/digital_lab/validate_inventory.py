@@ -18,7 +18,9 @@ REQUIRED_ASSET_FIELDS = {
     "asset_id", "path", "domain", "size_bytes", "modified_utc",
     "lifecycle_status", "verification_status", "evidence",
 }
-REQUIRED_EVIDENCE_FIELDS = {"source", "reference", "observed_utc", "result"}
+REQUIRED_EVIDENCE_FIELDS = {"source", "tool_version", "source_revision", "reference", "observed_utc", "result", "check_id", "exit_status", "scope", "limitations"}
+ARTIFACT_EVIDENCE_FIELDS = {"artifact_path", "artifact_size_bytes", "artifact_sha256"}
+EVIDENCE_RESULTS = {"PASS", "FAIL", "BLOCKED", "NOT_RUN"}
 LIFECYCLE_STATES = {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "TESTING", "ACCEPTED", "REJECTED", "BLOCKED", "QUARANTINED"}
 VERIFICATION_STATES = {"NOT_RUN", "PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"}
 
@@ -85,9 +87,24 @@ def validate_inventory(report: Any) -> list[str]:
             if missing_evidence:
                 errors.append(f"{ep} missing fields: {', '.join(missing_evidence)}")
                 continue
-            for field in REQUIRED_EVIDENCE_FIELDS:
+            for field in REQUIRED_EVIDENCE_FIELDS - {"exit_status"}:
                 if not isinstance(item[field], str) or not item[field].strip():
                     errors.append(f"{ep}.{field} must be a non-empty string")
+            if item["result"] not in EVIDENCE_RESULTS:
+                errors.append(f"{ep}.result must be one of {sorted(EVIDENCE_RESULTS)}")
+            if not isinstance(item["exit_status"], int) or isinstance(item["exit_status"], bool):
+                errors.append(f"{ep}.exit_status must be an integer")
+            artifact_fields_present = ARTIFACT_EVIDENCE_FIELDS.intersection(item)
+            if artifact_fields_present and artifact_fields_present != ARTIFACT_EVIDENCE_FIELDS:
+                errors.append(f"{ep} must provide artifact_path, artifact_size_bytes, and artifact_sha256 together")
+            if artifact_fields_present == ARTIFACT_EVIDENCE_FIELDS:
+                if not isinstance(item["artifact_path"], str) or not item["artifact_path"].strip():
+                    errors.append(f"{ep}.artifact_path must be a non-empty string")
+                if not isinstance(item["artifact_size_bytes"], int) or isinstance(item["artifact_size_bytes"], bool) or item["artifact_size_bytes"] < 0:
+                    errors.append(f"{ep}.artifact_size_bytes must be a non-negative integer")
+                digest = item["artifact_sha256"]
+                if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdefABCDEF" for c in digest):
+                    errors.append(f"{ep}.artifact_sha256 must be a 64-character hexadecimal SHA-256")
         if lifecycle == "DISCOVERED_NOT_TESTED" and verification != "NOT_RUN":
             errors.append(f"{prefix} cannot claim verification before leaving DISCOVERED_NOT_TESTED")
         if verification in {"PASS", "FAIL"} and not evidence:
