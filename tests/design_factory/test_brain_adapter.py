@@ -116,5 +116,41 @@ class BrainAdapterTests(unittest.TestCase):
         self.assertEqual(result["error"], "UNSUPPORTED_MODE")
 
 
+    def test_multiple_adapter_calls_retain_each_step_evidence(self):
+        planned = self.adapter.execute({
+            "task": "Bitcoin ASIC RTL and OpenROAD physical design verification"
+        })
+        ledger = planned["execution_ledger"]
+        self.assertGreaterEqual(len(ledger["steps"]), 2)
+
+        params = {
+            "mode": "step",
+            "authorize": True,
+            "dry_run": False,
+            "executor_mode": "simulation",
+        }
+        first_result = self.adapter.execute({**params, "execution_ledger": ledger})
+        first_ledger = first_result["execution_ledger"]
+        first_evidence = first_ledger["steps"][0]["evidence"].copy()
+        self.assertEqual(first_ledger["steps"][0]["status"], "SIMULATED")
+        self.assertEqual(first_ledger["next_step_index"], 1)
+        self.assertEqual(sum(step["started"] for step in first_ledger["steps"]), 1)
+
+        second_result = self.adapter.execute({
+            **params, "execution_ledger": first_ledger
+        })
+        second_ledger = second_result["execution_ledger"]
+        self.assertEqual(second_ledger["steps"][0]["status"], "SIMULATED")
+        self.assertEqual(second_ledger["steps"][0]["evidence"], first_evidence)
+        self.assertEqual(second_ledger["steps"][1]["status"], "SIMULATED")
+        self.assertEqual(second_ledger["next_step_index"], 2)
+        self.assertEqual(sum(step["started"] for step in second_ledger["steps"]), 2)
+        self.assertFalse(any(step["status"] == "VERIFIED" for step in second_ledger["steps"]))
+        self.assertNotEqual(
+            second_ledger["steps"][0]["evidence"]["sha256"],
+            second_ledger["steps"][1]["evidence"]["sha256"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
