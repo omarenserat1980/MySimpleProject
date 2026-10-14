@@ -190,7 +190,7 @@ class CognitiveLoop:
         )
         tool_result=self.execute_tool(tool_id,tool_params) if tool_id else None
         device_success = bool(action == "device" and tool_result and tool_result.get("ok") and tool_result.get("status") == "COMPLETED" and isinstance(tool_result.get("result"), dict))
-        if (action in {"observe","plan"} and tool_result and tool_result.get("ok")) or device_success:
+        if (action in {"observe","plan","engineering_proposal"} and tool_result and tool_result.get("ok")) or device_success:
             evidence_payload = {
                 "run_id": run_id,
                 "task_id": task["id"],
@@ -217,7 +217,7 @@ class CognitiveLoop:
         verification={
             "status":"VERIFIED" if verified_task and verified_task["status"]=="COMPLETED" and (action!="device" or device_success) else "PENDING",
             "task_status":verified_task["status"] if verified_task else "UNKNOWN",
-            "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else "تم فحص حالة المهمة بعد التنفيذ الداخلي.",
+            "evidence":"تم فحص حالة المهمة والنتيجة المستلمة من Termux." if action=="device" else ("تم التحقق من إنشاء الاقتراح الهندسي المنظم." if action=="engineering_proposal" and tool_result and tool_result.get("ok") else "تم فحص حالة المهمة بعد التنفيذ الداخلي."),
             "result_verified":bool(action!="device" or device_success),
             "run_id":run_id
         }
