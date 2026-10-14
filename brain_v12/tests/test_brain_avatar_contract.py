@@ -3,10 +3,50 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 from brain_v12.brain.avatar_state import resolve_avatar_event
+from brain_v12.brain.human_presence_pulse import evaluate_pulse, load_pulse, MEMORY_KEY
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app.py"
 UI = ROOT / "web" / "brain-avatar" / "index.html"
+
+
+class PulseMemoryStub:
+    def __init__(self):
+        self.values = {}
+
+    def memories(self):
+        return [{"key": key, "value": value} for key, value in self.values.items()]
+
+    def save_memory(self, key, value):
+        self.values[key] = value
+
+
+class HumanPresencePulseTests(unittest.TestCase):
+    def test_pulse_persists_one_bounded_tick_and_does_not_claim_render(self):
+        store = PulseMemoryStub()
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        state = evaluate_pulse(store, now=now)
+        self.assertEqual(state["pulse_id"], "HUMAN_PRESENCE")
+        self.assertEqual(state["tick_sequence"], 1)
+        self.assertEqual(state["visual_state"], "PENDING_RENDER_CONFIRMATION")
+        self.assertEqual(state["last_render_status"], "API_POLLED_RENDER_NOT_INDEPENDENTLY_VERIFIED")
+        self.assertIn(MEMORY_KEY, store.values)
+        self.assertEqual(load_pulse(store)["tick_sequence"], 1)
+
+    def test_pulse_tick_is_rate_limited(self):
+        store = PulseMemoryStub()
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        first = evaluate_pulse(store, now=now)
+        second = evaluate_pulse(store, now=now + timedelta(seconds=10))
+        self.assertEqual(first["tick_sequence"], 1)
+        self.assertEqual(second["tick_sequence"], 1)
+
+    def test_invalid_persisted_state_fails_closed(self):
+        store = PulseMemoryStub()
+        store.values[MEMORY_KEY] = "{broken"
+        state = load_pulse(store)
+        self.assertFalse(state["enabled"])
+        self.assertEqual(state["last_render_status"], "INVALID_PERSISTED_STATE")
 
 
 class BrainAvatarContractTests(unittest.TestCase):
@@ -29,6 +69,8 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertIn('if event_source != "recent_runtime_event"', route)
         self.assertLess(route.index("resolve_avatar_event(store.events(50))"), route.index('if event_source != "recent_runtime_event"'))
         self.assertIn('"source": event_source', route)
+        self.assertIn('evaluate_pulse(store, display_target="brain-avatar-ui")', route)
+        self.assertIn('"human_presence_pulse": pulse_status', route)
 
     def test_recent_supervisor_event_drives_thinking_expression(self):
         now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
