@@ -68,6 +68,10 @@ class ProofGateEngine:
                 rejected.append({"evidence_id": "", "reason": "MISSING_EVIDENCE_ID"})
                 continue
             if evidence_id in seen_ids:
+                # A reused ID makes the evidence identity ambiguous. Revoke any
+                # earlier acceptance for that ID rather than letting the first
+                # occurrence win silently.
+                accepted = {kind: item_id for kind, item_id in accepted.items() if item_id != evidence_id}
                 rejected.append({"evidence_id": evidence_id, "reason": "DUPLICATE_EVIDENCE_ID"})
                 continue
             seen_ids.add(evidence_id)
