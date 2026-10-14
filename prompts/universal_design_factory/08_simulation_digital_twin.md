@@ -1,0 +1,3 @@
+# Prompt 08 — Simulation and Digital Twin
+
+Create reproducible models for unavailable devices, nodes, networks, and systems. Record model version, assumptions, input fixtures, limits, random seeds where relevant, expected behavior, and results. Test normal, boundary, failure, and recovery paths. Mark every output as SIMULATED and use separate identifiers and schemas from physical devices. A simulated heartbeat, authentication, mining share, or sensor value must never satisfy a real-hardware evidence gate.

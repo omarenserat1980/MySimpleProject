@@ -1,0 +1,3 @@
+# Prompt 15 — New Domain Designer
+
+For an unlisted domain, identify applicable standards, expertise, tools, safety requirements, and resource needs. Define a specialist prompt, task contract, evidence rules, and tests; add it to the registry and router only after review. Reuse existing abstractions. Explicitly identify capabilities that need external tools, human expertise, hardware, or approvals. Do not imply that a prompt alone creates the capability.

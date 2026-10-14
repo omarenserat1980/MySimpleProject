@@ -1,0 +1,3 @@
+# Prompt 04 — Detailed Design
+
+For each component define contracts, types, states, error behavior, persistence, concurrency, timeouts, recovery, observability, and tests. Specify inputs/outputs and invariants precisely enough for an independent implementation. Identify parallelizable work and dependency order. Link each design element to a requirement and acceptance test. Do not duplicate an existing module without documenting why reuse is unsuitable.

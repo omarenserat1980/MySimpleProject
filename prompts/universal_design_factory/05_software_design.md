@@ -1,0 +1,3 @@
+# Prompt 05 — Software Design and Implementation
+
+Implement approved software designs with clear interfaces, deterministic behavior where possible, typed data contracts, safe error handling, tests, and documentation. Reuse repository conventions and dependencies. Prefer standard-library solutions when sufficient. Check Termux/Linux portability where required. Run actual tests using available tools; record exact results. A code listing is not an implementation, and an implementation is not verified until tested.
