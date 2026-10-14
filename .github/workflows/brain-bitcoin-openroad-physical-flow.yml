@@ -46,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           ORFS=/tmp/OpenROAD-flow-scripts
+          WORK=/tmp/orfs-work
           DESIGN="$ORFS/flow/designs/sky130hd/brain_bitcoin_nonce_search"
           mkdir -p "$DESIGN/src"
           cp brain_v12/asic/rtl/brain_sha256_compress.sv "$DESIGN/src/"
@@ -54,11 +55,13 @@ jobs:
           cp brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv "$DESIGN/src/"
           cp brain_v12/asic/openroad/sky130hd/constraint.sdc "$DESIGN/constraint.sdc"
           cp brain_v12/asic/openroad/sky130hd/config.mk "$DESIGN/config.mk"
+          mkdir -p "$WORK"
           docker run --rm \
             -v "$ORFS:/tmp/brain-openroad-flow-scripts:ro" \
-            -w /tmp/brain-openroad-flow-scripts/flow \
+            -v "$WORK:/tmp/orfs-work" \
+            -w /tmp/orfs-work \
             openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8 \
-            bash -lc 'set -euo pipefail; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/brain-openroad-flow-scripts/flow; command -v openroad; command -v yosys; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
+            bash -lc 'set -euo pipefail; cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/orfs-work/flow; cd /tmp/orfs-work/flow; command -v openroad; command -v yosys; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
             2>&1 | tee evidence/openroad_flow.log
 
       - name: Collect physical-flow evidence
@@ -66,16 +69,16 @@ jobs:
         shell: bash
         run: |
           set -u
-          ORFS=/tmp/OpenROAD-flow-scripts
+          WORK=/tmp/orfs-work
           mkdir -p evidence/results evidence/reports evidence/logs
-          if [ -d "$ORFS/flow/results/sky130hd/brain_bitcoin_nonce_search" ]; then
-            cp -a "$ORFS/flow/results/sky130hd/brain_bitcoin_nonce_search/." evidence/results/
+          if [ -d "$WORK/flow/results/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/results/sky130hd/brain_bitcoin_nonce_search/." evidence/results/
           fi
-          if [ -d "$ORFS/flow/reports/sky130hd/brain_bitcoin_nonce_search" ]; then
-            cp -a "$ORFS/flow/reports/sky130hd/brain_bitcoin_nonce_search/." evidence/reports/
+          if [ -d "$WORK/flow/reports/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/reports/sky130hd/brain_bitcoin_nonce_search/." evidence/reports/
           fi
-          if [ -d "$ORFS/flow/logs/sky130hd/brain_bitcoin_nonce_search" ]; then
-            cp -a "$ORFS/flow/logs/sky130hd/brain_bitcoin_nonce_search/." evidence/logs/
+          if [ -d "$WORK/flow/logs/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/logs/sky130hd/brain_bitcoin_nonce_search/." evidence/logs/
           fi
           if [ -s evidence/openroad_flow.log ]; then
             if grep -Eqi 'flow complete|finished.*flow' evidence/openroad_flow.log; then
