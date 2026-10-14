@@ -41,3 +41,10 @@ jobs:
             brain_v12/asic/rtl/tb_brain_bitcoin_nonce_search.sv
       - name: Verify bounded nonce search on genesis vector
         run: vvp /tmp/brain-nonce-search.vvp
+      - name: Install open-source synthesis tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yosys
+      - name: Synthesize bounded nonce-search RTL
+        run: |
+          yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_sha256_compress.sv brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv brain_v12/asic/rtl/brain_bitcoin_target_check.sv brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv; hierarchy -check -top brain_bitcoin_nonce_search; proc; opt; check; stat'
