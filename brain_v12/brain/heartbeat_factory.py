@@ -14,7 +14,9 @@ import os
 import re
 import sqlite3
 import time
+from functools import wraps
 from pathlib import Path
+from threading import RLock
 from typing import Any
 
 SCHEMA_VERSION = 1
@@ -91,6 +93,14 @@ class HeartbeatConflict(ValueError):
     """A duplicate identifier was reused with incompatible content."""
 
 
+def _serialized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
 class HeartbeatFactory:
     """SQLite-backed function registry and explicit heartbeat state machine.
 
@@ -104,7 +114,8 @@ class HeartbeatFactory:
             expanded = Path(self.path).expanduser()
             expanded.resolve().parent.mkdir(parents=True, exist_ok=True)
             self.path = str(expanded)
-        self.db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
+        self._lock = RLock()
+        self.db = sqlite3.connect(self.path, timeout=10, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA busy_timeout=10000")
         if self.path != ":memory:":
@@ -166,6 +177,7 @@ class HeartbeatFactory:
             ON heartbeat_events(status, generated_at DESC);
         """)
 
+    @_serialized
     def register_function(self, definition: FunctionDefinition | dict[str, Any], *, now: float | None = None) -> dict[str, Any]:
         if isinstance(definition, dict):
             definition = FunctionDefinition(**definition)
@@ -207,17 +219,20 @@ class HeartbeatFactory:
             ))
         return self.get_function(definition.function_id)
 
+    @_serialized
     def get_function(self, function_id: str) -> dict[str, Any] | None:
         row = self.db.execute(
             "SELECT * FROM heartbeat_functions WHERE function_id=?", (function_id,)
         ).fetchone()
         return dict(row) if row else None
 
+    @_serialized
     def list_functions(self) -> list[dict[str, Any]]:
         return [dict(row) for row in self.db.execute(
             "SELECT * FROM heartbeat_functions ORDER BY function_id"
         ).fetchall()]
 
+    @_serialized
     def create_heartbeat(
         self, function_id: str, *, worker_id: str, node_id: str,
         mode: str = "test", source: str = "local_protocol",
@@ -274,6 +289,7 @@ class HeartbeatFactory:
         )
         return self.get_heartbeat(heartbeat_id)
 
+    @_serialized
     def get_heartbeat(self, heartbeat_id: str) -> dict[str, Any] | None:
         row = self.db.execute(
             "SELECT * FROM heartbeat_events WHERE heartbeat_id=?", (heartbeat_id,)
@@ -284,6 +300,7 @@ class HeartbeatFactory:
         item["payload"] = json.loads(item.pop("payload_json"))
         return item
 
+    @_serialized
     def transition(self, heartbeat_id: str, target: str, *, now: float | None = None,
                    evidence_ref: str | None = None, error_code: str | None = None,
                    latency_ms: float | None = None) -> dict[str, Any]:
@@ -326,6 +343,7 @@ class HeartbeatFactory:
         """, (function_status, success_at, safe_error_code, evidence_ref, instant, item["function_id"]))
         return self.get_heartbeat(heartbeat_id)
 
+    @_serialized
     def delayed_functions(self, *, now: float | None = None) -> list[dict[str, Any]]:
         instant = time.time() if now is None else float(now)
         output = []
@@ -345,6 +363,7 @@ class HeartbeatFactory:
                 })
         return output
 
+    @_serialized
     def summary(self) -> dict[str, Any]:
         function_rows = self.list_functions()
         states = {state: 0 for state in sorted(HEARTBEAT_STATES)}
