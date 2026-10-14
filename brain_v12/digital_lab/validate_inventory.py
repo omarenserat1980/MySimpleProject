@@ -18,18 +18,18 @@ REQUIRED_ASSET_FIELDS = {
     "asset_id", "path", "domain", "size_bytes", "modified_utc",
     "lifecycle_status", "verification_status", "evidence",
 }
+LIFECYCLE_STATES = {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "ACCEPTED", "REJECTED", "QUARANTINED"}
+VERIFICATION_STATES = {"NOT_RUN", "PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"}
 
-class InventoryValidationError(ValueError):
-    """Raised when an inventory report is malformed or overstates verification."""
 
 def validate_inventory(report: Any) -> list[str]:
+    """Return validation errors; an empty list means structurally valid only."""
     errors: list[str] = []
     if not isinstance(report, dict):
         return ["report must be a JSON object"]
     missing = sorted(REQUIRED_TOP_LEVEL - report.keys())
     if missing:
-        errors.append(f"missing top-level fields: {', '.join(missing)}")
-        return errors
+        return [f"missing top-level fields: {', '.join(missing)}"]
     if report["schema_version"] != 1:
         errors.append("unsupported schema_version; expected 1")
     if report["inventory_type"] != "repository_path_metadata_only":
@@ -37,10 +37,11 @@ def validate_inventory(report: Any) -> list[str]:
     assets = report["assets"]
     if not isinstance(assets, list):
         return errors + ["assets must be a list"]
-    if report["asset_count"] != len(assets):
-        errors.append("asset_count does not match the assets list length")
-    if not isinstance(report["coverage_limitations"], list) or not report["coverage_limitations"]:
-        errors.append("coverage_limitations must be a non-empty list")
+    if not isinstance(report["asset_count"], int) or isinstance(report["asset_count"], bool) or report["asset_count"] != len(assets):
+        errors.append("asset_count must be an integer matching the assets list length")
+    limitations = report["coverage_limitations"]
+    if not isinstance(limitations, list) or not limitations or any(not isinstance(item, str) or not item.strip() for item in limitations):
+        errors.append("coverage_limitations must be a non-empty list of non-empty strings")
     seen: set[str] = set()
     for index, asset in enumerate(assets):
         prefix = f"assets[{index}]"
@@ -52,28 +53,34 @@ def validate_inventory(report: Any) -> list[str]:
             errors.append(f"{prefix} missing fields: {', '.join(absent)}")
             continue
         path = asset["path"]
-        asset_id = asset["asset_id"]
         if not isinstance(path, str) or not path or path.startswith("/") or "\\" in path:
             errors.append(f"{prefix}.path must be a non-empty repository-relative POSIX path")
         elif any(part in {"", ".", ".."} for part in path.split("/")):
             errors.append(f"{prefix}.path contains an unsafe path segment")
-        if asset_id != path:
+        if asset["asset_id"] != path:
             errors.append(f"{prefix}.asset_id must equal path")
         if isinstance(path, str):
             if path in seen:
                 errors.append(f"duplicate asset path: {path}")
             seen.add(path)
-        if not isinstance(asset["size_bytes"], int) or asset["size_bytes"] < 0:
+        if not isinstance(asset["size_bytes"], int) or isinstance(asset["size_bytes"], bool) or asset["size_bytes"] < 0:
             errors.append(f"{prefix}.size_bytes must be a non-negative integer")
-        if asset["lifecycle_status"] not in {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "ACCEPTED", "REJECTED", "QUARANTINED"}:
+        lifecycle = asset["lifecycle_status"]
+        verification = asset["verification_status"]
+        if not isinstance(lifecycle, str) or lifecycle not in LIFECYCLE_STATES:
             errors.append(f"{prefix}.lifecycle_status is not recognized")
-        if asset["verification_status"] not in {"NOT_RUN", "PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"}:
+        if not isinstance(verification, str) or verification not in VERIFICATION_STATES:
             errors.append(f"{prefix}.verification_status is not recognized")
-        if asset["lifecycle_status"] == "DISCOVERED_NOT_TESTED" and asset["verification_status"] != "NOT_RUN":
+        if lifecycle == "DISCOVERED_NOT_TESTED" and verification != "NOT_RUN":
             errors.append(f"{prefix} cannot claim verification before leaving DISCOVERED_NOT_TESTED")
         if not isinstance(asset["evidence"], list):
             errors.append(f"{prefix}.evidence must be a list")
+        if not isinstance(asset["domain"], str) or not asset["domain"].strip():
+            errors.append(f"{prefix}.domain must be a non-empty string")
+        if not isinstance(asset["modified_utc"], str) or not asset["modified_utc"].strip():
+            errors.append(f"{prefix}.modified_utc must be a non-empty string")
     return errors
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -89,6 +96,7 @@ def main() -> int:
                       "asset_count": report.get("asset_count") if isinstance(report, dict) else None,
                       "errors": errors}, ensure_ascii=False))
     return 0 if not errors else 2
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
