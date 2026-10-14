@@ -11,17 +11,21 @@ import json
 
 SIMULATOR_ID = "brain.design_factory.local_simulator.v1"
 ALLOWED_DOMAINS = {
+    "discovery",
     "requirements",
-    "research",
     "architecture",
+    "detailed_design",
     "software",
-    "rtl",
-    "verification",
-    "physical_design",
+    "digital_logic",
+    "simulation",
     "security",
-    "testing",
-    "documentation",
-    "unknown",
+    "verification",
+    "infrastructure",
+    "physical_design",
+    "manufacturing",
+    "reliability",
+    "integration",
+    "new_domain",
 }
 
 
