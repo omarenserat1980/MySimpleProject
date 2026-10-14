@@ -14,7 +14,7 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 </head>
 <body>
 <main>
-<header><div><div class="eyebrow">ELECTRONIC BRAIN · DIGITAL PRESENCE</div><div class="brand">BRAIN AVATAR</div><div class="sub">واجهة تجريبية مستقلة — لا تدّعي أنها متصلة بالعقل الحي</div></div><div class="sub" id="connection">الاتصال بالنواة: غير موصول</div></header>
+<header><div><div class="eyebrow">ELECTRONIC BRAIN · DIGITAL PRESENCE</div><div class="brand">BRAIN AVATAR</div><div class="sub">واجهة تجريبية مستقلة — لا تدّعي أنها متصلة بالعقل الحي</div></div><div class="sub" id="connection" role="status" aria-live="polite">الاتصال بالنواة: جارٍ التحقق…</div></header>
 <div class="layout">
 <section class="panel">
 <div class="stage" aria-label="عرض الوجه الرقمي">
@@ -27,6 +27,7 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 <section class="panel">
 <h2 style="margin-top:0">التحكم بالحضور</h2>
 <div class="controls">
+<div class="field"><label><input id="liveMode" type="checkbox" checked> مزامنة الحالة مع Brain الحي</label><div class="sub">عند التفعيل، تستبدل حالة الوجه الاختيار اليدوي بآخر حالة مؤكدة من واجهة API.</div></div>
 <div class="field"><label for="state">حالة الوجه</label><select id="state">
 <option value="IDLE">IDLE — انتظار</option><option value="LISTENING">LISTENING — استماع</option><option value="THINKING">THINKING — تفكير</option><option value="SPEAKING">SPEAKING — تحدث</option><option value="SUCCESS">SUCCESS — نجاح</option><option value="UNCERTAIN">UNCERTAIN — عدم يقين</option><option value="ERROR">ERROR — خطأ</option>
 </select></div>
@@ -41,13 +42,37 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 </main>
 <script>
 (function(){
-const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label');
+const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label'),connection=document.getElementById('connection'),liveMode=document.getElementById('liveMode'),applyButton=document.getElementById('apply');
+let lastLiveState=null, polling=false;
 const names={IDLE:'مستعد',LISTENING:'استماع',THINKING:'تفكير',SPEAKING:'تحدث',SUCCESS:'نجاح',UNCERTAIN:'عدم يقين',ERROR:'خطأ'};
-function apply(){const s=state.value;face.dataset.state=s;chip.textContent=s+' · '+names[s];stateText.textContent=s;document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
+function render(s){face.dataset.state=s;chip.textContent=s+' · '+names[s];stateText.textContent=s;}
+function apply(){const s=state.value;render(s);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
+async function pollLiveState(){
+ if(!liveMode.checked||polling)return;
+ polling=true;
+ try{
+  const response=await fetch('/api/brain-avatar/state',{headers:{'Accept':'application/json'},cache:'no-store'});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const data=await response.json();
+  if(!data||typeof data.state!=='string'||!names[data.state])throw new Error('Invalid status payload');
+  lastLiveState=data.state;render(data.state);
+  connection.textContent='Brain: '+(data.brain_status||'UNKNOWN')+' · API متصلة';
+  connection.style.color=data.brain_alive?'var(--green)':'var(--amber)';
+ }catch(_error){
+  lastLiveState=null;connection.textContent='Brain: غير متصل — عرض الحالة اليدوية';
+  connection.style.color='var(--amber)';render('UNCERTAIN');
+ }finally{polling=false;}
+}
+function syncControls(){
+ const manual=!liveMode.checked;
+ state.disabled=!manual;applyButton.disabled=!manual;
+ if(liveMode.checked)pollLiveState();else{connection.textContent='الوضع اليدوي · لا توجد مزامنة حية';connection.style.color='var(--muted)';apply();}
+}
 document.getElementById('apply').addEventListener('click',apply);
 document.getElementById('reset').addEventListener('click',()=>{state.value='IDLE';label.value='';apply();});
 state.addEventListener('change',apply);label.addEventListener('input',()=>{document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';});
-apply();
+liveMode.addEventListener('change',syncControls);
+apply();syncControls();window.setInterval(pollLiveState,5000);
 })();
 </script>
 </body>
