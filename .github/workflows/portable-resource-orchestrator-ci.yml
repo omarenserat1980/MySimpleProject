@@ -26,6 +26,11 @@ on:
       - "brain_v12/brain/health_probe.py"
       - "brain_v12/brain/task_engine.py"
       - "brain_v12/brain/worker_registry.py"
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/brain/bitcoin_north_star.py"
+      - "brain_v12/brain/decision_engine.py"
+      - "brain_v12/tests/test_bitcoin_north_star.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - "brain_v12/brain/evidence_store.py"
       - "brain_v12/asic/**"
       - ".github/workflows/portable-resource-orchestrator-ci.yml"
@@ -68,6 +73,10 @@ jobs:
             brain_v12/brain/asic_hardware_simulator.py \
             brain_v12/brain/mining_engine.py \
             brain_v12/brain/bitcoin_mining_intelligence_api.py \
+            brain_v12/brain/termux_bitcoin_worker.py \
+            brain_v12/brain/bitcoin_north_star.py \
+            brain_v12/brain/decision_engine.py \
+            brain_v12/tests/test_bitcoin_north_star.py \
             brain_v12/asic/toolchain_probe.py
 
       - name: Install ASIC test runner
@@ -84,7 +93,9 @@ jobs:
           mkdir -p artifacts/asic
           python -m unittest \
             brain_v12.tests.test_mining_engine \
-            brain_v12.tests.test_bitcoin_mining_intelligence_api -v \
+            brain_v12.tests.test_bitcoin_mining_intelligence_api \
+            brain_v12.tests.test_termux_bitcoin_worker \
+            brain_v12.tests.test_bitcoin_north_star -v \
             2>&1 | tee artifacts/asic/mining-economics-tests.log
 
       - name: Prepare RTL evidence directory

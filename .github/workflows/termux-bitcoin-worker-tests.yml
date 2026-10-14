@@ -1,0 +1,43 @@
+name: Termux Bitcoin Worker Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
+      - "brain_v12/tools/termux_bitcoin_acceptance.sh"
+      - ".github/workflows/termux-bitcoin-worker-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: termux-bitcoin-worker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker-unit-tests:
+    name: Static checks and unit tests (no live mining)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile worker and tests
+        run: python -m py_compile brain_v12/brain/termux_bitcoin_worker.py brain_v12/tests/test_termux_bitcoin_worker.py
+      - name: Run worker unit tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_termux_bitcoin_worker -v
+      - name: Verify preflight script syntax
+        run: bash -n brain_v12/tools/termux_bitcoin_acceptance.sh
+      - name: Record evidence boundary
+        run: |
+          echo "CI validates code and unit tests only."
+          echo "No phone, miner process, pool session, accepted share, ASIC, or revenue is verified by this job."
