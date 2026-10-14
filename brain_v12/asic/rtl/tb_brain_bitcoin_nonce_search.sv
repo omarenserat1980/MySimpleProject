@@ -65,6 +65,23 @@ module tb_brain_bitcoin_nonce_search;
         if (attempts !== 3) $fatal(1, "FAIL: expected exactly three attempts, got %0d", attempts);
         if (busy) $fatal(1, "FAIL: search remained busy after exhausting its bound");
         $display("PASS: bounded nonce search stops after three unsuccessful attempts");
+
+        // Boundary-path test: the 32-bit nonce wraps from FFFFFFFF to 00000000.
+        target = 256'b0;
+        nonce_start = 32'hffffffff;
+        max_attempts = 2;
+        @(posedge clk);
+        start <= 1'b1;
+        @(posedge clk);
+        start <= 1'b0;
+        wait (!done);
+        wait (done);
+        #1;
+        if (found) $fatal(1, "FAIL: zero target unexpectedly accepted a wrapped nonce");
+        if (attempts !== 2) $fatal(1, "FAIL: expected exactly two wrap-boundary attempts, got %0d", attempts);
+        if (nonce !== 32'h00000000) $fatal(1, "FAIL: nonce did not wrap to zero, got %08h", nonce);
+        if (busy) $fatal(1, "FAIL: search remained busy after wrap-boundary bound");
+        $display("PASS: nonce wrap boundary is handled within the configured attempt bound");
         $finish;
     end
 endmodule
