@@ -19,7 +19,7 @@ REQUIRED_ASSET_FIELDS = {
     "lifecycle_status", "verification_status", "evidence",
 }
 REQUIRED_EVIDENCE_FIELDS = {"source", "reference", "observed_utc", "result"}
-LIFECYCLE_STATES = {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "ACCEPTED", "REJECTED", "QUARANTINED"}
+LIFECYCLE_STATES = {"DISCOVERED_NOT_TESTED", "IN_REVIEW", "TESTING", "ACCEPTED", "REJECTED", "BLOCKED", "QUARANTINED"}
 VERIFICATION_STATES = {"NOT_RUN", "PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"}
 
 
@@ -96,6 +96,10 @@ def validate_inventory(report: Any) -> list[str]:
             errors.append(f"{prefix} cannot be ACCEPTED without PASS verification and evidence")
         if lifecycle == "REJECTED" and (verification != "FAIL" or not evidence):
             errors.append(f"{prefix} cannot be REJECTED without FAIL verification and evidence")
+        if lifecycle == "BLOCKED" and verification != "BLOCKED":
+            errors.append(f"{prefix} cannot be BLOCKED without BLOCKED verification status")
+        if verification == "BLOCKED" and lifecycle not in {"BLOCKED", "QUARANTINED"}:
+            errors.append(f"{prefix} BLOCKED verification requires BLOCKED or QUARANTINED lifecycle")
         if not isinstance(asset["domain"], str) or not asset["domain"].strip():
             errors.append(f"{prefix}.domain must be a non-empty string")
         if not isinstance(asset["modified_utc"], str) or not asset["modified_utc"].strip():
