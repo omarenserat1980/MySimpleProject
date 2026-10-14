@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from brain_v12.brain.resource_manager import ResourceManager
+from brain_v12.brain.virtual_task_queue import VirtualTaskQueue
 from brain_v12.brain.hybrid_resource_fabric import (
     FabricError,
     HybridResourceFabric,
@@ -127,6 +128,16 @@ class HybridResourceFabricTests(unittest.TestCase):
         result = manager.reserve_hybrid_resource("sim-01", "manager-task", {"cpu": 1}, {"cpu"})
         self.assertEqual(result["status"], "RESERVED")
         self.assertEqual(manager.release_hybrid_resource("manager-task")["status"], "RELEASED")
+
+    def test_virtual_task_queue_exposes_explicit_fabric_reservations(self):
+        manager = ResourceManager()
+        manager.register_hybrid_resource(self.virtual())
+        queue = VirtualTaskQueue.__new__(VirtualTaskQueue)
+        queue.resources = manager
+        result = queue.reserve_federated_resource("sim-01", "queue-task", {"cpu": 1}, {"cpu"})
+        self.assertEqual(result["status"], "RESERVED")
+        self.assertEqual(queue.federated_resource_status()["count"], 1)
+        self.assertEqual(queue.release_federated_resource("queue-task")["status"], "RELEASED")
 
     def test_release_is_idempotent(self):
         self.fabric.register(self.virtual())
