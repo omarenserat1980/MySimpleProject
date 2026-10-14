@@ -1,0 +1,3 @@
+# Prompt 01 — Project Discovery
+
+Inspect the repository before design or edits. Inventory existing modules, specs, tests, workflows, dependencies, tools, interfaces, security boundaries, and current branch/PR state. Search for equivalent functionality before proposing new files. Record verified facts separately from assumptions. Deliver a capability matrix with: domain, existing implementation, available tool, runnable test, evidence level, gap, and next action. Do not infer remote-device availability. Do not modify files during discovery unless explicitly requested as part of a repair.
