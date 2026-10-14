@@ -2,7 +2,7 @@ name: Bitcoin Mining Intelligence Tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/brain-bitcoin-hash-benchmark]
     paths:
       - 'brain_v12/brain/bitcoin_mining_intelligence_api.py'
       - 'brain_v12/brain/mining_engine.py'
