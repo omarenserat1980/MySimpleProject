@@ -6,6 +6,7 @@ on:
       - "brain_v12/brain/multi_agent_collaboration.py"
       - "brain_v12/brain/brain_supervisor.py"
       - "brain_v12/tests/test_multi_agent_collaboration.py"
+      - "brain_v12/tests/test_brain_supervisor_collaboration.py"
       - "brain_v12/docs/BRAIN_MULTI_AGENT_COLLABORATION_*.md"
       - ".github/workflows/brain-multi-agent-collaboration.yml"
   push:
@@ -47,7 +48,7 @@ jobs:
         run: |
           mkdir -p artifacts
           set +e
-          python -m unittest brain_v12.tests.test_multi_agent_collaboration -v 2>&1 | tee artifacts/collaboration-tests.log
+          python -m unittest brain_v12.tests.test_multi_agent_collaboration brain_v12.tests.test_brain_supervisor_collaboration -v 2>&1 | tee artifacts/collaboration-tests.log
           test_status=${PIPESTATUS[0]}
           set -e
           TEST_STATUS="$test_status" python - <<'PY'
@@ -56,7 +57,7 @@ jobs:
           sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
           record = {
               "schema_version": "1.0",
-              "suite": "brain_v12.tests.test_multi_agent_collaboration",
+              "suite": "brain_v12.tests.test_multi_agent_collaboration + brain_v12.tests.test_brain_supervisor_collaboration",
               "commit_sha": sha,
               "runner": "github-hosted-ubuntu",
               "reality_level": "CI",
