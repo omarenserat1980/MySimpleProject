@@ -1,6 +1,13 @@
 name: Brain Security Hardening
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/**"
+      - "cloud/**"
+      - ".github/workflows/**"
+      - "docs/**"
   workflow_dispatch:
   push:
     paths:
@@ -13,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: brain-security-hardening
+  group: brain-security-hardening-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
