@@ -28,6 +28,8 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertIn("window.setInterval(pollLiveState,5000)", self.html)
         self.assertIn("Brain: تعذّر التحقق من الحالة الحية", self.html)
         self.assertIn('id="liveMode"', self.html)
+        self.assertIn("brain.avatar.liveMode", self.html)
+        self.assertIn("brain.avatar.label", self.html)
 
     def test_avatar_has_accessible_arabic_mobile_and_reduced_motion_support(self):
         self.assertIn('<html lang="ar" dir="rtl">', self.html)
