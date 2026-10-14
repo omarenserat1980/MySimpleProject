@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from brain_v12.brain.heartbeat_factory import (
@@ -82,6 +83,18 @@ class HeartbeatFactoryTests(unittest.TestCase):
             authorization_ref="test-auth-fixture", now=101.0,
         )
         self.assertEqual(accepted["status"], "CREATED")
+
+    def test_concurrent_emission_keeps_sequences_unique(self):
+        self.register()
+        def emit(_):
+            return self.factory.create_heartbeat(
+                "brain.api", worker_id="shared-worker", node_id="shared-node",
+                mode="test", payload={"safe": True}, now=101.0,
+            )
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            rows = list(pool.map(emit, range(20)))
+        self.assertEqual(sorted(row["sequence"] for row in rows), list(range(1, 21)))
+        self.assertEqual(len({row["heartbeat_id"] for row in rows}), 20)
 
     def test_reused_sequence_with_different_payload_conflicts(self):
         self.register()
