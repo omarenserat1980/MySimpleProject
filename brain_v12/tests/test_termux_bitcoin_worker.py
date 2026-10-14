@@ -1,6 +1,8 @@
 import unittest
 
-from brain_v12.brain.termux_bitcoin_worker import build_command, validate_pool_url, _positive_int
+from brain_v12.brain.termux_bitcoin_worker import (
+    build_command, validate_pool_url, _positive_int, parse_miner_line,
+)
 
 
 class TermuxBitcoinWorkerTests(unittest.TestCase):
@@ -33,6 +35,23 @@ class TermuxBitcoinWorkerTests(unittest.TestCase):
     def test_rejects_unsafe_worker_name(self):
         with self.assertRaises(ValueError):
             build_command("cpuminer", "stratum+tcp://pool.example:3333", "wallet;rm -rf /", 1)
+
+    def test_parses_miner_output_as_unverified_candidate_signals(self):
+        counters = {
+            "accepted_shares": 0,
+            "rejected_or_stale_lines": 0,
+            "authorization_message_seen": False,
+            "last_reported_hashrate_hs": None,
+            "hashrate_unit_source": None,
+        }
+        parse_miner_line("accepted: 1/1 (100.00%), 12.50 khash/s", counters)
+        parse_miner_line("rejected: 1/2 (50.00%)", counters)
+        parse_miner_line("Stratum authorization successful", counters)
+        self.assertEqual(counters["accepted_shares"], 1)
+        self.assertEqual(counters["rejected_or_stale_lines"], 1)
+        self.assertTrue(counters["authorization_message_seen"])
+        self.assertEqual(counters["last_reported_hashrate_hs"], 12500.0)
+        self.assertEqual(counters["hashrate_unit_source"], "miner_stdout_stderr_unverified")
 
 
 if __name__ == "__main__":
