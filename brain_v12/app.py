@@ -63,6 +63,7 @@ from .brain.error_recovery_api import router as error_recovery_router
 from .brain.universal_simulator_api import router as universal_simulator_router
 from .brain.windows_server_2025_simulation_api import router as windows_server_2025_simulation_router
 from .brain.device_bridge import DeviceBridge
+from .brain.physical_asic_api import router as physical_asic_router
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
 from .brain.canonical_indicators import aggregate_indicator_payloads, indicators_for_fleet
@@ -259,6 +260,7 @@ app.include_router(cloud_executor_attestation_router)
 app.include_router(open_source_tools_router)
 app.include_router(asic_simulator_router)
 app.include_router(bitcoin_mining_intelligence_router)
+app.include_router(physical_asic_router)
 
 
 @app.get("/api/logs/errors")
