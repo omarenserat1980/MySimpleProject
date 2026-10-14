@@ -36,6 +36,14 @@ def _json_safe(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def _safe_error_code(value: str | None) -> str | None:
+    if value is None:
+        return None
+    candidate = str(value).strip()
+    # Only stable classification codes are persisted, never arbitrary exception text.
+    return candidate if re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", candidate) else "UNCLASSIFIED_ERROR"
+
+
 def redact(value: Any) -> Any:
     """Recursively redact secret-like keys before anything reaches evidence."""
     if isinstance(value, dict):
@@ -299,18 +307,19 @@ class HeartbeatFactory:
             raise ValueError("HEARTBEAT_ALREADY_SENT")
         sent_at = instant if target == "SENT" else item["sent_at"]
         received_at = instant if target == "ACKNOWLEDGED" else item["received_at"]
+        safe_error_code = _safe_error_code(error_code)
         self.db.execute("""
             UPDATE heartbeat_events SET status=?,sent_at=?,received_at=?,
               evidence_ref=COALESCE(?,evidence_ref),error_code=?,latency_ms=COALESCE(?,latency_ms)
             WHERE heartbeat_id=?
-        """, (target, sent_at, received_at, evidence_ref, error_code, latency_ms, heartbeat_id))
+        """, (target, sent_at, received_at, evidence_ref, safe_error_code, latency_ms, heartbeat_id))
         success_at = instant if target == "VERIFIED" else None
         function_status = target
         self.db.execute("""
             UPDATE heartbeat_functions SET status=?,last_success_at=COALESCE(?,last_success_at),
               last_error_code=?,evidence_ref=COALESCE(?,evidence_ref),updated_at=?
             WHERE function_id=?
-        """, (function_status, success_at, error_code, evidence_ref, instant, item["function_id"]))
+        """, (function_status, success_at, safe_error_code, evidence_ref, instant, item["function_id"]))
         return self.get_heartbeat(heartbeat_id)
 
     def delayed_functions(self, *, now: float | None = None) -> list[dict[str, Any]]:
