@@ -27,6 +27,18 @@ class BitcoinStratumConnectionProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(StratumConnectionProbeError, "UNEXPECTED_RESPONSE_ID"):
             _parse_response(b'{"id":7,"result":true,"error":null}', 1)
 
+    def test_subscribe_result_validation_requires_stratum_fields(self):
+        from brain_v12.brain.bitcoin_stratum_connection_probe import _validate_subscribe_result
+
+        for malformed in (True, {}, [], ["subscriptions"], ["subscriptions", "abcd"]):
+            with self.subTest(malformed=malformed):
+                with self.assertRaisesRegex(
+                    StratumConnectionProbeError, "SUBSCRIBE_REJECTED_OR_MALFORMED"
+                ):
+                    _validate_subscribe_result(malformed)
+
+        self.assertTrue(_validate_subscribe_result([[], "abcd", 4]))
+
     def test_rejection_does_not_leak_pool_error_details(self):
         with self.assertRaisesRegex(StratumConnectionProbeError, "STRATUM_REQUEST_REJECTED") as ctx:
             _parse_response(b'{"id":1,"result":null,"error":[20,"private detail",null]}', 1)
