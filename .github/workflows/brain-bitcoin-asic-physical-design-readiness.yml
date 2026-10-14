@@ -1,0 +1,74 @@
+name: Brain Bitcoin ASIC Physical Design Readiness
+on:
+  push:
+    branches:
+      - feat/bitcoin-asic-physical-design-gate
+  pull_request:
+    branches:
+      - feat/bitcoin-bounded-nonce-search
+    paths:
+      - "brain_v12/asic/rtl/**"
+      - "brain_v12/asic/PHYSICAL_DESIGN_GATE.md"
+      - ".github/workflows/brain-bitcoin-asic-physical-design-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generic-synthesis-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install open-source synthesis tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y yosys
+      - name: Generic synthesis preflight (not physical design signoff)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          yosys -p 'read_verilog -sv brain_v12/asic/rtl/brain_sha256_compress.sv brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv brain_v12/asic/rtl/brain_bitcoin_target_check.sv brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv; hierarchy -check -top brain_bitcoin_nonce_search; proc; opt; check; synth -top brain_bitcoin_nonce_search; stat; write_json evidence/brain_bitcoin_nonce_search_generic_netlist.json; write_verilog -noattr evidence/brain_bitcoin_nonce_search_generic_netlist.v' 2>&1 | tee evidence/yosys_generic_synthesis.log
+          test -s evidence/brain_bitcoin_nonce_search_generic_netlist.json
+          test -s evidence/brain_bitcoin_nonce_search_generic_netlist.v
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("evidence/brain_bitcoin_nonce_search_generic_netlist.json").read_text())
+          modules = data.get("modules", {})
+          top = modules.get("brain_bitcoin_nonce_search")
+          if not top:
+              raise SystemExit("FAIL: top module missing from synthesized netlist")
+          if not top.get("cells"):
+              raise SystemExit("FAIL: synthesized top module contains no cells")
+          print("PASS: generic synthesis produced a non-empty top-level netlist")
+          print("LIMIT: generic synthesis is not technology mapping, place-and-route, timing signoff, GDSII, fabrication, or mining proof")
+          PY
+      - name: Record reproducible preflight manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'schema_version=1\n'
+            printf 'status=PASS_GENERIC_SYNTHESIS_PREFLIGHT_ONLY\n'
+            printf 'gate=G4_GENERIC_SYNTHESIS_PREFLIGHT\n'
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'checkout_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'yosys_version=%s\n' "$(yosys -V)"
+            printf 'claim_limit=NO_PDK_NO_PLACE_AND_ROUTE_NO_TIMING_SIGNOFF_NO_GDSII_NO_FABRICATION_NO_MINING_PROOF\n'
+          } > evidence/manifest.txt
+          sha256sum evidence/yosys_generic_synthesis.log evidence/brain_bitcoin_nonce_search_generic_netlist.json evidence/brain_bitcoin_nonce_search_generic_netlist.v >> evidence/manifest.txt
+      - name: Upload preflight evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-bitcoin-asic-physical-design-preflight
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
