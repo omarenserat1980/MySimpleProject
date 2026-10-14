@@ -3234,29 +3234,73 @@ def brain_liveness():
 
 @app.get("/api/brain-avatar/state")
 def brain_avatar_state():
-    """Read-only live status for the avatar; never runs a device probe or external action."""
+    """Read-only liveness plus recent runtime events; never triggers execution."""
+    import json as _json
+    from datetime import datetime as _datetime, timezone as _timezone
     try:
         assessment = assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
         checks = assessment.get("checks", {})
         core_alive = bool(assessment.get("brain_alive"))
         device = checks.get("device_bridge", {})
+        avatar_state = "IDLE"
+        event_type = None
+        event_age_seconds = None
+        event_source = "none"
         if not core_alive:
             avatar_state = "ERROR"
+            event_source = "liveness_assessment"
         elif assessment.get("status") == "DEGRADED" or not device.get("ok"):
             avatar_state = "UNCERTAIN"
+            event_source = "liveness_assessment"
         else:
-            # No active task/event evidence is queried here; idle is the honest default.
-            avatar_state = "IDLE"
+            # Only explicit, recent, recorded events may drive an activity expression.
+            event_states = {
+                "BRAIN_SUPERVISOR_RUN_REQUESTED": ("THINKING", 120),
+                "BACKGROUND_WORK_SUBMITTED": ("THINKING", 60),
+                "BRAIN_SUPERVISOR_VERIFY": ("SUCCESS", 15),
+                "REMOTE_FABRIC_SIMULATION_COMMAND": ("SUCCESS", 15),
+            }
+            for event in store.events(50):
+                kind = str(event.get("kind", ""))
+                if kind not in event_states:
+                    continue
+                try:
+                    payload = event.get("payload", {})
+                    if isinstance(payload, str):
+                        payload = _json.loads(payload or "{}")
+                    if not isinstance(payload, dict):
+                        continue
+                    if kind == "BRAIN_SUPERVISOR_VERIFY":
+                        visual_state = "SUCCESS" if payload.get("verified") is True else "ERROR"
+                    elif kind == "REMOTE_FABRIC_SIMULATION_COMMAND":
+                        visual_state = "SUCCESS" if payload.get("ok") is True else "ERROR"
+                    else:
+                        visual_state = event_states[kind][0]
+                    stamp = _datetime.fromisoformat(str(event.get("created_at", "")).replace("Z", "+00:00"))
+                    if stamp.tzinfo is None:
+                        stamp = stamp.replace(tzinfo=_timezone.utc)
+                    age = max(0.0, (_datetime.now(_timezone.utc) - stamp.astimezone(_timezone.utc)).total_seconds())
+                    if age > event_states[kind][1]:
+                        continue
+                    avatar_state = visual_state
+                    event_type = kind
+                    event_age_seconds = round(age, 2)
+                    event_source = "recent_runtime_event"
+                    break
+                except (TypeError, ValueError, _json.JSONDecodeError):
+                    continue
         return {
             "ok": True,
-            "source": "live_brain_liveness_assessment",
+            "source": event_source,
             "state": avatar_state,
+            "event_type": event_type,
+            "event_age_seconds": event_age_seconds,
             "brain_status": assessment.get("status", "UNKNOWN"),
             "brain_alive": core_alive,
             "device_bridge_configured": bool(device.get("configured")),
             "agents_online": bool(device.get("agents_online")),
             "checked_at": assessment.get("checked_at"),
-            "note": "Avatar expression reflects only this read-only status snapshot; it does not imply feelings or consciousness.",
+            "note": "Expressions reflect recorded runtime status/events, not subjective feelings or consciousness.",
         }
     except Exception as exc:
         return {
