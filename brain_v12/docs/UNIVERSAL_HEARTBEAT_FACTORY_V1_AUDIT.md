@@ -58,4 +58,6 @@ Files added/changed on this branch:
 
 ## Validation status
 
-The focused test suite is `python -m unittest brain_v12.tests.test_heartbeat_factory -v`. It must be run in an available runner; do not infer a pass from source changes. CI run URLs and exact results should be appended after GitHub Actions completes on the exact commit.
+The Brain Fabric CI command on commit `e2b0b3597c49143431c7e8cad0ad0e10dfd784eb` completed successfully: **112 passed, 1 warning in 2.11 seconds**. Run: https://github.com/omarenserat1980/MySimpleProject/actions/runs/38551465400
+
+The workflow includes `brain_v12/tests/test_heartbeat_factory.py` plus the listed existing integration/security tests. The one warning is a Starlette deprecation warning from the test-client/httpx integration, not a heartbeat test failure. Because this document update creates a new commit, rerun CI on the final PR head before accepting it. This test evidence proves the exercised CI contracts only; it does not prove a scheduler, remote delivery, or production deployment.
