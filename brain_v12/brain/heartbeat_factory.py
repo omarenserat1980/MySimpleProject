@@ -295,7 +295,7 @@ class HeartbeatFactory:
             raise ValueError(f"INVALID_HEARTBEAT_TRANSITION:{item['status']}->{target}")
         if target == "VERIFIED" and not (evidence_ref and evidence_ref.strip()):
             raise ValueError("VERIFICATION_EVIDENCE_REQUIRED")
-        if target == "SENT" and item["sent_at"] is not None:
+        if target == "SENT" and item["sent_at"] is not None and item["status"] != "DELAYED":
             raise ValueError("HEARTBEAT_ALREADY_SENT")
         sent_at = instant if target == "SENT" else item["sent_at"]
         received_at = instant if target == "ACKNOWLEDGED" else item["received_at"]
