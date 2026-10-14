@@ -93,3 +93,29 @@ def test_rejects_empty_coverage_limitations():
     report = valid_report()
     report["coverage_limitations"] = []
     assert any("coverage_limitations" in error for error in validate_inventory(report))
+def test_accepts_testing_lifecycle_without_claiming_pass():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "TESTING"
+    report["assets"][0]["verification_status"] = "NOT_RUN"
+    assert validate_inventory(report) == []
+
+
+def test_requires_blocked_verification_for_blocked_lifecycle():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "BLOCKED"
+    assert any("cannot be BLOCKED" in error for error in validate_inventory(report))
+
+
+def test_accepts_explicit_blocked_state_without_claiming_success():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "BLOCKED"
+    report["assets"][0]["verification_status"] = "BLOCKED"
+    assert validate_inventory(report) == []
+
+
+def test_rejects_blocked_verification_in_testing_lifecycle():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "TESTING"
+    report["assets"][0]["verification_status"] = "BLOCKED"
+    assert any("requires BLOCKED or QUARANTINED" in error
+               for error in validate_inventory(report))
