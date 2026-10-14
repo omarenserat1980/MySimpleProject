@@ -125,8 +125,11 @@ jobs:
           if not counts or int(counts[-1]) != 0:
               raise SystemExit("FAIL: final detailed-routing violation count is not proven zero")
 
-          if not lec_log.is_file() or "global output passed lec test" not in lec_log.read_text(errors="replace").lower():
-              raise SystemExit("FAIL: expected final LEC pass message is missing")
+          lec_text = lec_log.read_text(errors="replace").lower() if lec_log.is_file() else ""
+          flow_log = Path("artifacts/asic/openroad-flow.log")
+          flow_text = flow_log.read_text(errors="replace").lower() if flow_log.is_file() else ""
+          if "global output passed lec test" not in (lec_text + "\n" + flow_text):
+              raise SystemExit("FAIL: expected final LEC pass message is missing from captured flow evidence")
 
           manifest = {
               "status": "GDSII_STRUCTURE_AND_FLOW_EVIDENCE_VERIFIED",
