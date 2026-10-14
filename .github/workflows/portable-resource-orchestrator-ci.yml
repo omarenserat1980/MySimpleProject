@@ -7,6 +7,16 @@ on:
       - "brain_v12/brain/portable_resource_orchestrator.py"
       - "brain_v12/brain/executor_contract.py"
       - "brain_v12/brain/run_evidence_store.py"
+      - "brain_v12/brain/bitcoin_north_star.py"
+      - "brain_v12/brain/bitcoin_pool_evidence.py"
+      - "brain_v12/brain/engineering_factory.py"
+      - "brain_v12/tests/test_engineering_factory.py"
+      - "brain_v12/brain/decision_engine.py"
+      - "brain_v12/brain/cognitive_loop.py"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_mining_controller.py"
+      - "brain_v12/tests/test_bitcoin_north_star.py"
+      - "brain_v12/tests/test_bitcoin_pool_evidence.py"
       - "brain_v12/brain/android_executor_adapter.py"
       - "brain_v12/tests/test_portable_resource_orchestrator.py"
       - "brain_v12/tests/test_executor_contract.py"
@@ -63,6 +73,15 @@ jobs:
             brain_v12/brain/portable_resource_orchestrator.py \
             brain_v12/brain/executor_contract.py \
             brain_v12/brain/run_evidence_store.py \
+            brain_v12/brain/bitcoin_north_star.py \
+            brain_v12/brain/bitcoin_pool_evidence.py \
+            brain_v12/brain/engineering_factory.py \
+            brain_v12/tests/test_engineering_factory.py \
+            brain_v12/brain/decision_engine.py \
+            brain_v12/brain/cognitive_loop.py \
+            brain_v12/brain/mining_controller.py \
+            brain_v12/tests/test_mining_controller.py \
+            brain_v12/tests/test_bitcoin_north_star.py \
             brain_v12/brain/android_executor_adapter.py \
             brain_v12/brain/asic_resource_adapter.py \
             brain_v12/brain/asic_hardware_simulator.py \
@@ -76,6 +95,23 @@ jobs:
       - name: Install API test dependencies
         run: python -m pip install --disable-pip-version-check fastapi pydantic
 
+      - name: Run focused Bitcoin SHA-256d preflight tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_mining_controller.py \
+            brain_v12/tests/test_bitcoin_north_star.py
+
+      - name: Run engineering factory tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_engineering_factory -v
+
+      - name: Run Bitcoin pool evidence gate tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_bitcoin_pool_evidence -v
       - name: Run mining economics and profit-gate tests
         env:
           PYTHONPATH: .
@@ -84,7 +120,8 @@ jobs:
           mkdir -p artifacts/asic
           python -m unittest \
             brain_v12.tests.test_mining_engine \
-            brain_v12.tests.test_bitcoin_mining_intelligence_api -v \
+            brain_v12.tests.test_bitcoin_mining_intelligence_api \
+            brain_v12.tests.test_bitcoin_north_star -v \
             2>&1 | tee artifacts/asic/mining-economics-tests.log
 
       - name: Prepare RTL evidence directory

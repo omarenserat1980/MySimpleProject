@@ -5,6 +5,7 @@ from brain_v12.brain.mining_controller import (
     choose_plan,
     evidence_record,
     profitability_gate,
+    bitcoin_sha256d_preflight,
 )
 
 
@@ -53,3 +54,70 @@ def test_payment_evidence_required_for_verified_received():
         verified_received=0.0,
     )
     assert ev["status"] == "MINING_EVIDENCE_ONLY"
+
+def test_bitcoin_sha256d_preflight_fails_closed_by_default():
+    result = bitcoin_sha256d_preflight(MiningPolicy())
+    assert result["status"] == "BLOCKED"
+    assert "MINING_DISABLED_BY_DEFAULT" in result["missing_requirements"]
+    assert "VERIFIED_STRATUM_SESSION_REQUIRED" in result["missing_requirements"]
+    assert not result["execution_started"]
+    assert not result["revenue_verified"]
+
+
+def test_bitcoin_sha256d_preflight_never_claims_mining_or_revenue():
+    policy = MiningPolicy(enabled=True, allow_github_actions=False)
+    result = bitcoin_sha256d_preflight(
+        policy,
+        worker_id="registered-worker",
+        worker_identity_verified=True,
+        stratum_session_id="session-ref",
+        stratum_session_verified=True,
+        accepted_share_proof_ref="pool-share-proof-ref",
+        accepted_share_proof_verified=True,
+        profitability_evidence_ref="economics-proof-ref",
+        profitability_verified=True,
+        explicit_approval=True,
+        worker_is_user_owned=True,
+        running_on_github_actions=False,
+        current_temperature_c=50.0,
+    )
+    assert result["status"] == "PREFLIGHT_PASS_NOT_MINING_PROOF"
+    assert result["ready_for_review"]
+    assert not result["execution_started"]
+    assert not result["accepted_shares_independently_verified"]
+    assert not result["revenue_verified"]
+
+
+def test_bitcoin_sha256d_preflight_blocks_github_actions_and_thermal_limit():
+    policy = MiningPolicy(enabled=True, allow_github_actions=False, max_temperature_c=75.0)
+    result = bitcoin_sha256d_preflight(
+        policy,
+        worker_id="registered-worker",
+        worker_identity_verified=True,
+        stratum_session_id="session-ref",
+        stratum_session_verified=True,
+        accepted_share_proof_ref="pool-share-proof-ref",
+        accepted_share_proof_verified=True,
+        profitability_evidence_ref="economics-proof-ref",
+        profitability_verified=True,
+        explicit_approval=True,
+        worker_is_user_owned=True,
+        running_on_github_actions=True,
+        current_temperature_c=80.0,
+    )
+    assert result["status"] == "BLOCKED"
+    assert "GITHUB_ACTIONS_MINING_FORBIDDEN" in result["missing_requirements"]
+    assert "THERMAL_LIMIT_REACHED" in result["missing_requirements"]
+
+def test_bitcoin_sha256d_plan_is_external_only_and_does_not_claim_live_mining():
+    from brain_v12.brain.mining_controller import HardwareProfile, choose_plan
+    hardware = HardwareProfile("linux", "aarch64", 8, 4.0, ())
+    plan = choose_plan(hardware, "sha256d")
+    assert plan.algorithm == "sha256d"
+    assert plan.backend == "external-asic/stratum"
+    assert plan.mode == "external-only"
+    assert "no live worker or mining session is verified" in plan.reason
+    import pytest
+    with pytest.raises(RuntimeError, match="external-sha256d-worker is not installed"):
+        choose_plan(hardware, "sha256d", require_installed_miner=True)
+
