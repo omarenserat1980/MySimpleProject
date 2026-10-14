@@ -25,11 +25,18 @@ def parse_cgminer_response(raw: bytes) -> dict[str, Any]:
             continue
         pieces = section.split(",")
         fields: dict[str, str] = {}
+        first = pieces[0].strip()
+        if "=" in first:
+            section_name, first_value = first.split("=", 1)
+            section_name = section_name.strip()
+            fields[section_name] = first_value.strip()
+        else:
+            section_name = first
         for piece in pieces[1:]:
             if "=" in piece:
                 key, value = piece.split("=", 1)
                 fields[key.strip()] = value.strip()
-        result["sections"][pieces[0].strip()] = fields
+        result["sections"][section_name] = fields
     status = result["sections"].get("STATUS", {})
     if status.get("Code") not in (None, "0", "S"):
         raise ValueError("ASIC_API_REPORTED_ERROR")
