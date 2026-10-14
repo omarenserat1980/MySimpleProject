@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from brain_v12.brain.gen_attestation_verifier import (
     AUDIENCE, SCHEMA, signing_payload, verify_gen_attestation,
+    verify_gen_attestation_with_trust_store,
 )
 
 
@@ -49,6 +50,24 @@ class GENAttestationVerifierTests(unittest.TestCase):
             expected_issuer_id="test-issuer", expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
             expected_operation="read_only_diagnostic", now=self.now, **kwargs,
         )
+
+    def test_trust_store_resolves_key_by_expected_issuer(self):
+        result = verify_gen_attestation_with_trust_store(
+            self.signed(), trusted_issuers={"test-issuer": self.public},
+            expected_nonce=self.nonce, expected_issuer_id="test-issuer",
+            expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
+            expected_operation="read_only_diagnostic", now=self.now,
+        )
+        self.assertTrue(result["verified"])
+
+    def test_unregistered_issuer_rejected_by_trust_store(self):
+        with self.assertRaisesRegex(ValueError, "GEN_ISSUER_NOT_TRUSTED"):
+            verify_gen_attestation_with_trust_store(
+                self.signed(), trusted_issuers={"other-issuer": self.public},
+                expected_nonce=self.nonce, expected_issuer_id="test-issuer",
+                expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
+                expected_operation="read_only_diagnostic", now=self.now,
+            )
 
     def test_valid_signed_nonce_bound_attestation(self):
         result = self.verify(self.signed())
