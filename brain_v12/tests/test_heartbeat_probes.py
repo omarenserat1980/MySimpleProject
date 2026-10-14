@@ -101,6 +101,11 @@ class HeartbeatProbeTests(unittest.TestCase):
         self.assertTrue(all(item["delivery_status"] == "CREATED" for item in result["results"]))
         self.assertTrue(all(item["remote_delivery_proven"] is False for item in result["results"]))
         self.assertEqual(self.factory.summary()["heartbeats_total"], 10)
+        for function in self.factory.list_functions():
+            self.assertEqual(function["last_execution_status"], "PASS" if function["function_id"] != "brain.device_bridge" else "UNKNOWN")
+            self.assertEqual(function["last_execution_at"], 103.0)
+        self.assertEqual(self.factory.delayed_functions(now=150.0), [])
+        self.assertEqual(len(self.factory.delayed_functions(now=164.0)), 10)
 
     def test_probe_is_not_run_without_authorization_reference(self):
         with self.assertRaisesRegex(PermissionError, "AUTHORIZATION_REFERENCE_REQUIRED"):
