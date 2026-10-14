@@ -47,6 +47,21 @@ module tb_brain_bitcoin_nonce_search;
         if (digest !== GENESIS_RAW_DIGEST) $fatal(1, "FAIL: digest mismatch %064h", digest);
         if (attempts !== 1) $fatal(1, "FAIL: expected exactly one attempt, got %0d", attempts);
         $display("PASS: bounded nonce search finds Bitcoin genesis header in one attempt");
+
+        // Negative-path test: zero target must not accept a nonzero hash.
+        target = 256'b0;
+        nonce_start = 32'h7c2bac1d;
+        max_attempts = 3;
+        @(posedge clk);
+        start <= 1'b1;
+        @(posedge clk);
+        start <= 1'b0;
+        wait(done);
+        #1;
+        if (found) $fatal(1, "FAIL: zero target unexpectedly accepted a hash");
+        if (attempts !== 3) $fatal(1, "FAIL: expected exactly three attempts, got %0d", attempts);
+        if (busy) $fatal(1, "FAIL: search remained busy after exhausting its bound");
+        $display("PASS: bounded nonce search stops after three unsuccessful attempts");
         $finish;
     end
 endmodule
