@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .task_router import route_task
+from .registry import load_registry
 
 DOMAIN_GATES = {
     "discovery": ["G0_DISCOVERY"],
@@ -32,6 +33,12 @@ def prepare_design_plan(description: str) -> dict:
     """Return a reviewable plan; no tools, files, devices, or external services are run."""
     routed = route_task(description)
     domains = sorted(set(routed["domains"]), key=lambda d: DOMAIN_ORDER.index(d) if d in DOMAIN_ORDER else len(DOMAIN_ORDER))
+    registry = load_registry()
+    prompt_by_id = {item["id"]: item for item in registry["prompts"]}
+    selected_prompts = [
+        {"id": prompt_id, "name": prompt_by_id[prompt_id]["name"], "path": prompt_by_id[prompt_id]["path"]}
+        for prompt_id in routed["prompt_ids"] if prompt_id in prompt_by_id
+    ]
     gates = []
     for domain in domains:
         for gate in DOMAIN_GATES.get(domain, ["G5_EVIDENCE"]):
@@ -42,6 +49,7 @@ def prepare_design_plan(description: str) -> dict:
         "task": description.strip(),
         "domains": domains,
         "prompt_ids": routed["prompt_ids"],
+        "selected_prompts": selected_prompts,
         "required_gates": gates,
         "review_required": True,
         "execution_started": False,
