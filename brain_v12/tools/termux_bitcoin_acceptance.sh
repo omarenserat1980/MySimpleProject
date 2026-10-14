@@ -17,7 +17,8 @@ echo "python=$(python --version 2>&1 || true)"
 echo "git=$(git --version 2>&1 || true)"
 echo "clang=$(clang --version 2>/dev/null | head -n 1 || echo unavailable)"
 echo "make=$(make --version 2>/dev/null | head -n 1 || echo unavailable)"
-echo "cpuminer_path=$(command -v cpuminer || echo not-installed)"
+MINER_PATH="$(command -v cpuminer || true)"
+echo "cpuminer_path=${MINER_PATH:-not-installed}"
 
 if [ ! -d "$ROOT/.git" ]; then
   echo "status=BLOCKED_REPOSITORY_NOT_FOUND"
@@ -50,13 +51,42 @@ else
 fi
 echo "unit_tests_end"
 
-if command -v cpuminer >/dev/null 2>&1; then
+if [ -n "$MINER_PATH" ]; then
   echo "miner_version_begin"
   cpuminer --version 2>&1 | head -n 8 || true
   echo "miner_version_end"
-  echo "miner_algorithm_support=UNVERIFIED; inspect this binary's help/version and verify SHA-256d support before use"
+
+  if command -v file >/dev/null 2>&1; then
+    echo "miner_file_type=$(file "$MINER_PATH" 2>&1 | head -n 1)"
+  else
+    echo "miner_file_type=UNAVAILABLE_FILE_COMMAND_NOT_INSTALLED"
+  fi
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    echo "miner_sha256=$(sha256sum "$MINER_PATH" 2>/dev/null | awk '{print $1}' || true)"
+  else
+    echo "miner_sha256=UNAVAILABLE_SHA256SUM_NOT_INSTALLED"
+  fi
+
+  MINER_HELP="$(cpuminer --help 2>&1 || true)"
+  if printf '%s\n' "$MINER_HELP" | grep -Eiq 'sha256d|sha-256d|sha256'; then
+    echo "miner_sha256d_help_signal=FOUND_UNVERIFIED"
+  else
+    echo "miner_sha256d_help_signal=NOT_FOUND_OR_HELP_UNAVAILABLE"
+  fi
+  if printf '%s\n' "$MINER_HELP" | grep -Eiq 'stratum| -o([ ,]|$)'; then
+    echo "miner_stratum_help_signal=FOUND_UNVERIFIED"
+  else
+    echo "miner_stratum_help_signal=NOT_FOUND_OR_HELP_UNAVAILABLE"
+  fi
+  echo "miner_binary_provenance=NOT_VERIFIED"
+  echo "miner_algorithm_support=NOT_VERIFIED; help text and local checksum are clues only, compare checksum to publisher's trusted release"
 else
   echo "miner_status=NOT_INSTALLED"
+  echo "miner_file_type=NOT_APPLICABLE"
+  echo "miner_sha256=NOT_APPLICABLE"
+  echo "miner_sha256d_help_signal=NOT_APPLICABLE"
+  echo "miner_stratum_help_signal=NOT_APPLICABLE"
 fi
 
 echo "status=PREFLIGHT_COMPLETE_NOT_MINING"
@@ -65,4 +95,5 @@ echo "pool_side_hashrate_verified=false"
 echo "accepted_shares_verified=false"
 echo "revenue_verified=false"
 echo "evidence_report=$REPORT"
-echo "Next: verify a trusted Android/Termux-compatible miner binary and pool endpoint manually; do not place pool passwords or wallet secrets in this report."
+echo "No mining process was started and no pool was contacted."
+echo "Next: verify the binary source and checksum against a trusted publisher release, then separately verify pool-side session, hashrate, shares, and payout. Never put pool passwords or wallet secrets in this report."
