@@ -2,7 +2,7 @@ name: Brain Digital Lab
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feature/brain-digital-lab-universal-governance]
     paths:
       - 'brain_v12/digital_lab/**'
       - 'brain_v12/tests/test_digital_lab_*.py'
