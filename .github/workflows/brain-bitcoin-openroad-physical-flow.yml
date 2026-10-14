@@ -38,6 +38,7 @@ jobs:
           printf 'source_sha=%s\n' "$(git rev-parse HEAD)" >> evidence/physical_flow_manifest.txt
           printf 'platform=sky130hd\n' >> evidence/physical_flow_manifest.txt
           printf 'design=brain_bitcoin_nonce_search\n' >> evidence/physical_flow_manifest.txt
+          printf 'container_image=openroad/orfs:latest (mutable tag; image digest not pinned)\n' >> evidence/physical_flow_manifest.txt
 
       - name: Stage RTL and run OpenROAD-flow-scripts in official container
         shell: bash
@@ -54,9 +55,9 @@ jobs:
           cp brain_v12/asic/openroad/sky130hd/config.mk "$DESIGN/config.mk"
           docker run --rm \
             -v "$ORFS:/OpenROAD-flow-scripts" \
-            -w /OpenROAD-flow-scripts/flow \
-            openroad/flow-ubuntu22.04:latest \
-            bash -lc 'set -euo pipefail; command -v openroad; command -v yosys; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
+            -w /OpenROAD-flow-scripts \
+            openroad/orfs:latest \
+            bash -lc 'set -euo pipefail; source env.sh; command -v openroad; command -v yosys; cd flow; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
             2>&1 | tee evidence/openroad_flow.log
 
       - name: Collect physical-flow evidence
