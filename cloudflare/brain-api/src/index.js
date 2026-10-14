@@ -279,9 +279,27 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   if (Number(order.amount) <= 0) return json({ ok: false, error: "INVALID_ORDER_AMOUNT" }, 409, requestOrigin, allowedOrigin);
 
   const existing = await env.BRAIN_DB.prepare(
-    "SELECT tran_ref, state FROM payments WHERE order_id = ? AND provider = 'paytabs' ORDER BY created_at DESC LIMIT 1"
+    "SELECT tran_ref, state, raw_evidence FROM payments WHERE order_id = ? AND provider = 'paytabs' ORDER BY created_at DESC LIMIT 1"
   ).bind(orderId).first();
   if (existing && existing.state === "PAYMENT_VERIFIED") return json({ ok: false, error: "PAYMENT_ALREADY_VERIFIED" }, 409, requestOrigin, allowedOrigin);
+  // Do not create a second provider transaction for an order with a pending payment.
+  // Reuse the persisted checkout URL on retries; fail closed if the evidence is incomplete.
+  if (existing && existing.state === "PAYMENT_PENDING") {
+    let priorEvidence = {};
+    try { priorEvidence = JSON.parse(String(existing.raw_evidence || "{}")); } catch {}
+    const priorUrl = String(priorEvidence.redirect_url || "");
+    if (!priorUrl || !/^https:\/\//i.test(priorUrl)) {
+      return json({ ok: false, error: "PAYMENT_REQUEST_ALREADY_PENDING" }, 409, requestOrigin, allowedOrigin);
+    }
+    return json({
+      ok: true,
+      state: "PAYMENT_PENDING",
+      order_id: order.order_id,
+      tran_ref: existing.tran_ref,
+      redirect_url: priorUrl,
+      idempotent: true,
+    }, 200, requestOrigin, allowedOrigin);
+  }
 
   const callback = url.origin + "/api/payments/paytabs/callback";
   const returnUrl = url.origin + "/api/payments/paytabs/return";
@@ -310,7 +328,7 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   }
 
   await env.BRAIN_DB.prepare(
-    "INSERT OR REPLACE INTO payments (tran_ref, order_id, amount, currency, provider, state, raw_evidence) VALUES (?, ?, ?, ?, 'paytabs', 'PAYMENT_PENDING', ?)"
+    "INSERT INTO payments (tran_ref, order_id, amount, currency, provider, state, raw_evidence) VALUES (?, ?, ?, ?, 'paytabs', 'PAYMENT_PENDING', ?)"
   ).bind(String(result.tran_ref), order.order_id, Number(order.amount), order.currency, JSON.stringify({
     type: "PAYMENT_REQUEST",
     tran_ref: result.tran_ref,
