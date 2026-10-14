@@ -102,3 +102,8 @@ assert.match(worker, /\/api\/supervisor\/tick/);
 assert.match(worker, /transitionClientOrder/);
 assert.match(worker, /INVALID_STATE_TRANSITION/);
 assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
+
+assert.match(worker, /PAYTABS_MODE \\|\\| "test"/, "payment mode must default safely to test");
+assert.match(worker, /SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY/, "sandbox payments must be separately classified");
+assert.match(worker, /environment = 'live'/, "revenue realization must require live environment");
+console.log("SANDBOX_CANNOT_REALIZE_REVENUE=PASS");
