@@ -121,6 +121,22 @@ def sign_report(report: dict[str, Any], key: str) -> str:
 def post_report(url: str, report: dict[str, Any], key: str, timeout: float = 10) -> dict[str, Any]:
     if not url.startswith("https://"):
         raise ValueError("BRAIN_INGEST_REQUIRES_HTTPS")
+    headers = {"Content-Type": "application/json", "User-Agent": "Brain-Physical-ASIC-Agent/1"}
+    challenge_request = urllib.request.Request(
+        url.rstrip("/") + "/challenge",
+        data=json.dumps({"device_id": report["device_id"]}).encode(),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(challenge_request, timeout=timeout, context=ssl.create_default_context()) as response:
+            challenge = json.loads(response.read(65536).decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise RuntimeError("BRAIN_ASIC_CHALLENGE_UNAVAILABLE") from exc
+    if not challenge.get("ok") or not challenge.get("challenge_id") or not challenge.get("nonce"):
+        raise RuntimeError("BRAIN_ASIC_CHALLENGE_INVALID")
+    report["challenge_id"] = challenge["challenge_id"]
+    report["challenge_nonce"] = challenge["nonce"]
     body = json.dumps({"report": report, "hmac_sha256": sign_report(report, key)}).encode()
     request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "Brain-Physical-ASIC-Agent/1"}, method="POST")
     try:
