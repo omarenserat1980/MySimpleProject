@@ -180,9 +180,10 @@ class CognitiveLoop:
         self.tasks.update(task["id"],"RUNNING")
         self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
 
-        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
+        tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","engineering_proposal":"engineering.propose","device":"device.enqueue"}.get(action)
         tool_params = (
-            {"title":task_title} if tool_id=="tasks.create"
+            {"problem":goal,"evidence":[]} if tool_id=="engineering.propose"
+            else {"title":task_title} if tool_id=="tasks.create"
             else {"path":"brain_v12/app.py"} if tool_id=="code.inspect"
             else {"task":"status","params":{}} if tool_id=="device.enqueue"
             else {}
