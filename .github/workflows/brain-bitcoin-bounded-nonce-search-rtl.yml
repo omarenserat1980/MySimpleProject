@@ -1,0 +1,43 @@
+name: Brain Bitcoin Bounded Nonce Search RTL Gate
+
+on:
+  push:
+    branches:
+      - feat/bitcoin-bounded-nonce-search
+  pull_request:
+    branches:
+      - main
+      - feat/bitcoin-target-comparator
+    paths:
+      - "brain_v12/asic/rtl/brain_sha256_compress.sv"
+      - "brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv"
+      - "brain_v12/asic/rtl/brain_bitcoin_target_check.sv"
+      - "brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv"
+      - "brain_v12/asic/rtl/tb_brain_bitcoin_nonce_search.sv"
+      - ".github/workflows/brain-bitcoin-bounded-nonce-search-rtl.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nonce-search-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Compile bounded nonce search and dependencies
+        run: |
+          iverilog -g2012 -s tb_brain_bitcoin_nonce_search -o /tmp/brain-nonce-search.vvp \
+            brain_v12/asic/rtl/brain_sha256_compress.sv \
+            brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv \
+            brain_v12/asic/rtl/brain_bitcoin_target_check.sv \
+            brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv \
+            brain_v12/asic/rtl/tb_brain_bitcoin_nonce_search.sv
+      - name: Verify bounded nonce search on genesis vector
+        run: vvp /tmp/brain-nonce-search.vvp
