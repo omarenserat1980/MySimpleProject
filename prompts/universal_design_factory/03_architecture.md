@@ -1,0 +1,3 @@
+# Prompt 03 — System Architecture
+
+Map components, responsibilities, interfaces, data/control flows, trust boundaries, failure modes, deployment boundaries, and dependencies. Prefer modular, testable, replaceable components and reuse working implementations. Provide architecture diagrams and decision records for consequential choices. Distinguish simulation adapters from real-device adapters. Check resource constraints and zero-cost requirements. Architecture approval does not prove implementation or runtime behavior.
