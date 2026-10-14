@@ -33,3 +33,18 @@ Open **Actions → Brain Digital ASIC Lab** and inspect the run and downloaded
 
 This is a digital replacement for prototyping and exercising the RTL logic; it is
 not a physical ASIC, FPGA execution, foundry signoff, or silicon fabrication.
+
+
+## Experimental signed MAC accelerator
+
+The lab also contains an independent signed multiply-accumulate (MAC) RTL prototype:
+
+- RTL: `rtl/brain_mac_accelerator.sv`
+- Testbench: `rtl/tb_brain_mac_accelerator.sv`
+- Runner: `python3 brain_v12/asic/mac_lab.py`
+
+The testbench checks positive and negative products, accumulation, enable/hold behavior,
+clear priority, and asynchronous reset. The runner requires a real Icarus Verilog pass
+marker and a non-empty Yosys synthesized netlist before reporting
+`MAC_DIGITAL_LAB_PASS`. This prototype is not yet integrated into the main ALU and
+does not claim measured PPA, formal proof, or fabricated silicon.
