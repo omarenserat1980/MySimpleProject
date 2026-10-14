@@ -78,6 +78,9 @@ def validate_inventory(report: Any) -> list[str]:
         if not isinstance(evidence, list):
             errors.append(f"{prefix}.evidence must be a list")
             evidence = []
+        commit_sha = report.get("commit_sha")
+        if evidence and (not isinstance(commit_sha, str) or not commit_sha.strip()):
+            errors.append(f"{prefix} evidence requires a non-empty inventory commit_sha")
         for evidence_index, item in enumerate(evidence):
             ep = f"{prefix}.evidence[{evidence_index}]"
             if not isinstance(item, dict):
@@ -94,8 +97,8 @@ def validate_inventory(report: Any) -> list[str]:
                 errors.append(f"{ep}.result must be one of {sorted(EVIDENCE_RESULTS)}")
             if not isinstance(item["exit_status"], int) or isinstance(item["exit_status"], bool):
                 errors.append(f"{ep}.exit_status must be an integer")
-            if isinstance(report.get("commit_sha"), str) and report["commit_sha"].strip():
-                if item["source_revision"] != report["commit_sha"]:
+            if isinstance(commit_sha, str) and commit_sha.strip():
+                if item["source_revision"] != commit_sha:
                     errors.append(f"{ep}.source_revision does not match inventory commit_sha")
             if item["result"] == "PASS" and item["exit_status"] != 0:
                 errors.append(f"{ep} PASS evidence requires exit_status 0")
