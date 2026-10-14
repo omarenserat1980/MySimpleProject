@@ -32,12 +32,24 @@ class ExecutionProbeVerificationTest(unittest.TestCase):
     class Device:
         def __init__(self, verification):
             self.verification = verification
+        def status(self):
+            return {"configured": True, "agents": {"online": True}}
         def enqueue(self, task_name, payload):
             return {"ok": True, "task": {"task_id": "probe-1"}}
         def result(self, task_id):
             return {"ok": True, "task": {"task_id": task_id, "status": "COMPLETED", "agent_id": "test-agent"}}
         def verify_result(self, task_id):
             return self.verification
+
+    def test_offline_agent_does_not_enqueue_probe(self):
+        class OfflineDevice(self.Device):
+            def status(self):
+                return {"configured": True, "agents": {"online": False}}
+            def enqueue(self, task_name, payload):
+                raise AssertionError("must not enqueue when no agent is online")
+        result = run_execution_probe(OfflineDevice({"verified": True}))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "PROBE_AGENT_OFFLINE")
 
     def test_missing_verification_fails_closed(self):
         result = run_execution_probe(self.Device({}))
