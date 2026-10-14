@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import replace
 
 from brain_v12.brain.self_engineering import (
     Evidence, EvidenceKind, RunState, SelfEngineeringEngine,
@@ -18,6 +19,19 @@ class SelfEngineeringEngineTests(unittest.TestCase):
         self.assertEqual(self.run.state, RunState.PLANNED)
         self.assertTrue(self.run.plan)
         self.assertTrue(self.run.claims()["source_inspected"])
+
+    def test_empty_inspection_is_not_claimed_as_passed(self):
+        run = self.engine.start("Inspect missing source")
+        self.engine.record_inspection(run, source="test-fixture", findings=[])
+        self.assertEqual(run.state, RunState.BLOCKED)
+        self.assertFalse(run.claims()["source_inspected"])
+        self.assertIn("SOURCE_INSPECTION_INCOMPLETE", run.blockers)
+
+    def test_blank_inspection_source_is_not_accepted(self):
+        run = self.engine.start("Inspect source")
+        self.engine.record_inspection(run, source="  ", findings=["some finding"])
+        self.assertFalse(run.claims()["source_inspected"])
+        self.assertEqual(run.state, RunState.BLOCKED)
 
     def test_cannot_execute_without_scoped_approval(self):
         self.engine.begin_execution(self.run)
@@ -40,7 +54,7 @@ class SelfEngineeringEngineTests(unittest.TestCase):
         self.assertIn("LIVE_RUNTIME_EVIDENCE_REQUIRED", self.run.blockers)
 
     def test_runtime_probe_plus_passing_tests_can_verify_run(self):
-        self.engine.record_test_result(self.run, passed=True, source="ci")
+        self.engine.record_test_result(self.run, passed=True, source="live-ci")
         self.engine.record_runtime_probe(self.run, passed=True, source="live-api")
         self.engine.finalize(self.run, runtime_required=True)
         self.assertEqual(self.run.state, RunState.VERIFIED)
@@ -52,14 +66,29 @@ class SelfEngineeringEngineTests(unittest.TestCase):
         self.engine.finalize(self.run)
         self.assertEqual(self.run.state, RunState.FAILED)
 
-    def test_evidence_is_digest_protected(self):
+    def test_evidence_digest_is_verified_on_add(self):
         evidence = Evidence.create(
             EvidenceKind.TEST_RESULT, "tests", "passed", "ci", {"count": 3}
         )
-        self.assertEqual(len(evidence.digest), 64)
+        self.assertTrue(evidence.verify_digest())
         self.run.add_evidence(evidence)
-        report = self.run.report()
-        self.assertEqual(report["evidence_count"], 2)
+        self.assertEqual(self.run.report()["evidence_count"], 2)
+
+    def test_tampered_evidence_is_rejected(self):
+        evidence = Evidence.create(
+            EvidenceKind.TEST_RESULT, "tests", "passed", "ci", {"count": 3}
+        )
+        tampered = replace(evidence, claim="changed after digest")
+        with self.assertRaisesRegex(ValueError, "EVIDENCE_DIGEST_MISMATCH"):
+            self.run.add_evidence(tampered)
+
+    def test_claims_ignore_evidence_tampered_after_insertion(self):
+        evidence = Evidence.create(
+            EvidenceKind.TEST_RESULT, "tests", "passed", "ci", {"count": 3}
+        )
+        self.run.add_evidence(evidence)
+        self.run.evidence[-1] = replace(evidence, outcome="failed")
+        self.assertFalse(self.run.claims()["tests_passed"])
 
     def test_empty_goal_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "GOAL_REQUIRED"):
