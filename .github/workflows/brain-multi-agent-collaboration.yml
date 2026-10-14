@@ -1,0 +1,80 @@
+name: Brain Multi-Agent Collaboration Gate
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/multi_agent_collaboration.py"
+      - "brain_v12/tests/test_multi_agent_collaboration.py"
+      - "brain_v12/docs/BRAIN_MULTI_AGENT_COLLABORATION_*.md"
+      - ".github/workflows/brain-multi-agent-collaboration.yml"
+  push:
+    branches:
+      - "feat/brain-multi-agent-collaboration-v1"
+    paths:
+      - "brain_v12/brain/multi_agent_collaboration.py"
+      - "brain_v12/tests/test_multi_agent_collaboration.py"
+      - "brain_v12/docs/BRAIN_MULTI_AGENT_COLLABORATION_*.md"
+      - ".github/workflows/brain-multi-agent-collaboration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-multi-agent-collaboration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  collaboration-policy-tests:
+    name: Collaboration policy unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run collaboration policy tests
+        env:
+          PYTHONPATH: .
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          mkdir -p artifacts
+          set +e
+          python -m unittest brain_v12.tests.test_multi_agent_collaboration -v 2>&1 | tee artifacts/collaboration-tests.log
+          test_status=${PIPESTATUS[0]}
+          set -e
+          python - <<'PY'
+          import json, os, subprocess, time
+          status = int(os.environ.get("TEST_STATUS", "0"))
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          record = {
+              "schema_version": "1.0",
+              "suite": "brain_v12.tests.test_multi_agent_collaboration",
+              "commit_sha": sha,
+              "runner": "github-hosted-ubuntu",
+              "reality_level": "CI",
+              "status": "PASS" if status == 0 else "FAIL",
+              "exit_code": status,
+              "generated_at_epoch": time.time(),
+          }
+          with open("artifacts/collaboration-evidence.json", "w", encoding="utf-8") as f:
+              json.dump(record, f, indent=2)
+          PY
+          exit "$test_status"
+        env:
+          PYTHONPATH: .
+          PYTHONDONTWRITEBYTECODE: "1"
+          TEST_STATUS: ${{ steps.tests.outputs.test_status }}
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-multi-agent-collaboration-evidence
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
