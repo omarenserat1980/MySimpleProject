@@ -70,7 +70,7 @@ def test_rejects_invalid_tip_height_and_output_values():
             collect_bitcoin_chain_transaction(TXID)
     with patch(
         "brain_v12.business.bitcoin_chain_readonly_collector._get_json",
-        return_value=transaction(vout=[{"scriptpubkey_address": "bc1qwallet", "value": -1}]),
+        return_value=transaction(status={"confirmed": False}, vout=[{"scriptpubkey_address": "bc1qwallet", "value": -1}]),
     ):
         with pytest.raises(ValueError, match="non-negative integer"):
             collect_bitcoin_chain_transaction(TXID)
