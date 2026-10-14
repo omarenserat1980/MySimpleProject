@@ -1,6 +1,9 @@
 from dataclasses import dataclass, asdict
+import os
+from pathlib import Path
 
 from .bitcoin_north_star import BitcoinNorthStar
+from .run_evidence_store import RunEvidenceStore
 
 
 @dataclass
@@ -25,13 +28,22 @@ class DecisionEngine:
 
     def __init__(self, north_star: BitcoinNorthStar | None = None):
         self.history = []
-        self.north_star = north_star or BitcoinNorthStar()
+        if north_star is None:
+            evidence_path = Path(os.environ.get(
+                "BRAIN_NORTH_STAR_EVIDENCE_PATH",
+                str(Path.home() / ".brain_v12" / "bitcoin_north_star.jsonl"),
+            ))
+            north_star = BitcoinNorthStar(evidence_store=RunEvidenceStore(evidence_path))
+        self.north_star = north_star
 
     @staticmethod
     def _mission_tags(goal: str) -> list[str]:
         text = (goal or "").lower()
         tags = []
-        if any(term in text for term in ("bitcoin", "بيتكوين", "btc", "mining", "التعدين", "stratum", "asic", "pool")):
+        bitcoin_context = any(term in text for term in ("bitcoin", "بيتكوين", "btc", "mining", "التعدين", "stratum", "asic", "pool", "sha-256", "sha256"))
+        if not bitcoin_context:
+            return []
+        if any(term in text for term in ("bitcoin", "بيتكوين", "btc", "mining", "التعدين", "stratum", "asic", "pool", "sha-256", "sha256")):
             tags.append("REAL_BTC_MINING")
         if any(term in text for term in ("profit", "ربح", "revenue", "إيراد", "payout", "ربحية", "economic", "اقتصاد")):
             tags.append("VERIFIED_NET_PROFIT")
