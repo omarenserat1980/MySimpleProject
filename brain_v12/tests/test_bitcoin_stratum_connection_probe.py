@@ -14,7 +14,7 @@ from brain_v12.brain.bitcoin_stratum_connection_probe import (
 class BitcoinStratumConnectionProbeTests(unittest.TestCase):
     def test_encode_request_is_newline_delimited_json(self):
         payload = encode_probe_request(1, "mining.subscribe", ["test-client"])
-        self.assertTrue(payload.endswith(b"\\n"))
+        self.assertTrue(payload.endswith(b"\n"))
         self.assertEqual(json.loads(payload), {
             "id": 1, "method": "mining.subscribe", "params": ["test-client"]
         })
