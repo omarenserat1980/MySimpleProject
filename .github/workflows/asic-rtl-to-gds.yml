@@ -42,13 +42,11 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git orfs
-          mkdir -p orfs/flow/designs/sky130hd/brain_asic_core/src
-          cp brain_v12/asic/rtl/brain_asic_core.sv \
-            orfs/flow/designs/sky130hd/brain_asic_core/src/brain_asic_core.sv
-          cp brain_v12/asic/openroad/config.mk \
-            orfs/flow/designs/sky130hd/brain_asic_core/config.mk
-          cp brain_v12/asic/openroad/constraint.sdc \
-            orfs/flow/designs/sky130hd/brain_asic_core/constraint.sdc
+          # ORFS's default VERILOG_FILES convention resolves from flow/designs/src.
+          mkdir -p orfs/flow/designs/src orfs/flow/designs/sky130hd/brain_asic_core
+          cp brain_v12/asic/rtl/brain_asic_core.sv orfs/flow/designs/src/brain_asic_core.sv
+          cp brain_v12/asic/openroad/config.mk orfs/flow/designs/sky130hd/brain_asic_core/config.mk
+          cp brain_v12/asic/openroad/constraint.sdc orfs/flow/designs/sky130hd/brain_asic_core/constraint.sdc
           git -C orfs rev-parse HEAD | tee artifacts/asic/openroad-flow-scripts-commit.txt
 
       - name: Run RTL-to-GDSII in the official OpenROAD container
