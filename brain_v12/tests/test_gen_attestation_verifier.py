@@ -46,7 +46,7 @@ class GENAttestationVerifierTests(unittest.TestCase):
     def verify(self, doc, **kwargs):
         return verify_gen_attestation(
             doc, public_key_b64=self.public, expected_nonce=self.nonce,
-            expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
+            expected_issuer_id="test-issuer", expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
             expected_operation="read_only_diagnostic", now=self.now, **kwargs,
         )
 
@@ -65,6 +65,10 @@ class GENAttestationVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "GEN_ATTESTATION_NONCE_MISMATCH"):
             self.verify(self.signed(nonce=uuid.uuid4().hex))
 
+    def test_wrong_issuer_rejected(self):
+        with self.assertRaisesRegex(ValueError, "GEN_ATTESTATION_ISSUER_MISMATCH"):
+            self.verify(self.signed(issuer_id="attacker-controlled-issuer"))
+
     def test_wrong_subject_rejected(self):
         with self.assertRaisesRegex(ValueError, "GEN_ATTESTATION_SUBJECT_MISMATCH"):
             self.verify(self.signed(subject_id="different-device"))
@@ -77,7 +81,7 @@ class GENAttestationVerifierTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "GEN_TRUST_ANCHOR_REQUIRED"):
             verify_gen_attestation(
                 self.signed(), public_key_b64="", expected_nonce=self.nonce,
-                expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
+                expected_issuer_id="test-issuer", expected_subject_id="hosted-asic-01", expected_subject_type="HOSTED_ASIC",
                 expected_operation="read_only_diagnostic", now=self.now,
             )
 
