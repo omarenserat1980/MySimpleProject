@@ -28,6 +28,7 @@ on:
       - "brain_v12/brain/worker_registry.py"
       - "brain_v12/brain/termux_bitcoin_worker.py"
       - "brain_v12/brain/bitcoin_north_star.py"
+      - "brain_v12/brain/decision_engine.py"
       - "brain_v12/tests/test_bitcoin_north_star.py"
       - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - "brain_v12/brain/evidence_store.py"
