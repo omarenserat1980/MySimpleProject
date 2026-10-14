@@ -158,3 +158,21 @@ def test_rejects_invalid_artifact_sha256():
     evidence.update({"artifact_path": "out/report.json", "artifact_size_bytes": 10, "artifact_sha256": "bad"})
     report["assets"][0]["evidence"] = [evidence]
     assert any("64-character hexadecimal SHA-256" in error for error in validate_inventory(report))
+
+def test_rejects_pass_state_when_evidence_says_fail():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    evidence = valid_evidence()[0]
+    evidence["result"] = "FAIL"
+    evidence["exit_status"] = 1
+    report["assets"][0]["evidence"] = [evidence]
+    assert any("requires matching evidence result" in error for error in validate_inventory(report))
+
+
+def test_rejects_blocked_state_without_blocked_evidence():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "BLOCKED"
+    report["assets"][0]["verification_status"] = "BLOCKED"
+    report["assets"][0]["evidence"] = valid_evidence()
+    assert any("requires matching evidence result" in error for error in validate_inventory(report))
