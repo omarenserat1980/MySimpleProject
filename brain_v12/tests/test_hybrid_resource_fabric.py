@@ -14,7 +14,7 @@ from brain_v12.brain.hybrid_resource_fabric import (
 class HybridResourceFabricTests(unittest.TestCase):
     def setUp(self):
         self.now = 1_800_000_000.0
-        self.fabric = HybridResourceFabric(evidence_ttl_seconds=30, clock=lambda: self.now)
+        self.fabric = HybridResourceFabric(evidence_ttl_seconds=30, clock=lambda: self.now, trusted_evidence_sources={"authenticated-agent"})
 
     def virtual(self, resource_id="sim-01", capacity=None):
         return ResourceRecord(
