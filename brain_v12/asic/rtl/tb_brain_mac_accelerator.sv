@@ -64,6 +64,16 @@ module tb_brain_mac_accelerator;
       end
     end
 
+    // Restore a known baseline for the hold/clear tests below.
+    @(negedge clk);
+    clear = 1;
+    enable = 0;
+    @(posedge clk); #1;
+    apply_mac(3, 4, 12);
+    apply_mac(-2, 5, 2);
+    apply_mac(-7, -3, 23);
+    apply_mac(127, 127, 16152);
+
     // Disabled unit must hold the accumulated result.
     @(negedge clk);
     enable = 0;
