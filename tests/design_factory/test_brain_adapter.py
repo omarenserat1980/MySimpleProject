@@ -45,7 +45,7 @@ class BrainAdapterTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["error"], "EXECUTION_LEDGER_REQUIRED")
 
-    def test_step_mode_cannot_execute_without_configured_executor(self):
+    def test_non_dry_run_without_executor_mode_fails_closed(self):
         planned = self.adapter.execute({"task": "Bitcoin ASIC RTL and OpenROAD physical design"})
         result = self.adapter.execute({
             "mode": "step",
@@ -59,6 +59,55 @@ class BrainAdapterTests(unittest.TestCase):
             result["execution_ledger"]["steps"][0]["evidence"]["reason"],
             "BLOCKED_NO_EXECUTOR",
         )
+
+    def test_explicit_simulation_runs_exactly_one_step_and_marks_evidence(self):
+        planned = self.adapter.execute({"task": "Bitcoin ASIC RTL and OpenROAD physical design"})
+        result = self.adapter.execute({
+            "mode": "step",
+            "execution_ledger": planned["execution_ledger"],
+            "authorize": True,
+            "dry_run": False,
+            "executor_mode": "simulation",
+        })
+        ledger = result["execution_ledger"]
+        first = ledger["steps"][0]
+        self.assertTrue(result["ok"])
+        self.assertEqual(first["status"], "SIMULATED")
+        self.assertTrue(result["execution_started"])
+        self.assertEqual(ledger["next_step_index"], 1)
+        self.assertEqual(sum(step["started"] for step in ledger["steps"]), 1)
+        self.assertEqual(first["evidence"]["kind"], "SIMULATION")
+        self.assertFalse(first["evidence"]["physical_execution"])
+        self.assertFalse(first["evidence"]["external_side_effects"])
+        self.assertIn("not_mining_evidence", first["evidence"]["limitations"])
+        self.assertNotEqual(first["status"], "VERIFIED")
+
+    def test_simulation_requires_explicit_authorization(self):
+        planned = self.adapter.execute({"task": "Bitcoin ASIC RTL and OpenROAD physical design"})
+        result = self.adapter.execute({
+            "mode": "step",
+            "execution_ledger": planned["execution_ledger"],
+            "authorize": False,
+            "dry_run": False,
+            "executor_mode": "simulation",
+        })
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(
+            result["execution_ledger"]["steps"][0]["evidence"]["reason"],
+            "EXPLICIT_AUTHORIZATION_REQUIRED",
+        )
+
+    def test_unknown_executor_mode_is_blocked(self):
+        planned = self.adapter.execute({"task": "Bitcoin ASIC RTL and OpenROAD physical design"})
+        result = self.adapter.execute({
+            "mode": "step",
+            "execution_ledger": planned["execution_ledger"],
+            "executor_mode": "remote",
+        })
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["error"], "UNSUPPORTED_EXECUTOR_MODE")
 
     def test_unknown_mode_is_blocked(self):
         result = self.adapter.execute({"mode": "auto"})
