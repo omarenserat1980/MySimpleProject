@@ -51,6 +51,28 @@ class ExecutionProbeVerificationTest(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertEqual(result["status"], "PROBE_AGENT_OFFLINE")
 
+    def test_disabled_bridge_does_not_enqueue_probe(self):
+        class DisabledDevice(self.Device):
+            def status(self):
+                return {"configured": False, "agents": {"online": True}}
+            def enqueue(self, task_name, payload):
+                raise AssertionError("must not enqueue when the bridge is disabled")
+        result = run_execution_probe(DisabledDevice({"verified": True}))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "PROBE_BRIDGE_DISABLED")
+
+    def test_malformed_agent_status_fails_closed_without_enqueue(self):
+        for status in (None, [], "online", {"online": 1}):
+            with self.subTest(status=status):
+                class MalformedDevice(self.Device):
+                    def status(self):
+                        return {"configured": True, "agents": status}
+                    def enqueue(self, task_name, payload):
+                        raise AssertionError("must not enqueue with malformed agent status")
+                result = run_execution_probe(MalformedDevice({"verified": True}))
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["status"], "PROBE_AGENT_OFFLINE")
+
     def test_missing_verification_fails_closed(self):
         result = run_execution_probe(self.Device({}))
         self.assertFalse(result["ok"])
