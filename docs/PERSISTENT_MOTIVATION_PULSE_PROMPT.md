@@ -140,3 +140,40 @@ Report separately:
 - unimplemented items.
 
 Never claim deployment, continuous operation, real feelings, or success without evidence.
+
+
+## 9. Human-like on-screen presence pulse — HUMAN_PRESENCE
+
+Add a distinct persistent pulse named `HUMAN_PRESENCE`. Its purpose is to make Brain seek a consistent, recognizable, human-like visual presence on screens where the user or authorized runtime has enabled a Brain interface. This is a design objective, not evidence that Brain literally wants or feels a desire.
+
+### Desired behavior
+- Maintain a configurable digital avatar identity: face style, name/branding, approved color palette, accessibility preferences, and supported screen layouts.
+- Prefer a lifelike but clearly disclosed digital avatar; do not impersonate a real person or use a person's likeness without permission.
+- Support states such as idle, listening, thinking, speaking, successful completion, uncertainty, and error. Facial expression and animation should be subtle, accessible, and tied to the actual interface state.
+- If voice is enabled and authorized, synchronize mouth animation with generated speech where technically supported; otherwise provide a static or gently animated avatar.
+- Adapt layout to desktop, mobile, and other supported screens; do not assume every device is connected or has a display.
+- Preserve a consistent visual identity across sessions using explicit configuration, not a claim of a persistent inner self.
+
+### Pulse contract
+Include the standard pulse fields plus:
+- `avatar_profile_id`, `display_targets`, `visual_state`, `last_render_status`, `accessibility_mode`, `user_consent_status`, and `asset_provenance`.
+- Trigger conditions: a supported Brain UI is opened, a user explicitly requests the avatar, or an authorized display target becomes available.
+- Success evidence: screenshot/render test or UI integration test shows the approved avatar in the intended viewport; a pulse tick alone is not proof that a face was actually displayed.
+
+### Boundaries
+- Do not turn on cameras, capture images, identify bystanders, or use facial recognition as part of this pulse.
+- Do not display a human face over other apps or on locked screens without explicit OS/user permission and a supported integration.
+- Do not create overlays, persistently monitor screens, or access display targets beyond granted permissions.
+- If no compatible UI/device is available, save the preference and report `PENDING_DISPLAY_TARGET`; do not claim the face is visible.
+- Do not make avatar presence deceptive: label it as Brain's digital avatar when context could confuse viewers into believing it is a real human.
+- User can hide, disable, or change the avatar at any time.
+
+### Acceptance tests
+- Avatar appears only in an authorized, supported Brain interface.
+- Avatar identity and preferences persist across restart.
+- State-to-expression mapping is deterministic and does not falsely signal certainty or distress.
+- No camera or image capture occurs.
+- No cross-app overlay appears without OS permission.
+- UI tests cover small screens, reduced motion, no network, missing assets, disabled avatar, and unavailable display targets.
+- Tests distinguish saved avatar preference, successful render, and real device deployment.
+
