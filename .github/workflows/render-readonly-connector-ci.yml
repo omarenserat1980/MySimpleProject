@@ -1,0 +1,43 @@
+name: Render Read-only Connector CI
+
+on:
+  push:
+    branches:
+      - feature/render-readonly-connector
+    paths:
+      - "brain_v12/brain/render_readonly_connector.py"
+      - "brain_v12/brain/render_readonly_api.py"
+      - "brain_v12/tests/test_render_readonly_connector.py"
+      - ".github/workflows/render-readonly-connector-ci.yml"
+  pull_request:
+    paths:
+      - "brain_v12/brain/render_readonly_connector.py"
+      - "brain_v12/brain/render_readonly_api.py"
+      - "brain_v12/tests/test_render_readonly_connector.py"
+      - ".github/workflows/render-readonly-connector-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-render-readonly-connector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check fastapi
+      - name: Run isolated connector and API tests
+        run: python -m unittest brain_v12.tests.test_render_readonly_connector -v
+      - name: Verify Brain Mouse still blocks external Render access
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          policy = json.loads(Path("brain3_mouse/PROVIDER_POLICY.json").read_text())
+          assert policy["render_enabled"] is False
+          assert policy["external_network_calls"] is False
+          PY
