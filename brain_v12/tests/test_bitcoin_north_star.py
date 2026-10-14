@@ -67,6 +67,18 @@ class BitcoinNorthStarTests(unittest.TestCase):
             self.assertEqual(events[0]["event_type"], "BITCOIN_NORTH_STAR_ASSESSMENT")
             self.assertEqual(events[0]["payload"]["task_id"], first.task_id)
 
+    def test_single_letter_n_is_bitcoin_north_star_command(self):
+        from brain_v12.brain.decision_engine import DecisionEngine
+        engine = DecisionEngine(north_star=BitcoinNorthStar())
+        self.assertIn("Bitcoin mining mission", engine.normalize_goal("N"))
+        self.assertEqual(engine.normalize_goal(" n "), engine.normalize_goal("north star"))
+        options = engine.generate("N")
+        result = engine.choose("N", options)
+        self.assertEqual(result["status"], "DECIDED")
+        self.assertEqual(result["goal"], "N")
+        self.assertIn("Bitcoin mining mission", result["normalized_goal"])
+        self.assertEqual(result["north_star"]["mission"], MISSION)
+
 
 if __name__ == "__main__":
     unittest.main()
