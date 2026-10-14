@@ -9,8 +9,14 @@ import time
 
 
 def run_execution_probe(device_bridge, timeout=8):
-    """Queue a harmless python_version probe and wait briefly for its result."""
+    """Queue a harmless python_version probe only when an agent is online."""
     try:
+        bridge_status = device_bridge.status()
+        if not bridge_status.get("configured"):
+            return {"ok": False, "status": "PROBE_BRIDGE_DISABLED"}
+        agents = bridge_status.get("agents", {})
+        if not isinstance(agents, dict) or agents.get("online") is not True:
+            return {"ok": False, "status": "PROBE_AGENT_OFFLINE"}
         created = device_bridge.enqueue("python_version", {})
         if not created.get("ok"):
             return {"ok": False, "status": "PROBE_ENQUEUE_FAILED", "error": created.get("error", "unknown")}
