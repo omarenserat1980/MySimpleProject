@@ -1,0 +1,40 @@
+name: Brain ASIC Execute Available Stages
+
+on:
+  push:
+    branches: [main, "feature/asic-physical-evidence-gate"]
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-execute-all.yml"
+  pull_request:
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-execute-all.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execute-asic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install free open-source RTL tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y iverilog yosys
+          iverilog -V || true
+          yosys -V
+      - name: Execute every available ASIC stage
+        run: python3 brain_v12/asic/execute_asic_pipeline.py
+      - name: Upload execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-asic-execution-evidence
+          path: artifacts/asic-execution/
+          if-no-files-found: error
+          retention-days: 90
