@@ -26,6 +26,8 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertNotIn('run_execution_probe', route)
         self.assertIn('store.events(50)', route)
         self.assertIn("resolve_avatar_event(store.events(50))", route)
+        self.assertIn('if event_source != "recent_runtime_event"', route)
+        self.assertLess(route.index("resolve_avatar_event(store.events(50))"), route.index('if event_source != "recent_runtime_event"'))
         self.assertIn('"source": event_source', route)
 
     def test_recent_supervisor_event_drives_thinking_expression(self):
