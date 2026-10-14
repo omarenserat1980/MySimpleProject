@@ -1,0 +1,34 @@
+# Brain Digital Lab asset inventory template
+# Copy one record per discovered asset. Unknown values must remain explicit.
+schema_version: 1
+inventory_status: NOT_YET_POPULATED
+assets:
+  - asset_id: example.core.api
+    name: Example asset
+    domain: software # software | application | agent | asic | hardware | server | infrastructure | security | data
+    kind: service
+    source: repository path, URL, device ID, or inventory source
+    version_or_fingerprint: unknown
+    owner: Brain Digital Lab
+    dependencies: []
+    risk_tier: medium # low | medium | high | critical
+    lifecycle_status: UNVERIFIED
+    baseline:
+      health: unknown
+      last_checked_utc: null
+      evidence: []
+    verification:
+      required_checks: []
+      last_result: NOT_RUN
+      evidence: []
+    change_policy:
+      autonomous_read_only_discovery: true
+      autonomous_patch_proposal: true
+      autonomous_production_change: false
+      human_approval_required: true
+    rollback:
+      available: unknown
+      procedure: null
+    blockers: []
+    next_action: discover and baseline
+    notes: simulated, software-only, hardware-in-the-loop, and physical results must be distinguished
