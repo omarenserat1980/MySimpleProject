@@ -63,13 +63,13 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertFalse(self.bridge.authenticate("same-secret", "redmi3-01"))
 
 
-    def test_authenticated_agent_heartbeat_is_recorded_and_expires(self):
+    def test_key_authentication_and_heartbeat_liveness_are_separate_checks(self):
         agent_id = "redmi3-01"
         self.assertTrue(self.bridge.authenticate("test-device-key", agent_id))
 
         heartbeat = self.bridge.heartbeat(agent_id, {
             "source": "termux-agent",
-            "reality": "REAL_DEVICE_CLAIM",
+            "reality": "TEST_FIXTURE",
             "test_run_id": "heartbeat-proof-test",
         })
         self.assertTrue(heartbeat["ok"])
