@@ -28,17 +28,18 @@ jobs:
         run: |
           set -euo pipefail
           ORFS_COMMIT=9c431405a71909ca9aa5b9000d3d11fa36b2a32a
-          git init /tmp/OpenROAD-flow-scripts
-          git -C /tmp/OpenROAD-flow-scripts remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
-          git -C /tmp/OpenROAD-flow-scripts fetch --depth 1 origin "$ORFS_COMMIT"
-          git -C /tmp/OpenROAD-flow-scripts checkout --detach FETCH_HEAD
-          test "$(git -C /tmp/OpenROAD-flow-scripts rev-parse HEAD)" = "$ORFS_COMMIT"
+          ORFS=/tmp/OpenROAD-flow-scripts
+          git init "$ORFS"
+          git -C "$ORFS" remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C "$ORFS" fetch --depth 1 origin "$ORFS_COMMIT"
+          git -C "$ORFS" checkout --detach FETCH_HEAD
+          test "$(git -C "$ORFS" rev-parse HEAD)" = "$ORFS_COMMIT"
           mkdir -p evidence
           printf 'orfs_commit=%s\n' "$ORFS_COMMIT" > evidence/physical_flow_manifest.txt
           printf 'source_sha=%s\n' "$(git rev-parse HEAD)" >> evidence/physical_flow_manifest.txt
           printf 'platform=sky130hd\n' >> evidence/physical_flow_manifest.txt
           printf 'design=brain_bitcoin_nonce_search\n' >> evidence/physical_flow_manifest.txt
-          printf 'container_image=openroad/orfs:latest (mutable tag; image digest not pinned)\n' >> evidence/physical_flow_manifest.txt
+          printf 'container_image=openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8\n' >> evidence/physical_flow_manifest.txt
 
       - name: Stage RTL and run OpenROAD-flow-scripts in official container
         shell: bash
@@ -54,10 +55,10 @@ jobs:
           cp brain_v12/asic/openroad/sky130hd/constraint.sdc "$DESIGN/constraint.sdc"
           cp brain_v12/asic/openroad/sky130hd/config.mk "$DESIGN/config.mk"
           docker run --rm \
-            -v "$ORFS:/OpenROAD-flow-scripts" \
-            -w /OpenROAD-flow-scripts \
-            openroad/orfs:latest \
-            bash -lc 'set -euo pipefail; source env.sh; command -v openroad; command -v yosys; cd flow; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
+            -v "$ORFS:/tmp/brain-openroad-flow-scripts:ro" \
+            -w /tmp/brain-openroad-flow-scripts/flow \
+            openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8 \
+            bash -lc 'set -euo pipefail; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/brain-openroad-flow-scripts/flow; command -v openroad; command -v yosys; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk' \
             2>&1 | tee evidence/openroad_flow.log
 
       - name: Collect physical-flow evidence
