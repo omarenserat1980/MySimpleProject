@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs for the same PR/branch to avoid duplicate resource use.
+concurrency:
+  group: brain-digital-asic-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   digital-asic-lab:
     name: RTL simulation and Yosys synthesis
