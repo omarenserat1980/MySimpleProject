@@ -13,6 +13,9 @@ class FakeStore:
         self.events.append({"type": event_type, "payload": payload})
     def memories(self):
         return []
+    def save_memory(self, key, value):
+        self._memories = getattr(self, "_memories", {})
+        self._memories[key] = value
 
 class CognitiveLoopDesignFactoryTests(unittest.TestCase):
     def setUp(self):
@@ -81,6 +84,29 @@ class CognitiveLoopDesignFactoryTests(unittest.TestCase):
         event_types = [event["type"] for event in self.store.events]
         self.assertGreaterEqual(event_types.count("TOOL_SELECTED"), 3)
         self.assertGreaterEqual(event_types.count("TOOL_RESULT"), 3)
+
+
+    def test_design_and_engineering_factories_coexist_in_live_catalog(self):
+        ids = {item["id"] for item in self.loop.tool_catalog()}
+        self.assertIn("design.plan", ids)
+        self.assertIn("engineering.propose", ids)
+
+        result = self.loop.execute_tool(
+            "engineering.propose",
+            {"problem": "Create a Bitcoin Stratum evidence contract", "evidence": []},
+        )
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["status"], "COMPLETED")
+        self.assertFalse(result["data"]["claims"]["real_mining_verified"])
+        event_types = [event["type"] for event in self.store.events]
+        self.assertIn("TOOL_SELECTED", event_types)
+        self.assertIn("TOOL_RESULT", event_types)
+
+    def test_north_star_blocks_unrelated_goal_before_task_creation(self):
+        result = self.loop.run("organize unrelated notes")
+        self.assertEqual(result["execution"]["status"], "BLOCKED_MISSION_ALIGNMENT")
+        self.assertEqual(result["verification"]["task_status"], "NOT_CREATED")
+        self.assertEqual(result["tasks"]["tasks"], [])
 
 
 if __name__ == "__main__":
