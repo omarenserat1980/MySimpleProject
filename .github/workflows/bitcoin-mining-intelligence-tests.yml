@@ -7,9 +7,18 @@ on:
       - 'brain_v12/brain/bitcoin_mining_intelligence_api.py'
       - 'brain_v12/brain/mining_engine.py'
       - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
+      - 'brain_v12/brain/bitcoin_stratum_worker.py'
+      - 'brain_v12/tests/test_bitcoin_stratum_worker.py'
       - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
   push:
-    branches: [brain-bitcoin-mining-intelligence]
+    branches: [brain-bitcoin-mining-intelligence, brain-bitcoin-stratum-connector]
+    paths:
+      - 'brain_v12/brain/bitcoin_mining_intelligence_api.py'
+      - 'brain_v12/brain/mining_engine.py'
+      - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
+      - 'brain_v12/brain/bitcoin_stratum_worker.py'
+      - 'brain_v12/tests/test_bitcoin_stratum_worker.py'
+      - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,9 +42,12 @@ jobs:
           python -m py_compile \
             brain_v12/brain/bitcoin_mining_intelligence_api.py \
             brain_v12/brain/mining_engine.py \
-            brain_v12/tests/test_bitcoin_mining_intelligence_api.py
-      - name: Run mining engine regression tests
+            brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
+            brain_v12/brain/bitcoin_stratum_worker.py \
+            brain_v12/tests/test_bitcoin_stratum_worker.py
+      - name: Run mining engine and Stratum probe regression tests
         run: |
           python -m pytest -q \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
-            brain_v12/tests/test_mining_engine.py
+            brain_v12/tests/test_mining_engine.py \
+            brain_v12/tests/test_bitcoin_stratum_worker.py
