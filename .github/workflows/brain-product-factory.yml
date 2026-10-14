@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test strategy-to-product mapping
+        run: python -m unittest scripts.test_brain_product_factory -v
+
       - name: Build revenue strategy
         run: python3 scripts/brain_revenue_strategy.py
 
