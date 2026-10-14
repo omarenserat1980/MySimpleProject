@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 from brain_v12.brain.cloud_executor_attestation_api import (
     ConsumeRequest, ExecutorRequest, IssueRequest, attestation_challenge,
-    attestation_consume, attestation_issue, _host_binding,
+    attestation_consume, attestation_issue, attestation_readiness, _host_binding,
 )
 
 
@@ -34,6 +34,23 @@ class CloudExecutorAttestationApiTests(unittest.TestCase):
         })
         self.env.start()
         self.addCleanup(self.env.stop)
+
+
+    def test_readiness_never_claims_live_attestation(self):
+        result = attestation_readiness()
+        self.assertTrue(result["configuration_ready"])
+        self.assertEqual(result["status"], "CONFIGURED_NOT_LIVE")
+        self.assertFalse(result["live_attestation_verified"])
+        self.assertFalse(result["executor_connected"])
+        self.assertFalse(result["physical_hardware_verified"])
+
+    def test_readiness_fails_closed_when_inventory_missing(self):
+        with patch.dict("os.environ", {"BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON": "{}",
+                                      "BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON": "{}"}):
+            result = attestation_readiness()
+        self.assertFalse(result["configuration_ready"])
+        self.assertEqual(result["status"], "UNVERIFIED")
+        self.assertFalse(result["live_attestation_verified"])
 
     def test_authenticated_flow_challenge_issue_consume(self):
         challenge = attestation_challenge(ExecutorRequest(executor_id="cloud-test-01"), self.token)
