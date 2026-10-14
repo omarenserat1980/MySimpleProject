@@ -6,6 +6,8 @@ from brain_v12.brain.bitcoin_mining_intelligence_api import (
     bitcoin_mining_analyze,
     bitcoin_mining_plan,
     bitcoin_mining_status,
+    HashBenchmarkRequest,
+    bitcoin_mining_benchmark,
 )
 
 
@@ -60,6 +62,18 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
         ))
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["stages"][2]["status"], "BLOCKED")
+
+
+    def test_local_hash_benchmark_is_bounded_and_not_real_mining(self):
+        result = bitcoin_mining_benchmark(HashBenchmarkRequest(
+            duration_seconds=0.05, max_hashes=100,
+        ))
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["mode"], "LOCAL_BENCHMARK_ONLY")
+        self.assertGreater(result["hashes_completed"], 0)
+        self.assertFalse(result["pool_connected"])
+        self.assertFalse(result["real_bitcoin_mining"])
+        self.assertFalse(result["revenue_verified"])
 
 
 if __name__ == "__main__":
