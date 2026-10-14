@@ -44,9 +44,15 @@ main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display
 (function(){
 const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label'),connection=document.getElementById('connection'),liveMode=document.getElementById('liveMode'),applyButton=document.getElementById('apply');
 let lastLiveState=null, polling=false;
+function readPref(key,fallback){try{const value=window.localStorage.getItem(key);return value===null?fallback:value;}catch(_error){return fallback;}}
+function savePref(key,value){try{window.localStorage.setItem(key,value);}catch(_error){/* private browsing/storage-disabled mode remains usable */}}
+label.value=readPref('brain.avatar.label','');
+state.value=readPref('brain.avatar.manualState','IDLE');
+if(!names[state.value])state.value='IDLE';
+liveMode.checked=readPref('brain.avatar.liveMode','true')!=='false';
 const names={IDLE:'مستعد',LISTENING:'استماع',THINKING:'تفكير',SPEAKING:'تحدث',SUCCESS:'نجاح',UNCERTAIN:'عدم يقين',ERROR:'خطأ'};
 function render(s){face.dataset.state=s;chip.textContent=s+' · '+names[s];stateText.textContent=s;}
-function apply(){const s=state.value;render(s);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
+function apply(){const s=state.value;render(s);savePref('brain.avatar.manualState',s);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
 async function pollLiveState(){
  if(!liveMode.checked||polling)return;
  polling=true;
@@ -70,8 +76,8 @@ function syncControls(){
 }
 document.getElementById('apply').addEventListener('click',apply);
 document.getElementById('reset').addEventListener('click',()=>{state.value='IDLE';label.value='';apply();});
-state.addEventListener('change',apply);label.addEventListener('input',()=>{document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';});
-liveMode.addEventListener('change',syncControls);
+state.addEventListener('change',apply);label.addEventListener('input',()=>{savePref('brain.avatar.label',label.value);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';});
+liveMode.addEventListener('change',()=>{savePref('brain.avatar.liveMode',String(liveMode.checked));syncControls();});
 apply();syncControls();window.setInterval(pollLiveState,5000);
 })();
 </script>
