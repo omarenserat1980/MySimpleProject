@@ -19,9 +19,28 @@ module brain_sha256d_nonce_search_tb;
 
   initial begin
     header_template = 640'h0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c;
-    nonce_start = 32'h7c2bac1d;
-    target_be = {256{1'b1}};
+
+    // Reject the final nonce against target=0 and prove the range terminates.
+    nonce_start = 32'hffffffff;
+    target_be = 256'd0;
     repeat (2) @(posedge clk);
+    rst_n <= 1;
+    @(posedge clk);
+    start <= 1;
+    @(posedge clk);
+    start <= 0;
+    wait(exhausted);
+    if (found) $fatal(1, "target=0 must reject the candidate");
+    $display("BRAIN_NONCE_TARGET_REJECT=PASS");
+
+    // Reset and validate the known genesis nonce/hash with a permissive target.
+    @(negedge clk);
+    rst_n <= 0;
+    start <= 0;
+    repeat (2) @(posedge clk);
+    nonce_start <= 32'h7c2bac1d;
+    target_be <= {256{1'b1}};
+    @(posedge clk);
     rst_n <= 1;
     @(posedge clk);
     start <= 1;
@@ -34,8 +53,9 @@ module brain_sha256d_nonce_search_tb;
     $display("BRAIN_NONCE_SEARCH_GENESIS=PASS");
     $finish;
   end
+
   initial begin
-    #2000;
+    #4000;
     $fatal(1, "nonce search timed out");
   end
 endmodule
