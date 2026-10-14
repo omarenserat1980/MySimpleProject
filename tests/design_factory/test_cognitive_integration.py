@@ -45,5 +45,43 @@ class CognitiveLoopDesignFactoryTests(unittest.TestCase):
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["error"], "TASK_DESCRIPTION_REQUIRED")
 
+    def test_live_loop_preserves_ledger_across_authorized_simulation_calls(self):
+        planned = self.loop.execute_tool(
+            "design.plan",
+            {"task": "Bitcoin ASIC RTL and OpenROAD physical design verification"},
+        )
+        self.assertTrue(planned["ok"])
+        ledger = planned["execution_ledger"]
+        params = {
+            "mode": "step",
+            "authorize": True,
+            "dry_run": False,
+            "executor_mode": "simulation",
+        }
+
+        first = self.loop.execute_tool(
+            "design.plan", {**params, "execution_ledger": ledger}
+        )
+        first_ledger = first["execution_ledger"]
+        evidence_1 = first_ledger["steps"][0]["evidence"].copy()
+        self.assertEqual(first["status"], "PLANNED")
+        self.assertEqual(first_ledger["next_step_index"], 1)
+        self.assertEqual(first_ledger["steps"][0]["status"], "SIMULATED")
+
+        second = self.loop.execute_tool(
+            "design.plan", {**params, "execution_ledger": first_ledger}
+        )
+        second_ledger = second["execution_ledger"]
+        self.assertEqual(second["status"], "PLANNED")
+        self.assertEqual(second_ledger["next_step_index"], 2)
+        self.assertEqual(second_ledger["steps"][0]["evidence"], evidence_1)
+        self.assertEqual(second_ledger["steps"][1]["status"], "SIMULATED")
+        self.assertEqual(sum(step["started"] for step in second_ledger["steps"]), 2)
+        self.assertFalse(any(step["status"] == "VERIFIED" for step in second_ledger["steps"]))
+        event_types = [event["type"] for event in self.store.events]
+        self.assertGreaterEqual(event_types.count("TOOL_SELECTED"), 3)
+        self.assertGreaterEqual(event_types.count("TOOL_RESULT"), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
