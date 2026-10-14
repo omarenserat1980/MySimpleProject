@@ -110,6 +110,17 @@ class HeartbeatFactoryTests(unittest.TestCase):
         self.assertEqual(verified["status"], "VERIFIED")
         self.assertEqual(verified["evidence_ref"], "test-receiver:ack-1")
 
+    def test_delayed_heartbeat_can_be_resent_without_duplicate_record(self):
+        self.register()
+        heartbeat = self.create()
+        heartbeat_id = heartbeat["heartbeat_id"]
+        self.factory.transition(heartbeat_id, "SENT", now=102.0)
+        self.factory.transition(heartbeat_id, "DELAYED", now=110.0, error_code="ACK_TIMEOUT")
+        resent = self.factory.transition(heartbeat_id, "SENT", now=111.0)
+        self.assertEqual(resent["status"], "SENT")
+        self.assertEqual(resent["sent_at"], 111.0)
+        self.assertEqual(self.factory.summary()["heartbeats_total"], 1)
+
     def test_invalid_transition_cannot_skip_delivery_acknowledgement(self):
         self.register()
         heartbeat = self.create()
