@@ -40,3 +40,18 @@ jobs:
         env:
           PYTHONPATH: .
         run: python -m brain_v12.digital_lab.validate_inventory --help
+      - name: Generate repository metadata inventory
+        env:
+          PYTHONPATH: .
+        run: python -m brain_v12.digital_lab.discover_assets --root . --output "$RUNNER_TEMP/brain-digital-lab-inventory.json"
+      - name: Validate generated inventory structure
+        env:
+          PYTHONPATH: .
+        run: python -m brain_v12.digital_lab.validate_inventory "$RUNNER_TEMP/brain-digital-lab-inventory.json"
+      - name: Upload inventory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-digital-lab-inventory
+          path: ${{ runner.temp }}/brain-digital-lab-inventory.json
+          if-no-files-found: error
+          retention-days: 14
