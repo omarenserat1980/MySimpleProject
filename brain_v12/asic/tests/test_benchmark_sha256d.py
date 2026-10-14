@@ -20,7 +20,10 @@ class Sha256dBenchmarkTests(unittest.TestCase):
 
     def test_benchmark_reports_software_only_and_count(self):
         result = MODULE.benchmark(3)
-        self.assertEqual(result["hashes"], 3)
+        self.assertEqual(result["hashes_per_sample"], 3)
+        self.assertEqual(result["repeats"], 3)
+        self.assertEqual(len(result["samples"]), 3)
+        self.assertGreater(result["median_hashes_per_second"], 0)
         self.assertEqual(result["execution"], "host_cpu_software")
         self.assertFalse(result["is_live_mining"])
         self.assertFalse(result["is_rtl_or_asic_measurement"])
@@ -29,6 +32,10 @@ class Sha256dBenchmarkTests(unittest.TestCase):
     def test_rejects_invalid_count(self):
         with self.assertRaises(ValueError):
             MODULE.benchmark(0)
+
+    def test_rejects_invalid_repeat_count(self):
+        with self.assertRaises(ValueError):
+            MODULE.benchmark(1, 10)
 
 
 if __name__ == "__main__":
