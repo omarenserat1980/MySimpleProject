@@ -1,0 +1,18 @@
+{
+  "operator_legal_name": "",
+  "facility_evidence_url": "",
+  "public_pool_or_payout_evidence_url": "",
+  "trial_terms_url": "",
+  "trial_hashrate_ths": 0,
+  "upfront_cost_usd": 0,
+  "deposit_required_usd": 0,
+  "recurring_cost_usd": 0,
+  "withdrawal_fee_usd": 0,
+  "activation_fee_usd": 0,
+  "trial_rewards_withdrawable": false,
+  "requires_paid_upgrade_to_withdraw": true,
+  "requires_referrals_to_withdraw": true,
+  "requires_wallet_seed_or_private_key": true,
+  "physical_asic_disclosed": false,
+  "external_wallet_payout_supported": false
+}
