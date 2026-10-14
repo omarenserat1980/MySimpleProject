@@ -15,18 +15,19 @@ from typing import Iterable
 
 EXCLUDED_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__",
                  ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "build"}
+GENERATED_FILES = {"brain-digital-lab-inventory.json"}
 
 def classify(path: Path) -> str:
-    p = path.as_posix().lower()
+    parts = tuple(part.lower() for part in path.parts)
     name = path.name.lower()
     suffix = path.suffix.lower()
-    if ".github/workflows/" in p or p.startswith(".github/workflows/"):
+    if len(parts) >= 2 and parts[0] == ".github" and parts[1] == "workflows":
         return "workflow"
-    if any(token in p for token in ("/asic/", "/rtl/", "/verilog/", "/gdsii/")) or suffix in {".v", ".sv", ".vhd", ".vhdl"}:
+    if any(part in {"asic", "rtl", "verilog", "gdsii"} for part in parts[:-1]) or suffix in {".v", ".sv", ".vhd", ".vhdl"}:
         return "asic_rtl"
-    if any(token in p for token in ("/terraform/", "/infra/", "/infrastructure/", "/k8s/", "/helm/")) or name in {"dockerfile", "docker-compose.yml", "compose.yml"}:
+    if any(part in {"terraform", "infra", "infrastructure", "k8s", "helm"} for part in parts[:-1]) or name in {"dockerfile", "docker-compose.yml", "compose.yml"}:
         return "infrastructure"
-    if any(token in p for token in ("/android/", "/mobile/", "/frontend/", "/web/", "/app/")) or suffix in {".apk", ".aab"}:
+    if any(part in {"android", "mobile", "frontend", "web", "app", "apps"} for part in parts[:-1]) or suffix in {".apk", ".aab"}:
         return "application"
     if suffix in {".py", ".sh", ".ps1", ".bat", ".cmd", ".js", ".ts", ".go", ".rs"}:
         return "code_or_script"
@@ -50,6 +51,8 @@ def iter_files(root: Path) -> Iterable[Path]:
     for current, dirs, files in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in EXCLUDED_DIRS)
         for filename in sorted(files):
+            if filename.lower() in GENERATED_FILES:
+                continue
             full = Path(current) / filename
             try:
                 if full.is_file() and not full.is_symlink():
