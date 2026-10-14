@@ -1,5 +1,6 @@
 """Deterministic, explainable routing from task descriptions to specialist prompts."""
 from __future__ import annotations
+import re
 from .registry import load_registry
 
 KEYWORDS = {
@@ -20,12 +21,16 @@ KEYWORDS = {
 "new_domain":("new domain","unlisted domain","new specialty")}
 PROMPT_FOR_DOMAIN={"discovery":"01","requirements":"02","architecture":"03","detailed_design":"04","software":"05","digital_logic":"06","physical_design":"07","simulation":"08","security":"09","verification":"10","infrastructure":"11","manufacturing":"12","reliability":"13","integration":"14","new_domain":"15"}
 
+def _contains_term(text: str, term: str) -> bool:
+    """Match whole terms/phrases so e.g. 'ui' or 'ci' don't match inside other words."""
+    return re.search(r"(?<![a-z0-9_])" + re.escape(term.casefold()) + r"(?![a-z0-9_])", text) is not None
+
 def route_task(description: str) -> dict:
     """Return matched domains and prompt IDs; always include master and verification."""
     if not isinstance(description,str) or not description.strip():
         raise ValueError("description must be a non-empty string")
     text=description.casefold()
-    matches=[domain for domain,terms in KEYWORDS.items() if any(term in text for term in terms)]
+    matches=[domain for domain,terms in KEYWORDS.items() if any(_contains_term(text,term) for term in terms)]
     if not matches: matches=["new_domain"]
     if "physical_design" in matches and "digital_logic" not in matches: matches.append("digital_logic")
     prompt_ids=["00"]
