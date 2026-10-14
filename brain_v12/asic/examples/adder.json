@@ -1,0 +1,15 @@
+{
+  "module": "brain_adder",
+  "width": 8,
+  "inputs": ["a", "b"],
+  "nodes": [
+    {
+      "id": "sum_node",
+      "op": "add",
+      "inputs": ["a", "b"]
+    }
+  ],
+  "outputs": {
+    "result": "sum_node"
+  }
+}

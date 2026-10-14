@@ -33,6 +33,28 @@ or provision a paid service without explicit approval.
 Design intent and static source inspection do not qualify as simulation or synthesis.
 Never report `PHYSICAL_HARDWARE_VERIFIED` based on the software simulator.
 
+## Software-node compiler (initial milestone)
+
+`node_compiler.py` compiles a strict JSON graph into combinational SystemVerilog.
+It supports add, subtract, bitwise AND/OR/XOR, NOT, pass-through, and constants.
+Node references must target inputs or earlier nodes; malformed graphs fail closed.
+This initial milestone intentionally does not generate sequential logic, pin
+constraints, board-specific programming files, or foundry-ready ASIC layouts.
+
+Example:
+
+```bash
+python -m brain_v12.asic.node_compiler \
+  --spec brain_v12/asic/examples/adder.json \
+  --output artifacts/asic/brain_adder.sv
+```
+
+A `DESIGN_GENERATED` result means only that validated RTL text was emitted.
+Run `python -m brain_v12.asic.toolchain_probe` to discover local RTL tools,
+then use the existing CI flow for simulation/build evidence. Never promote
+generated RTL to `SIMULATED_PASS`, `VERIFIED_BUILD`, or physical verification
+without the corresponding actual run and retained evidence.
+
 ## Existing simulator
 
 The existing API remains the software-only model:
