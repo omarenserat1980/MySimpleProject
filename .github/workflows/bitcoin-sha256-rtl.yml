@@ -35,6 +35,9 @@ jobs:
           iverilog -g2012 -Wall -s tb_sha256_compress -o artifacts/sha256-rtl/tb.vvp brain_v12/asic/rtl/sha256_compress.sv brain_v12/asic/rtl/tb_sha256_compress.sv
           vvp artifacts/sha256-rtl/tb.vvp | tee artifacts/sha256-rtl/simulation.log
           grep -q ALL_SHA256_RTL_TESTS_PASSED artifacts/sha256-rtl/simulation.log
+          iverilog -g2012 -Wall -s tb_sha256d_header_hash -o artifacts/sha256-rtl/sha256d.vvp brain_v12/asic/rtl/sha256_compress.sv brain_v12/asic/rtl/sha256d_header_hash.sv brain_v12/asic/rtl/tb_sha256d_header_hash.sv
+          vvp artifacts/sha256-rtl/sha256d.vvp | tee artifacts/sha256-rtl/sha256d-simulation.log
+          grep -q ALL_SHA256D_HEADER_RTL_TESTS_PASSED artifacts/sha256-rtl/sha256d-simulation.log
       - name: Upload simulation evidence
         if: always()
         uses: actions/upload-artifact@v4
