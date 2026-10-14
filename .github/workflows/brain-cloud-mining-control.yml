@@ -94,6 +94,9 @@ jobs:
       - name: Validate Mining Opportunity Audit Bridge
         run: |
           python -m pytest -q brain_v12/business/test_mining_opportunity_audit_bridge.py
+      - name: Validate independent Bitcoin payout reconciliation
+        run: |
+          python -m pytest -q brain_v12/business/test_bitcoin_payout_reconciliation.py
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
