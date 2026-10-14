@@ -54,6 +54,11 @@ jobs:
         run: |
           set -o pipefail
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
+      - name: Diagnose rejection causes and require complete evidence
+        if: always()
+        run: |
+          set -o pipefail
+          python3 tools/brain_asic_rejection_diagnostics.py --build-dir hardware/brain_asic_v1/build --report hardware/brain_asic_v1/build/rejection-diagnostics.json | tee hardware/brain_asic_v1/build/rejection-diagnostics.log
       - name: Publish build evidence
         if: always()
         uses: actions/upload-artifact@v4
