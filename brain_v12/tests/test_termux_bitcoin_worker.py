@@ -1,7 +1,11 @@
+import contextlib
+import io
+import os
 import unittest
+from unittest.mock import patch
 
 from brain_v12.brain.termux_bitcoin_worker import (
-    build_command, validate_pool_url, _positive_int, parse_miner_line,
+    build_command, validate_pool_url, _positive_int, parse_miner_line, main,
 )
 
 
@@ -52,6 +56,41 @@ class TermuxBitcoinWorkerTests(unittest.TestCase):
         self.assertTrue(counters["authorization_message_seen"])
         self.assertEqual(counters["last_reported_hashrate_hs"], 12500.0)
         self.assertEqual(counters["hashrate_unit_source"], "miner_stdout_stderr_unverified")
+
+    def _run_main_captured(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = main()
+        return code, output.getvalue()
+
+    def test_live_mining_is_blocked_without_explicit_opt_in(self):
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "brain_v12.brain.termux_bitcoin_worker.subprocess.Popen"
+        ) as popen:
+            code, output = self._run_main_captured()
+        self.assertEqual(code, 2)
+        self.assertIn("BLOCKED_OPT_IN_REQUIRED", output)
+        popen.assert_not_called()
+
+    def test_live_mining_is_blocked_in_github_actions_even_with_opt_in(self):
+        env = {"BRAIN_ENABLE_LIVE_MINING": "YES", "GITHUB_ACTIONS": "true"}
+        with patch.dict(os.environ, env, clear=True), patch(
+            "brain_v12.brain.termux_bitcoin_worker.subprocess.Popen"
+        ) as popen:
+            code, output = self._run_main_captured()
+        self.assertEqual(code, 2)
+        self.assertIn("BLOCKED_CI_ENVIRONMENT", output)
+        popen.assert_not_called()
+
+    def test_live_mining_is_blocked_outside_termux(self):
+        env = {"BRAIN_ENABLE_LIVE_MINING": "YES"}
+        with patch.dict(os.environ, env, clear=True), patch(
+            "brain_v12.brain.termux_bitcoin_worker.Path.is_dir", return_value=False
+        ), patch("brain_v12.brain.termux_bitcoin_worker.subprocess.Popen") as popen:
+            code, output = self._run_main_captured()
+        self.assertEqual(code, 2)
+        self.assertIn("BLOCKED_NOT_TERMUX", output)
+        popen.assert_not_called()
 
 
 if __name__ == "__main__":
