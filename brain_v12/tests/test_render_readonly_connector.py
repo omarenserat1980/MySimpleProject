@@ -94,7 +94,15 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         self.assertNotIn("hidden-value", rendered)
 
 
-    def test_repository_policy_blocks_live_requests_even_when_enabled(self):
+
+    def test_current_repository_policy_blocks_live_requests(self):
+        client = RenderReadOnlyClient(
+            enabled=True, api_key="test-key", transport=self.fake_transport
+        )
+        with self.assertRaisesRegex(RenderConnectorError, "policy blocks"):
+            client.service("srv-abc123")
+        self.assertEqual(self.calls, [])
+\n    def test_repository_policy_blocks_live_requests_even_when_enabled(self):
         client = RenderReadOnlyClient(
             enabled=True, api_key="test-key", transport=self.fake_transport,
             policy_check=lambda: False,
