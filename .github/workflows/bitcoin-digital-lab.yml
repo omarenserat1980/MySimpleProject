@@ -47,6 +47,8 @@ jobs:
           print("scope=hash_primitive_self_test_only")
           print("bitcoin_block_mining=false")
           PY
+      - name: Install API test dependencies
+        run: python -m pip install "fastapi>=0.115,<1.0" "httpx<0.28" "pydantic>=2.7,<3" python-multipart
       - name: Run mining economics and API tests
         env:
           PYTHONPATH: .
