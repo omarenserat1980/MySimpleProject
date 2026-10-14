@@ -101,7 +101,9 @@ class HeartbeatFactory:
     def __init__(self, path: str | os.PathLike[str] = ":memory:"):
         self.path = str(path)
         if self.path != ":memory:":
-            Path(self.path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+            expanded = Path(self.path).expanduser()
+            expanded.resolve().parent.mkdir(parents=True, exist_ok=True)
+            self.path = str(expanded)
         self.db = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA busy_timeout=10000")
@@ -226,6 +228,8 @@ class HeartbeatFactory:
         definition = self.get_function(function_id)
         if definition is None:
             raise KeyError("FUNCTION_NOT_REGISTERED")
+        if not definition["enabled"]:
+            raise RuntimeError("FUNCTION_DISABLED")
         if not worker_id.strip() or not node_id.strip():
             raise ValueError("WORKER_AND_NODE_ID_REQUIRED")
         if mode not in MODES:
