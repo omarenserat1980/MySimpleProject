@@ -90,6 +90,12 @@ class BitcoinNorthStarTests(unittest.TestCase):
             self.assertEqual(first["state"], "ACTION_REQUIRED")
             self.assertEqual(second["state"], "ACTION_REQUIRED")
             self.assertEqual(len(store.read_all()), count_after_first)
+            compass.assess({**task, "task_id": "another-run-same-blocker"})
+            events = store.read_all()
+            blocker_events = [event for event in events
+                              if event["event_type"] == "BITCOIN_NORTH_STAR_BLOCKER"]
+            self.assertEqual(len(blocker_events), 1)
+            self.assertEqual(compass.blocker_snapshot(task)["blocker_id"], first["blocker_id"])
 
     def test_blocker_requires_ordered_transitions_and_verified_closure_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
