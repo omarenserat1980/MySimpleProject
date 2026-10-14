@@ -16,15 +16,23 @@ jobs:
       - name: Bitcoin SHA256d reference tests
         working-directory: hardware/brain_asic_v1/reference
         run: python3 -m unittest -v test_bitcoin_sha256d.py
-      - name: RTL control-path smoke test (not SHA256 proof)
+      - name: Verify SHA-256 compression known vector
         run: |
           mkdir -p hardware/brain_asic_v1/build
+          iverilog -g2012 -s brain_sha256_compress_tb -o hardware/brain_asic_v1/build/sha256-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/tb/brain_sha256_compress_tb.sv
+          vvp hardware/brain_asic_v1/build/sha256-vector | tee hardware/brain_asic_v1/build/sha256-vector.log
+          grep -q 'BRAIN_SHA256_COMPRESS_VECTOR=PASS' hardware/brain_asic_v1/build/sha256-vector.log
+      - name: RTL control-path smoke test (not SHA256 proof)
+        run: |
           iverilog -g2012 -o hardware/brain_asic_v1/build/smoke hardware/brain_asic_v1/rtl/brain_sha256_core.sv hardware/brain_asic_v1/tb/brain_sha256_core_tb.sv
           vvp hardware/brain_asic_v1/build/smoke | tee hardware/brain_asic_v1/build/smoke.log
           grep -q 'BRAIN_ASIC_V1_SMOKE=PASS' hardware/brain_asic_v1/build/smoke.log
-      - name: Yosys synthesis (control shell only)
+      - name: Synthesize SHA-256 compression datapath
         run: |
-          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json"
+          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv; hierarchy -top brain_sha256_compress; proc; opt; check; synth -top brain_sha256_compress; stat; write_json hardware/brain_asic_v1/build/brain_sha256_compress.json" | tee hardware/brain_asic_v1/build/yosys-compress.log
+      - name: Synthesize control shell (not a miner)
+        run: |
+          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
       - name: Publish build evidence
         uses: actions/upload-artifact@v4
         with:
