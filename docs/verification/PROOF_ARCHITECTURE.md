@@ -6,7 +6,8 @@
 - Baseline branch: `main`
 - Baseline commit inspected: `a14e0db199c1cb3d991db30b16eea43a2150f41e`
 - Working branch: `brain/universal-proof-evolution-v1`
-- This document records architecture and proof boundaries; it does not claim that new runtime components have already been implemented or tested.
+- Implemented on the working branch: a minimal fail-closed evaluator at `brain_v12/brain/proof_gate_engine.py`, focused unit tests, and a branch-scoped GitHub Actions workflow.
+- CI/runtime result must be read from the actual workflow run; code being committed is not itself proof that tests passed.
 
 ## Design principles
 
@@ -22,7 +23,20 @@
 
 The baseline already contains `brain_v12/brain/verification_gate.py`, a `VerificationGate` that distinguishes action completion from objective verification and hashes evidence references. It also contains `brain_v12/digital_lab/UNIVERSAL_ENGINEERING_GATE_CONTRACT.md`, which defines lifecycle states, evidence minimums, domain checks, and fail-closed acceptance. The master specification already separates engineering health from commercial outcomes.
 
-Therefore, do not create a parallel verification gate or replace these contracts. The implementation should first map their current semantics and tests, then add only missing shared evidence provenance, freshness, source validation, audit persistence, and domain adapters. Preserve existing response contracts unless a reviewed migration proves a compatible change is required.
+The new `ProofGateEngine` is deliberately a small evidence-envelope evaluator, not a replacement for `VerificationGate`, `EvidenceStore`, or the domain-specific gates. It validates required proof types, status, freshness, optional source allowlists, synthetic/test markers, optional artifact SHA-256 formatting, and expected commit association. Its limitations explicitly state that envelope validation does not independently authenticate the source. Integrations should adapt existing evidence into this contract rather than duplicating runtime checks or ledgers.
+
+## Implemented evaluator contract
+
+Input: a gate ID, required proof types, evidence records, and optional expected commit, allowed source types, freshness duration, and evaluation time.
+
+Output: `PASS`, `FAIL`, `BLOCKED`, or `UNKNOWN`, with a reason, missing proof types, accepted evidence IDs, rejected evidence reasons, evaluation timestamp, and limitations.
+
+- `BLOCKED`: required evidence is absent.
+- `FAIL`: supplied evidence for a required proof type fails validation.
+- `UNKNOWN`: gate configuration or evaluation parameters are invalid.
+- `PASS`: every required proof type has a fresh, non-synthetic, status-approved record and satisfies configured source/revision constraints.
+
+This is structural policy enforcement, not cryptographic source attestation. Source allowlists are only as trustworthy as their configuration and the adapter that supplies evidence.
 
 ## Proposed logical components
 
@@ -91,18 +105,19 @@ The repair mechanism must not be the sole approver of its own changes or change 
 1. Inventory existing proof, mining, revenue, ASIC, runtime, and self-healing components.
 2. Map existing evidence schemas and APIs; identify overlap before creating new abstractions.
 3. Define gate contracts and evidence provenance.
-4. Implement a minimal shared evaluator and tests.
-5. Integrate mining/revenue and ASIC gates through adapters, preserving current behavior.
-6. Add device and self-healing integrations.
-7. Add dashboard/API views only after stable underlying contracts exist.
-8. Test persistence, replay, duplicates, tampering, stale data, missing evidence, and recovery.
-9. Publish a proof-gap report and retain all physical/financial claims as blocked until independent evidence exists.
+4. **Done on this branch:** add a minimal shared evaluator, nine focused unit tests, and a low-cost GitHub Actions test workflow.
+5. Next: verify the workflow run, refine failure semantics from test feedback, and connect one existing domain adapter without changing its current authorization behavior.
+6. Integrate mining/revenue and ASIC gates through adapters, preserving current behavior.
+7. Add device and self-healing integrations.
+8. Add dashboard/API views only after stable underlying contracts exist.
+9. Test persistence, replay, duplicates, tampering, stale data, missing evidence, and recovery.
+10. Retain all physical/financial claims as blocked until independent evidence exists.
 
 ## Acceptance criteria
 
 - No missing or synthetic evidence can unlock a real-world gate.
 - All decisions have a reason and traceable evidence references.
-- Tests explicitly cover missing, stale, mismatched, duplicated, conflicting, and synthetic evidence.
+- Tests explicitly cover missing, stale, mismatched, duplicate-ID, malformed digest, invalid timestamp, and synthetic evidence.
 - Existing endpoints and modules are reused where practical.
 - Security and cost constraints remain enforced.
 - The change is not merged into `main` automatically.
