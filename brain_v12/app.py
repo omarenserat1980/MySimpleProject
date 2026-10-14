@@ -3247,9 +3247,6 @@ def brain_avatar_state():
         if not core_alive:
             avatar_state = "ERROR"
             event_source = "liveness_assessment"
-        elif assessment.get("status") == "DEGRADED" or not device.get("ok"):
-            avatar_state = "UNCERTAIN"
-            event_source = "liveness_assessment"
         else:
             from .brain.avatar_state import resolve_avatar_event
             event_result = resolve_avatar_event(store.events(50))
@@ -3257,6 +3254,9 @@ def brain_avatar_state():
             event_type = event_result["event_type"]
             event_age_seconds = event_result["event_age_seconds"]
             event_source = event_result["source"]
+            if event_source != "recent_runtime_event" and (assessment.get("status") == "DEGRADED" or not device.get("ok")):
+                avatar_state = "UNCERTAIN"
+                event_source = "liveness_assessment"
         return {
             "ok": True,
             "source": event_source,
