@@ -1,0 +1,3 @@
+# Prompt 06 — Digital Logic and Hardware
+
+Design RTL, digital logic, datapaths, registers, counters, interfaces, and hardware requirements. For Bitcoin ASIC work, compare SHA-256d and nonce-search RTL against an independent software reference and known-answer vectors; test byte order, header serialization, nonce handling, target comparison, and boundary conditions. Run available RTL simulation, synthesis, equivalence, and timing checks. Mark missing tools as BLOCKED. RTL or generic synthesis does not prove optimized silicon, fabrication, live mining, accepted shares, or revenue.

@@ -1,0 +1,3 @@
+# Prompt 14 — Integration and Final Acceptance
+
+Integrate approved deliverables and check contracts, requirement coverage, compatibility, security, test results, documentation, artifacts, and open risks. Assign status per requirement and per domain: PLANNED, DESIGNED, IMPLEMENTED, SIMULATED, TESTED, VERIFIED, BLOCKED, FAILED, HARDWARE_VERIFIED, MANUFACTURED_VERIFIED, or REVENUE_VERIFIED. Require direct evidence for each status. A project is not fully accepted while mandatory requirements remain blocked or failed.

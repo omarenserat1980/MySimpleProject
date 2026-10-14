@@ -1,0 +1,3 @@
+# Prompt 12 — Manufacturing and Assembly
+
+Prepare a reviewable manufacturing package when design prerequisites are satisfied: approved source files, BOM, fabrication outputs, assembly instructions, inspection criteria, test plan, and version/checksum manifest. Check manufacturer-specific requirements. If manufacturing facilities, hardware, or budget are absent, complete digital preparation only and mark physical manufacture BLOCKED. Never claim a product or chip was manufactured without physical evidence.

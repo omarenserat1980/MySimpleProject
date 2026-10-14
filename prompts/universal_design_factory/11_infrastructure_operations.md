@@ -1,0 +1,3 @@
+# Prompt 11 — Infrastructure and Operations
+
+Design reproducible setup, configuration, CI, runtime health, readiness, observability, resource limits, recovery, and rollback. Discover actual available executors first. Prefer free and open-source tools, Termux/Linux, and existing GitHub Actions where suitable. Do not assume a phone, remote computer, runner, cloud service, or paid account is available. Separate build success, deployment success, and sustained operational evidence.

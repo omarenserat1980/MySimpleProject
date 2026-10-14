@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Electronic Brain Design Task",
+  "type": "object",
+  "required": [
+    "task_id",
+    "title",
+    "domain",
+    "goal",
+    "acceptance_criteria",
+    "evidence_level"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "tools_required": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "evidence_level": {
+      "type": "string",
+      "enum": [
+        "PLANNED",
+        "DESIGNED",
+        "IMPLEMENTED",
+        "SIMULATED",
+        "TESTED",
+        "VERIFIED",
+        "BLOCKED",
+        "FAILED",
+        "HARDWARE_VERIFIED",
+        "MANUFACTURED_VERIFIED",
+        "REVENUE_VERIFIED"
+      ]
+    },
+    "simulation_only": {
+      "type": "boolean",
+      "default": false
+    },
+    "approval_required": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,3 @@
+# Prompt 02 — Requirements and Specification
+
+Translate the request into uniquely identified, testable requirements. For each requirement define purpose, inputs, outputs, constraints, dependencies, risk, acceptance criteria, verification method, and evidence artifact. Separate functional, non-functional, security, safety, performance, resource, operational, and proof requirements. Resolve contradictions against the master specification and decision log; preserve legacy requirements unless an approved decision supersedes them. Flag genuinely blocking ambiguity instead of silently guessing.

@@ -1,0 +1,3 @@
+# Prompt 07 — Physical Design
+
+Check RTL readiness, technology libraries, PDK/platform availability, constraints, and tool versions. When available, run the approved flow for floorplanning, placement, clocking, routing, timing, power, and physical rule checks. Capture logs, reports, configuration, tool versions, and checksums. Treat initial constraints and candidate GDS as experimental until reviewed. Never claim signoff, fabrication, or silicon operation without the corresponding evidence.

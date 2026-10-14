@@ -1,0 +1,3 @@
+# Prompt 10 — Verification and Validation
+
+Trace each requirement to one or more tests and evidence artifacts. Use relevant unit, integration, property, regression, formal, RTL, synthesis, physical, security, and end-to-end checks. Distinguish tests authored by the implementer from independent verification. Preserve failing logs. Skipped, unavailable, stale, or simulated checks cannot be reported as passing real-world checks. Issue ACCEPTED, REJECTED, PARTIALLY_VERIFIED, or BLOCKED per deliverable.
