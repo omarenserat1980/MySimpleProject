@@ -53,6 +53,20 @@ class HybridResourceFabricTests(unittest.TestCase):
         result = self.fabric.reserve("host-01", "task-2", {"cpu": 1}, {"cpu"}, "execute_physical", physical_execution=True)
         self.assertEqual(result["status"], "PHYSICAL_EVIDENCE_GATE_BLOCKED")
 
+    def test_untrusted_evidence_source_is_blocked(self):
+        untrusted = ResourceRecord(
+            resource_id="host-untrusted",
+            owner_id="operator",
+            reality_mode=RealityMode.PHYSICAL,
+            capabilities=frozenset({"cpu"}),
+            measured_host_capacity={"cpu": 8},
+            evidence=ResourceEvidence("untrusted-agent", "proof-x", self.now, True),
+            permissions=frozenset({"simulate", "execute_physical"}),
+        )
+        self.fabric.register(untrusted)
+        result = self.fabric.reserve("host-untrusted", "task-untrusted", {"cpu": 1}, {"cpu"}, "execute_physical", physical_execution=True)
+        self.assertEqual(result["status"], "PHYSICAL_EVIDENCE_GATE_BLOCKED")
+
     def test_verified_physical_capacity_can_be_leased(self):
         self.fabric.register(self.physical())
         result = self.fabric.reserve("host-01", "task-1", {"cpu": 2}, {"cpu"}, "execute_physical", physical_execution=True)
