@@ -11,7 +11,7 @@ def ready_to_verify(coordinator):
     coordinator.mark_planned("task-1", planner_id="planner-A")
     coordinator.mark_ready("task-1")
     coordinator.start_implementation("task-1", implementer_id="coder-A", head_commit="base123")
-    coordinator.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456")
+    coordinator.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456", changed_paths=("brain_v12/brain/example.py",))
     coordinator.record_review("task-1", reviewer_id="reviewer-B", approved=True)
 
 class MultiAgentCollaborationTests(unittest.TestCase):
@@ -27,6 +27,16 @@ class MultiAgentCollaborationTests(unittest.TestCase):
         c.reserve_paths("one", ("brain_v12/brain",))
         with self.assertRaises(ValueError):
             c.reserve_paths("two", ("brain_v12/brain/x.py",))
+
+    def test_changed_path_outside_allowlist_is_rejected(self):
+        c = CollaborationCoordinator()
+        c.create_task(make_envelope())
+        c.mark_planned("task-1", planner_id="planner-A")
+        c.mark_ready("task-1")
+        c.start_implementation("task-1", implementer_id="coder-A", head_commit="base123")
+        with self.assertRaisesRegex(ValueError, "changed_path_outside_allowlist"):
+            c.submit_for_review("task-1", implementer_id="coder-A", head_commit="head456",
+                changed_paths=("README.md",))
 
     def test_reviewer_must_be_independent(self):
         c = CollaborationCoordinator()
