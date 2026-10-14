@@ -194,7 +194,7 @@ class HeartbeatFactoryTests(unittest.TestCase):
                 function_id = f"synthetic.{count}.{index}"
                 factory.register_function(FunctionDefinition(
                     function_id=function_id, name=function_id, category="load-test",
-                    interval_seconds=60, enabled=False, source_of_truth="synthetic_fixture",
+                    interval_seconds=60, enabled=True, source_of_truth="synthetic_fixture",
                 ), now=100.0)
                 pulse = factory.create_heartbeat(
                     function_id, worker_id="load-worker", node_id="load-node",
