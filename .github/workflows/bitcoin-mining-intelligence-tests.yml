@@ -7,9 +7,11 @@ on:
       - 'brain_v12/brain/bitcoin_mining_intelligence_api.py'
       - 'brain_v12/brain/mining_engine.py'
       - 'brain_v12/brain/bitcoin_hash_benchmark.py'
+      - 'brain_v12/brain/stratum_v1_protocol.py'
       - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
       - 'brain_v12/tests/test_mining_engine.py'
       - 'brain_v12/tests/test_bitcoin_hash_benchmark.py'
+      - 'brain_v12/tests/test_stratum_v1_protocol.py'
       - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
   push:
     branches: [brain-bitcoin-mining-intelligence, feat/brain-bitcoin-hash-benchmark]
@@ -31,17 +33,20 @@ jobs:
           python-version: '3.12'
       - name: Install minimal test dependencies
         run: python -m pip install --upgrade pip fastapi pydantic pytest
-      - name: Compile changed Python modules
+      - name: Compile mining modules and tests
         run: |
           python -m py_compile \
             brain_v12/brain/bitcoin_mining_intelligence_api.py \
             brain_v12/brain/mining_engine.py \
             brain_v12/brain/bitcoin_hash_benchmark.py \
+            brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
-            brain_v12/tests/test_bitcoin_hash_benchmark.py
-      - name: Run mining engine regression tests
+            brain_v12/tests/test_bitcoin_hash_benchmark.py \
+            brain_v12/tests/test_stratum_v1_protocol.py
+      - name: Run mining regression tests
         run: |
           python -m pytest -q \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
             brain_v12/tests/test_mining_engine.py \
-            brain_v12/tests/test_bitcoin_hash_benchmark.py
+            brain_v12/tests/test_bitcoin_hash_benchmark.py \
+            brain_v12/tests/test_stratum_v1_protocol.py
