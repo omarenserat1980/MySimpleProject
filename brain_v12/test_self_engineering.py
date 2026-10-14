@@ -33,6 +33,17 @@ class SelfEngineeringEngineTests(unittest.TestCase):
         self.assertFalse(run.claims()["source_inspected"])
         self.assertEqual(run.state, RunState.BLOCKED)
 
+    def test_inspection_details_cannot_override_validated_findings(self):
+        run = self.engine.start("Inspect source")
+        self.engine.record_inspection(
+            run, source="test-fixture", findings=["verified finding"],
+            details={"findings": []},
+        )
+        self.assertTrue(run.claims()["source_inspected"])
+        evidence = run.evidence[-1]
+        self.assertEqual(evidence.details["findings"], ["verified finding"])
+        self.assertTrue(evidence.verify_digest())
+
     def test_cannot_execute_without_scoped_approval(self):
         self.engine.begin_execution(self.run)
         self.assertEqual(self.run.state, RunState.BLOCKED)
