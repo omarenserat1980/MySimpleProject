@@ -61,7 +61,7 @@ jobs:
             -v "$WORK:/tmp/orfs-work" \
             -w /tmp/orfs-work \
             openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8 \
-            bash -lc 'set -euo pipefail; cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/orfs-work/flow; cd /tmp/orfs-work/flow; command -v openroad; command -v yosys; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad' \
+            bash -lc 'set -euo pipefail; cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/orfs-work/flow; cd /tmp/orfs-work/flow; command -v openroad; command -v yosys; RTL_FILES="$(find designs/sky130hd/brain_bitcoin_nonce_search/src -type f -name '*.sv' -print | sort | tr '\\n' ' ')"; test -n "$RTL_FILES"; printf 'RTL_FILES=%s\\n' "$RTL_FILES"; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk VERILOG_FILES="$RTL_FILES" YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad' \
             2>&1 | tee evidence/openroad_flow.log
 
       - name: Collect physical-flow evidence
