@@ -7,6 +7,7 @@ from .capability_registry import CapabilityRegistry
 from .executor_adapter import BladeExecutorAdapter
 from .supervisor_executor import SupervisorExecutor
 from .brain_supervisor import BrainSupervisor
+from .device_cloud_federation import eligible_fabric_resources
 
 class BrainVirtualDatacenter:
     """Brain-owned datacenter with durable queue and supervisor-controlled execution."""
@@ -42,6 +43,15 @@ class BrainVirtualDatacenter:
         task=self.task_queue.get(task_id)
         if task is None: return {"ok":False,"status":"TASK_NOT_FOUND","task_id":task_id}
         return {"ok":True,"task":task.__dict__}
+
+    def plan_fabric_resources(self, required_capabilities=None, physical_execution=False):
+        """Plan candidate resources through the federation policy; never executes work."""
+        snapshot = self.hybrid_resource_status()
+        return eligible_fabric_resources(
+            snapshot,
+            required_capabilities or (),
+            physical_execution=physical_execution,
+        )
 
     def hybrid_resource_status(self):
         """Return evidence-aware external resources separately from virtual blades."""
