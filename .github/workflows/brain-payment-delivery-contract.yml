@@ -6,6 +6,7 @@ on:
       - ".github/workflows/brain-payment-delivery-contract.yml"
       - "cloudflare/brain-api/src/index.js"
       - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/test/payment_delivery_flow.test.mjs"
       - "cloudflare/brain-api/migrations/**"
   push:
     branches: [main]
@@ -35,6 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           node test/commercial_worker_static.test.js | tee "$RUNNER_TEMP/payment-delivery-contract.log"
+          node test/payment_delivery_flow.test.mjs | tee "$RUNNER_TEMP/payment-delivery-dynamic.log"
           {
             echo "scope=static-contract-regression"
             echo "commit=$GITHUB_SHA"
@@ -47,12 +49,14 @@ jobs:
             echo "production_resources_changed=FALSE"
           } > "$RUNNER_TEMP/payment-delivery-contract-evidence.txt"
           cat "$RUNNER_TEMP/payment-delivery-contract.log" >> "$RUNNER_TEMP/payment-delivery-contract-evidence.txt"
+          cat "$RUNNER_TEMP/payment-delivery-dynamic.log" >> "$RUNNER_TEMP/payment-delivery-contract-evidence.txt"
       - name: Upload contract evidence
         uses: actions/upload-artifact@v4
         with:
           name: payment-delivery-contract-evidence
           path: |
             ${{ runner.temp }}/payment-delivery-contract.log
+            ${{ runner.temp }}/payment-delivery-dynamic.log
             ${{ runner.temp }}/payment-delivery-contract-evidence.txt
           if-no-files-found: error
           retention-days: 30
