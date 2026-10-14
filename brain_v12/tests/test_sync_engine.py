@@ -18,6 +18,13 @@ class BrainSyncStoreTests(unittest.TestCase):
         self.assertEqual(first, replay)
         self.assertEqual(s.revision("task/1"), 2)
 
+    def test_ignored_stale_event_remains_idempotently_addressable(self):
+        s = BrainSyncStore("cloud")
+        s.put("task/1", {"status": "RUNNING"}, event_id="e2")
+        stale = BrainSyncStore("phone").put("task/1", {"status": "READY"}, event_id="e1")
+        self.assertEqual(s.apply([stale])["ignored"], 1)
+        self.assertEqual(s.put("task/1", {"status": "READY"}, event_id="e1"), stale)
+
     def test_reusing_event_id_for_different_content_is_rejected(self):
         s = BrainSyncStore("cloud")
         s.put("task/1", {"status": "READY"}, event_id="e1")
@@ -25,6 +32,9 @@ class BrainSyncStoreTests(unittest.TestCase):
             s.put("task/1", {"status": "DONE"}, event_id="e1")
         with self.assertRaisesRegex(ValueError, "EVENT_ID_REUSE_CONFLICT"):
             s.put("task/2", {"status": "READY"}, event_id="e1")
+        conflicting = BrainSyncStore("phone").put("task/1", {"status": "DONE"}, event_id="e1")
+        with self.assertRaisesRegex(ValueError, "EVENT_ID_REUSE_CONFLICT"):
+            s.apply([conflicting])
 
     def test_duplicate_delete_is_idempotent_even_with_stale_expected_revision(self):
         s = BrainSyncStore("cloud")
