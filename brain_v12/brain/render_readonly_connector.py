@@ -18,7 +18,7 @@ _SERVICE_ID = re.compile(r"^srv-[A-Za-z0-9]+$")
 _SECRET_KEYS = re.compile(r"(token|secret|password|api[_-]?key|authorization)", re.I)
 _BEARER = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
 _KEY_VALUE = re.compile(
-    r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|password|authorization)"
+    r"(?i)\b(api[_-]?key|access[_-]?token|refresh[_-]?token|token|password|authorization)"
     r"(\s*[:=]\s*)([^\s,;]+)"
 )
 
