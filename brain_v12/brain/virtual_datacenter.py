@@ -43,6 +43,22 @@ class BrainVirtualDatacenter:
         if task is None: return {"ok":False,"status":"TASK_NOT_FOUND","task_id":task_id}
         return {"ok":True,"task":task.__dict__}
 
+    def hybrid_resource_status(self):
+        """Return evidence-aware external resources separately from virtual blades."""
+        return self.resource_manager.hybrid_resource_status()
+
+    def reserve_hybrid_resource(self, resource_id, task_id, required_capacity=None,
+                                required_capabilities=None, permission="simulate",
+                                lease_seconds=60, physical_execution=False):
+        """Explicitly reserve a registered resource; physical work is evidence-gated."""
+        return self.task_queue.reserve_federated_resource(
+            resource_id, task_id, required_capacity, required_capabilities,
+            permission, lease_seconds, physical_execution
+        )
+
+    def release_hybrid_resource(self, task_id):
+        return self.task_queue.release_federated_resource(task_id)
+
     def queue_status(self): return self.task_queue.status()
     def resources(self): return self.resource_manager.cluster(self.chassis)
 
