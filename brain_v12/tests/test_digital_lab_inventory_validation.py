@@ -23,6 +23,11 @@ def valid_report():
     }
 
 
+def valid_evidence():
+    return [{"source": "github_actions", "reference": "https://github.com/example/repo/actions/runs/1",
+             "observed_utc": "2026-10-14T00:00:00Z", "result": "PASS"}]
+
+
 def test_accepts_metadata_only_inventory():
     assert validate_inventory(valid_report()) == []
 
@@ -51,6 +56,37 @@ def test_rejects_claimed_pass_for_untested_asset():
     report = valid_report()
     report["assets"][0]["verification_status"] = "PASS"
     assert any("cannot claim verification" in error for error in validate_inventory(report))
+
+
+def test_rejects_pass_without_evidence():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    assert any("without evidence" in error for error in validate_inventory(report))
+
+
+def test_accepts_verified_asset_with_evidence():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    report["assets"][0]["evidence"] = valid_evidence()
+    assert validate_inventory(report) == []
+
+
+def test_rejects_accepted_asset_without_evidence():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "ACCEPTED"
+    report["assets"][0]["verification_status"] = "PASS"
+    assert any("cannot be ACCEPTED" in error for error in validate_inventory(report))
+
+
+def test_rejects_malformed_evidence_record():
+    report = valid_report()
+    report["assets"][0]["lifecycle_status"] = "IN_REVIEW"
+    report["assets"][0]["verification_status"] = "PASS"
+    report["assets"][0]["evidence"] = [{"source": "ci"}]
+    errors = validate_inventory(report)
+    assert any("missing fields" in error and "evidence" in error for error in errors)
 
 
 def test_rejects_empty_coverage_limitations():
