@@ -26,6 +26,20 @@ class Candidate:
 class DecisionEngine:
     """Decision selection guarded by the persistent Bitcoin mission policy."""
 
+    NORTH_STAR_COMMANDS = {"n", "north star", "bitcoin north star"}
+    NORTH_STAR_GOAL = (
+        "Bitcoin mining mission: inspect current evidence and CI, identify the nearest verified blocker, "
+        "prioritize real SHA-256/Stratum mining and accepted-share proof, then payout and net-profit "
+        "reconciliation; choose the smallest safe next step and never treat simulation as revenue."
+    )
+
+    @classmethod
+    def normalize_goal(cls, goal):
+        raw = str(goal or "").strip()
+        if raw.casefold() in cls.NORTH_STAR_COMMANDS:
+            return cls.NORTH_STAR_GOAL
+        return raw
+
     def __init__(self, north_star: BitcoinNorthStar | None = None):
         self.history = []
         if north_star is None:
@@ -54,6 +68,7 @@ class DecisionEngine:
         return tags
 
     def generate(self, goal):
+        goal = self.normalize_goal(goal)
         text = (goal or "").lower()
         code = any(x in text for x in ("كود", "برمج", "ملف", "github", "code", "تطوير", "إصلاح"))
         device = any(x in text for x in ("termux", "redmi", "هاتف", "جهاز", "موبايل", "جوال", "android", "device", "agent", "عامل"))
@@ -74,6 +89,8 @@ class DecisionEngine:
 
     def choose(self, goal, options, permissions=None):
         permissions = permissions or set()
+        original_goal = goal
+        goal = self.normalize_goal(goal)
         compass = self.north_star.assess({
             "task_id": "decision-" + str(len(self.history) + 1),
             "tags": self._mission_tags(str(goal)),
@@ -83,7 +100,7 @@ class DecisionEngine:
         if compass.status == "OFF_COURSE":
             result = {
                 "status": "MISSION_ALIGNMENT_REQUIRED",
-                "goal": goal,
+                "goal": original_goal,
                 "selected": None,
                 "reason": "bitcoin_north_star",
                 "north_star": compass.as_dict(),
@@ -108,16 +125,16 @@ class DecisionEngine:
             ranked.append((score, option, blocked, missing))
         ranked.sort(key=lambda item: item[0], reverse=True)
         if not ranked:
-            result = {"status": "NO_OPTIONS", "goal": goal, "north_star": compass.as_dict()}
+            result = {"status": "NO_OPTIONS", "goal": original_goal, "north_star": compass.as_dict()}
         else:
             score, selected, blocked, missing = ranked[0]
             if blocked and selected.get("risk") == "high":
-                result = {"status": "WAITING_APPROVAL", "goal": goal, "selected": selected,
+                result = {"status": "WAITING_APPROVAL", "goal": original_goal, "normalized_goal": goal, "selected": selected,
                           "score": round(score, 3), "reason": "required_permission",
                           "missing_permissions": missing, "alternatives": [item[1] for item in ranked[1:]],
                           "north_star": compass.as_dict()}
             else:
-                result = {"status": "DECIDED", "goal": goal, "selected": selected,
+                result = {"status": "DECIDED", "goal": original_goal, "normalized_goal": goal, "selected": selected,
                           "score": round(score, 3), "reason": "tool_aware_heuristic",
                           "alternatives": [item[1] for item in ranked[1:]], "north_star": compass.as_dict()}
         self.history.append(result)
