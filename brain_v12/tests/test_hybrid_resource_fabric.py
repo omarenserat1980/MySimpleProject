@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from brain_v12.brain.resource_manager import ResourceManager
 from brain_v12.brain.hybrid_resource_fabric import (
     FabricError,
     HybridResourceFabric,
@@ -116,6 +117,16 @@ class HybridResourceFabricTests(unittest.TestCase):
     def test_negative_capacity_rejected(self):
         with self.assertRaisesRegex(FabricError, "INVALID_MODELED_CAPACITY"):
             self.fabric.register(self.virtual(capacity={"cpu": -1}))
+
+    def test_resource_manager_exposes_fabric_without_claiming_physical_capacity(self):
+        manager = ResourceManager()
+        manager.register_hybrid_resource(self.virtual())
+        status = manager.hybrid_resource_status()
+        self.assertEqual(status["count"], 1)
+        self.assertEqual(status["resources"][0]["execution_claim"], "SIMULATION_ONLY")
+        result = manager.reserve_hybrid_resource("sim-01", "manager-task", {"cpu": 1}, {"cpu"})
+        self.assertEqual(result["status"], "RESERVED")
+        self.assertEqual(manager.release_hybrid_resource("manager-task")["status"], "RELEASED")
 
     def test_release_is_idempotent(self):
         self.fabric.register(self.virtual())
