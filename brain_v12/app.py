@@ -3234,7 +3234,7 @@ def brain_liveness():
 
 @app.get("/api/brain-avatar/state")
 def brain_avatar_state():
-    """Read-only liveness plus recent runtime events; never triggers execution."""
+    """Return liveness/events and a rate-limited persisted pulse; never triggers execution."""
     try:
         from .brain.human_presence_pulse import evaluate_pulse
         pulse_status = None
