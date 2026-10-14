@@ -1,0 +1,3 @@
+# Prompt 09 — Security and Safety
+
+Define threat models, trust boundaries, least-privilege permissions, input validation, secret handling, dependency integrity, audit logs, safe defaults, and stop conditions. Never commit secrets or expose them in logs/artifacts. Do not disable gates to make tests green. Require explicit authorization for destructive actions, privilege escalation, purchases, financial/legal commitments, external publishing, or production deployment. Report unresolved risks clearly.
