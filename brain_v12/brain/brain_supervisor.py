@@ -15,6 +15,7 @@ from .evidence_store import EvidenceStore
 from .verification_core import VerificationCore
 from .golden_acceptance_gate import GoldenAcceptanceGate
 from .asic_resource_adapter import ASICResourceAdapter
+from .multi_agent_collaboration import CollaborationCoordinator, TaskEnvelope
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
@@ -46,6 +47,31 @@ class BrainSupervisor:
         self.reality=RealityCore(); self.constitution=BrainConstitution(); self.evidence=EvidenceStore(str(self.root/"evidence.db")); self.verification=VerificationCore(self.evidence,self.constitution); self.golden_gate=GoldenAcceptanceGate(self.evidence); self.missions={}
         # ASIC simulations and external telemetry use the supervisor's evidence journal.
         self.asic_resources=ASICResourceAdapter(evidence=self.evidence)
+        # Collaboration policy is subordinate to this single authoritative supervisor.
+        self.collaboration=CollaborationCoordinator()
+
+    def create_collaboration_task(self, envelope: TaskEnvelope):
+        """Create a bounded role task under the authoritative Brain supervisor."""
+        task = self.collaboration.create_task(envelope)
+        self._event(
+            envelope.task_id,
+            "collaboration_task_created",
+            {"role": envelope.role.value, "branch": envelope.branch,
+             "base_commit": envelope.base_commit, "allowed_paths": list(envelope.allowed_paths),
+             "acceptance_criteria": list(envelope.acceptance_criteria)},
+        )
+        return task
+
+    def collaboration_record(self, task_id: str):
+        """Export a machine-readable collaboration snapshot and append its status to Brain audit events."""
+        record = self.collaboration.export_record(task_id)
+        self._event(
+            task_id, "collaboration_snapshot",
+            {"state": record["state"], "attempt": record["attempt"],
+             "head_commit": record["head_commit"], "reviewer_id": record["reviewer_id"],
+             "evidence_count": len(record["evidence"])},
+        )
+        return record
 
     def deliver_if_golden(self, job, criteria, *, expected_reality="SIMULATED", details=None):
         """Use the single mandatory guarded delivery path.
