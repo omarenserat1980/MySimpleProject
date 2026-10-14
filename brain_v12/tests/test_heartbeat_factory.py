@@ -57,12 +57,31 @@ class HeartbeatFactoryTests(unittest.TestCase):
         self.assertEqual(second["sequence"], 2)
         self.assertNotEqual(first["heartbeat_id"], second["heartbeat_id"])
 
+    def test_duplicate_sequence_with_changed_delivery_identity_conflicts(self):
+        self.register()
+        self.create(sequence=1)
+        with self.assertRaises(HeartbeatConflict):
+            self.factory.create_heartbeat(
+                "brain.api", worker_id="worker-test", node_id="different-node",
+                mode="test", sequence=1, payload={"ok": True}, now=101.0,
+            )
+
     def test_explicit_duplicate_sequence_is_idempotent_for_same_payload(self):
         self.register()
         first = self.create(sequence=1)
         duplicate = self.create(sequence=1)
         self.assertEqual(first["heartbeat_id"], duplicate["heartbeat_id"])
         self.assertEqual(len(self.factory.db.execute("SELECT * FROM heartbeat_events").fetchall()), 1)
+
+    def test_protected_function_requires_authorization_reference(self):
+        self.register(function_id="remote.api", enabled=True, auth_required=True)
+        with self.assertRaisesRegex(PermissionError, "AUTHORIZATION_REFERENCE_REQUIRED"):
+            self.create("remote.api")
+        accepted = self.factory.create_heartbeat(
+            "remote.api", worker_id="worker-test", node_id="node-test", mode="test",
+            authorization_ref="test-auth-fixture", now=101.0,
+        )
+        self.assertEqual(accepted["status"], "CREATED")
 
     def test_reused_sequence_with_different_payload_conflicts(self):
         self.register()
@@ -106,7 +125,9 @@ class HeartbeatFactoryTests(unittest.TestCase):
         )
         self.assertEqual(heartbeat["payload"]["api_key"], "[REDACTED]")
         self.assertEqual(heartbeat["payload"]["nested"]["password"], "[REDACTED]")
-        self.assertNotIn("never-store-me", self.path.read_text(encoding="utf-8") if self.path.exists() else "")
+        stored = self.factory.db.execute("SELECT payload_json FROM heartbeat_events").fetchone()["payload_json"]
+        self.assertNotIn("never-store-me", stored)
+        self.assertNotIn("also-secret", stored)
 
     def test_registry_and_events_survive_restart(self):
         self.register()
