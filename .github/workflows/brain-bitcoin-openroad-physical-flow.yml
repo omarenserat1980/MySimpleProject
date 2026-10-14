@@ -1,12 +1,5 @@
 name: Brain Bitcoin OpenROAD Physical Flow
 on:
-  pull_request:
-    branches:
-      - feat/bitcoin-openroad-pdk-readiness
-    paths:
-      - "brain_v12/asic/rtl/**"
-      - "brain_v12/asic/openroad/**"
-      - ".github/workflows/brain-bitcoin-openroad-physical-flow.yml"
   push:
     branches:
       - feat/bitcoin-openroad-physical-flow
