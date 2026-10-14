@@ -36,7 +36,7 @@ class RenderReadOnlyConnectorTests(unittest.TestCase):
         self.assertEqual(url, "https://api.render.com/v1/services/srv-abc123")
         self.assertEqual(headers["Authorization"], "Bearer test-key")
         self.assertEqual(timeout, 5.0)
-        self.assertEqual(result["log"], "Authorization: Bearer [REDACTED]")
+        self.assertEqual(result["log"], "Authorization: [REDACTED] [REDACTED]")
 
     def test_deploy_list_is_bounded_and_encoded(self):
         client = RenderReadOnlyClient(
