@@ -61,6 +61,7 @@ from .brain.revenue_conversion_api import router as revenue_conversion_router
 from .brain.problem_solver import ProblemSolver
 from .brain.error_recovery_api import router as error_recovery_router
 from .brain.universal_simulator_api import router as universal_simulator_router
+from .brain.render_readonly_api import router as render_readonly_router
 from .brain.windows_server_2025_simulation_api import router as windows_server_2025_simulation_router
 from .brain.device_bridge import DeviceBridge
 from .brain.brain_mcp import build_mcp_router
@@ -215,6 +216,7 @@ suggestion_worker_candidates = SuggestionWorkerCandidateStore(os.getenv("BRAIN_D
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(error_recovery_router)
 app.include_router(universal_simulator_router)
+app.include_router(render_readonly_router)
 app.include_router(windows_server_2025_simulation_router)
 app.include_router(virtual_hardware_router)
 app.include_router(arkan_software_executor_router)
