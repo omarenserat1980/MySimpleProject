@@ -109,3 +109,15 @@ def test_bitcoin_sha256d_preflight_blocks_github_actions_and_thermal_limit():
     assert "GITHUB_ACTIONS_MINING_FORBIDDEN" in result["missing_requirements"]
     assert "THERMAL_LIMIT_REACHED" in result["missing_requirements"]
 
+def test_bitcoin_sha256d_plan_is_external_only_and_does_not_claim_live_mining():
+    from brain_v12.brain.mining_controller import HardwareProfile, choose_plan
+    hardware = HardwareProfile("linux", "aarch64", 8, 4.0, ())
+    plan = choose_plan(hardware, "sha256d")
+    assert plan.algorithm == "sha256d"
+    assert plan.backend == "external-asic/stratum"
+    assert plan.mode == "external-only"
+    assert "no live worker or mining session is verified" in plan.reason
+    import pytest
+    with pytest.raises(RuntimeError, match="external-sha256d-worker is not installed"):
+        choose_plan(hardware, "sha256d", require_installed_miner=True)
+
