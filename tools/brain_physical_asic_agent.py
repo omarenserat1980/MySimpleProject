@@ -100,7 +100,7 @@ def read_cgminer(host: str, port: int, timeout: float) -> dict[str, Any]:
         raise ValueError("ASIC_PORT_OUT_OF_RANGE")
     with socket.create_connection((host, port), timeout=timeout) as sock:
         sock.settimeout(timeout)
-        sock.sendall(b"summary|devs|stats\x00")
+        sock.sendall(b"summary+devs+stats\x00")
         chunks, total = [], 0
         while total < 1024 * 1024:
             chunk = sock.recv(8192)
