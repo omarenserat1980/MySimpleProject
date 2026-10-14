@@ -2,6 +2,7 @@ import unittest
 
 from brain_v12.asic.bitcoin_pow_simulator import (
     MAX_ATTEMPTS,
+    decode_compact_target,
     simulate_pow,
     sha256d,
 )
@@ -14,6 +15,25 @@ class BitcoinPowSimulatorTests(unittest.TestCase):
             "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456",
         )
 
+
+
+    def test_genesis_compact_target_decoding(self):
+        self.assertEqual(
+            decode_compact_target(0x1D00FFFF),
+            0xFFFF << (8 * (0x1D - 3)),
+        )
+
+    def test_compact_target_rejects_invalid_encodings(self):
+        for bits, reason in [
+            (-1, "COMPACT_BITS_MUST_BE_UINT32"),
+            (1 << 32, "COMPACT_BITS_MUST_BE_UINT32"),
+            (0x1D80FFFF, "NEGATIVE_COMPACT_TARGET"),
+            (0x1D000000, "ZERO_COMPACT_TARGET"),
+            (0x23000001, "COMPACT_TARGET_OVERFLOW"),
+        ]:
+            with self.subTest(bits=bits):
+                with self.assertRaisesRegex(ValueError, reason):
+                    decode_compact_target(bits)
 
     def test_bitcoin_genesis_header_pow_vector(self):
         # Canonical Bitcoin genesis block header (wire serialization).
