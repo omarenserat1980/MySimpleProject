@@ -1,0 +1,52 @@
+name: ASIC Physical Evidence Gate
+
+on:
+  push:
+    branches: [main, "feature/asic-physical-evidence-gate"]
+    paths:
+      - "tools/asic_physical_evidence_gate.py"
+      - "tests/test_asic_physical_evidence_gate.py"
+      - "docs/ASIC_PHYSICAL_EVIDENCE_GATE.md"
+      - "docs/asic-evidence/**"
+      - ".github/workflows/asic-physical-evidence-gate.yml"
+  pull_request:
+    paths:
+      - "tools/asic_physical_evidence_gate.py"
+      - "tests/test_asic_physical_evidence_gate.py"
+      - "docs/ASIC_PHYSICAL_EVIDENCE_GATE.md"
+      - "docs/asic-evidence/**"
+      - ".github/workflows/asic-physical-evidence-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check
+        run: python -m py_compile tools/asic_physical_evidence_gate.py tests/test_asic_physical_evidence_gate.py
+      - name: Run fail-closed gate tests
+        run: python -m unittest discover -s tests -p 'test_asic_physical_evidence_gate.py' -v
+      - name: Generate audit of template (expected incomplete)
+        run: |
+          set +e
+          python tools/asic_physical_evidence_gate.py docs/asic-evidence/manifest.example.json --output asic-evidence-audit.json
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          grep -q '"fabrication_claim_allowed": false' asic-evidence-audit.json
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: asic-physical-evidence-gate
+          path: asic-evidence-audit.json
+          if-no-files-found: warn
+          retention-days: 90
