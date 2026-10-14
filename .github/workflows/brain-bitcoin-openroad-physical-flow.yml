@@ -48,21 +48,34 @@ jobs:
           ORFS=/tmp/OpenROAD-flow-scripts
           WORK=/tmp/orfs-work
           DESIGN="$ORFS/flow/designs/sky130hd/brain_bitcoin_nonce_search"
-          mkdir -p "$DESIGN/src"
+          mkdir -p "$DESIGN/src" evidence
           cp brain_v12/asic/rtl/brain_sha256_compress.sv "$DESIGN/src/"
           cp brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv "$DESIGN/src/"
           cp brain_v12/asic/rtl/brain_bitcoin_target_check.sv "$DESIGN/src/"
           cp brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv "$DESIGN/src/"
           cp brain_v12/asic/openroad/sky130hd/constraint.sdc "$DESIGN/constraint.sdc"
           cp brain_v12/asic/openroad/sky130hd/config.mk "$DESIGN/config.mk"
+          cat > evidence/run-openroad.sh <<'BRAIN_OPENROAD_SCRIPT'
+          set -euo pipefail
+          cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/
+          source /OpenROAD-flow-scripts/env.sh
+          export FLOW_HOME=/tmp/orfs-work/flow
+          cd /tmp/orfs-work/flow
+          command -v openroad
+          command -v yosys
+          RTL_FILES="$(find designs/sky130hd/brain_bitcoin_nonce_search/src -type f -name '*.sv' -print | sort | tr '\n' ' ')"
+          test -n "$RTL_FILES"
+          printf 'RTL_FILES=%s\n' "$RTL_FILES"
+          make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk VERILOG_FILES="$RTL_FILES" YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad
+          BRAIN_OPENROAD_SCRIPT
           mkdir -p "$WORK"
           docker run --rm \
             -v "$ORFS:/tmp/brain-openroad-flow-scripts:ro" \
             -v "$WORK:/tmp/orfs-work" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
             -w /tmp/orfs-work \
             openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8 \
-            bash -lc 'set -euo pipefail; cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/; source /OpenROAD-flow-scripts/env.sh; export FLOW_HOME=/tmp/orfs-work/flow; cd /tmp/orfs-work/flow; command -v openroad; command -v yosys; RTL_FILES="$(find designs/sky130hd/brain_bitcoin_nonce_search/src -type f -name \\*.sv -print | sort | tr \\"\\n\\" \\" \\")"; test -n "$RTL_FILES"; printf \\"RTL_FILES=%s\\n\\" "$RTL_FILES"; make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk VERILOG_FILES="$RTL_FILES" YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad' \
-            2>&1 | tee evidence/openroad_flow.log
+            bash /workspace/evidence/run-openroad.sh 2>&1 | tee evidence/openroad_flow.log
 
       - name: Collect physical-flow evidence
         if: always()
