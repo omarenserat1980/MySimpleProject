@@ -15,9 +15,7 @@ module tb_bitcoin_genesis_nonce_search;
 
   initial begin
     // Serialized header: version, previous hash, first 28 merkle-root bytes.
-    header_prefix = 512'h01000000
-      0000000000000000000000000000000000000000000000000000000000000000
-      3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa;
+    header_prefix = {32'h01000000, 256'b0, 224'h3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa};
     // Remaining merkle-root bytes, timestamp, nBits; nonce is supplied separately.
     header_tail = 128'h4b1e5e4a29ab5f49ffff001d00000000;
     target_be = 256'h00000000ffff0000000000000000000000000000000000000000000000000000;
