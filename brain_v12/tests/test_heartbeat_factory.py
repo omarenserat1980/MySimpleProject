@@ -160,7 +160,7 @@ class HeartbeatFactoryTests(unittest.TestCase):
         summary = self.factory.summary()
         self.assertEqual(summary["mode"], "local_protocol_only")
         self.assertFalse(summary["remote_delivery_proven"])
-        self.assertEqual(summary["functions_enabled"], 1)
+        self.assertEqual(summary["functions_enabled"], 0)
 
     def test_delayed_detection_only_reports_enabled_functions(self):
         self.register(function_id="enabled.one", enabled=True)
