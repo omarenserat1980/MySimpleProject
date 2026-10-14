@@ -39,6 +39,24 @@ class BrainAvatarContractTests(unittest.TestCase):
         self.assertEqual(result["event_type"], "BRAIN_SUPERVISOR_RUN_REQUESTED")
         self.assertEqual(result["source"], "recent_runtime_event")
 
+    def test_chat_events_drive_thinking_speaking_and_error_states(self):
+        now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+        started = resolve_avatar_event([{
+            "kind": "BRAIN_CHAT_REQUEST_STARTED", "payload": {"trace_id": "safe-id"},
+            "created_at": now.isoformat(),
+        }], now=now)
+        spoken = resolve_avatar_event([{
+            "kind": "BRAIN_CHAT_RESPONSE_COMPLETED", "payload": {"ok": True},
+            "created_at": now.isoformat(),
+        }], now=now)
+        failed = resolve_avatar_event([{
+            "kind": "BRAIN_CHAT_REQUEST_FAILED", "payload": {},
+            "created_at": now.isoformat(),
+        }], now=now)
+        self.assertEqual(started["state"], "THINKING")
+        self.assertEqual(spoken["state"], "SPEAKING")
+        self.assertEqual(failed["state"], "ERROR")
+
     def test_verification_event_maps_truthfully_and_stale_events_decay(self):
         now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
         success = resolve_avatar_event([{
