@@ -4,6 +4,7 @@ import unittest
 
 from brain_v12.brain.resource_manager import ResourceManager
 from brain_v12.brain.virtual_task_queue import VirtualTaskQueue
+from brain_v12.brain.device_cloud_federation import eligible_fabric_resources
 from brain_v12.brain.hybrid_resource_fabric import (
     FabricError,
     HybridResourceFabric,
