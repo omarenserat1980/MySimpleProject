@@ -1,0 +1,37 @@
+name: Brain Bitcoin Target Comparator RTL Gate
+
+on:
+  push:
+    branches:
+      - feat/bitcoin-target-comparator
+  pull_request:
+    branches:
+      - main
+      - feat/bitcoin-header-sha256d
+    paths:
+      - "brain_v12/asic/rtl/brain_bitcoin_target_check.sv"
+      - "brain_v12/asic/rtl/tb_brain_bitcoin_target_check.sv"
+      - ".github/workflows/brain-bitcoin-target-comparator-rtl.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  target-comparator-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Compile target comparator
+        run: |
+          iverilog -g2012 -s tb_brain_bitcoin_target_check -o /tmp/brain-target-check.vvp \
+            brain_v12/asic/rtl/brain_bitcoin_target_check.sv \
+            brain_v12/asic/rtl/tb_brain_bitcoin_target_check.sv
+      - name: Verify digest order and target comparison
+        run: vvp /tmp/brain-target-check.vvp
