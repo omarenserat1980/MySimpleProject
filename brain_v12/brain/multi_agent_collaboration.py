@@ -153,6 +153,7 @@ class CollaborationCoordinator:
     def __init__(self) -> None:
         self.tasks: dict[str, CollaborationTask] = {}
         self._idempotency: dict[str, str] = {}
+        self._path_owners: dict[str, str] = {}
 
     def create_task(self, envelope: TaskEnvelope) -> CollaborationTask:
         envelope.validate()
@@ -167,6 +168,30 @@ class CollaborationCoordinator:
         self._idempotency[envelope.idempotency_key] = envelope.task_id
         return task
 
+    def mark_planned(self, task_id: str, *, planner_id: str) -> CollaborationTask:
+        task = self._get(task_id)
+        task.transition(CollaborationState.PLANNED, actor=planner_id, reason="structured_plan_recorded")
+        return task
+
+    def mark_ready(self, task_id: str, *, coordinator_id: str = "coordinator") -> CollaborationTask:
+        task = self._get(task_id)
+        task.transition(CollaborationState.READY, actor=coordinator_id, reason="plan_and_dependencies_checked")
+        return task
+
+    def reserve_paths(self, task_id: str, paths: Iterable[str]) -> None:
+        """Reserve normalized exact paths; overlapping ownership fails closed."""
+        self._get(task_id)
+        normalized = tuple(dict.fromkeys(str(p).strip().strip("/") for p in paths))
+        if not normalized or any(not p or ".." in p.split("/") for p in normalized):
+            raise ValueError("invalid_reserved_paths")
+        for path in normalized:
+            for existing, owner in self._path_owners.items():
+                overlaps = path == existing or path.startswith(existing + "/") or existing.startswith(path + "/")
+                if overlaps and owner != task_id:
+                    raise ValueError("path_write_conflict:" + path + ":" + owner)
+        for path in normalized:
+            self._path_owners[path] = task_id
+
     @staticmethod
     def authorize_path(role: AgentRole, path: str, allowed_paths: Iterable[str]) -> bool:
         if role not in _WRITE_ROLES or not isinstance(path, str) or not path.strip():
@@ -177,6 +202,8 @@ class CollaborationCoordinator:
 
     def start_implementation(self, task_id: str, *, implementer_id: str, head_commit: str) -> CollaborationTask:
         task = self._get(task_id)
+        if task.state != CollaborationState.READY:
+            raise ValueError("task_not_ready")
         if task.envelope.role != AgentRole.IMPLEMENTER:
             raise ValueError("task_role_not_implementer")
         if not implementer_id.strip() or not head_commit.strip():
