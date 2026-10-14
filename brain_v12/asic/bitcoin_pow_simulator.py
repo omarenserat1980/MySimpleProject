@@ -86,3 +86,28 @@ def simulate_pow(
     return PowSimulationResult(
         False, None, attempts_allowed, None, None, target, "SIMULATION_LIMIT_REACHED"
     )
+
+
+def decode_compact_target(bits: int) -> int:
+    """Decode Bitcoin's 32-bit compact nBits representation into a target.
+
+    Rejects negative, zero, overflowing, and out-of-range encodings. This
+    validates target representation only; it does not validate chain consensus,
+    contextual difficulty rules, or whether a header belongs to the live chain.
+    """
+    if isinstance(bits, bool) or not isinstance(bits, int) or not 0 <= bits <= MAX_NONCE:
+        raise ValueError("COMPACT_BITS_MUST_BE_UINT32")
+    exponent = bits >> 24
+    mantissa = bits & 0x007FFFFF
+    negative = bool(bits & 0x00800000)
+    if negative:
+        raise ValueError("NEGATIVE_COMPACT_TARGET")
+    if mantissa == 0:
+        raise ValueError("ZERO_COMPACT_TARGET")
+    if exponent <= 3:
+        target = mantissa >> (8 * (3 - exponent))
+    else:
+        target = mantissa << (8 * (exponent - 3))
+    if target <= 0 or target >= (1 << 256):
+        raise ValueError("COMPACT_TARGET_OVERFLOW")
+    return target
