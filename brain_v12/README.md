@@ -28,7 +28,10 @@ When served by the Brain FastAPI app, open `/brain-avatar/`. The page polls the 
 `/api/brain-avatar/state` endpoint every five seconds while live sync is enabled. It displays
 an uncertainty state if live status cannot be verified. The avatar is a UI representation, not
 evidence of subjective feelings or consciousness; no camera, microphone, face recognition, or
-external service is used.
+external service is used. Each authorized UI poll can evaluate the persisted `HUMAN_PRESENCE`
+pulse through Brain's existing `MemoryStore`, rate-limited to one tick per minute. The API reports
+`PENDING_RENDER_CONFIRMATION`; this does not prove the browser rendered a frame or establish an
+always-on background heartbeat. Turning off live sync stops further UI polls.
 
 Contract tests:
 `python -m unittest brain_v12.tests.test_brain_avatar_contract -v`
