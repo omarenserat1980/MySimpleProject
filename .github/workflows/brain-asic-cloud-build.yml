@@ -18,36 +18,46 @@ jobs:
         run: python3 -m unittest -v test_bitcoin_sha256d.py
       - name: Verify SHA-256 compression known vector
         run: |
+          set -o pipefail
           mkdir -p hardware/brain_asic_v1/build
           iverilog -g2012 -s brain_sha256_compress_tb -o hardware/brain_asic_v1/build/sha256-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/tb/brain_sha256_compress_tb.sv
           vvp hardware/brain_asic_v1/build/sha256-vector | tee hardware/brain_asic_v1/build/sha256-vector.log
           grep -q 'BRAIN_SHA256_COMPRESS_VECTOR=PASS' hardware/brain_asic_v1/build/sha256-vector.log
       - name: Verify Bitcoin genesis SHA256d RTL vector
         run: |
+          set -o pipefail
           iverilog -g2012 -s brain_sha256d_header_tb -o hardware/brain_asic_v1/build/sha256d-vector hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv hardware/brain_asic_v1/tb/brain_sha256d_header_tb.sv
           vvp hardware/brain_asic_v1/build/sha256d-vector | tee hardware/brain_asic_v1/build/sha256d-vector.log
           grep -q 'BRAIN_SHA256D_GENESIS=PASS' hardware/brain_asic_v1/build/sha256d-vector.log
       - name: Verify nonce search and target gate
         run: |
+          set -o pipefail
           iverilog -g2012 -s brain_sha256d_nonce_search_tb -o hardware/brain_asic_v1/build/nonce-search hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv hardware/brain_asic_v1/rtl/brain_sha256d_nonce_search.sv hardware/brain_asic_v1/tb/brain_sha256d_nonce_search_tb.sv
           vvp hardware/brain_asic_v1/build/nonce-search | tee hardware/brain_asic_v1/build/nonce-search.log
+          grep -q 'BRAIN_NONCE_TARGET_REJECT=PASS' hardware/brain_asic_v1/build/nonce-search.log
           grep -q 'BRAIN_NONCE_SEARCH_GENESIS=PASS' hardware/brain_asic_v1/build/nonce-search.log
       - name: RTL control-path smoke test (not SHA256 proof)
         run: |
+          set -o pipefail
           iverilog -g2012 -o hardware/brain_asic_v1/build/smoke hardware/brain_asic_v1/rtl/brain_sha256_core.sv hardware/brain_asic_v1/tb/brain_sha256_core_tb.sv
           vvp hardware/brain_asic_v1/build/smoke | tee hardware/brain_asic_v1/build/smoke.log
           grep -q 'BRAIN_ASIC_V1_SMOKE=PASS' hardware/brain_asic_v1/build/smoke.log
       - name: Synthesize SHA-256 compression datapath
         run: |
+          set -o pipefail
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv; hierarchy -top brain_sha256_compress; proc; opt; check; synth -top brain_sha256_compress; stat; write_json hardware/brain_asic_v1/build/brain_sha256_compress.json" | tee hardware/brain_asic_v1/build/yosys-compress.log
       - name: Synthesize SHA256d header datapath
         run: |
+          set -o pipefail
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv; hierarchy -top brain_sha256d_header; proc; opt; check; synth -top brain_sha256d_header; stat; write_json hardware/brain_asic_v1/build/brain_sha256d_header.json" | tee hardware/brain_asic_v1/build/yosys-sha256d.log
       - name: Synthesize control shell (not a miner)
         run: |
+          set -o pipefail
           yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
       - name: Publish build evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: brain-asic-v1-cloud-evidence
           path: hardware/brain_asic_v1/build/
+          if-no-files-found: warn
