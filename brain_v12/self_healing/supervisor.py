@@ -56,6 +56,36 @@ class Attempt:
     reflection_answers: list[str] | None = None
 
 
+def workflow_actions_enabled(value: str | None = None) -> bool:
+    """Enable remote GitHub workflow dispatch only by explicit opt-in."""
+    setting = os.getenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "0") if value is None else value
+    return setting.strip().lower() in {"1", "true", "yes"}
+
+
+def register_workflow_action(
+    actions: ReflectionActionRegistry, enabled: bool | None = None, timeout: int | None = None
+) -> bool:
+    """Register only the fixed E2E workflow when remote actions are explicitly enabled."""
+    if not (workflow_actions_enabled() if enabled is None else enabled):
+        return False
+
+    from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
+
+    actions.register(
+        "workflow:reflection-e2e",
+        workflow_dispatch_action(
+            "workflow:reflection-e2e",
+            repo=os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject"),
+            workflow_id="reflection-e2e",
+            ref=os.getenv("BRAIN_GITHUB_REF", "main"),
+            inputs={},
+            timeout=min(timeout if timeout is not None else int(os.getenv("BRAIN_COMMAND_TIMEOUT", "900")), 120),
+        ),
+        "Dispatch the fixed Brain Reflection E2E GitHub workflow for an independent test.",
+    )
+    return True
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -75,7 +105,7 @@ def diagnose(stdout: str, stderr: str, exit_code: int) -> list[str]:
     text = (stdout + "\n" + stderr).lower()
     findings: list[str] = []
     rules = (
-        ("missing-token", ("token_missing", "token required", "gh_token_required", "github_token_or_gh_token_required")),
+        ("missing-token", ("token_missing", "token required", "gh_token_required", "github_token_required", "github_token_or_gh_token_required")),
         ("permission", ("permission denied", "resource not accessible", "403 forbidden", "insufficient permission")),
         ("network", ("timed out", "timeout", "temporary failure", "connection reset", "urlerror", "name or service not known")),
         ("dependency", ("modulenotfounderror", "no module named", "command not found", "cannot import")),
@@ -192,20 +222,7 @@ def main() -> int:
 
                 # Safe remote workflow test: only a fixed Brain-owned workflow is exposed.
                 # Never expose an arbitrary workflow filename to ChatGPT.
-                if os.getenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "1") == "1":
-                    from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
-                    actions.register(
-                        "workflow:reflection-e2e",
-                        workflow_dispatch_action(
-                            "workflow:reflection-e2e",
-                            repo=os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject"),
-                            workflow_id="reflection-e2e",
-                            ref=os.getenv("BRAIN_GITHUB_REF", "main"),
-                            inputs={},
-                            timeout=min(args.timeout, 120),
-                        ),
-                        "Dispatch the fixed Brain Reflection E2E GitHub workflow for an independent test.",
-                    )
+                register_workflow_action(actions, enabled=workflow_actions_enabled(), timeout=args.timeout)
                 chatgpt_repair_done = False
                 if args.chatgpt_reflection:
                     from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
