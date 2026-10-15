@@ -14,6 +14,16 @@ The requested self-copy is implemented as a deployment/control-plane direction, 
 
 This is a logical provider control plane, not a standalone infrastructure vendor. It does not yet provision VMs, allocate external CPU/RAM/storage, or bootstrap a new host. A provider-specific provisioning adapter plus an authorized account/credential and verified zero-cost offer are still required to create the first real node. The absence of such a host must result in `NO_VERIFIED_CAPACITY`, not simulated success.
 
+## Implemented API surface
+
+The FastAPI app mounts `brain_cloud_provider_api` under `/api/brain-cloud/provider`:
+- `GET /status` returns Brain Cloud provider configuration and current verified capacity status.
+- `GET /readiness` reports blockers without exposing credential values.
+- Both endpoints require the existing Brain control-key authorization.
+- When no worker is enrolled, the API must return `NO_VERIFIED_CAPACITY`; it must not manufacture a worker or claim provisioning succeeded.
+
+These endpoints are operational status/readiness surfaces, not a provider provisioning adapter. They are safe to use for diagnosing the missing prerequisites. CI must pass before treating the new implementation as accepted.
+
 ## Architecture
 
 1. Cloud discovery coordinator: enumerate only provider accounts/connectors explicitly authorized by the owner. Report connector availability and provider API failures distinctly.
