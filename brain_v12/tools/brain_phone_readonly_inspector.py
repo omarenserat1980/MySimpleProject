@@ -1,8 +1,13 @@
-"""Read-only local resource inspection; no network, mining, or activation."""
+""""Read-only local resource inspection; no network, mining, or activation."""
 from __future__ import annotations
+
 import argparse
 import json
+import os
+import tempfile
+from pathlib import Path
 from typing import Any
+
 from brain_v12.tools.brain_live_resource_agent import collect_resource_snapshot
 
 
@@ -46,11 +51,37 @@ def inspect_local_resources(node_id: str = "local-device-unverified") -> dict[st
     }
 
 
+def write_json_atomically(output_path: str | Path, payload: dict[str, Any]) -> Path:
+    """Write evidence locally and atomically; never upload or register it."""
+    target = Path(output_path).expanduser()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    fd, temp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(serialized)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_name, target)
+    except BaseException:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+        raise
+    return target
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--node-id", default="local-device-unverified")
+    p.add_argument("--output", help="Optional local JSON evidence path; no upload occurs.")
     args = p.parse_args(argv)
-    print(json.dumps(inspect_local_resources(args.node_id), indent=2, sort_keys=True))
+    payload = inspect_local_resources(args.node_id)
+    if args.output:
+        saved = write_json_atomically(args.output, payload)
+        print(f"Local evidence saved: {saved}")
+    print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
 
