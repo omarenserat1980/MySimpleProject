@@ -58,18 +58,25 @@ def probe_stratum_connection(*, timeout_seconds: float = 5.0) -> dict[str, Any]:
         raise StratumBridgeError("INVALID_STRATUM_PORT") from exc
     if not 1 <= port <= 65535:
         raise StratumBridgeError("INVALID_STRATUM_PORT")
-    if not 0.1 <= float(timeout_seconds) <= 15:
+    try:
+        timeout = float(timeout_seconds)
+    except (TypeError, ValueError) as exc:
+        raise StratumBridgeError("TIMEOUT_OUT_OF_RANGE") from exc
+    if not 0.1 <= timeout <= 15:
         raise StratumBridgeError("TIMEOUT_OUT_OF_RANGE")
 
+    raw: socket.socket | None = None
     sock: socket.socket | None = None
+    reader = None
+    writer = None
     try:
-        raw = socket.create_connection((cfg["host"], port), timeout=float(timeout_seconds))
+        raw = socket.create_connection((cfg["host"], port), timeout=timeout)
         if cfg["tls"]:
             context = ssl.create_default_context()
             sock = context.wrap_socket(raw, server_hostname=cfg["host"])
         else:
             sock = raw
-        sock.settimeout(float(timeout_seconds))
+        sock.settimeout(timeout)
         reader = sock.makefile("r", encoding="utf-8", newline="\n")
         writer = sock.makefile("w", encoding="utf-8", newline="\n")
 
@@ -122,8 +129,16 @@ def probe_stratum_connection(*, timeout_seconds: float = 5.0) -> dict[str, Any]:
     except (OSError, ssl.SSLError, TimeoutError) as exc:
         raise StratumBridgeError("STRATUM_CONNECTION_FAILED:" + type(exc).__name__) from exc
     finally:
-        if sock is not None:
-            try:
-                sock.close()
-            except OSError:
-                pass
+        for stream in (writer, reader):
+            if stream is not None:
+                try:
+                    stream.close()
+                except OSError:
+                    pass
+        # If TLS setup fails, close the original socket as well.
+        for connection in (sock, raw if sock is None else None):
+            if connection is not None:
+                try:
+                    connection.close()
+                except OSError:
+                    pass
