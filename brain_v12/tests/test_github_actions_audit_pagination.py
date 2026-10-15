@@ -50,7 +50,7 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
         self.assertEqual(result["pages_fetched"], 2)
 
     def test_api_cap_is_blocked_not_reported_as_complete(self):
-        path = "/repos/o/r/actions/runs"
+        path = "/repos/o/r/actions/workflows/7/runs"
         api = FakeControlPlane({
             (path, 1): {"total_count": 1001, "workflow_runs": []},
         })
@@ -58,12 +58,12 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
             api.actions_runs_last_24h("o", "r", workflow_ids=[7], now=datetime.now(timezone.utc))
 
     def test_missing_total_count_fails_closed(self):
-        path = "/repos/o/r/actions/runs"
+        path = "/repos/o/r/actions/workflows/7/runs"
         api = FakeControlPlane({
             (path, 1): {"workflow_runs": []},
         })
         with self.assertRaisesRegex(GitHubControlError, "ACTIONS_RUNS_TOTAL_COUNT_MISSING"):
-            api.actions_runs_last_24h("o", "r", now=datetime.now(timezone.utc))
+            api.actions_runs_last_24h("o", "r", workflow_ids=[7], now=datetime.now(timezone.utc))
 
     def test_naive_clock_is_rejected(self):
         api = FakeControlPlane({})
