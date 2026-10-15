@@ -1,0 +1,33 @@
+name: Brain Bitcoin SHA-256 Compression RTL Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain_v12/asic/rtl/brain_sha256_compress.sv'
+      - 'brain_v12/asic/rtl/tb_brain_sha256_compress.sv'
+      - '.github/workflows/brain-bitcoin-sha256-compress-rtl.yml'
+  push:
+    branches: [feat/bitcoin-sha256-compression-core]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sha256-compression-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Record simulator version
+        run: iverilog -V 2>&1 | head -n 2
+      - name: Compile SHA-256 compression core and testbench
+        run: iverilog -g2012 -s tb_brain_sha256_compress -o /tmp/brain_sha256_compress.vvp brain_v12/asic/rtl/brain_sha256_compress.sv brain_v12/asic/rtl/tb_brain_sha256_compress.sv
+      - name: Run full compression known-vector test
+        run: vvp /tmp/brain_sha256_compress.vvp
