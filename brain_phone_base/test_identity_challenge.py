@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
+from brain_phone_base.replay_store import SQLiteReplayStore
 from brain_phone_base.identity_challenge import (
     CHALLENGE_SCHEMA,
     RESPONSE_SCHEMA,
@@ -80,6 +81,27 @@ class IdentityChallengeTests(unittest.TestCase):
         self.assertFalse(result["trusted"])
         self.assertFalse(result["active"])
         self.assertEqual(result["mining"], "DISABLED")
+
+
+    def test_durable_replay_store_consumes_challenge_once(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as temp:
+            store = SQLiteReplayStore(Path(temp) / "replay.sqlite3")
+            result = self.verify(replay_store=store)
+            self.assertEqual(result["challenge_replay_check"], "DURABLE_ATOMIC_STORE")
+            self.assertFalse(result["device_identity_verified"])
+            with self.assertRaisesRegex(VerificationError, "CHALLENGE_REPLAYED"):
+                self.verify(replay_store=SQLiteReplayStore(Path(temp) / "replay.sqlite3"))
+
+    def test_replay_store_failure_fails_closed(self):
+        class BrokenStore:
+            def consume(self, *_args):
+                raise OSError("database unavailable")
+
+        with self.assertRaisesRegex(VerificationError, "DURABLE_REPLAY_STORE_FAILED"):
+            self.verify(replay_store=BrokenStore())
 
     def test_replayed_challenge_fails_closed(self):
         with self.assertRaisesRegex(VerificationError, "CHALLENGE_REPLAYED"):
