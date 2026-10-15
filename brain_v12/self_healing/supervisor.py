@@ -81,7 +81,7 @@ def diagnose(stdout: str, stderr: str, exit_code: int) -> list[str]:
     text = (stdout + "\n" + stderr).lower()
     findings: list[str] = []
     rules = (
-        ("missing-token", ("token_missing", "token required", "gh_token_required", "github_token_or_gh_token_required")),
+        ("missing-token", ("token_missing", "token required", "gh_token_required", "github_token_required", "github_token_or_gh_token_required")),
         ("permission", ("permission denied", "resource not accessible", "403 forbidden", "insufficient permission")),
         ("network", ("timed out", "timeout", "temporary failure", "connection reset", "urlerror", "name or service not known")),
         ("dependency", ("modulenotfounderror", "no module named", "command not found", "cannot import")),
