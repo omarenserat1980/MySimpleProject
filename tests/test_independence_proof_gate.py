@@ -39,3 +39,4 @@ def test_independence_proof_gate_runs_without_github_credentials(tmp_path):
     assert report["scope"]["authority_boundary"] is True
     assert report["independence_contract"]["allowed"] is True
     assert report["report_sha256"] == compute_report_sha256(report)
+    assert report["independence_contract"]["report_sha256"] == report["report_sha256"]
