@@ -35,3 +35,11 @@ The code is ready for deployment, but the commercial system is not declared live
 
 PAYMENT_VERIFIED is evidence-gated.
 REVENUE_REALIZED remains false until payment evidence is independently confirmed.
+
+## Test vs Live revenue boundary
+
+- `PAYTABS_MODE` defaults to `test`; Sandbox callbacks are recorded as `SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY` and can never transition to `REVENUE_REALIZED`.
+- Set `PAYTABS_MODE=live` only after PayTabs has approved and enabled the merchant for live payments and the Live Server Key/Profile ID are stored as production Worker secrets/variables. Never put credentials in source control or logs.
+- A Live payment starts at `PAYMENT_VERIFIED_PENDING_DELIVERY`. Only verified delivery for the same order/transaction can transition a row with `environment='live'` to `REVENUE_REALIZED`.
+- `REVENUE_REALIZED` is an accounting/work-delivery state, not proof of bank settlement. Track provider settlement separately and do not report collected cash until a settlement/payout record confirms it.
+- Existing rows receive `environment='test'` via migration 0008; they are not retroactively promoted to Live.
