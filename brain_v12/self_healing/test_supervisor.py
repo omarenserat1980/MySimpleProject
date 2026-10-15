@@ -85,14 +85,14 @@ def test_existing_supervisor_lock_is_not_overwritten_and_target_does_not_run(tmp
     target = tmp_path / "target.py"
     marker = tmp_path / "target-ran.txt"
     target.write_text(
-        "from pathlib import Path\\n"
-        + "Path(" + repr(str(marker)) + ").write_text('ran', encoding='utf-8')\\n",
+        "from pathlib import Path\n"
+        + "Path(" + repr(str(marker)) + ").write_text('ran', encoding='utf-8')\n",
         encoding="utf-8",
     )
     state_dir = tmp_path / "state"
     state_dir.mkdir()
     lock_path = state_dir / "supervisor.lock"
-    original_lock = "existing-owner 2026-01-01T00:00:00+00:00\\n"
+    original_lock = "existing-owner 2026-01-01T00:00:00+00:00\n"
     lock_path.write_text(original_lock, encoding="utf-8")
 
     env = os.environ.copy()
