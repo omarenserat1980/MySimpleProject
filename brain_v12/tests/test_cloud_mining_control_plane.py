@@ -117,6 +117,7 @@ def test_invalid_worker_limits_are_rejected():
         CloudWorker("w1", "vm", "region", "owner", max_cpu_percent=0),
         CloudWorker("w2", "vm", "region", "owner", max_cpu_percent=float("nan")),
         CloudWorker("w3", "vm", "region", "owner", max_temperature_c=0),
+        CloudWorker("w4", "vm", "region", "owner", max_temperature_c=float("inf")),
     ):
         try:
             cp.register_worker(worker)
