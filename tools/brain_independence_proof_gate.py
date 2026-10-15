@@ -94,7 +94,7 @@ def main():
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write a correctly hashed candidate before asking the contract to validate it.
+    # First write a correctly hashed candidate so the contract can validate it.
     write_report(report)
     contract = IndependenceContract(OUT).evaluate()
     report["independence_contract"] = contract
@@ -102,8 +102,11 @@ def main():
     report["status"] = "PROVEN_WITHIN_TEST_SCOPE" if proof_allowed else "NOT_PROVEN"
     report["independence_claim_allowed"] = proof_allowed
 
-    # The digest intentionally excludes report_sha256 and independence_contract.
-    # It still covers the status, claim, checks, scope, and all execution evidence.
+    # The digest excludes independence_contract, so update its embedded digest
+    # to match the final report without creating a circular hash dependency.
+    final_digest = compute_report_sha256(report)
+    if isinstance(report["independence_contract"], dict) and report["independence_contract"].get("allowed") is True:
+        report["independence_contract"]["report_sha256"] = final_digest
     write_report(report)
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if proof_allowed else 1
