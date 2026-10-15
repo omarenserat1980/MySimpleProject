@@ -20,7 +20,7 @@ class LocalExecutorTests(unittest.TestCase):
     def test_allowlist_rejects_arbitrary_shell(self):
         self.assertEqual(
             set(self.executor.actions()),
-            {"status", "test-measurement", "measure", "verify-evidence"},
+            {"status", "test-measurement", "test-local-executor", "measure", "verify-evidence"},
         )
         with self.assertRaisesRegex(ValueError, "ACTION_NOT_ALLOWED"):
             self.executor.enqueue("rm -rf /")
