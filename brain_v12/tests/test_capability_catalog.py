@@ -33,7 +33,7 @@ class CapabilityCatalogTests(unittest.TestCase):
             ["youtube-publisher"],
         )
         # A permissive policy still cannot replace the executor's explicit permissions.
-        self.assertEqual(authorized_fabric.plan("publish.youtube", {"youtube.upload"}), [])
+        self.assertEqual(authorized_fabric.plan("publish.youtube", {"external_publish", "youtube.upload", "admin"}), [])
 
 
 if __name__ == "__main__":
