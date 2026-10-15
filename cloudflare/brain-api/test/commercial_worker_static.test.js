@@ -102,3 +102,49 @@ assert.match(worker, /\/api\/supervisor\/tick/);
 assert.match(worker, /transitionClientOrder/);
 assert.match(worker, /INVALID_STATE_TRANSITION/);
 assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
+
+
+// Financial contract regression checks: assert the ordering and guards that
+// keep a payment from being counted as realized revenue before delivery.
+const callbackStart = worker.indexOf("async function handlePayTabsCallback(");
+const deliveryStart = worker.indexOf("async function confirmDelivery(", callbackStart);
+const completionStart = worker.indexOf("async function completeJob(", deliveryStart);
+assert.ok(callbackStart >= 0 && deliveryStart > callbackStart && completionStart > deliveryStart,
+  "payment and delivery handlers must remain separately testable");
+const callbackBody = worker.slice(callbackStart, deliveryStart);
+const deliveryBody = worker.slice(deliveryStart, completionStart);
+
+const mismatchGuard = callbackBody.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH");
+const paymentVerifiedWrite = callbackBody.indexOf("UPDATE payments SET state = 'PAYMENT_VERIFIED'");
+const pendingRevenueWrite = callbackBody.indexOf("'PAYMENT_VERIFIED_PENDING_DELIVERY'");
+const verifiedJobWrite = callbackBody.indexOf("INSERT OR IGNORE INTO service_jobs");
+assert.ok(mismatchGuard >= 0 && paymentVerifiedWrite > mismatchGuard,
+  "amount/currency mismatch must be rejected before payment verification");
+assert.ok(callbackBody.includes("payment.state === \"PAYMENT_VERIFIED\"") &&
+  callbackBody.includes("idempotent: true"),
+  "duplicate verified callbacks must be idempotent");
+assert.ok(callbackBody.includes("INSERT OR IGNORE INTO payment_events"),
+  "callback evidence must be recorded idempotently");
+assert.ok(pendingRevenueWrite >= 0 && verifiedJobWrite > pendingRevenueWrite,
+  "verified payment must enter pending-delivery ledger state before delivery work");
+assert.ok(!callbackBody.includes("REVENUE_REALIZED"),
+  "payment callback must never realize revenue by itself");
+
+const readyGuard = deliveryBody.indexOf('delivery.state !== "READY"');
+const deliveredWrite = deliveryBody.indexOf("UPDATE deliveries SET state = 'DELIVERED'");
+const verifiedPaymentLookup = deliveryBody.indexOf("state = 'PAYMENT_VERIFIED'");
+const realizeWrite = deliveryBody.indexOf("UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'");
+assert.ok(readyGuard >= 0 && deliveredWrite > readyGuard,
+  "delivery must be READY before it can be confirmed");
+assert.ok(verifiedPaymentLookup >= 0 && realizeWrite > verifiedPaymentLookup,
+  "revenue realization must follow a verified-payment lookup");
+assert.ok(deliveryBody.includes("state = 'PAYMENT_VERIFIED_PENDING_DELIVERY'") &&
+  deliveryBody.includes("AND amount = ? AND currency = ?"),
+  "revenue ledger update must be scoped to pending delivery and matching amount/currency");
+assert.ok(deliveryBody.includes("CLIENT_DELIVERY_CONFIRMED"),
+  "delivery confirmation must be auditable");
+
+console.log("PAYMENT_DELIVERY_LEDGER_ORDERING=PASS");
+console.log("DUPLICATE_CALLBACK_IDEMPOTENCY=PASS");
+console.log("AMOUNT_CURRENCY_MISMATCH_GUARD=PASS");
+console.log("REVENUE_AFTER_DELIVERY_ONLY=PASS");

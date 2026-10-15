@@ -1,0 +1,58 @@
+name: Brain Payment Delivery Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-payment-delivery-contract.yml"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/migrations/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-payment-delivery-contract.yml"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  payment-delivery-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Worker syntax
+        run: node --check cloudflare/brain-api/src/index.js
+      - name: Run payment and delivery contract checks
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node test/commercial_worker_static.test.js | tee "$RUNNER_TEMP/payment-delivery-contract.log"
+          {
+            echo "scope=static-contract-regression"
+            echo "commit=$GITHUB_SHA"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "payment_delivery_contract=PASS"
+            echo "duplicate_callback_idempotency=PASS"
+            echo "amount_currency_mismatch_guard=PASS"
+            echo "revenue_after_delivery_only=PASS"
+            echo "live_payment=NOT_PERFORMED"
+            echo "production_resources_changed=FALSE"
+          } > "$RUNNER_TEMP/payment-delivery-contract-evidence.txt"
+          cat "$RUNNER_TEMP/payment-delivery-contract.log" >> "$RUNNER_TEMP/payment-delivery-contract-evidence.txt"
+      - name: Upload contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: payment-delivery-contract-evidence
+          path: |
+            ${{ runner.temp }}/payment-delivery-contract.log
+            ${{ runner.temp }}/payment-delivery-contract-evidence.txt
+          if-no-files-found: error
+          retention-days: 30
