@@ -1,0 +1,55 @@
+name: Brain Independence Proof Integrity
+
+on:
+  push:
+    branches:
+      - brain-independence-hash-integrity-fix
+  pull_request:
+    branches:
+      - brain-independent-executor-pool
+    paths:
+      - "platform_foundation/independence_contract.py"
+      - "tools/brain_independence_proof_gate.py"
+      - "tests/test_independence_contract.py"
+      - "tests/test_independence_proof_gate.py"
+      - "tests/test_independence_proof_gate_contract.py"
+      - ".github/workflows/brain-independence-proof-integrity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-independence-proof-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  proof-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install --upgrade pip pytest
+      - name: Run proof integrity contract tests
+        run: python -m pytest -q tests/test_independence_contract.py tests/test_independence_proof_gate_contract.py
+      - name: Run evidence gate integration test
+        run: python -m pytest -q tests/test_independence_proof_gate.py
+      - name: Verify generated proof report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from platform_foundation.independence_contract import IndependenceContract, compute_report_sha256
+
+          path = Path("brain6_artifacts/independence_gate/independence_proof.json")
+          report = json.loads(path.read_text(encoding="utf-8"))
+          assert report["report_sha256"] == compute_report_sha256(report), "proof digest mismatch"
+          result = IndependenceContract(path).evaluate()
+          assert result["allowed"] is True, result
+          print(json.dumps({"status": report["status"], "contract": result}, indent=2))
+          PY
