@@ -45,6 +45,8 @@ jobs:
             brain_v12/tests/test_brain_phone_verification_gate.py \
             brain_phone_base/android_real_measurement.py \
             brain_phone_base/identity_challenge.py \
+            brain_phone_base/android_key_attestation.py \
+            brain_phone_base/test_android_key_attestation.py \
             brain_phone_base/replay_store.py \
             brain_phone_base/test_android_real_measurement.py \
             brain_phone_base/test_identity_challenge.py \
@@ -58,6 +60,7 @@ jobs:
           python -m unittest brain_v12.tests.test_brain_phone_verification_gate -v
           python -m unittest brain_phone_base.test_android_real_measurement -v
           python -m unittest brain_phone_base.test_identity_challenge -v
+          python -m unittest brain_phone_base.test_android_key_attestation -v
           python -m unittest brain_phone_base.test_replay_store -v
       - name: Assert simulation-only boundary
         run: |

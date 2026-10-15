@@ -18,9 +18,15 @@ identity is independently verified.
 - The Android helper only requests and exports the chain; it does not validate
   the chain or claim that the key is hardware-backed. Unsupported devices fail
   closed when key generation/attestation fails.
-- Validate Android Key Attestation and its certificate chain, security level,
-  application identity, verified-boot/device-lock state (where supported), and
-  challenge binding on a trusted verifier before making an identity decision.
+- `brain_phone_base.android_key_attestation.verify_android_key_attestation_chain`
+  now checks a supplied leaf-to-root chain against out-of-band SHA-256 root-certificate
+  pins, certificate validity/signatures/CA constraints, the Android Key Attestation
+  extension, its challenge binding, and the attested leaf public key. The trusted-root
+  fingerprints must be maintained independently; do not accept pins from the phone.
+- This is deliberately a partial gate, not complete Android attestation policy. It
+  does not check application package/signing identity, verified boot/device lock,
+  patch levels, revocation, or configured hardware security-level policy. Its result
+  is `CHAIN_AND_CHALLENGE_VALID_POLICY_INCOMPLETE` and never grants trust or activation.
 - Enforce one-time challenge IDs in durable verifier-side storage.
   `brain_phone_base.replay_store.SQLiteReplayStore` provides a SQLite-backed,
   atomic insert guarded by a unique challenge ID. Pass it as `replay_store=` to
@@ -63,8 +69,9 @@ a particular physical phone, or that the measurements are truthful.
    enrollment and measurement binding. Trust and activation remain blocked until
    the attestation policy and explicit manual approval both pass.
 
-No endpoint, enrollment authority, Android certificate-chain validator, or network
-transport is included in this change. The SQLite replay ledger is a reusable
+No endpoint, enrollment authority, full Android attestation policy engine, or network
+transport is included in this change. The chain checker requires a separately reviewed
+root-pin set and does not by itself establish device identity. The SQLite replay ledger is a reusable
 local verifier-side primitive; it is not a distributed replay service and does
 not establish device identity. Do not treat the helper alone
 as completed independent identity verification.
