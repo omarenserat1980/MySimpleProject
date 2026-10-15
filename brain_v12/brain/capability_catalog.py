@@ -6,6 +6,7 @@ Adapters must be probed before activation and verification must approve outputs.
 from __future__ import annotations
 
 from .capability_fabric import CapabilityFabric, ExecutorSpec
+from .autonomy_policy import AutonomyPolicy
 
 DEFAULT_EXECUTORS: tuple[ExecutorSpec, ...] = (
     ExecutorSpec("local-ffmpeg", "media.render", priority=10, cost_class="FREE",
@@ -26,8 +27,13 @@ DEFAULT_EXECUTORS: tuple[ExecutorSpec, ...] = (
                  metadata={"kind": "external", "adapter": "youtube_publisher", "tier": "FREE_DIVERSE", "side_effect": True}),
 )
 
-def build_default_fabric(*, include_offline: bool = False) -> CapabilityFabric:
-    fabric = CapabilityFabric()
+def build_default_fabric(
+    *,
+    include_offline: bool = False,
+    autonomy_policy: AutonomyPolicy | None = None,
+) -> CapabilityFabric:
+    """Build the default catalog with fail-closed policy unless explicitly overridden."""
+    fabric = CapabilityFabric(autonomy_policy=autonomy_policy)
     for spec in DEFAULT_EXECUTORS:
         if include_offline or not spec.metadata.get("requires_probe"):
             fabric.register(spec)
