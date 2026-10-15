@@ -108,6 +108,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import os
           from datetime import datetime, timezone
           from pathlib import Path
 
@@ -131,7 +132,7 @@ jobs:
 
           verification_report = report_status("verification_gate.json")
           review_report = report_status("review_loop_report.json")
-          verification_outcome = __import__("os").environ.get("BRAIN_VERIFICATION_OUTCOME", "unknown")
+          verification_outcome = os.environ.get("BRAIN_VERIFICATION_OUTCOME", "unknown")
           review_outcome = __import__("os").environ.get("BRAIN_REVIEW_OUTCOME", "unknown")
           verified = (
               verification_outcome == "success"
@@ -151,7 +152,7 @@ jobs:
               "finalized_at": datetime.now(timezone.utc).isoformat(),
               "note": "Final state reflects step outcomes and machine-readable reports; STARTED alone is never success."
           })
-          context_path.write_text(json.dumps(context, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+          context_path.write_text(json.dumps(context, sort_keys=True, indent=2) + "\n", encoding="utf-8")
           print(json.dumps({"state": context["state"], "verification_gate": verification_report, "review_and_self_heal": review_report}, sort_keys=True))
           PY
 
