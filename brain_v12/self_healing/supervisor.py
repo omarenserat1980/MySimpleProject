@@ -176,7 +176,7 @@ def main() -> int:
         print("BRAIN_SUPERVISOR_ALREADY_RUNNING")
         return 3
     with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
-        lock_file.write(f"{os.getpid()} {utc_now()}\\n")
+        lock_file.write(f"{os.getpid()} {utc_now()}\n")
 
     attempts: list[Attempt] = []
     final_code = 1
