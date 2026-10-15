@@ -135,3 +135,15 @@
 - [ ] Audit all core startup and mandatory CI paths for remaining hardware requirements
 - [ ] Migrate supported workloads to software nodes with durable task-state recovery
 - [ ] Verify remaining specialized workflows and document any non-migrated hardware requirements
+
+## Phase 2.7 — Simulator-to-real runtime migration
+- [x] Add machine-readable inventory separating simulator-only, unverified, missing integration, and external-auth/cost-gated components
+- [x] Add read-only migration audit and truth-boundary tests
+- [x] Add dedicated CI gate and JSON inventory artifact
+- [ ] Run and inspect migration CI evidence for the exact PR commit
+- [ ] Verify canonical Brain V12 process health, authenticated API, durable state, and restart recovery
+- [ ] Connect real executor adapters through the single Brain Execution Gateway
+- [ ] Replace the V12 cinematic renderer blocker with a real renderer and independent MP4/audio/video QC
+- [ ] Add native application/guest adapters one workload at a time; retain deterministic simulation for tests
+- [ ] Verify external email, payment, publishing, and cloud adapters using authorized sandbox/live receipts
+- [ ] Keep Windows real boot, mining, revenue, and physical-device claims blocked until their independent evidence gates pass

@@ -1,0 +1,51 @@
+name: Brain Real Runtime Migration Audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/real_runtime_migration.json"
+      - "tools/brain_real_runtime_migration_audit.py"
+      - "tests/test_brain_real_runtime_migration_audit.py"
+      - "docs/SIMULATOR_TO_REAL_RUNTIME_MIGRATION.md"
+      - ".github/workflows/brain-real-runtime-migration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  migration-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install audit test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run migration audit contract tests
+        run: python -m pytest -q tests/test_brain_real_runtime_migration_audit.py
+      - name: Emit source-only migration inventory
+        run: python tools/brain_real_runtime_migration_audit.py --json --output real-runtime-migration-report.json
+      - name: Verify report truth boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("real-runtime-migration-report.json").read_text(encoding="utf-8"))
+          assert report["mode"] == "read_only_source_audit"
+          assert report["live_status_claimed"] is False
+          assert report["component_count"] >= 5
+          print(json.dumps({
+              "component_count": report["component_count"],
+              "non_live_component_count": report["non_live_component_count"],
+              "live_status_claimed": report["live_status_claimed"],
+          }, indent=2))
+          PY
+      - name: Upload migration inventory report
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-real-runtime-migration-inventory
+          path: real-runtime-migration-report.json
+          if-no-files-found: error
