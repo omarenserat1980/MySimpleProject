@@ -49,6 +49,9 @@ def probe_stratum_connection(*, timeout_seconds: float = 5.0) -> dict[str, Any]:
         raise StratumBridgeError("EXPLICIT_WORKER_OWNERSHIP_AND_AUTHORIZATION_REQUIRED")
     if not all((cfg["host"], cfg["port"], cfg["username"], cfg["password"])):
         raise StratumBridgeError("STRATUM_ENV_CONFIGURATION_INCOMPLETE")
+    # Authorization sends a pool password; refuse plaintext Stratum.
+    if not cfg["tls"]:
+        raise StratumBridgeError("TLS_REQUIRED_TO_PROTECT_POOL_CREDENTIALS")
     try:
         port = int(cfg["port"])
     except ValueError as exc:
@@ -87,7 +90,15 @@ def probe_stratum_connection(*, timeout_seconds: float = 5.0) -> dict[str, Any]:
             raise StratumBridgeError("STRATUM_RESPONSE_NOT_FOUND")
 
         subscribed = exchange(1, "mining.subscribe", ["ElectronicBrain/0.1"])
-        if subscribed.get("error") is not None or subscribed.get("result") is None:
+        subscribe_result = subscribed.get("result")
+        if (
+            subscribed.get("error") is not None
+            or not isinstance(subscribe_result, list)
+            or len(subscribe_result) < 3
+            or not isinstance(subscribe_result[1], str)
+            or not isinstance(subscribe_result[2], int)
+            or subscribe_result[2] < 0
+        ):
             raise StratumBridgeError("STRATUM_SUBSCRIBE_REJECTED")
         authorized = exchange(2, "mining.authorize", [cfg["username"], cfg["password"]])
         result = authorized.get("result")
