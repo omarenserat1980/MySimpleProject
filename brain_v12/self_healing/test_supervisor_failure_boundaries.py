@@ -123,7 +123,7 @@ def test_successful_target_with_failed_independent_verifier_never_claims_success
 
 def test_successful_target_without_independent_verifier_never_claims_success(tmp_path):
     target = tmp_path / "target.py"
-    target.write_text("print('TARGET_OK')\\n", encoding="utf-8")
+    target.write_text("print('TARGET_OK')" + chr(10), encoding="utf-8")
 
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
