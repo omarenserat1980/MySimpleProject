@@ -1,5 +1,8 @@
 package com.electronicbrain.androidexecutor
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import org.json.JSONObject
@@ -12,11 +15,11 @@ import java.security.spec.ECGenParameterSpec
 import java.util.Base64
 
 /**
- * Local-only Android Keystore identity key helper.
+ * Local-only Android Keystore identity helper.
  *
- * This class never sends data anywhere and never activates/registers a node.
- * A returned certificate chain is evidence to be validated by an independent
- * verifier; this class deliberately does not claim that attestation is valid.
+ * It never sends data anywhere and never activates/registers a node. A returned
+ * certificate chain is evidence for an independent verifier; this class does
+ * not claim that attestation is valid.
  */
 object PhoneIdentityKeyStore {
     private const val ANDROID_KEY_STORE = "AndroidKeyStore"
@@ -39,10 +42,36 @@ object PhoneIdentityKeyStore {
         val deviceIdentityVerified: Boolean = false
     )
 
+    /** Read-only capability probe: does not generate or alter a key. */
+    fun probeCapabilities(context: Context): Map<String, Any> {
+        val providerAvailable = runCatching {
+            KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
+        }.isSuccess
+        val p256GeneratorAvailable = runCatching {
+            KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEY_STORE)
+        }.isSuccess
+        val strongBoxAdvertised = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
+        return mapOf(
+            "schema" to "brain-phone-base.android-keystore-capabilities.v1",
+            "android_api" to Build.VERSION.SDK_INT,
+            "android_keystore_provider_available" to providerAvailable,
+            "p256_key_generator_available" to p256GeneratorAvailable,
+            "strongbox_feature_advertised" to strongBoxAdvertised,
+            "attestation_tested" to false,
+            "device_identity_verified" to false,
+            "trusted" to false,
+            "active" to false,
+            "manual_approval" to "NOT_GRANTED",
+            "mining" to "DISABLED",
+            "network_upload" to false
+        )
+    }
+
     /**
      * Create a new P-256 signing key and request Android Key Attestation using
-     * an independent enrollment challenge. Refuses to silently reuse a key
-     * generated for a different challenge. Call from a foreground user action.
+     * an independent enrollment challenge. Refuses to silently reuse a key.
+     * Call only from a foreground user action after obtaining that challenge.
      */
     @Synchronized
     fun createEnrollmentKey(attestationChallenge: ByteArray): EnrollmentMaterial {
@@ -77,9 +106,8 @@ object PhoneIdentityKeyStore {
         check(chain.isNotEmpty()) { "ANDROID_KEYSTORE_ATTESTATION_CHAIN_EMPTY" }
 
         val publicKeyDer = certificate.publicKey.encoded
-        val keyId = sha256Hex(publicKeyDer)
         return EnrollmentMaterial(
-            keyId = keyId,
+            keyId = sha256Hex(publicKeyDer),
             publicKeyPem = pem("PUBLIC KEY", publicKeyDer),
             attestationChainPem = chain.map { cert -> pemCertificate(cert) },
             attestationChallengeSha256 = sha256Hex(attestationChallenge)
@@ -106,10 +134,9 @@ object PhoneIdentityKeyStore {
         val signer = Signature.getInstance("SHA256withECDSA")
         signer.initSign(privateKey as java.security.PrivateKey)
         signer.update(payload.toByteArray(Charsets.UTF_8))
-        val signature = signer.sign()
         return SignedResponse(
             payloadJson = payload,
-            signatureBase64 = Base64.getEncoder().encodeToString(signature)
+            signatureBase64 = Base64.getEncoder().encodeToString(signer.sign())
         )
     }
 
