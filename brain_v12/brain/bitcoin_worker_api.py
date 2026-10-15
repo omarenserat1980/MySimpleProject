@@ -85,10 +85,16 @@ def worker_heartbeat(
 def worker_status(authorization: str | None = Header(default=None)) -> dict:
     _authorize(authorization)
     now = time.time()
+    # Expire stale in-memory records instead of retaining dead workers forever.
+    # This endpoint is a live-status view, not a durable evidence archive.
     with _lock:
-        workers = [dict(item) for item in _latest.values()]
-    for worker in workers:
-        worker["online"] = now - worker["received_at"] <= REPORT_TTL_SECONDS
+        expired_ids = [
+            worker_id for worker_id, item in _latest.items()
+            if now - item["received_at"] > REPORT_TTL_SECONDS
+        ]
+        for worker_id in expired_ids:
+            del _latest[worker_id]
+        workers = [dict(item, online=True) for item in _latest.values()]
     return {
         "ok": True,
         "mode": "physical_worker_telemetry_intake",
