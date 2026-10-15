@@ -4,6 +4,10 @@
 
 Use Brain cloud orchestration to discover and prepare an owner-authorized, genuinely physical execution host while preserving the zero-budget requirement. Cloud orchestration is not itself a physical worker and must never be represented as one.
 
+## Brain-owned control plane and tool routing
+
+Brain is the orchestrator, not a cloud-compute provider by itself. Its connected tools must be the first discovery surface: enumerate available computer/device connectors, repository/CI execution, and explicitly connected cloud-provider APIs; record each tool's actual capabilities and authorization state; and route only to tools that can perform the requested operation. Never infer that a tool can provision compute merely because it can edit GitHub or run CI. If no persistent executor or authorized provider adapter is connected, return `NO_AUTHORIZED_PROVIDER` with the missing connector/capability names instead of looping on user prompts or fabricating credentials. GitHub Actions may run bounded discovery and tests, but is not a substitute for a persistent host.
+
 ## Architecture
 
 1. Cloud discovery coordinator: enumerate only provider accounts/connectors explicitly authorized by the owner. Report connector availability and provider API failures distinctly.
@@ -39,7 +43,7 @@ Each transition records UTC time, source, actor, evidence references, and reason
 
 ## Failure behavior
 
-- No connected device or provider credential: record NO_AUTHORIZED_PROVIDER; do not invent access.
+- No connected device or provider credential: record NO_AUTHORIZED_PROVIDER; do not invent access. Brain must report the actual connected-tool inventory and missing capability rather than asking the owner to repeat details already in the project context.
 - No confirmed zero-cost offer: record BLOCKED_COST_UNCERTAIN; do not provision.
 - Owner approval absent: no external side effect.
 - Provider API unavailable: retry with bounded exponential backoff, then stop and report the blocker.
