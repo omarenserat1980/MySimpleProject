@@ -47,11 +47,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$PDK_ROOT"
-          # OpenLane's Docker image needs a populated host PDK directory.
-          volare enable --pdk sky130A --pdk-root "$PDK_ROOT"
-          test -d "$PDK_ROOT/sky130A"
-          test -d "$PDK_ROOT/sky130A/libs.tech"
-          find "$PDK_ROOT/sky130A" -maxdepth 2 -type d | head -40
+          # Volare resolves the compatible open_pdks revision from OpenLane's
+          # tool_metadata.yml; pip-only installs do not include that file here.
+          git clone --depth 1 --branch 2.3.10 https://github.com/efabless/openlane2.git "$RUNNER_TEMP/openlane2-source"
+          cd "$RUNNER_TEMP/openlane2-source"
+          volare enable --pdk-root "$PDK_ROOT" --pdk sky130
+          test -f "$PDK_ROOT/sky130A/libs.tech/openlane/config.tcl"
+          test -f "$PDK_ROOT/sky130A/libs.tech/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
           echo "SKY130A_PDK_READY=TRUE"
 
       - name: Run OpenLane 2 Classic RTL-to-GDSII flow
@@ -62,7 +64,9 @@ jobs:
           mkdir -p artifacts/asic-gdsii
           printf 'commit=%s\n' "$GITHUB_SHA" | tee artifacts/asic-gdsii/build-context.txt
           printf 'pdk_root=%s\n' "$PDK_ROOT" | tee -a artifacts/asic-gdsii/build-context.txt
-          openlane --dockerized --pdk-root "$PDK_ROOT" --run-tag "brain-asic-$GITHUB_SHA" brain_v12/asic/openlane/config.json 2>&1 | tee artifacts/asic-gdsii/openlane.log
+          # OpenLane's Docker wrapper requests a TTY; provide a pseudo-TTY on hosted CI.
+          command -v script
+          script -q -e -c "openlane --dockerized --pdk-root \"$PDK_ROOT\" --run-tag \"brain-asic-$GITHUB_SHA\" brain_v12/asic/openlane/config.json" /dev/null 2>&1 | tee artifacts/asic-gdsii/openlane.log
 
       - name: Validate GDSII output and create evidence manifest
         if: always()
