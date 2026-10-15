@@ -56,6 +56,12 @@ class Attempt:
     reflection_answers: list[str] | None = None
 
 
+def workflow_actions_enabled(value: str | None = None) -> bool:
+    """Enable remote GitHub workflow dispatch only by explicit opt-in."""
+    setting = os.getenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "0") if value is None else value
+    return setting.strip().lower() in {"1", "true", "yes"}
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -192,7 +198,7 @@ def main() -> int:
 
                 # Safe remote workflow test: only a fixed Brain-owned workflow is exposed.
                 # Never expose an arbitrary workflow filename to ChatGPT.
-                if os.getenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "1") == "1":
+                if workflow_actions_enabled():
                     from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
                     actions.register(
                         "workflow:reflection-e2e",
