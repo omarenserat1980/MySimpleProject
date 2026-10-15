@@ -110,6 +110,9 @@ jobs:
       - name: Validate self-healing main-branch write boundary
         run: |
           python -m pytest -q brain_v12/self_healing/test_main_branch_write_boundary.py
+      - name: Validate self-healing failure boundaries
+        run: |
+          python -m pytest -q brain_v12/self_healing/test_supervisor_failure_boundaries.py
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
