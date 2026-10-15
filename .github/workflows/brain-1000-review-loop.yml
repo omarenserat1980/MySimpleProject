@@ -18,9 +18,11 @@ on:
 permissions:
   contents: read
 
+# Isolate runs by ref and never cancel an active verification/evolution cycle.
+# A newer run on this ref may wait as pending; evidence-producing gates are not interrupted.
 concurrency:
-  group: brain-continuous-evolution
-  cancel-in-progress: true
+  group: brain-continuous-evolution-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   evolve:
