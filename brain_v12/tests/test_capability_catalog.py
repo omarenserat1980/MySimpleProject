@@ -17,23 +17,29 @@ class CapabilityCatalogTests(unittest.TestCase):
         inventory = {x["executor_id"]: x for x in catalog_snapshot()}
         self.assertTrue(inventory["local-ffmpeg"]["metadata"]["requires_probe"])
 
-    def test_external_side_effect_requires_permissions_and_policy(self):
-        required = {"external_publish", "youtube.upload"}
+    def test_external_side_effect_requires_policy_and_explicit_permissions(self):
+        # Permissions alone must not override the default fail-closed policy.
         default_fabric = build_default_fabric(include_offline=True)
         self.assertEqual(default_fabric.plan("publish.youtube"), [])
-        # Permissions alone must not bypass the default external-side-effect deny.
-        self.assertEqual(default_fabric.plan("publish.youtube", required), [])
+        self.assertEqual(
+            default_fabric.plan("publish.youtube", {"external_publish", "youtube.upload"}),
+            [],
+        )
 
+        # A caller must explicitly authorize external side effects and supply
+        # every capability permission before the publisher becomes selectable.
         authorized_fabric = build_default_fabric(
             include_offline=True,
             autonomy_policy=AutonomyPolicy(allow_external_side_effects=True),
         )
         self.assertEqual(
-            [x.executor_id for x in authorized_fabric.plan("publish.youtube", required)],
+            [x.executor_id for x in authorized_fabric.plan(
+                "publish.youtube", {"external_publish", "youtube.upload"}
+            )],
             ["youtube-publisher"],
         )
-        # A permissive policy still cannot replace the executor's explicit permissions.
-        self.assertEqual(authorized_fabric.plan("publish.youtube", {"external_publish", "youtube.upload", "admin"}), [])
+        # Policy authorization alone is insufficient without required permissions.
+        self.assertEqual(authorized_fabric.plan("publish.youtube"), [])
 
 
 if __name__ == "__main__":
