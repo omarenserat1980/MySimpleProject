@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from brain_v12.brain.capability_fabric import CapabilityFabric, ExecutorSpec
 
@@ -37,14 +39,19 @@ class CapabilityHealthIntegrationTests(unittest.TestCase):
             ExecutorSpec("second", "code.execute", priority=2),
             probe=lambda: True,
         )
-        result = fabric.execute(
-            "code.execute",
-            lambda spec: (_ for _ in ()).throw(RuntimeError("executor failure"))
-            if spec.executor_id == "first" else "verified-result",
-        )
-        self.assertEqual(result["status"], "SUCCESS")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact = Path(temp_dir) / "verified-result.bin"
+            artifact.write_bytes(b"independently inspectable output")
+            result = fabric.execute(
+                "code.execute",
+                lambda spec: (_ for _ in ()).throw(RuntimeError("executor failure"))
+                if spec.executor_id == "first" else str(artifact),
+            )
+        self.assertEqual(result["status"], "VERIFIED_COMPLETED")
         self.assertEqual(result["executor_id"], "second")
         self.assertEqual(len(result["attempts"]), 2)
+        self.assertFalse(result["attempts"][0]["ok"])
+        self.assertTrue(result["attempts"][1]["ok"])
 
 
 if __name__ == "__main__":
