@@ -23,10 +23,14 @@ identity is independently verified.
   pins, certificate validity/signatures/CA constraints, the Android Key Attestation
   extension, its challenge binding, and the attested leaf public key. The trusted-root
   fingerprints must be maintained independently; do not accept pins from the phone.
-- This is deliberately a partial gate, not complete Android attestation policy. It
-  does not check application package/signing identity, verified boot/device lock,
-  patch levels, revocation, or configured hardware security-level policy. Its result
-  is `CHAIN_AND_CHALLENGE_VALID_POLICY_INCOMPLETE` and never grants trust or activation.
+- The verifier now checks the reported TEE/StrongBox security level against a
+  configurable minimum, device-lock and verified-boot state, and optional OS/vendor/boot
+  patch-level minimums. If expected package name and signing-certificate SHA-256
+  digests are supplied, it checks those against the attested application ID.
+- This remains a partial gate, not a complete Android attestation policy. Certificate
+  revocation is not checked, and the verifier does not yet validate a production Android
+  root set or the real Realme certificate chain. Its result remains
+  `CHAIN_AND_CHALLENGE_VALID_POLICY_INCOMPLETE` and never grants trust or activation.
 - Enforce one-time challenge IDs in durable verifier-side storage.
   `brain_phone_base.replay_store.SQLiteReplayStore` provides a SQLite-backed,
   atomic insert guarded by a unique challenge ID. Pass it as `replay_store=` to

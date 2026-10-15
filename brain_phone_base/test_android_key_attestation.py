@@ -31,11 +31,33 @@ def _integer(value: int, tag: int = 0x02) -> bytes:
     return _tlv(tag, raw)
 
 
-def _attestation_der(challenge: bytes, attestation_level: int = 1, keymaster_level: int = 1) -> bytes:
+def _high_tag(number: int, value: bytes) -> bytes:
+    parts = [number & 0x7F]
+    number >>= 7
+    while number:
+        parts.insert(0, 0x80 | (number & 0x7F))
+        number >>= 7
+    encoded_tag = b"\xbf" + bytes(parts)
+    length = len(value)
+    if length < 128:
+        encoded_length = bytes([length])
+    else:
+        raw = length.to_bytes((length.bit_length() + 7) // 8, "big")
+        encoded_length = bytes([0x80 | len(raw)]) + raw
+    return encoded_tag + encoded_length + value
+
+
+def _authorization_list(fields: dict[int, bytes]) -> bytes:
+    return _tlv(0x30, b"".join(_high_tag(number, value) for number, value in fields.items()))
+
+
+def _attestation_der(challenge: bytes, attestation_level: int = 1, keymaster_level: int = 1, locked: bool = True, boot_state: int = 0, patch_level: int = 202610) -> bytes:
+    root_of_trust = _tlv(0x30, _tlv(0x04, b"boot-key") + _tlv(0x01, b"\xff" if locked else b"\x00") + _tlv(0x0A, bytes([boot_state])) + _tlv(0x04, b"boot-hash"))
+    tee = _authorization_list({704: root_of_trust, 706: _tlv(0x02, (patch_level).to_bytes(3, "big")), 718: _tlv(0x02, (patch_level).to_bytes(3, "big")), 719: _tlv(0x02, (patch_level).to_bytes(3, "big"))})
     fields = b"".join([
         _integer(4), _integer(attestation_level, 0x0A), _integer(4),
         _integer(keymaster_level, 0x0A), _tlv(0x04, challenge), _tlv(0x04, b""),
-        _tlv(0x30, b""), _tlv(0x30, b""),
+        _tlv(0x30, b""), tee,
     ])
     return _tlv(0x30, fields)
 
@@ -66,7 +88,7 @@ class AndroidKeyAttestationTests(unittest.TestCase):
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
         )
 
-    def _make_leaf(self, challenge):
+    def _make_leaf(self, challenge, **attestation_options):
         leaf_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test Attested Device Key")])
         return (
             x509.CertificateBuilder().subject_name(leaf_name).issuer_name(self.root.subject)
@@ -76,7 +98,7 @@ class AndroidKeyAttestationTests(unittest.TestCase):
             .add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False,
                 key_encipherment=False, data_encipherment=False, key_agreement=False,
                 key_cert_sign=False, crl_sign=False, encipher_only=None, decipher_only=None), critical=True)
-            .add_extension(x509.UnrecognizedExtension(ObjectIdentifier(ATTESTATION_EXTENSION_OID), _attestation_der(challenge)), critical=False)
+            .add_extension(x509.UnrecognizedExtension(ObjectIdentifier(ATTESTATION_EXTENSION_OID), _attestation_der(challenge, **attestation_options)), critical=False)
             .sign(self.root_key, hashes.SHA256())
         )
 
@@ -103,6 +125,25 @@ class AndroidKeyAttestationTests(unittest.TestCase):
         self.assertFalse(result["trusted"])
         self.assertFalse(result["active"])
         self.assertEqual(result["mining"], "DISABLED")
+        self.assertEqual(result["verified_boot"]["verified_boot_state"], "VERIFIED")
+        self.assertTrue(result["verified_boot"]["device_locked"])
+        self.assertEqual(result["patch_levels"]["os"], 202610)
+
+
+    def test_unlocked_device_fails_closed(self):
+        leaf = self._make_leaf(self.challenge, locked=False)
+        with self.assertRaisesRegex(AttestationError, "DEVICE_NOT_LOCKED"):
+            self.verify(certificate_chain=[leaf.public_bytes(serialization.Encoding.DER), self.root_der])
+
+    def test_non_green_boot_fails_closed(self):
+        leaf = self._make_leaf(self.challenge, boot_state=2)
+        with self.assertRaisesRegex(AttestationError, "VERIFIED_BOOT_NOT_GREEN"):
+            self.verify(certificate_chain=[leaf.public_bytes(serialization.Encoding.DER), self.root_der])
+
+    def test_patch_level_below_minimum_fails_closed(self):
+        leaf = self._make_leaf(self.challenge, patch_level=202401)
+        with self.assertRaisesRegex(AttestationError, "OS_PATCH_LEVEL_BELOW_POLICY"):
+            self.verify(certificate_chain=[leaf.public_bytes(serialization.Encoding.DER), self.root_der], minimum_os_patch_level=202601)
 
     def test_unpinned_root_fails_closed(self):
         with self.assertRaisesRegex(AttestationError, "ROOT_CERTIFICATE_NOT_PINNED"):
