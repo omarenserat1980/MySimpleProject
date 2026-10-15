@@ -47,10 +47,10 @@ def test_invalid_telemetry_is_rejected():
 
 
 def test_payment_evidence_requires_transaction_id_for_reference_status():
-    cp, job = _planned_job()
+    cp, job = _ready_job()
     ev = cp.evidence(job.job_id, 1000, 5, 1)
     assert ev["status"] == "MINING_EVIDENCE_ONLY"
-    assert ev["payout_verified"] is False
+    assert ev["financial_state"] == "NOT_VERIFIED"
 
 
 def test_transaction_reference_is_not_verified_receipt():
