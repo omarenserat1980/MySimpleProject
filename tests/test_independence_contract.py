@@ -1,6 +1,9 @@
 import json
 
-from platform_foundation.independence_contract import IndependenceContract
+from platform_foundation.independence_contract import (
+    IndependenceContract,
+    compute_report_sha256,
+)
 
 
 def write_report(tmp_path, **overrides):
@@ -20,12 +23,17 @@ def write_report(tmp_path, **overrides):
             "restart_recovery": True,
             "authority_boundary": True,
         },
-        "report_sha256": "evidence",
     }
     report.update(overrides)
+    report["report_sha256"] = compute_report_sha256(report)
     path = tmp_path / "independence_proof.json"
     path.write_text(json.dumps(report), encoding="utf-8")
     return path
+
+
+def rewrite_report(path, report):
+    report["report_sha256"] = compute_report_sha256(report)
+    path.write_text(json.dumps(report), encoding="utf-8")
 
 
 def test_contract_allows_only_proven_scope(tmp_path):
@@ -50,7 +58,7 @@ def test_contract_rejects_missing_authority_proof(tmp_path):
     path = write_report(tmp_path)
     data = json.loads(path.read_text(encoding="utf-8"))
     data["scope"]["authority_boundary"] = False
-    path.write_text(json.dumps(data), encoding="utf-8")
+    rewrite_report(path, data)
     result = IndependenceContract(path).evaluate()
     assert result["allowed"] is False
     assert result["reason"] == "authority_boundary_not_proven"
@@ -60,7 +68,27 @@ def test_contract_rejects_network_dependency(tmp_path):
     path = write_report(tmp_path)
     data = json.loads(path.read_text(encoding="utf-8"))
     data["checks"]["network_dependency_for_gate"] = True
-    path.write_text(json.dumps(data), encoding="utf-8")
+    rewrite_report(path, data)
     result = IndependenceContract(path).evaluate()
     assert result["allowed"] is False
     assert result["reason"] == "checks_failed"
+
+
+def test_contract_rejects_tampered_report_hash(tmp_path):
+    path = write_report(tmp_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["checks"]["real_worker_execution"] = False
+    path.write_text(json.dumps(data), encoding="utf-8")
+    result = IndependenceContract(path).evaluate()
+    assert result["allowed"] is False
+    assert result["reason"] == "report_hash_mismatch"
+
+
+def test_contract_rejects_missing_report_hash(tmp_path):
+    path = write_report(tmp_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.pop("report_sha256")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    result = IndependenceContract(path).evaluate()
+    assert result["allowed"] is False
+    assert result["reason"] == "report_hash_missing"
