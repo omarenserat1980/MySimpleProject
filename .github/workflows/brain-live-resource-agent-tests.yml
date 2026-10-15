@@ -1,0 +1,38 @@
+name: Brain Live Resource Agent Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/brain_live_resource_agent.py"
+      - "brain_v12/tests/test_brain_live_resource_agent.py"
+      - "docs/BRAIN_LIVE_RESOURCE_NODE.md"
+      - ".github/workflows/brain-live-resource-agent-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-live-resource-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resource-agent-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile agent and tests
+        run: python -m py_compile brain_v12/tools/brain_live_resource_agent.py brain_v12/tests/test_brain_live_resource_agent.py
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_brain_live_resource_agent -v
+      - name: State evidence boundary
+        run: |
+          echo "Unit tests do not prove a live device heartbeat."
+          echo "Only a successful authenticated heartbeat from an authorized host is runtime connectivity evidence."
+          echo "Mining and revenue remain unverified."
