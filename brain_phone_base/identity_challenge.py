@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Fail-closed verifier for Brain Phone Base challenge-response proofs.
 
-This module verifies cryptographic signatures and binding fields only. It does
-NOT establish hardware-backed identity or Android Key Attestation trust.
-The caller must pin the verifier public key out-of-band and must obtain the
-device public key from a separately trusted enrollment/attestation process.
+This verifies signatures and binding fields, not hardware-backed identity.
+The verifier key must be pinned out-of-band and the device key must come from
+trusted enrollment/attestation, never solely from the response.
 """
 from __future__ import annotations
 
@@ -24,10 +23,7 @@ class VerificationError(ValueError):
 
 
 def canonical_json(value: dict[str, Any]) -> bytes:
-    """Canonical UTF-8 JSON bytes used as the exact signed message."""
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def sha256_hex(data: bytes) -> str:
@@ -46,37 +42,42 @@ def _parse_time(value: Any, field: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def _load_ed25519_public_key(pem: bytes):
+def _load_public_key(pem: bytes):
     try:
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey, SECP256R1
     except ImportError as exc:
         raise VerificationError("CRYPTO_BACKEND_UNAVAILABLE") from exc
     try:
         key = serialization.load_pem_public_key(pem)
     except (ValueError, TypeError) as exc:
         raise VerificationError("PUBLIC_KEY_INVALID") from exc
-    if not isinstance(key, Ed25519PublicKey):
-        raise VerificationError("ED25519_KEY_REQUIRED")
-    return key
+    if isinstance(key, Ed25519PublicKey):
+        return key
+    if isinstance(key, EllipticCurvePublicKey) and isinstance(key.curve, SECP256R1):
+        return key
+    raise VerificationError("SUPPORTED_KEY_REQUIRED:Ed25519_or_P256")
 
 
 def public_key_id(public_key_pem: bytes) -> str:
-    """Stable fingerprint of an Ed25519 public key's raw bytes."""
-    try:
-        from cryptography.hazmat.primitives import serialization
-        key = _load_ed25519_public_key(public_key_pem)
-        raw = key.public_bytes(
-            encoding=serialization.Encoding.Raw,
-            format=serialization.PublicFormat.Raw,
-        )
-    except VerificationError:
-        raise
-    return sha256_hex(raw)
+    """Fingerprint the canonical SubjectPublicKeyInfo DER for a supported key."""
+    from cryptography.hazmat.primitives import serialization
+    key = _load_public_key(public_key_pem)
+    der = key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return sha256_hex(der)
 
 
 def _verify_signature(public_key_pem: bytes, signature_b64: str, message: bytes) -> None:
-    key = _load_ed25519_public_key(public_key_pem)
+    try:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+    except ImportError as exc:
+        raise VerificationError("CRYPTO_BACKEND_UNAVAILABLE") from exc
+    key = _load_public_key(public_key_pem)
     if not isinstance(signature_b64, str):
         raise VerificationError("SIGNATURE_MISSING")
     try:
@@ -84,10 +85,11 @@ def _verify_signature(public_key_pem: bytes, signature_b64: str, message: bytes)
     except (ValueError, TypeError) as exc:
         raise VerificationError("SIGNATURE_ENCODING_INVALID") from exc
     try:
-        key.verify(signature, message)
+        if isinstance(key, ec.EllipticCurvePublicKey):
+            key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
+        else:
+            key.verify(signature, message)
     except Exception as exc:
-        # cryptography's InvalidSignature is intentionally translated into a
-        # stable, non-sensitive error for callers.
         raise VerificationError("SIGNATURE_INVALID") from exc
 
 
@@ -103,11 +105,10 @@ def verify_challenge_response(
     now: datetime | None = None,
     seen_challenge_ids: set[str] | None = None,
 ) -> dict[str, Any]:
-    """Verify a signed, fresh challenge and matching device response.
+    """Verify a signed fresh challenge and a response bound to one measurement.
 
-    The verifier key must be pinned out-of-band. The device public key must be
-    obtained from a separately trusted enrollment/attestation source; accepting
-    a key supplied only by the response would not verify device identity.
+    The verifier key is pinned out-of-band. The device public key must be
+    obtained from a separately trusted enrollment/attestation source.
     """
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if challenge.get("schema") != CHALLENGE_SCHEMA:
@@ -149,13 +150,8 @@ def verify_challenge_response(
     if current >= expires:
         raise VerificationError("CHALLENGE_EXPIRED")
 
-    _verify_signature(
-        pinned_verifier_public_key_pem,
-        challenge_signature_b64,
-        canonical_json(challenge),
-    )
-    expected_key_id = public_key_id(enrolled_device_public_key_pem)
-    if key_id != expected_key_id:
+    _verify_signature(pinned_verifier_public_key_pem, challenge_signature_b64, canonical_json(challenge))
+    if key_id != public_key_id(enrolled_device_public_key_pem):
         raise VerificationError("DEVICE_KEY_ID_MISMATCH")
 
     expected_fields = {
@@ -172,13 +168,8 @@ def verify_challenge_response(
     if signed_at < issued - timedelta(seconds=30) or signed_at >= expires:
         raise VerificationError("RESPONSE_TIME_OUTSIDE_CHALLENGE")
 
-    _verify_signature(
-        enrolled_device_public_key_pem,
-        response_signature_b64,
-        canonical_json(response),
-    )
+    _verify_signature(enrolled_device_public_key_pem, response_signature_b64, canonical_json(response))
 
-    # Signature validation is not hardware attestation. Never promote trust here.
     return {
         "schema": "brain-phone-base.identity-verification-result.v1",
         "status": "SIGNATURE_VALID_IDENTITY_UNVERIFIED",
@@ -194,5 +185,5 @@ def verify_challenge_response(
         "manual_approval": "NOT_GRANTED",
         "mining": "DISABLED",
         "network_upload": False,
-        "next_requirement": "Verify Android Key Attestation or an independently trusted device enrollment before any trust decision.",
+        "next_requirement": "Validate Android Key Attestation and the enrolled device key before any trust decision.",
     }
