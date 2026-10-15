@@ -77,6 +77,8 @@ class CloudMiningControlPlane:
         if on_github_actions:
             return False, "github_actions_mining_forbidden"
         worker = self.workers[job.worker_id]
+        if not worker.enabled:
+            return False, "worker_disabled"
         if temperature_c is not None:
             if not math.isfinite(temperature_c):
                 return False, "invalid_temperature_telemetry"
