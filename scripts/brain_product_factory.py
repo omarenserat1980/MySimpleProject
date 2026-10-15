@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 ROOT = Path(".brain_state")
 strategy = json.loads((ROOT / "revenue_strategy.json").read_text())
 
+# Every strategy emitted by scripts/brain_revenue_strategy.py must have a
+# corresponding product definition. Selection is planning-only: it does not
+# authorize spending, external submission, publication, or payment.
 PRODUCTS = {
     "brain_owned_digital_product": {
         "product_id": "brain_digital_toolkit",
@@ -39,9 +42,46 @@ PRODUCTS = {
         "external_dependency": 0.45,
         "validation_method": "local_api_test_and_contract_check",
     },
+    "open_source_bounty": {
+        "product_id": "brain_open_source_bounty_candidate",
+        "type": "open_source_contribution",
+        "build_cost_class": "LOW",
+        "time_to_first_test": "SHORT",
+        "repeatability": 0.35,
+        "margin_potential": 0.45,
+        "ownership": 0.45,
+        "external_dependency": 0.15,
+        "validation_method": "local_patch_tests_and_external_submission_gate",
+    },
+    "sponsorship": {
+        "product_id": "brain_sponsorship_readiness",
+        "type": "sponsorship_profile",
+        "build_cost_class": "LOW",
+        "time_to_first_test": "MEDIUM",
+        "repeatability": 0.70,
+        "margin_potential": 0.80,
+        "ownership": 0.80,
+        "external_dependency": 0.30,
+        "validation_method": "eligibility_review_and_evidence_check",
+    },
+    "free_ai_demo": {
+        "product_id": "brain_free_ai_demo",
+        "type": "software_demo",
+        "build_cost_class": "LOW",
+        "time_to_first_test": "SHORT",
+        "repeatability": 0.60,
+        "margin_potential": 0.60,
+        "ownership": 0.60,
+        "external_dependency": 0.30,
+        "validation_method": "local_demo_smoke_test_and_quality_gate",
+    },
 }
 
-selected_id = strategy["recommended_next"]
+recommended_next = strategy.get("recommended_next")
+if recommended_next not in PRODUCTS:
+    raise ValueError(f"UNSUPPORTED_RECOMMENDED_STRATEGY: {recommended_next!r}")
+
+selected_id = recommended_next
 selected = PRODUCTS[selected_id]
 
 plan = {
