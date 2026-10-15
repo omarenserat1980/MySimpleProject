@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string[]]$Locations = @("northeurope", "westeurope", "uksouth", "swedencentral", "francecentral", "polandcentral", "eastus2", "centralus"),
+    [string[]]$Locations = @("swedencentral", "northeurope", "westeurope", "uksouth", "francecentral", "polandcentral", "eastus2", "centralus"),
     [string[]]$VmSizes = @("Standard_D2s_v5", "Standard_D4s_v5", "Standard_D2s_v4", "Standard_D4s_v4", "Standard_B2s", "Standard_B2ms")
 )
 $ErrorActionPreference = "Stop"
@@ -20,6 +20,8 @@ if ($env:ARM_SUBSCRIPTION_ID -and $account.id -ne $env:ARM_SUBSCRIPTION_ID) { th
 
 $results = @()
 foreach ($location in $Locations) {
+    $imageChecked = $false
+    $imageAvailable = $false
     Write-Host "SKU_DISCOVERY_REGION=$location"
     # One SKU catalogue request per region; filter all requested sizes locally.
     $allSkusRaw = az vm list-skus --location $location --resource-type virtualMachines --all --output json --only-show-errors 2>$null
@@ -54,14 +56,31 @@ foreach ($location in $Locations) {
             Write-Host "SKU_CANDIDATE=$location,$size,STATUS=INSUFFICIENT_QUOTA,REGIONAL_AVAILABLE=$regionalAvailable,FAMILY_AVAILABLE=$familyAvailable,NEEDED=$cores"
             continue
         }
-        $results += [pscustomobject]@{ Location=$location; Size=$size; Cores=$cores; Family=$family; RegionalAvailable=$regionalAvailable; FamilyAvailable=$familyAvailable }
-        Write-Host "SKU_CANDIDATE=$location,$size,STATUS=ELIGIBLE_FOR_FURTHER_PREFLIGHT,REGIONAL_AVAILABLE=$regionalAvailable,FAMILY_AVAILABLE=$familyAvailable"
+        if (-not $imageChecked) {
+            $imageChecked = $true
+            $imageRaw = az vm image show --location $location --urn "MicrosoftWindowsServer:WindowsServer:2025-datacenter-g2:latest" --output json --only-show-errors 2>$null
+            $imageAvailable = ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($imageRaw -join "")))
+            if ($imageAvailable) {
+                try {
+                    $image = $imageRaw | ConvertFrom-Json
+                    $imageAvailable = [bool]$image.id
+                } catch { $imageAvailable = $false }
+            }
+            if ($imageAvailable) { Write-Host "WINDOWS_SERVER_2025_IMAGE=$location,STATUS=AVAILABLE,SKU=2025-datacenter-g2,VERSION=$($image.name)" }
+            else { Write-Host "WINDOWS_SERVER_2025_IMAGE=$location,STATUS=UNVERIFIED,SKU=2025-datacenter-g2" }
+        }
+        if (-not $imageAvailable) {
+            Write-Host "SKU_CANDIDATE=$location,$size,STATUS=UNVERIFIED,REASON=WINDOWS_SERVER_2025_IMAGE_NOT_CONFIRMED"
+            continue
+        }
+        $results += [pscustomobject]@{ Location=$location; Size=$size; Cores=$cores; Family=$family; RegionalAvailable=$regionalAvailable; FamilyAvailable=$familyAvailable; WindowsImage="2025-datacenter-g2" }
+        Write-Host "SKU_CANDIDATE=$location,$size,STATUS=ELIGIBLE_FOR_FURTHER_PREFLIGHT,WINDOWS_IMAGE=CONFIRMED,REGIONAL_AVAILABLE=$regionalAvailable,FAMILY_AVAILABLE=$familyAvailable"
     }
 }
 Write-Host "SKU_DISCOVERY_ELIGIBLE_COUNT=$($results.Count)"
 if ($results.Count -gt 0) {
     $results | Sort-Object Cores, Location, Size | Format-Table -AutoSize | Out-String | Write-Host
-    Write-Host "NOTE=Eligibility and quota are not a guarantee of live capacity or Windows image availability."
+    Write-Host "NOTE=Eligibility, quota, and image lookup do not guarantee live capacity or successful provisioning."
     Write-Host "NOTE=No deployment defaults were changed and no Azure resources were created."
 } else {
     Write-Host "NO_ELIGIBLE_CANDIDATES_VERIFIED=TRUE"
