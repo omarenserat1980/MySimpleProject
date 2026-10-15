@@ -92,56 +92,82 @@ class GitHubControlPlane:
                         "complete": True, "count": len(items)}
         raise GitHubControlError("ACTIONS_WORKFLOWS_PAGINATION_LIMIT_REACHED")
 
-    def actions_runs_last_24h(self, owner, repo, *, now=None, per_page=100,
-                              max_pages=10):
-        """Fetch all runs created in the last 24h; fail closed at GitHub's 1,000-result cap."""
+    def actions_runs_last_24h(self, owner, repo, *, workflow_ids=None, now=None, per_page=100, max_pages=10):
+        """Fetch the last 24h of runs per workflow to avoid the repository-wide 1,000-result cap.
+
+        GitHub caps the repository-wide workflow-runs listing at 1,000 results.
+        Splitting by workflow keeps each inventory independently paginatable; if
+        any single workflow still exceeds the API cap, fail closed rather than
+        claiming a complete audit.
+        """
         from datetime import datetime, timedelta, timezone
         if not 1 <= per_page <= 100:
             raise ValueError("per_page must be between 1 and 100")
+        if workflow_ids is None:
+            raise GitHubControlError("ACTIONS_WORKFLOW_IDS_REQUIRED")
+        if any(not isinstance(workflow_id, int) or workflow_id <= 0 for workflow_id in workflow_ids):
+            raise GitHubControlError("ACTIONS_WORKFLOW_ID_INVALID")
         current = now or datetime.now(timezone.utc)
         if current.tzinfo is None:
             raise ValueError("now must be timezone-aware")
         current = current.astimezone(timezone.utc)
         cutoff = current - timedelta(hours=24)
         created = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
-        items = []
-        expected_total = None
-        for page in range(1, max_pages + 1):
-            payload = self.request("GET", f"/repos/{owner}/{repo}/actions/runs",
-                                   capability="actions.read",
-                                   params={"page": page, "per_page": per_page,
-                                           "created": ">=" + created})
-            if not isinstance(payload, dict) or not isinstance(payload.get("workflow_runs"), list):
-                raise GitHubControlError("ACTIONS_RUNS_INVALID_RESPONSE")
-            if expected_total is None:
-                expected_total = payload.get("total_count")
-                if not isinstance(expected_total, int) or expected_total < 0:
-                    raise GitHubControlError("ACTIONS_RUNS_TOTAL_COUNT_MISSING")
-                if expected_total > 1000:
-                    raise GitHubControlError("ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED")
-            batch = payload["workflow_runs"]
-            items.extend(batch)
-            if len(items) >= expected_total or len(batch) < per_page:
-                filtered = []
-                for run in items:
-                    stamp = run.get("created_at")
-                    if not isinstance(stamp, str):
-                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_MISSING")
-                    try:
-                        created_at = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-                    except ValueError as exc:
-                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_INVALID") from exc
-                    if created_at.tzinfo is None:
-                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_TIMEZONE_MISSING")
-                    if cutoff <= created_at.astimezone(timezone.utc) <= current:
-                        filtered.append(run)
-                if len(items) < expected_total:
+        all_items = []
+        total_count = 0
+        pages_fetched = 0
+
+        for workflow_id in workflow_ids:
+            items = []
+            expected_total = None
+            for page in range(1, max_pages + 1):
+                payload = self.request(
+                    "GET", f"/repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs",
+                    capability="actions.read",
+                    params={"page": page, "per_page": per_page, "created": ">=" + created},
+                )
+                if not isinstance(payload, dict) or not isinstance(payload.get("workflow_runs"), list):
+                    raise GitHubControlError("ACTIONS_RUNS_INVALID_RESPONSE")
+                if expected_total is None:
+                    expected_total = payload.get("total_count")
+                    if not isinstance(expected_total, int) or expected_total < 0:
+                        raise GitHubControlError("ACTIONS_RUNS_TOTAL_COUNT_MISSING")
+                    if expected_total > 1000:
+                        raise GitHubControlError("ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED")
+                batch = payload["workflow_runs"]
+                items.extend(batch)
+                pages_fetched += 1
+                if len(items) >= expected_total:
+                    break
+                if len(batch) < per_page:
                     raise GitHubControlError("ACTIONS_RUNS_PAGINATION_INCOMPLETE")
-                return {"workflow_runs": filtered, "pages_fetched": page,
-                        "count": len(filtered), "api_total_count": expected_total,
-                        "window_start": cutoff.isoformat(), "window_end": current.isoformat(),
-                        "complete": True}
-        raise GitHubControlError("ACTIONS_RUNS_PAGINATION_LIMIT_REACHED")
+            else:
+                raise GitHubControlError("ACTIONS_RUNS_PAGINATION_LIMIT_REACHED")
+            if expected_total is not None and len(items) != expected_total:
+                raise GitHubControlError("ACTIONS_RUNS_PAGINATION_INCOMPLETE")
+            total_count += len(items)
+            all_items.extend(items)
+
+        filtered = []
+        for run in all_items:
+            if not isinstance(run, dict):
+                raise GitHubControlError("WORKFLOW_RUN_RECORD_INVALID")
+            stamp = run.get("created_at")
+            if not isinstance(stamp, str):
+                raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_MISSING")
+            try:
+                created_at = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_INVALID") from exc
+            if created_at.tzinfo is None:
+                raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_TIMEZONE_MISSING")
+            if cutoff <= created_at.astimezone(timezone.utc) <= current:
+                filtered.append(run)
+
+        return {"workflow_runs": filtered, "pages_fetched": pages_fetched,
+                "count": len(filtered), "api_total_count": total_count,
+                "window_start": cutoff.isoformat(), "window_end": current.isoformat(),
+                "complete": True}
     def dispatch_workflow(self, owner, repo, workflow_id, ref="main", inputs=None, approved=False):
         """Dispatch a workflow through GitHub REST; mutable action requires explicit approval."""
         body={"ref":ref}
