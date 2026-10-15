@@ -1,0 +1,78 @@
+name: Brain R2 Bucket Provisioning
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_r2_bucket_creation:
+        description: "Authorize creating the private brain-cinema-media R2 bucket if it is missing"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-r2-provisioning
+  cancel-in-progress: false
+
+jobs:
+  provision-r2:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.authorize_r2_bucket_creation == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify required configuration without exposing credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo "::error::CLOUDFLARE_API_TOKEN is missing"; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo "::error::CLOUDFLARE_ACCOUNT_ID is missing"; exit 1; }
+          echo "CLOUDFLARE_CONFIGURATION=READY"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Authenticate and check R2 availability
+        working-directory: cloudflare/brain-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npx --yes wrangler@4 whoami
+          if ! npx --yes wrangler@4 r2 bucket list > /tmp/r2-list.txt 2>&1; then
+            if grep -q '10042' /tmp/r2-list.txt; then
+              echo "::error title=R2 is not enabled::Cloudflare returned error 10042. Enable R2 for this account in the Cloudflare Dashboard first. This workflow cannot activate the account-level service."
+            else
+              echo "::error title=R2 bucket listing failed::Check the Cloudflare token permissions and account ID. Full provider diagnostics are withheld to avoid exposing sensitive information."
+            fi
+            exit 1
+          fi
+          cat /tmp/r2-list.txt
+
+      - name: Create the required bucket if missing
+        working-directory: cloudflare/brain-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if ! grep -Fq 'brain-cinema-media' /tmp/r2-list.txt; then
+            npx --yes wrangler@4 r2 bucket create brain-cinema-media
+          else
+            echo "R2_BUCKET_ALREADY_EXISTS=TRUE"
+          fi
+          npx --yes wrangler@4 r2 bucket list > /tmp/r2-verify.txt
+          if ! grep -Fq 'brain-cinema-media' /tmp/r2-verify.txt; then
+            echo "::error::R2 bucket verification failed"
+            exit 1
+          fi
+          echo "R2_BUCKET_READY=TRUE"
+          echo "R2_BUCKET_NAME=brain-cinema-media"
