@@ -16,5 +16,14 @@ Set these environment variables locally; do not put values in GitHub files, CI v
 
 The bridge refuses CI/GitHub Actions. Use a pool account and endpoint only if you are authorized to do so. Keep secrets in local environment or a secret manager. TLS is mandatory to protect credentials in transit. Connection and authorization may expose account/worker identifiers to the pool.
 
+## Current invocation and tests
+The bridge currently exposes `probe_stratum_connection()` as a Python function; this change does not add a command-line entry point or a Brain HTTP endpoint. Do not assume the bridge has run just because the module exists. The isolated regression tests can be run from the repository root with:
+
+```sh
+python -m pytest -q brain_v12/tests/test_bitcoin_stratum_bridge.py brain_v12/tests/test_bitcoin_stratum_evidence.py
+```
+
+Do not run a live probe until you have a user-owned/authorized worker and a pool's verified TLS endpoint. Never use production credentials in tests or CI.
+
 ## Important limits
 A successful result means only that Stratum subscribe and authorization succeeded. It does not prove SHA-256d hashing, accepted shares, BTC payout, or profitability. The response deliberately reports zero shares and `execution_authorized=false`. A real mining worker/ASIC or a separately installed and authorized miner is still required.
