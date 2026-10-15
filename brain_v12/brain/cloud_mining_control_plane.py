@@ -42,8 +42,8 @@ class CloudMiningControlPlane:
     def register_worker(self, worker: CloudWorker) -> None:
         if not worker.worker_id.strip() or not worker.owner.strip():
             raise ValueError("worker identity and owner are required")
-        if worker.max_temperature_c <= 0:
-            raise ValueError("max_temperature_c must be positive")
+        if not math.isfinite(worker.max_temperature_c) or worker.max_temperature_c <= 0:
+            raise ValueError("max_temperature_c must be a finite positive number")
         if not 0 < worker.max_cpu_percent <= 100:
             raise ValueError("max_cpu_percent must be in (0, 100]")
         self.workers[worker.worker_id] = worker
