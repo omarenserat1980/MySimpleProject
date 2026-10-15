@@ -1,13 +1,25 @@
 name: Brain Economic Cycle
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/brain/economic_connectors.py"
+      - "brain_v12/brain/payment_adapters.py"
+      - "brain_v12/brain/economic_cycle.py"
+      - "brain_v12/brain/binance_readonly_client.py"
+      - "brain_v12/tests/test_economic_connectors.py"
+      - "brain_v12/tests/test_binance_readonly_client.py"
+      - ".github/workflows/brain-economic-cycle.yml"
   push:
     branches: [main]
     paths:
       - "brain_v12/brain/economic_connectors.py"
       - "brain_v12/brain/payment_adapters.py"
       - "brain_v12/brain/economic_cycle.py"
+      - "brain_v12/brain/binance_readonly_client.py"
       - "brain_v12/tests/test_economic_connectors.py"
+      - "brain_v12/tests/test_binance_readonly_client.py"
+      - ".github/workflows/brain-economic-cycle.yml"
 permissions:
   contents: read
 jobs:
@@ -18,5 +30,6 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: python -m unittest brain_v12.tests.test_economic_connectors -v
+      - run: python -m unittest brain_v12.tests.test_binance_readonly_client -v
       - run: python -m brain_v12.brain.economic_cycle > /tmp/economic-cycle.json
       - run: cat /tmp/economic-cycle.json
