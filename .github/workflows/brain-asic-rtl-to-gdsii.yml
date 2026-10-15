@@ -47,12 +47,33 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$PDK_ROOT"
-          # Volare resolves the compatible open_pdks revision from OpenLane's
-          # tool_metadata.yml; pip-only installs may not include that metadata.
-          git clone --depth 1 --recurse-submodules --shallow-submodules --branch 2.3.10 https://github.com/efabless/openlane2.git "$RUNNER_TEMP/openlane2-source"
-          cd "$RUNNER_TEMP/openlane2-source"
-          test -f dependencies/tool_metadata.yml -o -f tool_metadata.yml
-          volare enable --pdk-root "$PDK_ROOT" --pdk sky130
+          # Do not assume tool_metadata.yml exists in the published OpenLane source tag.
+          # Discover an available public Sky130 build explicitly, then pin that hash
+          # for this run so Volare does not depend on repository-local metadata.
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          result = subprocess.run(
+              ["volare", "ls-remote", "--pdk", "sky130"],
+              check=True, text=True, capture_output=True
+          )
+          versions = re.findall(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", result.stdout)
+          if not versions:
+              print(result.stdout)
+              print(result.stderr, file=sys.stderr)
+              raise SystemExit("No downloadable Sky130 PDK revision was listed by Volare")
+          revision = versions[0]
+          print(f"Selected Sky130 open_pdks revision: {revision}")
+          subprocess.run(
+              ["volare", "enable", "--pdk-root", __import__("os").environ["PDK_ROOT"],
+               "--pdk", "sky130", revision],
+              check=True
+          )
+          with open("sky130-pdk-revision.txt", "w", encoding="utf-8") as handle:
+              handle.write(revision + "\\n")
+          PY
 
           # Verify the actual open_pdks layout: standard-cell timing libraries
           # live under libs.ref, while OpenLane platform files live under libs.tech.
