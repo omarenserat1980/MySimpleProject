@@ -103,25 +103,25 @@ def test_supervisor_rejects_repair_when_independent_verifier_fails(tmp_path):
     verify = tmp_path / "verify.py"
 
     target.write_text(
-        "from pathlib import Path\\n"
-        f"marker = Path({str(marker)!r})\\n"
-        "if not marker.exists():\\n"
-        "    print('EXPECTED_PRE_REPAIR_FAILURE')\\n"
-        "    raise SystemExit(7)\\n"
-        "print('TARGET_RECOVERED')\\n",
+        "from pathlib import Path\n"
+        f"marker = Path({str(marker)!r})\n"
+        "if not marker.exists():\n"
+        "    print('EXPECTED_PRE_REPAIR_FAILURE')\n"
+        "    raise SystemExit(7)\n"
+        "print('TARGET_RECOVERED')\n",
         encoding="utf-8",
     )
     repair.write_text(
-        "import os\\n"
-        "from pathlib import Path\\n"
-        f"Path({str(marker)!r}).write_text('repair applied', encoding='utf-8')\\n"
-        "assert Path(os.environ['BRAIN_FAILURE_FILE']).exists()\\n"
-        "print('LOCAL_REPAIR_APPLIED')\\n",
+        "import os\n"
+        "from pathlib import Path\n"
+        f"Path({str(marker)!r}).write_text('repair applied', encoding='utf-8')\n"
+        "assert Path(os.environ['BRAIN_FAILURE_FILE']).exists()\n"
+        "print('LOCAL_REPAIR_APPLIED')\n",
         encoding="utf-8",
     )
     verify.write_text(
-        "print('INDEPENDENT_VERIFY_REJECTED')\\n"
-        "raise SystemExit(9)\\n",
+        "print('INDEPENDENT_VERIFY_REJECTED')\n"
+        "raise SystemExit(9)\n",
         encoding="utf-8",
     )
 
