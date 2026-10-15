@@ -15,30 +15,35 @@ def _python_command(source: str) -> str:
     return f"{shlex.quote(sys.executable)} -c {shlex.quote(source)}"
 
 
-def _run_supervisor(state_dir: Path, verify_source: str) -> subprocess.CompletedProcess[str]:
+def _run_supervisor(
+    state_dir: Path, verify_source: str | None
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
+    command = [
+        sys.executable,
+        "-m",
+        "brain_v12.self_healing.supervisor",
+        "--command",
+        _python_command("print('TARGET_OK')"),
+        "--max-attempts",
+        "1",
+        "--backoff",
+        "0",
+        "--max-backoff",
+        "0",
+        "--timeout",
+        "15",
+        "--state",
+        str(state_dir),
+    ]
+    if verify_source is not None:
+        command.extend(["--verify", _python_command(verify_source)])
     return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "brain_v12.self_healing.supervisor",
-            "--command",
-            _python_command("print('TARGET_OK')"),
-            "--verify",
-            _python_command(verify_source),
-            "--max-attempts",
-            "1",
-            "--backoff",
-            "0",
-            "--max-backoff",
-            "0",
-            "--timeout",
-            "15",
-            "--state",
-            str(state_dir),
-        ],
+        command,
         cwd=REPO_ROOT,
         env=env,
         text=True,
@@ -68,4 +73,14 @@ def test_supervisor_rejects_success_when_verification_fails(tmp_path):
     assert history["status"] == "FAILED_AFTER_REPAIR_ATTEMPTS"
     assert history["attempts"][0]["verified"] is False
     assert history["attempts"][0]["exit_code"] == 7
+    assert "BRAIN_HEALING_SUCCESS" not in result.stdout
+
+
+def test_supervisor_rejects_success_when_verification_is_missing(tmp_path):
+    result = _run_supervisor(tmp_path / "state", None)
+
+    assert result.returncode != 0
+    history = json.loads((tmp_path / "state" / "self_healing_history.json").read_text())
+    assert history["status"] == "FAILED_AFTER_REPAIR_ATTEMPTS"
+    assert history["attempts"][0]["verified"] is False
     assert "BRAIN_HEALING_SUCCESS" not in result.stdout
