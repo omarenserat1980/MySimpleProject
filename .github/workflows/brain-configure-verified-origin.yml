@@ -1,0 +1,89 @@
+name: Configure Verified Brain Origin
+
+on:
+  workflow_dispatch:
+    inputs:
+      brain_origin:
+        description: "Existing public Brain runtime HTTPS origin (not the Cloudflare Worker URL)"
+        required: true
+        type: string
+      confirm:
+        description: "Type VERIFY_AND_SAVE to validate the live runtime and save BRAIN_ORIGIN"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: configure-verified-brain-origin
+  cancel-in-progress: false
+
+jobs:
+  verify-and-save:
+    if: ${{ inputs.confirm == 'VERIFY_AND_SAVE' && github.repository == 'omarenserat1980/MySimpleProject' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate candidate origin and live Brain health
+        id: verify
+        env:
+          CANDIDATE_ORIGIN: ${{ inputs.brain_origin }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          value = os.environ["CANDIDATE_ORIGIN"].strip().rstrip("/")
+          p = urlparse(value)
+          if p.scheme != "https" or not p.hostname or p.username or p.password:
+              raise SystemExit("BLOCKED: provide a valid HTTPS origin without credentials.")
+          if p.path or p.query or p.fragment:
+              raise SystemExit("BLOCKED: provide the origin only, without a path, query, or fragment.")
+          if p.hostname.lower() in {
+              "brain-cloud-api.oenserat.workers.dev",
+              "omarenserat1980.github.io",
+              "brain.example.com",
+          }:
+              raise SystemExit("BLOCKED: this is a known edge/static/example origin, not a verified Brain runtime.")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("origin=" + value + "\n")
+          PY
+          curl --fail --silent --show-error --max-time 15 "${CANDIDATE_ORIGIN%/}/healthz" -o /tmp/brain-health.json
+          curl --fail --silent --show-error --max-time 15 "${CANDIDATE_ORIGIN%/}/readyz" -o /tmp/brain-ready.json
+          python3 - <<'PY'
+          import json
+          h=json.load(open("/tmp/brain-health.json", encoding="utf-8"))
+          r=json.load(open("/tmp/brain-ready.json", encoding="utf-8"))
+          if h.get("status") != "ok":
+              raise SystemExit("BLOCKED: /healthz did not return status=ok")
+          if r.get("ready") is not True:
+              raise SystemExit("BLOCKED: /readyz did not return ready=true")
+          print("BRAIN_RUNTIME_HEALTH=PASS")
+          print("BRAIN_RUNTIME_READY=PASS")
+          PY
+
+      - name: Create or update repository variable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORIGIN: ${{ steps.verify.outputs.origin }}
+        run: |
+          set -euo pipefail
+          endpoint="repos/${GITHUB_REPOSITORY}/actions/variables/BRAIN_ORIGIN"
+          if gh api --silent "$endpoint" >/dev/null 2>&1; then
+            gh api --method PATCH "$endpoint" -f value="$ORIGIN" >/dev/null
+            echo "BRAIN_ORIGIN_VARIABLE=UPDATED"
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/variables" \
+              -f name="BRAIN_ORIGIN" -f value="$ORIGIN" >/dev/null
+            echo "BRAIN_ORIGIN_VARIABLE=CREATED"
+          fi
+
+      - name: Verify saved variable without printing its value
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/variables/BRAIN_ORIGIN" --jq '.name' | grep -Fx BRAIN_ORIGIN
+          echo "BRAIN_ORIGIN_SETUP=PASS"
