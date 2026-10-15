@@ -41,8 +41,13 @@ def executor_allowed(
         return False
 
     metadata = spec.metadata
-    if metadata.get("side_effect") and not policy.allow_external_side_effects:
-        return False
+    if metadata.get("side_effect"):
+        # Side-effect executors require both explicit policy authorization and
+        # every declared permission at selection time, not only at execution.
+        if not policy.allow_external_side_effects:
+            return False
+        if not spec.permissions.issubset(required):
+            return False
 
     tier = executor_tier(spec)
     if tier == PAID_EXTERNAL and not policy.allow_paid:
