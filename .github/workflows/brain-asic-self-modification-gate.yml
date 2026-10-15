@@ -5,8 +5,10 @@ on:
     paths:
       - "brain_v12/brain/asic_self_modification_gate.py"
       - "brain_v12/brain/asic_self_modification_service.py"
+      - "brain_v12/brain/asic_supervisor_review.py"
       - "brain_v12/tests/test_asic_self_modification_gate.py"
       - "brain_v12/tests/test_asic_self_modification_service.py"
+      - "brain_v12/tests/test_asic_supervisor_review.py"
       - "brain_v12/asic/**"
       - ".github/workflows/brain-asic-self-modification-gate.yml"
   push:
@@ -14,8 +16,10 @@ on:
     paths:
       - "brain_v12/brain/asic_self_modification_gate.py"
       - "brain_v12/brain/asic_self_modification_service.py"
+      - "brain_v12/brain/asic_supervisor_review.py"
       - "brain_v12/tests/test_asic_self_modification_gate.py"
       - "brain_v12/tests/test_asic_self_modification_service.py"
+      - "brain_v12/tests/test_asic_supervisor_review.py"
       - "brain_v12/asic/**"
       - ".github/workflows/brain-asic-self-modification-gate.yml"
   workflow_dispatch:
@@ -32,19 +36,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile policy, service, and tests
+      - name: Compile policy, service, supervisor bridge, and tests
         run: >-
           python -m py_compile
           brain_v12/brain/asic_self_modification_gate.py
           brain_v12/brain/asic_self_modification_service.py
+          brain_v12/brain/asic_supervisor_review.py
           brain_v12/tests/test_asic_self_modification_gate.py
           brain_v12/tests/test_asic_self_modification_service.py
+          brain_v12/tests/test_asic_supervisor_review.py
       - name: Install test runner
         run: python -m pip install --disable-pip-version-check pytest
-      - name: Run policy and service tests
+      - name: Run policy, service, and supervisor bridge tests
         env:
           PYTHONPATH: .
-        run: python -m pytest brain_v12/tests/test_asic_self_modification_gate.py brain_v12/tests/test_asic_self_modification_service.py -q
+        run: python -m pytest brain_v12/tests/test_asic_self_modification_gate.py brain_v12/tests/test_asic_self_modification_service.py brain_v12/tests/test_asic_supervisor_review.py -q
       - name: Install open-source RTL tools
         run: |
           sudo apt-get update
