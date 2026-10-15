@@ -98,7 +98,7 @@ class LocalExecutor:
 
     @staticmethod
     def actions() -> tuple[str, ...]:
-        return ("status", "test-measurement", "measure", "verify-evidence")
+        return ("status", "test-measurement", "test-local-executor", "measure", "verify-evidence")
 
     def _run_action(self, action: str) -> dict[str, Any]:
         if action == "status":
@@ -109,6 +109,12 @@ class LocalExecutor:
         if action == "test-measurement":
             proc = subprocess.run([sys.executable, "-m", "unittest",
                                    "brain_phone_base.test_android_real_measurement", "-v"],
+                                  cwd=self.repo, capture_output=True, text=True, timeout=120, check=False)
+            return {"exit_code": proc.returncode, "stdout": proc.stdout[-12000:],
+                    "stderr": proc.stderr[-12000:]}
+        if action == "test-local-executor":
+            proc = subprocess.run([sys.executable, "-m", "unittest",
+                                   "brain_phone_base.test_local_executor", "-v"],
                                   cwd=self.repo, capture_output=True, text=True, timeout=120, check=False)
             return {"exit_code": proc.returncode, "stdout": proc.stdout[-12000:],
                     "stderr": proc.stderr[-12000:]}
