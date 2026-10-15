@@ -38,7 +38,7 @@ jobs:
 
       - name: Install OpenLane 2 CLI and Volare
         run: |
-          python -m pip install --disable-pip-version-check --upgrade openlane volare
+          python -m pip install --disable-pip-version-check "openlane==2.3.10" "volare==0.20.6"
           openlane --version
           volare --version
 
@@ -55,17 +55,19 @@ jobs:
           import subprocess
           import sys
 
+          # Pin the exact PDK revision proven by the successful build; never let
+          # the first item in a remote listing silently change the build inputs.
+          revision = "0fe599b2afb6708d281543108caf8310912f54af"
           result = subprocess.run(
               ["volare", "ls-remote", "--pdk", "sky130"],
               check=True, text=True, capture_output=True
           )
           versions = re.findall(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", result.stdout)
-          if not versions:
+          if revision not in versions:
               print(result.stdout)
               print(result.stderr, file=sys.stderr)
-              raise SystemExit("No downloadable Sky130 PDK revision was listed by Volare")
-          revision = versions[0]
-          print(f"Selected Sky130 open_pdks revision: {revision}")
+              raise SystemExit(f"Pinned Sky130 revision is not listed by Volare: {revision}")
+          print(f"Using pinned Sky130 open_pdks revision: {revision}")
           subprocess.run(
               ["volare", "enable", "--pdk-root", __import__("os").environ["PDK_ROOT"],
                "--pdk", "sky130", revision],
