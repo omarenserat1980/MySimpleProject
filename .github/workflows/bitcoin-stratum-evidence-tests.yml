@@ -10,7 +10,7 @@ on:
       - 'brain_v12/tests/test_bitcoin_stratum_bridge.py'
       - '.github/workflows/bitcoin-stratum-evidence-tests.yml'
   push:
-    branches: [brain-bitcoin-live-readiness]
+    branches: [main, brain-stratum-bridge-ci, brain-bitcoin-live-readiness]
   workflow_dispatch:
 
 permissions:
