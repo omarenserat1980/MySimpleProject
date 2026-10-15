@@ -1,4 +1,17 @@
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
 from brain_v12.self_healing.supervisor import diagnose
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _command(target: Path) -> str:
+    return f"{shlex.quote(sys.executable)} {shlex.quote(str(target))}"
 
 
 def test_diagnose_missing_token():
