@@ -2,8 +2,10 @@ import base64
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from brain_phone_base.identity_challenge import (
     CHALLENGE_SCHEMA,
@@ -20,14 +22,13 @@ class IdentityChallengeTests(unittest.TestCase):
     def setUp(self):
         self.now = datetime(2026, 10, 15, 16, 0, tzinfo=timezone.utc)
         self.verifier_private = Ed25519PrivateKey.generate()
-        self.device_private = Ed25519PrivateKey.generate()
+        # Android Keystore helper uses a P-256 EC signing key.
+        self.device_private = ec.generate_private_key(ec.SECP256R1())
         self.verifier_public_pem = self.verifier_private.public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
+            Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
         )
         self.device_public_pem = self.device_private.public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
+            Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
         )
         self.measurement_hash = sha256_hex(b"fixture measurement")
         self.challenge = {
@@ -51,7 +52,7 @@ class IdentityChallengeTests(unittest.TestCase):
             "signed_at_utc": self.now.isoformat().replace("+00:00", "Z"),
         }
         self.response_signature = base64.b64encode(
-            self.device_private.sign(canonical_json(self.response))
+            self.device_private.sign(canonical_json(self.response), ec.ECDSA(hashes.SHA256()))
         ).decode("ascii")
 
     def verify(self, **overrides):
@@ -90,8 +91,7 @@ class IdentityChallengeTests(unittest.TestCase):
 
     def test_wrong_verifier_key_fails_signature(self):
         other = Ed25519PrivateKey.generate().public_key().public_bytes(
-            serialization.Encoding.PEM,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
+            Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
         )
         with self.assertRaisesRegex(VerificationError, "SIGNATURE_INVALID"):
             self.verify(pinned_verifier_public_key_pem=other)
