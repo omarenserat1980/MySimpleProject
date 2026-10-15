@@ -113,7 +113,9 @@ class LocalExecutor:
             return {"exit_code": proc.returncode, "stdout": proc.stdout[-12000:],
                     "stderr": proc.stderr[-12000:]}
         if action == "measure":
-            output = self.repo / "evidence" / "phone-real-measurement.json"
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            suffix = uuid.uuid4().hex[:8]
+            output = self.repo / "evidence" / f"phone-real-measurement-{stamp}-{suffix}.json"
             proc = subprocess.run([sys.executable, "-m", "brain_phone_base.android_real_measurement",
                                    "--output", str(output)], cwd=self.repo,
                                   capture_output=True, text=True, timeout=30, check=False)
@@ -138,24 +140,33 @@ class LocalExecutor:
             try:
                 raw = path.read_bytes()
                 data = json.loads(raw)
-                assert data.get("schema") == "brain-phone-base.real-measurement.v1", "SCHEMA_INVALID"
+                if data.get("schema") != "brain-phone-base.real-measurement.v1":
+                    raise ValueError("SCHEMA_INVALID")
                 gate = data["node_gate"]
                 evidence = data["evidence"]
                 network = data["network_actions"]
-                assert gate.get("state") == "untrusted_inactive", "NODE_STATE_NOT_SAFE"
-                assert gate.get("trusted") is False, "TRUST_GATE_NOT_CLOSED"
-                assert gate.get("active") is False, "ACTIVE_GATE_NOT_CLOSED"
-                assert gate.get("activation_allowed") is False, "ACTIVATION_GATE_NOT_CLOSED"
-                assert gate.get("manual_approval") == "not_granted", "MANUAL_APPROVAL_UNEXPECTED"
-                assert evidence.get("device_identity_verified") is False, "IDENTITY_MUST_REMAIN_UNVERIFIED"
-                assert evidence.get("independent_verification") == "not_performed", "INDEPENDENT_STATUS_UNEXPECTED"
-                assert evidence.get("integrity_signature") is None, "SIGNATURE_SEMANTICS_UNEXPECTED"
+                required_gate = {
+                    "state": "untrusted_inactive", "trusted": False, "active": False,
+                    "activation_allowed": False, "manual_approval": "not_granted",
+                }
+                for key, expected in required_gate.items():
+                    if gate.get(key) != expected or type(gate.get(key)) is not type(expected):
+                        raise ValueError(f"NODE_GATE_INVALID:{key}")
+                required_evidence = {
+                    "device_identity_verified": False,
+                    "independent_verification": "not_performed",
+                    "integrity_signature": None,
+                }
+                for key, expected in required_evidence.items():
+                    if evidence.get(key, object()) != expected or type(evidence.get(key, object())) is not type(expected):
+                        raise ValueError(f"EVIDENCE_GATE_INVALID:{key}")
                 for key in ("measurement_uploaded", "node_registered", "mining_started", "mining_pool_contacted"):
-                    assert network.get(key) is False, f"NETWORK_GATE_NOT_CLOSED:{key}"
+                    if network.get(key) is not False:
+                        raise ValueError(f"NETWORK_GATE_NOT_CLOSED:{key}")
                 findings.append({"path": str(path.relative_to(self.repo)), "status": "PASS_LOCAL_CONTRACT_ONLY",
                                  "measured_at_utc": data.get("measured_at_utc", data.get("timestamp")),
                                  "sha256": sha256_bytes(raw)})
-            except (OSError, json.JSONDecodeError, KeyError, AssertionError, TypeError) as exc:
+            except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 findings.append({"path": str(path.relative_to(self.repo)), "status": "FAIL",
                                  "reason": str(exc)[:300]})
         ok = all(item["status"] == "PASS_LOCAL_CONTRACT_ONLY" for item in findings)
