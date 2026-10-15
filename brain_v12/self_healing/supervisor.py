@@ -62,6 +62,28 @@ def workflow_actions_enabled(value: str | None = None) -> bool:
     return setting.strip().lower() in {"1", "true", "yes"}
 
 
+def register_workflow_action(actions: ReflectionActionRegistry, enabled: bool | None = None) -> bool:
+    """Register only the fixed E2E workflow when remote actions are explicitly enabled."""
+    if not (workflow_actions_enabled() if enabled is None else enabled):
+        return False
+
+    from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
+
+    actions.register(
+        "workflow:reflection-e2e",
+        workflow_dispatch_action(
+            "workflow:reflection-e2e",
+            repo=os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject"),
+            workflow_id="reflection-e2e",
+            ref=os.getenv("BRAIN_GITHUB_REF", "main"),
+            inputs={},
+            timeout=min(int(os.getenv("BRAIN_COMMAND_TIMEOUT", "900")), 120),
+        ),
+        "Dispatch the fixed Brain Reflection E2E GitHub workflow for an independent test.",
+    )
+    return True
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -198,20 +220,7 @@ def main() -> int:
 
                 # Safe remote workflow test: only a fixed Brain-owned workflow is exposed.
                 # Never expose an arbitrary workflow filename to ChatGPT.
-                if workflow_actions_enabled():
-                    from brain_v12.self_healing.reflection_actions import workflow_dispatch_action
-                    actions.register(
-                        "workflow:reflection-e2e",
-                        workflow_dispatch_action(
-                            "workflow:reflection-e2e",
-                            repo=os.getenv("BRAIN_GITHUB_REPO", "omarenserat1980/MySimpleProject"),
-                            workflow_id="reflection-e2e",
-                            ref=os.getenv("BRAIN_GITHUB_REF", "main"),
-                            inputs={},
-                            timeout=min(args.timeout, 120),
-                        ),
-                        "Dispatch the fixed Brain Reflection E2E GitHub workflow for an independent test.",
-                    )
+                register_workflow_action(actions, enabled=workflow_actions_enabled())
                 chatgpt_repair_done = False
                 if args.chatgpt_reflection:
                     from brain_v12.self_healing.chatgpt_reasoner import ChatGPTReasoner
