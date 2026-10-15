@@ -172,5 +172,5 @@ def test_supervisor_rejects_repair_when_independent_verifier_fails(tmp_path):
     assert "LOCAL_REPAIR_APPLIED" in first["repair_stdout"]
     assert second["exit_code"] == 9
     assert second["verified"] is False
-    assert "INDEPENDENT_VERIFY_REJECTED" in second["stderr"]
+    assert "INDEPENDENT_VERIFY_REJECTED" in second["stdout"]
     assert marker.exists()
