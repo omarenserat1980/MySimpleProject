@@ -1,6 +1,6 @@
 import unittest
 
-from brain_v12.tools.github_actions_runtime_audit import build_report
+from brain_v12.tools.github_actions_runtime_audit import build_report, safe_error_code
 
 
 class GitHubActionsRuntimeAuditTests(unittest.TestCase):
@@ -46,6 +46,15 @@ class GitHubActionsRuntimeAuditTests(unittest.TestCase):
         runs["workflow_runs"] = ["not-a-record"]
         with self.assertRaisesRegex(ValueError, "WORKFLOW_RUN_RECORD_INVALID"):
             build_report(workflows, runs)
+
+    def test_error_code_does_not_leak_api_response_body(self):
+        exc = RuntimeError("GITHUB_HTTP_403:token=ghp_secret response body")
+        self.assertEqual(safe_error_code(exc), "GITHUB_HTTP_403")
+        self.assertNotIn("ghp_secret", safe_error_code(exc))
+
+    def test_unknown_error_does_not_copy_exception_message(self):
+        exc = RuntimeError("private response details and credentials")
+        self.assertEqual(safe_error_code(exc), "RuntimeError")
 
 
 if __name__ == "__main__":
