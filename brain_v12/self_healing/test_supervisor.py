@@ -65,6 +65,8 @@ def test_workflow_action_registration_is_fixed_and_allowlisted(monkeypatch):
         captured.update(kwargs)
         return lambda: ActionResult(action_id, True, 0, "not executed", "")
 
+    monkeypatch.delenv("BRAIN_GITHUB_REPO", raising=False)
+    monkeypatch.delenv("BRAIN_GITHUB_REF", raising=False)
     monkeypatch.setattr(
         "brain_v12.self_healing.reflection_actions.workflow_dispatch_action",
         fake_dispatch,
