@@ -106,6 +106,7 @@ from .brain.open_source_tools_api import router as open_source_tools_router
 from .brain.asic_simulator_api import router as asic_simulator_router
 from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
 from .brain.bitcoin_worker_api import router as bitcoin_worker_router
+from .brain.mining_node_api import router as mining_node_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -261,6 +262,7 @@ app.include_router(open_source_tools_router)
 app.include_router(asic_simulator_router)
 app.include_router(bitcoin_mining_intelligence_router)
 app.include_router(bitcoin_worker_router)
+app.include_router(mining_node_router)
 
 
 @app.get("/api/logs/errors")
