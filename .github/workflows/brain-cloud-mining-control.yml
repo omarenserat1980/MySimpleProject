@@ -1,5 +1,9 @@
 name: Brain Cloud Mining Control Plane
 
+# This validation workflow is read-only; it must never write or mutate main.
+permissions:
+  contents: read
+
 on:
   push:
     branches:
