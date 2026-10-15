@@ -1,0 +1,119 @@
+name: Brain Bitcoin OpenROAD Physical Flow
+on:
+  push:
+    branches:
+      - feat/bitcoin-openroad-physical-flow
+  workflow_dispatch:
+
+concurrency:
+  group: brain-bitcoin-openroad-${{ github.head_ref || github.ref_name }}
+  # Physical synthesis can take a long time; do not cancel a useful run
+  # just because another run for this branch is queued.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sky130hd-physical-flow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Prepare pinned OpenROAD-flow-scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORFS_COMMIT=9c431405a71909ca9aa5b9000d3d11fa36b2a32a
+          ORFS=/tmp/OpenROAD-flow-scripts
+          git init "$ORFS"
+          git -C "$ORFS" remote add origin https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git
+          git -C "$ORFS" fetch --depth 1 origin "$ORFS_COMMIT"
+          git -C "$ORFS" checkout --detach FETCH_HEAD
+          test "$(git -C "$ORFS" rev-parse HEAD)" = "$ORFS_COMMIT"
+          mkdir -p evidence
+          printf 'orfs_commit=%s\n' "$ORFS_COMMIT" > evidence/physical_flow_manifest.txt
+          printf 'source_sha=%s\n' "$(git rev-parse HEAD)" >> evidence/physical_flow_manifest.txt
+          printf 'platform=sky130hd\n' >> evidence/physical_flow_manifest.txt
+          printf 'design=brain_bitcoin_nonce_search\n' >> evidence/physical_flow_manifest.txt
+          printf 'container_image=openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8\n' >> evidence/physical_flow_manifest.txt
+
+      - name: Stage RTL and run OpenROAD-flow-scripts in official container
+        shell: bash
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          ORFS=/tmp/OpenROAD-flow-scripts
+          WORK=/tmp/orfs-work
+          DESIGN="$ORFS/flow/designs/sky130hd/brain_bitcoin_nonce_search"
+          mkdir -p "$DESIGN/src" evidence
+          cp brain_v12/asic/rtl/brain_sha256_compress.sv "$DESIGN/src/"
+          cp brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv "$DESIGN/src/"
+          cp brain_v12/asic/rtl/brain_bitcoin_target_check.sv "$DESIGN/src/"
+          cp brain_v12/asic/rtl/brain_bitcoin_nonce_search.sv "$DESIGN/src/"
+          cp brain_v12/asic/openroad/sky130hd/constraint.sdc "$DESIGN/constraint.sdc"
+          cp brain_v12/asic/openroad/sky130hd/config.mk "$DESIGN/config.mk"
+          cat > evidence/run-openroad.sh <<'BRAIN_OPENROAD_SCRIPT'
+          set -euo pipefail
+          cp -a /tmp/brain-openroad-flow-scripts/. /tmp/orfs-work/
+          source /OpenROAD-flow-scripts/env.sh
+          export FLOW_HOME=/tmp/orfs-work/flow
+          cd /tmp/orfs-work/flow
+          command -v openroad
+          command -v yosys
+          RTL_FILES="$(find designs/sky130hd/brain_bitcoin_nonce_search/src -type f -name '*.sv' -print | sort | tr '\n' ' ')"
+          test -n "$RTL_FILES"
+          printf 'RTL_FILES=%s\n' "$RTL_FILES"
+          make DESIGN_CONFIG=designs/sky130hd/brain_bitcoin_nonce_search/config.mk VERILOG_FILES="$RTL_FILES" YOSYS_EXE=/OpenROAD-flow-scripts/tools/install/yosys/bin/yosys OPENROAD_EXE=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad
+          BRAIN_OPENROAD_SCRIPT
+          mkdir -p "$WORK"
+          docker run --rm \
+            -v "$ORFS:/tmp/brain-openroad-flow-scripts:ro" \
+            -v "$WORK:/tmp/orfs-work" \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -w /tmp/orfs-work \
+            openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8 \
+            bash /workspace/evidence/run-openroad.sh 2>&1 | tee evidence/openroad_flow.log
+
+      - name: Collect physical-flow evidence
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          WORK=/tmp/orfs-work
+          mkdir -p evidence/results evidence/reports evidence/logs
+          if [ -d "$WORK/flow/results/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/results/sky130hd/brain_bitcoin_nonce_search/." evidence/results/
+          fi
+          if [ -d "$WORK/flow/reports/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/reports/sky130hd/brain_bitcoin_nonce_search/." evidence/reports/
+          fi
+          if [ -d "$WORK/flow/logs/sky130hd/brain_bitcoin_nonce_search" ]; then
+            cp -a "$WORK/flow/logs/sky130hd/brain_bitcoin_nonce_search/." evidence/logs/
+          fi
+          if [ -s evidence/openroad_flow.log ]; then
+            if grep -Eqi 'flow complete|finished.*flow' evidence/openroad_flow.log; then
+              echo 'flow_log_completion_marker=present' >> evidence/physical_flow_manifest.txt
+            else
+              echo 'flow_log_completion_marker=not_detected' >> evidence/physical_flow_manifest.txt
+            fi
+          else
+            echo 'flow_log=missing' >> evidence/physical_flow_manifest.txt
+          fi
+          if find evidence/results -type f -iname '*.gds' -size +0c | grep -q .; then
+            echo 'gds_output=present_candidate_requires_review' >> evidence/physical_flow_manifest.txt
+          else
+            echo 'gds_output=not_produced' >> evidence/physical_flow_manifest.txt
+          fi
+          find evidence -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 -r sha256sum > evidence/SHA256SUMS
+
+      - name: Upload physical-flow evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-bitcoin-openroad-physical-flow
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
