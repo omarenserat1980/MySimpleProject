@@ -24,7 +24,7 @@ SAFE_ERROR_CODES = {
     "ACTIONS_WORKFLOWS_INVALID_RESPONSE",
     "ACTIONS_WORKFLOWS_PAGINATION_LIMIT_REACHED",
     "ACTIONS_RUNS_INVALID_RESPONSE", "ACTIONS_RUNS_TOTAL_COUNT_MISSING",
-    "ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED", "ACTIONS_RUN_TIMESTAMP_MISSING",
+    "ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED", "ACTIONS_WORKFLOW_IDS_REQUIRED", "ACTIONS_WORKFLOW_ID_INVALID", "ACTIONS_RUN_TIMESTAMP_MISSING",
     "ACTIONS_RUN_TIMESTAMP_INVALID", "ACTIONS_RUN_TIMESTAMP_TIMEZONE_MISSING",
     "ACTIONS_RUNS_PAGINATION_INCOMPLETE", "ACTIONS_RUNS_PAGINATION_LIMIT_REACHED",
 }
@@ -89,7 +89,8 @@ def main() -> int:
         api = GitHubControlPlane(token=token)
         owner, name = repo.split("/", 1)
         workflows = api.actions_workflows_all(owner, name)
-        runs = api.actions_runs_last_24h(owner, name)
+        workflow_ids = [item.get("id") for item in workflows.get("workflows", []) if isinstance(item, dict)]
+        runs = api.actions_runs_last_24h(owner, name, workflow_ids=workflow_ids)
         report = build_report(workflows, runs)
     except Exception as exc:
         report = {
