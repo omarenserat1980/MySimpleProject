@@ -103,3 +103,4 @@ jobs:
           name: brain-continuous-evolution-evidence
           path: .brain/state/
           if-no-files-found: ignore
+          include-hidden-files: true
