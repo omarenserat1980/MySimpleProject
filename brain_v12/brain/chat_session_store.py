@@ -176,6 +176,26 @@ class ChatSessionStore:
             con.commit()
         return memory
 
+    def find_message_by_client_id(self, session_id, client_message_id):
+        """Find a previously accepted client message for idempotent request retries."""
+        if not client_message_id:
+            return None
+        needle = '"client_message_id": "' + str(client_message_id).replace('"', '""') + '"'
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT id,role,content,metadata,created_at FROM chat_session_messages "
+                "WHERE session_id=? AND metadata LIKE ? ORDER BY id LIMIT 1",
+                (session_id, "%" + needle + "%"),
+            ).fetchone()
+        if not row:
+            return None
+        item = dict(row)
+        try:
+            item["metadata"] = json.loads(item["metadata"] or "{}")
+        except Exception:
+            item["metadata"] = {}
+        return item
+
     def sync_events(self, session_id, after=0, limit=100):
         """Return an ordered, replayable change feed for multi-device chat sync."""
         after = max(0, int(after))
