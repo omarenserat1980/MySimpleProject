@@ -100,6 +100,9 @@ jobs:
       - name: Validate self-healing completion evidence contract
         run: |
           python -m pytest -q brain_v12/self_healing/test_supervisor_evidence.py
+      - name: Validate self-healing repair and independent verification cycle
+        run: |
+          python -m pytest -q brain_v12/self_healing/test_supervisor_repair_cycle.py
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
