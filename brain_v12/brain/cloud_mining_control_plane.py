@@ -43,8 +43,8 @@ class CloudMiningControlPlane:
     def register_worker(self, worker: CloudWorker) -> None:
         if not worker.worker_id.strip() or not worker.owner.strip():
             raise ValueError("worker identity and owner are required")
-        if worker.max_temperature_c <= 0:
-            raise ValueError("max_temperature_c must be positive")
+        if not math.isfinite(worker.max_temperature_c) or worker.max_temperature_c <= 0:
+            raise ValueError("max_temperature_c must be a finite positive number")
         if not math.isfinite(worker.max_cpu_percent) or not 0 < worker.max_cpu_percent <= 100:
             raise ValueError("max_cpu_percent must be in (0, 100]")
         self.workers[worker.worker_id] = worker
@@ -64,8 +64,14 @@ class CloudMiningControlPlane:
         self.jobs[job_id] = job
         return job
 
-    def admit(self, job_id: str, *, on_github_actions: bool = False,
-              temperature_c: float | None = None) -> tuple[bool, str]:
+    def admit(
+        self,
+        job_id: str,
+        *,
+        on_github_actions: bool = False,
+        temperature_c: float | None = None,
+        cpu_percent: float | None = None,
+    ) -> tuple[bool, str]:
         job = self.jobs.get(job_id)
         if job is None:
             return False, "unknown_job"
@@ -79,10 +85,21 @@ class CloudMiningControlPlane:
                 return False, "invalid_temperature"
             if temperature_c >= worker.max_temperature_c:
                 return False, "thermal_limit_reached"
+        if cpu_percent is not None:
+            if not math.isfinite(cpu_percent) or not 0 <= cpu_percent <= 100:
+                return False, "invalid_cpu_telemetry"
+            if cpu_percent > worker.max_cpu_percent:
+                return False, "cpu_limit_reached"
         return True, "admitted_for_registered_worker"
 
-    def evidence(self, job_id: str, hashrate: float, accepted: int,
-                 rejected: int, payout_tx_id: str | None = None) -> dict[str, Any]:
+    def evidence(
+        self,
+        job_id: str,
+        hashrate: float,
+        accepted: int,
+        rejected: int,
+        payout_tx_id: str | None = None,
+    ) -> dict[str, Any]:
         """Record reported telemetry without promoting it to verified mining or revenue."""
         if job_id not in self.jobs:
             raise KeyError("unknown_job")
