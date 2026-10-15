@@ -7,6 +7,10 @@ def _planned_job():
     return cp, cp.plan("w1")
 
 
+def _ready_job():
+    return _planned_job()
+
+
 def test_cloud_worker_must_be_enabled_before_job():
     cp = CloudMiningControlPlane()
     cp.register_worker(CloudWorker("w1", "vm", "user-region", "owner"))
@@ -59,10 +63,11 @@ def test_evidence_is_labeled_unverified_and_not_revenue():
     cp, job = _planned_job()
     ev = cp.evidence(job.job_id, 1000, 5, 1)
     assert ev["schema"] == "brain-mining-evidence/v1"
+    assert ev["status"] == "MINING_EVIDENCE_ONLY"
     assert ev["evidence_source"] == "caller_supplied_unverified_telemetry"
     assert ev["financial_state"] == "NOT_VERIFIED"
-    assert ev["status"] == "MINING_EVIDENCE_ONLY"
     assert ev["payout_verified"] is False
+    assert ev["worker_id"] == "w1"
 
 
 def test_transaction_reference_is_not_verified_receipt():
@@ -78,9 +83,15 @@ def test_transaction_reference_is_not_verified_receipt():
 def test_invalid_hashrate_and_share_counts_are_rejected():
     cp, job = _planned_job()
     for args in (
-        (-1, 1, 0), (float("nan"), 1, 0), (float("inf"), 1, 0),
-        (True, 1, 0), ("100", 1, 0), (100, -1, 0), (100, 1, -1),
-        (100, True, 0), (100, 1, False),
+        (-1, 1, 0),
+        (float("nan"), 1, 0),
+        (float("inf"), 1, 0),
+        (True, 1, 0),
+        ("100", 1, 0),
+        (100, -1, 0),
+        (100, 1, -1),
+        (100, True, 0),
+        (100, 1, False),
     ):
         try:
             cp.evidence(job.job_id, *args)
