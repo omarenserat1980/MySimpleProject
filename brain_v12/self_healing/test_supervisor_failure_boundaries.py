@@ -39,6 +39,9 @@ def test_failed_repair_never_claims_success_and_attempts_are_bounded(tmp_path):
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
     state_dir = tmp_path / "state"
     result = subprocess.run(
         [
@@ -86,6 +89,9 @@ def test_successful_target_with_failed_independent_verifier_never_claims_success
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
     state_dir = tmp_path / "state"
     result = subprocess.run(
         [
@@ -128,6 +134,9 @@ def test_successful_target_without_independent_verifier_never_claims_success(tmp
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
     state_dir = tmp_path / "state"
     result = subprocess.run(
         [
