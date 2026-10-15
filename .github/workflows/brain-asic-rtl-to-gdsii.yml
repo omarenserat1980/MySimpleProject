@@ -1,0 +1,189 @@
+name: Brain ASIC RTL-to-GDSII Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-rtl-to-gdsii.yml"
+  push:
+    branches:
+      - "feature/asic-gdsii-evidence-gate"
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-rtl-to-gdsii.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-asic-gdsii-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rtl-to-gdsii:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PDK_ROOT: ${{ github.workspace }}/.pdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install OpenLane 2 CLI and Volare
+        run: |
+          python -m pip install --disable-pip-version-check --upgrade openlane volare
+          openlane --version
+          volare --version
+
+      - name: Install and verify the SkyWater sky130A PDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PDK_ROOT"
+          # Do not assume tool_metadata.yml exists in the published OpenLane source tag.
+          # Discover an available public Sky130 build explicitly, then pin that hash
+          # for this run so Volare does not depend on repository-local metadata.
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          result = subprocess.run(
+              ["volare", "ls-remote", "--pdk", "sky130"],
+              check=True, text=True, capture_output=True
+          )
+          versions = re.findall(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", result.stdout)
+          if not versions:
+              print(result.stdout)
+              print(result.stderr, file=sys.stderr)
+              raise SystemExit("No downloadable Sky130 PDK revision was listed by Volare")
+          revision = versions[0]
+          print(f"Selected Sky130 open_pdks revision: {revision}")
+          subprocess.run(
+              ["volare", "enable", "--pdk-root", __import__("os").environ["PDK_ROOT"],
+               "--pdk", "sky130", revision],
+              check=True
+          )
+          with open("sky130-pdk-revision.txt", "w", encoding="utf-8") as handle:
+              handle.write(revision + "\\n")
+          PY
+
+          # Verify the actual open_pdks layout: standard-cell timing libraries
+          # live under libs.ref, while OpenLane platform files live under libs.tech.
+          test -d "$PDK_ROOT/sky130A"
+          OPENLANE_CONFIG="$(find "$PDK_ROOT/sky130A/libs.tech/openlane" -type f -name config.tcl -print -quit)"
+          SKY130_LIB="$(find "$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lib" -maxdepth 1 -type f -name '*tt_025C_1v80.lib' -print -quit)"
+          test -n "$OPENLANE_CONFIG"
+          test -s "$OPENLANE_CONFIG"
+          test -n "$SKY130_LIB"
+          test -s "$SKY130_LIB"
+          printf 'SKY130A_PDK_READY=TRUE\nOPENLANE_CONFIG=%s\nSKY130_TIMING_LIB=%s\n' "$OPENLANE_CONFIG" "$SKY130_LIB"
+
+      - name: Run OpenLane 2 Classic RTL-to-GDSII flow
+        env:
+          PDK_ROOT: ${{ github.workspace }}/.pdk
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic-gdsii
+          printf 'commit=%s\n' "$GITHUB_SHA" | tee artifacts/asic-gdsii/build-context.txt
+          printf 'pdk_root=%s\n' "$PDK_ROOT" | tee -a artifacts/asic-gdsii/build-context.txt
+          # OpenLane's Docker wrapper requests a TTY; provide a pseudo-TTY on hosted CI.
+          command -v script
+          script -q -e -c "openlane --dockerized --pdk-root \"$PDK_ROOT\" --run-tag \"brain-asic-$GITHUB_SHA\" brain_v12/asic/openlane/config.json" /dev/null 2>&1 | tee artifacts/asic-gdsii/openlane.log
+
+      - name: Validate GDSII output and create evidence manifest
+        if: always()
+        env:
+          TESTED_COMMIT: ${{ github.sha }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          python - <<'PY'
+          import datetime, hashlib, json, os, pathlib, shutil, sys
+          root = pathlib.Path(".")
+          artifact_root = pathlib.Path("artifacts/asic-gdsii")
+          artifact_root.mkdir(parents=True, exist_ok=True)
+          candidates = []
+          for p in root.glob("**/*.gds"):
+              if ".git" in p.parts or "site-packages" in p.parts:
+                  continue
+              try:
+                  size = p.stat().st_size
+              except OSError:
+                  continue
+              if size > 0:
+                  candidates.append(p)
+          gds_records = []
+          layout_dir = artifact_root / "layouts"
+          layout_dir.mkdir(parents=True, exist_ok=True)
+          for index, p in enumerate(sorted(set(candidates)), start=1):
+              digest = hashlib.sha256(p.read_bytes()).hexdigest()
+              retained = layout_dir / f"{index:02d}-{p.name}"
+              shutil.copy2(p, retained)
+              gds_records.append({
+                  "path": str(p),
+                  "artifact_path": str(retained),
+                  "size_bytes": p.stat().st_size,
+                  "sha256": digest,
+              })
+          logs = sorted(str(p) for p in root.glob("**/openlane.log") if ".git" not in p.parts)
+          reports = sorted(str(p) for pattern in ("**/*sta*.rpt", "**/*drc*.rpt", "**/*lvs*.rpt", "**/*synthesis*.json", "**/*metrics*.json") for p in root.glob(pattern) if ".git" not in p.parts)
+          report_dir = artifact_root / "reports"
+          report_dir.mkdir(parents=True, exist_ok=True)
+          retained_reports = []
+          for index, report_path in enumerate(reports, start=1):
+              src = pathlib.Path(report_path)
+              dest = report_dir / f"{index:02d}-{src.name}"
+              try:
+                  shutil.copy2(src, dest)
+                  retained_reports.append(str(dest))
+              except OSError:
+                  pass
+          errors = []
+          if os.environ["JOB_STATUS"] != "success":
+              errors.append("OpenLane job status is " + os.environ["JOB_STATUS"])
+          if not gds_records:
+              errors.append("No non-empty GDSII file was found")
+          if not logs:
+              errors.append("OpenLane log was not found")
+          manifest = {
+              "schema_version": "1.0",
+              "commit_sha": os.environ["TESTED_COMMIT"],
+              "job_status": os.environ["JOB_STATUS"],
+              "recorded_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "pdk": "sky130A",
+              "flow": "OpenLane 2 Classic RTL-to-GDSII",
+              "gdsii_outputs": gds_records,
+              "report_paths": reports,
+              "retained_report_paths": retained_reports,
+              "log_paths": logs,
+              "passed": not errors,
+              "errors": errors,
+              "claim_boundary": "A non-empty GDSII output and flow logs are physical-design artifacts only. They do not prove tapeout acceptance, wafer fabrication, packaged silicon, or physical chip operation."
+          }
+          (artifact_root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({k: manifest[k] for k in ("commit_sha", "job_status", "gdsii_outputs", "passed", "errors")}, indent=2))
+          if errors:
+              sys.exit(1)
+          PY
+
+      - name: Upload RTL-to-GDSII evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-asic-rtl-to-gdsii-evidence
+          path: |
+            artifacts/asic-gdsii/
+            **/*.gds
+            **/*sta*.rpt
+            **/*drc*.rpt
+            **/*lvs*.rpt
+            runs/
+          if-no-files-found: warn
+          retention-days: 30
