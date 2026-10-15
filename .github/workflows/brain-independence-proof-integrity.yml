@@ -1,6 +1,7 @@
 name: Brain Independence Proof Integrity
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - brain-independence-hash-integrity-fix
@@ -49,7 +50,10 @@ jobs:
           path = Path("brain6_artifacts/independence_gate/independence_proof.json")
           report = json.loads(path.read_text(encoding="utf-8"))
           assert report["report_sha256"] == compute_report_sha256(report), "proof digest mismatch"
+          contract = report.get("independence_contract", {})
+          assert contract.get("report_sha256") == report["report_sha256"], "embedded contract digest mismatch"
           result = IndependenceContract(path).evaluate()
           assert result["allowed"] is True, result
+          assert report["status"] == "PROVEN_WITHIN_TEST_SCOPE", report["status"]
           print(json.dumps({"status": report["status"], "contract": result}, indent=2))
           PY
