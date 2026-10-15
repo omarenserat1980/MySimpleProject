@@ -79,3 +79,20 @@ root-pin set and does not by itself establish device identity. The SQLite replay
 local verifier-side primitive; it is not a distributed replay service and does
 not establish device identity. Do not treat the helper alone
 as completed independent identity verification.
+
+## Manual Android certificate-chain capture
+
+The Android Executor exposes an explicit **CREATE & EXPORT ATTESTATION CHAIN**
+action. Before using it, obtain the challenge from an independent enrollment
+authority and verify its origin/signature out of band. Enter the challenge bytes
+as Base64 (at least 32 bytes). The app does not verify the authority's signature.
+The user chooses the output file before a new Android Keystore key is created;
+existing key aliases are not overwritten. The JSON contains the public key,
+certificate chain, key fingerprint, and challenge hash, but not the private key
+or raw challenge.
+
+This export is local, unverified evidence only. It does not establish that the
+chain terminates in an approved Android root, does not check certificate
+revocation, and does not verify device identity. Do not upload it or mark the
+node trusted/active until an independently operated verifier checks the chain,
+policy, revocation status, and enrollment binding. Mining remains disabled.
