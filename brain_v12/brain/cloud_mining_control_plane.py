@@ -1,8 +1,7 @@
 """Cloud control plane for Brain's user-owned mining workers.
 
 The cloud coordinates workers; it is not itself a GitHub Actions miner.
-Workers must be explicitly registered and owned by the user. Telemetry is
-validated as untrusted input and never constitutes proof of a payout.
+Worker telemetry and payout references are untrusted until independently verified.
 """
 from __future__ import annotations
 
@@ -43,8 +42,8 @@ class CloudMiningControlPlane:
     def register_worker(self, worker: CloudWorker) -> None:
         if not worker.worker_id.strip() or not worker.owner.strip():
             raise ValueError("worker identity and owner are required")
-        if not 0 < worker.max_temperature_c <= 120:
-            raise ValueError("max_temperature_c must be in (0, 120]")
+        if worker.max_temperature_c <= 0:
+            raise ValueError("max_temperature_c must be positive")
         if not 0 < worker.max_cpu_percent <= 100:
             raise ValueError("max_cpu_percent must be in (0, 100]")
         self.workers[worker.worker_id] = worker
@@ -78,6 +77,8 @@ class CloudMiningControlPlane:
         if on_github_actions:
             return False, "github_actions_mining_forbidden"
         worker = self.workers[job.worker_id]
+        if not worker.enabled:
+            return False, "worker_disabled"
         if temperature_c is not None:
             if not math.isfinite(temperature_c):
                 return False, "invalid_temperature_telemetry"
@@ -100,8 +101,10 @@ class CloudMiningControlPlane:
     ) -> dict[str, Any]:
         if job_id not in self.jobs:
             raise KeyError("unknown_job")
+        if isinstance(hashrate, bool) or not isinstance(hashrate, (int, float)):
+            raise ValueError("hashrate must be a finite non-negative number")
         if not math.isfinite(hashrate) or hashrate < 0:
-            raise ValueError("hashrate must be finite and non-negative")
+            raise ValueError("hashrate must be a finite non-negative number")
         if isinstance(accepted, bool) or not isinstance(accepted, int) or accepted < 0:
             raise ValueError("accepted shares must be a non-negative integer")
         if isinstance(rejected, bool) or not isinstance(rejected, int) or rejected < 0:
@@ -110,14 +113,16 @@ class CloudMiningControlPlane:
         if payout_tx_id is not None and not tx_id:
             raise ValueError("payout transaction reference must not be blank")
         return {
-            "schema": "brain-mining-worker-evidence/v1",
+            "schema": "brain-mining-evidence/v1",
             "job_id": job_id,
+            "worker_id": self.jobs[job_id].worker_id,
             "hashrate": hashrate,
             "accepted_shares": accepted,
             "rejected_shares": rejected,
             "payout_tx_id": tx_id,
+            "evidence_source": "caller_supplied_unverified_telemetry",
+            "financial_state": "NOT_VERIFIED",
             "status": "PAYOUT_TX_REFERENCE_PRESENT" if tx_id else "MINING_EVIDENCE_ONLY",
-            "payout_verified": False,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -128,7 +133,7 @@ class CloudMiningControlPlane:
             "jobs": [asdict(j) for j in self.jobs.values()],
             "execution": "external_registered_worker_only",
             "github_actions_mining": "BLOCKED",
-            "payout_truth_boundary": "transaction_reference_is_not_chain_verification",
+            "revenue_realization": "requires_independent_blockchain_proof",
         }
 
 
