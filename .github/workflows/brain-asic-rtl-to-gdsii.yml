@@ -109,22 +109,17 @@ jobs:
           root = pathlib.Path(".")
           artifact_root = pathlib.Path("artifacts/asic-gdsii")
           artifact_root.mkdir(parents=True, exist_ok=True)
-          candidates = []
-          for p in root.glob("**/*.gds"):
-              if ".git" in p.parts or "site-packages" in p.parts:
-                  continue
-              try:
-                  size = p.stat().st_size
-              except OSError:
-                  continue
-              if size > 0:
-                  candidates.append(p)
+          # Only the design's final GDS is evidence. Never package PDK reference
+          # layouts or intermediate stream-outs as if they were this design's output.
+          final_gds = sorted(root.glob("brain_v12/asic/openlane/runs/*/final/gds/brain_asic_core.gds"))
           gds_records = []
           layout_dir = artifact_root / "layouts"
           layout_dir.mkdir(parents=True, exist_ok=True)
-          for index, p in enumerate(sorted(set(candidates)), start=1):
+          for p in final_gds:
+              if not p.is_file() or p.stat().st_size <= 0:
+                  continue
               digest = hashlib.sha256(p.read_bytes()).hexdigest()
-              retained = layout_dir / f"{index:02d}-{p.name}"
+              retained = layout_dir / p.name
               shutil.copy2(p, retained)
               gds_records.append({
                   "path": str(p),
@@ -132,8 +127,10 @@ jobs:
                   "size_bytes": p.stat().st_size,
                   "sha256": digest,
               })
-          logs = sorted(str(p) for p in root.glob("**/openlane.log") if ".git" not in p.parts)
-          reports = sorted(str(p) for pattern in ("**/*sta*.rpt", "**/*drc*.rpt", "**/*lvs*.rpt", "**/*synthesis*.json", "**/*metrics*.json") for p in root.glob(pattern) if ".git" not in p.parts)
+          run_roots = sorted(root.glob("brain_v12/asic/openlane/runs/*"))
+          logs = [str(artifact_root / "openlane.log")] if (artifact_root / "openlane.log").is_file() else []
+          report_patterns = ("*sta*.rpt", "*drc*.rpt", "*lvs*.rpt", "*synthesis*.json", "*metrics*.json")
+          reports = sorted(str(p) for run_root in run_roots for pattern in report_patterns for p in run_root.glob("**/" + pattern) if p.is_file())
           report_dir = artifact_root / "reports"
           report_dir.mkdir(parents=True, exist_ok=True)
           retained_reports = []
@@ -148,8 +145,8 @@ jobs:
           errors = []
           if os.environ["JOB_STATUS"] != "success":
               errors.append("OpenLane job status is " + os.environ["JOB_STATUS"])
-          if not gds_records:
-              errors.append("No non-empty GDSII file was found")
+          if len(gds_records) != 1:
+              errors.append(f"Expected exactly one final brain_asic_core.gds; found {len(gds_records)}")
           if not logs:
               errors.append("OpenLane log was not found")
           manifest = {
@@ -180,10 +177,5 @@ jobs:
           name: brain-asic-rtl-to-gdsii-evidence
           path: |
             artifacts/asic-gdsii/
-            **/*.gds
-            **/*sta*.rpt
-            **/*drc*.rpt
-            **/*lvs*.rpt
-            runs/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
