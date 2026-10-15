@@ -76,6 +76,7 @@ def test_supervisor_rejects_success_when_verification_fails(tmp_path):
     assert "BRAIN_HEALING_SUCCESS" not in result.stdout
 
 
+
 def test_supervisor_rejects_success_when_verification_is_missing(tmp_path):
     result = _run_supervisor(tmp_path / "state", None)
 

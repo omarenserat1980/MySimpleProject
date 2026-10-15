@@ -1,0 +1,170 @@
+{
+  "schema": "electronic-brain.real-runtime-migration.v1",
+  "policy": {
+    "default_mode": "fail-closed",
+    "hardware_reservation_required": false,
+    "paid_resources_allowed_by_default": false,
+    "main_branch_direct_writes_allowed": false,
+    "simulation_counts_as_real": false,
+    "runtime_evidence_required_for_live_status": true
+  },
+  "components": [
+    {
+      "id": "brain-v12-core",
+      "name": "Brain V12 API and core",
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "code_paths": [
+        "brain_v12/app.py"
+      ],
+      "real_acceptance": [
+        "process_started",
+        "health_endpoint_passed",
+        "authenticated_api_smoke_passed",
+        "restart_recovery_passed"
+      ],
+      "note": "Source code presence is not proof that a service is running."
+    },
+    {
+      "id": "internal-task-runtime",
+      "name": "Brain Internal Task Runtime",
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "code_paths": [
+        "brain_v12/brain/internal_task_runtime.py",
+        "brain_v12/brain/execution_gateway.py"
+      ],
+      "real_acceptance": [
+        "internal_runner_preflight_passed",
+        "task_executed",
+        "result_verified",
+        "evidence_persisted",
+        "restart_recovery_passed"
+      ],
+      "note": "A configured runner is not necessarily online or capable of executing the requested task."
+    },
+    {
+      "id": "virtual-software-applications",
+      "name": "Virtual browser, office, database and developer application profiles",
+      "status": "SIMULATOR_ONLY",
+      "code_paths": [
+        "brain_v12/virtual_software_runtime"
+      ],
+      "real_acceptance": [
+        "explicit_native_adapter_implemented",
+        "isolated_execution_passed",
+        "artifact_verified",
+        "capability_policy_passed"
+      ],
+      "note": "Workflow profiles do not run proprietary native applications or arbitrary commands."
+    },
+    {
+      "id": "cinematic-renderer",
+      "name": "V12 cinematic renderer",
+      "status": "INTEGRATION_NOT_IMPLEMENTED",
+      "code_paths": [
+        "cloud/film_reliability.py",
+        "brain_v12/media_engine.py"
+      ],
+      "real_acceptance": [
+        "real_mp4_created",
+        "ffprobe_passed",
+        "audio_video_qc_passed",
+        "master_qc_passed",
+        "artifact_digest_recorded"
+      ],
+      "note": "A pipeline plan or simulator output is not a rendered film."
+    },
+    {
+      "id": "windows-server-2025",
+      "name": "Windows Server 2025 guest",
+      "status": "SIMULATOR_ONLY",
+      "code_paths": [
+        "brain_v12/brain/azure_vm_simulator.py",
+        "brain_v12/brain/windows_runtime_contract.py"
+      ],
+      "real_acceptance": [
+        "authorized_executor_available",
+        "guest_installed_to_virtual_disk",
+        "guest_origin_boot_evidence",
+        "authenticated_guest_channel",
+        "completion_gate_passed"
+      ],
+      "note": "Real boot remains unverified; Azure simulation does not create resources."
+    },
+    {
+      "id": "azure-cloud",
+      "name": "Azure provisioning",
+      "status": "EXTERNAL_AUTH_AND_COST_GATE_REQUIRED",
+      "code_paths": [
+        "brain_v12/azure_emulator/real_azure_adapter.py"
+      ],
+      "real_acceptance": [
+        "free_entitlement_verified",
+        "explicit_resource_plan_approved",
+        "provider_api_success",
+        "resource_identity_verified",
+        "teardown_evidence_recorded"
+      ],
+      "note": "Do not provision or incur cost automatically. No paid resource may be created without explicit approval."
+    },
+    {
+      "id": "github-ci",
+      "name": "GitHub source control and CI",
+      "status": "IMPLEMENTED_UNVERIFIED",
+      "code_paths": [
+        ".github/workflows"
+      ],
+      "real_acceptance": [
+        "workflow_run_observed",
+        "required_jobs_passed",
+        "commit_sha_matched",
+        "evidence_artifact_inspected"
+      ],
+      "note": "A queued or unrelated green workflow is not evidence for the target change."
+    },
+    {
+      "id": "email-transport",
+      "name": "Outbound email transport",
+      "status": "EXTERNAL_AUTH_REQUIRED",
+      "code_paths": [
+        "docs/BRAIN_EMAIL_GATEWAY.md"
+      ],
+      "real_acceptance": [
+        "provider_configured_outside_source",
+        "authorized_test_delivery",
+        "provider_receipt_verified"
+      ],
+      "note": "A provider-neutral contract or draft is not a delivered email."
+    },
+    {
+      "id": "payments",
+      "name": "PayPal Sandbox and PayTabs Sandbox",
+      "status": "EXTERNAL_AUTH_AND_RECEIPT_REQUIRED",
+      "code_paths": [
+        "docs"
+      ],
+      "real_acceptance": [
+        "sandbox_credentials_configured",
+        "provider_transaction_created",
+        "provider_callback_verified",
+        "ledger_reconciled"
+      ],
+      "note": "Sandbox evidence must not be represented as production income."
+    },
+    {
+      "id": "bitcoin-mining",
+      "name": "Bitcoin mining and payout",
+      "status": "NOT_PROVEN",
+      "code_paths": [
+        "docs/BRAIN_ASIC_HOSTING_ZERO_BUDGET.md"
+      ],
+      "real_acceptance": [
+        "real_worker_or_pool_connection",
+        "fresh_share_or_job_evidence",
+        "pool_payout_record",
+        "blockchain_transaction_verified",
+        "ledger_reconciled"
+      ],
+      "note": "Hashrate estimates, simulator output, or a registered remote provider are not mining or revenue."
+    }
+  ]
+}

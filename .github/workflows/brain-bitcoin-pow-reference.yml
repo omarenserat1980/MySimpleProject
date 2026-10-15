@@ -29,3 +29,52 @@ jobs:
         run: python -m unittest -v brain_v12.tests.test_bitcoin_pow_reference
       - name: Compile reference and tests
         run: python -m py_compile brain_v12/brain/bitcoin_pow_reference.py brain_v12/tests/test_bitcoin_pow_reference.py
+      - name: Create evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p evidence/bitcoin-pow-reference
+          python --version > evidence/bitcoin-pow-reference/python-version.txt
+          git rev-parse HEAD > evidence/bitcoin-pow-reference/commit-sha.txt
+          sha256sum \
+            brain_v12/brain/bitcoin_pow_reference.py \
+            brain_v12/tests/test_bitcoin_pow_reference.py \
+            .github/workflows/brain-bitcoin-pow-reference.yml \
+            > evidence/bitcoin-pow-reference/SHA256SUMS.txt
+          python - <<'PY'
+          import json, os, pathlib, subprocess, datetime
+          root = pathlib.Path("evidence/bitcoin-pow-reference")
+          result = subprocess.run(
+              ["python", "-m", "unittest", "-q", "brain_v12.tests.test_bitcoin_pow_reference"],
+              text=True, capture_output=True
+          )
+          manifest = {
+              "gate": "BRAIN_BITCOIN_POW_REFERENCE",
+              "commit_sha": os.environ.get("GITHUB_SHA"),
+              "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+              "workflow_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+              "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "python_version": subprocess.run(["python", "--version"], text=True, capture_output=True).stdout.strip()
+                  or subprocess.run(["python", "--version"], text=True, capture_output=True).stderr.strip(),
+              "test_exit_code": result.returncode,
+              "test_status": "PASS" if result.returncode == 0 else "FAIL",
+              "stdout": result.stdout,
+              "stderr": result.stderr,
+              "scope": "LOCAL_REFERENCE_TESTS_ONLY",
+              "live_mining": False,
+              "pool_acceptance": False,
+              "fabricated_asic": False,
+              "revenue_verified": False
+          }
+          (root / "evidence-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          if result.returncode:
+              raise SystemExit(result.returncode)
+          PY
+      - name: Upload reference evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-bitcoin-pow-reference-evidence
+          path: evidence/bitcoin-pow-reference/
+          if-no-files-found: error
+          retention-days: 30

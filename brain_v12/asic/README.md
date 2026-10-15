@@ -1,43 +1,50 @@
-# Electronic Brain V12 — Advanced ASIC Complex (prototype)
+# Electronic Brain V12 — ASIC and Digital Lab
 
-## Current scope
+## Brain Digital ASIC Lab
 
-This directory starts a hardware-description-language (RTL) prototype alongside
-the existing Python software-only logic simulator. The RTL file is a synthesizable
-parameterized ALU/datapath register candidate; it is not proof of synthesis,
-physical implementation, FPGA availability, or manufactured silicon.
+Run a real RTL simulator and logic synthesis locally or in a free GitHub Actions
+runner. The tool does not fabricate hardware and never reports a pass when a
+required EDA tool is absent.
 
-## Artifacts
+```bash
+python3 brain_v12/asic/digital_lab.py --output-dir artifacts/asic-digital-lab
+```
 
-- `rtl/brain_asic_core.sv`: parameterized arithmetic/logic datapath with a
-  registered result and zero flag.
-- `hardware/BOM.csv`: preliminary hardware bill-of-materials and evidence states.
-- `hardware/ASSEMBLY_PLAN.md`: staged physical-prototype plan and explicit gates.
+The lab runs:
 
-## Toolchain gate
+1. Icarus Verilog against `rtl/brain_asic_core.sv` and
+   `rtl/tb_brain_asic_core.sv`, requiring the testbench marker
+   `ALL_RTL_TESTS_PASSED`.
+2. Yosys hierarchy/process/optimization/check/synthesis/check/stat passes.
+3. JSON netlist generation and SHA-256 evidence.
+4. A manifest with separate simulation and synthesis states, logs, source hashes,
+   and explicit limitations.
 
-Before claiming RTL simulation or synthesis, check whether an appropriate tool
-(e.g. Verilator or Icarus Verilog for simulation; Yosys for synthesis) is installed
-and record its actual version and command result. Tool absence means
-`NOT_ASSESSED`/blocked, not pass. Do not install software, purchase hardware,
-or provision a paid service without explicit approval.
+The GitHub Actions workflow is `.github/workflows/brain-digital-asic-lab.yml`.
+Open **Actions → Brain Digital ASIC Lab** and inspect the run and downloaded
+`brain-digital-asic-lab-evidence` artifact.
 
 ## Evidence states
 
-- `NOT_STARTED`: not attempted.
-- `IN_PROGRESS`: work in progress.
-- `SIMULATED_PASS`: actual simulator run passed.
-- `VERIFIED_BUILD`: defined build/synthesis checks passed with retained evidence.
-- `PHYSICAL_HARDWARE_VERIFIED`: physical device was actually tested and evidence reviewed.
+- `DIGITAL_ASIC_LAB_PASS`: real RTL testbench passed and Yosys produced a checked
+  synthesized netlist in that run.
+- `BLOCKED`: a required tool or input was unavailable.
+- `FAIL`: a tool command, test, or evidence check failed.
 
-Design intent and static source inspection do not qualify as simulation or synthesis.
-Never report `PHYSICAL_HARDWARE_VERIFIED` based on the software simulator.
+This is a digital replacement for prototyping and exercising the RTL logic; it is
+not a physical ASIC, FPGA execution, foundry signoff, or silicon fabrication.
 
-## Existing simulator
 
-The existing API remains the software-only model:
-- `GET /api/asic-sim/status`
-- `POST /api/asic-sim/run`
+## Experimental signed MAC accelerator
 
-Keep software simulation, RTL simulation, synthesis, FPGA execution, and silicon
-validation as separate evidence levels.
+The lab also contains an independent signed multiply-accumulate (MAC) RTL prototype:
+
+- RTL: `rtl/brain_mac_accelerator.sv`
+- Testbench: `rtl/tb_brain_mac_accelerator.sv`
+- Runner: `python3 brain_v12/asic/mac_lab.py`
+
+The testbench checks positive and negative products, accumulation, enable/hold behavior,
+clear priority, and asynchronous reset. The runner requires a real Icarus Verilog pass
+marker and a non-empty Yosys synthesized netlist before reporting
+`MAC_DIGITAL_LAB_PASS`. This prototype is not yet integrated into the main ALU and
+does not claim measured PPA, formal proof, or fabricated silicon.

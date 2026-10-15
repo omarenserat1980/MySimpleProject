@@ -279,9 +279,27 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   if (Number(order.amount) <= 0) return json({ ok: false, error: "INVALID_ORDER_AMOUNT" }, 409, requestOrigin, allowedOrigin);
 
   const existing = await env.BRAIN_DB.prepare(
-    "SELECT tran_ref, state FROM payments WHERE order_id = ? AND provider = 'paytabs' ORDER BY created_at DESC LIMIT 1"
+    "SELECT tran_ref, state, raw_evidence FROM payments WHERE order_id = ? AND provider = 'paytabs' ORDER BY created_at DESC LIMIT 1"
   ).bind(orderId).first();
   if (existing && existing.state === "PAYMENT_VERIFIED") return json({ ok: false, error: "PAYMENT_ALREADY_VERIFIED" }, 409, requestOrigin, allowedOrigin);
+  // Do not create a second provider transaction for an order with a pending payment.
+  // Reuse the persisted checkout URL on retries; fail closed if the evidence is incomplete.
+  if (existing && existing.state === "PAYMENT_PENDING") {
+    let priorEvidence = {};
+    try { priorEvidence = JSON.parse(String(existing.raw_evidence || "{}")); } catch {}
+    const priorUrl = String(priorEvidence.redirect_url || "");
+    if (!priorUrl || !/^https:\/\//i.test(priorUrl)) {
+      return json({ ok: false, error: "PAYMENT_REQUEST_ALREADY_PENDING" }, 409, requestOrigin, allowedOrigin);
+    }
+    return json({
+      ok: true,
+      state: "PAYMENT_PENDING",
+      order_id: order.order_id,
+      tran_ref: existing.tran_ref,
+      redirect_url: priorUrl,
+      idempotent: true,
+    }, 200, requestOrigin, allowedOrigin);
+  }
 
   const callback = url.origin + "/api/payments/paytabs/callback";
   const returnUrl = url.origin + "/api/payments/paytabs/return";
@@ -310,7 +328,7 @@ async function createPayTabsPayment(request, env, url, requestOrigin, allowedOri
   }
 
   await env.BRAIN_DB.prepare(
-    "INSERT OR REPLACE INTO payments (tran_ref, order_id, amount, currency, provider, state, raw_evidence) VALUES (?, ?, ?, ?, 'paytabs', 'PAYMENT_PENDING', ?)"
+    "INSERT INTO payments (tran_ref, order_id, amount, currency, provider, state, raw_evidence) VALUES (?, ?, ?, ?, 'paytabs', 'PAYMENT_PENDING', ?)"
   ).bind(String(result.tran_ref), order.order_id, Number(order.amount), order.currency, JSON.stringify({
     type: "PAYMENT_REQUEST",
     tran_ref: result.tran_ref,
@@ -411,11 +429,17 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ?").bind(orderId),
     env.BRAIN_DB.prepare("UPDATE cinema_entitlements SET state = 'GRANTED', granted_at = CURRENT_TIMESTAMP WHERE order_id = ?").bind(orderId),
   ]);
-  // Payment verification alone is not revenue realization: delivery must be verified separately.
+  // Sandbox evidence must never become realized revenue, even after a delivery test.
+  // PAYTABS_MODE defaults to test (fail-safe); production must explicitly set it to "live".
+  const paymentMode = String(env.PAYTABS_MODE || "test").trim().toLowerCase();
+  const revenueEnvironment = paymentMode === "live" ? "live" : "test";
+  const pendingRevenueState = revenueEnvironment === "live"
+    ? "PAYMENT_VERIFIED_PENDING_DELIVERY"
+    : "SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY";
   const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
-    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'PAYMENT_VERIFIED_PENDING_DELIVERY', ?)"
-  ).bind(revenueId, orderId, tranRef, amount, currency, evidence).run();
+    "INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).bind(revenueId, orderId, tranRef, amount, currency, pendingRevenueState, evidence, revenueEnvironment).run();
   const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)"
@@ -452,7 +476,7 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   ).bind(delivery.order_id).first();
   if (payment) {
     await env.BRAIN_DB.prepare(
-      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND amount = ? AND currency = ?"
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
     ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
   }
   await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });

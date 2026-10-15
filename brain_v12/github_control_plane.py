@@ -66,7 +66,82 @@ class GitHubControlPlane:
     def write_contents(self, owner, repo, path, body, approved=False): return self.request("PUT",f"/repos/{owner}/{repo}/contents/{path}",capability="code.write",approved=approved,body=body)
     def issues(self, owner, repo, number=None): return self.request("GET",f"/repos/{owner}/{repo}/issues"+(f"/{number}" if number is not None else ""),capability="issues.read")
     def pull_request(self, owner, repo, number): return self.request("GET",f"/repos/{owner}/{repo}/pulls/{number}",capability="pulls.read")
-    def actions_runs(self, owner, repo, page=1, per_page=30): return self.request("GET",f"/repos/{owner}/{repo}/actions/runs",capability="actions.read",params={"page":page,"per_page":per_page})
+    def actions_runs(self, owner, repo, page=1, per_page=100):
+        """Fetch one page of workflow runs; GitHub permits at most 100 per page."""
+        if not 1 <= per_page <= 100:
+            raise ValueError("per_page must be between 1 and 100")
+        return self.request("GET", f"/repos/{owner}/{repo}/actions/runs",
+                            capability="actions.read",
+                            params={"page": page, "per_page": per_page})
+
+    def actions_workflows_all(self, owner, repo, per_page=100, max_pages=1000):
+        """Enumerate every workflow definition, failing closed if pagination is incomplete."""
+        if not 1 <= per_page <= 100:
+            raise ValueError("per_page must be between 1 and 100")
+        items = []
+        for page in range(1, max_pages + 1):
+            payload = self.request("GET", f"/repos/{owner}/{repo}/actions/workflows",
+                                   capability="actions.read",
+                                   params={"page": page, "per_page": per_page})
+            batch = payload.get("workflows") if isinstance(payload, dict) else None
+            if not isinstance(batch, list):
+                raise GitHubControlError("ACTIONS_WORKFLOWS_INVALID_RESPONSE")
+            items.extend(batch)
+            if len(batch) < per_page:
+                return {"workflows": items, "pages_fetched": page,
+                        "complete": True, "count": len(items)}
+        raise GitHubControlError("ACTIONS_WORKFLOWS_PAGINATION_LIMIT_REACHED")
+
+    def actions_runs_last_24h(self, owner, repo, *, now=None, per_page=100,
+                              max_pages=10):
+        """Fetch all runs created in the last 24h; fail closed at GitHub's 1,000-result cap."""
+        from datetime import datetime, timedelta, timezone
+        if not 1 <= per_page <= 100:
+            raise ValueError("per_page must be between 1 and 100")
+        current = now or datetime.now(timezone.utc)
+        if current.tzinfo is None:
+            raise ValueError("now must be timezone-aware")
+        current = current.astimezone(timezone.utc)
+        cutoff = current - timedelta(hours=24)
+        created = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+        items = []
+        expected_total = None
+        for page in range(1, max_pages + 1):
+            payload = self.request("GET", f"/repos/{owner}/{repo}/actions/runs",
+                                   capability="actions.read",
+                                   params={"page": page, "per_page": per_page,
+                                           "created": ">=" + created})
+            if not isinstance(payload, dict) or not isinstance(payload.get("workflow_runs"), list):
+                raise GitHubControlError("ACTIONS_RUNS_INVALID_RESPONSE")
+            if expected_total is None:
+                expected_total = payload.get("total_count")
+                if not isinstance(expected_total, int) or expected_total < 0:
+                    raise GitHubControlError("ACTIONS_RUNS_TOTAL_COUNT_MISSING")
+                if expected_total > 1000:
+                    raise GitHubControlError("ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED")
+            batch = payload["workflow_runs"]
+            items.extend(batch)
+            if len(items) >= expected_total or len(batch) < per_page:
+                filtered = []
+                for run in items:
+                    stamp = run.get("created_at")
+                    if not isinstance(stamp, str):
+                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_MISSING")
+                    try:
+                        created_at = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                    except ValueError as exc:
+                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_INVALID") from exc
+                    if created_at.tzinfo is None:
+                        raise GitHubControlError("ACTIONS_RUN_TIMESTAMP_TIMEZONE_MISSING")
+                    if cutoff <= created_at.astimezone(timezone.utc) <= current:
+                        filtered.append(run)
+                if len(items) < expected_total:
+                    raise GitHubControlError("ACTIONS_RUNS_PAGINATION_INCOMPLETE")
+                return {"workflow_runs": filtered, "pages_fetched": page,
+                        "count": len(filtered), "api_total_count": expected_total,
+                        "window_start": cutoff.isoformat(), "window_end": current.isoformat(),
+                        "complete": True}
+        raise GitHubControlError("ACTIONS_RUNS_PAGINATION_LIMIT_REACHED")
     def dispatch_workflow(self, owner, repo, workflow_id, ref="main", inputs=None, approved=False):
         """Dispatch a workflow through GitHub REST; mutable action requires explicit approval."""
         body={"ref":ref}

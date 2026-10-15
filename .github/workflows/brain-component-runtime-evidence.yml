@@ -1,0 +1,157 @@
+name: Brain Component Runtime Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/app.py"
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/tests/**"
+      - ".github/workflows/brain-component-runtime-evidence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/app.py"
+      - "brain_v12/runtime_paths.py"
+      - "brain_v12/tests/**"
+      - ".github/workflows/brain-component-runtime-evidence.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-component-runtime-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
+      BRAIN_WORKFORCE_ENABLED: "false"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts/component-runtime-evidence
+
+      - name: Run runtime path regression
+        run: |
+          set -euo pipefail
+          python -m unittest brain_v12.tests.test_runtime_paths -v 2>&1 | tee artifacts/component-runtime-evidence/runtime-path-tests.log
+
+      - name: Start isolated Brain API and collect live health/readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          port=18012
+          log="$PWD/artifacts/component-runtime-evidence/uvicorn.log"
+          health="$PWD/artifacts/component-runtime-evidence/health.json"
+          readiness="$PWD/artifacts/component-runtime-evidence/readiness.json"
+          runtime_home="$root/brain-runtime"
+          cleanup() {
+            if [ -n "${server_pid:-}" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$root"
+          }
+          trap cleanup EXIT
+          BRAIN_RUNTIME_HOME="$runtime_home" PYTHONPATH="$PWD" python -m uvicorn brain_v12.app:app --host 127.0.0.1 --port "$port" --log-level info >"$log" 2>&1 &
+          server_pid=$!
+          health_ok=0
+          for attempt in $(seq 1 45); do
+            if curl --silent --show-error --fail "http://127.0.0.1:$port/health" >"$health"; then
+              health_ok=1
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$log"
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$health_ok" -eq 1 || { cat "$log"; echo "BRAIN_API_HEALTH_TIMEOUT"; exit 1; }
+          python -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); assert d.get("ok") is True and d.get("status") == "healthy", d; print("BRAIN_API_HEALTH=PASS")' "$health"
+          curl --silent --show-error --fail "http://127.0.0.1:$port/api/system/readiness" >"$readiness"
+          python -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); assert d.get("ok") is True and d.get("status") == "READY" and d.get("passed") == d.get("total"), d; print("BRAIN_SYSTEM_READINESS=PASS", d.get("passed"), "/", d.get("total"))' "$readiness"
+          test -d "$runtime_home"
+          printf '%s\n' "BRAIN_API_LIVE_PROBE=PASS" > artifacts/component-runtime-evidence/runtime-probe.txt
+
+      - name: Create evidence manifest with explicit claim boundaries
+        if: always()
+        env:
+          TESTED_COMMIT: ${{ github.sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_ATTEMPT: ${{ github.run_attempt }}
+          REF_NAME: ${{ github.ref }}
+        run: |
+          python - <<'PY'
+          import datetime, json, os, pathlib
+          root = pathlib.Path("artifacts/component-runtime-evidence")
+          health_path = root / "health.json"
+          ready_path = root / "readiness.json"
+          def load(path):
+              try:
+                  return json.loads(path.read_text(encoding="utf-8"))
+              except Exception:
+                  return None
+          health, readiness = load(health_path), load(ready_path)
+          health_ok = bool(health and health.get("ok") is True and health.get("status") == "healthy")
+          readiness_ok = bool(readiness and readiness.get("ok") is True and readiness.get("status") == "READY" and readiness.get("passed") == readiness.get("total"))
+          manifest = {
+              "schema_version": "1.0",
+              "evidence_type": "CI_ephemeral_runtime",
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "commit_sha": os.environ.get("TESTED_COMMIT"),
+              "ref": os.environ.get("REF_NAME"),
+              "workflow_run_id": os.environ.get("WORKFLOW_RUN_ID"),
+              "workflow_attempt": os.environ.get("WORKFLOW_ATTEMPT"),
+              "generated_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "checks": {
+                  "api_health": {"status": "PASS" if health_ok else "FAIL", "evidence": "health.json"},
+                  "system_readiness": {
+                      "status": "PASS" if readiness_ok else "FAIL",
+                      "passed": readiness.get("passed") if readiness else None,
+                      "total": readiness.get("total") if readiness else None,
+                      "evidence": "readiness.json"
+                  },
+                  "runtime_path_regression": {"evidence": "runtime-path-tests.log", "status": "REVIEW_JOB_STEP_RESULT"}
+              },
+              "scope": "A passing result proves this commit's API health/readiness in an ephemeral GitHub-hosted runner only.",
+              "not_proven": [
+                  "persistent-host operation or restart recovery",
+                  "all components independently exercised end-to-end",
+                  "physical ASIC fabrication or silicon delivery",
+                  "real customer payment or revenue settlement"
+              ]
+          }
+          (root / "component_runtime_evidence.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(manifest, indent=2))
+          if not health_ok or not readiness_ok:
+              raise SystemExit("Runtime evidence gate failed closed.")
+          PY
+
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-component-runtime-evidence
+          path: artifacts/component-runtime-evidence/
+          if-no-files-found: error
+          retention-days: 30

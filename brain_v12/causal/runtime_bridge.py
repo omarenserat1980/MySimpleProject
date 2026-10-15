@@ -61,24 +61,35 @@ def build_ledger(events: List[dict]) -> CausalEvidenceLedger:
     return ledger
 
 
-def main() -> int:
-    events = read_events()
+def build_report(events: List[dict], source: str = "") -> dict:
+    """Return an explicit evidence state; an empty stream is not recorded proof."""
     ledger = build_ledger(events)
-    report = {
+    records = ledger.snapshot()
+    status = "RECORDED" if events and records else "NO_RUNTIME_EVIDENCE"
+    return {
         "schema": "brain-causal-evidence/v1",
         "created_at": time.time(),
-        "source": str(EVENTS),
+        "source": source,
         "event_count": len(events),
-        "records": ledger.snapshot(),
+        "record_count": len(records),
+        "status": status,
+        "records": records,
     }
+
+
+def main() -> int:
+    events = read_events()
+    report = build_report(events, str(EVENTS))
     STATE.mkdir(parents=True, exist_ok=True)
     LEDGER.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({
-        "CAUSAL_EVIDENCE": "RECORDED",
-        "events": len(events),
-        "records": len(report["records"]),
+        "CAUSAL_EVIDENCE": report["status"],
+        "events": report["event_count"],
+        "records": report["record_count"],
         "evidence_file": str(LEDGER),
     }, ensure_ascii=False))
+    # Evidence absence is reported explicitly, but does not turn this
+    # collection step into a hard failure for simulation-only CI runs.
     return 0
 
 

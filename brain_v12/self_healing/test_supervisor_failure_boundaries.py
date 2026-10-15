@@ -39,6 +39,9 @@ def test_failed_repair_never_claims_success_and_attempts_are_bounded(tmp_path):
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
     state_dir = tmp_path / "state"
     result = subprocess.run(
         [
@@ -77,7 +80,7 @@ def test_failed_repair_never_claims_success_and_attempts_are_bounded(tmp_path):
 def test_successful_target_with_failed_independent_verifier_never_claims_success(tmp_path):
     target = tmp_path / "target.py"
     verify = tmp_path / "verify.py"
-    target.write_text("print('TARGET_OK')\n", encoding="utf-8")
+    target.write_text("print('TARGET_OK')" + chr(10), encoding="utf-8")
     verify.write_text(
         "print('INDEPENDENT_VERIFIER_FAILED')\nraise SystemExit(8)\n",
         encoding="utf-8",
@@ -86,6 +89,9 @@ def test_successful_target_with_failed_independent_verifier_never_claims_success
     env = os.environ.copy()
     env["BRAIN_CHATGPT_REFLECTION"] = "0"
     env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
     state_dir = tmp_path / "state"
     result = subprocess.run(
         [
@@ -118,3 +124,45 @@ def test_successful_target_with_failed_independent_verifier_never_claims_success
     assert all(attempt.get("exit_code") == 8 for attempt in history["attempts"])
     assert "BRAIN_HEALING_SUCCESS" not in result.stdout
     assert "INDEPENDENT_VERIFIER_FAILED" in result.stdout
+
+
+
+def test_successful_target_without_independent_verifier_never_claims_success(tmp_path):
+    target = tmp_path / "target.py"
+    target.write_text("print('TARGET_OK')" + chr(10), encoding="utf-8")
+
+    env = os.environ.copy()
+    env["BRAIN_CHATGPT_REFLECTION"] = "0"
+    env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    # Keep tests independent of repository/runner-level supervisor defaults.
+    env.pop("BRAIN_VERIFY_COMMAND", None)
+    env.pop("BRAIN_REPAIR_COMMAND", None)
+    state_dir = tmp_path / "state"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "brain_v12.self_healing.supervisor",
+            "--command", _command(target),
+            "--max-attempts", "1",
+            "--backoff", "0",
+            "--max-backoff", "0",
+            "--timeout", "10",
+            "--state", str(state_dir),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=35,
+        check=False,
+    )
+
+    history_path = state_dir / "self_healing_history.json"
+    assert history_path.exists(), result.stdout + result.stderr
+    history = json.loads(history_path.read_text(encoding="utf-8"))
+    assert result.returncode != 0
+    assert history["status"] == "FAILED_AFTER_REPAIR_ATTEMPTS"
+    assert history["attempts"][0]["verified"] is False
+    assert history["attempts"][0]["exit_code"] == 125
+    assert "BRAIN_HEALING_SUCCESS" not in result.stdout

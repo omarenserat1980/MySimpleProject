@@ -1,0 +1,86 @@
+{
+  "_template_notice": "TEMPLATE ONLY. Not runtime evidence. Replace every PLACEHOLDER, collect real observations, bind source_revision to the exact inspected commit, and never change NOT_RUN to PASS without external evidence.",
+  "schema_version": 1,
+  "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+  "generated_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+  "components": [
+    {
+      "component_id": "software-hardware-catalog",
+      "domain": "software_inventory",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_CHECK_ID",
+      "reference": "REPLACE_WITH_ARTIFACT_OR_RUN_URL",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Static catalog count only; not live hardware",
+      "limitations": "Must not be counted as physical devices or active workers"
+    },
+    {
+      "component_id": "software-worker-registry",
+      "domain": "worker_registry",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_CHECK_ID",
+      "reference": "REPLACE_WITH_ARTIFACT_OR_RUN_URL",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Software-only registry and lease-expiry tests",
+      "limitations": "A successful unit test does not attest a live device"
+    },
+    {
+      "component_id": "termux-agent-redmi3-01",
+      "domain": "physical_device",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_AUTHENTICATED_PROBE_ID",
+      "reference": "REPLACE_WITH_REDACTED_EVIDENCE_REFERENCE",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Authenticated agent identity, allowed capabilities, fresh heartbeat, revision and health",
+      "limitations": "Do not include secret keys or tokens; no device is live until this probe succeeds"
+    },
+    {
+      "component_id": "arkan-windows-runner",
+      "domain": "physical_host",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_RUNNER_PROBE_ID",
+      "reference": "REPLACE_WITH_RUN_URL_AND_GUEST_EVIDENCE",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Authorized runner execution and, separately, Windows Server 2025 guest boot",
+      "limitations": "CI success on a hosted runner is not proof that Arkan or the VM is running"
+    },
+    {
+      "component_id": "bitcoin-pool-mining",
+      "domain": "bitcoin_mining",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_POOL_SESSION_ID",
+      "reference": "REPLACE_WITH_REDACTED_POOL_EVIDENCE",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Authenticated pool session, measured hashrate and accepted shares",
+      "limitations": "Source code and CI do not prove mining or revenue; payout evidence is separate"
+    },
+    {
+      "component_id": "asic-fabrication",
+      "domain": "asic_fabrication",
+      "required": true,
+      "result": "NOT_RUN",
+      "source_revision": "REPLACE_WITH_EXACT_COMMIT_SHA",
+      "check_id": "REPLACE_WITH_REAL_FLOW_OR_FOUNDRY_REFERENCE",
+      "reference": "REPLACE_WITH_GDSII_HASH_AND_INDEPENDENT_EVIDENCE",
+      "observed_utc": "REPLACE_WITH_ACTUAL_UTC_TIMESTAMP",
+      "exit_status": null,
+      "scope": "Keep RTL simulation, physical-design output, foundry acceptance and fabricated-silicon test as separate gates",
+      "limitations": "A GDSII file alone does not prove fabricated or working silicon"
+    }
+  ]
+}

@@ -1,11 +1,19 @@
 name: Brain Cloudflare Emulator Gate
 
 on:
-  push:
+  pull_request:
     branches: [main]
     paths:
       - "cloudflare/brain-api/**"
       - "docs/architecture/BRAIN_CLOUDFLARE_EMULATOR_FIRST.md"
+      - "docs/prompts/CHATGPT_CLOUDFLARE_EMULATOR_PROMPTS_AR.md"
+      - ".github/workflows/brain-cloudflare-emulator.yml"
+  push:
+    branches: [main, "feat/cloudflare-emulator-devkit-v2"]
+    paths:
+      - "cloudflare/brain-api/**"
+      - "docs/architecture/BRAIN_CLOUDFLARE_EMULATOR_FIRST.md"
+      - "docs/prompts/CHATGPT_CLOUDFLARE_EMULATOR_PROMPTS_AR.md"
       - ".github/workflows/brain-cloudflare-emulator.yml"
   workflow_dispatch:
 
@@ -32,6 +40,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/brain-cloudflare-mode.sh
+          bash -n scripts/brain-cloudflare-devkit.sh
+          bash -n test/emulator_smoke.sh
           bash scripts/brain-cloudflare-mode.sh status | tee /tmp/brain-mode.log
           grep -Fq 'BRAIN_CLOUDFLARE_MODE=emulator' /tmp/brain-mode.log
           grep -Fq 'CREDENTIALS_REQUIRED=FALSE' /tmp/brain-mode.log
@@ -45,6 +55,14 @@ jobs:
           node test/cloudflare_deploy_static.test.js
           node test/commercial_worker_static.test.js
           node test/cinema_worker_static.test.js
+          node test/devkit_static.test.js
+      - name: Start local Wrangler and verify Worker health
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          bash test/emulator_smoke.sh
+          echo "BRAIN_CLOUDFLARE_EMULATOR_SMOKE=PASS"
+          echo "LIVE_CLOUDFLARE_USED=FALSE"
       - name: Exercise in-memory D1, R2, and queue contracts
         working-directory: cloudflare/brain-api
         run: |

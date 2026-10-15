@@ -1,0 +1,53 @@
+name: Brain Digital ASIC Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/asic-rtl-to-gds-zero-cost
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-digital-asic-lab.yml"
+  pull_request:
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-digital-asic-lab.yml"
+
+permissions:
+  contents: read
+
+# Cancel superseded runs for the same PR/branch to avoid duplicate resource use.
+concurrency:
+  group: brain-digital-asic-lab-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  digital-asic-lab:
+    name: RTL simulation and Yosys synthesis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Install open-source EDA tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y iverilog yosys
+          iverilog -V
+          yosys -V
+
+      - name: Run Brain Digital ASIC Lab
+        run: python3 brain_v12/asic/digital_lab.py --output-dir artifacts/asic-digital-lab
+
+      - name: Run MAC accelerator simulation and synthesis
+        run: python3 brain_v12/asic/mac_lab.py
+
+      - name: Upload verifiable digital ASIC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-digital-asic-lab-evidence
+          path: artifacts/asic-digital-lab/
+          if-no-files-found: warn
+          retention-days: 30

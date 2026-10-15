@@ -1,0 +1,82 @@
+name: Bitcoin Digital Lab (Cloud-Only, No Live Mining)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/mining_engine.py"
+      - "brain_v12/brain/bitcoin_mining_intelligence_api.py"
+      - "brain_v12/tests/test_mining_engine.py"
+      - "brain_v12/tests/test_bitcoin_mining_intelligence_api.py"
+      - "docs/BITCOIN_DIGITAL_LAB_CLOUD_ONLY.md"
+      - ".github/workflows/bitcoin-digital-lab.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bitcoin-digital-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  digital-lab:
+    name: Verify Bitcoin primitives and evidence gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile modules present on main
+        run: |
+          python -m py_compile \
+            brain_v12/brain/mining_engine.py \
+            brain_v12/brain/bitcoin_mining_intelligence_api.py
+      - name: Verify SHA-256d primitive (not Bitcoin mining)
+        run: |
+          python - <<'PY'
+          import hashlib
+          digest = hashlib.sha256(hashlib.sha256(b"").digest()).hexdigest()
+          expected = "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456"
+          assert digest == expected, (digest, expected)
+          print("sha256d_empty_input_vector=PASS")
+          print("scope=hash_primitive_self_test_only")
+          print("bitcoin_block_mining=false")
+          PY
+      - name: Install API test dependencies
+        run: python -m pip install "fastapi>=0.115,<1.0" "httpx<0.28" "pydantic>=2.7,<3" python-multipart
+      - name: Run mining economics and API tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest \
+            brain_v12.tests.test_mining_engine \
+            brain_v12.tests.test_bitcoin_mining_intelligence_api -v
+      - name: Write explicit evidence boundary
+        if: always()
+        run: |
+          mkdir -p artifacts/bitcoin-digital-lab
+          {
+            echo "lab=bitcoin-digital-lab-cloud-only"
+            echo "commit=$GITHUB_SHA"
+            echo "runner=github-hosted-ci"
+            echo "sha256d_primitive_test=attempted"
+            echo "live_mining=false"
+            echo "pool_session_verified=false"
+            echo "pool_hashrate_verified=false"
+            echo "accepted_shares_verified=false"
+            echo "asic_silicon_manufactured=false"
+            echo "revenue_verified=false"
+            echo "note=CI tests software only; no miner or pool connection is started."
+          } | tee artifacts/bitcoin-digital-lab/evidence-boundary.txt
+      - name: Upload evidence boundary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-digital-lab-evidence
+          path: artifacts/bitcoin-digital-lab/evidence-boundary.txt
+          if-no-files-found: error

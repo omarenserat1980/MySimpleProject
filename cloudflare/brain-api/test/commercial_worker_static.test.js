@@ -17,6 +17,9 @@ assert.match(worker, /HMAC/);
 assert.match(worker, /PAYMENT_VERIFIED/);
 assert.match(worker, /PAYMENT_PENDING/);
 assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /PAYMENT_REQUEST_ALREADY_PENDING/, "pending checkout retries must fail closed when prior checkout evidence is incomplete");
+assert.match(worker, /idempotent: true/, "pending checkout retry must reuse persisted checkout evidence");
+assert.doesNotMatch(worker, /INSERT OR REPLACE INTO payments/, "payment retries must not replace existing financial evidence");
 assert.match(worker, /idempotent: true/);
 assert.match(worker, /INSERT OR IGNORE INTO payment_events/);
 assert.match(worker, /secure-jordan\.paytabs\.com/);
@@ -102,3 +105,8 @@ assert.match(worker, /\/api\/supervisor\/tick/);
 assert.match(worker, /transitionClientOrder/);
 assert.match(worker, /INVALID_STATE_TRANSITION/);
 assert.match(worker, /PAYMENT_VERIFIED: \["IN_PROGRESS"\]/);
+
+assert.match(worker, /PAYTABS_MODE \\|\\| "test"/, "payment mode must default safely to test");
+assert.match(worker, /SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY/, "sandbox payments must be separately classified");
+assert.match(worker, /environment = 'live'/, "revenue realization must require live environment");
+console.log("SANDBOX_CANNOT_REALIZE_REVENUE=PASS");

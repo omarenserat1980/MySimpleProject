@@ -1,0 +1,183 @@
+name: ASIC RTL-to-GDSII (open-source, zero-budget gate)
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/asic-rtl-to-gds.yml"
+  push:
+    branches:
+      - "feature/asic-rtl-to-gds-zero-cost"
+    paths:
+      - "brain_v12/asic/**"
+      - ".github/workflows/asic-rtl-to-gds.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Keep one physical-design run per source branch; avoid duplicate push/PR builds.
+concurrency:
+  group: asic-rtl-to-gds-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  rtl-to-gds:
+    # Public GitHub-hosted runner; no paid cloud resources or external fabrication orders.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Electronic Brain
+        uses: actions/checkout@v4
+
+      - name: Record source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "rtl=brain_v12/asic/rtl/brain_asic_core.sv"
+            sha256sum brain_v12/asic/rtl/brain_asic_core.sv
+          } | tee artifacts/asic/source-identity.txt
+
+      - name: Fetch open-source OpenROAD Flow Scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git orfs
+          # ORFS's default VERILOG_FILES convention resolves from flow/designs/src.
+          mkdir -p orfs/flow/designs/src orfs/flow/designs/sky130hd/brain_asic_core
+          cp brain_v12/asic/rtl/brain_asic_core.sv orfs/flow/designs/src/brain_asic_core.sv
+          cp brain_v12/asic/openroad/config.mk orfs/flow/designs/sky130hd/brain_asic_core/config.mk
+          cp brain_v12/asic/openroad/constraint.sdc orfs/flow/designs/sky130hd/brain_asic_core/constraint.sdc
+          git -C orfs rev-parse HEAD | tee artifacts/asic/openroad-flow-scripts-commit.txt
+
+      - name: Run RTL-to-GDSII in the official OpenROAD container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull openroad/orfs:latest
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/orfs/flow:/OpenROAD-flow-scripts/flow" \
+            -w /OpenROAD-flow-scripts \
+            openroad/orfs:latest \
+            bash -lc 'source ./env.sh && cd flow && make DESIGN_CONFIG=./designs/sky130hd/brain_asic_core/config.mk' \
+            2>&1 | tee artifacts/asic/openroad-flow.log
+
+      - name: Collect physical-design evidence
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          mkdir -p artifacts/asic/physical-design
+          for d in results reports logs; do
+            if [ -d "orfs/flow/$d/sky130hd/brain_asic_core" ]; then
+              cp -a "orfs/flow/$d/sky130hd/brain_asic_core" "artifacts/asic/physical-design/$d"
+            fi
+          done
+          if [ -s orfs/flow/results/sky130hd/brain_asic_core/base/6_final.gds ]; then
+            cp orfs/flow/results/sky130hd/brain_asic_core/base/6_final.gds artifacts/asic/physical-design/brain_asic_core.gds
+            echo "GDSII_GENERATED=true" | tee artifacts/asic/physical-design-status.txt
+          else
+            echo "GDSII_GENERATED=false" | tee artifacts/asic/physical-design-status.txt
+          fi
+
+      - name: Verify GDSII structure and design evidence
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          root = Path("artifacts/asic/physical-design")
+          gds = root / "brain_asic_core.gds"
+          route_log = root / "logs/base/5_2_route.log"
+          lec_log = root / "logs/base/6_report.log"
+
+          if not gds.is_file() or gds.stat().st_size < 1000:
+              raise SystemExit("FAIL: GDSII file missing or implausibly small")
+
+          data = gds.read_bytes()
+          offset = 0
+          record_types = set()
+          record_count = 0
+          first_record_type = None
+          last_record_type = None
+          while offset < len(data):
+              if offset + 4 > len(data):
+                  raise SystemExit(f"FAIL: truncated GDSII record header at byte {offset}")
+              length = int.from_bytes(data[offset:offset + 2], "big")
+              record_type = data[offset + 2]
+              if length < 4 or length % 2 != 0 or offset + length > len(data):
+                  raise SystemExit(f"FAIL: invalid GDSII record length at byte {offset}")
+              if first_record_type is None:
+                  first_record_type = record_type
+              last_record_type = record_type
+              record_types.add(record_type)
+              record_count += 1
+              offset += length
+
+          # GDSII record types: HEADER, BGNLIB, LIBNAME, UNITS, ENDLIB,
+          # BGNSTR, STRNAME, ENDSTR. Validate the envelope as well as presence.
+          required_records = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07}
+          if (offset != len(data) or first_record_type != 0x00 or last_record_type != 0x04
+                  or not required_records.issubset(record_types)):
+              raise SystemExit("FAIL: GDSII record structure, boundaries, or required records are invalid")
+
+          if not route_log.is_file():
+              raise SystemExit("FAIL: detailed-route log is missing")
+          route_text = route_log.read_text(errors="replace")
+          counts = re.findall(r"Number of violations\s*=\s*(\d+)", route_text)
+          if not counts or int(counts[-1]) != 0:
+              raise SystemExit("FAIL: final detailed-routing violation count is not proven zero")
+
+          # Normalize case and whitespace so harmless log formatting does not fail the evidence gate.
+          lec_text = re.sub(r"\s+", " ", lec_log.read_text(errors="replace").lower()) if lec_log.is_file() else ""
+          flow_log = Path("artifacts/asic/openroad-flow.log")
+          flow_text = re.sub(r"\s+", " ", flow_log.read_text(errors="replace").lower()) if flow_log.is_file() else ""
+          if "global output passed lec test" not in (lec_text + " " + flow_text):
+              raise SystemExit("FAIL: expected final LEC pass message is missing from captured flow evidence")
+
+          manifest = {
+              "status": "GDSII_STRUCTURE_AND_FLOW_EVIDENCE_VERIFIED",
+              "gds_file": str(gds),
+              "gds_size_bytes": len(data),
+              "gds_sha256": hashlib.sha256(data).hexdigest(),
+              "gds_record_count": record_count,
+              "required_record_types_present": True,
+              "final_detailed_route_violations": int(counts[-1]),
+              "final_lec_pass_message_present": True,
+              "foundry_drc_lvs_signoff": "NOT_ESTABLISHED_BY_THIS_WORKFLOW",
+              "fabrication_status": "NOT_PERFORMED_OR_VERIFIED",
+              "silicon_status": "NOT_FABRICATED_OR_VERIFIED"
+          }
+          out = root / "evidence-manifest.json"
+          out.write_text(json.dumps(manifest, indent=2) + "\n")
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Enforce evidence gate
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s artifacts/asic/physical-design/brain_asic_core.gds
+          test -s artifacts/asic/physical-design/evidence-manifest.json
+          echo "RTL_TO_GDSII_AND_EVIDENCE_GATE_PASS"
+          echo "This proves a validated design artifact only, not foundry signoff, fabrication, or physical silicon."
+
+      - name: Upload ASIC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electronic-brain-asic-rtl-to-gds-evidence
+          path: artifacts/asic/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,33 @@
+name: Brain Bitcoin SHA-256 Round RTL Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'brain_v12/asic/rtl/brain_sha256_round.sv'
+      - 'brain_v12/asic/rtl/tb_brain_sha256_round.sv'
+      - '.github/workflows/brain-bitcoin-sha256-round-rtl.yml'
+  push:
+    branches: [feat/bitcoin-sha256-round-rtl]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rtl-round-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Record simulator version
+        run: iverilog -V 2>&1 | head -n 2
+      - name: Compile SHA-256 round and testbench
+        run: iverilog -g2012 -s tb_brain_sha256_round -o /tmp/brain_sha256_round.vvp brain_v12/asic/rtl/brain_sha256_round.sv brain_v12/asic/rtl/tb_brain_sha256_round.sv
+      - name: Run known-vector test
+        run: vvp /tmp/brain_sha256_round.vvp

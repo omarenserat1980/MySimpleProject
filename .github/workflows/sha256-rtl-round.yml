@@ -1,0 +1,28 @@
+name: SHA-256 RTL round smoke test
+on:
+  pull_request:
+    paths:
+      - "brain_v12/bitcoin_asic_lab/rtl/**"
+      - ".github/workflows/sha256-rtl-round.yml"
+  push:
+    paths:
+      - "brain_v12/bitcoin_asic_lab/rtl/**"
+      - ".github/workflows/sha256-rtl-round.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rtl-round-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Compile and simulate one SHA-256 round
+        run: |
+          iverilog -g2012 -s tb_sha256_round -o /tmp/sha256-round.vvp \
+            brain_v12/bitcoin_asic_lab/rtl/sha256_round.sv \
+            brain_v12/bitcoin_asic_lab/rtl/tb_sha256_round.sv
+          vvp /tmp/sha256-round.vvp

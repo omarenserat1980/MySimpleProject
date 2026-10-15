@@ -1,0 +1,45 @@
+name: Bitcoin SHA-256 generic synthesis estimate
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/rtl/sha256_compress.sv"
+      - ".github/workflows/bitcoin-asic-synthesis-estimate.yml"
+  push:
+    branches:
+      - "feat/bitcoin-sha256-compress-rtl"
+    paths:
+      - "brain_v12/asic/rtl/sha256_compress.sv"
+      - ".github/workflows/bitcoin-asic-synthesis-estimate.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  generic-synthesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install open-source synthesis tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yosys
+          yosys -V
+      - name: Synthesize SHA-256 compression to generic cells
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/asic-synthesis
+          yosys -p 'read_verilog -sv brain_v12/asic/rtl/sha256_compress.sv; hierarchy -check -top sha256_compress; proc; opt; techmap; opt; stat' | tee artifacts/asic-synthesis/yosys-stat.log
+          grep -q 'Number of cells' artifacts/asic-synthesis/yosys-stat.log
+          {
+            echo "## Generic-cell synthesis estimate"
+            echo "- Tool: Yosys on a GitHub-hosted ephemeral runner."
+            echo "- Scope: generic logic mapping only; not a foundry-specific area, timing, power, FPGA place-and-route, or fabricated ASIC result."
+            echo "- Detailed synthesis statistics are retained as an artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload synthesis evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bitcoin-asic-generic-synthesis
+          path: artifacts/asic-synthesis/
+          if-no-files-found: warn
