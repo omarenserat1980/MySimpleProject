@@ -1,6 +1,13 @@
 name: Brain Product Factory
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/brain_product_factory.py"
+      - "scripts/brain_revenue_strategy.py"
+      - "scripts/test_brain_product_factory.py"
+      - ".github/workflows/brain-product-factory.yml"
   workflow_dispatch:
   schedule:
     - cron: "31 */6 * * *"
@@ -19,6 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test strategy-to-product mapping
+        run: python -m unittest scripts.test_brain_product_factory -v
+
       - name: Build revenue strategy
         run: python3 scripts/brain_revenue_strategy.py
 
@@ -34,10 +49,12 @@ jobs:
           assert p["stage"] == "BUILD_PLAN_READY"
           assert p["financial_authority"] == "NONE"
           assert p["external_publication"] == "BLOCKED"
+          assert p["external_submission"] == "BLOCKED"
           assert p["payment"] == "NOT_VERIFIED"
           assert p["revenue_forecast"]["counts_as_revenue"] is False
           assert p["cost_tracking"]["money_spent"] == 0
           print("PRODUCT_FACTORY_GATE=VERIFIED")
+          print("STRATEGY="+p["strategy_id"])
           print("PRODUCT="+p["product"]["product_id"])
           print("FORECAST_ONLY=true")
           print("MONEY_SPENT=0")
