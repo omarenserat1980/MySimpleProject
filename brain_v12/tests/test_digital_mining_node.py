@@ -19,13 +19,17 @@ class DigitalMiningNodeTests(unittest.TestCase):
         self.assertIn("BRAIN_WORKER_AUTH_TOKEN_NOT_CONFIGURED", result["blockers"])
 
     def test_complete_local_preflight_still_does_not_claim_remote_verification(self):
+        secret = "secret-token-never-output"
+        pool_url = "stratum+tcp://pool.example.invalid:3333"
+        worker_name = "private-worker-identifier"
+        brain_url = "https://brain.example.invalid"
         env = {
             "TERMUX_VERSION": "test",
             "BRAIN_CPUMINER_BIN": "/trusted/cpuminer",
-            "BRAIN_MINING_POOL_URL": "configured",
-            "BRAIN_MINING_WORKER": "configured",
-            "V12_BRAIN_URL": "configured",
-            "BRAIN_WORKER_TOKEN": "secret-not-output",
+            "BRAIN_MINING_POOL_URL": pool_url,
+            "BRAIN_MINING_WORKER": worker_name,
+            "V12_BRAIN_URL": brain_url,
+            "BRAIN_WORKER_TOKEN": secret,
         }
         with patch("brain_v12.brain.digital_mining_node._memory_bytes", return_value=1024), patch(
             "brain_v12.brain.digital_mining_node._temperature_sensor_available", return_value=True
@@ -37,8 +41,9 @@ class DigitalMiningNodeTests(unittest.TestCase):
         self.assertFalse(result["node_verified"])
         self.assertFalse(result["accepted_shares_verified"])
         self.assertFalse(result["revenue_verified"])
-        self.assertNotIn("secret-not-output", str(result))
-        self.assertNotIn("configured", str(result))
+        serialized = str(result)
+        for private_value in (secret, pool_url, worker_name, brain_url):
+            self.assertNotIn(private_value, serialized)
 
 
 if __name__ == "__main__":
