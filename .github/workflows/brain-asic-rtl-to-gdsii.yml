@@ -48,14 +48,22 @@ jobs:
           set -euo pipefail
           mkdir -p "$PDK_ROOT"
           # Volare resolves the compatible open_pdks revision from OpenLane's
-          # tool_metadata.yml; pip-only installs do not include that file here.
+          # tool_metadata.yml; pip-only installs may not include that metadata.
           git clone --depth 1 --recurse-submodules --shallow-submodules --branch 2.3.10 https://github.com/efabless/openlane2.git "$RUNNER_TEMP/openlane2-source"
           cd "$RUNNER_TEMP/openlane2-source"
           test -f dependencies/tool_metadata.yml -o -f tool_metadata.yml
           volare enable --pdk-root "$PDK_ROOT" --pdk sky130
-          test -f "$PDK_ROOT/sky130A/libs.tech/openlane/config.tcl"
-          test -f "$PDK_ROOT/sky130A/libs.tech/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
-          echo "SKY130A_PDK_READY=TRUE"
+
+          # Verify the actual open_pdks layout: standard-cell timing libraries
+          # live under libs.ref, while OpenLane platform files live under libs.tech.
+          test -d "$PDK_ROOT/sky130A"
+          OPENLANE_CONFIG="$(find "$PDK_ROOT/sky130A/libs.tech/openlane" -type f -name config.tcl -print -quit)"
+          SKY130_LIB="$(find "$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lib" -maxdepth 1 -type f -name '*tt_025C_1v80.lib' -print -quit)"
+          test -n "$OPENLANE_CONFIG"
+          test -s "$OPENLANE_CONFIG"
+          test -n "$SKY130_LIB"
+          test -s "$SKY130_LIB"
+          printf 'SKY130A_PDK_READY=TRUE\nOPENLANE_CONFIG=%s\nSKY130_TIMING_LIB=%s\n' "$OPENLANE_CONFIG" "$SKY130_LIB"
 
       - name: Run OpenLane 2 Classic RTL-to-GDSII flow
         env:
@@ -80,7 +88,6 @@ jobs:
           root = pathlib.Path(".")
           artifact_root = pathlib.Path("artifacts/asic-gdsii")
           artifact_root.mkdir(parents=True, exist_ok=True)
-          # OpenLane run output location can vary by version; search the full workspace.
           candidates = []
           for p in root.glob("**/*.gds"):
               if ".git" in p.parts or "site-packages" in p.parts:
