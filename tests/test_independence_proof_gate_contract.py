@@ -1,12 +1,13 @@
 import json
-from pathlib import Path
 
-from platform_foundation.independence_contract import IndependenceContract
+from platform_foundation.independence_contract import (
+    IndependenceContract,
+    compute_report_sha256,
+)
 
 
 def test_contract_rejects_proof_without_required_authority_scope(tmp_path):
-    proof = tmp_path / "independence_proof.json"
-    proof.write_text(json.dumps({
+    report = {
         "status": "PROVEN_WITHIN_TEST_SCOPE",
         "independence_claim_allowed": True,
         "checks": {
@@ -22,7 +23,10 @@ def test_contract_rejects_proof_without_required_authority_scope(tmp_path):
             "restart_recovery": True,
             "authority_boundary": False,
         },
-    }), encoding="utf-8")
+    }
+    report["report_sha256"] = compute_report_sha256(report)
+    proof = tmp_path / "independence_proof.json"
+    proof.write_text(json.dumps(report), encoding="utf-8")
     result = IndependenceContract(proof).evaluate()
     assert result["allowed"] is False
-    assert result["reason"] == "scope_insufficient"
+    assert result["reason"] == "authority_boundary_not_proven"

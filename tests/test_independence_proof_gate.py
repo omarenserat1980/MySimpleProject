@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from platform_foundation.independence_contract import compute_report_sha256
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,3 +37,5 @@ def test_independence_proof_gate_runs_without_github_credentials(tmp_path):
     assert report["checks"]["github_credentials_removed"] is True
     assert report["checks"]["network_dependency_for_gate"] is False
     assert report["scope"]["authority_boundary"] is True
+    assert report["independence_contract"]["allowed"] is True
+    assert report["report_sha256"] == compute_report_sha256(report)

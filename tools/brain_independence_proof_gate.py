@@ -5,7 +5,7 @@ Runs the existing local integrity and real-worker self-tests as subprocesses
 with GitHub credentials removed, then emits one durable proof report.
 """
 from __future__ import annotations
-import hashlib, json, os, subprocess, sys
+import json, os, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from platform_foundation.independence_contract import IndependenceContract
+from platform_foundation.independence_contract import (
+    IndependenceContract,
+    compute_report_sha256,
+)
 OUT = ROOT / "brain6_artifacts" / "independence_gate" / "independence_proof.json"
 
 
@@ -32,6 +35,14 @@ def run(cmd):
     }
 
 
+def write_report(report):
+    report["report_sha256"] = compute_report_sha256(report)
+    OUT.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
 def main():
     started = datetime.now(timezone.utc).isoformat()
     integrity = run([sys.executable, "tools/base_expansion_integrity.py"])
@@ -44,7 +55,6 @@ def main():
         "github_credentials_removed": True,
         "network_dependency_for_gate": False,
     }
-    # This gate proves local execution/recovery, not unrestricted autonomy.
     # A network dependency of False is a required security property, not a failed check.
     positive_checks = (
         "base_expansion_integrity",
@@ -52,7 +62,10 @@ def main():
         "authority_boundary_negative_tests",
         "github_credentials_removed",
     )
-    proof_allowed = all(checks[name] is True for name in positive_checks) and checks["network_dependency_for_gate"] is False
+    proof_allowed = (
+        all(checks[name] is True for name in positive_checks)
+        and checks["network_dependency_for_gate"] is False
+    )
     report = {
         "schema": "brain.independence_proof.v1",
         "started_at": started,
@@ -80,15 +93,18 @@ def main():
         ],
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    canonical = json.dumps(report, indent=2, ensure_ascii=False)
-    OUT.write_text(canonical, encoding="utf-8")
+
+    # Write a correctly hashed candidate before asking the contract to validate it.
+    write_report(report)
     contract = IndependenceContract(OUT).evaluate()
     report["independence_contract"] = contract
     proof_allowed = proof_allowed and contract["allowed"]
     report["status"] = "PROVEN_WITHIN_TEST_SCOPE" if proof_allowed else "NOT_PROVEN"
     report["independence_claim_allowed"] = proof_allowed
-    report["report_sha256"] = hashlib.sha256(OUT.read_bytes()).hexdigest()
-    OUT.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # The digest intentionally excludes report_sha256 and independence_contract.
+    # It still covers the status, claim, checks, scope, and all execution evidence.
+    write_report(report)
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if proof_allowed else 1
 
