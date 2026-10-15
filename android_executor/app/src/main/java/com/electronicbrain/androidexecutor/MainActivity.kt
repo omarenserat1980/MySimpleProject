@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.core.app.ActivityCompat
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,13 +35,20 @@ class MainActivity : ComponentActivity() {
             textSize = 16f
             setPadding(0, 24, 0, 24)
         }
+        val identityProbe = Button(this).apply {
+            text = "CHECK PHONE IDENTITY SUPPORT"
+            setOnClickListener {
+                val result = PhoneIdentityKeyStore.probeCapabilities(this@MainActivity)
+                status.text = JSONObject(result).toString(2)
+            }
+        }
         val start = Button(this).apply {
             text = "START EXECUTOR"
             setOnClickListener {
                 prefs.edit().putString("agent_id", agentId.text.toString().trim())
                     .putString("agent_key", agentKey.text.toString().trim())
                     .putString("brain_base_url", brainUrl.text.toString().trim())
-.apply()
+                    .apply()
                 if (Build.VERSION.SDK_INT >= 33)
                     ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
                 val i = Intent(this@MainActivity, ExecutorService::class.java)
@@ -77,7 +85,9 @@ class MainActivity : ComponentActivity() {
                 text = "ELECTRONIC BRAIN\nRALMI ANDROID EXECUTOR"
                 textSize = 22f
             })
-            addView(agentId); addView(agentKey); addView(brainUrl); addView(start); addView(stop); addView(accessibility); addView(storage); addView(status)
+            addView(agentId); addView(agentKey); addView(brainUrl)
+            addView(identityProbe); addView(start); addView(stop)
+            addView(accessibility); addView(storage); addView(status)
             addView(TextView(this@MainActivity).apply {
                 text = "Brain Cloud is the primary runtime.\nThis Android client is optional and never required for cloud operation."
                 textSize = 13f

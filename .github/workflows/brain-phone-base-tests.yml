@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install verifier test dependency
+        run: python -m pip install --disable-pip-version-check "cryptography>=42,<47"
       - name: Compile modules and tests
         run: |
           python -m py_compile \
@@ -33,8 +35,10 @@ jobs:
             brain_v12/tests/test_brain_phone_base.py \
             brain_phone_base/android_real_measurement.py \
             brain_phone_base/local_executor.py \
+            brain_phone_base/identity_challenge.py \
             brain_phone_base/test_android_real_measurement.py \
-            brain_phone_base/test_local_executor.py
+            brain_phone_base/test_local_executor.py \
+            brain_phone_base/test_identity_challenge.py
       - name: Run focused tests
         env:
           PYTHONPATH: .
@@ -42,6 +46,7 @@ jobs:
           python -m unittest brain_v12.tests.test_brain_phone_base -v
           python -m unittest brain_phone_base.test_android_real_measurement -v
           python -m unittest brain_phone_base.test_local_executor -v
+          python -m unittest brain_phone_base.test_identity_challenge -v
       - name: Assert simulation-only boundary
         run: |
           python -m brain_v12.tools.brain_phone_base > phone-base-simulation.json
