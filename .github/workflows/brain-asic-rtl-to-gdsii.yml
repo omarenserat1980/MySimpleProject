@@ -49,8 +49,9 @@ jobs:
           mkdir -p "$PDK_ROOT"
           # Volare resolves the compatible open_pdks revision from OpenLane's
           # tool_metadata.yml; pip-only installs do not include that file here.
-          git clone --depth 1 --branch 2.3.10 https://github.com/efabless/openlane2.git "$RUNNER_TEMP/openlane2-source"
+          git clone --depth 1 --recurse-submodules --shallow-submodules --branch 2.3.10 https://github.com/efabless/openlane2.git "$RUNNER_TEMP/openlane2-source"
           cd "$RUNNER_TEMP/openlane2-source"
+          test -f dependencies/tool_metadata.yml -o -f tool_metadata.yml
           volare enable --pdk-root "$PDK_ROOT" --pdk sky130
           test -f "$PDK_ROOT/sky130A/libs.tech/openlane/config.tcl"
           test -f "$PDK_ROOT/sky130A/libs.tech/sky130_fd_sc_hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
