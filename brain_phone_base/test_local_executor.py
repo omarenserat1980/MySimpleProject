@@ -71,6 +71,69 @@ class LocalExecutorTests(unittest.TestCase):
         self.assertEqual(result["independent_identity_verification"], "NOT_PERFORMED")
         self.assertEqual(result["node_activation"], "PROHIBITED_BY_DEFAULT")
 
+    def test_rejects_evidence_claiming_trust_or_activation(self):
+        data = {
+            "schema": "brain-phone-base.real-measurement.v1",
+            "measured_at_utc": "2026-10-15T15:00:00Z",
+            "evidence": {
+                "device_identity_verified": False,
+                "independent_verification": "not_performed",
+                "integrity_signature": None,
+            },
+            "node_gate": {
+                "state": "trusted_active",
+                "trusted": True,
+                "active": True,
+                "activation_allowed": True,
+                "manual_approval": "granted",
+            },
+            "network_actions": {
+                "measurement_uploaded": False,
+                "node_registered": False,
+                "mining_started": False,
+                "mining_pool_contacted": False,
+            },
+        }
+        path = self.root / "evidence" / "phone-real-measurement.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        result = self.executor.verify_evidence()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["exit_code"], 2)
+        self.assertEqual(result["findings"][0]["status"], "FAIL")
+        self.assertEqual(result["node_activation"], "PROHIBITED_BY_DEFAULT")
+        self.assertEqual(result["mining"], "DISABLED")
+
+    def test_rejects_evidence_claiming_mining_started(self):
+        data = {
+            "schema": "brain-phone-base.real-measurement.v1",
+            "measured_at_utc": "2026-10-15T15:00:00Z",
+            "evidence": {
+                "device_identity_verified": False,
+                "independent_verification": "not_performed",
+                "integrity_signature": None,
+            },
+            "node_gate": {
+                "state": "untrusted_inactive",
+                "trusted": False,
+                "active": False,
+                "activation_allowed": False,
+                "manual_approval": "not_granted",
+            },
+            "network_actions": {
+                "measurement_uploaded": False,
+                "node_registered": False,
+                "mining_started": True,
+                "mining_pool_contacted": False,
+            },
+        }
+        path = self.root / "evidence" / "phone-real-measurement.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        result = self.executor.verify_evidence()
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertEqual(result["exit_code"], 2)
+        self.assertEqual(result["findings"][0]["status"], "FAIL")
+        self.assertEqual(result["mining"], "DISABLED")
+
 
 if __name__ == "__main__":
     unittest.main()
