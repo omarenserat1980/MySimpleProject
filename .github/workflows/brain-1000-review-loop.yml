@@ -76,6 +76,7 @@ jobs:
           python -m pip install pytest
 
       - name: Independent verification gate
+        id: verification_gate
         env:
           BRAIN_GATE_PYTEST: "1"
           BRAIN_GATE_TIMEOUT: "120"
@@ -84,6 +85,7 @@ jobs:
           python -m brain_v12.self_healing.verification_gate
 
       - name: Review and self-heal
+        id: review_self_heal
         env:
           BRAIN_REVIEW_LOOPS: ${{ github.event.inputs.loops || '1' }}
           BRAIN_REVIEW_TIMEOUT: "60"
@@ -95,6 +97,63 @@ jobs:
         run: |
           set -o pipefail
           python -m brain_v12.self_healing.review_loop --loops "$BRAIN_REVIEW_LOOPS" --timeout "$BRAIN_REVIEW_TIMEOUT"
+
+      # Finalize run context from actual gate outcomes and machine-readable reports.
+      # If this step never runs (for example, hard cancellation), STARTED remains honest.
+      - name: Finalize evolution run evidence
+        if: always()
+        env:
+          BRAIN_VERIFICATION_OUTCOME: ${{ steps.verification_gate.outcome }}
+          BRAIN_REVIEW_OUTCOME: ${{ steps.review_self_heal.outcome }}
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          state_dir = Path(".brain/state")
+          context_path = state_dir / "evolution-run-context.json"
+          state_dir.mkdir(parents=True, exist_ok=True)
+          context = json.loads(context_path.read_text(encoding="utf-8")) if context_path.exists() else {
+              "schema_version": 1,
+              "note": "Context reconstructed during finalization; missing startup context."
+          }
+
+          def report_status(filename, key="status"):
+              path = state_dir / filename
+              if not path.exists():
+                  return "NOT_AVAILABLE"
+              try:
+                  value = json.loads(path.read_text(encoding="utf-8"))
+                  return str(value.get(key, "NOT_AVAILABLE"))
+              except (OSError, ValueError, TypeError):
+                  return "INVALID_REPORT"
+
+          verification_report = report_status("verification_gate.json")
+          review_report = report_status("review_loop_report.json")
+          verification_outcome = __import__("os").environ.get("BRAIN_VERIFICATION_OUTCOME", "unknown")
+          review_outcome = __import__("os").environ.get("BRAIN_REVIEW_OUTCOME", "unknown")
+          verified = (
+              verification_outcome == "success"
+              and review_outcome == "success"
+              and verification_report == "VERIFIED"
+              and review_report == "VERIFIED_COMPLETED"
+          )
+          failed = "failure" in (verification_outcome, review_outcome) or "INVALID_REPORT" in (verification_report, review_report)
+          context.update({
+              "state": "VERIFIED_COMPLETED" if verified else ("FAILED" if failed else "INCOMPLETE"),
+              "verification_gate": verification_report,
+              "review_and_self_heal": review_report,
+              "step_outcomes": {
+                  "independent_verification_gate": verification_outcome,
+                  "review_and_self_heal": review_outcome,
+              },
+              "finalized_at": datetime.now(timezone.utc).isoformat(),
+              "note": "Final state reflects step outcomes and machine-readable reports; STARTED alone is never success."
+          })
+          context_path.write_text(json.dumps(context, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+          print(json.dumps({"state": context["state"], "verification_gate": verification_report, "review_and_self_heal": review_report}, sort_keys=True))
+          PY
 
       - name: Save evolution evidence
         if: always()
