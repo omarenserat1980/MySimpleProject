@@ -32,6 +32,38 @@ jobs:
       - name: Checkout Brain
         uses: actions/checkout@v4
 
+      # Record run identity before dependency installation, so cancellation during
+      # setup can still leave minimal evidence without secrets.
+      - name: Initialize evolution run evidence
+        env:
+          BRAIN_RUN_ID: ${{ github.run_id }}
+          BRAIN_RUN_ATTEMPT: ${{ github.run_attempt }}
+          BRAIN_COMMIT_SHA: ${{ github.sha }}
+          BRAIN_REF: ${{ github.ref }}
+          BRAIN_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          mkdir -p .brain/state
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          evidence = {
+              "schema_version": 1,
+              "run_id": os.environ["BRAIN_RUN_ID"],
+              "run_attempt": os.environ["BRAIN_RUN_ATTEMPT"],
+              "commit_sha": os.environ["BRAIN_COMMIT_SHA"],
+              "ref": os.environ["BRAIN_REF"],
+              "event_name": os.environ["BRAIN_EVENT_NAME"],
+              "state": "STARTED",
+              "verification_gate": "NOT_RUN",
+              "review_and_self_heal": "NOT_RUN",
+              "note": "Run context only; step outcomes and independent verification are required to claim success."
+          }
+          Path(".brain/state/evolution-run-context.json").write_text(
+              json.dumps(evidence, sort_keys=True, indent=2) + "\\n",
+              encoding="utf-8"
+          )
+          PY
+
       - name: Install system media dependencies
         run: |
           sudo apt-get update
