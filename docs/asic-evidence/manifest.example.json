@@ -1,0 +1,85 @@
+{
+  "project": "Electronic Brain ASIC",
+  "stages": {
+    "rtl_simulation": {
+      "test_log": "rtl_test_log"
+    },
+    "synthesis": {
+      "netlist": "synth_netlist",
+      "synthesis_log": "synth_log"
+    },
+    "physical_design": {
+      "layout": "layout",
+      "drc_report": "drc",
+      "lvs_report": "lvs"
+    },
+    "tapeout": {
+      "tapeout_receipt": "tapeout_receipt"
+    },
+    "foundry_fabrication": {
+      "foundry_receipt": "foundry_receipt",
+      "lot_or_wafer_id": "lot_wafer"
+    },
+    "silicon_test": {
+      "test_report": "silicon_test",
+      "raw_measurements": "raw_measurements",
+      "device_or_die_id": "die_id"
+    }
+  },
+  "artifacts": {
+    "rtl_test_log": {
+      "path": "rtl/rtl.log",
+      "sha256": "<64-hex-sha256>"
+    },
+    "synth_netlist": {
+      "path": "synthesis/netlist.json",
+      "sha256": "<64-hex-sha256>"
+    },
+    "synth_log": {
+      "path": "synthesis/yosys.log",
+      "sha256": "<64-hex-sha256>"
+    },
+    "layout": {
+      "path": "physical/chip.gds",
+      "sha256": "<64-hex-sha256>"
+    },
+    "drc": {
+      "path": "physical/drc.rpt",
+      "sha256": "<64-hex-sha256>"
+    },
+    "lvs": {
+      "path": "physical/lvs.rpt",
+      "sha256": "<64-hex-sha256>"
+    },
+    "tapeout_receipt": {
+      "path": "external/tapeout.pdf",
+      "sha256": "<64-hex-sha256>",
+      "issuer": "foundry/MPW service",
+      "issued_at": "YYYY-MM-DD",
+      "external_reference": "receipt-id"
+    },
+    "foundry_receipt": {
+      "path": "external/fabrication.pdf",
+      "sha256": "<64-hex-sha256>",
+      "issuer": "foundry",
+      "issued_at": "YYYY-MM-DD",
+      "external_reference": "lot-confirmation"
+    },
+    "lot_wafer": {
+      "path": "external/lot-wafer.txt",
+      "sha256": "<64-hex-sha256>"
+    },
+    "silicon_test": {
+      "path": "lab/test-report.pdf",
+      "sha256": "<64-hex-sha256>"
+    },
+    "raw_measurements": {
+      "path": "lab/measurements.csv",
+      "sha256": "<64-hex-sha256>"
+    },
+    "die_id": {
+      "path": "lab/die-id.txt",
+      "sha256": "<64-hex-sha256>"
+    }
+  }
+}
