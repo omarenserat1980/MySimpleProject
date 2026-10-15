@@ -1,4 +1,8 @@
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
+
+from brain_v12.github_control_plane import GitHubControlPlane, GitHubControlError
 
 from brain_v12.tools.github_actions_runtime_audit import build_report, safe_error_code
 
@@ -12,6 +16,42 @@ class GitHubActionsRuntimeAuditTests(unittest.TestCase):
                 {"complete": True, "workflow_runs": [run],
                  "window_start": "2026-10-14T12:00:00+00:00",
                  "window_end": "2026-10-15T12:00:00+00:00"})
+
+
+    def test_run_audit_paginates_per_workflow_beyond_repo_wide_cap(self):
+        api = GitHubControlPlane(token="test")
+        now = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+        def fake_request(method, path, *, capability, params):
+            self.assertIn("/actions/workflows/", path)
+            workflow_id = int(path.split("/actions/workflows/")[1].split("/")[0])
+            page = params["page"]
+            if workflow_id == 10 and page == 1:
+                return {"total_count": 101, "workflow_runs": [
+                    {"id": i, "created_at": "2026-10-15T11:00:00Z", "conclusion": "success"}
+                    for i in range(100)
+                ]}
+            if workflow_id == 10 and page == 2:
+                return {"total_count": 101, "workflow_runs": [
+                    {"id": 101, "created_at": "2026-10-15T11:00:00Z", "conclusion": "success"}
+                ]}
+            if workflow_id == 20 and page == 1:
+                return {"total_count": 1, "workflow_runs": [
+                    {"id": 201, "created_at": "2026-10-15T10:00:00Z", "conclusion": "failure"}
+                ]}
+            raise AssertionError(f"Unexpected request: {path} page={page}")
+        with patch.object(api, "request", side_effect=fake_request):
+            result = api.actions_runs_last_24h("owner", "repo", workflow_ids=[10, 20], now=now)
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["count"], 102)
+        self.assertEqual(result["api_total_count"], 102)
+        self.assertEqual(result["pages_fetched"], 3)
+
+    def test_run_audit_still_fails_closed_if_one_workflow_exceeds_api_cap(self):
+        api = GitHubControlPlane(token="test")
+        now = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
+        with patch.object(api, "request", return_value={"total_count": 1001, "workflow_runs": []}):
+            with self.assertRaisesRegex(GitHubControlError, "ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED"):
+                api.actions_runs_last_24h("owner", "repo", workflow_ids=[10], now=now)
 
     def test_successful_or_in_progress_runs_do_not_warn(self):
         for conclusion in ("success", None, "cancelled", "skipped"):
