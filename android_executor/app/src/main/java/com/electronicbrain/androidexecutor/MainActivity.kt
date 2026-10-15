@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -161,7 +162,9 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
-        setContentView(LinearLayout(this).apply {
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 48, 32, 32)
             addView(TextView(this@MainActivity).apply {
@@ -175,6 +178,7 @@ class MainActivity : ComponentActivity() {
             addView(TextView(this@MainActivity).apply {
                 text = "Brain Cloud is the primary runtime.\nThis Android client is optional and never required for cloud operation."
                 textSize = 13f
+            })
             })
         })
     }
