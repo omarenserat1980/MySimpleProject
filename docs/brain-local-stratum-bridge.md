@@ -12,9 +12,9 @@ Set these environment variables locally; do not put values in GitHub files, CI v
 - `BRAIN_MINING_AUTHORIZED=1`
 - `BRAIN_STRATUM_HOST`, `BRAIN_STRATUM_PORT`
 - `BRAIN_STRATUM_USERNAME`, `BRAIN_STRATUM_PASSWORD`
-- `BRAIN_STRATUM_TLS=1` when the pool supports TLS
+- `BRAIN_STRATUM_TLS=1` (mandatory; the bridge refuses plaintext Stratum)
 
-The bridge refuses CI/GitHub Actions. Use a pool account and endpoint only if you are authorized to do so. Keep secrets in local environment or a secret manager. Prefer TLS. Connection and authorization may expose account/worker identifiers to the pool.
+The bridge refuses CI/GitHub Actions. Use a pool account and endpoint only if you are authorized to do so. Keep secrets in local environment or a secret manager. TLS is mandatory to protect credentials in transit. Connection and authorization may expose account/worker identifiers to the pool.
 
 ## Important limits
 A successful result means only that Stratum subscribe and authorization succeeded. It does not prove SHA-256d hashing, accepted shares, BTC payout, or profitability. The response deliberately reports zero shares and `execution_authorized=false`. A real mining worker/ASIC or a separately installed and authorized miner is still required.
