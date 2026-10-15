@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
+from ..tool_lifecycle import ToolLifecycleResult, build_and_verify_tool
 from .execution_verifier import ExecutionVerifier, evidence_dict
 from .health_probe import HealthProbeEngine
 from .autonomy_policy import AutonomyPolicy, executor_allowed, rank_key
@@ -50,12 +51,49 @@ class CapabilityFabric:
         if probe is not None:
             self.health.register(spec.executor_id, probe)
 
+    def promote_tool(
+        self, *, spec: ExecutorSpec, simulate: Callable[[], bool],
+        build_real: Callable[[], Callable[[ExecutorSpec], Any]],
+        verify_real: Callable[[Callable[[ExecutorSpec], Any]], Mapping[str, Any]],
+        probe: Callable[[], Any] | None = None,
+        activation_authorized: bool = False,
+    ) -> ToolLifecycleResult:
+        """Build a real runner immediately after simulation passes.
+
+        The runner is registered only after real verification and explicit
+        activation authorization. Concrete builders/verifiers must perform and
+        evidence real integration checks; mocks cannot establish real status.
+        """
+        def activate(runner: Callable[[ExecutorSpec], Any]) -> bool:
+            if not callable(runner):
+                return False
+            self.register(spec, probe=probe)
+            # Keep the concrete real runner associated with this executor.
+            self._real_runners[spec.executor_id] = runner
+            return True
+
+        if not hasattr(self, "_real_runners"):
+            self._real_runners: dict[str, Callable[[ExecutorSpec], Any]] = {}
+        return build_and_verify_tool(
+            tool_name=spec.executor_id,
+            simulate=simulate,
+            build_real=build_real,
+            verify_real=verify_real,
+            activate=activate,
+            activation_authorized=activation_authorized,
+        )
+
+    def run_registered(self, executor_id: str, spec: ExecutorSpec) -> Any:
+        """Run an activated concrete adapter; fail closed if none was registered."""
+        runner = getattr(self, "_real_runners", {}).get(executor_id)
+        if runner is None:
+            raise RuntimeError(f"REAL_ADAPTER_NOT_ACTIVE: {executor_id}")
+        return runner(spec)
+
     def discover(self, capability: str, require_healthy: bool = True) -> list[ExecutorSpec]:
         candidates = [x for x in self._executors.values()
                       if x.capability == capability and x.state == "ONLINE"]
         if require_healthy:
-            # Registered executors without probes are health-neutral unless they
-            # explicitly require a probe before activation.
             candidates = [x for x in candidates if (
                 (x.executor_id not in self.health._probes and not x.metadata.get("requires_probe"))
                 or self.health.healthy(x.executor_id)
@@ -91,9 +129,6 @@ class CapabilityFabric:
                 attempts.append(ExecutionAttempt(spec.executor_id, False, error=str(exc)))
                 continue
 
-            # Policy is evaluated first; only policy-approved output reaches the
-            # master gate. This prevents a custom verifier from accidentally
-            # bypassing Brain-wide conservative rules.
             policy = verify_capability(capability, result)
             if not policy.get("verified", False):
                 self.health.record_execution(spec.executor_id, False)
