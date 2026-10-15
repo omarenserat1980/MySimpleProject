@@ -307,22 +307,9 @@ def main() -> int:
                 # The repair command is deliberately explicit and replaceable.
                 # It may generate/edit code, but success is impossible without verification.
                 if args.repair and not chatgpt_repair_done:
-                    # Give the repair agent a bounded, secret-redacted failure report.
-                    # The agent can improve code based on concrete evidence rather than guessing.
-                    failure_report = state_dir / "current_failure.json"
-                    write_state(failure_report, {
-                        "schema": "brain-repair-context/v1",
-                        "attempt": n,
-                        "exit_code": item.exit_code,
-                        "diagnosis": item.diagnosis,
-                        "stdout": item.stdout[-12000:],
-                        "stderr": item.stderr[-12000:],
-                        "command": args.command,
-                        "verify_command": args.verify,
-                    })
-                    repair_env = os.environ.copy()
-                    repair_env["BRAIN_FAILURE_FILE"] = str(failure_report)
-                    actions.register("repair", command_action("repair", shlex.split(args.repair), args.timeout, repair_env))
+                    # The repair action was registered once above with the current
+                    # failure report. Reuse it here; duplicate registration can
+                    # prevent the deterministic repair from running.
                     repair_result = actions.execute("repair")
                     item.repair_exit_code = repair_result.exit_code
                     item.repair_stdout = repair_result.output[-12000:]
