@@ -42,9 +42,19 @@ class CloudMiningControlPlane:
     def register_worker(self, worker: CloudWorker) -> None:
         if not worker.worker_id.strip() or not worker.owner.strip():
             raise ValueError("worker identity and owner are required")
-        if not math.isfinite(worker.max_temperature_c) or not 0 < worker.max_temperature_c <= 120:
+        if (
+            isinstance(worker.max_temperature_c, bool)
+            or not isinstance(worker.max_temperature_c, (int, float))
+            or not math.isfinite(worker.max_temperature_c)
+            or not 0 < worker.max_temperature_c <= 120
+        ):
             raise ValueError("max_temperature_c must be finite and in (0, 120]")
-        if not math.isfinite(worker.max_cpu_percent) or not 0 < worker.max_cpu_percent <= 100:
+        if (
+            isinstance(worker.max_cpu_percent, bool)
+            or not isinstance(worker.max_cpu_percent, (int, float))
+            or not math.isfinite(worker.max_cpu_percent)
+            or not 0 < worker.max_cpu_percent <= 100
+        ):
             raise ValueError("max_cpu_percent must be finite and in (0, 100]")
         self.workers[worker.worker_id] = worker
 
@@ -80,12 +90,21 @@ class CloudMiningControlPlane:
         if not worker.enabled:
             return False, "worker_disabled"
         if temperature_c is not None:
-            if isinstance(temperature_c, bool) or not isinstance(temperature_c, (int, float)) or not math.isfinite(temperature_c):
+            if (
+                isinstance(temperature_c, bool)
+                or not isinstance(temperature_c, (int, float))
+                or not math.isfinite(temperature_c)
+            ):
                 return False, "invalid_temperature_telemetry"
             if temperature_c >= worker.max_temperature_c:
                 return False, "thermal_limit_reached"
         if cpu_percent is not None:
-            if isinstance(cpu_percent, bool) or not isinstance(cpu_percent, (int, float)) or not math.isfinite(cpu_percent) or not 0 <= cpu_percent <= 100:
+            if (
+                isinstance(cpu_percent, bool)
+                or not isinstance(cpu_percent, (int, float))
+                or not math.isfinite(cpu_percent)
+                or not 0 <= cpu_percent <= 100
+            ):
                 return False, "invalid_cpu_telemetry"
             if cpu_percent > worker.max_cpu_percent:
                 return False, "cpu_limit_reached"
@@ -102,9 +121,12 @@ class CloudMiningControlPlane:
         """Record reported telemetry without promoting it to verified mining or revenue."""
         if job_id not in self.jobs:
             raise KeyError("unknown_job")
-        if isinstance(hashrate, bool) or not isinstance(hashrate, (int, float)):
-            raise ValueError("hashrate must be a finite non-negative number")
-        if not math.isfinite(hashrate) or hashrate < 0:
+        if (
+            isinstance(hashrate, bool)
+            or not isinstance(hashrate, (int, float))
+            or not math.isfinite(hashrate)
+            or hashrate < 0
+        ):
             raise ValueError("hashrate must be a finite non-negative number")
         for name, value in (("accepted", accepted), ("rejected", rejected)):
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
