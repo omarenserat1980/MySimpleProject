@@ -29,6 +29,21 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
             with self.assertRaisesRegex(StratumBridgeError, "FORBIDDEN_IN_CI"):
                 probe_stratum_connection()
 
+    def test_refuses_plaintext_stratum_before_sending_credentials(self):
+        env = {
+            "BRAIN_ENABLE_LIVE_STRATUM_BRIDGE": "1",
+            "BRAIN_STRATUM_HOST": "pool.example.invalid",
+            "BRAIN_STRATUM_PORT": "3333",
+            "BRAIN_STRATUM_USERNAME": "account.worker",
+            "BRAIN_STRATUM_PASSWORD": "secret",
+            "BRAIN_MINING_WORKER_OWNED": "1",
+            "BRAIN_MINING_AUTHORIZED": "1",
+            "BRAIN_STRATUM_TLS": "0",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(StratumBridgeError, "TLS_REQUIRED"):
+                probe_stratum_connection()
+
     def test_requires_explicit_ownership(self):
         env = {
             "BRAIN_ENABLE_LIVE_STRATUM_BRIDGE": "1",
