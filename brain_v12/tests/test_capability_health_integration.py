@@ -42,7 +42,7 @@ class CapabilityHealthIntegrationTests(unittest.TestCase):
             lambda spec: (_ for _ in ()).throw(RuntimeError("executor failure"))
             if spec.executor_id == "first" else "verified-result",
         )
-        self.assertEqual(result["status"], "SUCCESS")
+        self.assertEqual(result["status"], "VERIFIED_COMPLETED")
         self.assertEqual(result["executor_id"], "second")
         self.assertEqual(len(result["attempts"]), 2)
 
