@@ -13,6 +13,7 @@ Rules:
 - Backoff grows between attempts.
 - Secrets are redacted from persisted environment diagnostics.
 - The repair step is a replaceable Brain component. It can be a deterministic fixer today and an internal code-repair agent later.
+- Remote GitHub workflow dispatch is disabled by default; enable it only with `BRAIN_ENABLE_WORKFLOW_ACTIONS=1` after reviewing permissions and the target workflow.
 - The supervisor itself does not use Render, Oracle Cloud, or Google Cloud.
 
 Example:
