@@ -1,7 +1,14 @@
 """Safety tests for the read-only local resource inspector."""
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
-from brain_v12.tools.brain_phone_readonly_inspector import inspect_local_resources
+
+from brain_v12.tools.brain_phone_readonly_inspector import (
+    inspect_local_resources,
+    write_json_atomically,
+)
 
 
 class ReadOnlyInspectorTests(unittest.TestCase):
@@ -29,6 +36,16 @@ class ReadOnlyInspectorTests(unittest.TestCase):
     def test_rejects_invalid_node_id(self):
         with self.assertRaises(ValueError):
             inspect_local_resources(" ")
+
+    def test_saves_valid_json_to_local_path(self):
+        payload = {"state": "MEASURED_LOCAL_UNVERIFIED", "mining_started": False}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            target = Path(temp_dir) / "nested" / "measurement.json"
+            saved = write_json_atomically(target, payload)
+            self.assertEqual(saved, target)
+            self.assertEqual(json.loads(target.read_text(encoding="utf-8")), payload)
+            self.assertFalse(list(target.parent.glob("*.tmp")))
+
 
 if __name__ == "__main__":
     unittest.main()
