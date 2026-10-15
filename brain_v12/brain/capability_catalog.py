@@ -27,9 +27,12 @@ DEFAULT_EXECUTORS: tuple[ExecutorSpec, ...] = (
                  metadata={"kind": "external", "adapter": "youtube_publisher", "tier": "FREE_DIVERSE", "side_effect": True}),
 )
 
-def build_default_fabric(*, include_offline: bool = False,
-                         autonomy_policy: AutonomyPolicy | None = None) -> CapabilityFabric:
-    """Build the catalog with a caller-supplied explicit policy when authorized."""
+def build_default_fabric(
+    *,
+    include_offline: bool = False,
+    autonomy_policy: AutonomyPolicy | None = None,
+) -> CapabilityFabric:
+    """Build the default catalog with fail-closed policy unless explicitly overridden."""
     fabric = CapabilityFabric(autonomy_policy=autonomy_policy)
     for spec in DEFAULT_EXECUTORS:
         if include_offline or not spec.metadata.get("requires_probe"):
