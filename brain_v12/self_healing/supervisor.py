@@ -290,12 +290,18 @@ def main() -> int:
                 }, ensure_ascii=False))
 
                 if p.returncode == 0:
-                    ok = action_result.ok
-                    vo, ve, vc = action_result.output, action_result.error, action_result.exit_code
+                    # Success is gated by a deterministic independent verifier, never
+                    # by whichever action a reflection/LLM cycle happened to select.
+                    if args.verify:
+                        ok, vo, ve, vc = verify(args.verify, args.timeout)
+                    else:
+                        ok, vo, ve, vc = (
+                            False, "", "independent verification command not configured", 125
+                        )
                     item.verified = ok
                     item.stdout = (item.stdout + "\n[VERIFY]\n" + vo)[-20000:]
                     item.stderr = (item.stderr + "\n[VERIFY]\n" + ve)[-20000:]
-                    item.exit_code = vc if not ok else 0
+                    item.exit_code = 0 if ok else vc
                     attempts.append(item)
                     if ok:
                         final_code = 0
