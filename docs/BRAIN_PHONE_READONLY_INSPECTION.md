@@ -3,17 +3,19 @@
 This adds a strictly local, read-only inspection path alongside the existing
 simulation-first Brain Phone Base.
 
-## Run
+## Run on the target phone
 
-From the repository root, or from the checked-out repository in Termux:
+From the repository root in Termux, run this single command to save a local
+JSON evidence file and then run the safety tests:
 
 ```bash
-python -m brain_v12.tools.brain_phone_readonly_inspector --node-id realme-local-check
-python -m unittest brain_v12.tests.test_brain_phone_readonly_inspector -v
+python -m brain_v12.tools.brain_phone_readonly_inspector --node-id realme-local-check --output .brain/phone-measurements/phone-resource-measurement.json && python -m unittest brain_v12.tests.test_brain_phone_readonly_inspector -v
 ```
 
-Run the command on the phone you want to inspect. It measures the environment
-where Python is running. Running it on a PC measures that PC, not a phone.
+The JSON file is written locally and atomically. The command does not upload the
+file or send it to Brain. Keep `.brain/` local and do not commit personal device
+measurements unless explicitly intended. Running the inspector on a PC measures
+the PC, not a phone.
 
 ## Evidence labels
 
