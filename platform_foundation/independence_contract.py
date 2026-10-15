@@ -1,9 +1,25 @@
 """Fail-closed contract for claiming scoped Brain independence."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
+
+
+def compute_report_sha256(report: dict[str, Any]) -> str:
+    """Hash the canonical proof payload, excluding self-referential metadata."""
+    payload = dict(report)
+    payload.pop("report_sha256", None)
+    # The contract result is derived from this payload and would be circular.
+    payload.pop("independence_contract", None)
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 class IndependenceContract:
@@ -28,6 +44,17 @@ class IndependenceContract:
             report = json.loads(self.proof_path.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             return {"allowed": False, "reason": "proof_invalid"}
+
+        if not isinstance(report, dict):
+            return {"allowed": False, "reason": "proof_invalid"}
+
+        supplied_digest = report.get("report_sha256")
+        if not isinstance(supplied_digest, str) or len(supplied_digest) != 64:
+            return {"allowed": False, "reason": "report_hash_missing"}
+        if any(c not in "0123456789abcdef" for c in supplied_digest):
+            return {"allowed": False, "reason": "report_hash_invalid"}
+        if compute_report_sha256(report) != supplied_digest:
+            return {"allowed": False, "reason": "report_hash_mismatch"}
 
         checks = report.get("checks")
         if not isinstance(checks, dict):
@@ -55,6 +82,8 @@ class IndependenceContract:
             return {"allowed": False, "reason": "claim_not_allowed"}
 
         scope = report.get("scope", {})
+        if not isinstance(scope, dict):
+            return {"allowed": False, "reason": "scope_insufficient"}
         if scope.get("local_execution") is not True:
             return {"allowed": False, "reason": "local_execution_not_proven"}
         if scope.get("queue_to_completed") is not True:
@@ -69,8 +98,8 @@ class IndependenceContract:
             "reason": "scoped_independence_proven",
             "status": report["status"],
             "scope": scope,
-            "report_sha256": report.get("report_sha256"),
+            "report_sha256": supplied_digest,
         }
 
 
-__all__ = ["IndependenceContract"]
+__all__ = ["IndependenceContract", "compute_report_sha256"]
