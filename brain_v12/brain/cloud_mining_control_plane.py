@@ -2,7 +2,6 @@
 
 The cloud coordinates workers; it is not itself a GitHub Actions miner.
 Worker telemetry and payout references are untrusted until independently verified.
-Worker telemetry and payout references are untrusted until independently verified.
 """
 from __future__ import annotations
 
