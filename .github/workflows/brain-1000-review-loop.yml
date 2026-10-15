@@ -59,7 +59,7 @@ jobs:
               "note": "Run context only; step outcomes and independent verification are required to claim success."
           }
           Path(".brain/state/evolution-run-context.json").write_text(
-              json.dumps(evidence, sort_keys=True, indent=2) + "\\n",
+              json.dumps(evidence, sort_keys=True, indent=2) + "\n",
               encoding="utf-8"
           )
           PY
