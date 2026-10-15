@@ -1,0 +1,65 @@
+name: Brain ASIC Self-Modification Gate
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/asic_self_modification_gate.py"
+      - "brain_v12/brain/asic_self_modification_service.py"
+      - "brain_v12/tests/test_asic_self_modification_gate.py"
+      - "brain_v12/tests/test_asic_self_modification_service.py"
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-self-modification-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/asic_self_modification_gate.py"
+      - "brain_v12/brain/asic_self_modification_service.py"
+      - "brain_v12/tests/test_asic_self_modification_gate.py"
+      - "brain_v12/tests/test_asic_self_modification_service.py"
+      - "brain_v12/asic/**"
+      - ".github/workflows/brain-asic-self-modification-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-and-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile policy, service, and tests
+        run: >-
+          python -m py_compile
+          brain_v12/brain/asic_self_modification_gate.py
+          brain_v12/brain/asic_self_modification_service.py
+          brain_v12/tests/test_asic_self_modification_gate.py
+          brain_v12/tests/test_asic_self_modification_service.py
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run policy and service tests
+        env:
+          PYTHONPATH: .
+        run: python -m pytest brain_v12/tests/test_asic_self_modification_gate.py brain_v12/tests/test_asic_self_modification_service.py -q
+      - name: Install open-source RTL tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog yosys
+      - name: Run RTL testbench
+        run: |
+          mkdir -p artifacts/asic-self-modification
+          iverilog -g2012 -o artifacts/asic-self-modification/brain_asic_tb brain_v12/asic/rtl/brain_asic_core.sv brain_v12/asic/rtl/tb_brain_asic_core.sv
+          vvp artifacts/asic-self-modification/brain_asic_tb | tee artifacts/asic-self-modification/rtl.log
+          grep -q "ALL_RTL_TESTS_PASSED" artifacts/asic-self-modification/rtl.log
+      - name: Run Yosys synthesis checks
+        run: |
+          mkdir -p artifacts/asic-self-modification
+          yosys -p "read_verilog -sv brain_v12/asic/rtl/brain_asic_core.sv; hierarchy -check -top brain_asic_core; proc; opt; check; synth -top brain_asic_core; check; stat" | tee artifacts/asic-self-modification/yosys.log
+      - name: Assert no deployment or real-mining claim
+        run: |
+          echo "CI validates policy and RTL only."
+          echo "It does not prove fabricated silicon, pool shares, payout, or profit."
