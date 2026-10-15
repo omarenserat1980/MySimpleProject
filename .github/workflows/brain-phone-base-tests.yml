@@ -1,0 +1,38 @@
+name: Brain Phone Base Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/brain_phone_base.py"
+      - "brain_v12/tests/test_brain_phone_base.py"
+      - "docs/BRAIN_PHONE_BASE.md"
+      - ".github/workflows/brain-phone-base-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-phone-base-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phone-base-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile module and tests
+        run: python -m py_compile brain_v12/tools/brain_phone_base.py brain_v12/tests/test_brain_phone_base.py
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: python -m unittest brain_v12.tests.test_brain_phone_base -v
+      - name: Assert simulation-only boundary
+        run: |
+          python -m brain_v12.tools.brain_phone_base > phone-base-simulation.json
+          python -c "import json; d=json.load(open('phone-base-simulation.json')); assert d['mode']=='SIMULATOR' and d['synthetic'] is True and d['real_activation_performed'] is False and d['mining_started'] is False"
+          echo "Simulation output is synthetic; CI does not verify a real phone."
