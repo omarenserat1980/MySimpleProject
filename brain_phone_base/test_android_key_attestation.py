@@ -51,9 +51,14 @@ def _authorization_list(fields: dict[int, bytes]) -> bytes:
     return _tlv(0x30, b"".join(_high_tag(number, value) for number, value in fields.items()))
 
 
-def _attestation_der(challenge: bytes, attestation_level: int = 1, keymaster_level: int = 1, locked: bool = True, boot_state: int = 0, patch_level: int = 202610) -> bytes:
+def _attestation_der(challenge: bytes, attestation_level: int = 1, keymaster_level: int = 1, locked: bool = True, boot_state: int = 0, patch_level: int = 202610, app_package: str | None = None, app_signer_sha256: bytes | None = None) -> bytes:
     root_of_trust = _tlv(0x30, _tlv(0x04, b"boot-key") + _tlv(0x01, b"\xff" if locked else b"\x00") + _tlv(0x0A, bytes([boot_state])) + _tlv(0x04, b"boot-hash"))
-    tee = _authorization_list({704: root_of_trust, 706: _tlv(0x02, (patch_level).to_bytes(3, "big")), 718: _tlv(0x02, (patch_level).to_bytes(3, "big")), 719: _tlv(0x02, (patch_level).to_bytes(3, "big"))})
+    tee_fields = {704: root_of_trust, 706: _tlv(0x02, (patch_level).to_bytes(3, "big")), 718: _tlv(0x02, (patch_level).to_bytes(3, "big")), 719: _tlv(0x02, (patch_level).to_bytes(3, "big"))}
+    if app_package is not None and app_signer_sha256 is not None:
+        package_info = _tlv(0x30, _tlv(0x0C, app_package.encode("utf-8")) + _integer(1))
+        app_id = _tlv(0x30, _tlv(0x31, package_info) + _tlv(0x31, _tlv(0x04, app_signer_sha256)))
+        tee_fields[709] = _tlv(0x04, app_id)
+    tee = _authorization_list(tee_fields)
     fields = b"".join([
         _integer(4), _integer(attestation_level, 0x0A), _integer(4),
         _integer(keymaster_level, 0x0A), _tlv(0x04, challenge), _tlv(0x04, b""),
@@ -129,6 +134,38 @@ class AndroidKeyAttestationTests(unittest.TestCase):
         self.assertTrue(result["verified_boot"]["device_locked"])
         self.assertEqual(result["patch_levels"]["os"], 202610)
 
+
+    def test_application_identity_matching_package_and_signer_is_reported_but_not_trusted(self):
+        signer = bytes.fromhex("a1" * 32)
+        leaf = self._make_leaf(self.challenge, app_package="org.example.brain", app_signer_sha256=signer)
+        result = self.verify(
+            certificate_chain=[leaf.public_bytes(serialization.Encoding.DER), self.root_der],
+            expected_application_package_name="org.example.brain",
+            expected_application_signing_cert_sha256={signer.hex()},
+        )
+        self.assertTrue(result["application_identity_policy_checked"])
+        self.assertEqual(result["application_identity"], {
+            "checked": True,
+            "package_name_match": True,
+            "signing_certificate_digest_match": True,
+        })
+        self.assertFalse(result["device_identity_verified"])
+        self.assertFalse(result["trusted"])
+        self.assertFalse(result["active"])
+
+    def test_application_identity_mismatch_fails_closed(self):
+        signer = bytes.fromhex("b2" * 32)
+        leaf = self._make_leaf(self.challenge, app_package="org.example.other", app_signer_sha256=signer)
+        with self.assertRaisesRegex(AttestationError, "ATTESTATION_APPLICATION_ID_MISMATCH"):
+            self.verify(
+                certificate_chain=[leaf.public_bytes(serialization.Encoding.DER), self.root_der],
+                expected_application_package_name="org.example.brain",
+                expected_application_signing_cert_sha256={signer.hex()},
+            )
+
+    def test_application_identity_policy_requires_package_and_signer_together(self):
+        with self.assertRaisesRegex(AttestationError, "APPLICATION_IDENTITY_POLICY_INCOMPLETE"):
+            self.verify(expected_application_package_name="org.example.brain")
 
     def test_unlocked_device_fails_closed(self):
         leaf = self._make_leaf(self.challenge, locked=False)
