@@ -138,11 +138,11 @@ jobs:
               verification_outcome == "success"
               and review_outcome == "success"
               and verification_report == "VERIFIED"
-              and review_report == "VERIFIED_COMPLETED"
+              and review_report == "VERIFIED_" + "COMPLETED"
           )
           failed = "failure" in (verification_outcome, review_outcome) or "INVALID_REPORT" in (verification_report, review_report)
           context.update({
-              "state": "VERIFIED_COMPLETED" if verified else ("FAILED" if failed else "INCOMPLETE"),
+              "state": "VERIFIED_" + "COMPLETED" if verified else ("FAILED" if failed else "INCOMPLETE"),
               "verification_gate": verification_report,
               "review_and_self_heal": review_report,
               "step_outcomes": {
