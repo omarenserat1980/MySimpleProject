@@ -21,7 +21,9 @@ def test_full_fabric_flow(tmp_path, monkeypatch):
         storage_gb=100,
         capabilities=["docker", "ffmpeg", "python"],
     )
-    assert node["state"] == "READY"
+    assert node["state"] == "UNTRUSTED_INACTIVE"
+    assert node["trusted"] is False
+    assert node["active"] is False
 
     assert consume_enrollment("integration-node", issued["enrollment_token"])
     assert not verify_enrollment("integration-node", issued["enrollment_token"])
@@ -29,6 +31,20 @@ def test_full_fabric_flow(tmp_path, monkeypatch):
     live = heartbeat("integration-node", jobs_running=0)
     assert live["last_heartbeat"] > 0
 
+    # Enrollment proves possession of a short-lived token, not device identity.
+    # Scheduling must remain blocked until independent verification and manual approval.
+    try:
+        choose_node(["ffmpeg"])
+    except RuntimeError as exc:
+        assert str(exc) == "NO_ELIGIBLE_BRAIN_FABRIC_NODE"
+    else:
+        raise AssertionError("untrusted node was scheduled")
+
+    from cloud.brain_fabric import _atomic_write, _state_dir
+    node.update({"state": "READY", "trusted": True, "active": True,
+                 "identity_verified": True, "manual_approval": True,
+                 "last_heartbeat": 9999999999})
+    _atomic_write(_state_dir() / "node-integration-node.json", node)
     selected = choose_node(["ffmpeg"])
     assert selected["node_id"] == "integration-node"
 

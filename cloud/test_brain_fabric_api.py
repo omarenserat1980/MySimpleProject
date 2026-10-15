@@ -3,6 +3,23 @@ import sys
 
 from fastapi.testclient import TestClient
 
+
+def _authorize_test_node(node_id):
+    """Seed an explicitly authorized fixture for job/lease lifecycle tests."""
+    from cloud.brain_fabric import _atomic_write, _now, _state_dir, list_nodes
+
+    node = next(item for item in list_nodes() if item["node_id"] == node_id)
+    node.update(
+        state="READY",
+        trusted=True,
+        active=True,
+        identity_verified=True,
+        manual_approval=True,
+        last_heartbeat=_now(),
+    )
+    _atomic_write(_state_dir() / f"node-{node_id}.json", node)
+    return node
+
 def test_fabric_api_end_to_end(tmp_path, monkeypatch):
     monkeypatch.setenv("BRAIN_FABRIC_STATE_DIR", str(tmp_path / "fabric"))
     monkeypatch.setenv("BRAIN_STATE_DIR", str(tmp_path / "state"))
@@ -42,9 +59,19 @@ def test_fabric_api_end_to_end(tmp_path, monkeypatch):
     assert nodes.status_code == 200
     assert nodes.json()["nodes"][0]["node_id"] == "api-node"
 
-    job = client.post("/v1/fabric/jobs", headers=auth,
-                      json={"kind": "api-integration", "payload": {"test": True},
-                            "required_capabilities": ["ffmpeg"]})
+    assert node["state"] == "UNTRUSTED_INACTIVE"
+    assert node["trusted"] is False
+    assert node["active"] is False
+
+    job_payload = {"kind": "api-integration", "payload": {"test": True},
+                   "required_capabilities": ["ffmpeg"]}
+    rejected_job = client.post("/v1/fabric/jobs", headers=auth, json=job_payload)
+    assert rejected_job.status_code == 409
+
+    # This fixture authorizes the node only to exercise downstream job APIs;
+    # enrollment and heartbeat alone must never grant trust in production.
+    _authorize_test_node("api-node")
+    job = client.post("/v1/fabric/jobs", headers=auth, json=job_payload)
     assert job.status_code == 200
     job_id = job.json()["job"]["job_id"]
 
@@ -92,6 +119,7 @@ def test_expired_job_lease_is_recovered_and_released_again(tmp_path, monkeypatch
         "win-node", provider="azure", architecture="x86_64",
         capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
     )
+    _authorize_test_node("win-node")
     job = create_job(
         "windows-command", {"argv": ["cmd.exe", "/c", "echo", "x"]},
         ["windows-server-2025", "windows-cloud", "brain-task-execution"],
@@ -134,6 +162,7 @@ def test_expired_job_stops_after_lease_retry_limit(tmp_path, monkeypatch):
         "win-node-limit", provider="azure", architecture="x86_64",
         capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
     )
+    _authorize_test_node("win-node-limit")
     job = create_job(
         "windows-command", {"argv": ["cmd.exe"]},
         ["windows-server-2025", "windows-cloud", "brain-task-execution"],
@@ -205,17 +234,17 @@ def test_api_rejects_stale_worker_result_after_lease_expiry_and_release(tmp_path
     )
     assert heartbeat.status_code == 200
 
-    job_response = client.post(
-        "/v1/fabric/jobs",
-        headers=auth,
-        json={
-            "kind": "api-stale-lease",
-            "payload": {"test": True},
-            "required_capabilities": [
-                "windows-server-2025", "windows-cloud", "brain-task-execution"
-            ],
-        },
-    )
+    job_payload = {
+        "kind": "api-stale-lease",
+        "payload": {"test": True},
+        "required_capabilities": [
+            "windows-server-2025", "windows-cloud", "brain-task-execution"
+        ],
+    }
+    rejected_job = client.post("/v1/fabric/jobs", headers=auth, json=job_payload)
+    assert rejected_job.status_code == 409
+    _authorize_test_node("api-stale-worker")
+    job_response = client.post("/v1/fabric/jobs", headers=auth, json=job_payload)
     assert job_response.status_code == 200
     job_id = job_response.json()["job"]["job_id"]
 
@@ -282,6 +311,7 @@ def test_old_node_cannot_complete_released_lease(tmp_path, monkeypatch):
         "win-node-stale", provider="azure", architecture="x86_64",
         capabilities=["windows-server-2025", "windows-cloud", "brain-task-execution"],
     )
+    _authorize_test_node("win-node-stale")
     job = create_job(
         "windows-command", {"argv": ["cmd.exe"]},
         ["windows-server-2025", "windows-cloud", "brain-task-execution"],
