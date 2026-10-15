@@ -77,7 +77,7 @@ def test_failed_repair_never_claims_success_and_attempts_are_bounded(tmp_path):
 def test_successful_target_with_failed_independent_verifier_never_claims_success(tmp_path):
     target = tmp_path / "target.py"
     verify = tmp_path / "verify.py"
-    target.write_text("print('TARGET_OK')\n", encoding="utf-8")
+    target.write_text("print('TARGET_OK')" + chr(10), encoding="utf-8")
     verify.write_text(
         "print('INDEPENDENT_VERIFIER_FAILED')\nraise SystemExit(8)\n",
         encoding="utf-8",
