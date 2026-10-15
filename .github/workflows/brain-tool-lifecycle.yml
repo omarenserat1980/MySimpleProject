@@ -5,13 +5,17 @@ on:
     branches: [main]
     paths:
       - "brain_v12/tool_lifecycle.py"
+      - "brain_v12/brain/capability_fabric.py"
       - "brain_v12/tests/test_tool_lifecycle.py"
+      - "brain_v12/tests/test_capability_fabric_promotion.py"
       - ".github/workflows/brain-tool-lifecycle.yml"
   push:
     branches: ["feat/simulation-to-real-tool-lifecycle"]
     paths:
       - "brain_v12/tool_lifecycle.py"
+      - "brain_v12/brain/capability_fabric.py"
       - "brain_v12/tests/test_tool_lifecycle.py"
+      - "brain_v12/tests/test_capability_fabric_promotion.py"
       - ".github/workflows/brain-tool-lifecycle.yml"
 
 permissions:
@@ -28,7 +32,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run lifecycle unit tests
+      - name: Run lifecycle and promotion tests
         env:
           PYTHONPATH: .
-        run: python -m unittest brain_v12.tests.test_tool_lifecycle -v
+        run: |
+          python -m unittest brain_v12.tests.test_tool_lifecycle -v
+          python -m unittest brain_v12.tests.test_capability_fabric_promotion -v
