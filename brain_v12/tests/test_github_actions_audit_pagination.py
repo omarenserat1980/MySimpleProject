@@ -35,7 +35,7 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
         self.assertEqual(result["pages_fetched"], 2)
 
     def test_recent_runs_cover_all_pages_and_report_window(self):
-        path = "/repos/o/r/actions/runs"
+        path = "/repos/o/r/actions/workflows/7/runs"
         now = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
         old = (now - timedelta(hours=25)).isoformat().replace("+00:00", "Z")
         recent = (now - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
@@ -43,7 +43,7 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
             (path, 1): {"total_count": 2, "workflow_runs": [{"id": 1, "created_at": recent}]},
             (path, 2): {"total_count": 2, "workflow_runs": [{"id": 2, "created_at": old}]},
         })
-        result = api.actions_runs_last_24h("o", "r", now=now, per_page=1)
+        result = api.actions_runs_last_24h("o", "r", workflow_ids=[7], now=now, per_page=1)
         self.assertTrue(result["complete"])
         self.assertEqual([r["id"] for r in result["workflow_runs"]], [1])
         self.assertEqual(result["count"], 1)
@@ -55,7 +55,7 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
             (path, 1): {"total_count": 1001, "workflow_runs": []},
         })
         with self.assertRaisesRegex(GitHubControlError, "ACTIONS_RUNS_API_RESULT_CAP_EXCEEDED"):
-            api.actions_runs_last_24h("o", "r", now=datetime.now(timezone.utc))
+            api.actions_runs_last_24h("o", "r", workflow_ids=[7], now=datetime.now(timezone.utc))
 
     def test_missing_total_count_fails_closed(self):
         path = "/repos/o/r/actions/runs"
@@ -68,7 +68,7 @@ class GitHubActionsAuditPaginationTests(unittest.TestCase):
     def test_naive_clock_is_rejected(self):
         api = FakeControlPlane({})
         with self.assertRaisesRegex(ValueError, "timezone-aware"):
-            api.actions_runs_last_24h("o", "r", now=datetime(2026, 10, 15, 12))
+            api.actions_runs_last_24h("o", "r", workflow_ids=[7], now=datetime(2026, 10, 15, 12))
 
 
 if __name__ == "__main__":
