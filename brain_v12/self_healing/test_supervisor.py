@@ -78,3 +78,43 @@ def test_workflow_action_registration_is_fixed_and_allowlisted(monkeypatch):
     assert captured["workflow_id"] == "reflection-e2e"
     assert captured["repo"] == "omarenserat1980/MySimpleProject"
     assert captured["ref"] == "main"
+
+
+
+def test_existing_supervisor_lock_is_not_overwritten_and_target_does_not_run(tmp_path):
+    target = tmp_path / "target.py"
+    marker = tmp_path / "target-ran.txt"
+    target.write_text(
+        "from pathlib import Path\\n"
+        + "Path(" + repr(str(marker)) + ").write_text('ran', encoding='utf-8')\\n",
+        encoding="utf-8",
+    )
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    lock_path = state_dir / "supervisor.lock"
+    original_lock = "existing-owner 2026-01-01T00:00:00+00:00\\n"
+    lock_path.write_text(original_lock, encoding="utf-8")
+
+    env = os.environ.copy()
+    env["BRAIN_CHATGPT_REFLECTION"] = "0"
+    env.pop("BRAIN_ENABLE_WORKFLOW_ACTIONS", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "brain_v12.self_healing.supervisor",
+            "--command", _command(target),
+            "--state", str(state_dir),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 3
+    assert "BRAIN_SUPERVISOR_ALREADY_RUNNING" in result.stdout
+    assert lock_path.read_text(encoding="utf-8") == original_lock
+    assert not marker.exists()
