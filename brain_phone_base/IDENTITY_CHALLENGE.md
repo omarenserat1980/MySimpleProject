@@ -21,9 +21,12 @@ identity is independently verified.
 - Validate Android Key Attestation and its certificate chain, security level,
   application identity, verified-boot/device-lock state (where supported), and
   challenge binding on a trusted verifier before making an identity decision.
-- Enforce one-time challenge IDs in durable verifier-side storage. The optional
-  `seen_challenge_ids` set in this library is only a caller-supplied replay
-  check; it is not durable by itself.
+- Enforce one-time challenge IDs in durable verifier-side storage.
+  `brain_phone_base.replay_store.SQLiteReplayStore` provides a SQLite-backed,
+  atomic insert guarded by a unique challenge ID. Pass it as `replay_store=` to
+  the verifier; database errors fail closed. Keep its database on trusted
+  verifier-side storage with restrictive filesystem permissions. The optional
+  `seen_challenge_ids` set is compatibility-only and is not durable.
 - The verifier accepts Ed25519 or P-256 public keys. The Android helper signs
   response canonical JSON using `SHA256withECDSA`; challenge signatures may use
   a supported key type and base64 encoding.
@@ -60,6 +63,8 @@ a particular physical phone, or that the measurements are truthful.
    enrollment and measurement binding. Trust and activation remain blocked until
    the attestation policy and explicit manual approval both pass.
 
-No endpoint, enrollment authority, certificate-chain validator, replay database,
-or network transport is included in this change. Do not treat the helper alone
+No endpoint, enrollment authority, Android certificate-chain validator, or network
+transport is included in this change. The SQLite replay ledger is a reusable
+local verifier-side primitive; it is not a distributed replay service and does
+not establish device identity. Do not treat the helper alone
 as completed independent identity verification.
