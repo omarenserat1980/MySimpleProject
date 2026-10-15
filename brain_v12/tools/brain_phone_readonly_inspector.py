@@ -55,7 +55,7 @@ def write_json_atomically(output_path: str | Path, payload: dict[str, Any]) -> P
     """Write evidence locally and atomically; never upload or register it."""
     target = Path(output_path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
-    serialized = json.dumps(payload, indent=2, sort_keys=True) + "\\n"
+    serialized = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     fd, temp_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent))
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
