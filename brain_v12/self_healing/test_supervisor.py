@@ -27,3 +27,16 @@ def test_workflow_actions_require_explicit_opt_in():
     assert workflow_actions_enabled("0") is False
     assert workflow_actions_enabled("false") is False
     assert workflow_actions_enabled("anything") is False
+
+
+def test_workflow_actions_environment_value_is_normalized(monkeypatch):
+    from brain_v12.self_healing.supervisor import workflow_actions_enabled
+
+    monkeypatch.setenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", " TRUE ")
+    assert workflow_actions_enabled() is True
+
+    monkeypatch.setenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", " YES ")
+    assert workflow_actions_enabled() is True
+
+    monkeypatch.setenv("BRAIN_ENABLE_WORKFLOW_ACTIONS", "on")
+    assert workflow_actions_enabled() is False
