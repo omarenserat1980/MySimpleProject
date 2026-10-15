@@ -169,11 +169,14 @@ def main() -> int:
     state_dir = Path(args.state)
     history_path = state_dir / "self_healing_history.json"
     lock_path = state_dir / "supervisor.lock"
-    if lock_path.exists():
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
         print("BRAIN_SUPERVISOR_ALREADY_RUNNING")
         return 3
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    lock_path.write_text(f"{os.getpid()} {utc_now()}\n", encoding="utf-8")
+    with os.fdopen(lock_fd, "w", encoding="utf-8") as lock_file:
+        lock_file.write(f"{os.getpid()} {utc_now()}\n")
 
     attempts: list[Attempt] = []
     final_code = 1
