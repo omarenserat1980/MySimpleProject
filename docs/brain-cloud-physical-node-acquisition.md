@@ -8,6 +8,12 @@ Use Brain cloud orchestration to discover and prepare an owner-authorized, genui
 
 Brain is the orchestrator, not a cloud-compute provider by itself. Its connected tools must be the first discovery surface: enumerate available computer/device connectors, repository/CI execution, and explicitly connected cloud-provider APIs; record each tool's actual capabilities and authorization state; and route only to tools that can perform the requested operation. Never infer that a tool can provision compute merely because it can edit GitHub or run CI. If no persistent executor or authorized provider adapter is connected, return `NO_AUTHORIZED_PROVIDER` with the missing connector/capability names instead of looping on user prompts or fabricating credentials. GitHub Actions may run bounded discovery and tests, but is not a substitute for a persistent host.
 
+## Self-copy into a Brain Cloud provider
+
+The requested self-copy is implemented as a deployment/control-plane direction, not as a claim that copying source creates compute. Brain may package a version-pinned copy of its service and run it on an already available authorized host. The new `brain_v12/brain/brain_cloud_provider.py` provides a Brain-owned inventory facade (`brain-cloud`) and advertises capacity only when a worker has a provider instance identity, fresh heartbeat, authenticated connection, owner authorization, real backing resource, and verified zero-cost status. Its companion tests cover empty capacity, simulated nodes, and stale heartbeats.
+
+This is a logical provider control plane, not a standalone infrastructure vendor. It does not yet provision VMs, allocate external CPU/RAM/storage, or bootstrap a new host. A provider-specific provisioning adapter plus an authorized account/credential and verified zero-cost offer are still required to create the first real node. The absence of such a host must result in `NO_VERIFIED_CAPACITY`, not simulated success.
+
 ## Architecture
 
 1. Cloud discovery coordinator: enumerate only provider accounts/connectors explicitly authorized by the owner. Report connector availability and provider API failures distinctly.
