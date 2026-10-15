@@ -167,6 +167,23 @@ class AndroidKeyAttestationTests(unittest.TestCase):
         with self.assertRaisesRegex(AttestationError, "APPLICATION_IDENTITY_POLICY_INCOMPLETE"):
             self.verify(expected_application_package_name="org.example.brain")
 
+    def test_security_level_below_policy_fails_closed(self):
+        with self.assertRaisesRegex(AttestationError, "HARDWARE_SECURITY_LEVEL_BELOW_POLICY"):
+            self.verify(minimum_key_security_level="STRONG_BOX")
+
+    def test_invalid_security_level_policy_fails_closed(self):
+        with self.assertRaisesRegex(AttestationError, "MINIMUM_SECURITY_LEVEL_INVALID"):
+            self.verify(minimum_key_security_level="BEST_AVAILABLE")
+
+    def test_software_minimum_does_not_change_untrusted_result(self):
+        result = self.verify(minimum_key_security_level="SOFTWARE")
+        self.assertEqual(result["status"], "CHAIN_AND_CHALLENGE_VALID_POLICY_INCOMPLETE")
+        self.assertFalse(result["device_identity_verified"])
+        self.assertFalse(result["trusted"])
+        self.assertFalse(result["active"])
+        self.assertEqual(result["manual_approval"], "NOT_GRANTED")
+        self.assertEqual(result["mining"], "DISABLED")
+
     def test_unlocked_device_fails_closed(self):
         leaf = self._make_leaf(self.challenge, locked=False)
         with self.assertRaisesRegex(AttestationError, "DEVICE_NOT_LOCKED"):
