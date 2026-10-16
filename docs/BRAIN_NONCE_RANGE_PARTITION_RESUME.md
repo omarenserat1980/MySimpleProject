@@ -33,3 +33,16 @@ range arithmetic inconsistencies, and nonce-space exhaustion. The checkpoint
 explicitly marks itself `authenticated: false`: it is not a signed token and
 must not be trusted across process boundaries until a separate signature/MAC
 or trusted storage layer is implemented and verified.
+
+## Optional authenticated checkpoint contract
+
+`sign_nonce_search_checkpoint` and `validate_authenticated_nonce_search_checkpoint`
+add HMAC-SHA256 authentication for persistence or transfer when the caller has a
+trusted secret provider. The key is supplied by the caller, must be at least 32
+bytes, and is never generated or persisted by this module. The signed contract
+uses a deterministic JSON representation and rejects unknown fields, tampering,
+wrong keys, malformed tags, and unsigned checkpoints. HMAC requires the signer
+and verifier to share a secret; it does not provide non-repudiation or solve key
+rotation/distribution. Do not use a test key in production. No production key,
+secret, or storage backend is configured by this change, and no checkpoint is
+used to start compute automatically.
