@@ -57,3 +57,12 @@ def test_cli_json_output_is_machine_readable(monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["brain_mining_runtime_doctor.py", "--json"])
     assert doctor.main() == 0
     assert json.loads(capsys.readouterr().out)["read_only"] is True
+
+
+def test_find_powershell_uses_systemroot_fallback_when_path_is_reduced(monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which", lambda _name: None)
+    monkeypatch.setenv("SystemRoot", r"C:\Windows")
+    monkeypatch.setattr(doctor.os.path, "isfile", lambda path: path.endswith("powershell.exe"))
+    result = doctor._find_powershell()
+    assert result is not None
+    assert result.endswith("WindowsPowerShell\\v1.0\\powershell.exe") or result.endswith("WindowsPowerShell/v1.0/powershell.exe")
