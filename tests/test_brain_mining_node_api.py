@@ -17,8 +17,13 @@ def test_status_is_explicitly_simulated_and_makes_no_real_claims():
         "brain_supervisor",
         "asic_simulator",
         "bitcoin_mining_intelligence",
-        "bitcoin_worker",
+        "brain_owned_mining_contract",
+        "brain_owned_compute_backend_pending",
     }.issubset(set(result["integrated_components"]))
+    assert result["execution_mode"] == "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY"
+    assert result["physical_devices_role"] == "CONNECTIVITY_OBSERVATION_ONLY"
+    assert result["external_miner_execution"] == "FORBIDDEN"
+    assert result["local_device_computation_allowed"] is False
 
 
 def test_readiness_keeps_real_mining_blocked_without_trusted_collectors():
@@ -26,7 +31,8 @@ def test_readiness_keeps_real_mining_blocked_without_trusted_collectors():
     assert result["software_api_ready"] is True
     assert result["real_mining_ready"] is False
     assert result["state"] == "BLOCKED"
-    assert result["gates"]["G4_physical_device"].startswith("BLOCKED")
+    assert result["gates"]["G2_brain_owned_compute_backend"] == "BLOCKED_NOT_IMPLEMENTED"
+    assert result["gates"]["G4_gateway_connectivity"] == "NOT_REQUIRED_FOR_COMPUTE"
     assert result["gates"]["G5_pool_shares"].startswith("BLOCKED")
     assert result["real_mining_claim"] is False
     assert result["revenue_claim"] is False
@@ -54,3 +60,14 @@ def test_caller_supplied_fields_cannot_promote_mining_to_verified():
     assert result["real_mining_verified"] is False
     assert result["state"] == "REQUIRES_INDEPENDENT_SERVER_VERIFICATION"
     assert result["missing_evidence"] == []
+
+
+
+def test_software_only_contract_endpoint_fails_closed():
+    from brain_v12.brain.mining_node_api import get_software_only_contract
+
+    result = get_software_only_contract()
+    assert result["plan"]["physical_device_computation_allowed"] is False
+    assert result["plan"]["external_miner_execution_allowed"] is False
+    assert result["execution_gate"]["execution_allowed"] is False
+    assert result["execution_started"] is False
