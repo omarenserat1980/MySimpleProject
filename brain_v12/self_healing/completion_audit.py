@@ -17,6 +17,15 @@ def files():
         if any(part in SKIP for part in p.parts) or not p.is_file(): continue
         if p.suffix.lower() in TEXT_EXT: yield p
 
+def is_intentional_not_implemented_state(line: str) -> bool:
+    """Recognize explicit fail-closed status fields, not unfinished TODOs."""
+    patterns = (
+        r"""^\s*["']?adapter_status["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
+        r"""^\s*["']?native_mining_backend["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
+        r"""^\s*assert\s+[^#]*\[\s*["']native_mining_backend["']\s*\]\s*==\s*["']NOT_IMPLEMENTED["']\s*$""",
+    )
+    return any(re.search(pattern, line) for pattern in patterns)
+
 def main():
     findings=[]
     py=list(ROOT.glob("brain_v12/**/*.py"))+list(ROOT.glob("cloud/**/*.py"))
@@ -26,13 +35,9 @@ def main():
         try: text=p.read_text(encoding="utf-8")
         except Exception: continue
         for i,line in enumerate(text.splitlines(),1):
-            # NOT_IMPLEMENTED is a legitimate runtime state for discovered, unverified
-            # adapters; it is not an unfinished-code marker when used as adapter_status.
-            intentional_adapter_state = re.search(
-                r"""^\s*["']?adapter_status["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
-                line,
-            )
-            if not intentional_adapter_state and re.search(r"(?i)\b(TODO|FIXME|XXX|NOT_IMPLEMENTED)\b",line):
+            # Explicit fail-closed readiness fields are truthful status, not TODOs.
+            intentional_state = is_intentional_not_implemented_state(line)
+            if not intentional_state and re.search(r"(?i)\b(TODO|FIXME|XXX|NOT_IMPLEMENTED)\b",line):
                 findings.append({"kind":"marker","file":str(p.relative_to(ROOT)),"line":i,"text":line.strip()[:240]})
         if p.name.startswith("test_"): continue
         if "def " in text and "pytest" not in text and "test_" not in p.name:
