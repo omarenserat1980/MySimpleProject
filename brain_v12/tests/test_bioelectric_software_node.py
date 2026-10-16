@@ -42,6 +42,7 @@ class BioelectricSoftwareNodeTests(unittest.TestCase):
             {"pulse_duration_s": 0},
             {"pulses_per_second": -1},
             {"cell_voltage_v": math.inf},
+            {"pulse_duration_s": 1e308, "pulses_per_second": 1e308},
         ):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 simulate_bioelectric_node(**kwargs)
