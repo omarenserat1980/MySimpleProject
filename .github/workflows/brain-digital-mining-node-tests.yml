@@ -29,7 +29,7 @@ jobs:
       - name: Run tests
         env:
           PYTHONPATH: .
-        run: python -m unittest brain_v12.tests.test_digital_mining_node -v
+        run: python -m pytest -q brain_v12/tests/test_digital_mining_node.py
       - name: State evidence boundary
         run: |
           echo "CI validates only source and unit tests."
