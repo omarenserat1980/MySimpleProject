@@ -5,8 +5,14 @@ on:
     paths:
       - "brain_v12/tools/brain_phone_base.py"
       - "brain_v12/tests/test_brain_phone_base.py"
+      - "brain_v12/tools/brain_phone_readonly_inspector.py"
+      - "brain_v12/tools/brain_phone_verification_gate.py"
+      - "brain_v12/tests/test_brain_phone_readonly_inspector.py"
+      - "brain_v12/tests/test_brain_phone_verification_gate.py"
       - "brain_phone_base/**"
+      - "android_executor/app/src/main/java/com/electronicbrain/androidexecutor/**"
       - "docs/BRAIN_PHONE_BASE.md"
+      - "docs/BRAIN_PHONE_VERIFICATION_GATE.md"
       - ".github/workflows/brain-phone-base-tests.yml"
   workflow_dispatch:
 
@@ -33,12 +39,20 @@ jobs:
           python -m py_compile \
             brain_v12/tools/brain_phone_base.py \
             brain_v12/tests/test_brain_phone_base.py \
+            brain_v12/tools/brain_phone_readonly_inspector.py \
+            brain_v12/tools/brain_phone_verification_gate.py \
+            brain_v12/tests/test_brain_phone_readonly_inspector.py \
+            brain_v12/tests/test_brain_phone_verification_gate.py \
             brain_phone_base/android_real_measurement.py \
             brain_phone_base/local_executor.py \
             brain_phone_base/identity_challenge.py \
+            brain_phone_base/android_key_attestation.py \
             brain_phone_base/test_android_real_measurement.py \
             brain_phone_base/test_local_executor.py \
-            brain_phone_base/test_identity_challenge.py
+            brain_phone_base/test_identity_challenge.py \
+            brain_phone_base/test_android_key_attestation.py \
+            brain_phone_base/replay_store.py \
+            brain_phone_base/test_replay_store.py
       - name: Run focused tests
         env:
           PYTHONPATH: .
@@ -47,6 +61,10 @@ jobs:
           python -m unittest brain_phone_base.test_android_real_measurement -v
           python -m unittest brain_phone_base.test_local_executor -v
           python -m unittest brain_phone_base.test_identity_challenge -v
+          python -m unittest brain_v12.tests.test_brain_phone_readonly_inspector -v
+          python -m unittest brain_v12.tests.test_brain_phone_verification_gate -v
+          python -m unittest brain_phone_base.test_android_key_attestation -v
+          python -m unittest brain_phone_base.test_replay_store -v
       - name: Assert simulation-only boundary
         run: |
           python -m brain_v12.tools.brain_phone_base > phone-base-simulation.json

@@ -104,6 +104,7 @@ def verify_challenge_response(
     expected_measurement_sha256: str,
     now: datetime | None = None,
     seen_challenge_ids: set[str] | None = None,
+    replay_store: Any | None = None,
 ) -> dict[str, Any]:
     """Verify a signed fresh challenge and a response bound to one measurement.
 
@@ -170,13 +171,33 @@ def verify_challenge_response(
 
     _verify_signature(enrolled_device_public_key_pem, response_signature_b64, canonical_json(response))
 
+    # Claim the challenge only after cryptographic/binding checks. The store must
+    # implement an atomic, durable consume() operation so concurrent requests
+    # cannot both accept the same challenge. Store failures fail closed.
+    replay_check = "NOT_CONFIGURED"
+    if replay_store is not None:
+        consume = getattr(replay_store, "consume", None)
+        if not callable(consume):
+            raise VerificationError("DURABLE_REPLAY_STORE_INVALID")
+        try:
+            consume(challenge_id, expires.isoformat().replace("+00:00", "Z"), current.isoformat().replace("+00:00", "Z"))
+        except Exception as exc:
+            if getattr(exc, "code", None) == "CHALLENGE_REPLAYED":
+                raise VerificationError("CHALLENGE_REPLAYED") from exc
+            raise VerificationError("DURABLE_REPLAY_STORE_FAILED") from exc
+        replay_check = "DURABLE_ATOMIC_STORE"
+    elif seen_challenge_ids is not None:
+        # Compatibility only: this caller-owned set is not a durable security boundary.
+        seen_challenge_ids.add(challenge_id)
+        replay_check = "CALLER_SUPPLIED_NON_DURABLE"
+
     return {
         "schema": "brain-phone-base.identity-verification-result.v1",
         "status": "SIGNATURE_VALID_IDENTITY_UNVERIFIED",
         "challenge_signature_valid": True,
         "device_response_signature_valid": True,
         "measurement_binding_valid": True,
-        "challenge_replay_check": "caller_supplied" if seen_challenge_ids is not None else "NOT_CONFIGURED",
+        "challenge_replay_check": replay_check,
         "hardware_backed_key_verified": False,
         "android_key_attestation_verified": False,
         "device_identity_verified": False,
