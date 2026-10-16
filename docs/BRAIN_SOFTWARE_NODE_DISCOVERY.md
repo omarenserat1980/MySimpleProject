@@ -2,10 +2,10 @@
 
 ## Purpose
 
-Electronic Brain needs to distinguish the software capabilities it can observe
-locally from physical devices, remote executors, simulated resources, and
-verified live services. This first discovery adapter inventories local runtime
-facts and repository components without executing tools or contacting devices.
+Electronic Brain needs to distinguish locally observed software capabilities
+from physical devices, remote executors, simulated resources, and verified
+live services. The adapter inventories runtime facts and repository source
+modules without executing tools or contacting devices.
 
 ## Run on the Windows computer
 
@@ -22,9 +22,11 @@ python -m brain_v12.brain.software_node_discovery --output .brain\state\software
 ```
 
 The report includes OS/Python facts, optional Python module availability,
-selected executable availability, and the presence of known Brain component
-files. It does not read environment-variable values, API tokens, process
-command lines, or private keys.
+selected executable availability, known component presence, and a bounded
+source inventory from `brain_v12/brain`, `tools`, `self_healing`, `cloud`,
+and `generated_tools`. The source inventory is capped at 2,000 Python files
+and excludes common cache/vendor directories. It does not read environment
+variable values, API tokens, process command lines, or private keys.
 
 ## Evidence levels
 
@@ -37,6 +39,10 @@ command lines, or private keys.
 - `PHYSICAL_MINER_ACTIVE`: **not** inferred; requires worker telemetry and
   independent live evidence from the real device/pool.
 - `REVENUE_REALIZED`: **not** inferred; requires verified payout evidence.
+
+The source inventory is not a dynamic runtime plugin registry. It may omit
+modules outside the declared roots, non-Python tools, dynamically loaded
+components, and services running in other processes or devices.
 
 ## Safe self-improvement loop
 
