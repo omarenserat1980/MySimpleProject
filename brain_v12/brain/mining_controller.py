@@ -1,11 +1,9 @@
-"""Brain Mining Controller.
+"""Brain Mining Controller — Brain-owned software-only plan and evidence gates.
 
-Safe control-plane for user-owned mining hosts.
-It discovers hardware, selects compatible open-source miners, estimates
-profitability, and enforces thermal/resource/payout gates.
-
-Important: this module never mines inside GitHub Actions and never moves funds.
-Actual mining is opt-in on an explicitly registered external/self-hosted worker.
+Physical devices are connectivity/observation gateways only; they are never
+mining compute hosts. This controller currently plans and evaluates evidence
+but does not implement a native mining backend, launch miners, contact pools,
+or enable mining in GitHub Actions.
 """
 
 from __future__ import annotations
@@ -49,11 +47,11 @@ class MiningPlan:
 
 
 MINER_REGISTRY = {
-    "sha256d": ("external-sha256d-worker", "external-asic/stratum"),
-    "randomx": ("xmrig", "cpu"),
-    "kawpow": ("xmrig", "cpu/gpu"),
-    "cryptonight": ("xmrig", "cpu/gpu"),
-    "ghostrider": ("xmrig", "cpu/gpu"),
+    "sha256d": ("brain-native-backend-pending", "brain-owned-software-runtime"),
+    "randomx": ("brain-native-backend-pending", "brain-owned-software-runtime"),
+    "kawpow": ("brain-native-backend-pending", "brain-owned-software-runtime"),
+    "cryptonight": ("brain-native-backend-pending", "brain-owned-software-runtime"),
+    "ghostrider": ("brain-native-backend-pending", "brain-owned-software-runtime"),
 }
 
 
@@ -90,22 +88,23 @@ def choose_plan(
         raise ValueError(f"unsupported algorithm: {algorithm}")
 
     miner, backend = MINER_REGISTRY[algorithm]
-    installed = miner in hardware.miners_present
-    if require_installed_miner and not installed:
-        raise RuntimeError(f"{miner} is not installed on this worker")
+    if require_installed_miner:
+        raise RuntimeError(
+            "Brain-owned mining backend is not implemented; external miner execution is forbidden"
+        )
 
-    mode = "fast" if hardware.ram_gb >= 3.0 else "light"
+    # The supplied hardware profile is diagnostic metadata only. It must never
+    # select a physical CPU/GPU/ASIC as the mining execution target.
     reason = (
-        "External Bitcoin SHA-256d worker and verified Stratum integration required; "
-        "plan metadata only, no live worker or mining session is verified"
-        if algorithm == "sha256d"
-        else "CPU-first RandomX-compatible plan; actual execution is opt-in"
+        "Brain-owned software-only plan; physical devices are connectivity/observation "
+        "gateways only. Native compute backend is not implemented; no mining session "
+        "or pool activity is verified."
     )
     return MiningPlan(
         algorithm=algorithm,
         miner=miner,
         backend=backend,
-        mode="external-only" if algorithm == "sha256d" else mode,
+        mode="plan-only",
         reason=reason,
     )
 
@@ -137,13 +136,15 @@ def can_start(
 ) -> tuple[bool, str]:
     if running_on_github_actions and not policy.allow_github_actions:
         return False, "github_actions_mining_forbidden"
-    if policy.require_user_owned_worker and not worker_is_user_owned:
-        return False, "worker_not_registered_as_user_owned"
     if not policy.enabled:
         return False, "mining_disabled_by_default"
+    if policy.require_user_owned_worker and not worker_is_user_owned:
+        return False, "worker_not_registered_as_user_owned"
     if current_temperature_c is not None and current_temperature_c >= policy.max_temperature_c:
         return False, "thermal_limit_reached"
-    return True, "approved_by_local_policy"
+    # No execution backend is implemented. A registered physical worker is a
+    # gateway, not a permitted place to run mining computation.
+    return False, "brain_owned_mining_backend_not_implemented"
 
 
 def evidence_record(
@@ -216,6 +217,12 @@ def bitcoin_sha256d_preflight(
     if current_temperature_c is not None and current_temperature_c >= policy.max_temperature_c:
         missing.append("THERMAL_LIMIT_REACHED")
 
+    # These blockers are unconditional until a native Brain-owned backend is
+    # implemented and independently reviewed. External worker/ASIC execution
+    # is not an allowed fallback, even when all caller-supplied flags are true.
+    missing.append("BRAIN_OWNED_BACKEND_NOT_IMPLEMENTED")
+    missing.append("EXTERNAL_WORKER_EXECUTION_FORBIDDEN")
+
     return {
         "algorithm": "sha256d",
         "status": "BLOCKED" if missing else "PREFLIGHT_PASS_NOT_MINING_PROOF",
@@ -234,7 +241,11 @@ def status() -> dict[str, Any]:
         "policy": asdict(MiningPolicy()),
         "hardware": asdict(detect_hardware()),
         "github_actions_mining": "BLOCKED",
-        "default_mode": "BENCHMARK_ONLY",
+        "execution_contract": "BRAIN_OWNED_SOFTWARE_ONLY",
+        "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_mining_backend": "NOT_IMPLEMENTED",
+        "external_miner_execution": "FORBIDDEN",
+        "default_mode": "PLAN_ONLY",
     }
 
 

@@ -9,11 +9,13 @@ from brain_v12.brain.mining_controller import (
 )
 
 
-def test_randomx_plan_is_cpu_first():
-    hw = HardwareProfile("linux", "aarch64", 8, 7.5, ())
+def test_randomx_plan_is_brain_owned_plan_only():
+    hw = HardwareProfile("linux", "aarch64", 8, 7.5, ("xmrig",))
     plan = choose_plan(hw, "randomx")
-    assert plan.miner == "xmrig"
-    assert plan.mode == "fast"
+    assert plan.miner == "brain-native-backend-pending"
+    assert plan.backend == "brain-owned-software-runtime"
+    assert plan.mode == "plan-only"
+    assert "physical devices are connectivity/observation" in plan.reason
 
 
 def test_mining_disabled_by_default():
@@ -81,8 +83,10 @@ def test_bitcoin_sha256d_preflight_never_claims_mining_or_revenue():
         running_on_github_actions=False,
         current_temperature_c=50.0,
     )
-    assert result["status"] == "PREFLIGHT_PASS_NOT_MINING_PROOF"
-    assert result["ready_for_review"]
+    assert result["status"] == "BLOCKED"
+    assert not result["ready_for_review"]
+    assert "BRAIN_OWNED_BACKEND_NOT_IMPLEMENTED" in result["missing_requirements"]
+    assert "EXTERNAL_WORKER_EXECUTION_FORBIDDEN" in result["missing_requirements"]
     assert not result["execution_started"]
     assert not result["accepted_shares_independently_verified"]
     assert not result["revenue_verified"]
@@ -109,15 +113,26 @@ def test_bitcoin_sha256d_preflight_blocks_github_actions_and_thermal_limit():
     assert "GITHUB_ACTIONS_MINING_FORBIDDEN" in result["missing_requirements"]
     assert "THERMAL_LIMIT_REACHED" in result["missing_requirements"]
 
-def test_bitcoin_sha256d_plan_is_external_only_and_does_not_claim_live_mining():
+def test_bitcoin_sha256d_plan_is_brain_owned_and_does_not_claim_live_mining():
     from brain_v12.brain.mining_controller import HardwareProfile, choose_plan
     hardware = HardwareProfile("linux", "aarch64", 8, 4.0, ())
     plan = choose_plan(hardware, "sha256d")
     assert plan.algorithm == "sha256d"
-    assert plan.backend == "external-asic/stratum"
-    assert plan.mode == "external-only"
-    assert "no live worker or mining session is verified" in plan.reason
+    assert plan.backend == "brain-owned-software-runtime"
+    assert plan.mode == "plan-only"
+    assert "native compute backend is not implemented" in plan.reason.lower()
     import pytest
-    with pytest.raises(RuntimeError, match="external-sha256d-worker is not installed"):
+    with pytest.raises(RuntimeError, match="external miner execution is forbidden"):
         choose_plan(hardware, "sha256d", require_installed_miner=True)
+
+
+def test_enabled_policy_still_blocks_until_brain_backend_exists():
+    policy = MiningPolicy(enabled=True)
+    ok, reason = can_start(
+        policy,
+        worker_is_user_owned=True,
+        running_on_github_actions=False,
+    )
+    assert not ok
+    assert reason == "brain_owned_mining_backend_not_implemented"
 

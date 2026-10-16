@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/mining_node_api.py"
+      - "brain_v12/brain/brain_owned_mining_contract.py"
+      - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/app.py"
       - "tests/test_brain_mining_node_api.py"
       - ".github/workflows/brain-mining-node-api.yml"
@@ -42,4 +44,4 @@ jobs:
       - name: Run mining node contract tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m pytest -q tests/test_brain_mining_node_api.py
+        run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py

@@ -147,3 +147,13 @@
 - [ ] Add native application/guest adapters one workload at a time; retain deterministic simulation for tests
 - [ ] Verify external email, payment, publishing, and cloud adapters using authorized sandbox/live receipts
 - [ ] Keep Windows real boot, mining, revenue, and physical-device claims blocked until their independent evidence gates pass
+
+
+## Phase 2.8 — Brain-owned software-only mining
+
+- [x] Record the canonical rule that physical devices are connectivity/observation gateways only.
+- [x] Add fail-closed plan and evidence contract; simulation cannot count as real mining.
+- [x] Block external miner execution and GitHub Actions mining in the mining controller.
+- [ ] Implement a bounded Brain-owned native mining compute backend in a separately reviewable software execution environment.
+- [ ] Verify algorithm feasibility, resource limits, secure secret injection, cancellation/recovery, and explicit authorization gates.
+- [ ] Prove real activity with independently verified pool accepted-share/worker telemetry bound to Brain runtime; verify payout and profit separately.
