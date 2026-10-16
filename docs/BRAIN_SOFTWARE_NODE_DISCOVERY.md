@@ -70,3 +70,20 @@ components, and services running in other processes or devices.
 This module is a first inventory adapter, not a claim that the whole Brain
 self-evolution loop is wired to it. A later integration must connect it to the
 capability registry and supervisor through tests and explicit permissions.
+
+## Review-only capability candidate catalog
+
+Build a catalog that joins local inventory and capability-gap evidence without
+registering executors:
+
+```powershell
+python -m brain_v12.brain.software_capability_candidate_catalog
+```
+
+Use `--output` only with a new path if you want to preserve a JSON artifact.
+Every candidate remains `NOT_REGISTERED`; discovery cannot set an executor to
+`ONLINE`. The catalog records what evidence is needed for a later promotion,
+including runtime smoke tests for local tools and live authentication/heartbeat
+and task evidence for remote devices. Physical mining still requires independent
+pool and physical-device evidence. This catalog does not import or mutate the
+capability registry and is not a production execution path.
