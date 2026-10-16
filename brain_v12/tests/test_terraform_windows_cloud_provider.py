@@ -43,7 +43,7 @@ def test_status_maps_terraform_outputs(tmp_path: Path) -> None:
     vm = provider.status("vm-123")
     assert vm.vm_id == "vm-123"
     assert vm.provider == "azure"
-    assert vm.state == "RUNNING"
+    assert vm.state == "PROVISIONED"
     assert vm.os == "Windows Server 2025"
 
 
