@@ -28,6 +28,17 @@ and `generated_tools`. The source inventory is capped at 2,000 Python files
 and excludes common cache/vendor directories. It does not read environment
 variable values, API tokens, process command lines, or private keys.
 
+To produce a conservative capability-gap report from the inventory logic:
+
+```powershell
+python -m brain_v12.brain.software_capability_gap_audit
+```
+
+To save it to a new path, use `--output` with a path that does not already exist.
+The report is plan-only: it does not mutate the capability registry, launch
+proposed tools, probe devices, or enable mining. Locally detected tools are
+marked observed but not runtime-verified until a separate test supplies evidence.
+
 ## Evidence levels
 
 - `PRESENT`: a module, executable, or source file was found.
