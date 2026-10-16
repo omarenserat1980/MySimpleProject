@@ -22,7 +22,7 @@ def classify_endpoint(value: str | None) -> str:
             return "INVALID_OR_UNSUPPORTED"
         if parsed.username is not None or parsed.password is not None:
             return "URL_EMBEDS_CREDENTIALS_BLOCKED"
-        if host == "render.com" or host.endswith(".render.com"):
+        if host in {"render.com", "onrender.com"} or host.endswith((".render.com", ".onrender.com")):
             return "LEGACY_RENDER_ENDPOINT"
         if host in {"localhost", "127.0.0.1", "::1"}:
             return "LOCAL_ONLY_ENDPOINT"
