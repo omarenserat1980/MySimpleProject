@@ -11,8 +11,8 @@ import urllib.request
 
 PORT = os.getenv("PORT", "10000")
 API_URL = f"http://127.0.0.1:{PORT}/health"
-# Existing service URL only; no new service or credential is created.
-os.environ.setdefault("BRAIN_ORIGIN", "https://brain-control-plane-main.onrender.com")
+# BRAIN_ORIGIN must be explicitly configured for the worker; no implicit service fallback.
+os.environ.setdefault("BRAIN_ORIGIN", "")
 
 
 def wait_for_api(process: subprocess.Popen, timeout: float = 45.0) -> bool:
