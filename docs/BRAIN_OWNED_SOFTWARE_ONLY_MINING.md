@@ -8,6 +8,7 @@ Electronic Brain owns mining orchestration and, when implemented, the mining com
 
 - `brain_v12/brain/brain_owned_mining_contract.py` expresses the policy, planning, execution gate, and evidence classification.
 - `brain_v12/brain/mining_controller.py` produces Brain-owned software-only plans and blocks execution until a native Brain-owned backend exists.
+- `brain_v12/brain/cloud_mining_control_plane.py` accepts only software-node kinds, creates plan-only jobs, and blocks admission until the native backend exists.
 - The controller does not install or launch miner software and does not contact a mining pool.
 - The current backend is **NOT IMPLEMENTED**. A plan, test pass, online gateway, or successful API response is not proof of mining.
 - GitHub Actions must not run mining workloads. Simulators may test orchestration and evidence rules only.
