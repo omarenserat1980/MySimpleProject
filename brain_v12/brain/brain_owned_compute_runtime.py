@@ -41,6 +41,40 @@ def validate_target(target: int) -> None:
         raise ValueError("TARGET_OUT_OF_RANGE")
 
 
+def partition_nonce_range(
+    start_nonce: int,
+    end_nonce_exclusive: int,
+    partitions: int,
+) -> tuple[tuple[int, int], ...]:
+    """Split a nonce interval into deterministic, disjoint half-open ranges.
+
+    `end_nonce_exclusive` may be 2**32 to include the maximum uint32 nonce.
+    Empty ranges are omitted when partitions outnumber available nonces.
+    This is scheduling metadata only; it does not start or parallelize work.
+    """
+    if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
+        raise ValueError("START_NONCE_OUT_OF_RANGE")
+    if (isinstance(end_nonce_exclusive, bool) or not isinstance(end_nonce_exclusive, int)
+            or not start_nonce < end_nonce_exclusive <= 2**32):
+        raise ValueError("END_NONCE_EXCLUSIVE_OUT_OF_RANGE")
+    if isinstance(partitions, bool) or not isinstance(partitions, int) or not 1 <= partitions <= 1_000_000:
+        raise ValueError("PARTITION_COUNT_OUT_OF_RANGE")
+
+    total = end_nonce_exclusive - start_nonce
+    count = min(total, partitions)
+    base, remainder = divmod(total, count)
+    ranges: list[tuple[int, int]] = []
+    cursor = start_nonce
+    for index in range(count):
+        width = base + (1 if index < remainder else 0)
+        end = cursor + width
+        ranges.append((cursor, end))
+        cursor = end
+    if cursor != end_nonce_exclusive:
+        raise AssertionError("NONCE_PARTITION_COVERAGE_FAILURE")
+    return tuple(ranges)
+
+
 def search_nonce(
     header: bytes,
     target: int,
