@@ -25,6 +25,21 @@ def test_unknown_algorithm_is_rejected():
 
 def test_execution_gate_fails_closed_without_native_backend():
     gate = execution_gate(
+        backend_implemented=False,
+        backend_attested=True,
+        pool_endpoint_verified=True,
+        credentials_in_secret_store=True,
+        resource_budget_verified=True,
+        explicit_user_approval=True,
+    )
+    assert gate["status"] == "BLOCKED"
+    assert "BRAIN_OWNED_BACKEND_NOT_IMPLEMENTED" in gate["blockers"]
+    assert gate["execution_allowed"] is False
+    assert gate["execution_started"] is False
+
+
+def test_complete_gate_is_only_ready_for_separate_review_not_execution():
+    gate = execution_gate(
         backend_implemented=True,
         backend_attested=True,
         pool_endpoint_verified=True,
