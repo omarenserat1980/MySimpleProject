@@ -119,6 +119,15 @@ jobs:
       - name: Validate Brain mining controller software-only gate
         run: |
           python -m pytest -q brain_v12/tests/test_mining_controller.py
+      - name: Validate gateway-only mining-node preflight
+        run: |
+          python -m pytest -q brain_v12/tests/test_digital_mining_node.py
+      - name: Validate software-only mining-node API
+        run: |
+          python -m pytest -q brain_v12/tests/test_mining_node_api_software_only.py
+      - name: Validate mining-to-revenue fail-closed boundary
+        run: |
+          python -m pytest -q brain_v12/business/test_crypto_mining_end_to_end.py
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
