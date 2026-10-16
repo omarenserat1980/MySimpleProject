@@ -37,11 +37,40 @@ def test_disabled_worker_cannot_run_a_previously_planned_job():
     assert reason == "worker_disabled"
 
 
-def test_cpu_and_thermal_limits_are_enforced():
+def test_resource_limits_are_enforced_and_execution_stays_blocked():
     cp, job = _planned_job()
-    assert cp.admit(job.job_id, cpu_percent=50.0)[0]
+    assert job.status == "BLOCKED_BACKEND_NOT_IMPLEMENTED"
+    assert cp.admit(job.job_id, cpu_percent=50.0) == (
+        False, "brain_owned_mining_backend_not_implemented"
+    )
     assert cp.admit(job.job_id, cpu_percent=50.1) == (False, "cpu_limit_reached")
     assert cp.admit(job.job_id, temperature_c=75.0) == (False, "thermal_limit_reached")
+
+
+def test_plan_uses_brain_owned_software_runtime_only():
+    cp, job = _planned_job()
+    assert job.miner == "brain-native-backend-pending"
+    assert job.mode == "plan-only"
+    assert job.status == "BLOCKED_BACKEND_NOT_IMPLEMENTED"
+    snapshot = cp.snapshot()
+    assert snapshot["execution"] == "brain_owned_software_runtime_plan_only"
+    assert snapshot["physical_devices_role"] == "connectivity_observation_only"
+    assert snapshot["external_miner_execution"] == "FORBIDDEN"
+
+
+def test_physical_devices_cannot_register_as_mining_compute_workers():
+    cp = CloudMiningControlPlane()
+    for worker in (
+        CloudWorker("phone", "android", "region", "owner", enabled=True),
+        CloudWorker("asic", "asic", "region", "owner", enabled=True),
+        CloudWorker("desktop", "desktop", "region", "owner", enabled=True),
+    ):
+        try:
+            cp.register_worker(worker)
+        except ValueError as exc:
+            assert "physical devices are gateways only" in str(exc)
+        else:
+            raise AssertionError("physical device must not register as mining compute worker")
 
 
 def test_invalid_telemetry_is_rejected():
