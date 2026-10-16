@@ -56,6 +56,8 @@ def test_invalid_nonce_partitions_fail_closed():
 from brain_v12.brain.brain_owned_compute_runtime import (
     build_nonce_search_checkpoint,
     validate_nonce_search_checkpoint,
+    sign_nonce_search_checkpoint,
+    validate_authenticated_nonce_search_checkpoint,
 )
 
 
@@ -101,3 +103,42 @@ def test_checkpoint_mutation_fails_closed():
     checkpoint["next_nonce"] = 999
     with pytest.raises(ValueError, match="CHECKPOINT_RANGE_ARITHMETIC_MISMATCH"):
         validate_nonce_search_checkpoint(checkpoint, header, 1, "job-A")
+
+
+_AUTH_TEST_KEY = b"test-only-checkpoint-key-material-32-bytes-minimum"
+
+
+def _unsigned_checkpoint_for_auth():
+    header = bytes(80)
+    target = 1
+    result = search_nonce(header, target, start_nonce=300, max_hashes=3)
+    return header, target, build_nonce_search_checkpoint(header, target, "job-auth", 300, result)
+
+
+def test_authenticated_checkpoint_round_trip_with_caller_supplied_key():
+    header, target, unsigned = _unsigned_checkpoint_for_auth()
+    signed = sign_nonce_search_checkpoint(unsigned, header, target, "job-auth", _AUTH_TEST_KEY)
+    assert signed["authenticated"] is True
+    assert signed["auth_scheme"] == "HMAC-SHA256"
+    assert validate_authenticated_nonce_search_checkpoint(signed, header, target, "job-auth", _AUTH_TEST_KEY) == 303
+
+
+def test_authenticated_checkpoint_rejects_mutation_and_wrong_key():
+    header, target, unsigned = _unsigned_checkpoint_for_auth()
+    signed = sign_nonce_search_checkpoint(unsigned, header, target, "job-auth", _AUTH_TEST_KEY)
+    changed = dict(signed, next_nonce=304)
+    with pytest.raises(ValueError, match="CHECKPOINT_AUTHENTICATION_FAILED"):
+        validate_authenticated_nonce_search_checkpoint(changed, header, target, "job-auth", _AUTH_TEST_KEY)
+    with pytest.raises(ValueError, match="CHECKPOINT_AUTHENTICATION_FAILED"):
+        validate_authenticated_nonce_search_checkpoint(signed, header, target, "job-auth", b"x" * 32)
+
+
+def test_authenticated_checkpoint_requires_strong_caller_key_and_exact_fields():
+    header, target, unsigned = _unsigned_checkpoint_for_auth()
+    with pytest.raises(ValueError, match="CHECKPOINT_MAC_KEY_MUST_BE_AT_LEAST_32_BYTES"):
+        sign_nonce_search_checkpoint(unsigned, header, target, "job-auth", b"short")
+    with pytest.raises(ValueError, match="INVALID_UNSIGNED_CHECKPOINT_FIELDS"):
+        sign_nonce_search_checkpoint(dict(unsigned, unexpected=True), header, target, "job-auth", _AUTH_TEST_KEY)
+    signed = sign_nonce_search_checkpoint(unsigned, header, target, "job-auth", _AUTH_TEST_KEY)
+    with pytest.raises(ValueError, match="INVALID_SIGNED_CHECKPOINT_FIELDS"):
+        validate_authenticated_nonce_search_checkpoint(dict(signed, unexpected=True), header, target, "job-auth", _AUTH_TEST_KEY)

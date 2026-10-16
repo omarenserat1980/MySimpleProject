@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import hmac
+import json
 import os
 import platform
 from typing import Any
@@ -185,6 +187,79 @@ def validate_nonce_search_checkpoint(
     if start_nonce + checked != next_nonce:
         raise ValueError("CHECKPOINT_RANGE_ARITHMETIC_MISMATCH")
     return next_nonce
+
+
+_CHECKPOINT_UNSIGNED_FIELDS = frozenset({
+    "schema_version", "job_id", "header_sha256", "target_hex", "start_nonce",
+    "next_nonce", "hashes_checked", "status", "authenticated",
+})
+_CHECKPOINT_SIGNED_FIELDS = _CHECKPOINT_UNSIGNED_FIELDS | {"auth_scheme", "auth_tag"}
+_CHECKPOINT_AUTH_SCHEME = "HMAC-SHA256"
+_CHECKPOINT_MIN_KEY_BYTES = 32
+
+
+def _checkpoint_mac_key(key: bytes) -> bytes:
+    """Validate a caller-managed MAC key without generating or persisting one."""
+    if not isinstance(key, bytes) or len(key) < _CHECKPOINT_MIN_KEY_BYTES:
+        raise ValueError("CHECKPOINT_MAC_KEY_MUST_BE_AT_LEAST_32_BYTES")
+    return key
+
+
+def _checkpoint_mac_payload(checkpoint: dict[str, Any]) -> bytes:
+    """Serialize a checkpoint deterministically for HMAC authentication."""
+    unsigned_mac = {name: value for name, value in checkpoint.items() if name != "auth_tag"}
+    try:
+        return json.dumps(unsigned_mac, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("INVALID_CHECKPOINT_MAC_PAYLOAD") from exc
+
+
+def sign_nonce_search_checkpoint(
+    checkpoint: Any,
+    header: bytes,
+    target: int,
+    job_id: str,
+    key: bytes,
+) -> dict[str, Any]:
+    """Authenticate an unsigned no-hit checkpoint with a caller-supplied HMAC key.
+
+    The key must come from a trusted external secret provider and must not be
+    generated, logged, or stored by this module. HMAC is suitable only where
+    the signer and verifier can securely share the same key.
+    """
+    mac_key = _checkpoint_mac_key(key)
+    if not isinstance(checkpoint, dict) or set(checkpoint) != _CHECKPOINT_UNSIGNED_FIELDS:
+        raise ValueError("INVALID_UNSIGNED_CHECKPOINT_FIELDS")
+    validate_nonce_search_checkpoint(checkpoint, header, target, job_id)
+    signed = dict(checkpoint)
+    signed["authenticated"] = True
+    signed["auth_scheme"] = _CHECKPOINT_AUTH_SCHEME
+    signed["auth_tag"] = hmac.new(mac_key, _checkpoint_mac_payload(signed), hashlib.sha256).hexdigest()
+    return signed
+
+
+def validate_authenticated_nonce_search_checkpoint(
+    checkpoint: Any,
+    header: bytes,
+    target: int,
+    job_id: str,
+    key: bytes,
+) -> int:
+    """Verify HMAC before validating checkpoint bindings and returning next nonce."""
+    mac_key = _checkpoint_mac_key(key)
+    if not isinstance(checkpoint, dict) or set(checkpoint) != _CHECKPOINT_SIGNED_FIELDS:
+        raise ValueError("INVALID_SIGNED_CHECKPOINT_FIELDS")
+    if checkpoint.get("authenticated") is not True or checkpoint.get("auth_scheme") != _CHECKPOINT_AUTH_SCHEME:
+        raise ValueError("INVALID_CHECKPOINT_AUTHENTICATION")
+    tag = checkpoint.get("auth_tag")
+    if not isinstance(tag, str) or len(tag) != 64 or any(ch not in "0123456789abcdef" for ch in tag):
+        raise ValueError("INVALID_CHECKPOINT_AUTH_TAG")
+    expected = hmac.new(mac_key, _checkpoint_mac_payload(checkpoint), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(tag, expected):
+        raise ValueError("CHECKPOINT_AUTHENTICATION_FAILED")
+    unsigned = {name: value for name, value in checkpoint.items() if name not in {"auth_scheme", "auth_tag"}}
+    unsigned["authenticated"] = False
+    return validate_nonce_search_checkpoint(unsigned, header, target, job_id)
 
 
 def is_android_or_termux_runtime() -> bool:
