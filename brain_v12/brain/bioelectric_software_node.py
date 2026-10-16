@@ -84,6 +84,8 @@ def simulate_bioelectric_node(
     load_power = current * current * float(load_resistance_ohm)
     energy_per_pulse = load_power * float(pulse_duration_s)
     average_power = energy_per_pulse * float(pulses_per_second)
+    if not all(math.isfinite(value) for value in (voltage, internal_resistance, current, load_voltage, load_power, energy_per_pulse, average_power)):
+        raise ValueError("parameters produce a non-finite estimate; reduce the input values")
 
     return BioelectricSimulation(
         status="SIMULATED_ONLY",
