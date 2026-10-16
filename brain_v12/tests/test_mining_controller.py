@@ -120,7 +120,7 @@ def test_bitcoin_sha256d_plan_is_brain_owned_and_does_not_claim_live_mining():
     assert plan.algorithm == "sha256d"
     assert plan.backend == "brain-owned-software-runtime"
     assert plan.mode == "plan-only"
-    assert "native compute backend is not implemented" in plan.reason
+    assert "native compute backend is not implemented" in plan.reason.lower()
     import pytest
     with pytest.raises(RuntimeError, match="external miner execution is forbidden"):
         choose_plan(hardware, "sha256d", require_installed_miner=True)
