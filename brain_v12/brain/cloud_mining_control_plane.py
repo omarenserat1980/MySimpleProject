@@ -1,7 +1,9 @@
-"""Cloud control plane for Brain's user-owned mining workers.
+"""Brain-owned software-only mining control plane.
 
-The cloud coordinates workers; it is not itself a GitHub Actions miner.
-Worker telemetry and payout references are untrusted until independently verified.
+Physical devices are connectivity/observation gateways only. This module can
+plan work for a Brain-owned software node, but it cannot dispatch mining or
+admit real execution until a native Brain-owned backend is implemented.
+Telemetry and payout references remain untrusted until independently verified.
 """
 from __future__ import annotations
 
@@ -34,6 +36,13 @@ class MiningJob:
     status: str = "PLANNED"
 
 
+ALLOWED_SOFTWARE_NODE_KINDS = {"vm", "software_node", "brain_vm", "container"}
+FORBIDDEN_PHYSICAL_KINDS = {
+    "physical", "device", "android", "termux", "phone", "desktop", "laptop",
+    "asic", "gpu", "cpu", "hardware", "redmi3", "realme",
+}
+
+
 class CloudMiningControlPlane:
     def __init__(self) -> None:
         self.workers: dict[str, CloudWorker] = {}
@@ -42,6 +51,11 @@ class CloudMiningControlPlane:
     def register_worker(self, worker: CloudWorker) -> None:
         if not worker.worker_id.strip() or not worker.owner.strip():
             raise ValueError("worker identity and owner are required")
+        kind = str(worker.kind).strip().lower()
+        if kind in FORBIDDEN_PHYSICAL_KINDS or kind not in ALLOWED_SOFTWARE_NODE_KINDS:
+            raise ValueError(
+                "mining worker must be a Brain-owned software node; physical devices are gateways only"
+            )
         if (
             isinstance(worker.max_temperature_c, bool)
             or not isinstance(worker.max_temperature_c, (int, float))
@@ -69,7 +83,14 @@ class CloudMiningControlPlane:
         job_id = hashlib.sha256(
             f"{worker_id}:{algorithm}:{datetime.now(timezone.utc).isoformat()}".encode()
         ).hexdigest()[:16]
-        job = MiningJob(job_id, worker_id, algorithm, "xmrig", "benchmark")
+        job = MiningJob(
+            job_id,
+            worker_id,
+            algorithm,
+            "brain-native-backend-pending",
+            "plan-only",
+            status="BLOCKED_BACKEND_NOT_IMPLEMENTED",
+        )
         self.jobs[job_id] = job
         return job
 
@@ -108,7 +129,9 @@ class CloudMiningControlPlane:
                 return False, "invalid_cpu_telemetry"
             if cpu_percent > worker.max_cpu_percent:
                 return False, "cpu_limit_reached"
-        return True, "admitted_for_registered_worker"
+        # A registered software node is not proof that Brain has a native
+        # mining backend. Never dispatch to an external miner as a fallback.
+        return False, "brain_owned_mining_backend_not_implemented"
 
     def evidence(
         self,
@@ -154,7 +177,10 @@ class CloudMiningControlPlane:
             "service": "Brain Cloud Mining Control Plane",
             "workers": [asdict(w) for w in self.workers.values()],
             "jobs": [asdict(j) for j in self.jobs.values()],
-            "execution": "external_registered_worker_only",
+            "execution": "brain_owned_software_runtime_plan_only",
+            "physical_devices_role": "connectivity_observation_only",
+            "native_mining_backend": "NOT_IMPLEMENTED",
+            "external_miner_execution": "FORBIDDEN",
             "github_actions_mining": "BLOCKED",
             "payout_truth_boundary": "transaction_reference_is_not_chain_verification",
             "revenue_realization": "requires_independent_blockchain_proof",
