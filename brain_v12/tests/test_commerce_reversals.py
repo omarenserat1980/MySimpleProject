@@ -9,6 +9,9 @@ from brain_v12.brain.commerce_reversals import router as reversal_router
 class CommerceReversalTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.NamedTemporaryFile(delete=False); self.tmp.close(); self.db=self.tmp.name
+        # NamedTemporaryFile creates an empty file; the store correctly rejects invalid JSON.
+        # Initialize this isolated test database as a valid empty store instead.
+        with open(self.db, "w", encoding="utf-8") as handle: handle.write("{}")
         self.old_db=os.environ.get("BRAIN_COMMERCE_DB"); os.environ["BRAIN_COMMERCE_DB"]=self.db; os.environ["BRAIN_CONTROL_KEY"]="test-control"
         app=FastAPI(); app.include_router(commerce_router(self.db)); app.include_router(reversal_router(self.db)); self.client=TestClient(app)
     def tearDown(self):
