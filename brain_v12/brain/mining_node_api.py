@@ -11,6 +11,8 @@ from typing import Any
 from fastapi import APIRouter
 
 from .brain_owned_mining_contract import build_plan, execution_gate
+from .brain_owned_compute_runtime import double_sha256, execution_host_gate
+from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -65,6 +67,10 @@ def node_status() -> dict[str, Any]:
         "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
         "native_pow_primitive": "IMPLEMENTED_SHA256D_BOUNDED",
         "native_mining_backend": "NOT_IMPLEMENTED",
+        "bounded_software_compute_primitive": "AVAILABLE_SHA256D_LIBRARY",
+        "compute_preflight_endpoint": "/api/mining-node/compute-preflight",
+        "pool_evidence_status_endpoint": "/api/mining-node/pool-evidence/status",
+        "live_compute_ready": False,
         "external_miner_execution": "FORBIDDEN",
         "local_device_computation_allowed": False,
         "integrated_components": list(INTEGRATED_COMPONENTS),
@@ -91,7 +97,10 @@ def readiness_status() -> dict[str, Any]:
             "G0_api_contract": "READY",
             "G1_simulation": "READY",
             "G1a_sha256d_pow_primitive": "READY_BOUNDED_LIBRARY_ONLY",
-            "G2_brain_owned_compute_backend": "BLOCKED_NOT_IMPLEMENTED",
+            "G2_brain_owned_compute_backend": "BLOCKED_LIVE_BACKEND_NOT_IMPLEMENTED",
+            "G2a_bounded_sha256d_primitive": "READY_BOUNDED_LIBRARY_ONLY",
+            "G2b_live_compute_host_attestation": "BLOCKED_HOST_ATTESTATION_REQUIRED",
+            "G2c_pool_share_submission_adapter": "BLOCKED_NOT_IMPLEMENTED",
             "G3_brain_runtime_attestation": "NOT_VERIFIED_BY_THIS_API",
             "G4_gateway_connectivity": "NOT_REQUIRED_FOR_COMPUTE",
             "G5_pool_shares": "BLOCKED_NO_VERIFIED_POOL_SHARES",
@@ -99,8 +108,9 @@ def readiness_status() -> dict[str, Any]:
             "G7_profit": "BLOCKED_NO_VERIFIED_COST_AND_REVENUE",
         },
         "blockers": [
-            "The bounded SHA256d proof-of-work primitive is a library only; the Brain-owned native mining compute backend is not implemented.",
-            "No independently verified pool session or accepted-share evidence is bound to a Brain runtime.",
+            "The bounded SHA256d software primitive is available for offline tests only; the production Brain-owned compute service is not implemented and no live nonce-search endpoint is exposed.",
+            "A production Brain compute host has not been independently attested, and live execution remains blocked.",
+            "No Stratum share-submission adapter or independently verified pool-session/share evidence is bound to the Brain runtime.",
             "Payout and profit evidence are not available through this API.",
         ],
         "real_mining_claim": False,
@@ -109,10 +119,78 @@ def readiness_status() -> dict[str, Any]:
     }
 
 
+def compute_backend_preflight() -> dict[str, Any]:
+    """Run a fixed SHA256d known-answer test without searching nonces or using the network."""
+    expected = (
+        "4f8b42c22dd3729b519ba6f68d2da7cc"
+        "5b2d606d05daed5ad5128cc03e6c6358"
+    )
+    actual = double_sha256(b"abc").hex()
+    gate = execution_host_gate(
+        attested_brain_compute_host=False,
+        explicit_approval=False,
+        pool_adapter_ready=False,
+        resource_budget_verified=False,
+        physical_gateway_only=True,
+    )
+    return {
+        "ok": actual == expected,
+        "status": "PRIMITIVE_SELF_TEST_PASSED" if actual == expected else "PRIMITIVE_SELF_TEST_FAILED",
+        "backend": "BOUNDED_SHA256D_SOFTWARE_LIBRARY",
+        "known_answer_test_passed": actual == expected,
+        "nonce_search_executed": False,
+        "pool_contacted": False,
+        "network_access_performed": False,
+        "physical_device_computation_allowed": False,
+        "live_compute_ready": False,
+        "execution_allowed": False,
+        "execution_started": False,
+        "real_mining_verified": False,
+        "revenue_verified": False,
+        "live_execution_gate": gate,
+    }
+
+
+def pool_evidence_status() -> dict[str, Any]:
+    """Describe the read-only collector without making a pool request or inspecting credentials."""
+    return {
+        "ok": True,
+        "status": "READ_ONLY_COLLECTOR_AVAILABLE_AWAITING_AUTHORIZED_CONFIGURATION",
+        "provider": "Braiins Pool",
+        "endpoint": BRAIINS_WORKERS_URL,
+        "http_method": "GET",
+        "authentication": "Pool-Auth-Token header; token must be supplied via an existing protected environment setting",
+        "operator_must_use_read_only_access_profile": True,
+        "pool_credential_scope_verified": False,
+        "tls_verification_required": True,
+        "redirects_allowed": False,
+        "pool_settings_changed": False,
+        "pool_query_performed": False,
+        "network_access_performed": False,
+        "pool_activity_verified": False,
+        "accepted_share_submission_verified": False,
+        "brain_runtime_activity_verified": False,
+        "payout_verified": False,
+        "revenue_verified": False,
+        "execution_allowed": False,
+        "note": "Pool API aggregate telemetry is independent of worker self-reports, but does not prove Brain generated the work or verify an individual accepted-share submission.",
+    }
+
+
 @router.get("/status")
 def get_mining_node_status() -> dict[str, Any]:
     """Return truthful node status without activating workers or external services."""
     return node_status()
+
+
+@router.get("/compute-preflight")
+def get_compute_backend_preflight() -> dict[str, Any]:
+    return compute_backend_preflight()
+
+
+@router.get("/pool-evidence/status")
+def get_pool_evidence_status() -> dict[str, Any]:
+    return pool_evidence_status()
 
 
 @router.get("/readiness")
