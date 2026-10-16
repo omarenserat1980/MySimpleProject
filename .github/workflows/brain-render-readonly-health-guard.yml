@@ -1,0 +1,37 @@
+name: Brain Render Read-Only Health Guard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-render-readonly-health-guard
+  cancel-in-progress: true
+
+jobs:
+  health:
+    name: Read-only Render health probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe control-plane health without changing service state
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://brain-control-plane-main.onrender.com/health"
+          tmp="$(mktemp)"
+          trap 'rm -f "$tmp"' EXIT
+          code="$(curl --silent --show-error --max-time 20 --output "$tmp" --write-out '%{http_code}' "$url")"
+          echo "endpoint=$url"
+          echo "http_status=$code"
+          if [[ "$code" != "200" ]]; then
+            echo "::error::Brain control-plane health check did not return HTTP 200."
+            # Print only a small, non-secret diagnostic body; never dump environment variables.
+            head -c 500 "$tmp" || true
+            exit 1
+          fi
+          echo "READ_ONLY_HEALTH_CHECK=PASS"
