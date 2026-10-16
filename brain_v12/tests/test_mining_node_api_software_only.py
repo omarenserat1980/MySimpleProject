@@ -10,6 +10,7 @@ def test_node_status_declares_gateway_only_software_execution():
     status = node_status()
     assert status["execution_mode"] == "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY"
     assert status["physical_devices_role"] == "CONNECTIVITY_OBSERVATION_ONLY"
+    assert status["native_pow_primitive"] == "IMPLEMENTED_SHA256D_BOUNDED"
     assert status["native_mining_backend"] == "NOT_IMPLEMENTED"
     assert status["external_miner_execution"] == "FORBIDDEN"
     assert status["local_device_computation_allowed"] is False
@@ -19,6 +20,7 @@ def test_node_status_declares_gateway_only_software_execution():
 def test_readiness_blocks_real_mining_on_missing_brain_backend_not_missing_device():
     status = readiness_status()
     assert status["real_mining_ready"] is False
+    assert status["gates"]["G1a_sha256d_pow_primitive"] == "READY_BOUNDED_LIBRARY_ONLY"
     assert status["gates"]["G2_brain_owned_compute_backend"] == "BLOCKED_NOT_IMPLEMENTED"
     assert status["gates"]["G4_gateway_connectivity"] == "NOT_REQUIRED_FOR_COMPUTE"
     assert any("native mining compute backend is not implemented" in item.lower() for item in status["blockers"])

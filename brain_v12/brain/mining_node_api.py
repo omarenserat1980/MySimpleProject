@@ -20,6 +20,7 @@ INTEGRATED_COMPONENTS = (
     "asic_simulator",
     "bitcoin_mining_intelligence",
     "brain_owned_mining_contract",
+    "brain_owned_sha256d_pow_primitive",
     "brain_owned_compute_backend_pending",
 )
 
@@ -62,6 +63,7 @@ def node_status() -> dict[str, Any]:
         "state": "SIMULATED",
         "execution_mode": "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY",
         "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_pow_primitive": "IMPLEMENTED_SHA256D_BOUNDED",
         "native_mining_backend": "NOT_IMPLEMENTED",
         "external_miner_execution": "FORBIDDEN",
         "local_device_computation_allowed": False,
@@ -83,10 +85,12 @@ def readiness_status() -> dict[str, Any]:
         "state": "BLOCKED",
         "execution_mode": "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY",
         "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_pow_primitive": "IMPLEMENTED_SHA256D_BOUNDED",
         "native_mining_backend": "NOT_IMPLEMENTED",
         "gates": {
             "G0_api_contract": "READY",
             "G1_simulation": "READY",
+            "G1a_sha256d_pow_primitive": "READY_BOUNDED_LIBRARY_ONLY",
             "G2_brain_owned_compute_backend": "BLOCKED_NOT_IMPLEMENTED",
             "G3_brain_runtime_attestation": "NOT_VERIFIED_BY_THIS_API",
             "G4_gateway_connectivity": "NOT_REQUIRED_FOR_COMPUTE",
@@ -95,7 +99,7 @@ def readiness_status() -> dict[str, Any]:
             "G7_profit": "BLOCKED_NO_VERIFIED_COST_AND_REVENUE",
         },
         "blockers": [
-            "The Brain-owned native mining compute backend is not implemented.",
+            "The bounded SHA256d proof-of-work primitive is a library only; the Brain-owned native mining compute backend is not implemented.",
             "No independently verified pool session or accepted-share evidence is bound to a Brain runtime.",
             "Payout and profit evidence are not available through this API.",
         ],

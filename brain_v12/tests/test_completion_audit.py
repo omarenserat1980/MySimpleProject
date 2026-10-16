@@ -8,6 +8,8 @@ def test_fail_closed_mining_backend_status_is_not_an_incomplete_marker():
     field = "native_mining_" + "backend"
     marker = "NOT_" + "IMPLEMENTED"
     assert is_intentional_not_implemented_state(f'"{field}": "{marker}",')
+    adapter_field = "stratum_pool_" + "adapter"
+    assert is_intentional_not_implemented_state(f'"{adapter_field}": "{marker}",')
     assert is_intentional_not_implemented_state(
         f'assert status["{field}"] == "{marker}"'
     )

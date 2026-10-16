@@ -4,7 +4,19 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/mining_node_api.py"
+      - "brain_v12/brain/brain_owned_compute_runtime.py"
+      - "brain_v12/brain/bitcoin_header.py"
+      - "brain_v12/self_healing/completion_audit.py"
+      - "brain_v12/tests/test_brain_owned_compute_runtime.py"
+      - "brain_v12/tests/test_bitcoin_header.py"
+      - "brain_v12/tests/test_completion_audit.py"
       - "brain_v12/brain/brain_owned_mining_contract.py"
+      - "brain_v12/brain/brain_owned_compute_runtime.py"
+      - "brain_v12/brain/bitcoin_header.py"
+      - "brain_v12/self_healing/completion_audit.py"
+      - "brain_v12/tests/test_brain_owned_compute_runtime.py"
+      - "brain_v12/tests/test_bitcoin_header.py"
+      - "brain_v12/tests/test_completion_audit.py"
       - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/app.py"
       - "tests/test_brain_mining_node_api.py"
@@ -45,3 +57,7 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py
+      - name: Validate bounded SHA256d proof-of-work primitive and Bitcoin header vectors
+        run: python -m pytest -q brain_v12/tests/test_brain_owned_compute_runtime.py brain_v12/tests/test_bitcoin_header.py
+      - name: Validate completion-audit fail-closed status recognition
+        run: python -m pytest -q brain_v12/tests/test_completion_audit.py
