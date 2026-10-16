@@ -23,6 +23,7 @@ from .brain.orchestrator import CognitiveOrchestrator
 from .brain.capabilities import CAPABILITIES, PLUGINS, TOOLS
 from .brain.self_improvement import SelfImprovementEngine
 from .brain.cognitive_loop import CognitiveLoop
+from .brain.goal_verifiers import verify_cognitive_goal
 from .brain.ai_gateway import AIGateway
 from .brain.brain_ai import BrainAI
 from .brain.brain_ai_api import router as brain_ai_router
@@ -79,7 +80,7 @@ store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); stor
 register_quranic_reasoning_paths(store)
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
-cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
+cognitive=CognitiveLoop(store, goal_verifier=verify_cognitive_goal); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
 model_router=ModelRouter()
 for _provider in configured_model_providers():
     model_router.register(_provider.name, _provider.respond, tasks=["chat","reasoning","coding","vision","creative","summarization"], priority={"openai":10,"gemini":20,"ollama":30}.get(_provider.name,100))

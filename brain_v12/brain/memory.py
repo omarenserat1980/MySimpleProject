@@ -1,4 +1,5 @@
 import json
+import math
 import re
 import sqlite3
 import unicodedata
@@ -25,6 +26,27 @@ class MemoryStore:
               key TEXT UNIQUE NOT NULL,
               value TEXT NOT NULL,
               updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS memory_metadata(
+              memory_key TEXT PRIMARY KEY REFERENCES memories(key) ON DELETE CASCADE,
+              source TEXT NOT NULL DEFAULT 'LEGACY_UNKNOWN',
+              confidence REAL NOT NULL DEFAULT 0.5,
+              expires_at TEXT,
+              status TEXT NOT NULL DEFAULT 'ACTIVE',
+              tags TEXT NOT NULL DEFAULT '[]',
+              updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS memory_conflicts(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              memory_key TEXT NOT NULL,
+              conflicting_key TEXT NOT NULL,
+              reason TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'OPEN',
+              created_at TEXT NOT NULL,
+              resolution_evidence TEXT NOT NULL DEFAULT '',
+              resolved_by TEXT NOT NULL DEFAULT '',
+              resolved_at TEXT,
+              UNIQUE(memory_key,conflicting_key)
             );
             CREATE TABLE IF NOT EXISTS goals(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,7 +146,107 @@ class MemoryStore:
 
     def memories(self):
         with self.connect() as con:
-            return [dict(x) for x in con.execute("SELECT key,value,updated_at FROM memories ORDER BY id DESC").fetchall()]
+            rows = con.execute("""
+                SELECT m.key,m.value,m.updated_at,
+                       COALESCE(mm.source,'LEGACY_UNKNOWN') AS source,
+                       COALESCE(mm.confidence,0.5) AS confidence,
+                       mm.expires_at,
+                       COALESCE(mm.status,'ACTIVE') AS status,
+                       COALESCE(mm.tags,'[]') AS tags
+                FROM memories AS m
+                LEFT JOIN memory_metadata AS mm ON mm.memory_key=m.key
+                ORDER BY m.id DESC
+            """).fetchall()
+        out = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["tags"] = json.loads(item.get("tags") or "[]")
+            except (TypeError, ValueError):
+                item["tags"] = []
+            out.append(item)
+        return out
+
+    @staticmethod
+    def _memory_is_recallable(memory, at=None):
+        """Exclude inactive, disputed, or expired memories from decision recall."""
+        status = str(memory.get("status") or "ACTIVE").strip().upper()
+        if status != "ACTIVE":
+            return False
+        expires_at = memory.get("expires_at")
+        if not expires_at:
+            return True
+        try:
+            expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            current = at or datetime.now(timezone.utc)
+            if current.tzinfo is None:
+                current = current.replace(tzinfo=timezone.utc)
+            return expiry > current
+        except (TypeError, ValueError, OverflowError):
+            # A malformed expiry must not silently turn stale data into live evidence.
+            return False
+
+    def set_memory_metadata(self, key, *, source=None, confidence=None, expires_at=None,
+                            status=None, tags=None):
+        """Set provenance/lifecycle metadata without rewriting the memory value."""
+        allowed_statuses = {"ACTIVE", "UNVERIFIED", "CONFLICTED", "SUPERSEDED", "RETRACTED", "ARCHIVED"}
+        if confidence is not None:
+            try:
+                confidence = float(confidence)
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("confidence must be a finite number from 0 to 1")
+            if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+                raise ValueError("confidence must be a finite number from 0 to 1")
+        if status is not None:
+            status = str(status).strip().upper()
+            if status not in allowed_statuses:
+                raise ValueError("unsupported memory status")
+        if source is not None:
+            source = str(source).strip()[:500] or "UNKNOWN"
+        if expires_at is not None:
+            try:
+                expiry = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("expires_at must be an ISO-8601 datetime")
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            expires_at = expiry.astimezone(timezone.utc).isoformat()
+        if tags is not None:
+            if not isinstance(tags, (list, tuple, set)):
+                raise ValueError("tags must be a list, tuple, or set")
+            tags = sorted({str(tag).strip()[:80] for tag in tags if str(tag).strip()})[:50]
+        with self.connect() as con:
+            exists = con.execute("SELECT 1 FROM memories WHERE key=?", (key,)).fetchone()
+            if not exists:
+                raise KeyError(key)
+            current = con.execute("SELECT * FROM memory_metadata WHERE memory_key=?", (key,)).fetchone()
+            current = dict(current) if current else {
+                "source": "LEGACY_UNKNOWN", "confidence": 0.5, "expires_at": None,
+                "status": "ACTIVE", "tags": "[]", "updated_at": now()
+            }
+            merged = {
+                "source": current["source"] if source is None else source,
+                "confidence": current["confidence"] if confidence is None else confidence,
+                "expires_at": current["expires_at"] if expires_at is None else expires_at,
+                "status": current["status"] if status is None else status,
+                "tags": current["tags"] if tags is None else json.dumps(tags, ensure_ascii=False),
+                "updated_at": now(),
+            }
+            con.execute("""
+                INSERT INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                VALUES(?,?,?,?,?,?,?)
+                ON CONFLICT(memory_key) DO UPDATE SET
+                    source=excluded.source, confidence=excluded.confidence,
+                    expires_at=excluded.expires_at, status=excluded.status,
+                    tags=excluded.tags, updated_at=excluded.updated_at
+            """, (key, merged["source"], merged["confidence"], merged["expires_at"],
+                  merged["status"], merged["tags"], merged["updated_at"]))
+            con.commit()
+        self.event("MEMORY_METADATA_UPDATED", {"key": key, "status": merged["status"]})
+        return {**merged, "memory_key": key, "tags": json.loads(merged["tags"])}
+
 
     @staticmethod
     def _memory_terms(text):
@@ -150,33 +272,172 @@ class MemoryStore:
                 normalized.add(term)
         return normalized
 
-    def recall_memories(self, query="", limit=12, candidates=None):
+    def recall_memories(self, query="", limit=12, candidates=None, fallback_recent=True):
         """Recall goal-relevant memories first; fall back to recent records only when no match exists."""
         limit = max(1, min(int(limit), 100))
         rows = list(candidates) if candidates is not None else self.memories()
+        rows = [memory for memory in rows if self._memory_is_recallable(memory)]
         query_terms = self._memory_terms(query)
         if not query_terms:
-            return rows[:limit]
+            return rows[:limit] if fallback_recent else []
 
-        ranked = []
-        for position, memory in enumerate(rows):
+        prepared = []
+        document_frequency = {term: 0 for term in query_terms}
+        for memory in rows:
             key_terms = self._memory_terms(memory.get("key", ""))
             value_terms = self._memory_terms(memory.get("value", ""))
-            key_overlap = len(query_terms & key_terms)
-            value_overlap = len(query_terms & value_terms)
-            score = (key_overlap * 3) + (value_overlap * 2)
+            document_terms = key_terms | value_terms
+            for term in query_terms & document_terms:
+                document_frequency[term] += 1
+            prepared.append((memory, key_terms, value_terms))
+
+        # Rare goal terms carry more information than generic words repeated
+        # across many memories. This is a small corpus-local IDF weighting.
+        corpus_size = max(1, len(prepared))
+        term_weights = {
+            term: math.log((corpus_size + 1) / (document_frequency[term] + 1)) + 1.0
+            for term in query_terms
+        }
+        ranked = []
+        for position, (memory, key_terms, value_terms) in enumerate(prepared):
+            key_score = sum(term_weights[term] for term in query_terms & key_terms)
+            value_score = sum(term_weights[term] for term in query_terms & value_terms)
+            score = (key_score * 3) + (value_score * 2)
+            try:
+                confidence = float(memory.get("confidence", 0.5))
+            except (TypeError, ValueError, OverflowError):
+                confidence = 0.5
+            if not math.isfinite(confidence):
+                confidence = 0.5
+            confidence = min(1.0, max(0.0, confidence))
+            # Confidence adjusts relevance without erasing the lexical match.
+            score *= 0.5 + confidence
             if score:
                 ranked.append((score, position, memory))
         if not ranked:
-            return rows[:limit]
+            return rows[:limit] if fallback_recent else []
 
         ranked.sort(key=lambda item: (-item[0], item[1]))
         return [memory for _, _, memory in ranked[:limit]]
+
+    def record_memory_conflict(self, key, conflicting_key, reason):
+        """Record an explicit conflict and quarantine both memories from active recall."""
+        key = str(key or "").strip()
+        conflicting_key = str(conflicting_key or "").strip()
+        reason = str(reason or "").strip()[:2000]
+        if not key or not conflicting_key or key == conflicting_key:
+            raise ValueError("two distinct memory keys are required")
+        if not reason:
+            raise ValueError("a conflict reason is required")
+        first, second = sorted((key, conflicting_key))
+        created_at = now()
+        with self.connect() as con:
+            existing = con.execute(
+                "SELECT key FROM memories WHERE key IN (?,?)", (first, second)
+            ).fetchall()
+            if len(existing) != 2:
+                raise KeyError(key if not any(row["key"] == key for row in existing) else conflicting_key)
+            con.execute("""
+                INSERT INTO memory_conflicts(memory_key,conflicting_key,reason,status,created_at)
+                VALUES(?,?,?,'OPEN',?)
+                ON CONFLICT(memory_key,conflicting_key) DO UPDATE SET
+                    reason=excluded.reason,status='OPEN',created_at=excluded.created_at,
+                    resolution_evidence='',resolved_by='',resolved_at=NULL
+            """, (first, second, reason, created_at))
+            for memory_key in (first, second):
+                con.execute("""
+                    INSERT INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                    VALUES(?,'LEGACY_UNKNOWN',0.5,NULL,'CONFLICTED','[]',?)
+                    ON CONFLICT(memory_key) DO UPDATE SET
+                        status='CONFLICTED',updated_at=excluded.updated_at
+                """, (memory_key, created_at))
+            con.commit()
+        self.event("MEMORY_CONFLICT_RECORDED", {
+            "memory_key": first, "conflicting_key": second, "reason": reason
+        })
+        return {
+            "memory_key": first, "conflicting_key": second, "reason": reason,
+            "status": "OPEN", "created_at": created_at
+        }
+
+    def resolve_memory_conflict(self, key, conflicting_key, accepted_key, evidence, verifier):
+        """Resolve a recorded conflict by activating one evidence-backed fact and superseding the other."""
+        key = str(key or "").strip()
+        conflicting_key = str(conflicting_key or "").strip()
+        accepted_key = str(accepted_key or "").strip()
+        evidence = str(evidence or "").strip()[:2000]
+        verifier = str(verifier or "").strip()[:500]
+        if not key or not conflicting_key or key == conflicting_key:
+            raise ValueError("two distinct memory keys are required")
+        if accepted_key not in {key, conflicting_key}:
+            raise ValueError("accepted_key must identify one side of the conflict")
+        if not evidence or not verifier:
+            raise ValueError("resolution evidence and verifier identity are required")
+        first, second = sorted((key, conflicting_key))
+        resolved_at = now()
+        rejected_key = conflicting_key if accepted_key == key else key
+        with self.connect() as con:
+            conflict = con.execute(
+                "SELECT status FROM memory_conflicts WHERE memory_key=? AND conflicting_key=?",
+                (first, second)
+            ).fetchone()
+            if not conflict:
+                raise KeyError(f"{first} <> {second}")
+            if conflict["status"] != "OPEN":
+                raise ValueError("only an OPEN memory conflict can be resolved")
+            for memory_key, status in ((accepted_key, "ACTIVE"), (rejected_key, "SUPERSEDED")):
+                current = con.execute(
+                    "SELECT source,confidence,expires_at,tags FROM memory_metadata WHERE memory_key=?",
+                    (memory_key,)
+                ).fetchone()
+                if current:
+                    source = f"conflict_resolution:{verifier}"
+                    con.execute("""
+                        UPDATE memory_metadata SET source=?,status=?,updated_at=?
+                        WHERE memory_key=?
+                    """, (source, status, resolved_at, memory_key))
+                else:
+                    con.execute("""
+                        INSERT INTO memory_metadata(
+                            memory_key,source,confidence,expires_at,status,tags,updated_at
+                        ) VALUES(?,?,0.5,NULL,?,'[]',?)
+                    """, (memory_key, f"conflict_resolution:{verifier}", status, resolved_at))
+            con.execute("""
+                UPDATE memory_conflicts
+                SET status='RESOLVED',resolution_evidence=?,resolved_by=?,resolved_at=?
+                WHERE memory_key=? AND conflicting_key=?
+            """, (evidence, verifier, resolved_at, first, second))
+            con.commit()
+        self.event("MEMORY_CONFLICT_RESOLVED", {
+            "memory_key": first, "conflicting_key": second,
+            "accepted_key": accepted_key, "rejected_key": rejected_key,
+            "verifier": verifier, "evidence": evidence
+        })
+        return {
+            "memory_key": first, "conflicting_key": second,
+            "accepted_key": accepted_key, "rejected_key": rejected_key,
+            "status": "RESOLVED", "evidence": evidence, "verifier": verifier,
+            "resolved_at": resolved_at
+        }
+
+    def memory_conflicts(self, limit=100):
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT memory_key,conflicting_key,reason,status,created_at,"
+                "resolution_evidence,resolved_by,resolved_at "
+                "FROM memory_conflicts ORDER BY id DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),)
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def save_memory(self,key,value):
         with self.connect() as con:
             con.execute("""INSERT INTO memories(key,value,updated_at) VALUES(?,?,?)
                            ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at""",(key,value,now()))
+            con.execute("""
+                INSERT OR IGNORE INTO memory_metadata(memory_key,source,confidence,expires_at,status,tags,updated_at)
+                VALUES(?,?,?,?,?,?,?)
+            """, (key, "LEGACY_UNKNOWN", 0.5, None, "ACTIVE", "[]", now()))
             con.commit()
         self.event("MEMORY_UPDATED",{"key":key})
 

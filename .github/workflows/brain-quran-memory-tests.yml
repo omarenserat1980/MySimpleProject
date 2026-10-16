@@ -3,9 +3,11 @@ name: Brain Quran Memory Regression Tests
 on:
   push:
     paths:
+      - "brain_v12/app.py"
       - "brain_v12/brain/memory.py"
       - "brain_v12/brain/github_auth.py"
       - "brain_v12/brain/cognitive_loop.py"
+      - "brain_v12/brain/goal_verifiers.py"
       - "brain_v12/brain/decision_engine.py"
       - "brain_v12/brain/quranic_reasoning_paths.py"
       - "brain_v12/tests/test_memory_recall.py"
@@ -13,6 +15,7 @@ on:
       - "brain_v12/tests/test_quranic_reasoning_paths.py"
       - "brain_v12/tests/test_cognitive_learning_memory.py"
       - "brain_v12/tests/test_cognitive_loop_evidence.py"
+      - "brain_v12/tests/test_goal_verifiers.py"
       - ".github/workflows/brain-quran-memory-tests.yml"
   workflow_dispatch:
 
@@ -36,7 +39,8 @@ jobs:
             brain_v12/brain/github_auth.py \
             brain_v12/brain/quranic_reasoning_paths.py \
             brain_v12/brain/decision_engine.py \
-            brain_v12/brain/cognitive_loop.py
+            brain_v12/brain/cognitive_loop.py \
+            brain_v12/brain/goal_verifiers.py
       - name: Run memory and cognitive regression tests
         run: |
           python -m unittest -v \
@@ -44,4 +48,5 @@ jobs:
             brain_v12.tests.test_github_header_policy \
             brain_v12.tests.test_quranic_reasoning_paths \
             brain_v12.tests.test_cognitive_learning_memory \
-            brain_v12.tests.test_cognitive_loop_evidence
+            brain_v12.tests.test_cognitive_loop_evidence \
+            brain_v12.tests.test_goal_verifiers
