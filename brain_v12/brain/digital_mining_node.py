@@ -1,79 +1,53 @@
-"""Read-only preflight for a real Brain mining node.
+"""Read-only preflight for a Brain connectivity gateway, never a mining worker.
 
-This module does not start mining, contact a pool, or claim remote verification.
-Its output is local diagnostic evidence only; the Brain control plane must
-independently authenticate a fresh heartbeat before a node can be VERIFIED.
+This module checks only whether a physical device can connect to Brain. It does
+not require a local miner, local pool configuration, Termux, thermal sensors, or
+local compute resources because mining computation must not run on the gateway.
 """
 from __future__ import annotations
 
-import json
 import os
 import platform
-import shutil
-import sys
 from pathlib import Path
 from typing import Mapping, Any
 
 
-def _memory_bytes() -> int | None:
+def _termux_detected(env: Mapping[str, str]) -> bool:
     try:
-        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024
-    except (OSError, ValueError, IndexError):
-        pass
-    return None
-
-
-def _temperature_sensor_available() -> bool:
-    try:
-        return any(Path("/sys/class/thermal").glob("thermal_zone*/temp"))
+        return bool(env.get("TERMUX_VERSION")) or Path(
+            "/data/data/com.termux/files/usr"
+        ).is_dir()
     except OSError:
-        return False
+        return bool(env.get("TERMUX_VERSION"))
 
 
 def inspect_node(env: Mapping[str, str] | None = None) -> dict[str, Any]:
-    """Return bounded local diagnostics without exposing environment values."""
+    """Return safe gateway readiness metadata without exposing environment values."""
     env = os.environ if env is None else env
-    termux_root = Path("/data/data/com.termux/files/usr").is_dir()
-    is_termux = bool(env.get("TERMUX_VERSION")) or termux_root
-    is_linux = platform.system().lower() == "linux"
-    miner_path = env.get("BRAIN_CPUMINER_BIN") or shutil.which("cpuminer")
-    pool_configured = bool(env.get("BRAIN_MINING_POOL_URL"))
-    worker_configured = bool(env.get("BRAIN_MINING_WORKER"))
     brain_url_configured = bool(env.get("V12_BRAIN_URL") or env.get("BRAIN_URL"))
-    worker_token_configured = bool(env.get("BRAIN_WORKER_TOKEN"))
-    memory_available = _memory_bytes()
+    gateway_auth_configured = bool(
+        env.get("BRAIN_AGENT_KEY")
+        or env.get("BRAIN_WORKER_TOKEN")
+        or env.get("V12_AGENT_KEY")
+    )
     blockers: list[str] = []
-
-    if not is_linux:
-        blockers.append("UNSUPPORTED_OS_FOR_THIS_PREFLIGHT")
-    if not is_termux:
-        blockers.append("NOT_RUNNING_IN_TERMUX")
-    if not miner_path or not Path(miner_path).is_file():
-        blockers.append("TRUSTED_MINER_BINARY_NOT_FOUND")
-    if not pool_configured:
-        blockers.append("MINING_POOL_NOT_CONFIGURED")
-    if not worker_configured:
-        blockers.append("POOL_WORKER_NOT_CONFIGURED")
     if not brain_url_configured:
         blockers.append("BRAIN_CONTROL_PLANE_URL_NOT_CONFIGURED")
-    if not worker_token_configured:
-        blockers.append("BRAIN_WORKER_AUTH_TOKEN_NOT_CONFIGURED")
-    if memory_available is None:
-        blockers.append("AVAILABLE_MEMORY_UNREADABLE")
-    if not _temperature_sensor_available():
-        blockers.append("TEMPERATURE_SENSOR_UNAVAILABLE")
+    if not gateway_auth_configured:
+        blockers.append("GATEWAY_AUTH_TOKEN_NOT_CONFIGURED")
 
-    # A local probe cannot prove physical backing, remote identity, pool shares,
-    # ASIC capability, or payout. Those require independent control-plane evidence.
     return {
-        "schema_version": "1.0",
-        "component": "brain-digital-mining-node-preflight",
-        "status": "BLOCKED" if blockers else "PREFLIGHT_READY_NOT_VERIFIED",
-        "execution_mode": "READ_ONLY_PREFLIGHT",
+        "schema_version": "2.0",
+        "component": "brain-connectivity-gateway-preflight",
+        "status": "BLOCKED" if blockers else "GATEWAY_CONFIGURED_NOT_VERIFIED",
+        "execution_mode": "GATEWAY_CONNECTIVITY_PREFLIGHT_ONLY",
+        "gateway_configured": not blockers,
+        "gateway_identity_verified": False,
         "node_verified": False,
         "real_mining_started": False,
+        "local_mining_allowed": False,
+        "physical_device_computation_allowed": False,
+        "pool_contacted": False,
         "accepted_shares_verified": False,
         "revenue_verified": False,
         "environment": {
@@ -81,33 +55,32 @@ def inspect_node(env: Mapping[str, str] | None = None) -> dict[str, Any]:
             "os_release": platform.release(),
             "architecture": platform.machine(),
             "python_version": platform.python_version(),
-            "cpu_logical_count": os.cpu_count(),
-            "termux_detected": is_termux,
-            "available_memory_bytes": memory_available,
-            "temperature_sensor_available": _temperature_sensor_available(),
-            "miner_binary_present": bool(miner_path and Path(miner_path).is_file()),
-            "pool_url_configured": pool_configured,
-            "pool_worker_configured": worker_configured,
+            "termux_detected": _termux_detected(env),
             "brain_url_configured": brain_url_configured,
-            "worker_auth_token_configured": worker_token_configured,
+            "gateway_auth_configured": gateway_auth_configured,
         },
         "blockers": blockers,
         "verification_required": [
-            "independently authenticated worker identity",
-            "fresh signed or authenticated heartbeat received by Brain",
-            "measured host resources and physical/cloud backing attested",
-            "pool-derived accepted-share evidence for real mining",
-            "independent payout evidence before claiming revenue",
+            "trusted gateway identity and authenticated connection to Brain",
+            "fresh Brain-side gateway heartbeat",
+            "implemented and reviewed Brain-owned software mining backend",
+            "independently verified pool accepted-share evidence bound to the Brain runtime",
+            "independent payout and cost evidence before revenue or profit claims",
         ],
-        "security_note": "Secret values, pool URL, worker name, hostname, and device identifiers are not emitted.",
+        "security_note": (
+            "Secret values, pool URLs, worker names, hostnames, and device identifiers "
+            "are not emitted. This gateway does not host or launch mining computation."
+        ),
     }
 
 
 def main() -> int:
+    import json
     result = inspect_node()
     print(json.dumps(result, sort_keys=True))
-    return 0 if result["status"] == "PREFLIGHT_READY_NOT_VERIFIED" else 2
+    return 0 if result["status"] == "GATEWAY_CONFIGURED_NOT_VERIFIED" else 2
 
 
 if __name__ == "__main__":
+    import sys
     sys.exit(main())
