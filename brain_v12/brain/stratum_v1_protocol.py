@@ -128,29 +128,45 @@ class StratumV1Session:
             raise StratumProtocolError("RESPONSE_ID_MISSING")
         if isinstance(request_id, bool) or not isinstance(request_id, int):
             raise StratumProtocolError("INVALID_RESPONSE_ID")
-        purpose = self.pending.pop(request_id, None)
+        purpose = self.pending.get(request_id)
         if purpose is None:
             raise StratumProtocolError("UNMATCHED_RESPONSE_ID")
-        error = message.get("error")
-        result = message.get("result")
+        # A malformed response must not consume the legitimate pending request.
+        # Both JSON-RPC response members are required before it can be correlated.
+        if "error" not in message or "result" not in message:
+            raise StratumProtocolError("MALFORMED_JSON_RPC_RESPONSE")
+        error = message["error"]
+        result = message["result"]
         if purpose == "subscribe":
-            if error or not isinstance(result, list) or len(result) < 3:
+            if error is not None:
+                self.pending.pop(request_id, None)
                 raise StratumProtocolError("SUBSCRIBE_REJECTED_OR_MALFORMED")
+            if not isinstance(result, list) or len(result) < 3:
+                raise StratumProtocolError("MALFORMED_SUBSCRIBE_RESPONSE")
+            self.pending.pop(request_id, None)
             self.subscribed = True
         elif purpose == "authorize":
-            if error or result is not True:
+            if error is not None or result is False:
+                self.pending.pop(request_id, None)
                 raise StratumProtocolError("POOL_AUTHORIZATION_REJECTED")
+            if result is not True:
+                raise StratumProtocolError("MALFORMED_AUTHORIZE_RESPONSE")
+            self.pending.pop(request_id, None)
             self.authorized = True
         elif purpose == "share":
             if error is None and result is True:
+                self.pending.pop(request_id, None)
                 self.accepted_shares += 1
                 return {"event": "SHARE_RESPONSE", "status": "ACCEPTED_BY_POOL",
                         "accepted_shares": self.accepted_shares}
-            self.rejected_shares += 1
-            return {"event": "SHARE_RESPONSE", "status": "REJECTED_BY_POOL",
-                    "accepted_shares": self.accepted_shares,
-                    "rejected_shares": self.rejected_shares}
-        return {"event": "RESPONSE", "purpose": purpose, "success": not bool(error)}
+            if error is not None or result is False:
+                self.pending.pop(request_id, None)
+                self.rejected_shares += 1
+                return {"event": "SHARE_RESPONSE", "status": "REJECTED_BY_POOL",
+                        "accepted_shares": self.accepted_shares,
+                        "rejected_shares": self.rejected_shares}
+            raise StratumProtocolError("MALFORMED_SHARE_RESPONSE")
+        return {"event": "RESPONSE", "purpose": purpose, "success": True}
 
     def snapshot(self) -> dict[str, Any]:
         return {

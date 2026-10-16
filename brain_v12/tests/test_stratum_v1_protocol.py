@@ -70,3 +70,35 @@ def test_pool_rejection_is_not_counted_as_acceptance():
     assert result["status"] == "REJECTED_BY_POOL"
     assert session.accepted_shares == 0
     assert session.rejected_shares == 1
+
+
+def test_malformed_share_response_does_not_consume_pending_request():
+    session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
+    request = json.loads(session.request_submit("job", "00", "00", "00"))
+    with pytest.raises(StratumProtocolError, match="MALFORMED_JSON_RPC_RESPONSE"):
+        session.receive(json.dumps({"id": request["id"], "result": True}))
+    assert request["id"] in session.pending
+    result = session.receive(json.dumps({"id": request["id"], "result": True, "error": None}))
+    assert result["status"] == "ACCEPTED_BY_POOL"
+    assert request["id"] not in session.pending
+
+
+def test_malformed_subscribe_response_does_not_consume_pending_request():
+    session = StratumV1Session("worker", "secret")
+    request = json.loads(session.request_subscribe())
+    with pytest.raises(StratumProtocolError, match="MALFORMED_SUBSCRIBE_RESPONSE"):
+        session.receive(json.dumps({"id": request["id"], "result": [], "error": None}))
+    assert request["id"] in session.pending
+    session.receive(json.dumps({"id": request["id"], "result": [[], "abcd", 4], "error": None}))
+    assert session.subscribed is True
+    assert request["id"] not in session.pending
+
+
+def test_invalid_authorize_result_does_not_consume_pending_request():
+    session = StratumV1Session("worker", "secret", subscribed=True)
+    request = json.loads(session.request_authorize())
+    with pytest.raises(StratumProtocolError, match="MALFORMED_AUTHORIZE_RESPONSE"):
+        session.receive(json.dumps({"id": request["id"], "result": "true", "error": None}))
+    assert request["id"] in session.pending
+    session.receive(json.dumps({"id": request["id"], "result": True, "error": None}))
+    assert session.authorized is True
