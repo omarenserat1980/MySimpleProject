@@ -31,7 +31,10 @@ def test_readiness_keeps_real_mining_blocked_without_trusted_collectors():
     assert result["software_api_ready"] is True
     assert result["real_mining_ready"] is False
     assert result["state"] == "BLOCKED"
-    assert result["gates"]["G2_brain_owned_compute_backend"] == "BLOCKED_NOT_IMPLEMENTED"
+    assert result["gates"]["G2_brain_owned_compute_backend"] == "BLOCKED_LIVE_BACKEND_NOT_IMPLEMENTED"
+    assert result["gates"]["G2a_bounded_sha256d_primitive"] == "READY_BOUNDED_LIBRARY_ONLY"
+    assert result["gates"]["G2b_live_compute_host_attestation"] == "BLOCKED_HOST_ATTESTATION_REQUIRED"
+    assert result["gates"]["G2c_pool_share_submission_adapter"] == "BLOCKED_NOT_IMPLEMENTED"
     assert result["gates"]["G4_gateway_connectivity"] == "NOT_REQUIRED_FOR_COMPUTE"
     assert result["gates"]["G5_pool_shares"].startswith("BLOCKED")
     assert result["real_mining_claim"] is False
