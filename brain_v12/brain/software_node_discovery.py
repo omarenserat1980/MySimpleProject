@@ -1,7 +1,7 @@
 """Read-only discovery of Electronic Brain's local software nodes.
 
-This module inventories software capabilities and repository components without
-starting processes, contacting networks, reading secret values, or claiming that
+Inventories local runtime capabilities and repository modules without starting
+processes, contacting networks, reading secret values, or claiming that
 simulated/installed components are live executors.
 """
 from __future__ import annotations
@@ -18,6 +18,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+SOURCE_ROOTS = ("brain_v12/brain", "brain_v12/tools", "brain_v12/self_healing",
+                "brain_v12/cloud", "brain_v12/generated_tools")
+EXCLUDED_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules"}
+MAX_SOURCE_FILES = 2000
 
 # Import availability is evidence of an installed module, not proof of runtime health.
 MODULES = (
@@ -58,6 +62,40 @@ def _component_status(relative: str) -> dict[str, Any]:
     return {"path": relative, "present": path.is_file()}
 
 
+def _source_inventory() -> dict[str, Any]:
+    """Enumerate repository source files under bounded, explicit roots."""
+    found: list[str] = []
+    scanned_roots: list[str] = []
+    truncated = False
+    for relative_root in SOURCE_ROOTS:
+        root = ROOT / relative_root
+        if not root.is_dir():
+            continue
+        scanned_roots.append(relative_root)
+        for current, dirs, files in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if d not in EXCLUDED_DIRS)
+            for filename in sorted(files):
+                if not filename.endswith(".py"):
+                    continue
+                path = Path(current) / filename
+                found.append(path.relative_to(ROOT).as_posix())
+                if len(found) >= MAX_SOURCE_FILES:
+                    truncated = True
+                    break
+            if truncated:
+                break
+        if truncated:
+            break
+    found.sort()
+    return {
+        "roots_scanned": scanned_roots,
+        "python_file_count": len(found),
+        "python_files": found,
+        "truncated": truncated,
+        "limit": MAX_SOURCE_FILES,
+    }
+
+
 def discover() -> dict[str, Any]:
     """Return a JSON-safe inventory with explicit evidence boundaries."""
     return {
@@ -75,6 +113,7 @@ def discover() -> dict[str, Any]:
         "python_modules": [_module_status(name) for name in MODULES],
         "executables": [_executable_status(name) for name in EXECUTABLES],
         "brain_components": [_component_status(path) for path in COMPONENT_PATHS],
+        "source_inventory": _source_inventory(),
         "safety": {
             "network_probed": False,
             "processes_started": False,
@@ -87,7 +126,9 @@ def discover() -> dict[str, Any]:
         "interpretation": (
             "Presence indicates local software or a repository file only. "
             "It does not prove that a service is running, a remote device is "
-            "reachable, a mining worker is connected, or revenue was realized."
+            "reachable, a mining worker is connected, or revenue was realized. "
+            "The source inventory is bounded to listed roots and may not include "
+            "all runtime plugins or dynamically registered nodes."
         ),
     }
 
