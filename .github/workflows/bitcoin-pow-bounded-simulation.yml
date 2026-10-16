@@ -1,0 +1,32 @@
+name: Bitcoin PoW Bounded Simulation
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/bitcoin_pow_simulator.py"
+      - "brain_v12/tests/test_bitcoin_pow_simulator.py"
+      - ".github/workflows/bitcoin-pow-bounded-simulation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/asic/bitcoin_pow_simulator.py"
+      - "brain_v12/tests/test_bitcoin_pow_simulator.py"
+      - ".github/workflows/bitcoin-pow-bounded-simulation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-pow-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile simulator and tests
+        run: python -m compileall -q brain_v12/asic/bitcoin_pow_simulator.py brain_v12/tests/test_bitcoin_pow_simulator.py
+      - name: Run deterministic offline proof-of-work tests
+        run: python -m unittest brain_v12.tests.test_bitcoin_pow_simulator -v

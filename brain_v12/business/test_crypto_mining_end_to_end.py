@@ -1,79 +1,46 @@
-import pytest
+"""Integration boundary tests: no mining/revenue claim without Brain-owned execution.
 
+All telemetry below is synthetic test input. The native Brain mining backend is
+not implemented, so this suite must never promote a planned job to real mining
+or realized revenue.
+"""
 from brain_v12.brain.cloud_mining_control_plane import CloudMiningControlPlane, CloudWorker
-from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
-from brain_v12.business.crypto_mining_verification import (
-    BlockchainProof,
-    VerificationState,
-    start_cloud_mining_verification,
-)
-from brain_v12.business.revenue_ledger import RevenueRecord
 
 
-def test_worker_to_revenue_ledger_requires_every_gate():
-    """Integration guard: worker evidence -> payout -> chain proof -> ledger."""
+def _planned_job():
     cp = CloudMiningControlPlane()
-    cp.register_worker(
-        CloudWorker("worker-e2e-01", "vm", "user-region", "owner", enabled=True)
-    )
-    job = cp.plan("worker-e2e-01")
+    cp.register_worker(CloudWorker("brain-vm-01", "vm", "brain-region", "brain", enabled=True))
+    return cp, cp.plan("brain-vm-01")
 
+
+def test_planned_job_cannot_be_admitted_without_brain_native_backend():
+    cp, job = _planned_job()
+    assert job.status == "BLOCKED_BACKEND_NOT_IMPLEMENTED"
     admitted, reason = cp.admit(job.job_id, on_github_actions=False, temperature_c=40.0)
-    assert admitted is True
-    assert reason == "admitted_for_registered_worker"
+    assert admitted is False
+    assert reason == "brain_owned_mining_backend_not_implemented"
 
-    mining_evidence = cp.evidence(
-        job.job_id, hashrate=1000.0, accepted=12, rejected=1, payout_tx_id="tx-e2e-001"
+    evidence = cp.evidence(
+        job.job_id, hashrate=1000.0, accepted=12, rejected=1, payout_tx_id="synthetic-test-tx"
     )
-    assert mining_evidence["status"] == "PAYOUT_TX_REFERENCE_PRESENT"
-
-    cycle = start_cloud_mining_verification("CloudMineCrypto", job.job_id)
-    for state in (
-        VerificationState.RISK_CHECK,
-        VerificationState.FREE_TEST,
-        VerificationState.MEASURE,
-        VerificationState.WITHDRAWAL_TEST,
-    ):
-        cycle.advance(state, "integration-test")
-
-    payout = PayoutEvidence(
-        provider="CloudMineCrypto",
-        observed_at="2026-10-03T03:30:00Z",
-        balance_btc=0.0000012,
-        withdrawal_requested_btc=0.000001,
-        network="bitcoin",
-        destination_fingerprint="wallet:sha256:e2e",
-        txid=mining_evidence["payout_tx_id"],
-        explorer_url="https://example.test/tx/tx-e2e-001",
-        received_btc=0.00000095,
-        fee_btc=0.00000005,
-    )
-    payout_result = cycle.submit_payout_evidence(payout)
-    assert payout_result["state"] == VerificationState.BLOCKCHAIN_VERIFY.value
-
-    realized = cycle.submit_blockchain_proof(
-        BlockchainProof(
-            txid="tx-e2e-001",
-            explorer_url="https://example.test/tx/tx-e2e-001",
-            confirmations=3,
-            verified_at="2026-10-03T03:31:00Z",
-        )
-    )
-    assert realized["state"] == VerificationState.REVENUE_REALIZED.value
-    assert realized["guardrails"]["brain_moves_funds"] is False
-
-    ledger = RevenueRecord(job.job_id, "verified mining payout", "BTC")
-    final = ledger.realize_from_mining_verification(realized)
-    assert final["status"] == "REVENUE_REALIZED"
-    assert any("tx-e2e-001" in item for item in final["evidence"])
+    assert evidence["evidence_source"] == "caller_supplied_unverified_telemetry"
+    assert evidence["financial_state"] == "NOT_VERIFIED"
+    assert evidence["payout_verified"] is False
+    assert evidence["status"] == "PAYOUT_TX_REFERENCE_PRESENT"
 
 
-def test_github_actions_worker_path_cannot_enter_the_integration_gate():
-    cp = CloudMiningControlPlane()
-    cp.register_worker(
-        CloudWorker("worker-e2e-blocked", "vm", "user-region", "owner", enabled=True)
-    )
-    job = cp.plan("worker-e2e-blocked")
+def test_github_actions_mining_path_is_blocked():
+    cp, job = _planned_job()
     admitted, reason = cp.admit(job.job_id, on_github_actions=True)
     assert admitted is False
     assert reason == "github_actions_mining_forbidden"
+
+
+def test_physical_device_cannot_be_registered_as_compute_worker():
+    cp = CloudMiningControlPlane()
+    try:
+        cp.register_worker(CloudWorker("asic-01", "asic", "region", "owner", enabled=True))
+    except ValueError as exc:
+        assert "physical devices are gateways only" in str(exc)
+    else:
+        raise AssertionError("physical ASIC must be a gateway, not a mining compute worker")

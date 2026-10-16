@@ -100,3 +100,14 @@ Paid execution may be enabled only when:
 4. explicit authorization enables commercial mode.
 
 This gate only authorizes capability selection. It never purchases services, moves funds, withdraws money, or creates a contract automatically.
+
+
+## Software-only mining execution contract — 2026-10-16
+
+- Electronic Brain is the sole mining orchestration environment and intended compute runtime.
+- Physical phones, desktops, Termux agents, GPUs, ASICs, and other devices are connectivity/control/read-only observation gateways only; they must not host mining computation.
+- External miner execution is not an allowed fallback. The Brain-owned native compute backend is currently not implemented, so real mining remains blocked.
+- Simulations, plan results, gateway heartbeats, and process presence must never be reported as accepted shares, real hashrate, payout, or profit.
+- A future real backend requires independent technical review, bounded resources/runtime, secure credential injection, explicit user approval, and pool telemetry independently bound to the Brain-owned runtime.
+- GitHub Actions must never perform mining. Do not change production pool settings, install/launch miners, or restart production services as part of planning/tests.
+- Detailed contract: `docs/BRAIN_OWNED_SOFTWARE_ONLY_MINING.md`.

@@ -1,0 +1,72 @@
+name: Brain Phone Base Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/brain_phone_base.py"
+      - "brain_v12/tests/test_brain_phone_base.py"
+      - "brain_v12/tools/brain_phone_readonly_inspector.py"
+      - "brain_v12/tools/brain_phone_verification_gate.py"
+      - "brain_v12/tests/test_brain_phone_readonly_inspector.py"
+      - "brain_v12/tests/test_brain_phone_verification_gate.py"
+      - "brain_phone_base/**"
+      - "android_executor/app/src/main/java/com/electronicbrain/androidexecutor/**"
+      - "docs/BRAIN_PHONE_BASE.md"
+      - "docs/BRAIN_PHONE_VERIFICATION_GATE.md"
+      - ".github/workflows/brain-phone-base-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-phone-base-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phone-base-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install verifier test dependency
+        run: python -m pip install --disable-pip-version-check "cryptography>=42,<47"
+      - name: Compile modules and tests
+        run: |
+          python -m py_compile \
+            brain_v12/tools/brain_phone_base.py \
+            brain_v12/tests/test_brain_phone_base.py \
+            brain_v12/tools/brain_phone_readonly_inspector.py \
+            brain_v12/tools/brain_phone_verification_gate.py \
+            brain_v12/tests/test_brain_phone_readonly_inspector.py \
+            brain_v12/tests/test_brain_phone_verification_gate.py \
+            brain_phone_base/android_real_measurement.py \
+            brain_phone_base/local_executor.py \
+            brain_phone_base/identity_challenge.py \
+            brain_phone_base/android_key_attestation.py \
+            brain_phone_base/test_android_real_measurement.py \
+            brain_phone_base/test_local_executor.py \
+            brain_phone_base/test_identity_challenge.py \
+            brain_phone_base/test_android_key_attestation.py \
+            brain_phone_base/replay_store.py \
+            brain_phone_base/test_replay_store.py
+      - name: Run focused tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m unittest brain_v12.tests.test_brain_phone_base -v
+          python -m unittest brain_phone_base.test_android_real_measurement -v
+          python -m unittest brain_phone_base.test_local_executor -v
+          python -m unittest brain_phone_base.test_identity_challenge -v
+          python -m unittest brain_v12.tests.test_brain_phone_readonly_inspector -v
+          python -m unittest brain_v12.tests.test_brain_phone_verification_gate -v
+          python -m unittest brain_phone_base.test_android_key_attestation -v
+          python -m unittest brain_phone_base.test_replay_store -v
+      - name: Assert simulation-only boundary
+        run: |
+          python -m brain_v12.tools.brain_phone_base > phone-base-simulation.json
+          python -c "import json; d=json.load(open('phone-base-simulation.json')); assert d['mode']=='SIMULATOR' and d['synthetic'] is True and d['real_activation_performed'] is False and d['mining_started'] is False"
+          echo "Simulation output is synthetic; CI does not verify a real phone."

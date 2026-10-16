@@ -1,0 +1,37 @@
+name: Bitcoin Mining Evidence Gate Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - ".github/workflows/bitcoin-mining-evidence-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - ".github/workflows/bitcoin-mining-evidence-gate.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bitcoin-mining-evidence-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Validate evidence gate (offline only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run deterministic evidence-gate tests
+        run: python -m unittest brain_v12.tests.test_bitcoin_mining_evidence_gate -v

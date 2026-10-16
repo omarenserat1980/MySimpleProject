@@ -51,7 +51,7 @@ def register_node(name: str, *, provider: str = "self-hosted",
         "architecture": architecture.strip() or "unknown",
         "capacity": {"cpu": float(cpu), "memory_mb": int(memory_mb), "storage_gb": int(storage_gb)},
         "capabilities": sorted(set(str(x).strip() for x in (capabilities or []) if str(x).strip())),
-        "endpoint": endpoint, "state": "READY", "last_heartbeat": _now(),
+        "endpoint": endpoint, "state": "UNTRUSTED_INACTIVE", "trusted": False, "active": False, "identity_verified": False, "manual_approval": False, "last_heartbeat": _now(),
         "registered_at": _now(), "jobs_running": 0,
     }
     with _LOCK:
@@ -65,7 +65,7 @@ def heartbeat(node_id: str, *, state: str = "READY", jobs_running: int = 0) -> d
         record = _read(path)
         if not record:
             raise KeyError(node_id)
-        record["state"] = state.strip().upper() or "READY"
+        # Heartbeats report liveness only; they cannot approve or activate a node.
         record["jobs_running"] = max(0, int(jobs_running))
         record["last_heartbeat"] = _now()
         _atomic_write(path, record)
@@ -74,7 +74,7 @@ def heartbeat(node_id: str, *, state: str = "READY", jobs_running: int = 0) -> d
 def update_node(node_id: str, **changes: Any) -> dict[str, Any]:
     """Apply a validated partial node update and persist it atomically."""
     node_id = _validate_id(node_id)
-    allowed = {"provider", "architecture", "endpoint", "capabilities", "state", "jobs_running"}
+    allowed = {"provider", "architecture", "endpoint", "capabilities", "jobs_running"}
     capacity_allowed = {"cpu", "memory_mb", "storage_gb"}
     unknown = set(changes) - allowed - capacity_allowed
     if unknown:
@@ -107,6 +107,14 @@ def list_nodes() -> list[dict[str, Any]]:
 
 def _eligible(node: dict[str, Any], required: set[str]) -> bool:
     if node.get("state") not in {"READY", "RUNNING"}:
+        return False
+    if node.get("trusted") is not True:
+        return False
+    if node.get("active") is not True:
+        return False
+    if node.get("identity_verified") is not True:
+        return False
+    if node.get("manual_approval") is not True:
         return False
     if _now() - float(node.get("last_heartbeat", 0)) > float(os.getenv("BRAIN_FABRIC_HEARTBEAT_TIMEOUT", "120")):
         return False

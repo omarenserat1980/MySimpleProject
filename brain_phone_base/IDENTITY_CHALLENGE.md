@@ -1,0 +1,98 @@
+# Brain Phone Base: Identity Challenge Protocol
+
+## Purpose
+
+This work adds a fail-closed Python challenge/response verifier and an Android
+Keystore signing helper. It is protocol groundwork, not proof that the phone's
+identity is independently verified.
+
+## Security boundaries
+
+- The challenge must be signed by an independent verifier. Pin that verifier's
+  public key out-of-band; do not accept a verifier key supplied by the challenge.
+- The device public key must come from a separately trusted enrollment process.
+  Do not trust a public key merely because the phone includes it in its response.
+- `PhoneIdentityKeyStore.kt` requests a P-256 signing key in Android Keystore
+  with an enrollment attestation challenge and returns the public key and
+  certificate chain. The private key is not exported.
+- The Android helper only requests and exports the chain; it does not validate
+  the chain or claim that the key is hardware-backed. Unsupported devices fail
+  closed when key generation/attestation fails.
+- `brain_phone_base.android_key_attestation.verify_android_key_attestation_chain`
+  now checks a supplied leaf-to-root chain against out-of-band SHA-256 root-certificate
+  pins, certificate validity/signatures/CA constraints, the Android Key Attestation
+  extension, its challenge binding, and the attested leaf public key. The trusted-root
+  fingerprints must be maintained independently; do not accept pins from the phone.
+- The verifier now checks the reported TEE/StrongBox security level against a
+  configurable minimum, device-lock and verified-boot state, and optional OS/vendor/boot
+  patch-level minimums. If expected package name and signing-certificate SHA-256
+  digests are supplied, it checks those against the attested application ID.
+- This remains a partial gate, not a complete Android attestation policy. Certificate
+  revocation is not checked, and the verifier does not yet validate a production Android
+  root set or the real Realme certificate chain. Its result remains
+  `CHAIN_AND_CHALLENGE_VALID_POLICY_INCOMPLETE` and never grants trust or activation.
+- Enforce one-time challenge IDs in durable verifier-side storage.
+  `brain_phone_base.replay_store.SQLiteReplayStore` provides a SQLite-backed,
+  atomic insert guarded by a unique challenge ID. Pass it as `replay_store=` to
+  the verifier; database errors fail closed. Keep its database on trusted
+  verifier-side storage with restrictive filesystem permissions. The optional
+  `seen_challenge_ids` set is compatibility-only and is not durable.
+- The verifier accepts Ed25519 or P-256 public keys. The Android helper signs
+  response canonical JSON using `SHA256withECDSA`; challenge signatures may use
+  a supported key type and base64 encoding.
+- The module rejects expired/overlong challenges, short nonces, mismatched
+  measurement hashes, wrong key fingerprints, replayed IDs (when supplied),
+  altered response fields, and invalid signatures.
+
+## Current result semantics
+
+Even if both signatures validate, the result is
+`SIGNATURE_VALID_IDENTITY_UNVERIFIED`. The verifier always returns
+`device_identity_verified=false`, `trusted=false`, `active=false`,
+`manual_approval=NOT_GRANTED`, and `mining=DISABLED`. It does not register
+the node, upload evidence, activate a node, or contact a mining pool.
+
+A valid signature proves possession of the corresponding private key for that
+message. It does not by itself prove that the key is hardware-backed, belongs to
+a particular physical phone, or that the measurements are truthful.
+
+## Enrollment and response flow
+
+1. An independent enrollment authority generates a fresh random challenge of at
+   least 32 bytes and signs/records it.
+2. A foreground user action calls `createEnrollmentKey(challenge)`. The helper
+   refuses to overwrite an existing alias and returns the P-256 public key plus
+   the Android certificate chain.
+3. The independent verifier validates the chain and the attestation challenge,
+   then records the enrolled public key and its fingerprint.
+4. For a short-lived, signed challenge bound to a measurement hash, the Android
+   app builds the response fields and calls `signResponse(fields)`. The caller
+   sends the returned payload/signature to the independent verifier through a
+   separately reviewed transport.
+5. The verifier validates signatures, challenge freshness, replay state, key
+   enrollment and measurement binding. Trust and activation remain blocked until
+   the attestation policy and explicit manual approval both pass.
+
+No endpoint, enrollment authority, full Android attestation policy engine, or network
+transport is included in this change. The chain checker requires a separately reviewed
+root-pin set and does not by itself establish device identity. The SQLite replay ledger is a reusable
+local verifier-side primitive; it is not a distributed replay service and does
+not establish device identity. Do not treat the helper alone
+as completed independent identity verification.
+
+## Manual Android certificate-chain capture
+
+The Android Executor exposes an explicit **CREATE & EXPORT ATTESTATION CHAIN**
+action. Before using it, obtain the challenge from an independent enrollment
+authority and verify its origin/signature out of band. Enter the challenge bytes
+as Base64 (at least 32 bytes). The app does not verify the authority's signature.
+The user chooses the output file before a new Android Keystore key is created;
+existing key aliases are not overwritten. The JSON contains the public key,
+certificate chain, key fingerprint, and challenge hash, but not the private key
+or raw challenge.
+
+This export is local, unverified evidence only. It does not establish that the
+chain terminates in an approved Android root, does not check certificate
+revocation, and does not verify device identity. Do not upload it or mark the
+node trusted/active until an independently operated verifier checks the chain,
+policy, revocation status, and enrollment binding. Mining remains disabled.
