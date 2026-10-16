@@ -22,6 +22,7 @@ def is_intentional_not_implemented_state(line: str) -> bool:
     patterns = (
         r"""^\s*["']?adapter_status["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
         r"""^\s*["']?native_mining_backend["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
+        r"""^\s*["']?stratum_pool_adapter["']?\s*:\s*["']NOT_IMPLEMENTED["']\s*,?\s*(?:#.*)?$""",
         r"""^\s*assert\s+[^#]*\[\s*["']native_mining_backend["']\s*\]\s*==\s*["']NOT_IMPLEMENTED["']\s*$""",
     )
     return any(re.search(pattern, line) for pattern in patterns)
