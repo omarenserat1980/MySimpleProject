@@ -16,6 +16,7 @@ on:
       - "brain_v12/tests/test_software_node_discovery.py"
       - "brain_v12/tests/test_software_capability_gap_audit.py"
       - "brain_v12/tests/test_software_capability_candidate_catalog.py"
+      - "brain_v12/tests/test_software_capability_promotion_gate.py"
       - ".github/workflows/brain-component-contract-tests.yml"
   push:
     branches: [main]
@@ -32,6 +33,7 @@ on:
       - "brain_v12/tests/test_software_node_discovery.py"
       - "brain_v12/tests/test_software_capability_gap_audit.py"
       - "brain_v12/tests/test_software_capability_candidate_catalog.py"
+      - "brain_v12/tests/test_software_capability_promotion_gate.py"
       - ".github/workflows/brain-component-contract-tests.yml"
 
 permissions:
@@ -71,6 +73,8 @@ jobs:
             test: brain_v12.tests.test_software_capability_gap_audit
           - component: software_capability_candidate_catalog
             test: brain_v12.tests.test_software_capability_candidate_catalog
+          - component: software_capability_promotion_gate
+            test: brain_v12.tests.test_software_capability_promotion_gate
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -166,7 +170,7 @@ jobs:
               "evidence_lineage", "revenue_realization_gate",
               "media_engine", "asic_software_simulator",
               "software_node_discovery", "software_capability_gap_audit",
-              "software_capability_candidate_catalog",
+              "software_capability_candidate_catalog", "software_capability_promotion_gate",
           }
           records = []
           errors = []
