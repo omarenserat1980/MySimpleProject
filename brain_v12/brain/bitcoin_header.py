@@ -22,6 +22,19 @@ def sha256d(data: bytes) -> bytes:
     return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
+def stratum_v1_prevhash_to_header_wire_hex(prevhash_hex: str) -> str:
+    """Normalize the common legacy Stratum V1 prevhash encoding.
+
+    The legacy mining.notify prevhash encoding is eight little-endian 32-bit
+    words. Convert each 4-byte word to the byte order serialized in a Bitcoin
+    block header. This is NOT a whole-32-byte reversal. The caller must use this
+    only when the pool's documented/proven dialect matches this convention.
+    The function does not contact a pool or infer a dialect.
+    """
+    raw = _fixed_hex(prevhash_hex, "stratum_v1_prevhash", 32)
+    return b"".join(raw[i:i + 4][::-1] for i in range(0, 32, 4)).hex()
+
+
 @dataclass(frozen=True)
 class HeaderCandidate:
     header_bytes: bytes

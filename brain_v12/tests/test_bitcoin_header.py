@@ -4,6 +4,7 @@ from brain_v12.brain.bitcoin_header import (
     build_header_candidate,
     compact_nbits_to_target,
     verify_candidate_against_target,
+    stratum_v1_prevhash_to_header_wire_hex,
 )
 
 
@@ -66,3 +67,22 @@ def test_bitcoin_genesis_header_sha256d_known_vector():
         "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
     )
     assert candidate.meets_share_target is True
+
+
+def test_legacy_stratum_v1_prevhash_known_word_endian_vector():
+    # Observed legacy Stratum mining.notify example for block 672486; the pool
+    # hash is encoded as eight little-endian 32-bit words. See the cited source
+    # in docs/BRAIN_STRATUM_V1_PREVHASH_BYTE_ORDER.md.
+    stratum_prevhash = (
+        "852ab3acf6baeb51e883cc88f49ef03a"
+        "e17ed8110009a5fb0000000000000000"
+    )
+    assert stratum_v1_prevhash_to_header_wire_hex(stratum_prevhash) == (
+        "acb32a8551ebbaf688cc83e83af09ef4"
+        "11d87ee1fba509000000000000000000"
+    )
+
+
+def test_stratum_prevhash_normalizer_rejects_invalid_width():
+    with pytest.raises(ValueError, match="INVALID_STRATUM_V1_PREVHASH_WIDTH"):
+        stratum_v1_prevhash_to_header_wire_hex("00" * 31)

@@ -3,7 +3,9 @@
 This is a deterministic integration layer only. It opens no network sockets,
 loads no credentials, starts no background worker, and submits no shares.
 Stratum prevhash byte order is pool-specific; callers MUST supply the already
-validated 32-byte serialized header representation explicitly.
+validated 32-byte serialized header representation explicitly. A separate
+named normalizer covers the common legacy V1 eight-word encoding, but must only
+be selected after the pool dialect is confirmed.
 """
 from __future__ import annotations
 
