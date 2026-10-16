@@ -1,0 +1,58 @@
+name: Brain Phone Real Measurement Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_phone_base/**"
+      - ".github/workflows/brain-phone-real-measurement-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-phone-real-measurement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phone-real-measurement-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile phone measurement code and tests
+        run: |
+          python -m py_compile \
+            brain_phone_base/android_real_measurement.py \
+            brain_phone_base/local_executor.py \
+            brain_phone_base/test_android_real_measurement.py \
+            brain_phone_base/test_local_executor.py
+      - name: Run real-measurement contract tests
+        run: python -m unittest brain_phone_base.test_android_real_measurement -v
+      - name: Run local-executor safety tests
+        run: python -m unittest brain_phone_base.test_local_executor -v
+      - name: Assert CI never activates a phone or starts mining
+        run: |
+          python - <<'PY'
+          import json
+          from brain_phone_base.android_real_measurement import collect_measurement
+          data = collect_measurement()
+          assert data["evidence"]["classification"] == "local_measurement_unattested"
+          assert data["evidence"]["device_identity_verified"] is False
+          assert data["node_gate"]["trusted"] is False
+          assert data["node_gate"]["active"] is False
+          assert data["node_gate"]["activation_allowed"] is False
+          assert data["network_actions"]["measurement_uploaded"] is False
+          assert data["network_actions"]["node_registered"] is False
+          assert data["network_actions"]["mining_started"] is False
+          assert data["network_actions"]["mining_pool_contacted"] is False
+          print(json.dumps({
+              "result": "PASS_LOCAL_CONTRACT_ONLY",
+              "device_identity_verified": False,
+              "node_activation": "PROHIBITED_BY_DEFAULT",
+              "mining": "DISABLED"
+          }, sort_keys=True))
+          PY
