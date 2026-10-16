@@ -1,5 +1,15 @@
 # Electronic Brain — Changelog
 
+
+## 2026-10-16
+
+### Brain-owned software-only mining contract
+- Added a canonical plan/evidence contract that assigns mining computation only to a Brain-owned software runtime.
+- Reclassified physical devices as connectivity/observation gateways and blocked external miner execution.
+- Kept the native mining backend unimplemented and real execution fail-closed; no miner was installed/launched and no pool settings were changed.
+- Added regression tests for gateway-only hardware, simulation-vs-real evidence, and execution gates.
+- This is an architecture/control-plane change, not proof that mining is running or profitable.
+
 ## 2026-10-12
 
 ### Software-only execution enforcement
