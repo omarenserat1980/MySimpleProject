@@ -10,6 +10,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from .brain_owned_mining_contract import build_plan, execution_gate
+
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
 NODE_MODE = "SIMULATOR"
@@ -17,7 +19,8 @@ INTEGRATED_COMPONENTS = (
     "brain_supervisor",
     "asic_simulator",
     "bitcoin_mining_intelligence",
-    "bitcoin_worker",
+    "brain_owned_mining_contract",
+    "brain_owned_compute_backend_pending",
 )
 
 
@@ -57,6 +60,11 @@ def node_status() -> dict[str, Any]:
         "node_id": "brain-mining-node-local",
         "node_mode": NODE_MODE,
         "state": "SIMULATED",
+        "execution_mode": "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY",
+        "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_mining_backend": "NOT_IMPLEMENTED",
+        "external_miner_execution": "FORBIDDEN",
+        "local_device_computation_allowed": False,
         "integrated_components": list(INTEGRATED_COMPONENTS),
         "real_mining_claim": False,
         "revenue_claim": False,
@@ -73,19 +81,22 @@ def readiness_status() -> dict[str, Any]:
         "software_api_ready": True,
         "real_mining_ready": False,
         "state": "BLOCKED",
+        "execution_mode": "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY",
+        "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_mining_backend": "NOT_IMPLEMENTED",
         "gates": {
             "G0_api_contract": "READY",
             "G1_simulation": "READY",
-            "G2_sha256d_reference": "NOT_VERIFIED_BY_THIS_API",
-            "G3_rtl_tool_evidence": "NOT_VERIFIED_BY_THIS_API",
-            "G4_physical_device": "BLOCKED_NO_VERIFIED_DEVICE",
+            "G2_brain_owned_compute_backend": "BLOCKED_NOT_IMPLEMENTED",
+            "G3_brain_runtime_attestation": "NOT_VERIFIED_BY_THIS_API",
+            "G4_gateway_connectivity": "NOT_REQUIRED_FOR_COMPUTE",
             "G5_pool_shares": "BLOCKED_NO_VERIFIED_POOL_SHARES",
             "G6_payout": "BLOCKED_NO_VERIFIED_PAYOUT",
             "G7_profit": "BLOCKED_NO_VERIFIED_COST_AND_REVENUE",
         },
         "blockers": [
-            "No trusted physical-device attestation is connected to this API.",
-            "No server-collected authenticated pool session or accepted-share evidence is connected.",
+            "The Brain-owned native mining compute backend is not implemented.",
+            "No independently verified pool session or accepted-share evidence is bound to a Brain runtime.",
             "Payout and profit evidence are not available through this API.",
         ],
         "real_mining_claim": False,
@@ -104,3 +115,14 @@ def get_mining_node_status() -> dict[str, Any]:
 def get_mining_node_readiness() -> dict[str, Any]:
     """Return software readiness separately from real mining readiness."""
     return readiness_status()
+
+
+@router.get("/software-only-contract")
+def get_software_only_contract() -> dict[str, Any]:
+    """Expose the canonical software-only plan and fail-closed execution gate."""
+    return {
+        "plan": build_plan("sha256d"),
+        "execution_gate": execution_gate(),
+        "execution_allowed": False,
+        "execution_started": False,
+    }
