@@ -39,13 +39,37 @@ def _matches(values: list[str]) -> list[str]:
 def _run_readonly(command: list[str], timeout: int = 12) -> tuple[int, str]:
     """Run a fixed inventory command; callers must never pass user-supplied commands."""
     try:
+        # Keep only runtime paths needed by fixed read-only commands. In particular,
+        # PowerShell needs PSModulePath to auto-load built-in cmdlets such as ConvertTo-Json.
+        safe_env_keys = ("PATH", "SystemRoot", "WINDIR", "PSModulePath", "TEMP", "TMP")
+        safe_env = {key: os.environ.get(key, "") for key in safe_env_keys}
         completed = subprocess.run(
             command, capture_output=True, text=True, timeout=timeout, check=False,
-            shell=False, env={"PATH": os.environ.get("PATH", ""), "SystemRoot": os.environ.get("SystemRoot", "")},
+            shell=False, env=safe_env,
         )
         return completed.returncode, completed.stdout[:200_000]
     except (OSError, subprocess.TimeoutExpired):
         return 127, ""
+
+
+def _find_powershell() -> str | None:
+    """Find PowerShell even when a managed Python process has a reduced PATH."""
+    shell = shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
+    if shell:
+        return shell
+
+    # Some Windows launchers omit System32 from PATH. Use the well-known Windows PowerShell
+    # location as a fallback, but only if the executable exists. Do not invoke a shell lookup.
+    root = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+    if root:
+        candidates = (
+            os.path.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+            os.path.join(root, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+        )
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+    return None
 
 
 def _windows_inventory() -> tuple[dict[str, list[str]], dict[str, bool]]:
@@ -61,12 +85,13 @@ $paths = @('HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\
 foreach ($path in $paths) { $apps += @(Get-ItemProperty -Path $path | ForEach-Object { $_.DisplayName }) }
 [pscustomobject]@{processes=$processes;services=$services;tasks=$tasks;apps=$apps} | ConvertTo-Json -Compress -Depth 3
 '''
-    shell = shutil.which("powershell.exe") or shutil.which("powershell") or shutil.which("pwsh")
+    shell = _find_powershell()
     if not shell:
         return {"processes": [], "services": [], "tasks": [], "apps": []}, {
             "processes": False, "services": False, "tasks": False, "apps": False,
         }
-    code, output = _run_readonly([shell, "-NoProfile", "-NonInteractive", "-Command", script])
+    # Windows inventory can take longer on hosts with many scheduled tasks.
+    code, output = _run_readonly([shell, "-NoProfile", "-NonInteractive", "-Command", script], timeout=30)
     if code != 0 or not output.strip():
         return {"processes": [], "services": [], "tasks": [], "apps": []}, {
             "processes": False, "services": False, "tasks": False, "apps": False,
