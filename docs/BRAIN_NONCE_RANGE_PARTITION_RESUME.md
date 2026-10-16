@@ -23,3 +23,13 @@ python -m pytest -q \
   brain_v12/tests/test_stratum_v1_end_to_end_fixture.py \
   brain_v12/tests/test_stratum_candidate_pipeline.py
 ```
+
+## Bound checkpoint contract
+
+The follow-up checkpoint helpers bind the job ID, SHA-256 fingerprint of the
+80-byte header, exact target, start nonce, number of hashes checked, and next
+nonce. They reject a hit result, changed job/header/target, malformed fields,
+range arithmetic inconsistencies, and nonce-space exhaustion. The checkpoint
+explicitly marks itself `authenticated: false`: it is not a signed token and
+must not be trusted across process boundaries until a separate signature/MAC
+or trusted storage layer is implemented and verified.

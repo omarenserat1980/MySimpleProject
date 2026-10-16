@@ -52,3 +52,52 @@ def test_invalid_nonce_partitions_fail_closed():
     ]:
         with pytest.raises(ValueError, match=error):
             partition_nonce_range(*args)
+
+from brain_v12.brain.brain_owned_compute_runtime import (
+    build_nonce_search_checkpoint,
+    validate_nonce_search_checkpoint,
+)
+
+
+def test_checkpoint_binds_job_header_target_and_next_nonce():
+    header = bytes(80)
+    target = 1
+    result = search_nonce(header, target, start_nonce=200, max_hashes=3)
+    checkpoint = build_nonce_search_checkpoint(header, target, "job-A", 200, result)
+    assert checkpoint["next_nonce"] == 203
+    assert checkpoint["authenticated"] is False
+    assert validate_nonce_search_checkpoint(checkpoint, header, target, "job-A") == 203
+
+
+def test_checkpoint_rejects_changed_job_header_or_target():
+    header = bytes(80)
+    result = search_nonce(header, 1, start_nonce=10, max_hashes=2)
+    checkpoint = build_nonce_search_checkpoint(header, 1, "job-A", 10, result)
+    with pytest.raises(ValueError, match="CHECKPOINT_JOB_MISMATCH"):
+        validate_nonce_search_checkpoint(checkpoint, header, 1, "job-B")
+    with pytest.raises(ValueError, match="CHECKPOINT_HEADER_MISMATCH"):
+        validate_nonce_search_checkpoint(checkpoint, bytes([1]) + bytes(79), 1, "job-A")
+    with pytest.raises(ValueError, match="CHECKPOINT_TARGET_MISMATCH"):
+        validate_nonce_search_checkpoint(checkpoint, header, 2, "job-A")
+
+
+def test_checkpoint_rejects_found_candidate_and_nonce_space_overflow():
+    header = bytes(80)
+    found = search_nonce(header, (1 << 256) - 1, start_nonce=0, max_hashes=1)
+    with pytest.raises(ValueError, match="CHECKPOINT_REQUIRES_EXHAUSTED_NO_HIT_RESULT"):
+        build_nonce_search_checkpoint(header, (1 << 256) - 1, "job-A", 0, found)
+    last_chunk = search_nonce(header, 1, start_nonce=0xFFFFFFFF, max_hashes=2)
+    with pytest.raises(ValueError, match="NONCE_SPACE_EXHAUSTED"):
+        build_nonce_search_checkpoint(header, 1, "job-A", 0xFFFFFFFF, last_chunk)
+
+
+def test_checkpoint_mutation_fails_closed():
+    header = bytes(80)
+    result = search_nonce(header, 1, start_nonce=50, max_hashes=1)
+    checkpoint = build_nonce_search_checkpoint(header, 1, "job-A", 50, result)
+    checkpoint["next_nonce"] = True
+    with pytest.raises(ValueError, match="INVALID_CHECKPOINT_NEXT_NONCE"):
+        validate_nonce_search_checkpoint(checkpoint, header, 1, "job-A")
+    checkpoint["next_nonce"] = 999
+    with pytest.raises(ValueError, match="CHECKPOINT_RANGE_ARITHMETIC_MISMATCH"):
+        validate_nonce_search_checkpoint(checkpoint, header, 1, "job-A")

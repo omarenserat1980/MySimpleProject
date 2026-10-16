@@ -109,6 +109,84 @@ def search_nonce(
     return PowResult(False, None, checked, None, "NONCE_NOT_FOUND_WITHIN_BOUND")
 
 
+def build_nonce_search_checkpoint(
+    header: bytes,
+    target: int,
+    job_id: str,
+    start_nonce: int,
+    result: PowResult,
+) -> dict[str, Any]:
+    """Create a job/header/target-bound checkpoint after a no-hit bounded search.
+
+    This is a plain data contract, not an authenticated token. Callers must
+    authenticate persisted checkpoints before trusting them across processes.
+    A found nonce is not resumable and must be handled as an unsubmitted candidate.
+    """
+    validate_header(header)
+    validate_target(target)
+    if not isinstance(job_id, str) or not job_id or len(job_id) > 256:
+        raise ValueError("INVALID_CHECKPOINT_JOB_ID")
+    if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
+        raise ValueError("START_NONCE_OUT_OF_RANGE")
+    if not isinstance(result, PowResult) or result.found or result.nonce is not None or result.status != "NONCE_NOT_FOUND_WITHIN_BOUND":
+        raise ValueError("CHECKPOINT_REQUIRES_EXHAUSTED_NO_HIT_RESULT")
+    if isinstance(result.hashes_checked, bool) or not isinstance(result.hashes_checked, int) or result.hashes_checked < 1:
+        raise ValueError("INVALID_CHECKPOINT_HASH_COUNT")
+    next_nonce = start_nonce + result.hashes_checked
+    if next_nonce > 0xFFFFFFFF:
+        raise ValueError("NONCE_SPACE_EXHAUSTED")
+    return {
+        "schema_version": 1,
+        "job_id": job_id,
+        "header_sha256": hashlib.sha256(header).hexdigest(),
+        "target_hex": f"{target:064x}",
+        "start_nonce": start_nonce,
+        "next_nonce": next_nonce,
+        "hashes_checked": result.hashes_checked,
+        "status": "BOUNDED_NO_HIT_CHECKPOINT",
+        "authenticated": False,
+    }
+
+
+def validate_nonce_search_checkpoint(
+    checkpoint: Any,
+    header: bytes,
+    target: int,
+    job_id: str,
+) -> int:
+    """Validate checkpoint bindings and return the next nonce, failing closed.
+
+    This validates consistency only; it does not authenticate who created the
+    checkpoint. Production persistence must verify a signature/MAC separately.
+    """
+    validate_header(header)
+    validate_target(target)
+    if not isinstance(job_id, str) or not job_id or len(job_id) > 256:
+        raise ValueError("INVALID_CHECKPOINT_JOB_ID")
+    if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != 1:
+        raise ValueError("INVALID_CHECKPOINT_SCHEMA")
+    if checkpoint.get("status") != "BOUNDED_NO_HIT_CHECKPOINT" or checkpoint.get("authenticated") is not False:
+        raise ValueError("INVALID_CHECKPOINT_STATUS")
+    if checkpoint.get("job_id") != job_id:
+        raise ValueError("CHECKPOINT_JOB_MISMATCH")
+    if checkpoint.get("header_sha256") != hashlib.sha256(header).hexdigest():
+        raise ValueError("CHECKPOINT_HEADER_MISMATCH")
+    if checkpoint.get("target_hex") != f"{target:064x}":
+        raise ValueError("CHECKPOINT_TARGET_MISMATCH")
+    next_nonce = checkpoint.get("next_nonce")
+    if isinstance(next_nonce, bool) or not isinstance(next_nonce, int) or not 0 <= next_nonce <= 0xFFFFFFFF:
+        raise ValueError("INVALID_CHECKPOINT_NEXT_NONCE")
+    checked = checkpoint.get("hashes_checked")
+    if isinstance(checked, bool) or not isinstance(checked, int) or checked < 1:
+        raise ValueError("INVALID_CHECKPOINT_HASH_COUNT")
+    start_nonce = checkpoint.get("start_nonce")
+    if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
+        raise ValueError("INVALID_CHECKPOINT_START_NONCE")
+    if start_nonce + checked != next_nonce:
+        raise ValueError("CHECKPOINT_RANGE_ARITHMETIC_MISMATCH")
+    return next_nonce
+
+
 def is_android_or_termux_runtime() -> bool:
     """Detect Android/Termux so a phone cannot be mistaken for Brain cloud compute."""
     if os.environ.get("ANDROID_ROOT") or os.environ.get("ANDROID_DATA") or os.environ.get("TERMUX_VERSION"):
