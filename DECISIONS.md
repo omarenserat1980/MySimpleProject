@@ -42,3 +42,19 @@ Decision: Brain's execution registry accepts software workers only. Physical-dev
 Reason: Brain must not depend on Arkan, phones, user-owned PCs, Hyper-V, or self-hosted physical runners for core operation. Virtual CPU, memory, storage, network, power, and thermal behavior must be labeled simulated unless independently calibrated.
 
 Constraint: Software-only does not imply unlimited compute or prove that every external workflow is hardware-independent. A task still needs executor output and independent evidence gates.
+
+
+## D-013 — Brain-owned software-only mining execution (2026-10-16)
+
+Decision: Mining computation must run only in a Brain-owned software execution environment. Physical devices (including phones, desktops, Termux agents, GPUs, and ASICs) may act only as connectivity, control, or read-only observation gateways; external miner execution is forbidden.
+
+Current status: The architecture contract and fail-closed planning/evidence rules are implemented, but the native Brain-owned mining backend is not implemented. Therefore real mining remains blocked; simulation and plan output are not mining evidence.
+
+Constraints:
+- Never mine in GitHub Actions.
+- Never install/launch a miner or change production pool settings without explicit separate authorization.
+- Never expose pool credentials in source control, logs, or evidence.
+- Require independently verified pool telemetry linked to the Brain-owned runtime for activity claims; verify payout and profit separately.
+- Do not claim software-only Bitcoin mining is profitable without suitable compute and independent evidence.
+
+Reference: `docs/BRAIN_OWNED_SOFTWARE_ONLY_MINING.md`.
