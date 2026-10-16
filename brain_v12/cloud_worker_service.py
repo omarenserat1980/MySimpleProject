@@ -13,7 +13,9 @@ _stop = threading.Event()
 
 
 def _run() -> None:
-    origin = os.getenv("BRAIN_ORIGIN", "https://brain-control-plane-main.onrender.com").strip().rstrip("/")
+    # Never silently route the worker to a retired/third-party service.
+    # Without an explicitly configured HTTPS origin, the agent fails closed.
+    origin = os.getenv("BRAIN_ORIGIN", "").strip().rstrip("/")
     timeout = max(2.0, float(os.getenv("BRAIN_CLOUD_WORKER_HTTP_TIMEOUT_SECONDS", "8")))
     import httpx
 
