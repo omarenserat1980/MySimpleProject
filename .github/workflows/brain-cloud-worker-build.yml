@@ -178,7 +178,7 @@ jobs:
           # Simulation status must never be reported as real mining or revenue.
           status6, submitted_sim = task_request("POST", "/api/tasks",
               {"taskType": "simulation_status", "arguments": {"probe": "ci-simulation"}},
-              {"Idempotency-Key": "ci-task-simulation-1"})
+              {"Idempotency-Key": "ci-job-sim-1"})
           assert status6 == 202, f"expected 202 for simulation task, got {status6}: {submitted_sim}"
           simulation_id = submitted_sim["task"]["taskId"]
           simulation_detail = None
