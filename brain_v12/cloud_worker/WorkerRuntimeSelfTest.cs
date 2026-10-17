@@ -35,6 +35,7 @@ public static class WorkerRuntimeSelfTest
             if (!leases.Release("job-1", first.LeaseId))
                 throw new InvalidOperationException("release failed");
 
+            VerifyDurableTaskQueue();
             VerifyReadinessPolicy();
             Console.WriteLine("BRAIN_WORKER_SELF_TEST=PASS");
         }
@@ -105,4 +106,55 @@ public static class WorkerRuntimeSelfTest
         var failedRegistrationResult = WorkerReadinessPolicy.Evaluate(freshSuccesses, failedRegistration, now, TimeSpan.FromMinutes(2));
         if (failedRegistrationResult.Ready || failedRegistrationResult.Checks["quality"]) throw new InvalidOperationException("failed registry status incorrectly passed readiness");
     }
+
+    private static void VerifyDurableTaskQueue()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "brain-task-queue-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var queue = new DurableFileTaskQueue(path);
+            var first = queue.Submit("self-test", "idem-1", "health_check", "{\\"probe\\":\\"local\\"}");
+            if (first.Duplicate || first.Task.Status != "queued")
+                throw new InvalidOperationException("new durable task was not queued");
+
+            var duplicate = queue.Submit("self-test", "idem-1", "health_check", "{ \\"probe\\" : \\"local\\" }");
+            if (!duplicate.Duplicate || duplicate.Task.TaskId != first.Task.TaskId)
+                throw new InvalidOperationException("idempotent submission did not return the original task");
+
+            try
+            {
+                queue.Submit("self-test", "idem-1", "simulation_status", "{}");
+                throw new InvalidOperationException("idempotency key payload conflict was accepted");
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "IDEMPOTENCY_KEY_PAYLOAD_CONFLICT") { }
+
+            try
+            {
+                queue.Submit("self-test", "idem-2", "shell", "{\\"cmd\\":\\"echo unsafe\\"}");
+                throw new InvalidOperationException("non-allow-listed task type was accepted");
+            }
+            catch (ArgumentException) { }
+
+            var lease = queue.TryLeaseNext("test-worker", TimeSpan.FromMinutes(1))
+                ?? throw new InvalidOperationException("queued task could not be leased");
+            if (lease.TaskId != first.Task.TaskId || lease.LeaseId is null)
+                throw new InvalidOperationException("lease metadata was not recorded");
+            if (!queue.Complete(lease.TaskId, lease.LeaseId, "{\\"ok\\":true}"))
+                throw new InvalidOperationException("valid lease could not complete task");
+            if (queue.Complete(lease.TaskId, lease.LeaseId, "{\\"ok\\":true}"))
+                throw new InvalidOperationException("completed task accepted a stale completion");
+
+            var reloaded = new DurableFileTaskQueue(path);
+            var persisted = reloaded.Snapshot().Single(t => t.TaskId == first.Task.TaskId);
+            if (persisted.Status != "succeeded" || persisted.ResultJson is null)
+                throw new InvalidOperationException("task result did not persist across queue reload");
+            if (!reloaded.AuditSnapshot().Any(e => e.TaskId == first.Task.TaskId && e.Event == "succeeded"))
+                throw new InvalidOperationException("completion audit event was not persisted");
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
 }
