@@ -9,12 +9,13 @@ from __future__ import annotations
 import hmac
 import math
 import os
+import re
 import time
 from threading import Lock
 from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, validator
 
 router = APIRouter(prefix="/api/bitcoin-mining/worker", tags=["Physical Bitcoin Worker"])
 _lock = Lock()
@@ -23,7 +24,7 @@ REPORT_TTL_SECONDS = 120
 
 
 class WorkerHeartbeat(BaseModel):
-    worker_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    worker_id: str = Field(min_length=1, max_length=128)
     algorithm: Literal["sha256d"]
     hashrate_hs: float = Field(ge=0, le=1e30)
     accepted_shares: int = Field(ge=0, le=10**15)
@@ -31,7 +32,14 @@ class WorkerHeartbeat(BaseModel):
     stale_shares: int = Field(default=0, ge=0, le=10**15)
     observed_at: float = Field(gt=0)
 
-    @field_validator("hashrate_hs", "observed_at")
+    @validator("worker_id")
+    @classmethod
+    def require_safe_worker_id(cls, value: str) -> str:
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", value):
+            raise ValueError("WORKER_ID_FORMAT_INVALID")
+        return value
+
+    @validator("hashrate_hs", "observed_at")
     @classmethod
     def require_finite(cls, value: float) -> float:
         if not math.isfinite(value):
