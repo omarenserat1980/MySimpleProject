@@ -34,6 +34,20 @@ class TermuxAgentContractTests(unittest.TestCase):
         self.assertNotIn("memory_mb", metadata)
         self.assertNotIn("disk_mb", metadata)
 
+    def test_send_heartbeat_posts_agent_id_and_software_metadata(self):
+        captured = {}
+        def fake_request(method, path, payload=None, key=None, timeout=20):
+            captured.update(method=method, path=path, payload=payload, key=key)
+            return {"ok": True, "status": "HEARTBEAT"}
+        self.agent.request = fake_request
+        result = self.agent.send_heartbeat("test-key")
+        self.assertEqual(result["status"], "HEARTBEAT")
+        self.assertEqual(captured["method"], "POST")
+        self.assertEqual(captured["path"], "/api/device/heartbeat")
+        self.assertEqual(captured["payload"]["agent_id"], "software-executor-redmi3-01")
+        self.assertEqual(captured["payload"]["metadata"]["node_type"], "software")
+        self.assertEqual(captured["key"], "test-key")
+
     def test_agent_rejects_unlisted_shell_execution(self):
         with self.assertRaises(ValueError):
             self.agent.execute("shell", {})
