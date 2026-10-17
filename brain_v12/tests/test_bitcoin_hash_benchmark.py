@@ -26,6 +26,9 @@ def test_sha256d_known_empty_vector():
 def test_benchmark_returns_provenance_and_never_claims_mining():
     result = benchmark_header_hashing(duration_seconds=0.05, max_hashes=200)
     assert result["ok"] is True
+    assert result["contract_version"] == "brain.sha256d.execution.v1"
+    assert result["status"] == "VERIFIED"
+    assert result["execution_layer"] == "CPU_SOFTWARE"
     assert result["mode"] == "LOCAL_BENCHMARK_ONLY"
     assert result["execution_mode"] == "CPU_SOFTWARE"
     assert result["algorithm"] == "SHA-256d"
