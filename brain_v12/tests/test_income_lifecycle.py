@@ -1,5 +1,7 @@
+import os
 import unittest
 from brain_v12.brain.income_lifecycle import IncomeLifecycle
+from brain_v12.brain.commerce_api import payment_authority_proof
 
 
 class FakeStore:
@@ -33,6 +35,9 @@ class FakeStore:
 
 class IncomeLifecycleTests(unittest.TestCase):
     def setUp(self):
+        self.secret = "income-test-secret"
+        self.previous_secret = os.environ.get("BRAIN_PAYMENT_WEBHOOK_SECRET")
+        os.environ["BRAIN_PAYMENT_WEBHOOK_SECRET"] = self.secret
         self.store=FakeStore()
         self.store.upsert_income_opportunity({
             "opportunity_id":"LIVE-test",
@@ -47,6 +52,11 @@ class IncomeLifecycleTests(unittest.TestCase):
         })
         self.life=IncomeLifecycle(self.store)
 
+    def tearDown(self):
+        if self.previous_secret is None:
+            os.environ.pop("BRAIN_PAYMENT_WEBHOOK_SECRET", None)
+        else:
+            os.environ["BRAIN_PAYMENT_WEBHOOK_SECRET"] = self.previous_secret
     def test_prepare_does_not_claim_submission(self):
         q=self.life.qualify("LIVE-test")
         self.assertTrue(q["ok"])
@@ -75,10 +85,12 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.life.prepare("LIVE-test")
         for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
             self.life.record_external("LIVE-test", status, evidence)
-        req=self.life.request_payment("LIVE-test", 25, currency="JOD")
+        req=self.life.request_payment("LIVE-test", 25, currency="JOD", order_id="ORDER-1")
         self.assertEqual(req["status"], "PAYMENT_REQUESTED")
-        self.assertEqual(self.life.request_payment("LIVE-test",25,currency="JOD")["status"], "ALREADY_REQUESTED")
-        recon=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-001",{"evidence_ref":"provider-reference-001","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-001"})
+        self.assertEqual(self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")["status"], "ALREADY_REQUESTED")
+        evidence={"evidence_ref":"provider-reference-001","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-001"}
+        evidence["authority_proof"] = payment_authority_proof(self.secret, "ORDER-1", "TX-001", "test", "evt-001")
+        recon=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-001",evidence,order_id="ORDER-1")
         self.assertEqual(recon["status"], "RECONCILED")
         self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "REVENUE_REALIZED")
         self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "ALREADY_REALIZED")
@@ -88,17 +100,30 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.life.prepare("LIVE-test")
         for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
             self.life.record_external("LIVE-test", status, evidence)
-        self.life.request_payment("LIVE-test",25,currency="JOD")
-        self.assertEqual(self.life.reconcile_payment("LIVE-test",20,"JOD","TX-002",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-002"})["status"],"AMOUNT_MISMATCH")
-        self.assertEqual(self.life.reconcile_payment("LIVE-test",25,"USD","TX-003",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-003"})["status"],"CURRENCY_MISMATCH")
+        self.assertEqual(self.life.request_payment("LIVE-test",float("nan"),currency="JOD",order_id="ORDER-1")["status"],"INVALID_AMOUNT")
+        self.assertEqual(self.life.request_payment("LIVE-test",25,currency="JOD")["status"],"ORDER_ID_AND_CURRENCY_REQUIRED")
+        self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",25,"JOD","TX-ORDER","{\"evidence_ref\":\"evidence\"}",order_id="ORDER-OTHER")["status"],"ORDER_MISMATCH")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",26,"JOD","TX-OVER",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-over"},order_id="ORDER-1")["status"],"AMOUNT_MISMATCH")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",20,"JOD","TX-002",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-002"},order_id="ORDER-1")["status"],"AMOUNT_MISMATCH")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test",25,"USD","TX-003",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-003"},order_id="ORDER-1")["status"],"CURRENCY_MISMATCH")
+    def test_reconciliation_rejects_caller_claimed_signed_marker(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")
+        claimed={"evidence_ref":"caller-claim","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-claim"}
+        result=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-CLAIM",claimed,order_id="ORDER-1")
+        self.assertEqual(result["status"],"SIGNED_PROVIDER_AUTHORITY_REQUIRED")
     def test_reconciliation_rejects_free_form_evidence(self):
         self.life.qualify("LIVE-test")
         self.life.prepare("LIVE-test")
         for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
             self.life.record_external("LIVE-test", status, evidence)
-        self.life.request_payment("LIVE-test",25,currency="JOD")
-        result=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-004","typed-receipt")
-        self.assertEqual(result["status"],"SIGNED_PROVIDER_AUTHORITY_REQUIRED")
+        self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")
+        result=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-004","typed-receipt",order_id="ORDER-1")
+        self.assertEqual(result["status"],"INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED")
 
     def test_payment_cannot_skip_delivery(self):
         self.life.qualify("LIVE-test")

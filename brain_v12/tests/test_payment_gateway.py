@@ -1,7 +1,7 @@
 import json, os, tempfile, time, unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from brain_v12.brain.commerce_api import CommerceStore, CommerceOrderIn
+from brain_v12.brain.commerce_api import CommerceStore, CommerceOrderIn, payment_authority_proof
 from brain_v12.brain.payment_gateway import signature
 class PaymentGatewayTests(unittest.TestCase):
     def setUp(self):
@@ -41,6 +41,7 @@ class PaymentGatewayTests(unittest.TestCase):
             "provider": p["provider"],
             "event_id": p["event_id"],
             "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+            "authority_proof": payment_authority_proof(self.secret, p["order_id"], p["payment_reference"], p["provider"], p["event_id"]),
         })
         journal_path=self.db + ".payment-events.json"
         journal=PaymentEventJournal(journal_path)
