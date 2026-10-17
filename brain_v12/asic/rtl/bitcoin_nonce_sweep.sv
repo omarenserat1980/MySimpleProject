@@ -65,7 +65,8 @@ module bitcoin_nonce_sweep #(
           found_nonce <= nonce_current;
           busy <= 1'b0;
           done <= 1'b1;
-        end else if ((attempts + 1'b1) >= bounded_limit) begin
+        end else if ((attempts + 1'b1) >= bounded_limit || nonce_current == 32'hFFFF_FFFF) begin
+          // Never wrap the uint32 nonce space within a single search range.
           busy <= 1'b0;
           done <= 1'b1;
         end else begin
