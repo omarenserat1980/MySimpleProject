@@ -8,8 +8,8 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-BRAIN_URL = os.getenv("V12_BRAIN_URL", "http://127.0.0.1:10000").rstrip("/")
-AGENT_ID = os.getenv("V12_AGENT_ID", "redmi3-01")
+BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://mysimpleproject.onrender.com").rstrip("/")
+AGENT_ID = os.getenv("V12_AGENT_ID", "software-executor-redmi3-01")
 KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent.key"))
 POLL_SECONDS = float(os.getenv("V12_POLL_SECONDS", "3"))
 
@@ -45,6 +45,12 @@ def execute(task, params):
         return {"system": platform.system(), "release": platform.release(),
                 "machine": platform.machine(), "processor": platform.processor()}
     raise ValueError("task_not_allowed")
+
+def heartbeat_metadata():
+    """Describe this worker as software without claiming physical resource capacity."""
+    return {"agent": "V12-Termux-Agent", "python": platform.python_version(),
+            "node_type": "software", "runtime": "termux"}
+
 
 def main():
     key = read_key()
