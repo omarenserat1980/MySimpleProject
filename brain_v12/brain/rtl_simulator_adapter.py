@@ -8,8 +8,9 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,7 +27,42 @@ EXPECTED_NONCE = "7c2bac1d"
 DEFAULT_TIMEOUT_SECONDS = 20.0
 
 
-def run_sha256d_rtl_self_test(*, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> dict[str, Any]:
+def _run_process(
+    command: list[str], *, cwd: str, timeout_seconds: float,
+    cancel_check: Callable[[], bool] | None = None,
+) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+    """Run a child process with a hard timeout and cooperative cancellation."""
+    process = subprocess.Popen(
+        command, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    started = time.monotonic()
+    while True:
+        if cancel_check is not None and cancel_check():
+            process.terminate()
+            try:
+                stdout, stderr = process.communicate(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr), "CANCELLED"
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr), None
+        if time.monotonic() - started >= timeout_seconds:
+            process.terminate()
+            try:
+                stdout, stderr = process.communicate(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                stdout, stderr = process.communicate()
+            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr), "TIMEOUT"
+        time.sleep(0.02)
+
+
+def run_sha256d_rtl_self_test(
+    *, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    cancel_check: Callable[[], bool] | None = None,
+) -> dict[str, Any]:
     """Run a fixed known-answer RTL test; fail closed if tools/output/evidence are missing."""
     base: dict[str, Any] = {
         "contract_version": "brain.sha256d.execution.v1",
@@ -65,23 +101,30 @@ def run_sha256d_rtl_self_test(*, timeout_seconds: float = DEFAULT_TIMEOUT_SECOND
                 iverilog, "-g2012", "-Wall", "-s", "tb_bitcoin_genesis_nonce_search",
                 "-o", output, *(str(RTL_DIR / name) for name in RTL_SOURCES),
             ]
-            compiled = subprocess.run(
-                compile_cmd, cwd=str(ROOT), capture_output=True, text=True,
-                timeout=float(timeout_seconds), check=False,
+            compiled, compile_stop = _run_process(
+                compile_cmd, cwd=str(ROOT), timeout_seconds=float(timeout_seconds),
+                cancel_check=cancel_check,
             )
-            if compiled.returncode != 0:
+            if compile_stop == "CANCELLED":
+                return {**base, "status": "RTL_CANCELLED", "error_code": "CANCELLED_DURING_COMPILE"}
+            if compile_stop == "TIMEOUT":
+                return {**base, "status": "RTL_COMPILE_TIMEOUT", "error_code": "IVERILOG_TIMEOUT"}
+            if compiled is None or compiled.returncode != 0:
                 return {
                     **base, "status": "RTL_COMPILE_FAILED", "error_code": "IVERILOG_NONZERO_EXIT",
                     "return_code": compiled.returncode,
                     "stderr_tail": (compiled.stderr or "")[-2000:],
                 }
-            try:
-                simulated = subprocess.run(
-                    [vvp, output], cwd=str(ROOT), capture_output=True, text=True,
-                    timeout=float(timeout_seconds), check=False,
-                )
-            except subprocess.TimeoutExpired:
+            simulated, simulation_stop = _run_process(
+                [vvp, output], cwd=str(ROOT), timeout_seconds=float(timeout_seconds),
+                cancel_check=cancel_check,
+            )
+            if simulation_stop == "CANCELLED":
+                return {**base, "status": "RTL_CANCELLED", "error_code": "CANCELLED_DURING_SIMULATION"}
+            if simulation_stop == "TIMEOUT":
                 return {**base, "status": "RTL_SIMULATION_TIMEOUT", "error_code": "VVP_TIMEOUT"}
+            if simulated is None:
+                return {**base, "status": "RTL_RESULT_UNVERIFIED", "error_code": "SIMULATOR_RESULT_MISSING"}
             log = (simulated.stdout or "") + "\n" + (simulated.stderr or "")
             nonce_match = re.search(r"PASS BITCOIN_GENESIS_NONCE_FOUND nonce=([0-9a-fA-F]{8}) attempts=(\d+)", log)
             passed = (
@@ -115,7 +158,5 @@ def run_sha256d_rtl_self_test(*, timeout_seconds: float = DEFAULT_TIMEOUT_SECOND
                     "expected_nonce_observed": True,
                 },
             }
-    except subprocess.TimeoutExpired:
-        return {**base, "status": "RTL_COMPILE_TIMEOUT", "error_code": "IVERILOG_TIMEOUT"}
     except OSError as exc:
         return {**base, "status": "RTL_TOOL_EXECUTION_FAILED", "error_code": type(exc).__name__}
