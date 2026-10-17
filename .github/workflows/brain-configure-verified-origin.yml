@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       brain_origin:
-        description: "Existing public Brain runtime HTTPS origin (not the Cloudflare Worker URL)"
+        description: "Existing public HTTPS Brain runtime origin (not a Cloudflare/static edge)"
         required: true
         type: string
       confirm:
@@ -33,35 +33,86 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import ipaddress
+          import json
           import os
+          import socket
+          from urllib.error import HTTPError, URLError
           from urllib.parse import urlparse
+          from urllib.request import Request, urlopen
+
           value = os.environ["CANDIDATE_ORIGIN"].strip().rstrip("/")
           p = urlparse(value)
           if p.scheme != "https" or not p.hostname or p.username or p.password:
               raise SystemExit("BLOCKED: provide a valid HTTPS origin without credentials.")
-          if p.path or p.query or p.fragment:
-              raise SystemExit("BLOCKED: provide the origin only, without a path, query, or fragment.")
-          if p.hostname.lower() in {
+          if p.path or p.query or p.fragment or p.port not in (None, 443):
+              raise SystemExit("BLOCKED: provide an HTTPS origin only, without path/query/fragment or a custom port.")
+          host = p.hostname.lower().rstrip(".")
+          if host in {
               "brain-cloud-api.oenserat.workers.dev",
               "omarenserat1980.github.io",
               "brain.example.com",
-          }:
-              raise SystemExit("BLOCKED: this is a known edge/static/example origin, not a verified Brain runtime.")
+              "render.com",
+              "onrender.com",
+          } or host.endswith((".onrender.com", ".render.com")):
+              raise SystemExit("BLOCKED: edge/static/example or legacy Render origin; use the intended independent Brain runtime.")
+          try:
+              addresses = {item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
+          except OSError:
+              raise SystemExit("BLOCKED: origin hostname did not resolve.")
+          if not addresses:
+              raise SystemExit("BLOCKED: origin hostname did not resolve.")
+          for address in addresses:
+              if not ipaddress.ip_address(address).is_global:
+                  raise SystemExit("BLOCKED: origin resolves to a non-public IP address.")
+
+          def get_json(path):
+              req = Request(
+                  value + path,
+                  headers={"Accept": "application/json", "User-Agent": "Brain-Origin-Verification"},
+              )
+              try:
+                  with urlopen(req, timeout=12) as response:
+                      if response.status != 200:
+                          return None
+                      body = response.read(65537)
+                      if len(body) > 65536:
+                          return None
+                      return json.loads(body.decode("utf-8"))
+              except HTTPError as exc:
+                  if exc.code == 404:
+                      return None
+                  raise SystemExit(f"BLOCKED: {path} returned HTTP {exc.code}.")
+              except (URLError, TimeoutError, ValueError, OSError):
+                  return None
+
+          health = get_json("/healthz")
+          ready = get_json("/readyz")
+          standard_ok = isinstance(health, dict) and health.get("status") == "ok"
+          standard_ready = isinstance(ready, dict) and ready.get("ready") is True
+
+          if not (standard_ok and standard_ready):
+              health_v14 = get_json("/health")
+              supervisor = get_json("/api/supervisor/status")
+              v14_ok = (
+                  isinstance(health_v14, dict)
+                  and health_v14.get("ok") is True
+                  and health_v14.get("state") == "RUNNING"
+              )
+              v14_ready = (
+                  isinstance(supervisor, dict)
+                  and supervisor.get("ok") is True
+                  and supervisor.get("supervisor") == "READY"
+                  and supervisor.get("device_agnostic") is True
+              )
+              if not (v14_ok and v14_ready):
+                  raise SystemExit("BLOCKED: neither supported Brain health/readiness contract passed; BRAIN_ORIGIN was not saved.")
+
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("origin=" + value + "\n")
-          PY
-          curl --fail --silent --show-error --max-time 15 "${CANDIDATE_ORIGIN%/}/healthz" -o /tmp/brain-health.json
-          curl --fail --silent --show-error --max-time 15 "${CANDIDATE_ORIGIN%/}/readyz" -o /tmp/brain-ready.json
-          python3 - <<'PY'
-          import json
-          h=json.load(open("/tmp/brain-health.json", encoding="utf-8"))
-          r=json.load(open("/tmp/brain-ready.json", encoding="utf-8"))
-          if h.get("status") != "ok":
-              raise SystemExit("BLOCKED: /healthz did not return status=ok")
-          if r.get("ready") is not True:
-              raise SystemExit("BLOCKED: /readyz did not return ready=true")
           print("BRAIN_RUNTIME_HEALTH=PASS")
           print("BRAIN_RUNTIME_READY=PASS")
+          print("BRAIN_ORIGIN_NOT_PRINTED=true")
           PY
 
       - name: Create or update repository variable
