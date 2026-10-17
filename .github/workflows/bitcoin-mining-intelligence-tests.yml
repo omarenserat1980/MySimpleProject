@@ -10,12 +10,14 @@ on:
       - 'brain_v12/brain/stratum_v1_protocol.py'
       - 'brain_v12/brain/bitcoin_header.py'
       - 'brain_v12/brain/brain_owned_compute_runtime.py'
+      - 'brain_v12/brain/brain_mcp.py'
       - 'brain_v12/asic/bitcoin_pow_simulator.py'
       - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
       - 'brain_v12/tests/test_mining_engine.py'
       - 'brain_v12/tests/test_bitcoin_hash_benchmark.py'
       - 'brain_v12/tests/test_stratum_v1_protocol.py'
       - 'brain_v12/tests/test_sha256d_engine_consistency.py'
+      - 'brain_v12/tests/test_brain_mcp_protocol.py'
       - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
   push:
     branches: [brain-bitcoin-mining-intelligence, feat/brain-bitcoin-hash-benchmark, brain-sha256d-evidence-benchmark]
@@ -36,7 +38,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install minimal test dependencies
-        run: python -m pip install --upgrade pip fastapi pydantic pytest
+        run: python -m pip install --upgrade pip fastapi pydantic pytest httpx
       - name: Compile mining modules and tests
         run: |
           python -m py_compile \
@@ -46,11 +48,13 @@ jobs:
             brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/brain/bitcoin_header.py \
             brain_v12/brain/brain_owned_compute_runtime.py \
+            brain_v12/brain/brain_mcp.py \
             brain_v12/asic/bitcoin_pow_simulator.py \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
-            brain_v12/tests/test_sha256d_engine_consistency.py
+            brain_v12/tests/test_sha256d_engine_consistency.py \
+            brain_v12/tests/test_brain_mcp_protocol.py
       - name: Run mining regression tests
         env:
           PYTHONPATH: .
@@ -61,6 +65,7 @@ jobs:
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
             brain_v12/tests/test_sha256d_engine_consistency.py \
+            brain_v12/tests/test_brain_mcp_protocol.py \
             brain_v12/tests/test_bitcoin_pow_simulator.py \
             brain_v12/tests/test_bounded_pow_task_engine.py
       - name: Capture bounded CPU benchmark evidence
