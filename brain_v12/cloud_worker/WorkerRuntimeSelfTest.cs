@@ -35,6 +35,7 @@ public static class WorkerRuntimeSelfTest
             if (!leases.Release("job-1", first.LeaseId))
                 throw new InvalidOperationException("release failed");
 
+            VerifyBoundedTaskConsumer();
             VerifyDurableTaskQueue();
             VerifyExpiredLeaseRecovery();
             VerifyReadinessPolicy();
@@ -106,6 +107,47 @@ public static class WorkerRuntimeSelfTest
         var failedRegistration = healthyRegistry.Select(entry => entry.Registration.WorkerId == "quality" ? entry with { EffectiveStatus = "failed" } : entry).ToArray();
         var failedRegistrationResult = WorkerReadinessPolicy.Evaluate(freshSuccesses, failedRegistration, now, TimeSpan.FromMinutes(2));
         if (failedRegistrationResult.Ready || failedRegistrationResult.Checks["quality"]) throw new InvalidOperationException("failed registry status incorrectly passed readiness");
+    }
+
+
+    private static void VerifyBoundedTaskConsumer()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "brain-consumer-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var queue = new DurableFileTaskQueue(path);
+            using var loggerFactory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Warning));
+            var logger = loggerFactory.CreateLogger("BoundedTaskConsumerSelfTest");
+
+            var health = queue.Submit("self-test", "consumer-health", "health_check", "{}").Task;
+            var healthLease = queue.TryLeaseNext("self-test-consumer", TimeSpan.FromMinutes(1))
+                ?? throw new InvalidOperationException("health task could not be leased");
+            if (!BoundedTaskConsumer.ProcessLeasedTask(queue, healthLease, logger))
+                throw new InvalidOperationException("bounded consumer did not complete health task");
+            var healthResult = queue.Snapshot().Single(t => t.TaskId == health.TaskId);
+            if (healthResult.Status != "succeeded" || healthResult.ResultJson is null ||
+                !healthResult.ResultJson.Contains("LOCAL_QUEUE_CHECK_ONLY", StringComparison.Ordinal) ||
+                !healthResult.ResultJson.Contains("\"external_runtime_verified\":false", StringComparison.Ordinal))
+                throw new InvalidOperationException("health task result overstated external verification");
+
+            var simulation = queue.Submit("self-test", "consumer-simulation", "simulation_status", "{}").Task;
+            var simulationLease = queue.TryLeaseNext("self-test-consumer", TimeSpan.FromMinutes(1))
+                ?? throw new InvalidOperationException("simulation task could not be leased");
+            if (!BoundedTaskConsumer.ProcessLeasedTask(queue, simulationLease, logger))
+                throw new InvalidOperationException("bounded consumer did not complete simulation task");
+            var simulationResult = queue.Snapshot().Single(t => t.TaskId == simulation.TaskId);
+            if (simulationResult.Status != "succeeded" || simulationResult.ResultJson is null ||
+                !simulationResult.ResultJson.Contains("\"mode\":\"SIMULATOR\"", StringComparison.Ordinal) ||
+                !simulationResult.ResultJson.Contains("\"network_access_performed\":false", StringComparison.Ordinal) ||
+                !simulationResult.ResultJson.Contains("\"real_mining_verified\":false", StringComparison.Ordinal) ||
+                !simulationResult.ResultJson.Contains("\"accepted_shares_verified\":false", StringComparison.Ordinal) ||
+                !simulationResult.ResultJson.Contains("\"revenue_verified\":false", StringComparison.Ordinal))
+                throw new InvalidOperationException("simulation result overstated real mining or revenue evidence");
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
     }
 
     private static void VerifyDurableTaskQueue()
