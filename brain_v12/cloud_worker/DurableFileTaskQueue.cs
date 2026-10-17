@@ -45,6 +45,7 @@ public sealed class DurableFileTaskQueue
     private const int MaxArgumentsBytes = 16 * 1024;
     private const int MaxIdempotencyKeyLength = 128;
     private const int MaxAuditEntries = 10_000;
+    private readonly int _maxTaskRecords;
     private static readonly TimeSpan MaxLeaseTtl = TimeSpan.FromHours(24);
     private static readonly HashSet<string> AllowedTaskTypes = new(StringComparer.Ordinal)
     {
@@ -56,11 +57,13 @@ public sealed class DurableFileTaskQueue
     private readonly string _path;
     private readonly TimeProvider _clock;
 
-    public DurableFileTaskQueue(string path, TimeProvider? clock = null)
+    public DurableFileTaskQueue(string path, TimeProvider? clock = null, int maxTaskRecords = 10_000)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (maxTaskRecords < 1) throw new ArgumentOutOfRangeException(nameof(maxTaskRecords));
         _path = Path.GetFullPath(path);
         _clock = clock ?? TimeProvider.System;
+        _maxTaskRecords = maxTaskRecords;
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
         lock (_gate) _ = ReadSnapshot();
     }
@@ -93,6 +96,9 @@ public sealed class DurableFileTaskQueue
                     throw new InvalidOperationException("IDEMPOTENCY_KEY_PAYLOAD_CONFLICT");
                 return new TaskSubmissionResult(existing, true);
             }
+
+            if (snapshot.Tasks.Count >= _maxTaskRecords)
+                throw new InvalidOperationException("TASK_QUEUE_CAPACITY_REACHED");
 
             var now = _clock.GetUtcNow();
             var task = new DurableTaskRecord(Guid.NewGuid().ToString("N"), principal, idempotencyKey,

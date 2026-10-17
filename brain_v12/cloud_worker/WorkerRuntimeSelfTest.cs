@@ -37,6 +37,7 @@ public static class WorkerRuntimeSelfTest
 
             VerifyBoundedTaskConsumer();
             VerifyDurableTaskQueue();
+            VerifyTaskQueueCapacity();
             VerifyExpiredLeaseRecovery();
             VerifyReadinessPolicy();
             Console.WriteLine("BRAIN_WORKER_SELF_TEST=PASS");
@@ -193,6 +194,33 @@ public static class WorkerRuntimeSelfTest
                 throw new InvalidOperationException("task result did not persist across queue reload");
             if (!reloaded.AuditSnapshot().Any(e => e.TaskId == first.Task.TaskId && e.Event == "succeeded"))
                 throw new InvalidOperationException("completion audit event was not persisted");
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    private static void VerifyTaskQueueCapacity()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "brain-task-capacity-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            var queue = new DurableFileTaskQueue(path, maxTaskRecords: 2);
+            queue.Submit("self-test", "capacity-1", "health_check", "{}");
+            queue.Submit("self-test", "capacity-2", "simulation_status", "{}");
+
+            try
+            {
+                queue.Submit("self-test", "capacity-3", "health_check", "{}");
+                throw new InvalidOperationException("task queue accepted records beyond its configured capacity");
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "TASK_QUEUE_CAPACITY_REACHED") { }
+
+            // Existing idempotent retries must still work at capacity.
+            var duplicate = queue.Submit("self-test", "capacity-1", "health_check", "{}");
+            if (!duplicate.Duplicate || queue.Snapshot().Count != 2)
+                throw new InvalidOperationException("queue capacity broke idempotent retries");
         }
         finally
         {
