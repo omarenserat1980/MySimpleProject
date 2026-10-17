@@ -501,7 +501,7 @@ async function verifySignedSettlementEvidence(request, env, requestOrigin, allow
   const signature = String(body.signature || "").trim().toLowerCase();
 
   if (!tranRef || !settlementReference || !Number.isFinite(amount) || amount <= 0
-      || !/^[A-Z]{3}$/.test(currency) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(settlementDate)
+      || !/^[A-Z]{3}$/.test(currency) || !/^\d{4}-\d{2}-\d{2}$/.test(settlementDate)
       || !["PAYTABS_SETTLEMENT_REPORT", "BANK_STATEMENT"].includes(source)
       || !/^[a-f0-9]{64}$/.test(reportSha256) || !/^[a-f0-9]{64}$/.test(signature)) {
     return json({ ok: false, error: "SETTLEMENT_EVIDENCE_INVALID" }, 400, requestOrigin, allowedOrigin);
@@ -556,8 +556,8 @@ async function verifySignedSettlementEvidence(request, env, requestOrigin, allow
     settlement_verification_method: "SIGNED_OPERATOR_ATTESTATION_AFTER_INDEPENDENT_SOURCE_REVIEW",
   };
   const result = await env.BRAIN_DB.prepare(
-    "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT' AND amount = ? AND currency = ?"
-  ).bind(JSON.stringify(settlementEvidence), tranRef, Number(ledger.amount), String(ledger.currency)).run();
+    "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', settlement_reference = ?, evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT' AND amount = ? AND currency = ? AND settlement_reference IS NULL"
+  ).bind(settlementReference, JSON.stringify(settlementEvidence), tranRef, Number(ledger.amount), String(ledger.currency)).run();
   if (!result || !result.meta || Number(result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: "SETTLEMENT_STATE_RACE", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
   }
