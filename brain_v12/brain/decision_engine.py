@@ -53,6 +53,17 @@ class DecisionEngine:
         self.north_star = north_star
 
     @staticmethod
+    def _is_income_goal(goal: str) -> bool:
+        text = str(goal or "").casefold()
+        terms = (
+            "income", "earn", "earning", "revenue", "profit", "paid work",
+            "freelance", "client", "sales", "monetize", "money", "دخل",
+            "كسب", "كسب المال", "إيراد", "ربح", "مصاري", "فرصة مدفوعة",
+            "عميل", "بيع", "تحقيق الدخل",
+        )
+        return any(term in text for term in terms)
+
+    @staticmethod
     def _mission_tags(goal: str) -> list[str]:
         text = (goal or "").lower()
         tags = []
@@ -81,6 +92,13 @@ class DecisionEngine:
                              "memory.read" if memory else "state.read")),
             asdict(Candidate("plan", "بناء خطة متعددة الخطوات", "خطة قابلة للتحقق", "low", [], True, ["goal"], .80, "tasks.create")),
         ]
+        if self._is_income_goal(goal):
+            options.insert(0, asdict(Candidate(
+                "income_opportunities",
+                "البحث عن فرص دخل حقيقية قابلة للتنفيذ بأقل تكلفة",
+                "فرص موثقة مع متطلبات وسعر/ميزانية وتكلفة التنفيذ والخطوة التالية",
+                "low", [], True, ["goal", "opportunity_evidence"], .99, "income.search",
+            )))
         if device:
             options.insert(0, asdict(Candidate("device", "تنفيذ مهمة آمنة على الجهاز", "نتيجة موثقة من Termux", "medium", ["device_agent"], True, ["goal", "device_result"], .92, "device.enqueue")))
         if code:
@@ -94,31 +112,47 @@ class DecisionEngine:
         permissions = permissions or set()
         original_goal = goal
         goal = self.normalize_goal(goal)
-        compass = self.north_star.assess({
-            "task_id": "decision-" + str(len(self.history) + 1),
-            "tags": self._mission_tags(str(goal)),
-            "expected_progress": 0.5,
-            "evidence_status": "MISSING",
-        })
-        if compass.status == "OFF_COURSE":
-            result = {
-                "status": "MISSION_ALIGNMENT_REQUIRED",
-                "goal": original_goal,
-                "selected": None,
-                "reason": "bitcoin_north_star",
-                "north_star": compass.as_dict(),
-                "next_action": compass.next_action,
-                "alternatives": [],
-            }
-            self.history.append(result)
-            return result
+        bitcoin_tags = self._mission_tags(str(goal))
+        income_goal = self._is_income_goal(str(goal)) and not bitcoin_tags
+        compass = None
+        # Bitcoin's North Star governs Bitcoin tasks. It must not accidentally
+        # veto legitimate non-Bitcoin income paths such as freelance services.
+        # General non-income tasks retain the previous mission-alignment gate.
+        if not income_goal:
+            compass = self.north_star.assess({
+                "task_id": "decision-" + str(len(self.history) + 1),
+                "tags": bitcoin_tags,
+                "expected_progress": 0.5,
+                "evidence_status": "MISSING",
+            })
+            if compass.status == "OFF_COURSE":
+                result = {
+                    "status": "MISSION_ALIGNMENT_REQUIRED",
+                    "goal": original_goal,
+                    "selected": None,
+                    "reason": "bitcoin_north_star",
+                    "north_star": compass.as_dict(),
+                    "next_action": compass.next_action,
+                    "alternatives": [],
+                }
+                self.history.append(result)
+                return result
 
+        compass_data = compass.as_dict() if compass is not None else {
+            "status": "NOT_APPLICABLE",
+            "reason": "NON_BITCOIN_INCOME_OBJECTIVE",
+        }
         ranked = []
         for option in options:
             required = option.get("requirements", [])
             missing = [item for item in required if item not in permissions]
             blocked = bool(missing)
             score = float(option.get("confidence", .5))
+            if income_goal:
+                searchable = " ".join(str(option.get(key, "")) for key in ("id", "action", "expected", "tool_id")).casefold()
+                income_markers = ("income", "earn", "revenue", "profit", "opportunit", "freelance", "client", "payment", "دخل", "ربح", "إيراد", "فرص")
+                if any(marker in searchable for marker in income_markers):
+                    score += 0.20
             if option.get("risk") == "high":
                 score -= .30
             if not option.get("reversible", True):
@@ -128,14 +162,14 @@ class DecisionEngine:
             ranked.append((score, option, blocked, missing))
         ranked.sort(key=lambda item: item[0], reverse=True)
         if not ranked:
-            result = {"status": "NO_OPTIONS", "goal": original_goal, "north_star": compass.as_dict()}
+            result = {"status": "NO_OPTIONS", "goal": original_goal, "north_star": compass_data}
         else:
             score, selected, blocked, missing = ranked[0]
             if blocked and selected.get("risk") == "high":
                 result = {"status": "WAITING_APPROVAL", "goal": original_goal, "normalized_goal": goal, "selected": selected,
                           "score": round(score, 3), "reason": "required_permission",
                           "missing_permissions": missing, "alternatives": [item[1] for item in ranked[1:]],
-                          "north_star": compass.as_dict()}
+                          "north_star": compass_data}
             else:
                 result = {"status": "DECIDED", "goal": original_goal, "normalized_goal": goal, "selected": selected,
                           "score": round(score, 3), "reason": "tool_aware_heuristic",
