@@ -20,6 +20,7 @@ on:
       - "brain_v12/brain/brain_mcp.py"
       - "brain_v12/tests/test_sha256d_execution_contract.py"
       - "brain_v12/tests/test_sha256d_mcp_contract.py"
+      - "brain_v12/web/bitcoin-mining/index.html"
       - ".github/workflows/bitcoin-sha256-rtl.yml"
   push:
     branches:
