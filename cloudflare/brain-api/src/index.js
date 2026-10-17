@@ -484,19 +484,19 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
     "UPDATE orders SET state = 'COMPLETED' WHERE order_id = ? AND state = 'READY'"
   ).bind(delivery.order_id).run();
 
-  // Realize revenue only after a verified payment and a delivery confirmation for the same order.
+  // Delivery is not proof of provider settlement. Keep cash/revenue unrecognized
+  // until a separate authenticated settlement reconciliation confirms the payout.
   const payment = await env.BRAIN_DB.prepare(
     "SELECT tran_ref, amount, currency, state FROM payments WHERE order_id = ? AND provider = 'paytabs' AND state = 'PAYMENT_VERIFIED' LIMIT 1"
   ).bind(delivery.order_id).first();
-  let revenueRealized = false;
+  let settlementRequired = Boolean(payment);
   if (payment) {
-    const revenueUpdate = await env.BRAIN_DB.prepare(
-      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
-    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
-    revenueRealized = Number(revenueUpdate.meta?.changes || 0) > 0;
+    await env.BRAIN_DB.prepare(
+      "UPDATE revenue_ledger SET state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
+    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), delivery_verified_by: client.email, settlement_status: "NOT_YET_VERIFIED" }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
   }
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: revenueRealized });
-  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: revenueRealized }, 200, requestOrigin, allowedOrigin);
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: false, settlement_required: settlementRequired });
+  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: false, settlement_required: settlementRequired }, 200, requestOrigin, allowedOrigin);
 }
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
