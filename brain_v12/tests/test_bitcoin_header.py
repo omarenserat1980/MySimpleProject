@@ -86,3 +86,47 @@ def test_legacy_stratum_v1_prevhash_known_word_endian_vector():
 def test_stratum_prevhash_normalizer_rejects_invalid_width():
     with pytest.raises(ValueError, match="INVALID_STRATUM_V1_PREVHASH_WIDTH"):
         stratum_v1_prevhash_to_header_wire_hex("00" * 31)
+
+
+
+def test_fixed_width_header_fields_reject_embedded_whitespace():
+    with pytest.raises(ValueError, match="INVALID_VERSION_WIDTH"):
+        build_header_candidate(
+            version_hex="01 000000",
+            prevhash_wire_hex="00" * 32,
+            merkle_root_raw=b"\x11" * 32,
+            ntime_hex="02000000",
+            nbits_hex="ffff001d",
+            nonce=0,
+            share_target=2**256 - 1,
+        )
+
+
+def test_genesis_hash_integer_matches_independent_display_vector():
+    expected_display = (
+        "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+    )
+    candidate = build_header_candidate(
+        version_hex="01000000",
+        prevhash_wire_hex="00" * 32,
+        merkle_root_raw=bytes.fromhex(
+            "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"
+        ),
+        ntime_hex="29ab5f49",
+        nbits_hex="ffff001d",
+        nonce=0x7C2BAC1D,
+        share_target=compact_nbits_to_target("ffff001d"),
+    )
+    assert candidate.digest_display_hex == expected_display
+    assert candidate.hash_integer == int(expected_display, 16)
+    assert candidate.hash_integer <= compact_nbits_to_target("ffff001d")
+
+
+def test_target_comparison_is_inclusive_at_exact_boundary():
+    header = bytes.fromhex("00" * 80)
+    exact = verify_candidate_against_target(header, 2**256 - 1)
+    assert exact["hash_integer_meets_target"] is True
+    below_hash = exact["hash_integer"] - 1
+    if below_hash > 0:
+        rejected = verify_candidate_against_target(header, below_hash)
+        assert rejected["hash_integer_meets_target"] is False
