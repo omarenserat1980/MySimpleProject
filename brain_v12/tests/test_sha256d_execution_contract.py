@@ -10,7 +10,8 @@ from brain_v12.brain.sha256d_execution_contract import (
     make_layer_result, validate_layer_result, layer_status_snapshot,
 )
 from brain_v12.brain.sha256d_rtl_adapter import (
-    _run_command, classify_simulation_result, normalize_cpu_benchmark, run_rtl_smoke, validate_nonce_range,
+    CASES, _run_command, classify_simulation_result, normalize_cpu_benchmark,
+    run_rtl_smoke, validate_nonce_range,
 )
 
 
@@ -88,6 +89,31 @@ class Sha256dRtlAdapterTests(unittest.TestCase):
         result = run_rtl_smoke("arbitrary_shell_command")
         self.assertEqual(result["status"], "BLOCKED")
         self.assertEqual(result["error_code"], "RTL_CASE_NOT_ALLOWLISTED")
+
+    def test_overall_deadline_covers_compile_and_simulation(self):
+        clock = [0.0]
+
+        def fake_command(command, *, timeout_seconds, cancel_event=None, log_path):
+            # Simulate a compile that consumes the entire shared deadline.
+            clock[0] = 0.11
+            return {"status": "PASS", "exit_code": 0, "elapsed_seconds": 0.11}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            rtl_root = Path(tmp)
+            for name in CASES["genesis_nonce_search"]["sources"]:
+                (rtl_root / name).write_text("test source\n", encoding="utf-8")
+            with patch("brain_v12.brain.sha256d_rtl_adapter.shutil.which",
+                       side_effect=lambda name: "/usr/bin/" + name), \
+                 patch("brain_v12.brain.sha256d_rtl_adapter.time.monotonic",
+                       side_effect=lambda: clock[0]), \
+                 patch("brain_v12.brain.sha256d_rtl_adapter._run_command",
+                       side_effect=fake_command) as run_command:
+                result = run_rtl_smoke(timeout_seconds=0.1, rtl_root=rtl_root)
+
+        self.assertEqual(result["status"], "TIMEOUT")
+        self.assertEqual(result["error_code"], "OVERALL_TIMEOUT")
+        self.assertEqual(result["evidence"]["phase"], "simulation")
+        self.assertEqual(run_command.call_count, 1)
 
     def test_command_timeout_is_not_pass(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -154,15 +154,26 @@ def run_rtl_smoke(
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in source_paths
     }
+    # One wall-clock budget covers both compilation and simulation, rather than
+    # allowing each phase to consume the full timeout independently.
+    deadline = time.monotonic() + float(timeout_seconds)
     with tempfile.TemporaryDirectory(prefix="brain-sha256d-rtl-") as tmp:
         work = Path(tmp)
         binary = work / "testbench.vvp"
         compile_log = work / "compile.log"
         sim_log = work / "simulation.log"
+        compile_remaining = deadline - time.monotonic()
+        if compile_remaining <= 0:
+            return make_layer_result(
+                layer="rtl_simulator", status="TIMEOUT", error_code="OVERALL_TIMEOUT",
+                evidence={"case": case, "phase": "compile", "source_sha256": source_hashes,
+                          "execution_scope": "LOCAL_RTL_SIMULATION_ONLY"},
+                started_at_utc=started_at,
+            )
         compile_result = _run_command(
             [iverilog, "-g2012", "-Wall", "-s", spec["top"], "-o", str(binary),
              *[str(path) for path in source_paths]],
-            timeout_seconds=float(timeout_seconds), cancel_event=cancel_event,
+            timeout_seconds=compile_remaining, cancel_event=cancel_event,
             log_path=compile_log,
         )
         if compile_result["status"] != "PASS":
@@ -174,8 +185,27 @@ def run_rtl_smoke(
                           "tool_result": compile_result, "source_sha256": source_hashes},
                 started_at_utc=started_at,
             )
+        simulation_remaining = deadline - time.monotonic()
+        if simulation_remaining <= 0:
+            return make_layer_result(
+                layer="rtl_simulator", status="TIMEOUT", error_code="OVERALL_TIMEOUT",
+                evidence={
+                    "case": case,
+                    "top_module": spec["top"],
+                    "compiler": Path(iverilog).name,
+                    "simulator": Path(vvp).name,
+                    "source_sha256": source_hashes,
+                    "compile": compile_result,
+                    "simulation": {"status": "TIMEOUT", "exit_code": None,
+                                   "error_code": "OVERALL_TIMEOUT"},
+                    "required_success_marker": spec["marker"],
+                    "success_marker_found": False,
+                    "execution_scope": "LOCAL_RTL_SIMULATION_ONLY",
+                },
+                started_at_utc=started_at,
+            )
         sim_result = _run_command(
-            [vvp, str(binary)], timeout_seconds=float(timeout_seconds),
+            [vvp, str(binary)], timeout_seconds=simulation_remaining,
             cancel_event=cancel_event, log_path=sim_log,
         )
         output = sim_log.read_text(encoding="utf-8", errors="replace")[-12000:] if sim_log.exists() else ""
