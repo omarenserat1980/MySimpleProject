@@ -569,6 +569,11 @@ async function verifySignedSettlementEvidence(request, env, requestOrigin, allow
   } catch {
     return json({ ok: false, error: "SETTLEMENT_REFERENCE_CONFLICT", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
   }
+  // Fail closed if another request changed the ledger after our read. D1's
+  // conditional UPDATE must affect exactly one row before revenue is reported.
+  if (Number(result?.meta?.changes) !== 1) {
+    return json({ ok: false, error: "SETTLEMENT_STATE_CONFLICT", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
   return json({
     ok: true,
     state: "REVENUE_REALIZED",
