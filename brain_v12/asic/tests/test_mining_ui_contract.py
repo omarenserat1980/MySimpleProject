@@ -9,6 +9,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 UI = ROOT / "brain_v12" / "web" / "brain.html"
 API = ROOT / "brain_v12" / "brain" / "asic_simulator_api.py"
+ADAPTER = ROOT / "brain_v12" / "brain" / "asic_resource_adapter.py"
 APP = ROOT / "brain_v12" / "app.py"
 
 
@@ -17,10 +18,11 @@ class MiningUIContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.ui = UI.read_text(encoding="utf-8")
         cls.api = API.read_text(encoding="utf-8")
+        cls.adapter = ADAPTER.read_text(encoding="utf-8")
         cls.app = APP.read_text(encoding="utf-8")
 
     def test_ui_calls_registered_simulator_status_endpoint(self):
-        self.assertIn("fetch('/api/asic-sim/status')", self.ui)
+        self.assertIn("api('/api/asic-sim/status')", self.ui)
         self.assertIn("app.include_router(asic_simulator_router)", self.app)
         self.assertIn('@router.get("/status")', self.api)
 
@@ -34,7 +36,7 @@ class MiningUIContractTests(unittest.TestCase):
         self.assertIn(
             "r.status==='RTL_SIMULATION_VERIFIED'&&r.ok===true", self.ui
         )
-        self.assertIn('"physical_asic_executed":False', self.api)
+        self.assertIn('"physical_asic_executed": False', self.adapter)
         self.assertIn('"hardware_access": False', self.api)
         self.assertIn('"network_access": False', self.api)
 
