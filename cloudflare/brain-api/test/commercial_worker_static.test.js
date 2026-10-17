@@ -150,5 +150,7 @@ assert.match(worker, /CONTROL_AUTH_REQUIRED/, "transaction reconciliation must r
 
 assert.match(worker, /SETTLEMENT_REFERENCE_ALREADY_USED/, "settlement references must not be reused across revenue rows");
 assert.match(worker, /settlement_reference IS NULL/, "realization transition must only happen once per ledger row");
+assert.match(worker, /Number\(result\?\.meta\?\.changes\) !== 1/, "settlement must fail closed unless the conditional update changes exactly one row");
+assert.match(worker, /SETTLEMENT_STATE_CONFLICT/, "a concurrent ledger state change must not be reported as realized revenue");
 assert.match(settlementMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_settlement_reference_unique/, "settlement reference must be unique");
 assert.match(worker, /settlementDate/);
