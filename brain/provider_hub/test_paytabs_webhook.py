@@ -15,6 +15,7 @@ def body():
         "cart_id": "BRAIN-TEST-1",
         "cart_amount": "1.00",
         "cart_currency": "USD",
+        "tran_type": "sale",
         "payment_result": {"response_status": "A"},
         "tran_ref": "TST123",
     }, separators=(",", ":")).encode()
@@ -32,6 +33,20 @@ def test_valid_signature():
 def test_tampered_body_is_rejected():
     raw = body()
     assert not verify_ipn_signature(raw + b"tampered", signature(raw), KEY)
+
+
+def test_documented_top_level_ipn_payload_is_accepted():
+    data = json.loads(body())
+    data["response_status"] = data["payment_result"].pop("response_status")
+    data.pop("payment_result")
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    result = parse_and_validate_payment(
+        raw, signature(raw), KEY,
+        expected_order_id="BRAIN-TEST-1",
+        expected_amount="1.00",
+        expected_currency="USD",
+    )
+    assert result["tran_ref"] == "TST123"
 
 
 def test_valid_payment_payload():
@@ -55,6 +70,19 @@ def test_top_level_mismatches_are_rejected(field, value, error):
     data[field] = value
     raw = json.dumps(data, separators=(",", ":")).encode()
     with pytest.raises(ValueError, match=error):
+        parse_and_validate_payment(
+            raw, signature(raw), KEY,
+            expected_order_id="BRAIN-TEST-1",
+            expected_amount="1.00",
+            expected_currency="USD",
+        )
+
+
+def test_authorization_only_transaction_is_rejected():
+    data = json.loads(body())
+    data["tran_type"] = "auth"
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    with pytest.raises(ValueError, match="PAYTABS_CAPTURED_SALE_REQUIRED"):
         parse_and_validate_payment(
             raw, signature(raw), KEY,
             expected_order_id="BRAIN-TEST-1",
