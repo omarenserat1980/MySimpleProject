@@ -87,12 +87,16 @@ class RevenueRealizationGate:
         opportunity_id = _required(task, "opportunity_id")
         order_id = _required(task, "order_id")
 
-        # Explicit simulation/demo/test evidence can never become realized revenue.
+        # Every evidence source must explicitly declare production mode.
+        # Missing or unknown modes fail closed; simulation/demo/test never count.
+        simulated_modes = {"simulation", "simulated", "demo", "test", "fixture", "mock"}
         for label, evidence in (("task", task), ("worker", worker),
                                 ("delivery", delivery), ("payment", payment)):
-            mode = str(evidence.get("mode", "production")).lower()
-            if mode in {"simulation", "simulated", "demo", "test", "fixture", "mock"}:
+            mode = str(evidence.get("mode", "")).strip().lower()
+            if mode in simulated_modes:
                 raise RevenueGateError(f"SIMULATED_{label.upper()}_REJECTED")
+            if mode != "production":
+                raise RevenueGateError(f"PRODUCTION_{label.upper()}_MODE_REQUIRED")
 
         if str(worker.get("status", "")).upper() != "COMPLETED":
             raise RevenueGateError("WORKER_EXECUTION_NOT_COMPLETED")
