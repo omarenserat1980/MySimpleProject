@@ -21,6 +21,10 @@ class MiningUIContractTests(unittest.TestCase):
         cls.adapter = ADAPTER.read_text(encoding="utf-8")
         cls.app = APP.read_text(encoding="utf-8")
 
+    def test_ui_is_reachable_through_the_root_static_mount(self):
+        self.assertTrue(UI.is_file(), "SHA-256d UI file must exist in the served web root")
+        self.assertIn('app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")', self.app)
+
     def test_ui_calls_registered_simulator_status_endpoint(self):
         self.assertIn("api('/api/asic-sim/status')", self.ui)
         self.assertIn("app.include_router(asic_simulator_router)", self.app)
