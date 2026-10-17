@@ -28,6 +28,33 @@ class Sha256dMcpContractTests(unittest.TestCase):
         names = [tool["name"] for tool in response.json()["result"]["tools"]]
         self.assertIn("brain.sha256d_layers", names)
 
+    def test_sha256d_run_rtl_tool_is_discoverable_and_fail_closed(self):
+        listed = self.client.post("/mcp", headers=self.headers, json={
+            "jsonrpc": "2.0", "id": 10, "method": "tools/list", "params": {},
+        })
+        self.assertEqual(listed.status_code, 200)
+        tools = listed.json()["result"]["tools"]
+        run_tool = next(tool for tool in tools if tool["name"] == "brain.sha256d_run_rtl")
+        self.assertEqual(
+            run_tool["inputSchema"]["properties"]["case"]["enum"],
+            ["genesis_nonce_search", "nonce_sweep", "header_hash"],
+        )
+
+        # An unknown case must fail closed before invoking external RTL tools.
+        response = self.client.post("/mcp", headers=self.headers, json={
+            "jsonrpc": "2.0", "id": 11, "method": "tools/call",
+            "params": {
+                "name": "brain.sha256d_run_rtl",
+                "arguments": {"case": "arbitrary-command", "timeout_seconds": 1.0},
+            },
+        })
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]["structuredContent"]
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["external_claims_verified"])
+        self.assertEqual(result["rtl_result"]["status"], "BLOCKED")
+        self.assertEqual(result["rtl_result"]["error_code"], "RTL_CASE_NOT_ALLOWLISTED")
+
     def test_mcp_validates_shared_cpu_rtl_evidence_contract(self):
         record = make_layer_result(
             layer="cpu_reference", status="PASS",
