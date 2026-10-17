@@ -531,13 +531,27 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
   const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
-  await env.BRAIN_DB.prepare("UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ?").bind(evidenceText, jobId).run();
+  // Compare-and-set prevents two concurrent completion requests from both claiming success.
+  const completion = await env.BRAIN_DB.prepare(
+    "UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ? AND state = 'RUNNING'"
+  ).bind(evidenceText, jobId).run();
+  if (Number(completion.meta?.changes || 0) !== 1) {
+    return json({ ok: false, error: "JOB_COMPLETION_RACE" }, 409, requestOrigin, allowedOrigin);
+  }
   const deliveryId = "DEL-" + crypto.randomUUID().toUpperCase();
-  await env.BRAIN_DB.prepare(
+  const deliveryInsert = await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO deliveries (delivery_id, order_id, state, artifact_url, evidence) VALUES (?, ?, 'READY', ?, ?)"
-  ).bind(deliveryId, job.order_id, artifactUrl || null, evidenceText).run();
+  ).bind(deliveryId, job.order_id, artifactUrl, evidenceText).run();
+  let finalDeliveryId = deliveryId;
+  if (Number(deliveryInsert.meta?.changes || 0) !== 1) {
+    const existingDelivery = await env.BRAIN_DB.prepare(
+      "SELECT delivery_id, state FROM deliveries WHERE order_id = ?"
+    ).bind(job.order_id).first();
+    if (!existingDelivery) return json({ ok: false, error: "DELIVERY_PERSISTENCE_FAILED" }, 500, requestOrigin, allowedOrigin);
+    finalDeliveryId = String(existingDelivery.delivery_id);
+  }
   await env.BRAIN_DB.prepare("UPDATE orders SET state = 'READY' WHERE order_id = ? AND state = 'PAYMENT_VERIFIED'").bind(job.order_id).run();
-  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: deliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
+  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: finalDeliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
 }
 
 async function claimNextJob(request, env, requestOrigin, allowedOrigin) {
