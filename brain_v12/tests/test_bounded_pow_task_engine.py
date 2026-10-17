@@ -64,6 +64,9 @@ def test_nonce_space_exhaustion_does_not_wrap():
         ({"batch_hashes": 0}, "BATCH_HASHES_OUT_OF_RANGE"),
         ({"batch_hashes": MAX_BATCH_HASHES + 1}, "BATCH_HASHES_OUT_OF_RANGE"),
         ({"timeout_seconds": 0}, "TIMEOUT_SECONDS_OUT_OF_RANGE"),
+        ({"timeout_seconds": float("nan")}, "TIMEOUT_SECONDS_OUT_OF_RANGE"),
+        ({"timeout_seconds": float("inf")}, "TIMEOUT_SECONDS_OUT_OF_RANGE"),
+        ({"timeout_seconds": 3601}, "TIMEOUT_SECONDS_OUT_OF_RANGE"),
     ],
 )
 def test_invalid_limits_fail_closed(kwargs, message):
