@@ -133,6 +133,28 @@ jobs:
           except urllib.error.HTTPError as exc:
               assert exc.code == 401, f"expected HTTP 401 for unauthenticated task submission, got {exc.code}"
 
+          # An incorrect API key must also block task creation.
+          wrong_key = urllib.request.Request(
+              base + "/api/tasks",
+              data=json.dumps({"taskType": "health_check", "arguments": {"probe": "ci"}}).encode(),
+              headers={"Content-Type": "application/json", "Idempotency-Key": "ci-wrong-key",
+                       "X-Brain-Api-Key": "incorrect-ci-key"},
+              method="POST")
+          try:
+              urllib.request.urlopen(wrong_key, timeout=3)
+              raise SystemExit("SECURITY FAILURE: task accepted with incorrect API key")
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 401, f"expected HTTP 401 for incorrect API key, got {exc.code}"
+
+          # Authenticated requests still need an idempotency key.
+          status_missing_key, missing_key = task_request(
+              "POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"probe": "ci"}})
+          assert status_missing_key == 400 and missing_key.get("error") == "IDEMPOTENCY_KEY_REQUIRED", (
+              status_missing_key, missing_key)
+          print("BRAIN_TASK_API_WRONG_KEY=BLOCKED")
+          print("BRAIN_TASK_API_IDEMPOTENCY_REQUIRED=PASS")
+
           status, _ = task_request("POST", "/api/tasks",
               {"taskType": "health_check", "arguments": {"probe": "ci"}},
               {"Idempotency-Key": "ci-task-1"})
