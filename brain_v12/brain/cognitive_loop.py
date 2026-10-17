@@ -4,6 +4,7 @@ from .permissions import PermissionGate
 from .task_engine import TaskEngine
 from .world_model import WorldModel
 from .quranic_reasoning_paths import select_reasoning_path
+from .logic_unit import LogicUnit
 from uuid import uuid4
 import hashlib
 import json
@@ -31,9 +32,13 @@ class CognitiveLoop:
         self.tasks=TaskEngine()
         self.world=WorldModel()
         self.code_tool=None
+        self.logic_unit=LogicUnit(store)
+        self._active_logic_context=None
 
     def _state(self,stage,status="RUNNING",**extra):
         current=self.store.state()
+        if self._active_logic_context:
+            extra.setdefault("logic_unit", self.logic_unit.trace(self._active_logic_context))
         current.update({
             "status":status,
             "cognitive_stage":stage,
@@ -117,7 +122,14 @@ class CognitiveLoop:
         # Count durable run lessons across the full store, not only the recalled slice.
         prior_lessons=[m for m in all_memories if str(m.get("key","")).startswith("cognitive.run.")]
         reasoning_path=select_reasoning_path(goal,memories)
-        decision_memories=list(memories)
+        logic_context=self.logic_unit.activate(
+            goal=goal,
+            memories=memories,
+            reasoning_path=reasoning_path,
+            run_id=run_id,
+        )
+        self._active_logic_context=logic_context
+        decision_memories=self.logic_unit.decision_memories(memories,logic_context)
         if reasoning_path:
             decision_memories.append({
                 "key":reasoning_path["key"],
@@ -136,20 +148,22 @@ class CognitiveLoop:
             "prior_lesson_count":len(prior_lessons),
             "memory_keys":[str(m.get("key","")) for m in memories[:12]],
             "reasoning_path_key":reasoning_path.get("key") if reasoning_path else None,
+            "logic_unit":self.logic_unit.trace(logic_context),
             "run_id":run_id
         })
 
         self._state("ANALYZE",goal=goal,run_id=run_id)
         options=self.decisions.generate(goal,memories=decision_memories)
-        self.events.publish("ANALYZE",{"options_count":len(options),"memory_context_count":len(decision_memories),"run_id":run_id})
+        self.events.publish("ANALYZE",{"options_count":len(options),"memory_context_count":len(decision_memories),"logic_unit":self.logic_unit.trace(logic_context),"run_id":run_id})
 
         self._state("PLAN",goal=goal,run_id=run_id)
         plan_steps=reasoning_path["stages"] if reasoning_path else ["فهم الطلب","تقييم الخيارات","اختيار الخطوة الآمنة","التحقق"]
-        self.events.publish("PLAN_CREATED",{"steps":plan_steps,"reasoning_path_key":reasoning_path.get("key") if reasoning_path else None,"run_id":run_id})
+        self.events.publish("PLAN_CREATED",{"steps":plan_steps,"reasoning_path_key":reasoning_path.get("key") if reasoning_path else None,"logic_unit":self.logic_unit.trace(logic_context),"run_id":run_id})
 
         self._state("DECIDE",goal=goal,run_id=run_id)
         decision=self.decisions.choose(goal,options,self.permissions.grants,memories=decision_memories)
         decision["run_id"]=run_id
+        decision["logic_unit"]=self.logic_unit.trace(logic_context)
         self.events.publish("DECISION_MADE",decision)
 
         selected=decision.get("selected",{})
@@ -159,7 +173,7 @@ class CognitiveLoop:
         task_title=selected.get("action","تحليل الهدف") if isinstance(selected,dict) else "تحليل الهدف"
         task=self.tasks.create(task_title)
         self.tasks.update(task["id"],"RUNNING")
-        self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"run_id":run_id})
+        self.events.publish("EXECUTION_STARTED",{"task_id":task["id"],"action":action,"title":task_title,"logic_unit":self.logic_unit.trace(logic_context),"run_id":run_id})
 
         tool_id={"observe":"memory.read","plan":"tasks.create","inspect_code":"code.inspect","verify_code":"code.verify","device":"device.enqueue"}.get(action)
         tool_params = (
@@ -202,6 +216,7 @@ class CognitiveLoop:
             "result_verified":verified,
             "run_id":run_id
         }
+        verification["logic_unit"]=self.logic_unit.trace(logic_context)
         self.events.publish("VERIFIED",verification)
 
         self._state("LEARN",status="READY",goal=goal,run_id=run_id)
@@ -222,7 +237,8 @@ class CognitiveLoop:
             f"cognitive.run.{run_id}",
             __import__("json").dumps(lesson,ensure_ascii=False,sort_keys=True)
         )
-        self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"run_id":run_id})
+        self.logic_unit.record_run(logic_context, lesson)
+        self.events.publish("LEARNING_RECORDED",{"lesson":lesson,"logic_unit":self.logic_unit.trace(logic_context),"run_id":run_id})
 
         return {
             "run_id":run_id,
@@ -231,6 +247,7 @@ class CognitiveLoop:
             "stage_count":len(self.STAGES),
             "memory_count":len(memories),
             "prior_lesson_count":len(prior_lessons),
+            "logic_unit":self.logic_unit.trace(logic_context),
             "reasoning_path":({"key":reasoning_path["key"],"title":reasoning_path["title"],"stages":reasoning_path["stages"],"source_references":reasoning_path["source_references"],"interpretation_type":reasoning_path.get("interpretation_type","bounded_engineering_inference")} if reasoning_path else None),
             "plan_steps":plan_steps,
             "options":options,
