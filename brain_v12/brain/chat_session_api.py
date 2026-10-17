@@ -21,6 +21,7 @@ class MessageIn(BaseModel):
     approved: bool = False
     client_message_id: str | None = None
     device_id: str | None = None
+    partner_mode: bool = False
 
 
 class MemoryIn(BaseModel):
@@ -164,11 +165,14 @@ def router(brain_ai, store=None, context_limit=24):
             context_lines = ["[{}] {}".format(item["role"], item["content"]) for item in history]
             session_context = "\n".join(context_lines)
             instructions = body.instructions
+            if body.partner_mode:
+                from .brain_partner import PARTNER_INSTRUCTIONS
+                instructions = (instructions + "\n\n" if instructions else "") + PARTNER_INSTRUCTIONS
             if memory and memory.get("summary"):
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_MEMORY]\n" + memory["summary"]
             if session_context:
                 instructions = (instructions + "\n\n" if instructions else "") + "[BRAIN_SESSION_CONTEXT]\n" + session_context
-            result = brain_ai.chat(body.message, instructions, approved=body.approved)
+            result = brain_ai.chat(body.message, instructions, approved=(body.approved and not body.partner_mode))
             model_routing = next((e for e in result.evidence if e.get("type") == "model_routing"), None)
             assistant = {
                 "role": "assistant", "content": result.reply, "ok": result.ok, "mode": result.mode,
