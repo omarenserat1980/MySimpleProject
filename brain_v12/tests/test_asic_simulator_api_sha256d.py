@@ -82,3 +82,48 @@ def test_sha256d_pow_api_validates_bounds(overrides, expected_status):
         "/api/asic-sim/sha256d-pow", json=request_payload(**overrides)
     )
     assert response.status_code == expected_status
+
+
+def test_sha256d_rtl_api_reports_only_evidence_gated_rtl_success(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as adapter_module
+
+    monkeypatch.setattr(adapter_module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "VERIFIED",
+        "rtl_executed": True,
+        "evidence_status": "RTL_SIMULATION_VERIFIED",
+        "physical_asic_executed": False,
+        "pool_contacted": False,
+        "share_submitted": False,
+        "pool_acceptance_verified": False,
+        "revenue_verified": False,
+    })
+    response = make_client().post("/api/asic-sim/sha256d-rtl-self-test", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["status"] == "RTL_SIMULATION_VERIFIED"
+    assert body["result"]["execution_mode"] == "RTL_SIMULATION"
+    assert body["result"]["rtl_executed"] is True
+    assert body["result"]["physical_asic_executed"] is False
+    assert body["evidence_verification"] == "VERIFIED"
+
+
+def test_sha256d_rtl_api_does_not_claim_success_when_toolchain_is_missing(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as adapter_module
+
+    monkeypatch.setattr(adapter_module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "BLOCKED_TOOLCHAIN_UNAVAILABLE",
+        "rtl_executed": False,
+        "evidence_status": "BLOCKED",
+    })
+    response = make_client().post("/api/asic-sim/sha256d-rtl-self-test", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["status"] == "BLOCKED_TOOLCHAIN_UNAVAILABLE"
+    assert body["result"]["rtl_executed"] is False
+    assert body["evidence_ref"] is None
