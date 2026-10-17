@@ -11,7 +11,7 @@ PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, "2025-11-25", "2025-06-18"}
 
 
-def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
+def build_mcp_router(brain_ai, device_bridge, store, asic_resources=None) -> APIRouter:
     """Expose a minimal, stateless MCP Streamable HTTP surface.
 
     This implementation deliberately avoids adding an MCP SDK dependency to
@@ -117,6 +117,60 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         },
         evidence_handler,
     )
+    if asic_resources is not None:
+        def asic_sha256d_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+            from .asic_resource_adapter import ASICResource
+
+            resource_id = str(arguments.get("resource_id", "brain-sha256d-sim")).strip()
+            header_hex = arguments.get("header_hex")
+            target_hex = arguments.get("target_hex")
+            if not isinstance(header_hex, str) or len(header_hex) != 160:
+                return {"ok": False, "status": "HEADER_MUST_BE_80_BYTES"}
+            if not isinstance(target_hex, str) or not 1 <= len(target_hex) <= 64:
+                return {"ok": False, "status": "INVALID_TARGET_HEX"}
+            try:
+                header = bytes.fromhex(header_hex)
+                target = int(target_hex, 16)
+            except ValueError:
+                return {"ok": False, "status": "INVALID_HEX_INPUT"}
+            if len(header) != 80 or not 0 <= target < (1 << 256):
+                return {"ok": False, "status": "INVALID_HEADER_OR_TARGET"}
+            if not resource_id or len(resource_id) > 128:
+                return {"ok": False, "status": "INVALID_RESOURCE_ID"}
+            resource = asic_resources.resources.get(resource_id)
+            if resource is None:
+                asic_resources.register(ASICResource(
+                    resource_id=resource_id, execution_mode="SIMULATOR"
+                ))
+            elif resource.execution_mode != "SIMULATOR":
+                return {"ok": False, "status": "SIMULATION_MODE_REQUIRED"}
+            result = asic_resources.simulate_sha256d_pow(
+                resource_id,
+                header=header,
+                target=target,
+                start_nonce=arguments.get("start_nonce", 0),
+                max_attempts=arguments.get("max_attempts", 1000),
+            )
+            return {"ok": True, "status": "SIMULATION_ONLY", **result}
+
+        register(
+            "brain.asic_sha256d_simulate",
+            "Run bounded SHA-256d proof-of-work in Brain's software ASIC simulator. No RTL, physical hardware, pool, share submission, or revenue is implied.",
+            {
+                "type": "object",
+                "properties": {
+                    "resource_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                    "header_hex": {"type": "string", "minLength": 160, "maxLength": 160},
+                    "target_hex": {"type": "string", "minLength": 1, "maxLength": 64},
+                    "start_nonce": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+                    "max_attempts": {"type": "integer", "minimum": 1, "maximum": 1000000},
+                },
+                "required": ["header_hex", "target_hex"],
+                "additionalProperties": False,
+            },
+            asic_sha256d_handler,
+        )
+
     register(
         "brain.chat",
         "Ask Electronic Brain through its governed BrainAI chat loop.",
