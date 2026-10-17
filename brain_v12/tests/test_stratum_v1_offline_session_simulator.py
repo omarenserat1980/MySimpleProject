@@ -65,7 +65,7 @@ class FakeStratumServer:
         else:
             result, error = None, [ method, "unsupported method", None ]
         return (json.dumps({"id": request["id"], "result": result, "error": error})
-                + "\\n").encode("utf-8")
+                + "\n").encode("utf-8")
 
 
 def exchange(session: StratumV1Session, server: FakeStratumServer, request: bytes) -> dict:
