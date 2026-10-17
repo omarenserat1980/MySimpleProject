@@ -1,13 +1,12 @@
 """Brain Mining Controller.
 
-Safe control-plane for user-owned mining hosts.
-It discovers hardware, selects compatible open-source miners, estimates
-profitability, and enforces thermal/resource/payout gates.
+Safe planning and policy evaluation for a future Brain-owned mining backend.
+Hardware discovery and miner compatibility are advisory only: this module does
+not launch a miner, contact a pool, or establish that mining is profitable.
 
-Important: this module never mines inside GitHub Actions and never moves funds.
-Actual mining is opt-in on an explicitly registered external/self-hosted worker.
+Actual execution remains blocked until a native Brain-owned backend is
+implemented, attested, and separately reviewed. GitHub Actions never mines.
 """
-
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -15,7 +14,6 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 from typing import Any
 
 
@@ -46,6 +44,8 @@ class MiningPlan:
     backend: str
     mode: str
     reason: str
+    execution_mode: str = "PLAN_ONLY"
+    external_miner_execution_allowed: bool = False
 
 
 MINER_REGISTRY = {
@@ -84,6 +84,7 @@ def choose_plan(
     algorithm: str = "randomx",
     require_installed_miner: bool = False,
 ) -> MiningPlan:
+    """Return compatibility advice only; never authorize or start a miner."""
     algorithm = algorithm.lower()
     if algorithm not in MINER_REGISTRY:
         raise ValueError(f"unsupported algorithm: {algorithm}")
@@ -99,7 +100,12 @@ def choose_plan(
         miner=miner,
         backend=backend,
         mode=mode,
-        reason="CPU-first RandomX-compatible plan; actual execution is opt-in",
+        reason=(
+            "compatibility recommendation only; external miner execution is "
+            "blocked and the Brain-owned native backend is pending"
+        ),
+        execution_mode="PLAN_ONLY",
+        external_miner_execution_allowed=False,
     )
 
 
@@ -134,12 +140,7 @@ def can_start(
     resource_budget_verified: bool = False,
     explicit_user_approval: bool = False,
 ) -> tuple[bool, str]:
-    """Fail closed until a real Brain-owned backend passes separate review.
-
-    This function only evaluates policy; it never launches a process or contacts
-    a pool. An installed external miner is not a substitute for the native
-    Brain-owned backend.
-    """
+    """Fail closed; this policy check never launches a process or contacts a pool."""
     if running_on_github_actions:
         return False, "github_actions_mining_forbidden"
     if policy.require_user_owned_worker and not worker_is_user_owned:
@@ -160,8 +161,6 @@ def can_start(
         return False, "resource_budget_verification_required"
     if not explicit_user_approval:
         return False, "explicit_user_approval_required"
-    # Passing these checks is not permission to launch; a separate execution
-    # review and runtime authorization are still required.
     return False, "separate_execution_review_required"
 
 
@@ -198,7 +197,9 @@ def status() -> dict[str, Any]:
         "policy": asdict(MiningPolicy()),
         "hardware": asdict(detect_hardware()),
         "github_actions_mining": "BLOCKED",
-        "default_mode": "BENCHMARK_ONLY",
+        "default_mode": "PLAN_ONLY",
+        "external_miner_execution": "BLOCKED",
+        "brain_owned_backend": "PENDING_IMPLEMENTATION_AND_REVIEW",
     }
 
 

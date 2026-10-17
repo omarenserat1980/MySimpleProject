@@ -8,11 +8,14 @@ from brain_v12.brain.mining_controller import (
 )
 
 
-def test_randomx_plan_is_cpu_first():
+def test_randomx_plan_is_cpu_first_and_plan_only():
     hw = HardwareProfile("linux", "aarch64", 8, 7.5, ())
     plan = choose_plan(hw, "randomx")
     assert plan.miner == "xmrig"
     assert plan.mode == "fast"
+    assert plan.execution_mode == "PLAN_ONLY"
+    assert not plan.external_miner_execution_allowed
+    assert "compatibility recommendation only" in plan.reason
 
 
 def test_mining_disabled_by_default():
