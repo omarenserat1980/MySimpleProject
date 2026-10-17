@@ -105,7 +105,8 @@ def test_nonzero_compile_is_not_rtl_success(monkeypatch):
 
 def test_simulation_timeout_fails_closed(monkeypatch):
     setup_tools(monkeypatch, never_finishes=True)
-    times = iter([0.0, 0.2])
+    # Deadline, compile budget, compile start, simulation budget, simulation start, then timeout.
+    times = iter([0.0, 0.0, 0.0, 0.0, 0.0, 0.2])
     monkeypatch.setattr(rtl.time, "monotonic", lambda: next(times))
     monkeypatch.setattr(rtl.time, "sleep", lambda _: None)
     result = rtl.run_sha256d_rtl_self_test(timeout_seconds=0.1)
