@@ -93,11 +93,11 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
     def test_status_http_route_is_bound_to_status_payload_not_budget_helper(self):
         status_routes = [
             route for route in router.routes
-            if getattr(route, "path", None) == "/status"
+            if getattr(route, "path", None) == "/api/bitcoin-mining/status"
             and "GET" in (getattr(route, "methods", set()) or set())
         ]
         self.assertEqual(len(status_routes), 1)
-        self.assertEqual(router.prefix + status_routes[0].path, "/api/bitcoin-mining/status")
+        self.assertEqual(status_routes[0].path, "/api/bitcoin-mining/status")
         self.assertIs(status_routes[0].endpoint, bitcoin_mining_status)
         payload = status_routes[0].endpoint()
         self.assertEqual(payload["execution_mode"], "ANALYSIS_AND_DRY_RUN_ONLY")
