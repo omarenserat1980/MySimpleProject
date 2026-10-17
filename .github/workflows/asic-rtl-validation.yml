@@ -4,12 +4,24 @@ on:
   pull_request:
     paths:
       - "brain_v12/asic/**"
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/brain/bitcoin_stratum_bridge.py"
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_stratum_bridge.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - ".github/workflows/asic-rtl-validation.yml"
   push:
     branches:
       - "feature/advanced-asic-prototype"
     paths:
       - "brain_v12/asic/**"
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/brain/bitcoin_stratum_bridge.py"
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_stratum_bridge.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - ".github/workflows/asic-rtl-validation.yml"
   workflow_dispatch:
 
@@ -113,6 +125,16 @@ jobs:
           python -m pytest brain_v12/tests/test_asic_hardware_simulator.py -q \
             | tee artifacts/asic/software-simulator-tests.log
           grep -Eq "[0-9]+ passed" artifacts/asic/software-simulator-tests.log
+
+      - name: Validate live-mining safety gates and evidence contract
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            brain_v12/tests/test_bitcoin_mining_evidence_gate.py \
+            brain_v12/tests/test_bitcoin_stratum_bridge.py \
+            brain_v12/tests/test_termux_bitcoin_worker.py \
+            | tee artifacts/asic/live-mining-safety-tests.log
+          grep -Eq "[0-9]+ passed" artifacts/asic/live-mining-safety-tests.log
 
       - name: Synthesize RTL with Yosys
         run: |
