@@ -92,7 +92,7 @@ def test_stratum_prevhash_normalizer_rejects_invalid_width():
 def test_fixed_width_header_fields_reject_embedded_whitespace():
     with pytest.raises(ValueError, match="INVALID_VERSION_HEX"):
         build_header_candidate(
-            version_hex="01 000000",
+            version_hex="01 00000",
             prevhash_wire_hex="00" * 32,
             merkle_root_raw=b"\x11" * 32,
             ntime_hex="02000000",
@@ -137,7 +137,7 @@ def test_target_comparison_is_inclusive_at_exact_boundary():
     ("field", "value", "expected"),
     [
         ("version_hex", "0100000g", "INVALID_VERSION_HEX"),
-        ("ntime_hex", "02 000000", "INVALID_NTIME_HEX"),
+        ("ntime_hex", "020 0000", "INVALID_NTIME_HEX"),
         ("nbits_hex", "ffff00zz", "INVALID_NBITS_HEX"),
         ("prevhash_wire_hex", "00" * 15 + "  " + "00" * 16, "INVALID_PREVHASH_WIRE_HEX"),
     ],
