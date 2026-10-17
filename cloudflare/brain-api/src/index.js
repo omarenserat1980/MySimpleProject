@@ -569,7 +569,6 @@ async function verifySignedSettlementEvidence(request, env, requestOrigin, allow
   } catch {
     return json({ ok: false, error: "SETTLEMENT_REFERENCE_CONFLICT", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
   }
-  }
   return json({
     ok: true,
     state: "REVENUE_REALIZED",
