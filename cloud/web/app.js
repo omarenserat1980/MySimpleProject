@@ -14,8 +14,25 @@ async function first(paths){let last;for(const p of paths){try{return await requ
 function setView(id){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===id));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===id));const b=document.querySelector('nav button[data-view="'+id+'"]');$("title").textContent=b?b.textContent:"Brain Cloud"}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
 function renderList(el,data,label="item"){const arr=Array.isArray(data)?data:(data?.items||data?.tasks||data?.agents||data?.events||[]);el.innerHTML=arr.length?arr.slice(0,100).map(x=>'<div class="item"><b>'+esc(x.name||x.title||x.task_id||x.id||label)+'</b><span class="badge">'+esc(x.status||x.state||x.risk||"INFO")+'</span></div>').join(""):'<div class="empty">لا توجد بيانات متاحة.</div>'}
+async function loadAttestationStatus(){
+ const state=$("attestationState"), detail=$("attestationDetail"), checks=$("attestationChecks");
+ if(!state||!detail||!checks)return;
+ try{
+  const d=await request("/api/cloud-executor/attestation/status");
+  const verified=d.live_attestation_verified===true && d.executor_connected===true;
+  state.textContent=verified?"ATTESTED":(d.configuration_ready===true?"CONFIGURED / NOT LIVE":"UNVERIFIED");
+  detail.textContent=d.evidence_note||"لا يوجد إثبات اتصال حي.";
+  checks.textContent=JSON.stringify(d.checks||{},null,2);
+  state.className=verified?"ok":"badge";
+ }catch(e){
+  state.textContent="UNVERIFIED";
+  detail.textContent="تعذر قراءة حالة الاعتماد من الخادم: "+e.message;
+  checks.textContent="لا يوجد دليل حي. لا تُفسّر حالة RUNNING على أنها اعتماد.";
+  state.className="badge";
+ }
+}
 async function refresh(){if(!api){setConn(false,"API غير مضبوط");$("overview").textContent="افتح الإعدادات وأدخل عنوان Brain API.";return}
-try{const s=await first(endpoints.state);setConn(true,"متصل");$("state").textContent=s.status||s.state||s.service||"READY";$("stateDetail").textContent=s.mode||"Cloud API";$("overview").textContent=JSON.stringify(s,null,2);$("evidence").textContent=s.evidence?.status||s.evidence_status||"GATED";try{$("taskCount").textContent=(await first(endpoints.tasks)).length??"—"}catch{$("taskCount").textContent="—"}try{$("agentCount").textContent=((await first(endpoints.agents)).agents||await first(endpoints.agents)).length??"—"}catch{$("agentCount").textContent="—"}$("guards").innerHTML=["No secrets in browser","External actions require authorization","Evidence required for success","Fail closed on missing API"].map(x=>'<div class="item"><span>'+x+'</span><span class="ok">✓</span></div>').join("")}catch(e){setConn(false,"API غير متاح");$("overview").textContent="فشل الاتصال: "+e.message}}
+loadAttestationStatus();try{const s=await first(endpoints.state);setConn(true,"متصل");$("state").textContent=s.status||s.state||s.service||"READY";$("stateDetail").textContent=s.mode||"Cloud API";$("overview").textContent=JSON.stringify(s,null,2);$("evidence").textContent=s.evidence?.status||s.evidence_status||"GATED";try{$("taskCount").textContent=(await first(endpoints.tasks)).length??"—"}catch{$("taskCount").textContent="—"}try{$("agentCount").textContent=((await first(endpoints.agents)).agents||await first(endpoints.agents)).length??"—"}catch{$("agentCount").textContent="—"}$("guards").innerHTML=["No secrets in browser","External actions require authorization","Evidence required for success","Fail closed on missing API"].map(x=>'<div class="item"><span>'+x+'</span><span class="ok">✓</span></div>').join("")}catch(e){setConn(false,"API غير متاح");$("overview").textContent="فشل الاتصال: "+e.message}}
 async function loadTasks(){try{renderList($("tasksList"),await first(endpoints.tasks),"task")}catch(e){$("tasksList").innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
 async function loadAgents(){try{renderList($("agentsList"),await first(endpoints.agents),"agent")}catch(e){$("agentsList").innerHTML='<div class="empty">'+esc(e.message)+'</div>'}}
 async function loadAudit(){try{$("auditRaw").textContent=JSON.stringify(await first(endpoints.audit),null,2)}catch(e){$("auditRaw").textContent=e.message}}
