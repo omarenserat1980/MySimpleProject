@@ -1,5 +1,7 @@
+import os
 import unittest
 from brain_v12.brain.income_lifecycle import IncomeLifecycle
+from brain_v12.brain.commerce_api import payment_authority_proof
 
 
 class FakeStore:
@@ -33,6 +35,9 @@ class FakeStore:
 
 class IncomeLifecycleTests(unittest.TestCase):
     def setUp(self):
+        self.secret = "income-test-secret"
+        self.previous_secret = os.environ.get("BRAIN_PAYMENT_WEBHOOK_SECRET")
+        os.environ["BRAIN_PAYMENT_WEBHOOK_SECRET"] = self.secret
         self.store=FakeStore()
         self.store.upsert_income_opportunity({
             "opportunity_id":"LIVE-test",
@@ -78,7 +83,9 @@ class IncomeLifecycleTests(unittest.TestCase):
         req=self.life.request_payment("LIVE-test", 25, currency="JOD", order_id="ORDER-1")
         self.assertEqual(req["status"], "PAYMENT_REQUESTED")
         self.assertEqual(self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")["status"], "ALREADY_REQUESTED")
-        recon=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-001",{"evidence_ref":"provider-reference-001","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-001"},order_id="ORDER-1")
+        evidence={"evidence_ref":"provider-reference-001","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-001"}
+        evidence["authority_proof"] = payment_authority_proof(self.secret, "ORDER-1", "TX-001", "test", "evt-001")
+        recon=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-001",evidence,order_id="ORDER-1")
         self.assertEqual(recon["status"], "RECONCILED")
         self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "REVENUE_REALIZED")
         self.assertEqual(self.life.realize_revenue("LIVE-test")["status"], "ALREADY_REALIZED")
