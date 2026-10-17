@@ -6,6 +6,8 @@ from typing import Any, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .sha256d_execution_contract import layer_status_snapshot
+
 
 PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = {PROTOCOL_VERSION, "2025-11-25", "2025-06-18"}
@@ -78,6 +80,17 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "count": len(events),
         }
 
+    def sha256d_layers_handler(_: dict[str, Any]) -> dict[str, Any]:
+        """Read the shared Arabic SHA-256d status contract; no execution side effects."""
+        snapshot = layer_status_snapshot()
+        return {
+            "ok": True,
+            "source": "electronic-brain",
+            "contract_version": snapshot["contract_version"],
+            "sha256d_layers": snapshot,
+            "execution_started": False,
+        }
+
     def chat_handler(arguments: dict[str, Any]) -> dict[str, Any]:
         message = str(arguments.get("message", "")).strip()
         if not message:
@@ -116,6 +129,12 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "additionalProperties": False,
         },
         evidence_handler,
+    )
+    register(
+        "brain.sha256d_layers",
+        "Read Arabic SHA-256d CPU/RTL/MCP layer statuses and separate external pool/revenue evidence gates. Read-only; starts no simulation or mining.",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+        sha256d_layers_handler,
     )
     register(
         "brain.chat",
