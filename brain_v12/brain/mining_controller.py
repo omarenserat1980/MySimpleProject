@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+import math
 import os
 import platform
 import shutil
@@ -116,14 +117,47 @@ def profitability_gate(
     hardware_cost_per_hour: float = 0.0,
     minimum_margin: float = 0.0,
 ) -> dict[str, Any]:
-    net = gross_revenue_per_hour - electricity_cost_per_hour - pool_fee_per_hour - hardware_cost_per_hour
-    margin = (net / gross_revenue_per_hour) if gross_revenue_per_hour > 0 else -1.0
-    return {
+    """Calculate a hypothetical estimate; reject invalid numeric inputs.
+
+    This is only an estimate based on caller-supplied values, not proof of
+    current mining revenue, pool acceptance, payout, or realized profit.
+    """
+    values = {
         "gross_revenue_per_hour": gross_revenue_per_hour,
-        "cost_per_hour": electricity_cost_per_hour + pool_fee_per_hour + hardware_cost_per_hour,
+        "electricity_cost_per_hour": electricity_cost_per_hour,
+        "pool_fee_per_hour": pool_fee_per_hour,
+        "hardware_cost_per_hour": hardware_cost_per_hour,
+        "minimum_margin": minimum_margin,
+    }
+    for name, value in values.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError(f"{name} must be a finite number")
+    for name in (
+        "gross_revenue_per_hour",
+        "electricity_cost_per_hour",
+        "pool_fee_per_hour",
+        "hardware_cost_per_hour",
+        "minimum_margin",
+    ):
+        if values[name] < 0:
+            raise ValueError(f"{name} must be non-negative")
+
+    gross = float(gross_revenue_per_hour)
+    electricity = float(electricity_cost_per_hour)
+    pool_fee = float(pool_fee_per_hour)
+    hardware = float(hardware_cost_per_hour)
+    threshold = float(minimum_margin)
+    total_cost = electricity + pool_fee + hardware
+    net = gross - total_cost
+    margin = net / gross if gross > 0 else -1.0
+    return {
+        "gross_revenue_per_hour": gross,
+        "cost_per_hour": total_cost,
         "net_per_hour": round(net, 8),
         "margin": round(margin, 6),
-        "profitable": net > minimum_margin,
+        "profitable": gross > 0 and net > threshold,
+        "estimate_only": True,
+        "realized_revenue_verified": False,
     }
 
 
