@@ -173,6 +173,31 @@ jobs:
           print("BRAIN_TASK_API_IDEMPOTENCY=PASS")
           print("BRAIN_TASK_API_ALLOWLIST=PASS")
           print("BRAIN_TASK_API_STATUS_LOOKUP=PASS")
-          print("BRAIN_BOUNDED_CONSUMER_HTTP_E2E=PASS")
+          print("BRAIN_BOUNDED_CONSUMER_HEALTH_E2E=PASS")
+
+          # Simulation status must never be reported as real mining or revenue.
+          status6, submitted_sim = task_request("POST", "/api/tasks",
+              {"taskType": "simulation_status", "arguments": {"probe": "ci-simulation"}},
+              {"Idempotency-Key": "ci-job-sim-1"})
+          assert status6 == 202, f"expected 202 for simulation task, got {status6}: {submitted_sim}"
+          simulation_id = submitted_sim["task"]["taskId"]
+          simulation_detail = None
+          for _ in range(15):
+              status7, simulation_detail = task_request("GET", "/api/tasks/" + simulation_id)
+              assert status7 == 200 and simulation_detail["task"]["taskId"] == simulation_id, (status7, simulation_detail)
+              if simulation_detail["task"]["status"] == "succeeded":
+                  break
+              if simulation_detail["task"]["status"] in ("failed", "cancelled"):
+                  raise SystemExit(f"simulation task did not succeed: {simulation_detail}")
+              time.sleep(1)
+          assert simulation_detail["task"]["status"] == "succeeded", f"simulation consumer did not complete task: {simulation_detail}"
+          simulation_result = json.loads(simulation_detail["task"]["resultJson"])
+          assert simulation_result.get("mode") == "SIMULATOR", simulation_result
+          assert simulation_result.get("network_access_performed") is False, simulation_result
+          assert simulation_result.get("real_mining_verified") is False, simulation_result
+          assert simulation_result.get("accepted_shares_verified") is False, simulation_result
+          assert simulation_result.get("revenue_verified") is False, simulation_result
+          assert simulation_result.get("evidence_level") == "SIMULATION_STATUS_ONLY", simulation_result
+          print("BRAIN_BOUNDED_CONSUMER_SIMULATION_E2E=PASS")
           PY
           docker logs brain-cloud-worker-auth-smoke
