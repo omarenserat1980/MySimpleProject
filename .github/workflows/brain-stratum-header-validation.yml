@@ -5,12 +5,14 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/stratum_v1_offline_candidate.py"
+      - "brain_v12/brain/stratum_candidate_pipeline.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "brain_v12/brain/stratum_v1_jobs.py"
       - "brain_v12/brain/stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_offline_session_simulator.py"
       - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
+      - "brain_v12/tests/test_stratum_candidate_pipeline.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - ".github/workflows/brain-stratum-header-validation.yml"
@@ -19,12 +21,14 @@ on:
       - main
     paths:
       - "brain_v12/brain/stratum_v1_offline_candidate.py"
+      - "brain_v12/brain/stratum_candidate_pipeline.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "brain_v12/brain/stratum_v1_jobs.py"
       - "brain_v12/brain/stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_offline_session_simulator.py"
       - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
+      - "brain_v12/tests/test_stratum_candidate_pipeline.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - ".github/workflows/brain-stratum-header-validation.yml"
@@ -56,13 +60,15 @@ jobs:
             brain_v12/brain/stratum_v1_jobs.py \
             brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/brain/stratum_v1_offline_candidate.py \
+            brain_v12/brain/stratum_candidate_pipeline.py \
             brain_v12/tests/test_bitcoin_header.py \
             brain_v12/tests/test_stratum_v1_jobs.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
             brain_v12/tests/test_stratum_v1_offline_session_simulator.py \
-            brain_v12/tests/test_stratum_v1_offline_candidate.py
+            brain_v12/tests/test_stratum_v1_offline_candidate.py \
+            brain_v12/tests/test_stratum_candidate_pipeline.py
       - name: Run offline Stratum-to-header tests
-        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_bitcoin_header.py brain_v12/tests/test_stratum_v1_jobs.py brain_v12/tests/test_stratum_v1_protocol.py brain_v12/tests/test_stratum_v1_offline_session_simulator.py brain_v12/tests/test_stratum_v1_offline_candidate.py
+        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_bitcoin_header.py brain_v12/tests/test_stratum_v1_jobs.py brain_v12/tests/test_stratum_v1_protocol.py brain_v12/tests/test_stratum_v1_offline_session_simulator.py brain_v12/tests/test_stratum_v1_offline_candidate.py brain_v12/tests/test_stratum_candidate_pipeline.py
       - name: Verify offline-only evidence contract
         run: |
           python - <<'PY'
@@ -96,5 +102,25 @@ jobs:
           assert result["share_submitted"] is False
           assert result["pool_acceptance_verified"] is False
           assert result["revenue_verified"] is False
+          from brain_v12.brain.stratum_candidate_pipeline import prepare_and_search_job
+          from brain_v12.brain.stratum_v1_jobs import StratumJob
+          job = StratumJob.from_notify([
+              "ci-bounded-job", "00" * 32, "01020304", "aabbccdd", [],
+              "01000000", "ffff001d", "29ab5f49", True,
+          ])
+          bounded = prepare_and_search_job(
+              job, extranonce1_hex="a1b2", extranonce2_hex="c3d4",
+              extranonce2_size=2, prevhash_wire_hex="00" * 32,
+              share_target=(1 << 256) - 1, start_nonce=0, max_hashes=1,
+          )
+          assert bounded.execution_mode == "OFFLINE_BOUNDED_SHA256D"
+          assert bounded.transport_connected is False
+          assert bounded.credentials_loaded is False
+          assert bounded.live_execution_allowed is False
+          assert bounded.pool_contacted is False
+          assert bounded.share_submitted is False
+          assert bounded.pool_acceptance_verified is False
+          assert bounded.revenue_verified is False
+          assert bounded.evidence_class == "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY"
           print("OFFLINE_ONLY_EVIDENCE_BOUNDARY=PASS")
           PY
