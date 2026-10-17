@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080d18">
+<title>BRAIN AVATAR — Human Presence</title>
+<style>
+:root{color-scheme:dark;--bg:#080d18;--panel:#111a2b;--line:#263550;--text:#edf4ff;--muted:#a8b6ce;--cyan:#72e3ee;--violet:#a89aff;--green:#70e1b0;--amber:#ffd27b}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#1a2850 0,transparent 52%),var(--bg);color:var(--text);font:16px/1.7 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+main{width:min(100% - 28px,980px);margin:auto;padding:24px 0 42px}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px}.brand{font-weight:900;letter-spacing:.04em}.eyebrow{color:var(--cyan);font-size:.8rem;font-weight:800}.sub{color:var(--muted);font-size:.92rem}.layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(260px,.9fr);gap:16px;margin-top:18px}.panel{background:#111a2beF;border:1px solid var(--line);border-radius:20px;padding:20px;min-width:0}.stage{min-height:390px;display:grid;place-items:center;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 48%,#1b3651 0,transparent 52%),#0b1322}.orb{width:min(72vw,280px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 24%,#354d78,#17223e 58%,#10182c);border:1px solid #647ba6;box-shadow:0 0 70px #4a83b933,inset 0 0 28px #8edce522;position:relative}.face{width:58%;height:69%;border-radius:48% 48% 43% 43%;background:linear-gradient(145deg,#dce9f8,#9db4d7 70%,#748fb9);position:relative;box-shadow:inset -12px -8px 20px #344a6d44;transition:transform .25s,filter .25s}.face:before{content:"";position:absolute;left:13%;right:13%;top:13%;height:20%;border-radius:50%;background:#526b96;opacity:.6}.eyes{position:absolute;top:39%;left:17%;right:17%;display:flex;justify-content:space-between}.eye{width:24%;height:9px;background:#14213b;border-radius:50%;position:relative}.eye:after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:#9ef6ff;top:2px;left:35%;box-shadow:0 0 9px #8bf3ff}.mouth{position:absolute;left:35%;right:35%;top:70%;height:5px;border-radius:0 0 12px 12px;background:#3b5077;transition:all .2s}.status-chip{position:absolute;bottom:18px;right:18px;border:1px solid #38536c;border-radius:999px;background:#0a1423d9;padding:5px 11px;color:var(--cyan);font-size:.82rem}.orb:after{content:"";position:absolute;inset:9%;border:1px solid #a0c8ff22;border-radius:50%;pointer-events:none}.face[data-state="LISTENING"]{filter:brightness(1.07)}.face[data-state="THINKING"]{transform:rotate(-3deg) scale(.98)}.face[data-state="SPEAKING"] .mouth{height:17px;left:39%;right:39%;border-radius:50%;background:#273c60}.face[data-state="SUCCESS"]{filter:brightness(1.15) saturate(1.1);transform:scale(1.02)}.face[data-state="UNCERTAIN"]{transform:rotate(4deg)}.face[data-state="ERROR"]{filter:grayscale(.55) brightness(.8)}.face[data-state="IDLE"] .eye{height:7px}.controls{display:grid;gap:12px}.field{display:grid;gap:5px}label{font-weight:700}select,input[type=text]{width:100%;padding:11px 12px;border-radius:10px;border:1px solid #354866;background:#0a1220;color:var(--text);font:inherit}button{padding:10px 13px;border-radius:11px;border:1px solid #46617e;background:#182742;color:var(--text);font:inherit;font-weight:750;cursor:pointer}button:hover{border-color:var(--cyan)}button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.row{display:flex;gap:8px;flex-wrap:wrap}.row button{flex:1}.notice{border:1px solid #33415a;border-radius:12px;padding:12px;color:var(--muted);font-size:.9rem}.state-line{font-weight:800;color:var(--green)}.foot{margin-top:16px;color:var(--muted);font-size:.85rem}
+@media(max-width:720px){.layout{grid-template-columns:1fr}.stage{min-height:330px}.panel{padding:16px}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main>
+<header><div><div class="eyebrow">ELECTRONIC BRAIN · DIGITAL PRESENCE</div><div class="brand">BRAIN AVATAR</div><div class="sub">واجهة تجريبية مستقلة — لا تدّعي أنها متصلة بالعقل الحي</div></div><div class="sub" id="connection" role="status" aria-live="polite">الاتصال بالنواة: جارٍ التحقق…</div></header>
+<div class="layout">
+<section class="panel">
+<div class="stage" aria-label="عرض الوجه الرقمي">
+<div class="orb" role="img" aria-label="وجه رقمي تجريبي">
+<div class="face" id="face" data-state="IDLE" aria-hidden="true"><div class="eyes"><span class="eye"></span><span class="eye"></span></div><div class="mouth"></div></div>
+</div><div class="status-chip" id="chip">IDLE · مستعد</div>
+</div>
+<p class="foot">هذا وجه رقمي مرسوم محليًا باستخدام CSS، وليس صورة شخص حقيقي ولا دليلًا على وعي أو مشاعر ذاتية.</p>
+</section>
+<section class="panel">
+<h2 style="margin-top:0">التحكم بالحضور</h2>
+<div class="controls">
+<div class="field"><label><input id="liveMode" type="checkbox" checked> مزامنة الحالة مع Brain الحي</label><div class="sub">عند التفعيل، تستبدل حالة الوجه الاختيار اليدوي بآخر حالة مؤكدة من واجهة API.</div></div>
+<div class="field"><label for="state">حالة الوجه</label><select id="state">
+<option value="IDLE">IDLE — انتظار</option><option value="LISTENING">LISTENING — استماع</option><option value="THINKING">THINKING — تفكير</option><option value="SPEAKING">SPEAKING — تحدث</option><option value="SUCCESS">SUCCESS — نجاح</option><option value="UNCERTAIN">UNCERTAIN — عدم يقين</option><option value="ERROR">ERROR — خطأ</option>
+</select></div>
+<div class="field"><label for="label">اسم العرض الاختياري</label><input id="label" type="text" maxlength="48" placeholder="Electronic Brain"></div>
+<div class="row"><button id="apply" type="button">تطبيق الحالة</button><button id="reset" type="button">إعادة الضبط</button></div>
+<div class="notice"><strong>HUMAN_PRESENCE</strong><br>الحالة الحالية: <span class="state-line" id="stateText">IDLE</span><br>مصدر الحالة: اختيار يدوي داخل هذه الصفحة، وليس من محرك Brain.</div>
+<div class="notice">نبضة HUMAN_PRESENCE: <strong id="pulseText">بانتظار التحقق</strong><br>تُحفظ حالة النبضة في ذاكرة Brain، ويُقيّد التقييم بدقيقة واحدة على الأكثر. نجاح النبضة لا يعني أن عرض الوجه على الشاشة قد تم التحقق منه مستقلًا.</div>
+<div class="notice">لا تستخدم الصفحة الكاميرا أو الميكروفون أو التعرف على الوجوه، ولا تتصل بأي خدمة خارجية.</div>
+</div>
+</section>
+</div>
+<div class="foot">خطوة أولية قابلة للفحص · لا مكتبات خارجية · تعمل دون إنترنت · تدعم الهاتف وتقليل الحركة</div>
+</main>
+<script>
+(function(){
+const face=document.getElementById('face'),state=document.getElementById('state'),chip=document.getElementById('chip'),stateText=document.getElementById('stateText'),label=document.getElementById('label'),connection=document.getElementById('connection'),liveMode=document.getElementById('liveMode'),applyButton=document.getElementById('apply'),pulseText=document.getElementById('pulseText');
+let lastLiveState=null, polling=false;
+function readPref(key,fallback){try{const value=window.localStorage.getItem(key);return value===null?fallback:value;}catch(_error){return fallback;}}
+function savePref(key,value){try{window.localStorage.setItem(key,value);}catch(_error){/* private browsing/storage-disabled mode remains usable */}}
+const names={IDLE:'مستعد',LISTENING:'استماع',THINKING:'تفكير',SPEAKING:'تحدث',SUCCESS:'نجاح',UNCERTAIN:'عدم يقين',ERROR:'خطأ'};
+label.value=readPref('brain.avatar.label','');
+state.value=readPref('brain.avatar.manualState','IDLE');
+if(!Object.prototype.hasOwnProperty.call(names,state.value))state.value='IDLE';
+liveMode.checked=readPref('brain.avatar.liveMode','true')!=='false';
+function render(s){face.dataset.state=s;chip.textContent=s+' · '+names[s];stateText.textContent=s;}
+function apply(){const s=state.value;render(s);savePref('brain.avatar.manualState',s);savePref('brain.avatar.label',label.value);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';}
+async function pollLiveState(){
+ if(!liveMode.checked||polling)return;
+ polling=true;
+ try{
+  const response=await fetch('/api/brain-avatar/state',{headers:{'Accept':'application/json'},cache:'no-store'});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const data=await response.json();
+  if(!data||typeof data.state!=='string'||!names[data.state])throw new Error('Invalid status payload');
+  lastLiveState=data.state;render(data.state);
+  connection.textContent='Brain: '+(data.brain_status||'UNKNOWN')+' · API متصلة';
+  connection.style.color=data.brain_alive?'var(--green)':'var(--amber)';
+  const pulse=data.human_presence_pulse;
+  if(pulseText)pulseText.textContent=pulse?(pulse.visual_state||pulse.last_render_status||'حالة غير معروفة'):'لم تُرجع API حالة النبضة';
+ }catch(_error){
+  lastLiveState=null;connection.textContent='Brain: تعذّر التحقق من الحالة الحية';
+  connection.style.color='var(--amber)';if(pulseText)pulseText.textContent='تعذّر التحقق';render('UNCERTAIN');
+ }finally{polling=false;}
+}
+function syncControls(){
+ const manual=!liveMode.checked;
+ state.disabled=!manual;applyButton.disabled=!manual;
+ if(liveMode.checked)pollLiveState();else{connection.textContent='الوضع اليدوي · لا توجد مزامنة حية';connection.style.color='var(--muted)';apply();}
+}
+document.getElementById('apply').addEventListener('click',apply);
+document.getElementById('reset').addEventListener('click',()=>{state.value='IDLE';label.value='';liveMode.checked=false;savePref('brain.avatar.liveMode','false');syncControls();apply();});
+state.addEventListener('change',apply);label.addEventListener('input',()=>{savePref('brain.avatar.label',label.value);document.title=(label.value.trim()||'BRAIN AVATAR')+' — Human Presence';});
+liveMode.addEventListener('change',()=>{savePref('brain.avatar.liveMode',String(liveMode.checked));syncControls();});
+apply();syncControls();window.setInterval(pollLiveState,5000);
+})();
+</script>
+</body>
+</html>
