@@ -11,6 +11,8 @@ const jobsMigration = fs.readFileSync("migrations/0006_jobs.sql", "utf8");
 const cinemaMigration = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
+assert.match(worker, /delivery_artifact_policy/, "health must report delivery artifact policy readiness");
+assert.match(worker, /deliveryOrigins\.length > 0 \? "CONFIGURED" : "NOT_CONFIGURED"/, "health readiness must reflect the artifact origin allowlist");
 assert.match(worker, /PAYTABS_SERVER_KEY/);
 assert.match(worker, /Signature/);
 assert.match(worker, /HMAC/);
