@@ -11,11 +11,13 @@ import sys
 SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "brain_micro_executor_doctor.py"
 
 
-def make_repo(root: Path) -> None:
+def make_repo(root: Path, *, optional: bool = False) -> None:
     (root / ".git").mkdir()
     (root / "brain_v12" / "tools").mkdir(parents=True)
     (root / "brain_v12" / "app.py").write_text("# app\n", encoding="utf-8")
     (root / "brain_v12" / "tools" / "brain_runtime_launcher.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    if optional:
+        (root / "brain_v12" / "tools" / "brain_device_bridge_doctor.py").write_text("# optional\n", encoding="utf-8")
 
 
 def run_doctor(root: Path) -> subprocess.CompletedProcess[str]:
@@ -50,3 +52,34 @@ def test_doctor_fails_when_required_file_is_missing(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     required = [item for item in payload["checks"] if item["name"].startswith("required_file:")]
     assert any(not item["ok"] for item in required)
+
+
+def test_doctor_reports_optional_file_when_present(tmp_path: Path) -> None:
+    make_repo(tmp_path, optional=True)
+    result = run_doctor(tmp_path)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    optional = [item for item in payload["checks"] if item["name"] == "optional_file:brain_v12/tools/brain_device_bridge_doctor.py"]
+    assert len(optional) == 1
+    assert optional[0]["ok"] is True
+    assert optional[0]["detail"] == "present"
+
+
+def test_doctor_auto_detects_repository_root_from_working_directory(tmp_path: Path) -> None:
+    make_repo(tmp_path)
+    env = os.environ.copy()
+    env["PREFIX"] = "/data/data/com.termux/files/usr"
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--json"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    root_check = next(item for item in payload["checks"] if item["name"] == "repository_root")
+    assert root_check["ok"] is True
+    assert root_check["detail"] == str(tmp_path)
