@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>سجل إنجازات برين</title>
+<style>
+:root{--ink:#172033;--muted:#667085;--line:#d8dee8;--paper:#fff;--bg:#eef1f5;--blue:#244a78;--green:#16794b;--amber:#9a6700;--red:#b42318}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,Arial,sans-serif;line-height:1.65}
+.toolbar{max-width:210mm;margin:18px auto 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px}
+.toolbar button{border:1px solid #b8c2d1;border-radius:8px;background:#fff;color:var(--ink);padding:9px 13px;font:inherit;cursor:pointer}
+.toolbar button:focus-visible{outline:3px solid #8bb8f0}
+.sheet{width:210mm;min-height:297mm;margin:0 auto 24px;padding:16mm 15mm;background:var(--paper);box-shadow:0 8px 30px #18223018}
+header{border-bottom:2px solid var(--blue);padding-bottom:14px;margin-bottom:18px}
+.eyebrow{font-size:11px;letter-spacing:.04em;color:var(--blue);font-weight:bold}
+h1{font-size:25px;margin:4px 0 2px} .sub{color:var(--muted);font-size:12px}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px}.stat small{display:block;color:var(--muted);font-size:11px}.stat strong{font-size:18px}
+.section-title{font-size:15px;margin:22px 0 10px;border-right:4px solid var(--blue);padding-right:9px}
+.timeline{position:relative;padding-right:22px}.timeline:before{content:"";position:absolute;right:7px;top:6px;bottom:8px;width:2px;background:var(--line)}
+.event{position:relative;border:1px solid var(--line);border-radius:8px;padding:11px 13px;margin:0 0 11px;break-inside:avoid;background:#fff}
+.event:before{content:"";position:absolute;right:-21px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--blue);border:2px solid white;box-shadow:0 0 0 1px var(--blue)}
+.event-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.event h3{font-size:14px;margin:0 0 4px;overflow-wrap:anywhere}.time{font-size:10px;color:var(--muted);white-space:nowrap}
+.tag{display:inline-block;border-radius:4px;padding:1px 7px;font-size:10px;background:#edf2f8;color:var(--blue);margin:4px 0}
+.detail{font-size:12px;color:#344054;overflow-wrap:anywhere}.detail dl{display:grid;grid-template-columns:95px 1fr;gap:2px 8px;margin:7px 0 0}.detail dt{color:var(--muted)}.detail dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.notice{border:1px solid var(--line);background:#f8fafc;border-radius:8px;padding:12px;font-size:12px;color:#475467}
+.status{font-size:11px}.good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+footer{margin-top:26px;padding-top:10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+@media(max-width:760px){.toolbar{margin:10px;padding:0}.sheet{width:100%;min-height:100vh;padding:22px 16px;margin:0;box-shadow:none}.summary{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:8px 6px}.stat strong{font-size:15px}.event-top{display:block}.time{display:block;white-space:normal}.detail dl{grid-template-columns:78px 1fr}}
+@page{size:A4;margin:0}
+@media print{body{background:white}.toolbar{display:none}.sheet{width:210mm;min-height:297mm;margin:0;padding:14mm 14mm;box-shadow:none}.event{break-inside:avoid}.event:before{print-color-adjust:exact;-webkit-print-color-adjust:exact}a{color:inherit;text-decoration:none}}
+</style>
+</head>
+<body>
+<div class="toolbar" aria-label="أدوات العرض">
+<span class="status" id="loadState" role="status" aria-live="polite">جارٍ قراءة السجل…</span>
+<div><button type="button" id="refresh">تحديث القراءة</button> <button type="button" id="print">طباعة / حفظ PDF</button></div>
+</div>
+<main class="sheet">
+<header>
+<div class="eyebrow">ELECTRONIC BRAIN · READ-ONLY AUDIT</div>
+<h1>سجل إنجازات وعمليات برين</h1>
+<div class="sub">تسلسل زمني للأحداث المسجلة في النظام — للقراءة فقط</div>
+<div class="sub" id="generatedAt">وقت إنشاء العرض: —</div>
+</header>
+<section class="summary" aria-label="ملخص السجل">
+<div class="stat"><small>الأحداث المعروضة</small><strong id="eventCount">—</strong></div>
+<div class="stat"><small>حالة واجهة برين</small><strong id="brainStatus">—</strong></div>
+<div class="stat"><small>مصدر البيانات</small><strong style="font-size:13px">سجل API</strong></div>
+</section>
+<h2 class="section-title">تسلسل العمليات والإجراءات</h2>
+<div id="timeline" class="timeline" aria-live="polite">
+<div class="notice">جارٍ تحميل الأحداث المسجلة من واجهة برين…</div>
+</div>
+<h2 class="section-title">حدود هذا التقرير</h2>
+<div class="notice">هذه الصفحة لا تنفذ أوامر ولا تعدّل البيانات. تعرض فقط ما تعيده واجهات القراءة المتاحة. ظهور حدث في السجل لا يعني وحده نجاحه؛ يجب قراءة نوع الحدث وتفاصيله. إذا لم تُسجّل عملية، فلن تُعرض كإنجاز مثبت. بيانات Azure لا تُستنتج من سجل الأحداث، ويجب التحقق منها عبر مصدر Azure موثوق.</div>
+<footer><span>برين — تقرير قراءة فقط</span><span id="footerTime">—</span></footer>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+  const pretty = value => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "object") { try { return JSON.stringify(value, null, 2); } catch { return String(value); } }
+    return String(value);
+  };
+  const pick = (obj, keys) => { for (const key of keys) if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== "") return obj[key]; return null; };
+  const timeOf = event => pick(event, ["created_at","timestamp","time","datetime","occurred_at","createdAt","ts"]);
+  const dateText = raw => {
+    if (raw === null) return "الوقت غير مسجل";
+    let d = typeof raw === "number" ? new Date(raw < 1e12 ? raw * 1000 : raw) : new Date(raw);
+    return Number.isNaN(d.getTime()) ? String(raw) : d.toLocaleString("ar-JO",{dateStyle:"medium",timeStyle:"medium"});
+  };
+  const summarize = event => {
+    const type = pick(event, ["kind","type","event_type","name","action"]) || "حدث مسجل";
+    let payload = pick(event, ["payload","data","details","metadata","context"]);
+    if (typeof payload === "string") { try { payload = JSON.parse(payload); } catch { /* preserve non-JSON payload as text */ } }
+    const details = [];
+    if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+      for (const [key,value] of Object.entries(payload).slice(0,12)) details.push([key,pretty(value)]);
+    } else if (payload !== null) details.push(["التفاصيل",pretty(payload)]);
+    for (const key of ["id","status","run_id","goal","objective","message","result","source"]) {
+      if (event[key] !== undefined && event[key] !== null && event[key] !== "") details.push([key,pretty(event[key])]);
+    }
+    return {type,details,rawTime:timeOf(event)};
+  };
+  const renderEvents = events => {
+    const host = $("timeline");
+    $("eventCount").textContent = String(events.length);
+    if (!events.length) {
+      host.innerHTML = '<div class="notice">لا توجد أحداث في استجابة السجل الحالية. هذا لا يثبت أن النظام لم ينفذ عمليات؛ قد يكون السجل فارغًا أو أن الواجهة لا تعيد أحداثًا.</div>';
+      return;
+    }
+    const items = events.map((event,index) => ({event,index,...summarize(event)}));
+    items.sort((a,b) => {
+      const ta = a.rawTime == null ? NaN : new Date(typeof a.rawTime === "number" ? (a.rawTime < 1e12 ? a.rawTime*1000 : a.rawTime) : a.rawTime).getTime();
+      const tb = b.rawTime == null ? NaN : new Date(typeof b.rawTime === "number" ? (b.rawTime < 1e12 ? b.rawTime*1000 : b.rawTime) : b.rawTime).getTime();
+      if (Number.isNaN(ta) && Number.isNaN(tb)) return a.index-b.index;
+      if (Number.isNaN(ta)) return 1; if (Number.isNaN(tb)) return -1; return ta-tb;
+    });
+    host.innerHTML = items.map((item,i) => {
+      const status = pick(item.event,["status","result_status"]);
+      const details = item.details.length ? '<dl>'+item.details.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join("")+'</dl>' : '<div>لا توجد تفاصيل إضافية في سجل هذا الحدث.</div>';
+      return '<article class="event"><div class="event-top"><div><h3>'+esc((i+1)+". "+item.type)+'</h3><span class="tag">'+esc(status || "مسجل")+'</span></div><time class="time">'+esc(dateText(item.rawTime))+'</time></div><div class="detail">'+details+'</div></article>';
+    }).join("");
+  };
+  async function load() {
+    $("loadState").textContent = "جارٍ قراءة البيانات…";
+    $("timeline").innerHTML = '<div class="notice">جارٍ الاتصال بواجهات القراءة…</div>';
+    $("generatedAt").textContent = "وقت إنشاء العرض: "+new Date().toLocaleString("ar-JO");
+    $("footerTime").textContent = "تم توليد العرض محليًا";
+    let eventError = null;
+    try {
+      const response = await fetch("/api/events",{method:"GET",headers:{"Accept":"application/json"},cache:"no-store"});
+      if (!response.ok) throw new Error("HTTP "+response.status);
+      const data = await response.json();
+      const events = Array.isArray(data) ? data : (Array.isArray(data.events) ? data.events : []);
+      renderEvents(events);
+      $("loadState").textContent = "تمت قراءة سجل الأحداث";
+      $("loadState").className = "status good";
+    } catch (error) {
+      eventError = error;
+      $("timeline").innerHTML = '<div class="notice">تعذر قراءة سجل الأحداث: '+esc(error.message)+'. لم تُعرض بيانات تجريبية.</div>';
+      $("eventCount").textContent = "—";
+      $("loadState").textContent = "تعذر تحميل السجل";
+      $("loadState").className = "status bad";
+    }
+    try {
+      const response = await fetch("/api/system/status",{method:"GET",headers:{"Accept":"application/json"},cache:"no-store"});
+      if (!response.ok) throw new Error("HTTP "+response.status);
+      const data = await response.json();
+      $("brainStatus").textContent = pick(data,["status","stage","version"]) ? [pick(data,["status","stage"]),pick(data,["version"])].filter(Boolean).join(" · ") : "استجابة متاحة";
+    } catch { $("brainStatus").textContent = "غير متاح"; }
+    if (eventError) $("loadState").title = eventError.message;
+  }
+  $("refresh").addEventListener("click",load);
+  $("print").addEventListener("click",()=>window.print());
+  load();
+})();
+</script>
+</body>
+</html>
