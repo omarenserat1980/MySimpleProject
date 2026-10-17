@@ -1,16 +1,18 @@
-name: BRAIN ASIC Software Board Simulator
+name: BRAIN ASIC Digital Board Bench
 
 on:
   pull_request:
     paths:
-      - "brain_v12/asic/unit_001/board_simulator.py"
-      - "brain_v12/asic/unit_001/test_board_simulator.py"
+      - "brain_v12/asic/unit_001/**"
+      - "brain_v12/asic/rtl/**"
+      - "brain_v12/asic/sha256d_lab.py"
       - ".github/workflows/brain-asic-board-simulator.yml"
   push:
     branches: [main, "feat/brain-asic-001-board-simulator"]
     paths:
-      - "brain_v12/asic/unit_001/board_simulator.py"
-      - "brain_v12/asic/unit_001/test_board_simulator.py"
+      - "brain_v12/asic/unit_001/**"
+      - "brain_v12/asic/rtl/**"
+      - "brain_v12/asic/sha256d_lab.py"
       - ".github/workflows/brain-asic-board-simulator.yml"
   workflow_dispatch:
 
@@ -18,15 +20,33 @@ permissions:
   contents: read
 
 jobs:
-  simulator-test:
+  digital-board-bench:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout Brain source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run software board simulator
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y iverilog
+          iverilog -V
+          vvp -V
+      - name: Run explicit software board model
         run: python brain_v12/asic/unit_001/board_simulator.py --json
-      - name: Test evidence boundaries and SHA-256d known answer
+      - name: Test model and evidence boundaries
         run: python -m unittest brain_v12.asic.unit_001.test_board_simulator -v
+      - name: Run actual RTL known-answer and nonce tests
+        run: python brain_v12/asic/unit_001/run_unit.py
+      - name: Upload digital evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-asic-001-digital-board-evidence
+          path: artifacts/asic-unit-001/
+          if-no-files-found: warn
+          retention-days: 30
