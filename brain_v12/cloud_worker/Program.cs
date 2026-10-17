@@ -22,6 +22,7 @@ builder.Services.AddSingleton<DurableFileTaskQueue>(services =>
         path = "/var/lib/brain/task-queue.json";
     return new DurableFileTaskQueue(path);
 });
+builder.Services.AddHostedService<BoundedTaskConsumer>();
 builder.Services.AddHostedService<BrainSupervisorWorker>();
 builder.Services.AddHostedService<VideoWorker>();
 builder.Services.AddHostedService<MiningWorker>();
