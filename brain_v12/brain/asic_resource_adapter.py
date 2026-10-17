@@ -289,9 +289,26 @@ class ASICResourceAdapter:
             raise PermissionError("SIMULATION_MODE_REQUIRED")
         task = self.tasks.create(f"SHA256d RTL self-test {resource_id}")
         self.tasks.update(task["id"], "RUNNING")
-        result = run_sha256d_rtl_self_test(
-            timeout_seconds=timeout_seconds, cancel_check=cancel_check
-        )
+        try:
+            result = run_sha256d_rtl_self_test(
+                timeout_seconds=timeout_seconds, cancel_check=cancel_check
+            )
+        except Exception as exc:
+            result = {
+                "contract_version": "brain.sha256d.execution.v1",
+                "algorithm": "SHA-256d",
+                "execution_mode": "RTL_SIMULATION",
+                "status": "RTL_ADAPTER_EXCEPTION",
+                "error_code": type(exc).__name__,
+                "rtl_executed": False,
+                "software_hashing_substituted": False,
+                "physical_asic_executed": False,
+                "pool_contacted": False,
+                "share_submitted": False,
+                "pool_acceptance_verified": False,
+                "revenue_verified": False,
+                "evidence_status": "BLOCKED",
+            }
         payload = {
             "resource_id": resource_id,
             "resource_type": "ASIC",
@@ -308,6 +325,7 @@ class ASICResourceAdapter:
         verification = self.evidence.verify_hash(evidence["evidence_id"])
         completed = self.tasks.verify_and_complete(task["id"], verification, evidence["evidence_id"])
         if completed.get("status") != "COMPLETED":
+            self.tasks.fail(task["id"], "EVIDENCE_VERIFICATION_FAILED", evidence["evidence_id"])
             return {"task": self.tasks.tasks[task["id"]], "result": payload,
                     "evidence_ref": evidence["evidence_id"],
                     "evidence_sha256": evidence["sha256"],
