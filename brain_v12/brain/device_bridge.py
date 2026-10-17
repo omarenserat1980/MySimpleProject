@@ -43,9 +43,10 @@ class DeviceBridge:
     def enabled(self):
         """Return the runtime feature switch, independent of credentials or device presence."""
         raw = os.getenv(ENABLE_ENV)
-        if raw is None:
-            # Runtime bridge stays available by default. Authentication is a
-            # separate gate; deployments can explicitly disable this feature.
+        if raw is None or not raw.strip():
+            # Missing/blank means the runtime bridge is available by default.
+            # Authentication is a separate gate; deployments can explicitly
+            # disable this feature with a false-like value.
             return True
         return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
