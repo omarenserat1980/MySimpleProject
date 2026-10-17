@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from typing import Any, Callable
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+from .render_cat_channel import RenderCatReadOnlyChannel
 
 
 PROTOCOL_VERSION = "2026-07-28"
@@ -93,6 +97,80 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "error": result.error,
         }
 
+    def communication_channels_handler(_: dict[str, Any]) -> dict[str, Any]:
+        """Report declared channel readiness without initiating external traffic."""
+        try:
+            device_status = device_bridge.agent_status()
+            device_ok = True
+        except Exception as exc:
+            device_status = {"status": "DEVICE_STATUS_ERROR", "error": str(exc)[:200]}
+            device_ok = False
+        render_cat = RenderCatReadOnlyChannel().status()
+        return {
+            "ok": True,
+            "source": "electronic-brain",
+            "read_only": True,
+            "channels": [
+                {
+                    "id": "mcp",
+                    "status": "IN_PROCESS",
+                    "detail": "MCP tools are served by this router; remote auth is enforced by the mcp_server wrapper.",
+                },
+                {
+                    "id": "render-cat",
+                    "status": ("NOT_CONFIGURED" if not render_cat["configured"] else ("CONFIGURED_NOT_PROBED" if render_cat["configuration_valid"] else "INVALID_CONFIGURATION")),
+                    "detail": "HTTPS GET-only diagnostics; HTTP response alone does not prove service identity.",
+                    "configuration": render_cat,
+                },
+                {
+                    "id": "device-bridge",
+                    "status": "STATUS_AVAILABLE" if device_ok else "STATUS_ERROR",
+                    "detail": "Reports bridge state only; does not queue or execute a device task.",
+                    "device": device_status,
+                },
+                {
+                    "id": "brain-mouse",
+                    "status": "LOCAL_EMULATOR_ONLY",
+                    "detail": "Repository policy disables real GitHub, Render, external network, physical devices, and remote execution.",
+                },
+                {
+                    "id": "github-actions",
+                    "status": "EXTERNAL_CONNECTOR_NOT_RUNTIME_BRIDGE",
+                    "detail": "GitHub workflow evidence is read through GitHub integration; this MCP tool does not trigger workflows.",
+                },
+            ],
+            "external_side_effects": False,
+        }
+
+    def render_cat_probe_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        path = str(arguments.get("path", "/health"))
+        # RenderCatReadOnlyChannel accepts only a strict endpoint allowlist and
+        # performs GET requests only. No endpoint or credentials can be supplied
+        # by tool arguments.
+        return RenderCatReadOnlyChannel().get(path)
+
+    register(
+        "brain.communication_channels",
+        "Read the readiness of Brain communication channels without initiating external traffic or device work.",
+        {"type": "object", "properties": {}, "additionalProperties": False},
+        communication_channels_handler,
+    )
+    register(
+        "brain.render_cat_probe",
+        "Perform one bounded HTTPS GET against an allowlisted Render Cat diagnostics endpoint. Requires server-side BRAIN_RENDER_CAT_BASE_URL; never deploys or mutates provider state.",
+        {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "enum": ["/health", "/api/deploy/identity", "/api/brain-hub/config", "/api/brain-hub/actions"],
+                }
+            },
+            "additionalProperties": False,
+        },
+        render_cat_probe_handler,
+    )
+
     register(
         "brain.status",
         "Read the current Electronic Brain status and governed capabilities.",
@@ -129,6 +207,17 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         chat_handler,
     )
 
+    def auth_error(request: Request) -> JSONResponse | None:
+        """Protect the router itself, including when mounted by app.py directly."""
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse({"ok": False, "status": "MCP_NOT_CONFIGURED"}, status_code=503)
+        authorization = request.headers.get("authorization", "")
+        supplied = authorization.removeprefix("Bearer ").strip() if authorization.startswith("Bearer ") else ""
+        if not supplied or not hmac.compare_digest(supplied, expected):
+            return JSONResponse({"ok": False, "status": "MCP_AUTH_REQUIRED"}, status_code=401)
+        return None
+
     def rpc_result(request_id: Any, result: dict[str, Any]) -> JSONResponse:
         return JSONResponse({"jsonrpc": "2.0", "id": request_id, "result": result})
 
@@ -143,6 +232,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.get("/mcp")
     async def mcp_get(request: Request):
+        denied = auth_error(request)
+        if denied is not None:
+            return denied
         # Stateless MCP does not require an event stream for these read-only
         # request/response tools. A GET is kept for discovery/health clients.
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
@@ -161,13 +253,10 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
+        denied = auth_error(request)
+        if denied is not None:
+            return denied
         version = request.headers.get("MCP-Protocol-Version")
-        if version not in SUPPORTED_PROTOCOL_VERSIONS:
-            return JSONResponse(
-                {"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"},
-                status_code=400,
-                headers={"MCP-Protocol-Version": PROTOCOL_VERSION},
-            )
 
         try:
             body = await request.json()
@@ -180,6 +269,16 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         method = str(body.get("method", ""))
         request_id = body.get("id")
         params = body.get("params") or {}
+        # MCP initialization negotiates the version in its JSON-RPC params;
+        # the protocol-version header is expected on subsequent requests.
+        if method == "initialize" and not version:
+            version = str(params.get("protocolVersion", ""))
+        if version not in SUPPORTED_PROTOCOL_VERSIONS:
+            return JSONResponse(
+                {"error": "UNSUPPORTED_MCP_PROTOCOL_VERSION"},
+                status_code=400,
+                headers={"MCP-Protocol-Version": PROTOCOL_VERSION},
+            )
 
         if method == "initialize":
             if version == PROTOCOL_VERSION:

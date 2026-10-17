@@ -8,6 +8,8 @@ This is a read-first MCP surface for Electronic Brain.
 - `brain_device_status`
 - `brain_evidence`
 - `brain_chat`
+- `brain.communication_channels` (read-only channel inventory)
+- `brain.render_cat_probe` (bounded HTTPS GET to an allowlisted diagnostics path)
 
 The MCP surface does not create agent keys, change Android permissions, execute arbitrary shell commands, or replace the existing Brain app.
 
