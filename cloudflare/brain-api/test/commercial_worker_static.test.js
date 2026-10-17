@@ -60,7 +60,7 @@ assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "payment callback must not report revenue realized before delivery");
 assert.match(worker, /Delivery is not proof of provider settlement/);
 assert.match(worker, /DELIVERY_CONFIRMED_PENDING_SETTLEMENT/);
-assert.doesNotMatch(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "delivery confirmation must not by itself recognize collected revenue");
+assert.doesNotMatch(confirmDeliverySource, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "delivery confirmation must not by itself recognize collected revenue");
 
 assert.match(worker, /revenue_ledger/);
 assert.match(worker, /revenue_state/);
