@@ -46,6 +46,18 @@ def test_cancellation_is_checked_between_batches():
     assert result.next_nonce == 2
 
 
+def test_timeout_is_checked_before_each_batch(monkeypatch):
+    import brain_v12.brain.bounded_pow_task_engine as engine
+
+    ticks = iter([10.0, 50.0])
+    monkeypatch.setattr(engine.time, "monotonic", lambda: next(ticks))
+    result = run_bounded_pow_task(
+        bytes(80), 1, max_total_hashes=10, batch_hashes=2, timeout_seconds=1
+    )
+    assert result.status == "TIMED_OUT"
+    assert result.hashes_checked == 0
+
+
 def test_nonce_space_exhaustion_does_not_wrap():
     result = run_bounded_pow_task(
         bytes(80), 1, start_nonce=0xFFFFFFFF,
