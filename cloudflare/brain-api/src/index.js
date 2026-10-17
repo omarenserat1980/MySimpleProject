@@ -501,11 +501,23 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   const jobId = String(body.job_id || "").trim();
   const evidence = body.evidence;
   const artifactUrl = String(body.artifact_url || "").trim();
-  if (!jobId || !evidence || (typeof evidence !== "string" && typeof evidence !== "object")) return json({ ok: false, error: "RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const evidenceObject = evidence && typeof evidence === "object" && !Array.isArray(evidence) ? evidence : null;
+  const artifactHash = String(evidenceObject?.artifact_sha256 || "").trim().toLowerCase();
+  let parsedArtifactUrl;
+  try { parsedArtifactUrl = new URL(artifactUrl); } catch {}
+  if (!jobId || !evidenceObject || Object.keys(evidenceObject).length === 0) {
+    return json({ ok: false, error: "STRUCTURED_RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
+  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname) {
+    return json({ ok: false, error: "HTTPS_ARTIFACT_URL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
+  if (!/^[a-f0-9]{64}$/.test(artifactHash)) {
+    return json({ ok: false, error: "ARTIFACT_SHA256_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
   const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
-  const evidenceText = typeof evidence === "string" ? evidence : JSON.stringify(evidence);
+  const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
   await env.BRAIN_DB.prepare("UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ?").bind(evidenceText, jobId).run();
   const deliveryId = "DEL-" + crypto.randomUUID().toUpperCase();
   await env.BRAIN_DB.prepare(
