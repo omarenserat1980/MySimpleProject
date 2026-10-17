@@ -1,0 +1,55 @@
+name: BRAIN-ASIC-001 Standalone Unit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/asic/unit_001/**"
+      - "brain_v12/asic/rtl/**"
+      - "brain_v12/asic/sha256d_lab.py"
+      - ".github/workflows/brain-asic-unit-001.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/asic/unit_001/**"
+      - "brain_v12/asic/rtl/**"
+      - "brain_v12/asic/sha256d_lab.py"
+      - ".github/workflows/brain-asic-unit-001.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-asic-unit-001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-001:
+    name: Isolated unit contract and RTL evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install open-source RTL simulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y iverilog
+          iverilog -V
+          vvp -V
+
+      - name: Test standalone evidence gate
+        run: python3 -m unittest discover -s brain_v12/asic/unit_001 -p 'test_*.py' -v
+
+      - name: Run BRAIN-ASIC-001 RTL lab through isolated entry point
+        run: python3 brain_v12/asic/unit_001/run_unit.py
+
+      - name: Upload unit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-asic-001-unit-evidence
+          path: artifacts/asic-unit-001/
+          if-no-files-found: warn
+          retention-days: 30
