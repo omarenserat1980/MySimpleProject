@@ -67,6 +67,13 @@ class InternalTaskRuntime:
         started = time.time()
         try:
             metadata = item.get("metadata") or {}
+            if item["capability"] in {
+                "windows-server-2025-real-boot",
+                "windows-server-2025-cloud",
+                "windows-server-2025-cloud-native",
+                "windows-native-agent",
+            }:
+                raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
             risk = str(metadata.get("risk", "LOW")).upper()
             if risk in {"HIGH", "CRITICAL"}:
                 if self.leadership_store is None:

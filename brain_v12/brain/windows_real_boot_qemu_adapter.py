@@ -27,14 +27,7 @@ class WindowsRealBootQemuAdapter:
         self.runner=runner or InternalRunner()
 
     def authorize(self, contract_path:str|None=None)->dict:
-        evidence=load_and_verify(contract_path)
-        c=evidence["contract"]
-        if c.get("capability")!=CAPABILITY:
-            raise RuntimeError("WINDOWS_QEMU_ADAPTER_CAPABILITY_INVALID")
-        if c.get("executor")!=EXECUTOR:
-            raise RuntimeError("WINDOWS_QEMU_ADAPTER_EXECUTOR_INVALID")
-        self.runner.require("qemu")
-        return evidence
+        raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
 
     def build_command(self, *, os_disk:str,evidence_disk:str,proof_iso:str,ovmf_vars:str,
                       qmp_socket:str="qmp.sock",serial_log:str="qemu-serial.log",

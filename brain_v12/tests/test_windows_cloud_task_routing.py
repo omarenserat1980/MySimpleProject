@@ -32,7 +32,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
 
     def test_windows_task_requires_explicit_cloud_executor(self):
         with self.assertRaisesRegex(
-            RuntimeError, "WINDOWS_CLOUD_NATIVE_REQUIRES_NATIVE_CLOUD_EXECUTOR"
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
         ):
             self.gateway.authorize_task(
                 "windows-server-2025-cloud-native",
@@ -41,7 +41,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
 
     def test_windows_task_requires_runtime_evidence(self):
         with self.assertRaisesRegex(
-            RuntimeError, "WINDOWS_CLOUD_RUNTIME_EVIDENCE_REQUIRED"
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
         ):
             self.gateway.authorize_task(
                 "windows-server-2025-cloud-native",
@@ -51,7 +51,7 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
     def test_stale_cloud_runtime_is_blocked_by_task_authorization(self):
         node = dict(self.node)
         node["last_heartbeat"] = 800.0
-        with self.assertRaisesRegex(RuntimeError, "WINDOWS_CLOUD_HEARTBEAT_STALE"):
+        with self.assertRaisesRegex(RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"):
             self.gateway.authorize_task(
                 "windows-server-2025-cloud-native",
                 {
@@ -84,42 +84,37 @@ class WindowsCloudTaskRoutingTests(unittest.TestCase):
                 result = runtime.run_one()
             self.assertEqual(result["state"], "BLOCKED")
             self.assertIn(
-                "WINDOWS_REAL_BOOT_REQUIRES_DEDICATED_QEMU_WORKFLOW",
+                "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
                 result["error"],
             )
             cloud_run.assert_not_called()
 
-    def test_local_runtime_routes_windows_task_to_cloud_adapter(self):
-        runtime = InternalTaskRuntime(
-            root=".brain/test-windows-cloud-routing",
-            gateway=self.gateway,
-        )
-        runtime.enqueue(
-            "windows-task",
-            ["echo", "must-not-run-locally"],
-            capability="windows-server-2025-cloud-native",
-            metadata={
-                "executor": "windows-server-2025-cloud",
-                "vm": self.vm,
-                "node": self.node,
-                "heartbeat_timeout": 120.0,
-                "now": 1000.0,
-            },
-        )
-        fake = {
-            "ok": True, "state": "SUCCESS", "job_id": "job-1",
-            "executor": "windows-server-2025-cloud", "verified_runtime": True,
-            "evidence": [{"returncode": 0}],
-        }
-        with patch(
-            "brain_v12.brain.internal_task_runtime.WindowsCloudTaskExecutor.run",
-            return_value=fake,
-        ):
-            result = runtime.run_one()
-        self.assertEqual(result["state"], "COMPLETED")
-        self.assertEqual(result["executor"], "windows-server-2025-cloud")
-        self.assertEqual(result["job_id"], "job-1")
-
+    def test_local_runtime_blocks_windows_cloud_task(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            runtime = InternalTaskRuntime(root=root, gateway=self.gateway)
+            runtime.enqueue(
+                "windows-task",
+                ["echo", "must-not-run-locally"],
+                capability="windows-server-2025-cloud-native",
+                metadata={
+                    "executor": "windows-server-2025-cloud",
+                    "vm": self.vm,
+                    "node": self.node,
+                    "heartbeat_timeout": 120.0,
+                    "now": 1000.0,
+                },
+            )
+            with patch(
+                "brain_v12.brain.internal_task_runtime.WindowsCloudTaskExecutor.run"
+            ) as cloud_run:
+                result = runtime.run_one()
+            self.assertEqual(result["state"], "BLOCKED")
+            self.assertIn(
+                "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+                result["error"],
+            )
+            cloud_run.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,21 +29,20 @@ class WindowsCloudExecutionGatewayTests(unittest.TestCase):
             ],
         }
 
-    def test_fresh_guest_heartbeat_authorizes_windows_cloud(self):
-        decision = self.gateway.authorize_windows_cloud(
-            self.vm,
-            self.node(990.0),
-            heartbeat_timeout=120.0,
-            now=1000.0,
-        )
-        self.assertEqual(decision.executor, "windows-server-2025-cloud")
-        self.assertEqual(decision.capability, WINDOWS_CLOUD_NATIVE)
-        self.assertTrue(decision.verified)
-        self.assertEqual(decision.reason, "WINDOWS_CLOUD_NATIVE_RUNTIME_VERIFIED")
+    def test_fresh_guest_heartbeat_does_not_enable_real_windows_cloud(self):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
+            self.gateway.authorize_windows_cloud(
+                self.vm,
+                self.node(990.0),
+                heartbeat_timeout=120.0,
+                now=1000.0,
+            )
 
     def test_stale_guest_heartbeat_is_blocked(self):
         with self.assertRaisesRegex(
-            RuntimeError, "WINDOWS_CLOUD_HEARTBEAT_STALE"
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
         ):
             self.gateway.authorize_windows_cloud(
                 self.vm,
@@ -56,7 +55,7 @@ class WindowsCloudExecutionGatewayTests(unittest.TestCase):
         node = self.node(990.0)
         node["node_id"] = "different-node"
         with self.assertRaisesRegex(
-            RuntimeError, "WINDOWS_CLOUD_VM_ID_MISMATCH"
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
         ):
             self.gateway.authorize_windows_cloud(
                 self.vm,

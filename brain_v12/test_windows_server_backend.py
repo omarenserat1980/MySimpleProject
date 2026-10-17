@@ -35,20 +35,24 @@ class _FakeResponse:
 
 
 class QemuWindowsBackendTests(unittest.TestCase):
-    def test_command_contract(self):
+    def test_real_qemu_command_is_disabled(self):
         b = QemuWindowsBackend(
             disk_path="/brain/windows.raw",
             iso_path="/brain/WindowsServer2025.iso",
         )
-        cmd = b.command(True)
-        self.assertEqual(cmd[0], "qemu-system-x86_64")
-        self.assertIn("-cdrom", cmd)
-        self.assertIn("/brain/WindowsServer2025.iso", cmd)
-
-    def test_no_media_is_rejected(self):
-        b = QemuWindowsBackend(disk_path="/brain/windows.raw")
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             b.command(True)
+
+    def test_backend_reports_simulation_only(self):
+        result = QemuWindowsBackend().run()
+        self.assertFalse(result["ok"])
+        self.assertEqual(
+            result["status"], "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        )
+        self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
+        self.assertFalse(result["real_windows_boot_verified"])
 
     def test_remote_iso_url_downloads_on_executor_and_verifies_hash(self):
         body = b"synthetic test media"
@@ -83,7 +87,9 @@ class QemuWindowsBackendTests(unittest.TestCase):
             disk_path="/brain/windows.raw",
             iso_url="https://download.microsoft.com/example.iso",
         )
-        with self.assertRaisesRegex(ValueError, "ISO_SHA256_REQUIRED"):
+        with self.assertRaisesRegex(
+            RuntimeError, "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY"
+        ):
             b.prepare_iso()
 
 
