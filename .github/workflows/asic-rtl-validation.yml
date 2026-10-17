@@ -4,6 +4,11 @@ on:
   pull_request:
     paths:
       - "brain_v12/asic/**"
+      - "brain_v12/brain/brain_mcp.py"
+      - "brain_v12/brain/sha256d_rtl_adapter.py"
+      - "brain_v12/brain/sha256d_execution_contract.py"
+      - "brain_v12/tests/test_sha256d_mcp_contract.py"
+      - "brain_v12/tests/test_sha256d_rtl_adapter.py"
       - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
       - "brain_v12/brain/bitcoin_stratum_bridge.py"
       - "brain_v12/brain/termux_bitcoin_worker.py"
@@ -13,6 +18,7 @@ on:
       - ".github/workflows/asic-rtl-validation.yml"
   push:
     branches:
+      - "main"
       - "feature/advanced-asic-prototype"
     paths:
       - "brain_v12/asic/**"
