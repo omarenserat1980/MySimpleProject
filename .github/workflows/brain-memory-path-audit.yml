@@ -1,0 +1,40 @@
+name: Brain memory path audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/**"
+      - "docs/**"
+      - "tools/audit_brain_memory_paths.py"
+      - "tools/test_audit_brain_memory_paths.py"
+      - ".github/workflows/brain-memory-path-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile audit scripts
+        run: python -m py_compile tools/audit_brain_memory_paths.py tools/test_audit_brain_memory_paths.py
+      - name: Run regression tests
+        run: python -m unittest -v tools/test_audit_brain_memory_paths.py
+      - name: Run read-only source audit
+        run: python tools/audit_brain_memory_paths.py > brain-memory-audit-report.json
+      - name: Validate report JSON
+        run: python -m json.tool brain-memory-audit-report.json > /dev/null
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-memory-audit-report
+          path: brain-memory-audit-report.json
+          if-no-files-found: error
