@@ -6,10 +6,20 @@ from unittest.mock import patch
 
 from brain_v12.brain.termux_bitcoin_worker import (
     build_command, validate_pool_url, _positive_int, parse_miner_line, main,
+    supervisor_exit_code,
 )
 
 
 class TermuxBitcoinWorkerTests(unittest.TestCase):
+    def test_expected_duration_limit_is_success_even_when_terminated_by_signal(self):
+        self.assertEqual(supervisor_exit_code("duration_limit", -15), 0)
+        self.assertEqual(supervisor_exit_code("duration_limit", 0), 0)
+
+    def test_unexpected_exit_and_thermal_stop_are_not_success(self):
+        self.assertEqual(supervisor_exit_code("process_exit", 0), 1)
+        self.assertEqual(supervisor_exit_code("thermal_limit", -15), 1)
+        self.assertEqual(supervisor_exit_code("user_interrupt", 130), 130)
+
     def test_builds_sha256d_command_with_bounded_threads(self):
         command = build_command(
             "/usr/bin/cpuminer", "stratum+tcp://pool.example:3333",
