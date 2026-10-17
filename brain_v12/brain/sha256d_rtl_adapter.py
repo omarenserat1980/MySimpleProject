@@ -191,6 +191,7 @@ def run_rtl_smoke(
                 layer="rtl_simulator", status="TIMEOUT", error_code="OVERALL_TIMEOUT",
                 evidence={
                     "case": case,
+                    "phase": "simulation",
                     "top_module": spec["top"],
                     "compiler": Path(iverilog).name,
                     "simulator": Path(vvp).name,
