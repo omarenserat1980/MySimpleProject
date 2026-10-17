@@ -1,0 +1,257 @@
+name: Standalone Windows Server 2022 Boot Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      timeout_minutes:
+        description: "Maximum time to install and verify Windows Server 2022"
+        required: true
+        default: "55"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-windows-server-2022-standalone-boot
+  cancel-in-progress: false
+
+jobs:
+  standalone_boot:
+    # This workflow tests an isolated Windows guest only. It does not run Brain
+    # tasks, request a Brain execution contract, or replace the protected 2025 path.
+    runs-on: [self-hosted, linux, x64, qemu, windows-real-boot]
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight isolated VM host
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in qemu-system-x86_64 qemu-img xorriso wimlib-imagex mkfs.vfat mcopy curl; do
+            command -v "$tool" >/dev/null || { echo "MISSING_TOOL=$tool"; exit 2; }
+          done
+          test -c /dev/kvm && test -r /dev/kvm && test -w /dev/kvm || {
+            echo "BLOCKED: KVM acceleration is unavailable"; exit 2;
+          }
+          test -s /usr/share/OVMF/OVMF_CODE_4M.fd
+          test -s /usr/share/OVMF/OVMF_VARS_4M.fd
+          df -h .
+          free -h
+          echo "STANDALONE_VM_PREFLIGHT=PASS"
+
+      - name: Download official Microsoft evaluation ISO
+        shell: bash
+        run: |
+          set -euo pipefail
+          ISO_URL='https://go.microsoft.com/fwlink/p/?LinkID=2195174&clcid=0x409&culture=en-us&country=US'
+          curl -fL --retry 3 --retry-delay 3 "$ISO_URL" -o windows-server-2022.iso
+          test -s windows-server-2022.iso
+          xorriso -indev windows-server-2022.iso -toc 2>&1 | tee iso-toc.txt
+          grep -Eq 'ISO 9660|El Torito' iso-toc.txt
+          sha256sum windows-server-2022.iso | tee windows-server-2022.iso.sha256
+
+      - name: Inspect Server 2022 image and prepare unattended media
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/ws2022
+          sudo mount -o loop,ro windows-server-2022.iso /mnt/ws2022
+          trap 'sudo umount /mnt/ws2022 || true' EXIT
+          image_file=""
+          if [ -f /mnt/ws2022/sources/install.wim ]; then
+            image_file=/mnt/ws2022/sources/install.wim
+          elif [ -f /mnt/ws2022/sources/install.esd ]; then
+            image_file=/mnt/ws2022/sources/install.esd
+          else
+            echo "BLOCKED: install.wim/install.esd not found"
+            exit 2
+          fi
+          wimlib-imagex info "$image_file" | tee wim-info.txt
+          image_index="$(awk '
+            /^Index:/ {idx=$2}
+            tolower($0) ~ /^name:.*windows server 2022.*serverdatacenter.*desktop experience/ {print idx; exit}
+          ' wim-info.txt)"
+          if [ -z "$image_index" ]; then
+            image_index="$(awk '
+              /^Index:/ {idx=$2}
+              tolower($0) ~ /^name:.*windows server 2022.*serverstandard.*desktop experience/ {print idx; exit}
+            ' wim-info.txt)"
+          fi
+          if [ -z "$image_index" ]; then
+            image_index="$(awk '
+              /^Index:/ {idx=$2}
+              tolower($0) ~ /^name:.*windows server 2022.*serverdatacenter/ {print idx; exit}
+            ' wim-info.txt)"
+          fi
+          if [ -z "$image_index" ]; then
+            image_index="$(awk '
+              /^Index:/ {idx=$2}
+              tolower($0) ~ /^name:.*windows server 2022.*serverstandard/ {print idx; exit}
+            ' wim-info.txt)"
+          fi
+          test -n "$image_index" || { echo "BLOCKED: no Windows Server 2022 image index found"; grep -E '^(Index|Name):' wim-info.txt || true; exit 2; }
+          printf '%s\n' "$image_index" > windows-image-index.txt
+          sudo umount /mnt/ws2022
+          trap - EXIT
+
+          rm -rf /tmp/brain-ws2022-oem
+          oem_scripts='/tmp/brain-ws2022-oem/$OEM$/$$/Setup/Scripts'
+          mkdir -p "$oem_scripts"
+          cat > "$oem_scripts/brain-windows-2022-evidence.ps1" <<'PS'
+          $ErrorActionPreference = 'Stop'
+          $deadline = (Get-Date).AddMinutes(10)
+          $vol = $null
+          while ((Get-Date) -lt $deadline -and -not $vol) {
+            $vol = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'BRAIN_EVIDENCE' -and $_.DriveLetter } | Select-Object -First 1
+            if (-not $vol) { Start-Sleep -Seconds 5 }
+          }
+          if (-not $vol) { exit 20 }
+          $os = Get-CimInstance Win32_OperatingSystem
+          $ok = ($os.Caption -match 'Windows Server 2022')
+          $root = "$($vol.DriveLetter):\\"
+          $evidence = [ordered]@{
+            schema = 'BRAIN-STANDALONE-WINDOWS-BOOT-1'
+            status = if ($ok) { 'WINDOWS_SERVER_2022_BOOT_VERIFIED' } else { 'OS_MISMATCH' }
+            collected_at = (Get-Date).ToUniversalTime().ToString('o')
+            os_caption = $os.Caption
+            os_version = $os.Version
+            os_build = $os.BuildNumber
+            architecture = $env:PROCESSOR_ARCHITECTURE
+            boot_time = $os.LastBootUpTime
+            computer_name = $env:COMPUTERNAME
+          }
+          $evidence | ConvertTo-Json -Depth 5 | Set-Content -Path ($root + 'windows-server-2022-boot-evidence.json') -Encoding UTF8
+          if (-not $ok) { exit 21 }
+          'WINDOWS_SERVER_2022_BOOT_VERIFIED' | Set-Content -Path ($root + 'WINDOWS_SERVER_2022_BOOT_VERIFIED') -Encoding ASCII
+          PS
+          cat > "$oem_scripts/SetupComplete.cmd" <<'CMD'
+          @echo off
+          %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SystemRoot%\Setup\Scripts\brain-windows-2022-evidence.ps1"
+          exit /b 0
+          CMD
+          image_index="$(cat windows-image-index.txt)"
+          BRAIN_AUTOPASS="$(python3 - <<'PY'
+          import secrets, string
+          rng=secrets.SystemRandom()
+          symbols='!@#%+=_-'
+          chars=[rng.choice(string.ascii_lowercase),rng.choice(string.ascii_uppercase),rng.choice(string.digits),rng.choice(symbols)]
+          chars.extend(rng.choice(string.ascii_letters+string.digits+symbols) for _ in range(28))
+          rng.shuffle(chars)
+          print(''.join(chars))
+          PY
+          )"
+          export BRAIN_AUTOPASS
+          cat > /tmp/brain-ws2022-oem/Autounattend.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <settings pass="windowsPE">
+              <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <SetupUILanguage><UILanguage>en-US</UILanguage></SetupUILanguage><InputLocale>en-US</InputLocale><SystemLocale>en-US</SystemLocale><UILanguage>en-US</UILanguage><UserLocale>en-US</UserLocale>
+              </component>
+              <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <DiskConfiguration><Disk wcm:action="add"><DiskID>0</DiskID><WillWipeDisk>true</WillWipeDisk><CreatePartitions>
+                  <CreatePartition wcm:action="add"><Order>1</Order><Type>EFI</Type><Size>100</Size></CreatePartition>
+                  <CreatePartition wcm:action="add"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>
+                  <CreatePartition wcm:action="add"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>
+                </CreatePartitions><ModifyPartitions>
+                  <ModifyPartition wcm:action="add"><Order>1</Order><PartitionID>1</PartitionID><Format>FAT32</Format><Label>System</Label></ModifyPartition>
+                  <ModifyPartition wcm:action="add"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>
+                  <ModifyPartition wcm:action="add"><Order>3</Order><PartitionID>3</PartitionID><Format>NTFS</Format><Label>Windows</Label><Letter>C</Letter></ModifyPartition>
+                </ModifyPartitions></Disk><WillShowUI>OnError</WillShowUI></DiskConfiguration>
+                <ImageInstall><OSImage><InstallFrom><MetaData wcm:action="add"><Key>/IMAGE/INDEX</Key><Value>$image_index</Value></MetaData></InstallFrom><InstallTo><DiskID>0</DiskID><PartitionID>3</PartitionID></InstallTo></OSImage></ImageInstall>
+                <UserData><AcceptEula>true</AcceptEula></UserData>
+              </component>
+            </settings>
+            <settings pass="oobeSystem">
+              <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                <OOBE><HideEULAPage>true</HideEULAPage><ProtectYourPC>3</ProtectYourPC><SkipMachineOOBE>true</SkipMachineOOBE></OOBE>
+                <AutoLogon><Password><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></Password><Enabled>true</Enabled><LogonCount>1</LogonCount><Username>Administrator</Username></AutoLogon>
+                <UserAccounts><AdministratorPassword><Value>${BRAIN_AUTOPASS}</Value><PlainText>true</PlainText></AdministratorPassword></UserAccounts>
+                <FirstLogonCommands><SynchronousCommand wcm:action="add"><Order>1</Order><CommandLine>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\brain-windows-2022-evidence.ps1</CommandLine><Description>Collect isolated Windows Server 2022 boot evidence</Description><RequiresUserInput>false</RequiresUserInput></SynchronousCommand></FirstLogonCommands>
+              </component>
+            </settings>
+          </unattend>
+          XML
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse('/tmp/brain-ws2022-oem/Autounattend.xml')
+          print('AUTOUNATTEND_XML=VALID')
+          PY
+          xorriso -indev windows-server-2022.iso -outdev brain-windows-server-2022-proof.iso -boot_image any replay \
+            -map /tmp/brain-ws2022-oem/Autounattend.xml /Autounattend.xml \
+            -map "$oem_scripts" "/sources/\$OEM\$/\$\$/Setup/Scripts" -commit
+          test -s brain-windows-server-2022-proof.iso
+          sha256sum brain-windows-server-2022-proof.iso | tee proof-iso.sha256
+
+      - name: Prepare VM disks
+        shell: bash
+        run: |
+          set -euo pipefail
+          qemu-img create -f qcow2 windows-server-2022.qcow2 64G
+          truncate -s 64M windows-evidence.img
+          mkfs.vfat -F 32 -n BRAIN_EVIDENCE windows-evidence.img
+          cp /usr/share/OVMF/OVMF_VARS_4M.fd OVMF_VARS.fd
+
+      - name: Install and boot Windows Server 2022
+        shell: bash
+        env:
+          BOOT_TIMEOUT: ${{ inputs.timeout_minutes || '55' }}
+        run: |
+          set -euo pipefail
+          qemu-system-x86_64 \
+            -machine q35,accel=kvm -cpu max -m 2G -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
+            -device ich9-ahci,id=sata \
+            -drive file=windows-server-2022.qcow2,format=qcow2,if=none,id=osdisk \
+            -device ide-hd,bus=sata.2,drive=osdisk \
+            -drive file=windows-evidence.img,format=raw,if=none,id=evidence \
+            -device ide-hd,bus=sata.3,drive=evidence \
+            -nic user,model=e1000 \
+            -drive file=brain-windows-server-2022-proof.iso,media=cdrom,if=none,id=installmedia,readonly=on \
+            -device ide-cd,bus=sata.1,drive=installmedia \
+            -boot once=d,menu=off -display none \
+            -qmp unix:qmp.sock,server=on,wait=off -serial file:qemu-serial.log \
+            >qemu-console.log 2>&1 &
+          QEMU_PID=$!
+          trap 'kill "$QEMU_PID" 2>/dev/null || true; wait "$QEMU_PID" 2>/dev/null || true' EXIT
+          deadline=$((SECONDS + BOOT_TIMEOUT * 60))
+          while (( SECONDS < deadline )); do
+            if mcopy -i windows-evidence.img ::WINDOWS_SERVER_2022_BOOT_VERIFIED /tmp/ws2022-boot-marker 2>/dev/null; then
+              mcopy -i windows-evidence.img ::windows-server-2022-boot-evidence.json ./windows-server-2022-boot-evidence.json
+              echo "WINDOWS_SERVER_2022_BOOT=VERIFIED"
+              cat ./windows-server-2022-boot-evidence.json
+              break
+            fi
+            if ! kill -0 "$QEMU_PID" 2>/dev/null; then
+              echo "QEMU_EXITED_BEFORE_BOOT_EVIDENCE"
+              tail -n 100 qemu-console.log || true
+              tail -n 100 qemu-serial.log || true
+              exit 2
+            fi
+            sleep 5
+          done
+          test -s ./windows-server-2022-boot-evidence.json || {
+            echo "WINDOWS_SERVER_2022_BOOT_EVIDENCE_NOT_FOUND"
+            tail -n 100 qemu-console.log || true
+            tail -n 100 qemu-serial.log || true
+            exit 2
+          }
+
+      - name: Upload boot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-server-2022-standalone-boot-evidence
+          path: |
+            windows-server-2022-boot-evidence.json
+            windows-server-2022.iso.sha256
+            proof-iso.sha256
+            iso-toc.txt
+            wim-info.txt
+            qemu-console.log
+            qemu-serial.log
+          if-no-files-found: warn
+          retention-days: 14
