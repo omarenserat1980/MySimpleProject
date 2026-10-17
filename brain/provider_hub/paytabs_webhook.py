@@ -50,6 +50,9 @@ def parse_and_validate_payment(
     payment_result = payload.get("payment_result") or {}
     if payment_result.get("response_status") != "A":
         raise ValueError("PAYTABS_PAYMENT_NOT_AUTHORISED")
+    # An authorization-only transaction is not sufficient evidence for revenue.
+    if str(payload.get("tran_type", "")).strip().lower() != "sale":
+        raise ValueError("PAYTABS_CAPTURED_SALE_REQUIRED")
 
     if not payload.get("tran_ref"):
         raise ValueError("PAYTABS_TRANSACTION_REFERENCE_MISSING")
