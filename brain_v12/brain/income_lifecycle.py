@@ -10,6 +10,9 @@ from datetime import datetime, timezone
 from typing import Any
 import hashlib
 import json
+import hmac
+import os
+from .commerce_api import payment_authority_proof
 import math
 
 
@@ -201,6 +204,16 @@ class IncomeLifecycle:
         # as independently verified (normally from a signed provider webhook).
         if not isinstance(evidence, dict) or evidence.get("independent_verification") != "SIGNED_PROVIDER_WEBHOOK":
             return {"ok": False, "status": "SIGNED_PROVIDER_AUTHORITY_REQUIRED"}
+        secret = os.getenv("BRAIN_PAYMENT_WEBHOOK_SECRET", "")
+        supplied_proof = str(evidence.get("authority_proof") or "").strip()
+        if not secret or not supplied_proof:
+            return {"ok": False, "status": "SIGNED_PROVIDER_AUTHORITY_REQUIRED"}
+        expected_proof = payment_authority_proof(
+            secret, supplied_order_id, str(transaction_id).strip(),
+            str(evidence.get("provider") or "").strip(), str(evidence.get("event_id") or "").strip()
+        )
+        if not hmac.compare_digest(supplied_proof, expected_proof):
+            return {"ok": False, "status": "INVALID_PAYMENT_AUTHORITY_PROOF"}
         existing = data.get("payment_reconciliation")
         if existing:
             if existing.get("transaction_id") == transaction_id and float(existing.get("received_amount_jod", 0) or 0) == received:
