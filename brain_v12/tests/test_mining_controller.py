@@ -124,7 +124,7 @@ def test_profitability_gate_rejects_arithmetic_overflow():
         profitability_gate(1.0, 1e308, 1e308)
 
     with pytest.raises(ValueError, match="overflowed"):
-        profitability_gate(1e308, 0.0, 0.0, 0.0, 1e308)
+        profitability_gate(5e-324, 1e308)
 
 
 def test_profitability_gate_rejects_integer_too_large_for_float():
