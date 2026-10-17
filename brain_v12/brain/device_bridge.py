@@ -41,13 +41,11 @@ class DeviceBridge:
             return False
 
     def enabled(self):
-        configured = self.configured()
-        if not configured:
-            return False
+        """Return the runtime feature switch, independent of credentials or device presence."""
         raw = os.getenv(ENABLE_ENV)
         if raw is None:
-            # Local Trust Root is the bootstrap switch. Cloud deployments can
-            # still opt out explicitly with BRAIN_ENABLE_DEVICE_BRIDGE=0.
+            # Runtime bridge stays available by default. Authentication is a
+            # separate gate; deployments can explicitly disable this feature.
             return True
         return raw.strip().lower() in {"1", "true", "yes", "on"}
     def auth_mode(self):
@@ -101,6 +99,8 @@ class DeviceBridge:
     def enqueue(self,task,params=None):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED"}
         if task not in self.ALLOWED_TASKS:return {"ok":False,"status":"TASK_NOT_ALLOWED","task":task}
+        if not self.configured():
+            return {"ok":False,"status":"AUTH_NOT_CONFIGURED","message":"Bridge runtime is ready, but no agent credential is configured."}
         if task in self.TASK_CAPABILITIES and not self.authorized_executor_for_task(task):
             return {"ok":False,"status":"CAPABILITY_WORKER_OFFLINE","task":task,"capability":self.TASK_CAPABILITIES[task],"required_executor":"android-executor-*"}
         task_id="brain-termux-"+uuid4().hex
@@ -215,4 +215,21 @@ class DeviceBridge:
         return self.requeue_stale(max_age_seconds=max(30,int(os.getenv("DEVICE_TASK_STALE_SECONDS","120"))))
     def status(self):
         counts=self.store.device_task_counts()
-        return {"ok":True,"enabled":self.enabled(),"configured":self.configured(),"auth_env":AGENT_KEY_ENV,"auth_mode":self.auth_mode(),"queued":counts.get("QUEUED",0),"pending":counts.get("CLAIMED",0),"completed":counts.get("COMPLETED",0),"failed":counts.get("FAILED",0),"last_agent_seen":self._last_seen,"agents":self.agent_status()}
+        auth_configured=self.configured()
+        return {
+            "ok": True,
+            # Backward-compatible configured now describes the initialized
+            # bridge runtime, not whether a personal device is online.
+            "configured": True,
+            "runtime_ready": True,
+            "enabled": self.enabled(),
+            "auth_configured": auth_configured,
+            "auth_env": AGENT_KEY_ENV,
+            "auth_mode": self.auth_mode(),
+            "queued": counts.get("QUEUED", 0),
+            "pending": counts.get("CLAIMED", 0),
+            "completed": counts.get("COMPLETED", 0),
+            "failed": counts.get("FAILED", 0),
+            "last_agent_seen": self._last_seen,
+            "agents": self.agent_status(),
+        }
