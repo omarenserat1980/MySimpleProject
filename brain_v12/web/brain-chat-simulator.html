@@ -40,7 +40,7 @@
   <div class="statusCard"><div class="statusHead"><span>الجلسة</span><span class="pill" id="sessionPill">محلية</span></div><div class="statusValue" id="sessionValue">لم تُنشأ جلسة بعد.</div></div>
   <h3 style="margin-top:22px">طبقات SHA-256d والأدلة</h3>
   <div class="statusCard"><div class="statusHead"><span>CPU / Python</span><span class="pill" id="shaCpuPill">غير مختبر</span></div><div class="statusValue" id="shaCpuValue">لا يوجد قياس منفّذ في هذه الجلسة.</div></div>
-  <div class="statusCard"><div class="statusHead"><span>محاكي ASIC البرمجي</span><span class="pill" id="shaSimPill">محاكاة فقط</span></div><div class="statusValue" id="shaSimValue">لا يثبت تشغيل RTL أو جهاز مادي.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>محاكي ASIC البرمجي · CPU</span><span class="pill" id="shaSimPill">لم يُختبر</span></div><div class="statusValue" id="shaSimValue">اختبار SHA-256d محدود على CPU باستخدام رأس Genesis معروف؛ لا يثبت RTL أو جهازًا ماديًا.</div><button class="secondary full" id="runShaSoftwareTest" type="button" style="margin-top:10px">تشغيل اختبار SHA-256d البرمجي</button></div>
   <div class="statusCard"><div class="statusHead"><span>محاكي RTL</span><span class="pill" id="shaRtlPill">لم يُختبر</span></div><div class="statusValue" id="shaRtlValue">يتطلب تشغيل Icarus Verilog/VVP واجتياز متجه nonce المعروف.</div><button class="secondary full" id="runRtlSelfTest" type="button" style="margin-top:10px">تشغيل اختبار RTL المحدود</button></div>
   <div class="statusCard"><div class="statusHead"><span>ASIC مادي</span><span class="pill" id="shaPhysicalPill">غير مثبت</span></div><div class="statusValue" id="shaPhysicalValue">لا توجد هوية جهاز أو نبضة من عتاد مادي مثبتة.</div></div>
   <div class="statusCard"><div class="statusHead"><span>المجمع والحصص والإيراد</span><span class="pill" id="shaPoolPill">غير مثبت</span></div><div class="statusValue" id="shaPoolValue">لا يوجد اتصال بمجمع أو قبول حصة أو دليل إيراد ضمن اختبار RTL.</div></div>
@@ -99,6 +99,54 @@
       $("modelValue").textContent="الحالة كما أعادها الخادم: "+JSON.stringify({provider,model_router:router,chatgpt_bridge:bridge});
     } catch(e) {setPill("modelPill","تعذّر الفحص","bad");$("modelValue").textContent=e.message;}
   }
+  async function runShaSoftwareTest() {
+    const button = $("runShaSoftwareTest");
+    button.disabled = true;
+    button.textContent = "جارٍ تشغيل SHA-256d على CPU…";
+    setPill("shaSimPill", "قيد الاختبار");
+    $("shaSimValue").textContent = "تنفيذ برمجي محدود؛ لا يُستبدل بمحاكاة RTL ولا يُعد تعدينًا خارجيًا.";
+    // Bitcoin genesis header serialized in wire byte order, with nonce supplied by the API.
+    const headerHex =
+      "01000000" + "00".repeat(32) +
+      "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a" +
+      "29ab5f49ffff001d00000000";
+    try {
+      const result = await api("/api/asic-sim/sha256d-pow", {
+        method: "POST",
+        body: JSON.stringify({
+          resource_id: "brain-chat-cpu-sha256d-ui",
+          header_hex: headerHex,
+          target_hex: "00000000ffff0000000000000000000000000000000000000000000000000000",
+          start_nonce: 0x7c2bac1c,
+          max_attempts: 2
+        })
+      });
+      const payload = result.result || {};
+      const hashResult = payload.result || {};
+      const found = hashResult.found === true && Number(hashResult.nonce) === 2083236893;
+      const verified = found && result.evidence_verification === "VERIFIED" &&
+        payload.software_hashing_performed === true && payload.rtl_executed === false;
+      setPill("shaSimPill", verified ? "CPU موثّق" : (payload.status || "غير متحقق"), verified ? "ok" : "bad");
+      $("shaSimValue").textContent = JSON.stringify({
+        status: verified ? "SOFTWARE_VERIFIED" : (payload.status || "SOFTWARE_RESULT_UNVERIFIED"),
+        execution_layer: payload.execution_layer || "UNKNOWN",
+        hashes_performed: payload.software_hashes_performed ?? null,
+        nonce: hashResult.nonce ?? null,
+        evidence_ref: result.evidence_ref || null,
+        evidence_verification: result.evidence_verification || "NOT_VERIFIED",
+        rtl_executed: payload.rtl_executed === true,
+        physical_asic_executed: payload.physical_asic_executed === true,
+        pool_acceptance_verified: payload.pool_acceptance_verified === true,
+        revenue_verified: payload.revenue_verified === true
+      });
+    } catch (e) {
+      setPill("shaSimPill", "تعذّر الفحص", "bad");
+      $("shaSimValue").textContent = "لم تثبت نتيجة CPU: " + e.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "إعادة اختبار SHA-256d البرمجي";
+    }
+  }
   async function runRtlSelfTest() {
     const button = $("runRtlSelfTest");
     button.disabled = true;
@@ -136,6 +184,7 @@
       button.textContent = "إعادة اختبار RTL المحدود";
     }
   }
+  $("runShaSoftwareTest").addEventListener("click", runShaSoftwareTest);
   $("runRtlSelfTest").addEventListener("click", runRtlSelfTest);
   async function loadSessions() {
     try {
