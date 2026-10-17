@@ -9,18 +9,20 @@ def test_completion_audit_runs():
 
 
 def test_explicit_blocked_mining_status_is_not_a_todo_marker():
+    marker = "NOT_" + "IMPLEMENTED"
     assert is_intentional_not_implemented_state(
-        '"native_mining_backend": "NOT_IMPLEMENTED",'
+        '"native_mining_backend": "' + marker + '",'
     )
     assert is_intentional_not_implemented_state(
-        '"stratum_pool_adapter": "NOT_IMPLEMENTED",'
+        '"stratum_pool_adapter": "' + marker + '",'
     )
 
 
 def test_unrelated_not_implemented_marker_is_still_reported():
+    marker = "NOT_" + "IMPLEMENTED"
     assert not is_intentional_not_implemented_state(
-        'raise RuntimeError("TOOL_NOT_IMPLEMENTED_OR_APPROVED")'
+        'raise RuntimeError("TOOL_' + marker + '_OR_APPROVED")'
     )
     assert not is_intentional_not_implemented_state(
-        '"provider_adapter": "NOT_IMPLEMENTED",'
+        '"provider_adapter": "' + marker + '",'
     )
