@@ -69,6 +69,8 @@ from .brain.canonical_indicators import aggregate_indicator_payloads, indicators
 from .brain.liveness import assess as assess_brain_liveness, assess_full as assess_brain_liveness_full
 from .brain.sync_engine import BrainSyncStore
 from .brain.sync_runtime import DurableSyncQueue
+from .brain.heartbeat_factory import HeartbeatFactory
+from .brain.heartbeat_probes import register_core_probes, run_core_probes
 from .brain.task_sync_adapter import TaskSyncAdapter
 from .brain.brain_supervisor import BrainSupervisor
 from .brain.brain_self_monitor import BrainSelfMonitor
@@ -112,7 +114,8 @@ from .brain.mining_node_api import router as mining_node_router
 from .brain.profit_first_governance import router as profit_first_router
 
 ROOT=os.path.dirname(__file__)
-store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
+BRAIN_DB_PATH=os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))
+store=MemoryStore(BRAIN_DB_PATH); store.init()
 brain=BrainCore(store); agent=Agent(); builder=SoftwareBuilder()
 orchestrator=CognitiveOrchestrator(store,brain,builder); self_improver=SelfImprovementEngine()
 cognitive=CognitiveLoop(store); ai=AIGateway(); openai_provider=OpenAIProvider(); plugins=PluginManager()
@@ -191,6 +194,8 @@ brain_git=BrainGitService(os.getenv("BRAIN_GIT_ROOT", os.path.join(ROOT, "brain_
 brain_datacenter=BrainVirtualDatacenter()
 evidence_store=EvidenceStore(os.getenv("BRAIN_EVIDENCE_DB",os.path.join(ROOT,"brain6_artifacts","evidence","evidence.db")))
 verification_engine=VerificationEngine(evidence_store)
+heartbeat_factory=HeartbeatFactory(os.getenv("BRAIN_HEARTBEAT_DB",BRAIN_DB_PATH))
+register_core_probes(heartbeat_factory)
 cognitive.device_bridge=device_bridge
 if device_bridge.configured():
     cognitive.permissions.grant("device_agent")
@@ -271,6 +276,51 @@ app.include_router(brain_cloud_provider_router)
 app.include_router(digital_mining_node_router)
 app.include_router(mining_node_router)
 app.include_router(profit_first_router)
+
+
+class HeartbeatDiagnosticRequest(BaseModel):
+    function_ids: list[str] | None = None
+
+
+@app.get("/api/heartbeats/summary")
+def heartbeat_summary(request: Request):
+    """Read the protected heartbeat factory summary; never runs a probe."""
+    require_control_key(request)
+    return heartbeat_factory.summary()
+
+
+@app.get("/api/heartbeats/functions")
+def heartbeat_functions(request: Request):
+    """Read the registered heartbeat functions; requires the Brain control key."""
+    require_control_key(request)
+    functions = heartbeat_factory.list_functions()
+    return {"ok": True, "count": len(functions), "functions": functions}
+
+
+@app.post("/api/heartbeats/diagnostic")
+def heartbeat_diagnostic(request: Request, payload: HeartbeatDiagnosticRequest | None = None):
+    """Run at most ten explicit local read-only probes; never starts a scheduler."""
+    require_control_key(request)
+    context = {
+        "store": store,
+        "cognitive": cognitive,
+        "sync_queue": sync_queue,
+        "sync_store": sync_store,
+        "worker_registry": worker_registry,
+        "self_monitor": brain_self_monitor,
+        "evidence_store": evidence_store,
+        "device_bridge": device_bridge,
+        "app": app,
+    }
+    try:
+        return run_core_probes(
+            heartbeat_factory,
+            context,
+            function_ids=payload.function_ids if payload else None,
+            authorization_ref="control-key-validated",
+        )
+    except (KeyError, ValueError, RuntimeError):
+        raise HTTPException(status_code=400, detail="HEARTBEAT_DIAGNOSTIC_REQUEST_INVALID")
 
 
 @app.get("/api/logs/errors")
