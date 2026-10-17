@@ -49,7 +49,13 @@ assert.match(worker, /recordOrderEvent/);
 assert.match(worker, /PAYMENT_WEBHOOK_VERIFIED/);
 assert.match(auditMigration, /CREATE TABLE IF NOT EXISTS order_events/);
 
-assert.doesNotMatch(worker, /UPDATE revenue_ledger SET state = ['\"]REVENUE_REALIZED['\"]/i, "worker must not mark revenue realized without independent settlement evidence");
+const confirmDeliverySource = worker.slice(worker.indexOf("async function confirmDelivery("), worker.indexOf("async function completeJob("));
+assert.doesNotMatch(confirmDeliverySource, /REVENUE_REALIZED/, "delivery confirmation must not mark revenue realized");
+assert.match(worker, /async function verifySignedSettlementEvidence/);
+assert.match(worker, /BRAIN_SETTLEMENT_ATTESTATION_KEY/);
+assert.match(worker, /SETTLEMENT_SIGNATURE_INVALID/);
+assert.match(worker, /SETTLEMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "revenue realization transition must exist only behind settlement verification");
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "payment callback must not report revenue realized before delivery");
 assert.match(worker, /Delivery is not proof of provider settlement/);
