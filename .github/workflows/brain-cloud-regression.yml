@@ -6,6 +6,8 @@ on:
       - "brain_v12/ai_fabric/intelligence.py"
       - "brain_v12/tests/test_ai_fabric_v3_loop.py"
       - "brain_v12/tests/test_device_bridge.py"
+      - "brain_v12/tests/test_termux_agent_contract.py"
+      - "v12-agent/agent.py"
       - ".github/workflows/brain-cloud-regression.yml"
   pull_request:
     paths:
@@ -33,3 +35,5 @@ jobs:
         run: python -m unittest brain_v12.tests.test_ai_fabric_v3_loop -v
       - name: Run DeviceBridge regression
         run: python -m unittest brain_v12.tests.test_device_bridge -v
+      - name: Run Termux software worker contract
+        run: python -m unittest brain_v12.tests.test_termux_agent_contract -v
