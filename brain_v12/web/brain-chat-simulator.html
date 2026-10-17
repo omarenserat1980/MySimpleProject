@@ -38,6 +38,12 @@
   <div class="statusCard"><div class="statusHead"><span>نبضة المحاكي</span><span class="pill" id="heartbeatPill">بدء</span></div><div class="statusValue" id="heartbeatValue">بانتظار أول نبضة مؤكدة من المتصفح إلى الخادم.</div></div>
   <div class="statusCard"><div class="statusHead"><span>مزود النموذج</span><span class="pill" id="modelPill">فحص</span></div><div class="statusValue" id="modelValue">لن نفترض أن النموذج مهيأ قبل قراءة الحالة.</div></div>
   <div class="statusCard"><div class="statusHead"><span>الجلسة</span><span class="pill" id="sessionPill">محلية</span></div><div class="statusValue" id="sessionValue">لم تُنشأ جلسة بعد.</div></div>
+  <h3 style="margin-top:22px">طبقات SHA-256d والأدلة</h3>
+  <div class="statusCard"><div class="statusHead"><span>CPU / Python</span><span class="pill" id="shaCpuPill">غير مختبر</span></div><div class="statusValue" id="shaCpuValue">لا يوجد قياس منفّذ في هذه الجلسة.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>محاكي ASIC البرمجي</span><span class="pill" id="shaSimPill">محاكاة فقط</span></div><div class="statusValue" id="shaSimValue">لا يثبت تشغيل RTL أو جهاز مادي.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>محاكي RTL</span><span class="pill" id="shaRtlPill">لم يُختبر</span></div><div class="statusValue" id="shaRtlValue">يتطلب تشغيل Icarus Verilog/VVP واجتياز متجه nonce المعروف.</div><button class="secondary full" id="runRtlSelfTest" type="button" style="margin-top:10px">تشغيل اختبار RTL المحدود</button></div>
+  <div class="statusCard"><div class="statusHead"><span>ASIC مادي</span><span class="pill" id="shaPhysicalPill">غير مثبت</span></div><div class="statusValue" id="shaPhysicalValue">لا توجد هوية جهاز أو نبضة من عتاد مادي مثبتة.</div></div>
+  <div class="statusCard"><div class="statusHead"><span>المجمع والحصص والإيراد</span><span class="pill" id="shaPoolPill">غير مثبت</span></div><div class="statusValue" id="shaPoolValue">لا يوجد اتصال بمجمع أو قبول حصة أو دليل إيراد ضمن اختبار RTL.</div></div>
   <h3 style="margin-top:22px">مسار المعالجة</h3>
   <div class="pipeline"><div class="step" data-step="0"><span class="stepNum">01</span> فهم الطلب</div><div class="step" data-step="1"><span class="stepNum">02</span> سياق المحادثة والذاكرة</div><div class="step" data-step="2"><span class="stepNum">03</span> توجيه النموذج</div><div class="step" data-step="3"><span class="stepNum">04</span> استلام الرد</div><div class="step" data-step="4"><span class="stepNum">05</span> عرض النتيجة</div></div>
   <div class="notice">ملاحظة أدلة: المؤشرات أعلاه تُحدّث من استجابات API الفعلية. لا تمثّل الرسوم وحدها دليلًا على وجود مزود أو خادم Windows أو جهاز منفّذ متصل.</div>
@@ -93,6 +99,44 @@
       $("modelValue").textContent="الحالة كما أعادها الخادم: "+JSON.stringify({provider,model_router:router,chatgpt_bridge:bridge});
     } catch(e) {setPill("modelPill","تعذّر الفحص","bad");$("modelValue").textContent=e.message;}
   }
+  async function runRtlSelfTest() {
+    const button = $("runRtlSelfTest");
+    button.disabled = true;
+    button.textContent = "جارٍ تشغيل اختبار RTL المحدود…";
+    setPill("shaRtlPill", "قيد الاختبار");
+    $("shaRtlValue").textContent = "ينتظر نتيجة أداة RTL الفعلية؛ لن يُستبدل التنفيذ بمحاكاة Python.";
+    try {
+      const result = await api("/api/asic-sim/sha256d-rtl-self-test", {
+        method: "POST",
+        body: JSON.stringify({resource_id: "brain-chat-rtl-ui", timeout_seconds: 20})
+      });
+      const payload = result.result || {};
+      if (result.ok === true && result.status === "RTL_SIMULATION_VERIFIED" &&
+          payload.rtl_executed === true && result.evidence_verification === "VERIFIED") {
+        setPill("shaRtlPill", "RTL موثّق", "ok");
+      } else {
+        setPill("shaRtlPill", result.status || payload.status || "غير متحقق", "bad");
+      }
+      $("shaRtlValue").textContent = JSON.stringify({
+        status: result.status || payload.status,
+        testbench: payload.testbench,
+        known_answer: payload.known_answer,
+        evidence_ref: result.evidence_ref || null,
+        evidence_verification: result.evidence_verification || "NOT_VERIFIED",
+        rtl_executed: payload.rtl_executed === true,
+        physical_asic_executed: payload.physical_asic_executed === true,
+        pool_acceptance_verified: payload.pool_acceptance_verified === true,
+        revenue_verified: payload.revenue_verified === true
+      });
+    } catch (e) {
+      setPill("shaRtlPill", "تعذّر الفحص", "bad");
+      $("shaRtlValue").textContent = "لم يثبت تشغيل RTL: " + e.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "إعادة اختبار RTL المحدود";
+    }
+  }
+  $("runRtlSelfTest").addEventListener("click", runRtlSelfTest);
   async function loadSessions() {
     try {
       const data=await api("/api/brain-chat/sessions");
