@@ -9,9 +9,10 @@ def evidence():
         "task": {"task_id": "task-1", "opportunity_id": "opp-1", "order_id": "order-1",
                  "expected_amount": "12.50", "currency": "JOD", "mode": "production"},
         "worker": {"status": "COMPLETED", "execution_kind": "real", "execution_id": "exec-1",
-                   "task_id": "task-1", "opportunity_id": "opp-1", "evidence_ref": "worker-log-1"},
+                   "task_id": "task-1", "opportunity_id": "opp-1", "evidence_ref": "worker-log-1",
+                   "mode": "production"},
         "delivery": {"status": "ACCEPTED", "task_id": "task-1", "opportunity_id": "opp-1",
-                     "execution_id": "exec-1", "evidence_ref": "delivery-1"},
+                     "execution_id": "exec-1", "evidence_ref": "delivery-1", "mode": "production"},
         "payment": {"verification_status": "INDEPENDENTLY_VERIFIED", "settlement_status": "SETTLED",
                     "order_id": "order-1", "task_id": "task-1", "opportunity_id": "opp-1",
                     "provider": "paytabs", "transaction_id": "txn-1", "evidence_ref": "provider-proof-1",
@@ -57,6 +58,19 @@ def test_simulation_mode_never_counts_as_revenue(tmp_path, evidence):
     evidence["payment"]["mode"] = "simulation"
     with pytest.raises(RevenueGateError, match="SIMULATED_PAYMENT_REJECTED"):
         gate.realize(**evidence, idempotency_key="demo")
+
+
+@pytest.mark.parametrize(("part", "error"), [
+    ("task", "PRODUCTION_TASK_MODE_REQUIRED"),
+    ("worker", "PRODUCTION_WORKER_MODE_REQUIRED"),
+    ("delivery", "PRODUCTION_DELIVERY_MODE_REQUIRED"),
+    ("payment", "PRODUCTION_PAYMENT_MODE_REQUIRED"),
+])
+def test_missing_evidence_mode_fails_closed(tmp_path, evidence, part, error):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    evidence[part].pop("mode", None)
+    with pytest.raises(RevenueGateError, match=error):
+        gate.realize(**evidence, idempotency_key="missing-mode")
 
 
 def test_costs_are_separate_and_idempotent(tmp_path):
