@@ -17,6 +17,7 @@ on:
       - ".github/workflows/asic-rtl-validation.yml"
   push:
     branches:
+      - "main"
       - "feature/advanced-asic-prototype"
     paths:
       - "brain_v12/asic/**"
