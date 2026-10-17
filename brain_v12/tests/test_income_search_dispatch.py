@@ -50,6 +50,18 @@ class IncomeSearchDispatchTests(unittest.TestCase):
         self.assertFalse(action["income_search"]["revenue_verified"])
         self.assertFalse(result["revenue_verified"])
 
+    def test_empty_search_does_not_queue_an_action(self):
+        self.search_result = {"ok": True, "received": 0, "accepted": 0, "errors": []}
+        result = self.bridge.submit("CL-000003", "ابحث عن فرص دخل مدفوعة")
+        self.assertEqual(result["status"], "NO_LIVE_OPPORTUNITIES")
+        self.assertEqual(self.calls, ["search"])
+
+    def test_search_evidence_is_persisted_in_history(self):
+        result = self.bridge.submit("CL-000003", "ابحث عن فرص دخل مدفوعة")
+        history = self.bridge.history()
+        self.assertEqual(result["status"], "ACTION_REQUESTED")
+        self.assertEqual(history["items"][0]["action_result"]["income_search"]["received"], 3)
+
     def test_search_failure_does_not_queue_an_action(self):
         self.search_result = {"ok": False, "status": "NETWORK_FAILED"}
         result = self.bridge.submit("CL-000003", "ابحث عن فرص دخل مدفوعة")
