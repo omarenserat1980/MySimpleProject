@@ -1,13 +1,28 @@
 name: Brain Mining Control Plane
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-mining-control.yml"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_mining_controller.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-mining-control.yml"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_mining_controller.py"
   workflow_dispatch:
   schedule:
     - cron: "17 */6 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
