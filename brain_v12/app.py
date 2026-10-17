@@ -234,7 +234,7 @@ from .brain.customer_portal import router as customer_router
 from .brain.economic_reconciliation import router as economic_reconciliation_router
 from .brain.industrial_quote_portal import router as industrial_quote_portal_router
 from .brain.commerce_reversals import router as commerce_reversals_router
-from .brain.habitat.api import router as habitat_router
+from .brain.habitat.api import router as habitat_router, configure_device_bridge
 from .economics.router_bundle import router as economics_router
 from .youtube.router_bundle import router as youtube_router
 from .marketing.router_bundle import router as marketing_router
@@ -253,6 +253,7 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(industrial_quote_portal_router(os.path.join(ROOT, "brain_v12_industrial_quotes.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
+configure_device_bridge(device_bridge)
 app.include_router(habitat_router)
 app.include_router(economics_router)
 app.include_router(youtube_router)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from ..control_auth import require_control_key
 from .capability_manager import CapabilityManager
@@ -22,6 +22,20 @@ SOURCE_ROOTS = [Path(x).resolve() for x in os.getenv(
 capabilities = CapabilityManager(STATE)
 projects = ProjectFactory(WORKSPACE)
 sources = SourceExplorer(SOURCE_ROOTS)
+_device_bridge = None
+
+
+def configure_device_bridge(bridge) -> None:
+    """Inject the application-owned bridge so Habitat shares Brain's initialized store."""
+    global _device_bridge
+    _device_bridge = bridge
+
+
+def _configured_device_bridge():
+    if _device_bridge is None:
+        raise HTTPException(status_code=503, detail="DEVICE_BRIDGE_NOT_CONFIGURED")
+    return _device_bridge
+
 
 router = APIRouter(prefix="/api/habitat", tags=["brain-habitat"])
 
@@ -63,8 +77,7 @@ def read_source(path: str, request: Request):
 def android_open_app_test(request: Request, package: str = "com.android.settings"):
     """Queue a least-privilege Android app-open test through the live Executor gate."""
     require_control_key(request)
-    from ..device_bridge import DeviceBridge
-    bridge = DeviceBridge()
+    bridge = _configured_device_bridge()
     result = bridge.enqueue("open_app", {"package": package})
     return result
 
@@ -73,10 +86,9 @@ def android_open_app_test(request: Request, package: str = "com.android.settings
 def android_project_test(request: Request, name: str = "BrainHabitatTest"):
     """Create a tiny project through the live Android Executor gate."""
     require_control_key(request)
-    from ..device_bridge import DeviceBridge
     files = {
         "README.md": "# Brain Habitat Android Test\n\nCreated through the controlled Android Executor path.\n",
         "src/BrainHabitatTest.txt": "BRAIN_HABITAT_ANDROID_EXECUTOR_OK\n",
     }
-    bridge = DeviceBridge()
+    bridge = _configured_device_bridge()
     return bridge.enqueue("create_app_project", {"name": name, "files": files})

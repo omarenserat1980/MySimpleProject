@@ -1,13 +1,15 @@
 import unittest
 from unittest.mock import patch
 
-from brain_v12.brain.habitat.api import android_project_test
+from brain_v12.brain.habitat.api import android_project_test, configure_device_bridge
+from brain_v12.brain.device_bridge import DeviceBridge
 
 
 class HabitatAndroidProjectTests(unittest.TestCase):
     def test_project_factory_routes_to_android_executor(self):
         class Request:
             headers = {}
+        configure_device_bridge(DeviceBridge(store=None))
         with patch("brain_v12.brain.habitat.api.require_control_key"), patch(
             "brain_v12.brain.device_bridge.DeviceBridge.enqueue",
             return_value={"ok": True, "status": "QUEUED"},
