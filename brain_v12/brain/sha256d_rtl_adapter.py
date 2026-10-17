@@ -105,6 +105,16 @@ def _run_command(
                 "elapsed_seconds": round(time.monotonic() - start, 4)}
 
 
+def classify_simulation_result(sim_result: dict[str, Any], output: str, required_marker: str) -> tuple[str, str | None, bool]:
+    """A zero exit code without the exact success marker is not a PASS."""
+    marker_found = required_marker in output
+    if sim_result.get("status") != "PASS":
+        return str(sim_result.get("status", "FAIL")), str(sim_result.get("error_code") or "RTL_SIMULATION_FAILED"), marker_found
+    if not marker_found:
+        return "FAIL", "SUCCESS_MARKER_MISSING", False
+    return "PASS", None, True
+
+
 def run_rtl_smoke(
     case: str = "genesis_nonce_search",
     *,
@@ -168,14 +178,7 @@ def run_rtl_smoke(
             cancel_event=cancel_event, log_path=sim_log,
         )
         output = sim_log.read_text(encoding="utf-8", errors="replace")[-12000:] if sim_log.exists() else ""
-        marker_found = spec["marker"] in output
-        if sim_result["status"] != "PASS":
-            status = sim_result["status"]
-            error = sim_result.get("error_code", "RTL_SIMULATION_" + status)
-        elif not marker_found:
-            status, error = "FAIL", "SUCCESS_MARKER_MISSING"
-        else:
-            status, error = "PASS", None
+        status, error, marker_found = classify_simulation_result(sim_result, output, spec["marker"])
         evidence = {
             "case": case,
             "top_module": spec["top"],
