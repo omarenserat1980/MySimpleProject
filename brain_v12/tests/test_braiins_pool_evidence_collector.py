@@ -20,6 +20,9 @@ class FakeResponse:
     def json(self):
         return self._payload
 
+    def iter_bytes(self):
+        yield self.content
+
 
 class FakeClient:
     response = None
@@ -35,9 +38,17 @@ class FakeClient:
     def __exit__(self, *_args):
         return False
 
-    def get(self, url, *, headers):
-        type(self).request_args = (url, dict(headers))
-        return type(self).response
+    class _StreamContext:
+        def __init__(self, response):
+            self.response = response
+        def __enter__(self):
+            return self.response
+        def __exit__(self, *_args):
+            return False
+
+    def stream(self, method, url, *, headers):
+        type(self).request_args = (method, url, dict(headers))
+        return self._StreamContext(type(self).response)
 
 
 def fixture(now):
@@ -85,8 +96,9 @@ def test_success_is_independent_pool_telemetry_not_brain_mining_or_revenue():
     assert result["pool_response_sha256"]
     assert result["proof_level"] == "SYNTHETIC_TEST_FIXTURE"
     assert FakeClient.init_kwargs == {"verify": True, "timeout": 10.0, "follow_redirects": False}
-    assert FakeClient.request_args[0] == BRAIINS_WORKERS_URL
-    assert FakeClient.request_args[1] == {"Pool-Auth-Token": "test-token-not-a-real-secret"}
+    assert FakeClient.request_args[0] == "GET"
+    assert FakeClient.request_args[1] == BRAIINS_WORKERS_URL
+    assert FakeClient.request_args[2] == {"Pool-Auth-Token": "test-token-not-a-real-secret"}
     assert "test-token-not-a-real-secret" not in json.dumps(result)
 
 
