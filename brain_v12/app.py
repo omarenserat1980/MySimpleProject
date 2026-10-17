@@ -175,6 +175,13 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+app.include_router(asic_simulator_router)
+app.include_router(bitcoin_mining_intelligence_router)
+app.include_router(bitcoin_worker_router)
+app.include_router(brain_cloud_provider_router)
+app.include_router(digital_mining_node_router)
+app.include_router(mining_node_router)
+app.include_router(profit_first_router)
 
 @app.get("/api/brain/cloud/status")
 def brain_cloud_status():
