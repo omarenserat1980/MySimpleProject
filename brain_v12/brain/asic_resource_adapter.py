@@ -21,6 +21,7 @@ from .health_probe import HealthProbeEngine
 from .mining_engine import MiningEngine
 from .task_engine import TaskEngine
 from .worker_registry import WorkerRegistry
+from .rtl_simulator_adapter import run_sha256d_rtl_self_test
 
 
 EXECUTION_MODES = frozenset({"SIMULATOR", "REMOTE_PROVIDER", "PHYSICAL_DEVICE"})
@@ -274,6 +275,38 @@ class ASICResourceAdapter:
             "evidence_sha256": evidence["sha256"],
             "evidence_verification": verification["status"],
         }
+
+    def simulate_sha256d_rtl(self, resource_id: str, *, timeout_seconds: float = 20.0) -> dict[str, Any]:
+        """Execute the repository RTL testbench; never fall back to Python hashing."""
+        resource = self._require_resource(resource_id)
+        if resource.execution_mode != "SIMULATOR":
+            raise PermissionError("SIMULATION_MODE_REQUIRED")
+        task = self.tasks.create(f"SHA256d RTL self-test {resource_id}")
+        self.tasks.update(task["id"], "RUNNING")
+        result = run_sha256d_rtl_self_test(timeout_seconds=timeout_seconds)
+        payload = {
+            "resource_id": resource_id,
+            "resource_type": "ASIC",
+            **result,
+        }
+        if result.get("status") != "VERIFIED" or result.get("rtl_executed") is not True:
+            self.tasks.fail(task["id"], str(result.get("status") or "RTL_VERIFICATION_FAILED"))
+            return {"task": self.tasks.tasks[task["id"]], "result": payload,
+                    "evidence_ref": None, "evidence_verification": "NOT_VERIFIED"}
+        evidence = self.evidence.append(
+            task["id"], "asic_sha256d_rtl_simulation", payload,
+            producer="brain.rtl_simulator_adapter",
+        )
+        verification = self.evidence.verify_hash(evidence["evidence_id"])
+        completed = self.tasks.verify_and_complete(task["id"], verification, evidence["evidence_id"])
+        if completed.get("status") != "COMPLETED":
+            return {"task": self.tasks.tasks[task["id"]], "result": payload,
+                    "evidence_ref": evidence["evidence_id"],
+                    "evidence_sha256": evidence["sha256"],
+                    "evidence_verification": "VERIFICATION_FAILED"}
+        return {"task": self.tasks.tasks[task["id"]], "result": payload,
+                "evidence_ref": evidence["evidence_id"], "evidence_sha256": evidence["sha256"],
+                "evidence_verification": verification.get("status", "UNKNOWN")}
 
     def record_telemetry(self, resource_id: str, telemetry: dict[str, Any]) -> dict[str, Any]:
         resource = self._require_resource(resource_id)
