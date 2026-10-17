@@ -1,0 +1,42 @@
+name: Arkan Living AI Desktop Validation
+
+on:
+  pull_request:
+    paths:
+      - "tools/windows/arkan_living_ai_desktop.ps1"
+      - "tools/windows/ARKAN_LIVING_AI_DESKTOP.md"
+      - ".github/workflows/arkan-living-ai-desktop.yml"
+  push:
+    branches:
+      - "feat/arkan-living-ai-desktop"
+    paths:
+      - "tools/windows/arkan_living_ai_desktop.ps1"
+      - "tools/windows/ARKAN_LIVING_AI_DESKTOP.md"
+      - ".github/workflows/arkan-living-ai-desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parse-powershell:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse script without executing desktop actions
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$env:GITHUB_WORKSPACE\tools\windows\arkan_living_ai_desktop.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+          Write-Output "ARKAN_LIVING_AI_DESKTOP_SYNTAX=PASS"
+          Write-Output "PHYSICAL_DESKTOP_LAUNCH=NOT_TESTED"
