@@ -1,5 +1,7 @@
 import pytest
 
+from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
 from brain_v12.business.crypto_mining_verification import BlockchainProof, VerificationState, start_cloud_mining_verification
 from brain_v12.business.revenue_ledger import RevenueRecord
@@ -32,7 +34,7 @@ def test_mining_verification_is_the_gate_to_revenue_realized():
 def test_unverified_mining_result_cannot_realize_revenue():
     cycle = start_cloud_mining_verification("CloudMineCrypto", "cloudminecrypto-ledger-002")
     ledger = RevenueRecord("cloudminecrypto-ledger-002", "unverified mining payout", "BTC")
-    with pytest.raises(ValueError, match="REVENUE_REALIZED"):
+    with pytest.raises(ValueError, match="verified payout evidence required"):
         ledger.realize_from_mining_verification(cycle.snapshot())
 
 
@@ -67,3 +69,162 @@ def test_verified_payment_still_requires_delivery_reconciliation():
     })
     with pytest.raises(ValueError, match="delivery_evidence_ref and reconciliation_ref"):
         ledger.realize({"delivery_evidence_ref": "evidence://delivery/guard-003"})
+
+
+def test_repeated_verified_payment_is_idempotent():
+    ledger = RevenueRecord("commercial-idempotent-001", "100", "USD")
+    evidence = {
+        "transaction_id": "tx-idempotent-001",
+        "evidence_ref": "evidence://payment/tx-idempotent-001",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    }
+    first = ledger.verify(evidence)
+    second = ledger.verify(evidence)
+    assert second == first
+    assert len(second["evidence"]) == 1
+
+
+def test_conflicting_payment_cannot_overwrite_verified_payment():
+    ledger = RevenueRecord("commercial-idempotent-002", "100", "USD")
+    first = {
+        "transaction_id": "tx-original",
+        "evidence_ref": "evidence://payment/tx-original",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    }
+    ledger.verify(first)
+    conflicting = {**first, "transaction_id": "tx-different", "evidence_ref": "evidence://payment/tx-different"}
+    with pytest.raises(ValueError, match="conflicting payment evidence"):
+        ledger.verify(conflicting)
+
+
+def test_repeated_revenue_realization_is_idempotent():
+    ledger = RevenueRecord("commercial-idempotent-003", "100", "USD")
+    ledger.verify({
+        "transaction_id": "tx-realize-003",
+        "evidence_ref": "evidence://payment/tx-realize-003",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    })
+    evidence = {
+        "delivery_evidence_ref": "evidence://delivery/003",
+        "reconciliation_ref": "evidence://reconciliation/003",
+    }
+    first = ledger.realize(evidence)
+    second = ledger.realize(evidence)
+    assert second == first
+    assert len(second["evidence"]) == 2
+
+
+def test_conflicting_revenue_realization_evidence_is_rejected():
+    ledger = RevenueRecord("commercial-idempotent-004", "100", "USD")
+    ledger.verify({
+        "transaction_id": "tx-realize-004",
+        "evidence_ref": "evidence://payment/tx-realize-004",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    })
+    ledger.realize({
+        "delivery_evidence_ref": "evidence://delivery/004",
+        "reconciliation_ref": "evidence://reconciliation/004",
+    })
+    with pytest.raises(ValueError, match="conflicting realization evidence"):
+        ledger.realize({
+            "delivery_evidence_ref": "evidence://delivery/other",
+            "reconciliation_ref": "evidence://reconciliation/other",
+        })
+
+
+
+def test_repeated_mining_realization_is_idempotent():
+    result = _verified_cycle("cloudminecrypto-ledger-idempotent-005")
+    ledger = RevenueRecord("cloudminecrypto-ledger-idempotent-005", "verified mining payout", "BTC")
+    first = ledger.realize_from_mining_verification(result)
+    second = ledger.realize_from_mining_verification(result)
+    assert second == first
+    assert len(second["evidence"]) == 1
+
+
+def test_conflicting_mining_realization_evidence_is_rejected():
+    result = _verified_cycle("cloudminecrypto-ledger-conflict-006")
+    ledger = RevenueRecord("cloudminecrypto-ledger-conflict-006", "verified mining payout", "BTC")
+    ledger.realize_from_mining_verification(result)
+    conflicting = {**result, "provider": "DifferentProvider"}
+    with pytest.raises(ValueError, match="conflicting mining evidence"):
+        ledger.realize_from_mining_verification(conflicting)
+
+
+
+def test_revenue_snapshot_does_not_expose_mutable_internal_evidence():
+    ledger = RevenueRecord("commercial-snapshot-007", "100", "USD")
+    snapshot = ledger.snapshot()
+    snapshot["evidence"].append("forged-evidence")
+    assert ledger.evidence == []
+
+
+
+def test_durable_revenue_store_survives_reopen_and_retries(tmp_path):
+    db_path = tmp_path / "revenue.db"
+    payment = {
+        "transaction_id": "durable-tx-001",
+        "evidence_ref": "evidence://payment/durable-tx-001",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    }
+    realization = {
+        "delivery_evidence_ref": "evidence://delivery/durable-001",
+        "reconciliation_ref": "evidence://reconciliation/durable-001",
+    }
+    store = RevenueLedgerStore(db_path)
+    store.create("durable-opportunity-001", "100", "USD")
+    first_payment = store.verify("durable-opportunity-001", payment)
+    store = RevenueLedgerStore(db_path)
+    assert store.get("durable-opportunity-001")["status"] == "PAYMENT_VERIFIED"
+    assert store.verify("durable-opportunity-001", payment) == first_payment
+    first_realization = store.realize("durable-opportunity-001", realization)
+    store = RevenueLedgerStore(db_path)
+    assert store.realize("durable-opportunity-001", realization) == first_realization
+    assert store.get("durable-opportunity-001")["status"] == "REVENUE_REALIZED"
+    assert len(store.get("durable-opportunity-001")["evidence"]) == 2
+
+
+def test_durable_revenue_store_rejects_conflicting_retries(tmp_path):
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    store.create("durable-opportunity-002", "100", "USD")
+    store.verify("durable-opportunity-002", {
+        "transaction_id": "durable-original",
+        "evidence_ref": "evidence://payment/durable-original",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    })
+    with pytest.raises(ValueError, match="conflicting payment evidence"):
+        store.verify("durable-opportunity-002", {
+            "transaction_id": "durable-other",
+            "evidence_ref": "evidence://payment/durable-other",
+            "source": "independent-bank-record",
+            "verification_status": "INDEPENDENTLY_VERIFIED",
+            "amount": "100",
+            "currency": "USD",
+        })
+    assert store.get("durable-opportunity-002")["status"] == "PAYMENT_VERIFIED"
+
+
+def test_durable_revenue_store_create_is_idempotent_and_rejects_identity_conflict(tmp_path):
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    first = store.create("durable-opportunity-003", "100", "USD")
+    assert store.create("durable-opportunity-003", "100", "USD") == first
+    with pytest.raises(ValueError, match="conflicting revenue record"):
+        store.create("durable-opportunity-003", "200", "USD")
