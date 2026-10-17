@@ -9,6 +9,7 @@ from brain_v12.brain.mining_controller import (
     choose_plan,
     evidence_record,
     profitability_gate,
+    verify_payout_proof,
 )
 
 
@@ -178,4 +179,66 @@ def test_evidence_record_does_not_claim_independent_payment_verification():
     )
     assert result["status"] == "MINING_EVIDENCE_ONLY"
     assert result["payment_claim_present"] is True
+    assert result["payment_independently_verified"] is False
+
+
+def test_payout_proof_never_trusts_caller_flag_as_provider_attestation():
+    evidence = {
+        "transaction_id": "tx-123",
+        "worker_id": "worker-01",
+        "currency": "XMR",
+        "source": "claimed-pool-api",
+        "amount": 0.25,
+    }
+    result = verify_payout_proof(
+        evidence=evidence,
+        expected_worker_id="worker-01",
+        expected_currency="XMR",
+        independent_source_verified=True,
+    )
+    assert result["status"] == "PAYOUT_PROOF_REQUIRES_TRUSTED_PROVIDER_ATTESTATION"
+    assert result["payment_independently_verified"] is False
+    assert result["revenue_realized"] is False
+
+
+def test_payout_proof_requires_independent_source_and_matches_worker_currency():
+    evidence = {
+        "transaction_id": "tx-123",
+        "worker_id": "worker-01",
+        "currency": "XMR",
+        "source": "pool-api",
+        "amount": 0.25,
+    }
+    pending = verify_payout_proof(
+        evidence=evidence,
+        expected_worker_id="worker-01",
+        expected_currency="XMR",
+    )
+    assert pending["status"] == "PAYOUT_PROOF_PENDING_INDEPENDENT_SOURCE"
+
+    mismatch = verify_payout_proof(
+        evidence=evidence,
+        expected_worker_id="worker-02",
+        expected_currency="XMR",
+        independent_source_verified=True,
+    )
+    assert mismatch["reason"] == "WORKER_ID_MISMATCH"
+
+
+@pytest.mark.parametrize("amount", [0, -1, math.nan, math.inf, True, "0.25", 10**1000])
+def test_payout_proof_rejects_invalid_amount(amount):
+    evidence = {
+        "transaction_id": "tx-123",
+        "worker_id": "worker-01",
+        "currency": "XMR",
+        "source": "pool-api",
+        "amount": amount,
+    }
+    result = verify_payout_proof(
+        evidence=evidence,
+        expected_worker_id="worker-01",
+        expected_currency="XMR",
+        independent_source_verified=True,
+    )
+    assert result["status"] == "PAYOUT_PROOF_INVALID"
     assert result["payment_independently_verified"] is False
