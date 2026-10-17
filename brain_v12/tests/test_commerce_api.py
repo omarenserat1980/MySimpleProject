@@ -1,8 +1,14 @@
+import hashlib
+import hmac
+import json
+import os
 import tempfile
 import unittest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pathlib import Path
 
-from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore
+from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore, router as commerce_router
 
 
 class CommerceApiTests(unittest.TestCase):
@@ -66,3 +72,99 @@ class CommerceApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PayTabsCommerceWebhookTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.db = str(Path(self.temp.name) / "commerce.json")
+        self.previous_db = os.environ.get("BRAIN_COMMERCE_DB")
+        self.previous_paytabs_key = os.environ.get("PAYTABS_SERVER_KEY")
+        self.previous_authority_secret = os.environ.get("BRAIN_PAYMENT_WEBHOOK_SECRET")
+        os.environ["BRAIN_COMMERCE_DB"] = self.db
+        os.environ["PAYTABS_SERVER_KEY"] = "TEST_PAYTABS_KEY_ONLY"
+        os.environ["BRAIN_PAYMENT_WEBHOOK_SECRET"] = "TEST_BRAIN_AUTHORITY_SECRET_ONLY"
+        app = FastAPI()
+        app.include_router(commerce_router(self.db))
+        self.client = TestClient(app)
+
+    def tearDown(self):
+        for name, old in (
+            ("BRAIN_COMMERCE_DB", self.previous_db),
+            ("PAYTABS_SERVER_KEY", self.previous_paytabs_key),
+            ("BRAIN_PAYMENT_WEBHOOK_SECRET", self.previous_authority_secret),
+        ):
+            if old is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = old
+        self.temp.cleanup()
+
+    def _pending_order(self):
+        response = self.client.post("/api/commerce/orders", json={
+            "customer_name": "Test Customer",
+            "contact": "test@example.com",
+            "product_id": "ai-starter-kit",
+        })
+        self.assertEqual(response.status_code, 200)
+        order_id = response.json()["order"]["order_id"]
+        pending = self.client.post(
+            f"/api/commerce/orders/{order_id}/payment-pending",
+            json={"evidence_ref": "test-checkout-intent"},
+        )
+        self.assertEqual(pending.status_code, 200)
+        return order_id
+
+    def _callback(self, order_id, *, tran_type="sale", signature_override=None):
+        payload = {
+            "cart_id": order_id,
+            "cart_amount": "9.00",
+            "cart_currency": "USD",
+            "tran_type": tran_type,
+            "payment_result": {"response_status": "A"},
+            "tran_ref": "PAYTABS-TEST-TX-001",
+        }
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        sig = hmac.new(b"TEST_PAYTABS_KEY_ONLY", raw, hashlib.sha256).hexdigest()
+        if signature_override is not None:
+            sig = signature_override
+        return self.client.post(
+            f"/api/commerce/orders/{order_id}/paytabs-webhook",
+            content=raw,
+            headers={"signature": sig, "content-type": "application/json"},
+        )
+
+    def test_signed_captured_sale_creates_order_bound_authority(self):
+        order_id = self._pending_order()
+        response = self._callback(order_id)
+        self.assertEqual(response.status_code, 200, response.text)
+        order = response.json()["order"]
+        self.assertEqual(order["state"], "PAYMENT_VERIFIED")
+        authority = order["revenue_authority"]
+        self.assertEqual(authority["provider"], "paytabs")
+        self.assertEqual(authority["order_id"], order_id)
+        self.assertEqual(authority["payment_transaction_id"], "PAYTABS-TEST-TX-001")
+        self.assertTrue(authority["event_id"])
+
+    def test_duplicate_signed_callback_is_idempotent(self):
+        order_id = self._pending_order()
+        first = self._callback(order_id)
+        self.assertEqual(first.status_code, 200, first.text)
+        second = self._callback(order_id)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertTrue(second.json()["duplicate"])
+        self.assertEqual(second.json()["order"]["state"], "PAYMENT_VERIFIED")
+
+    def test_invalid_provider_signature_does_not_change_order(self):
+        order_id = self._pending_order()
+        response = self._callback(order_id, signature_override="0" * 64)
+        self.assertEqual(response.status_code, 400)
+        order = CommerceStore(self.db).get(order_id)
+        self.assertEqual(order["state"], "PAYMENT_PENDING")
+        self.assertNotIn("revenue_authority", order)
+
+    def test_authorization_only_callback_is_rejected(self):
+        order_id = self._pending_order()
+        response = self._callback(order_id, tran_type="auth")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("PAYTABS_CAPTURED_SALE_REQUIRED", response.text)
