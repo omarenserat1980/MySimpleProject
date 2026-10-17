@@ -108,3 +108,59 @@ def test_mcp_asic_sha256d_tool_runs_bounded_software_work_and_preserves_evidence
     assert result["result"]["pool_contacted"] is False
     assert result["result"]["share_submitted"] is False
     assert result["result"]["revenue_verified"] is False
+
+
+def test_mcp_exposes_distinct_rtl_self_test_and_never_falls_back_to_python(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as adapter_module
+
+    monkeypatch.setattr(adapter_module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "VERIFIED",
+        "rtl_executed": True,
+        "evidence_status": "RTL_SIMULATION_VERIFIED",
+        "physical_asic_executed": False,
+        "pool_contacted": False,
+        "share_submitted": False,
+        "pool_acceptance_verified": False,
+        "revenue_verified": False,
+    })
+    adapter = ASICResourceAdapter()
+    c = client(asic_resources=adapter)
+    listed = rpc(c, "tools/list")
+    names = {tool["name"] for tool in listed.json()["result"]["tools"]}
+    assert "brain.asic_sha256d_rtl_self_test" in names
+
+    response = rpc(c, "tools/call", {
+        "name": "brain.asic_sha256d_rtl_self_test",
+        "arguments": {"resource_id": "mcp-rtl-test", "timeout_seconds": 5},
+    })
+    result = response.json()["result"]["structuredContent"]
+    assert result["ok"] is True
+    assert result["status"] == "RTL_SIMULATION_VERIFIED"
+    assert result["result"]["execution_mode"] == "RTL_SIMULATION"
+    assert result["result"]["rtl_executed"] is True
+    assert result["result"]["physical_asic_executed"] is False
+    assert result["evidence_verification"] == "VERIFIED"
+
+
+def test_mcp_rtl_self_test_toolchain_failure_is_not_success(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as adapter_module
+
+    monkeypatch.setattr(adapter_module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "BLOCKED_TOOLCHAIN_UNAVAILABLE",
+        "rtl_executed": False,
+        "evidence_status": "BLOCKED",
+    })
+    c = client(asic_resources=ASICResourceAdapter())
+    response = rpc(c, "tools/call", {
+        "name": "brain.asic_sha256d_rtl_self_test",
+        "arguments": {},
+    })
+    result = response.json()["result"]["structuredContent"]
+    assert result["ok"] is False
+    assert result["status"] == "BLOCKED_TOOLCHAIN_UNAVAILABLE"
+    assert result["evidence_ref"] is None
+    assert response.json()["result"]["isError"] is True
