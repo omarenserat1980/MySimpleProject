@@ -173,6 +173,7 @@ sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
 sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
 task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
+app.state.brain_supervisor = brain_supervisor
 from .github_actions_operator import GitHubActionsOperator
 from .brain.execution_gateway import BrainExecutionGateway
 execution_gateway=BrainExecutionGateway()
