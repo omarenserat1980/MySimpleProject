@@ -17,6 +17,13 @@ D1 binding: BRAIN_DB (database name: brain-commercial)
 
 The GitHub deployment workflow provisions/binds the D1 database and applies migrations when Cloudflare credentials are configured. D1 migrations are versioned under migrations/.
 
+## Delivery artifact trust boundary
+
+- Set the Worker variable `BRAIN_DELIVERY_ALLOWED_ORIGINS` to a comma-separated allowlist of exact HTTPS origins that actually host trusted service artifacts (origins only; no paths).
+- Keep this variable unset until the artifact host is selected and reviewed. In that state, `/health` reports `delivery_artifact_policy: NOT_CONFIGURED` and job completion fails closed.
+- Job completion requires structured evidence, an HTTPS artifact URL on an allowlisted origin, and a 64-character SHA-256 digest. The digest is currently recorded as executor-supplied evidence; this Worker does not download the artifact or independently recompute the digest. Do not treat the digest alone as proof that the artifact contents are authentic.
+- Before enabling production delivery, add an authenticated artifact verifier or signed-manifest verification and test it against the actual artifact provider. Do not use a broad wildcard origin or a user-controlled public upload host.
+
 ## Payment safety
 
 - Uses the Jordan endpoint https://secure-jordan.paytabs.com/payment/request.
