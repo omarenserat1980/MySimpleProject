@@ -33,6 +33,18 @@ assert.match(schema, /CREATE TABLE IF NOT EXISTS payment_events/);
 assert.match(wrangler, /binding = "BRAIN_DB"/);
 assert.match(wrangler, /migrations_dir = "migrations"/);
 
+assert.match(worker, /PAYPAL_CLIENT_ID/);
+assert.match(worker, /PAYPAL_CLIENT_SECRET/);
+assert.match(worker, /\/api\/payments\/paypal\/create/);
+assert.match(worker, /\/api\/payments\/paypal\/capture/);
+assert.match(worker, /\/api\/payments\/paypal\/webhook/);
+assert.match(worker, /verify-webhook-signature/);
+assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
+assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
+console.log("PAYPAL_SANDBOX_STATIC_GATES=PASS");
+
 console.log("COMMERCIAL_WORKER_STATIC_TEST=PASS");
 console.log("PAYMENT_VERIFICATION_GATES=PASS");
 console.log("D1_SCHEMA_GATES=PASS");
