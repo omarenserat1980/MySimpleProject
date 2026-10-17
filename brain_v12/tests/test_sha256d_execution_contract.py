@@ -10,7 +10,7 @@ from brain_v12.brain.sha256d_execution_contract import (
     make_layer_result, validate_layer_result, layer_status_snapshot,
 )
 from brain_v12.brain.sha256d_rtl_adapter import (
-    _run_command, normalize_cpu_benchmark, run_rtl_smoke, validate_nonce_range,
+    _run_command, classify_simulation_result, normalize_cpu_benchmark, run_rtl_smoke, validate_nonce_range,
 )
 
 
@@ -55,6 +55,27 @@ class Sha256dRtlAdapterTests(unittest.TestCase):
         for start, attempts in ((-1, 1), (0, 0), (0xFFFFFFFF, 2), (0, 1_000_001)):
             with self.subTest(start=start, attempts=attempts), self.assertRaises(ValueError):
                 validate_nonce_range(start, attempts)
+
+    def test_zero_exit_without_success_marker_is_not_pass(self):
+        status, error, marker = classify_simulation_result(
+            {"status": "PASS", "exit_code": 0}, "simulation ended without proof",
+            "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED",
+        )
+        self.assertEqual(status, "FAIL")
+        self.assertEqual(error, "SUCCESS_MARKER_MISSING")
+        self.assertFalse(marker)
+
+    def test_required_marker_and_zero_exit_are_both_required(self):
+        status, error, marker = classify_simulation_result(
+            {"status": "PASS", "exit_code": 0}, "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED",
+            "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED",
+        )
+        self.assertEqual((status, error, marker), ("PASS", None, True))
+        failed, _, _ = classify_simulation_result(
+            {"status": "FAIL", "exit_code": 7}, "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED",
+            "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED",
+        )
+        self.assertEqual(failed, "FAIL")
 
     def test_missing_tool_is_blocked(self):
         with patch("brain_v12.brain.sha256d_rtl_adapter.shutil.which", return_value=None):
