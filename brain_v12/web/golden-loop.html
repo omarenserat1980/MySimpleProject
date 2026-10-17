@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الحلقة الذهبية — سجل الأدلة</title>
+<style>
+:root{color-scheme:light;--ink:#172033;--muted:#5c6678;--line:#d7dde7;--paper:#fff;--bg:#eef1f6;--accent:#173b63}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,Arial,sans-serif;line-height:1.55}
+.toolbar{max-width:210mm;margin:18px auto 10px;display:flex;gap:8px;align-items:center;justify-content:space-between;padding:0 4px}
+button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer}
+.sheet{width:210mm;min-height:297mm;margin:0 auto 24px;background:var(--paper);padding:15mm;box-shadow:0 8px 28px #1d2a3a18}
+h1{font-size:23px;margin:0 0 4px;color:var(--accent)}.sub{margin:0 0 18px;color:var(--muted);font-size:12px}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}.metric{border:1px solid var(--line);border-radius:8px;padding:10px}.metric small{display:block;color:var(--muted)}.metric strong{font-size:19px}
+h2{font-size:15px;border-bottom:1px solid var(--line);padding-bottom:6px;margin:18px 0 8px}
+.status{font-size:12px;color:var(--muted);margin:10px 0}.status.error{color:#9b1c1c}
+table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}th,td{border:1px solid var(--line);padding:7px;vertical-align:top;overflow-wrap:anywhere}th{background:#f3f6fa;text-align:right}
+code{font-size:10px;direction:ltr;unicode-bidi:embed}.pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:1px 7px;font-size:10px}
+.empty{padding:24px;border:1px dashed var(--line);text-align:center;color:var(--muted);border-radius:8px}
+footer{margin-top:18px;padding-top:8px;border-top:1px solid var(--line);color:var(--muted);font-size:10px}
+@page{size:A4;margin:0}
+@media print{body{background:#fff}.toolbar{display:none}.sheet{margin:0;width:210mm;min-height:297mm;box-shadow:none;padding:12mm}.metric,th,td{break-inside:avoid}a{color:inherit;text-decoration:none}}
+@media screen and (max-width:800px){.toolbar{margin:10px;padding:0 8px}.sheet{width:100%;min-height:100vh;padding:18px;overflow-x:auto}.summary{grid-template-columns:repeat(3,minmax(0,1fr))}table{min-width:650px}}
+</style>
+</head>
+<body>
+<div class="toolbar"><strong>عرض قراءة فقط · الحلقة الذهبية</strong><div><button id="refresh">تحديث السجل</button> <button id="print">طباعة A4</button></div></div>
+<main class="sheet">
+<header><h1>الحلقة الذهبية — سجل العمليات والأدلة</h1><p class="sub">واجهة تدقيق للقراءة فقط · المصدر: Evidence Store · لا تنفّذ مهام ولا تغيّر حالة النظام</p></header>
+<section class="summary">
+<div class="metric"><small>إجمالي أدلة الحلقة</small><strong id="total">—</strong></div>
+<div class="metric"><small>الأحداث المعروضة</small><strong id="shown">—</strong></div>
+<div class="metric"><small>حالة المصدر</small><strong id="source">غير مفحوص</strong></div>
+</section>
+<h2>تسلسل المراحل</h2>
+<p class="sub">INTENT ← PLAN ← AUTHORITY ← ADMIT ← EXECUTE ← OBSERVE ← VERIFY ← COMMIT ← LEARN ← CLOSE؛ وعند الفشل RECOVER ثم FAILED.</p>
+<div id="status" class="status" role="status">جارٍ قراءة سجل الأدلة…</div>
+<div id="empty" class="empty" hidden>لا توجد أدلة مسجلة للحلقة الذهبية حتى الآن. لن تُعرض إنجازات غير مثبتة.</div>
+<table id="eventsTable" hidden><thead><tr><th style="width:17%">الوقت (Unix)</th><th style="width:15%">المهمة</th><th style="width:16%">المرحلة</th><th style="width:15%">التحقق</th><th style="width:37%">الدليل / SHA-256</th></tr></thead><tbody id="events"></tbody></table>
+<footer>تُعرض السجلات المحفوظة فقط. وجود حدث لا يثبت وحده أن المهمة نجحت؛ يُرجى قراءة حالة التحقق وبصمة الدليل. لم تُجرَ أي عملية تنفيذ من هذه الصفحة.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function phaseOf(e){return e.phase||(e.kind||"").replace(/^golden:/,"").toUpperCase()}
+function timeOf(v){if(!v)return "—";try{return new Date(Number(v)*1000).toISOString().replace("T"," ").replace("Z"," UTC")}catch{return String(v)}}
+function cell(tr,text){const td=document.createElement("td");td.textContent=text??"—";tr.appendChild(td)}
+async function load(){ $("status").className="status";$("status").textContent="جارٍ قراءة سجل الأدلة…";try{
+ const r=await fetch("/api/golden-loop/events?limit=100",{headers:{"Accept":"application/json"},cache:"no-store"});
+ if(!r.ok)throw new Error("HTTP "+r.status);
+ const d=await r.json();if(d.read_only!==true)throw new Error("مصدر القراءة غير مؤكد");
+ $("total").textContent=String(d.total_evidence??0);$("shown").textContent=String(d.returned??0);$("source").textContent="متصل";
+ const body=$("events");body.replaceChildren();
+ for(const e of (d.events||[])){const tr=document.createElement("tr");cell(tr,timeOf(e.created_at));cell(tr,e.task_id);cell(tr,phaseOf(e));cell(tr,e.verification_status||"UNVERIFIED");const td=document.createElement("td");const id=document.createElement("div");id.textContent=e.evidence_id||"—";const hash=document.createElement("code");hash.textContent=e.sha256||"—";td.append(id,hash);tr.appendChild(td);body.appendChild(tr)}
+ $("eventsTable").hidden=!d.events?.length;$("empty").hidden=!!d.events?.length;$("status").textContent="آخر قراءة ناجحة · البيانات معروضة كما وردت من الخادم دون تعديل";
+ }catch(e){$("source").textContent="غير متاح";$("status").className="status error";$("status").textContent="تعذرت قراءة سجل الأدلة: "+e.message+" · لم تُنشأ سجلات بديلة.";$("empty").hidden=true;$("eventsTable").hidden=true}}
+$("refresh").addEventListener("click",load);$("print").addEventListener("click",()=>window.print());load();
+</script>
+</body>
+</html>

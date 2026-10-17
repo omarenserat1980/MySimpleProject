@@ -22,7 +22,13 @@ class EvidenceStore:
         raw=json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":")).encode()
         return hashlib.sha256(raw).hexdigest()
 
-    def append(self,task_id,kind,payload,producer="brain"):
+    def append(self,task_id,kind,payload,producer="brain",*,mission_id=None,attempt=None,phase=None):
+        # Optional Golden-loop metadata remains backward-compatible with existing producers.
+        if mission_id is not None or attempt is not None or phase is not None:
+            payload = dict(payload)
+            if mission_id is not None: payload.setdefault("mission_id", mission_id)
+            if attempt is not None: payload.setdefault("attempt", attempt)
+            if phase is not None: payload.setdefault("phase", phase)
         evidence_id="ev-"+uuid4().hex
         digest=self.digest(payload)
         self.db.execute("INSERT INTO evidence VALUES(?,?,?,?,?,?,?,?)",
@@ -47,5 +53,20 @@ class EvidenceStore:
         self.db.execute("UPDATE evidence SET verification_status=? WHERE evidence_id=?",(status,evidence_id))
         self.db.commit()
         return {"ok":valid,"status":status,"evidence_id":evidence_id,"sha256":item["sha256"]}
+
+    def recent_golden(self, limit=100):
+        """Return recent Golden-loop evidence only; this is a read-only projection."""
+        limit = max(1, min(int(limit), 200))
+        rows = self.db.execute(
+            "SELECT evidence_id FROM evidence WHERE kind LIKE 'golden:%' ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [self.get(row["evidence_id"]) for row in rows]
+
+    def golden_count(self):
+        row = self.db.execute(
+            "SELECT COUNT(*) AS total FROM evidence WHERE kind LIKE 'golden:%'"
+        ).fetchone()
+        return int(row["total"])
 
     def close(self): self.db.close()
