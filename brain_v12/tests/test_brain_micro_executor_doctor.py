@@ -48,9 +48,7 @@ def test_doctor_fails_when_required_file_is_missing(tmp_path: Path) -> None:
     make_repo(tmp_path)
     (tmp_path / "brain_v12" / "app.py").unlink()
     result = run_doctor(tmp_path)
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 1
     payload = json.loads(result.stdout)
     required = [item for item in payload["checks"] if item["name"].startswith("required_file:")]
     assert any(not item["ok"] for item in required)
-    # Diagnostics report required-file failures; exit status currently gates only
-    # runtime compatibility and repository discovery, not project completeness.
