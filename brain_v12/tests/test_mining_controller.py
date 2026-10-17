@@ -130,3 +130,51 @@ def test_profitability_gate_rejects_arithmetic_overflow():
 def test_profitability_gate_rejects_integer_too_large_for_float():
     with pytest.raises(ValueError, match="finite number"):
         profitability_gate(10**1000, 0.0)
+
+
+@pytest.mark.parametrize("field,bad_value", [
+    ("runtime_seconds", True),
+    ("runtime_seconds", 1.5),
+    ("hashrate", math.nan),
+    ("hashrate", math.inf),
+    ("accepted_shares", -1),
+    ("accepted_shares", 1.5),
+    ("rejected_shares", False),
+    ("verified_received", math.inf),
+    ("verified_received", -0.01),
+    ("worker_id", ""),
+    ("algorithm", " "),
+    ("currency", ""),
+    ("payout_tx_id", ""),
+])
+def test_evidence_record_rejects_invalid_fields(field, bad_value):
+    values = {
+        "worker_id": "worker-01",
+        "algorithm": "randomx",
+        "runtime_seconds": 600,
+        "hashrate": 1000.0,
+        "accepted_shares": 10,
+        "rejected_shares": 1,
+        "payout_tx_id": None,
+        "verified_received": 0.0,
+        "currency": "XMR",
+    }
+    values[field] = bad_value
+    with pytest.raises(ValueError):
+        evidence_record(**values)
+
+
+def test_evidence_record_does_not_claim_independent_payment_verification():
+    result = evidence_record(
+        worker_id="worker-01",
+        algorithm="randomx",
+        runtime_seconds=600,
+        hashrate=1000,
+        accepted_shares=10,
+        rejected_shares=1,
+        payout_tx_id="tx-claimed-by-caller",
+        verified_received=0.25,
+        currency="XMR",
+    )
+    assert result["status"] == "PAYMENT_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION"
+    assert result["payment_independently_verified"] is False
