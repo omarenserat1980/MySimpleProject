@@ -9,7 +9,6 @@ import re
 import shutil
 import subprocess
 import time
-import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -103,8 +102,11 @@ def run_sha256d_rtl_self_test(
                 iverilog, "-g2012", "-Wall", "-s", "tb_bitcoin_genesis_nonce_search",
                 "-o", output, *(str(RTL_DIR / name) for name in RTL_SOURCES),
             ]
+            compile_remaining = deadline - time.monotonic()
+            if compile_remaining <= 0:
+                return {**base, "status": "RTL_COMPILE_TIMEOUT", "error_code": "OVERALL_TIMEOUT"}
             compiled, compile_stop = _run_process(
-                compile_cmd, cwd=str(ROOT), timeout_seconds=float(timeout_seconds),
+                compile_cmd, cwd=str(ROOT), timeout_seconds=compile_remaining,
                 cancel_check=cancel_check,
             )
             if compile_stop == "CANCELLED":
@@ -117,8 +119,11 @@ def run_sha256d_rtl_self_test(
                     "return_code": compiled.returncode,
                     "stderr_tail": (compiled.stderr or "")[-2000:],
                 }
+            simulation_remaining = deadline - time.monotonic()
+            if simulation_remaining <= 0:
+                return {**base, "status": "RTL_SIMULATION_TIMEOUT", "error_code": "OVERALL_TIMEOUT"}
             simulated, simulation_stop = _run_process(
-                [vvp, output], cwd=str(ROOT), timeout_seconds=float(timeout_seconds),
+                [vvp, output], cwd=str(ROOT), timeout_seconds=simulation_remaining,
                 cancel_check=cancel_check,
             )
             if simulation_stop == "CANCELLED":
