@@ -14,6 +14,13 @@ builder.Services.AddSingleton<WorkerHeartbeatStore>();
 builder.Services.AddSingleton<WorkerState>();
 builder.Services.AddSingleton<WorkerRegistry>();
 builder.Services.AddSingleton<JobLeaseStore>();
+builder.Services.AddSingleton<DurableFileTaskQueue>(services =>
+{
+    var path = Environment.GetEnvironmentVariable("BRAIN_TASK_QUEUE_PATH");
+    if (string.IsNullOrWhiteSpace(path))
+        path = "/var/lib/brain/task-queue.json";
+    return new DurableFileTaskQueue(path);
+});
 builder.Services.AddHostedService<BrainSupervisorWorker>();
 builder.Services.AddHostedService<VideoWorker>();
 builder.Services.AddHostedService<MiningWorker>();
@@ -67,6 +74,59 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
     recent_pulses = state.Snapshot().TakeLast(50)
 }));
 
+// Bounded task API: it only queues allow-listed task types. It does not execute them.
+app.MapPost("/api/tasks", (HttpContext http, TaskSubmissionRequest request, DurableFileTaskQueue queue) =>
+{
+    if (!IsAuthorized(http))
+        return Results.Unauthorized();
+
+    if (!http.Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey) ||
+        string.IsNullOrWhiteSpace(idempotencyKey))
+        return Results.BadRequest(new { ok = false, error = "IDEMPOTENCY_KEY_REQUIRED" });
+
+    if (request.Arguments.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
+        return Results.BadRequest(new { ok = false, error = "TASK_ARGUMENTS_REQUIRED" });
+
+    try
+    {
+        var result = queue.Submit(
+            "cloud-api-key",
+            idempotencyKey.ToString(),
+            request.TaskType ?? "",
+            request.Arguments.GetRawText());
+        var task = result.Task;
+        return Results.Json(new
+        {
+            ok = true,
+            duplicate = result.Duplicate,
+            task = new { task.TaskId, task.TaskType, task.Status, task.CreatedAt, task.UpdatedAt, task.Attempt }
+        }, statusCode: result.Duplicate ? StatusCodes.Status200OK : StatusCodes.Status202Accepted);
+    }
+    catch (InvalidOperationException ex) when (ex.Message == "IDEMPOTENCY_KEY_PAYLOAD_CONFLICT")
+    {
+        return Results.Conflict(new { ok = false, error = "IDEMPOTENCY_KEY_PAYLOAD_CONFLICT" });
+    }
+    catch (ArgumentException)
+    {
+        return Results.BadRequest(new { ok = false, error = "INVALID_TASK_REQUEST", allowedTaskTypes = new[] { "health_check", "simulation_status" } });
+    }
+});
+
+app.MapGet("/api/tasks/{taskId}", (HttpContext http, string taskId, DurableFileTaskQueue queue) =>
+{
+    if (!IsAuthorized(http))
+        return Results.Unauthorized();
+
+    var task = queue.Snapshot().FirstOrDefault(t => t.TaskId == taskId);
+    if (task is null) return Results.NotFound(new { ok = false, error = "TASK_NOT_FOUND" });
+
+    return Results.Ok(new
+    {
+        ok = true,
+        task = new { task.TaskId, task.TaskType, task.Status, task.CreatedAt, task.UpdatedAt, task.Attempt, task.ResultJson, task.ErrorCode }
+    });
+});
+
 app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
 {
     var expected = Environment.GetEnvironmentVariable("BRAIN_CLOUD_API_KEY");
@@ -91,4 +151,13 @@ app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
 
 app.Run();
 
+static bool IsAuthorized(HttpContext http)
+{
+    var expected = Environment.GetEnvironmentVariable("BRAIN_CLOUD_API_KEY");
+    return !string.IsNullOrWhiteSpace(expected) &&
+        http.Request.Headers.TryGetValue("X-Brain-Api-Key", out var supplied) &&
+        supplied == expected;
+}
+
+public sealed record TaskSubmissionRequest(string? TaskType, System.Text.Json.JsonElement Arguments);
 public sealed record CommandRequest(string? Command);
