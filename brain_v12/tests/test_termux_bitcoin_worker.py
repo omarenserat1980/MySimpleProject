@@ -6,11 +6,19 @@ from unittest.mock import patch
 
 from brain_v12.brain.termux_bitcoin_worker import (
     build_command, validate_pool_url, _positive_int, parse_miner_line, main,
-    supervisor_exit_code,
+    supervisor_exit_code, is_cpu_thermal_zone_type,
 )
 
 
 class TermuxBitcoinWorkerTests(unittest.TestCase):
+    def test_only_cpu_related_thermal_zones_are_accepted(self):
+        for zone_type in ("cpu-thermal", "CPU0", "soc_thermal", "gpu-therm", "package"):
+            with self.subTest(zone_type=zone_type):
+                self.assertTrue(is_cpu_thermal_zone_type(zone_type))
+        for zone_type in ("battery", "modem-therm", "skin", "usb", "tsens_tz_sensor0", "unknown"):
+            with self.subTest(zone_type=zone_type):
+                self.assertFalse(is_cpu_thermal_zone_type(zone_type))
+
     def test_expected_duration_limit_is_success_even_when_terminated_by_signal(self):
         self.assertEqual(supervisor_exit_code("duration_limit", -15), 0)
         self.assertEqual(supervisor_exit_code("duration_limit", 0), 0)
@@ -18,6 +26,7 @@ class TermuxBitcoinWorkerTests(unittest.TestCase):
     def test_unexpected_exit_and_thermal_stop_are_not_success(self):
         self.assertEqual(supervisor_exit_code("process_exit", 0), 1)
         self.assertEqual(supervisor_exit_code("thermal_limit", -15), 1)
+        self.assertEqual(supervisor_exit_code("thermal_sensor_lost", -15), 1)
         self.assertEqual(supervisor_exit_code("user_interrupt", 130), 130)
 
     def test_builds_sha256d_command_with_bounded_threads(self):
@@ -90,6 +99,23 @@ class TermuxBitcoinWorkerTests(unittest.TestCase):
             code, output = self._run_main_captured()
         self.assertEqual(code, 2)
         self.assertIn("BLOCKED_CI_ENVIRONMENT", output)
+        popen.assert_not_called()
+
+    def test_live_mining_is_blocked_without_thermal_sensor(self):
+        env = {
+            "BRAIN_ENABLE_LIVE_MINING": "YES",
+            "TERMUX_VERSION": "test",
+            "BRAIN_MINING_POOL_URL": "stratum+tcp://pool.example:3333",
+            "BRAIN_MINING_WORKER": "wallet.worker1",
+            "BRAIN_CPUMINER_BIN": "/usr/bin/cpuminer",
+        }
+        with patch.dict(os.environ, env, clear=True), patch(
+            "brain_v12.brain.termux_bitcoin_worker.read_max_temperature_c",
+            return_value=None,
+        ), patch("brain_v12.brain.termux_bitcoin_worker.subprocess.Popen") as popen:
+            code, output = self._run_main_captured()
+        self.assertEqual(code, 2)
+        self.assertIn("BLOCKED_THERMAL_SENSOR_UNAVAILABLE", output)
         popen.assert_not_called()
 
     def test_live_mining_is_blocked_outside_termux(self):
