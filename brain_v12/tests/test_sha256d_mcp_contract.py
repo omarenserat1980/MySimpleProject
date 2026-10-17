@@ -31,7 +31,13 @@ class Sha256dMcpContractTests(unittest.TestCase):
     def test_mcp_validates_shared_cpu_rtl_evidence_contract(self):
         record = make_layer_result(
             layer="cpu_reference", status="PASS",
-            evidence={"execution_scope": "HOST_CPU_SOFTWARE_ONLY", "hashes_completed": 1},
+            evidence={
+                "execution_scope": "HOST_CPU_SOFTWARE_ONLY",
+                "hashes_completed": 1,
+                "elapsed_seconds": 0.1,
+                "hashrate_hs": 10.0,
+                "last_digest_hex": "a" * 64,
+            },
         )
         response = self.client.post("/mcp", headers=self.headers, json={
             "jsonrpc": "2.0", "id": 3, "method": "tools/call",
