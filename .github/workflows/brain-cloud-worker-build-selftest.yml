@@ -1,0 +1,46 @@
+name: Brain Cloud Worker Build and Self-Test
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/cloud_worker/**"
+      - ".github/workflows/brain-cloud-worker-build-selftest.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "brain_v12/cloud_worker/**"
+      - ".github/workflows/brain-cloud-worker-build-selftest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-cloud-worker-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-self-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore brain_v12/cloud_worker/BrainCloudWorker.csproj
+
+      - name: Build Release
+        run: dotnet build brain_v12/cloud_worker/BrainCloudWorker.csproj --configuration Release --no-restore
+
+      - name: Run worker self-test
+        run: dotnet run --project brain_v12/cloud_worker/BrainCloudWorker.csproj --configuration Release --no-build -- --self-test
+
+      - name: Build container image
+        run: docker build --file brain_v12/cloud_worker/Dockerfile --tag brain-cloud-worker:ci .
