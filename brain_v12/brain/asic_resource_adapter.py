@@ -242,6 +242,9 @@ class ASICResourceAdapter:
             header, target, start_nonce=start_nonce, max_attempts=max_attempts
         )
         payload = {
+            "contract_version": "brain.sha256d.execution.v1",
+            "status": "SIMULATION_ONLY",
+            "execution_layer": "PYTHON_SOFTWARE",
             "resource_id": resource_id,
             "resource_type": "ASIC",
             "execution_mode": "SIMULATOR",
