@@ -143,10 +143,8 @@ def test_fake_server_rejection_and_acceptance_are_only_simulated_responses():
 
     # A duplicate response cannot be correlated to a pending request.
     with pytest.raises(StratumProtocolError, match="UNMATCHED_RESPONSE_ID"):
-        session.receive(accepted_request and (
-            json.dumps({"id": json.loads(accepted_request)["id"],
-                        "result": True, "error": None})
-        ))
+        session.receive(json.dumps({"id": json.loads(accepted_request)["id"],
+                                      "result": True, "error": None}))
 
     assert session.snapshot()["transport_connected"] is False
     assert session.snapshot()["real_bitcoin_mining"] is False
