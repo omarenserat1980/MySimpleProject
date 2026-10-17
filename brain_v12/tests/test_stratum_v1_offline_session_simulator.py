@@ -199,3 +199,29 @@ def test_session_job_and_bitcoin_header_candidate_stay_correlated_offline():
         session.request_submit("job-before", "00000001", "65aa0000", "00000001")
     assert session.snapshot()["real_bitcoin_mining"] is False
     assert session.snapshot()["revenue_verified"] is False
+
+
+
+def test_clean_jobs_false_keeps_prior_job_active_until_clean_job_arrives():
+    session = StratumV1Session(
+        "worker-test", "test-only-password", subscribed=True, authorized=True,
+    )
+    session.receive(json.dumps(notify("job-old", clean=True)))
+    session.receive(json.dumps(notify("job-new", clean=False)))
+    assert session.current_job_id == "job-new"
+    assert session.active_job_ids == {"job-old", "job-new"}
+    # The protocol may still submit a previously announced job when clean_jobs
+    # is false; this is only request construction, not network transmission.
+    request = json.loads(session.request_submit(
+        "job-old", "00000001", "65aa0000", "00000001"
+    ))
+    assert request["method"] == "mining.submit"
+    assert request["params"][1] == "job-old"
+
+    session.receive(json.dumps(notify("job-clean", clean=True)))
+    assert session.current_job_id == "job-clean"
+    assert session.active_job_ids == {"job-clean"}
+    with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
+        session.request_submit("job-old", "00000001", "65aa0000", "00000001")
+    with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
+        session.request_submit("job-new", "00000001", "65aa0000", "00000001")
