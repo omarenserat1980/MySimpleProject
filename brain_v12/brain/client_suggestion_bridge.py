@@ -11,9 +11,12 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 class ClientSuggestionBridge:
-    def __init__(self, db_path: str, chatgpt_provider: Any, decision_engine: Any, action_requester: Any):
+    def __init__(self, db_path: str, chatgpt_provider: Any, decision_engine: Any, action_requester: Any,
+                 income_searcher: Any | None = None):
         self.db_path, self.chatgpt_provider = db_path, chatgpt_provider
         self.decision_engine, self.action_requester = decision_engine, action_requester
+        # Optional, bounded public-listing research; never submits offers or records revenue.
+        self.income_searcher = income_searcher
         self._init()
 
     def _connect(self):
@@ -60,9 +63,41 @@ class ClientSuggestionBridge:
             return {"ok":True,"status":"DECISION_BLOCKED","suggestion_id":sid,"client_id":client_id,
                     "chatgpt":{"provider":advice.get("provider"),"model":advice.get("model"),"reply":advice_text},
                     "decision":decision,"execution_allowed":False}
+        selected = decision.get("selected") or {}
+        income_search = None
+        if selected.get("tool_id") == "income.search":
+            if not callable(self.income_searcher):
+                result = {"ok": False, "status": "INCOME_SEARCHER_NOT_CONFIGURED"}
+                self._update(sid, "INCOME_SEARCH_BLOCKED", advice_text, decision, result)
+                return {"ok": True, "status": "INCOME_SEARCH_BLOCKED", "suggestion_id": sid,
+                        "client_id": client_id, "decision": decision, "search": result,
+                        "execution_allowed": False, "revenue_verified": False}
+            try:
+                income_search = self.income_searcher()
+                if not isinstance(income_search, dict) or not income_search.get("ok"):
+                    result = income_search if isinstance(income_search, dict) else {"ok": False, "status": "INVALID_SEARCH_RESULT"}
+                    self._update(sid, "INCOME_SEARCH_FAILED", advice_text, decision, result)
+                    return {"ok": True, "status": "INCOME_SEARCH_FAILED", "suggestion_id": sid,
+                            "client_id": client_id, "decision": decision, "search": result,
+                            "execution_allowed": False, "revenue_verified": False}
+            except Exception as exc:
+                result = {"ok": False, "status": "INCOME_SEARCH_FAILED", "error": str(exc)[:500]}
+                self._update(sid, "INCOME_SEARCH_FAILED", advice_text, decision, result)
+                return {"ok": True, "status": "INCOME_SEARCH_FAILED", "suggestion_id": sid,
+                        "client_id": client_id, "decision": decision, "search": result,
+                        "execution_allowed": False, "revenue_verified": False}
         action={"client_id":client_id,"suggestion_id":sid,"objective":"ADVANCE_CLIENT_SUGGESTION_TOWARD_VERIFIED_OUTCOME",
-                "suggestion":suggestion,"chatgpt_recommendation":advice_text[:12000],"brain_decision":decision.get("selected") or {},
+                "suggestion":suggestion,"chatgpt_recommendation":advice_text[:12000],"brain_decision":selected,
                 "constraint":"ONE_BOUNDED_ACTION_THROUGH_EXISTING_PRIMARY_PIPELINE","verified_revenue_only":True,"external_evidence_required":True}
+        if income_search is not None:
+            action["income_search"] = {
+                "ok": bool(income_search.get("ok")),
+                "received": int(income_search.get("received", 0) or 0),
+                "accepted": int(income_search.get("accepted", 0) or 0),
+                "errors": income_search.get("errors", []),
+                "retrieved_at": income_search.get("retrieved_at"),
+                "revenue_verified": False,
+            }
         outcome=self.action_requester(client_id,action)
         if not isinstance(outcome,dict): outcome={"result":outcome}
         status="ACTION_REQUESTED" if outcome.get("accepted") else "ACTION_REJECTED"
