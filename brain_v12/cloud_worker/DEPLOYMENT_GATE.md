@@ -39,3 +39,14 @@ This checklist is intentionally fail-closed. Passing CI proves that the image bu
 ## Safety boundary
 
 This checklist does not authorize production changes, secret rotation, live mining, external publishing, or financial actions. Each requires its own explicit authorization and independent verification.
+
+
+## Durable task queue capacity
+
+The file-backed queue defaults to a maximum of 10,000 task records. A deployment may set
+`BRAIN_TASK_QUEUE_MAX_RECORDS` to an integer from 1 through 100,000. Invalid values fail
+startup rather than silently disabling the bound. When the queue is full, task submission
+returns HTTP 503 with `TASK_QUEUE_CAPACITY_REACHED`; operators must inspect and manage
+retention deliberately before increasing capacity. This is a single-process file queue,
+not a distributed multi-replica queue. Do not change production environment settings without
+separate authorization and a tested rollout plan.

@@ -20,7 +20,20 @@ builder.Services.AddSingleton<DurableFileTaskQueue>(services =>
     var path = Environment.GetEnvironmentVariable("BRAIN_TASK_QUEUE_PATH");
     if (string.IsNullOrWhiteSpace(path))
         path = "/var/lib/brain/task-queue.json";
-    return new DurableFileTaskQueue(path);
+
+    const int defaultMaxTaskRecords = 10_000;
+    const int absoluteMaxTaskRecords = 100_000;
+    var configuredLimit = Environment.GetEnvironmentVariable("BRAIN_TASK_QUEUE_MAX_RECORDS");
+    var maxTaskRecords = defaultMaxTaskRecords;
+    if (!string.IsNullOrWhiteSpace(configuredLimit) &&
+        (!int.TryParse(configuredLimit, out maxTaskRecords) ||
+         maxTaskRecords < 1 || maxTaskRecords > absoluteMaxTaskRecords))
+    {
+        throw new InvalidOperationException(
+            $"BRAIN_TASK_QUEUE_MAX_RECORDS must be an integer between 1 and {absoluteMaxTaskRecords}.");
+    }
+
+    return new DurableFileTaskQueue(path, maxTaskRecords: maxTaskRecords);
 });
 builder.Services.AddHostedService<BoundedTaskConsumer>();
 builder.Services.AddHostedService<BrainSupervisorWorker>();
