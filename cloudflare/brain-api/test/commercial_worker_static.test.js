@@ -9,6 +9,7 @@ const revenueMigration = fs.readFileSync("migrations/0004_revenue_ledger.sql", "
 const deliveryMigration = fs.readFileSync("migrations/0005_delivery.sql", "utf8");
 const jobsMigration = fs.readFileSync("migrations/0006_jobs.sql", "utf8");
 const cinemaMigration = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
+const settlementMigration = fs.readFileSync("migrations/0009_settlement_reference.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
 assert.match(worker, /delivery_artifact_policy/, "health must report delivery artifact policy readiness");
@@ -146,3 +147,8 @@ assert.match(worker, /settlement_verified: false/, "transaction query must not c
 assert.match(worker, /revenue_realized: false/, "transaction query must not realize revenue");
 assert.match(worker, /PAYTABS_QUERY_EVIDENCE_MISMATCH/, "transaction query must fail closed on order/amount/currency/reference mismatch");
 assert.match(worker, /CONTROL_AUTH_REQUIRED/, "transaction reconciliation must require control-plane authentication");
+
+assert.match(worker, /SETTLEMENT_REFERENCE_ALREADY_USED/, "settlement references must not be reused across revenue rows");
+assert.match(worker, /settlement_reference IS NULL/, "realization transition must only happen once per ledger row");
+assert.match(settlementMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_settlement_reference_unique/, "settlement reference must be unique");
+assert.match(worker, /!\/^\\\\d\{4\}-\\\\d\{2\}-\\\\d\{2\}\$\//, "settlement date must use YYYY-MM-DD validation");
