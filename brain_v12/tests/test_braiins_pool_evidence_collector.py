@@ -17,6 +17,16 @@ class FakeResponse:
         self.content = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         self._payload = payload
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def iter_bytes(self, chunk_size=65536):
+        for offset in range(0, len(self.content), chunk_size):
+            yield self.content[offset:offset + chunk_size]
+
     def json(self):
         return self._payload
 
@@ -35,7 +45,8 @@ class FakeClient:
     def __exit__(self, *_args):
         return False
 
-    def get(self, url, *, headers):
+    def stream(self, method, url, *, headers):
+        assert method == "GET"
         type(self).request_args = (url, dict(headers))
         return type(self).response
 
@@ -157,3 +168,36 @@ def test_unknown_hashrate_unit_is_rejected():
                                           client_factory=FakeClient, now=now)
     assert result["reason"] == "POOL_WORKER_METRICS_INVALID"
     assert result["pool_activity_verified"] is False
+
+
+def test_streaming_rejects_oversized_response_as_soon_as_limit_is_crossed():
+    now = datetime(2026, 10, 17, 0, 0, tzinfo=timezone.utc)
+
+    class OversizedResponse(FakeResponse):
+        yielded_chunks = 0
+
+        def iter_bytes(self, chunk_size=65536):
+            type(self).yielded_chunks = 0
+            type(self).yielded_chunks += 1
+            yield b"x" * chunk_size
+            type(self).yielded_chunks += 1
+            yield b"x" * chunk_size
+
+    FakeClient.response = OversizedResponse(fixture(now))
+    from brain_v12.brain import braiins_pool_evidence_collector as collector
+    original_limit = collector.MAX_RESPONSE_BYTES
+    collector.MAX_RESPONSE_BYTES = 65536
+    try:
+        result = collect_braiins_pool_evidence(
+            api_token="test-token",
+            expected_worker_id="account.worker-01",
+            client_factory=FakeClient,
+            now=now,
+        )
+    finally:
+        collector.MAX_RESPONSE_BYTES = original_limit
+
+    assert result["reason"] == "POOL_API_RESPONSE_SIZE_INVALID"
+    assert result["pool_activity_verified"] is False
+    assert result["response_size_limit_bytes"] == 65536
+    assert OversizedResponse.yielded_chunks == 2
