@@ -35,6 +35,17 @@ internal sealed record DurableTaskQueueSnapshot(
 
 public sealed record TaskSubmissionResult(DurableTaskRecord Task, bool Duplicate);
 
+public sealed record TaskQueueCapacitySnapshot(
+    int Total,
+    int Queued,
+    int Leased,
+    int Completed,
+    int Failed,
+    int MaxRecords,
+    int Remaining,
+    double UtilizationPercent,
+    bool AtCapacity);
+
 /// <summary>
 /// Crash-safe, atomic-file task queue for a single process and single writer.
 /// This is not a distributed or multi-process queue; do not use across replicas.
@@ -213,6 +224,24 @@ public sealed class DurableFileTaskQueue
             snapshot.Audit.Add(new DurableTaskAuditEvent(taskId, "succeeded", now, current.Principal));
             WriteSnapshot(snapshot);
             return true;
+        }
+    }
+
+    public TaskQueueCapacitySnapshot CapacitySnapshot()
+    {
+        lock (_gate)
+        {
+            var tasks = ReadSnapshot().Tasks;
+            var total = tasks.Count;
+            var queued = tasks.Count(t => t.Status == "queued");
+            var leased = tasks.Count(t => t.Status == "leased");
+            var completed = tasks.Count(t => t.Status == "completed");
+            var failed = tasks.Count(t => t.Status == "failed");
+            return new TaskQueueCapacitySnapshot(
+                total, queued, leased, completed, failed, _maxTaskRecords,
+                Math.Max(0, _maxTaskRecords - total),
+                _maxTaskRecords == 0 ? 100 : Math.Round(total * 100d / _maxTaskRecords, 2),
+                total >= _maxTaskRecords);
         }
     }
 
