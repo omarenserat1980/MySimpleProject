@@ -107,5 +107,57 @@ jobs:
           assert "No command was executed" in payload, payload
           print("BRAIN_WORKER_WRONG_OR_MISSING_KEY=BLOCKED")
           print("BRAIN_WORKER_EXECUTION_STATUS=HONESTLY_NOT_CONNECTED")
+
+          # Bounded task API: auth, idempotency, allow-list, and status lookup.
+          def task_request(method, path, payload=None, headers=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              request_headers = {"X-Brain-Api-Key": "ci-test-only-key", **(headers or {})}
+              if data is not None:
+                  request_headers["Content-Type"] = "application/json"
+              request = urllib.request.Request(base + path, data=data, headers=request_headers, method=method)
+              try:
+                  with urllib.request.urlopen(request, timeout=3) as response:
+                      return response.status, json.loads(response.read().decode())
+              except urllib.error.HTTPError as exc:
+                  return exc.code, json.loads(exc.read().decode(errors="replace"))
+
+          # No API key must block task creation.
+          unauth = urllib.request.Request(
+              base + "/api/tasks",
+              data=json.dumps({"taskType": "health_check", "arguments": {"probe": "ci"}}).encode(),
+              headers={"Content-Type": "application/json", "Idempotency-Key": "ci-unauth"},
+              method="POST")
+          try:
+              urllib.request.urlopen(unauth, timeout=3)
+              raise SystemExit("SECURITY FAILURE: unauthenticated task submission accepted")
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 401, f"expected HTTP 401 for unauthenticated task submission, got {exc.code}"
+
+          status, _ = task_request("POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"probe": "ci"}},
+              {"Idempotency-Key": "ci-task-1"})
+          assert status == 202, f"expected 202 for new task, got {status}"
+          status2, duplicate = task_request("POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"probe": "ci"}},
+              {"Idempotency-Key": "ci-task-1"})
+          assert status2 == 200 and duplicate.get("duplicate") is True, (status2, duplicate)
+          task_id = duplicate["task"]["taskId"]
+
+          status3, conflict = task_request("POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"probe": "different"}},
+              {"Idempotency-Key": "ci-task-1"})
+          assert status3 == 409 and conflict.get("error") == "IDEMPOTENCY_KEY_PAYLOAD_CONFLICT", (status3, conflict)
+
+          status4, rejected = task_request("POST", "/api/tasks",
+              {"taskType": "shell", "arguments": {"cmd": "echo unsafe"}},
+              {"Idempotency-Key": "ci-task-unsafe"})
+          assert status4 == 400 and rejected.get("error") == "INVALID_TASK_REQUEST", (status4, rejected)
+
+          status5, detail = task_request("GET", "/api/tasks/" + task_id)
+          assert status5 == 200 and detail["task"]["taskId"] == task_id and detail["task"]["status"] == "queued", (status5, detail)
+          print("BRAIN_TASK_API_AUTH=PASS")
+          print("BRAIN_TASK_API_IDEMPOTENCY=PASS")
+          print("BRAIN_TASK_API_ALLOWLIST=PASS")
+          print("BRAIN_TASK_API_STATUS_LOOKUP=PASS")
           PY
           docker logs brain-cloud-worker-auth-smoke
