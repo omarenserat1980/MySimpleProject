@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           cleanup() {
-            docker rm -f brain-cloud-worker-smoke brain-cloud-worker-auth-smoke >/dev/null 2>&1 || true
+            docker rm -f brain-cloud-worker-smoke brain-cloud-worker-auth-smoke brain-cloud-worker-capacity-smoke >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
 
@@ -276,3 +276,68 @@ jobs:
           print("BRAIN_BOUNDED_CONSUMER_SIMULATION_E2E=PASS")
           PY
           docker logs brain-cloud-worker-auth-smoke
+
+          # Isolated low-capacity instance: prove HTTP 503 behavior without touching any deployment.
+          docker run --rm -d --name brain-cloud-worker-capacity-smoke \
+            -p 127.0.0.1:18081:8080 \
+            -e BRAIN_CLOUD_API_KEY=ci-capacity-only-key \
+            -e BRAIN_TASK_QUEUE_MAX_RECORDS=2 \
+            -e BRAIN_TASK_QUEUE_PATH=/tmp/brain-capacity-test.json \
+            brain-cloud-worker:ci
+          python - <<'PY'
+          import json
+          import time
+          import urllib.error
+          import urllib.request
+
+          base = "http://127.0.0.1:18081"
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen(base + "/healthz", timeout=2):
+                      break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("capacity smoke container did not become healthy")
+
+          def request(method, path, payload=None, key=None):
+              data = None if payload is None else json.dumps(payload).encode()
+              headers = {"X-Brain-Api-Key": "ci-capacity-only-key"}
+              if data is not None:
+                  headers["Content-Type"] = "application/json"
+              if key:
+                  headers["Idempotency-Key"] = key
+              req = urllib.request.Request(base + path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=3) as response:
+                      return response.status, json.loads(response.read().decode())
+              except urllib.error.HTTPError as exc:
+                  return exc.code, json.loads(exc.read().decode(errors="replace"))
+
+          for n in (1, 2):
+              status, payload = request("POST", "/api/tasks",
+                  {"taskType": "health_check", "arguments": {"capacity_test": n}},
+                  "capacity-e2e-" + str(n))
+              assert status == 202, (status, payload)
+
+          status, full = request("POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"capacity_test": 3}},
+              "capacity-e2e-3")
+          assert status == 503 and full.get("error") == "TASK_QUEUE_CAPACITY_REACHED", (status, full)
+
+          # Idempotent retry for an existing record remains safe even when full.
+          status, duplicate = request("POST", "/api/tasks",
+              {"taskType": "health_check", "arguments": {"capacity_test": 1}},
+              "capacity-e2e-1")
+          assert status == 200 and duplicate.get("duplicate") is True, (status, duplicate)
+
+          status, snapshot = request("GET", "/api/tasks/queue-status")
+          assert status == 200, (status, snapshot)
+          capacity = snapshot["capacity"]
+          assert capacity["total"] == 2 and capacity["maxRecords"] == 2, capacity
+          assert capacity["remaining"] == 0 and capacity["atCapacity"] is True, capacity
+          print("BRAIN_QUEUE_CAPACITY_HTTP_503=PASS")
+          print("BRAIN_QUEUE_CAPACITY_IDEMPOTENCY_AT_LIMIT=PASS")
+          print("BRAIN_QUEUE_CAPACITY_STATUS_AT_LIMIT=PASS")
+          PY
+          docker logs brain-cloud-worker-capacity-smoke
