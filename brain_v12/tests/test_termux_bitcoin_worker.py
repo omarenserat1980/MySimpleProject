@@ -116,6 +116,8 @@ class TermuxBitcoinWorkerTests(unittest.TestCase):
             code, output = self._run_main_captured()
         self.assertEqual(code, 2)
         self.assertIn("BLOCKED_THERMAL_SENSOR_UNAVAILABLE", output)
+        self.assertIn("BLOCKED_REQUIRED_THERMAL_SENSOR", output)
+        self.assertIn('"evidence_class": "REAL_HARDWARE"', output)
         popen.assert_not_called()
 
     def test_live_mining_is_blocked_outside_termux(self):
