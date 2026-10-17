@@ -11,7 +11,7 @@ KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent
 POLL_SECONDS = int(os.getenv("V12_POLL_SECONDS", "5"))
 TIMEOUT = 15
 
-ALLOWED_TASKS = {"status", "python_version", "brain_emulator_path", "platform"}
+ALLOWED_TASKS = {"status", "python_version", "brain_emulator_path", "platform", "brain_memory_context"}
 
 def load_key():
     with open(KEY_FILE, "r", encoding="utf-8") as f:
@@ -31,6 +31,14 @@ def request(method, path, key, payload=None):
         return json.loads(resp.read().decode("utf-8"))
 
 def execute(task, params):
+    memory = params.get("brain_memory_context") if isinstance(params, dict) else None
+    if task == "brain_memory_context":
+        return {
+            "status": "MEMORY_CONTEXT_RECEIVED",
+            "agent_id": (memory or {}).get("agent_id", AGENT_ID),
+            "history_count": len((memory or {}).get("history", [])),
+            "history": (memory or {}).get("history", []),
+        }
     if task == "status":
         return {
             "device": platform.system(),
