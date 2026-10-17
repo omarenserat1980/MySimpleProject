@@ -54,6 +54,18 @@ class SHA256dPowSimulationRequest(BaseModel):
 
 
 @router.get("/status")
+
+class SHA256dRtlSelfTestRequest(BaseModel):
+    resource_id: str = Field(default="brain-sha256d-rtl-sim", min_length=1, max_length=128)
+    timeout_seconds: float = Field(default=20.0, ge=0.1, le=120.0)
+
+    @field_validator("resource_id")
+    @classmethod
+    def validate_rtl_resource_id(cls, value: str) -> str:
+        if not value.strip() or any(ord(char) < 32 for char in value):
+            raise ValueError("INVALID_RESOURCE_ID")
+        return value.strip()
+
 def asic_simulator_status():
     return {
         "ok": True,
@@ -107,3 +119,31 @@ def asic_sha256d_pow_simulation(body: SHA256dPowSimulationRequest, request: Requ
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.post("/sha256d-rtl-self-test")
+def asic_sha256d_rtl_self_test(body: SHA256dRtlSelfTestRequest, request: Request):
+    """Run the actual repository RTL testbench; never substitute software hashing."""
+    supervisor = getattr(request.app.state, "brain_supervisor", None)
+    adapter = getattr(supervisor, "asic_resources", None)
+    if adapter is None:
+        raise HTTPException(status_code=503, detail={"status": "BRAIN_ASIC_RUNTIME_NOT_WIRED"})
+    resource = adapter.resources.get(body.resource_id)
+    if resource is None:
+        resource = ASICResource(resource_id=body.resource_id, execution_mode="SIMULATOR")
+        adapter.register(resource)
+    elif resource.execution_mode != "SIMULATOR":
+        raise HTTPException(status_code=403, detail={"status": "SIMULATION_MODE_REQUIRED"})
+    try:
+        result = adapter.simulate_sha256d_rtl(
+            body.resource_id, timeout_seconds=body.timeout_seconds
+        )
+        status = result.get("result", {}).get("status", "UNKNOWN")
+        if status != "VERIFIED":
+            return {**result, "ok": False, "status": status}
+        return {**result, "ok": True, "status": "RTL_SIMULATION_VERIFIED"}
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
