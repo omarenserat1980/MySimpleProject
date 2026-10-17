@@ -2,7 +2,6 @@
 from __future__ import annotations
 from decimal import Decimal, InvalidOperation, ROUND_FLOOR, localcontext
 import math
-from typing import SupportsInt
 
 MAX_TARGET = (1 << 256) - 1
 
