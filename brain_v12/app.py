@@ -143,12 +143,16 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
+from .brain.deployment_identity import deployment_identity
+
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+_DEPLOYMENT_IDENTITY=deployment_identity()
+DEPLOY_COMMIT=_DEPLOYMENT_IDENTITY["commit"]
+DEPLOY_BRANCH=_DEPLOYMENT_IDENTITY["branch"]
+DEPLOY_REPOSITORY=_DEPLOYMENT_IDENTITY["repository"]
+DEPLOY_SERVICE_ID=_DEPLOYMENT_IDENTITY["service_id"]
+DEPLOY_RUN_ID=_DEPLOYMENT_IDENTITY["run_id"]
+RUNTIME_INSTANCE=_DEPLOYMENT_IDENTITY["instance"]
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
@@ -1252,16 +1256,17 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "github_sha": expected or None,
+        "github_sha": os.getenv("GITHUB_SHA") or None,
+        "expected_commit": _DEPLOYMENT_IDENTITY["expected_commit"] or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
-        "run_id": DEPLOY_SERVICE_ID,
+        "run_id": DEPLOY_RUN_ID,
+        "service_id": DEPLOY_SERVICE_ID,
         "instance": RUNTIME_INSTANCE,
-        "converged": bool(DEPLOY_COMMIT and expected and DEPLOY_COMMIT == expected),
+        "converged": _DEPLOYMENT_IDENTITY["converged"],
     }
 
 @app.get("/api/deploy/diagnostics")
