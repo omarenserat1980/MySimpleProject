@@ -51,3 +51,10 @@ REVENUE_REALIZED remains false until payment evidence is independently confirmed
 - A Live payment starts at `PAYMENT_VERIFIED_PENDING_DELIVERY`. Delivery confirmation advances it only to `DELIVERY_CONFIRMED_PENDING_SETTLEMENT`; delivery alone must never mark collected revenue.
 - `REVENUE_REALIZED` and collected cash require a separate authenticated settlement/payout reconciliation that binds the provider settlement reference, transaction, amount, currency, and order. This Worker currently does not implement that independent settlement verifier, so it intentionally leaves revenue pending settlement and returns `revenue_realized=false`.
 - Existing rows receive `environment='test'` via migration 0008; they are not retroactively promoted to Live.
+
+
+## Read-only transaction reconciliation (not settlement)
+
+The authenticated `POST /api/payments/paytabs/reconcile-query` endpoint queries PayTabs' documented `/payment/query` endpoint for a live revenue row that is already `DELIVERY_CONFIRMED_PENDING_SETTLEMENT`. It checks the provider transaction reference, cart/order ID, amount, currency, approved response status, and Sale transaction type before recording a timestamped audit observation in the revenue evidence.
+
+This endpoint is read-only against PayTabs and is **not** proof of payout or merchant-bank settlement. A successful result explicitly returns `settlement_verified: false` and `revenue_realized: false`; the ledger state remains pending settlement. It must not be used to bypass an independently verified settlement/payout report or bank reconciliation. It requires `BRAIN_CONTROL_TOKEN`, `PAYTABS_SERVER_KEY`, and `PAYTABS_PROFILE_ID`; no secrets belong in source control.
