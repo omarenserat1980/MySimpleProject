@@ -15,6 +15,7 @@ def body():
         "cart_id": "BRAIN-TEST-1",
         "cart_amount": "1.00",
         "cart_currency": "USD",
+        "tran_type": "sale",
         "payment_result": {"response_status": "A"},
         "tran_ref": "TST123",
     }, separators=(",", ":")).encode()
@@ -55,6 +56,19 @@ def test_top_level_mismatches_are_rejected(field, value, error):
     data[field] = value
     raw = json.dumps(data, separators=(",", ":")).encode()
     with pytest.raises(ValueError, match=error):
+        parse_and_validate_payment(
+            raw, signature(raw), KEY,
+            expected_order_id="BRAIN-TEST-1",
+            expected_amount="1.00",
+            expected_currency="USD",
+        )
+
+
+def test_authorization_only_transaction_is_rejected():
+    data = json.loads(body())
+    data["tran_type"] = "auth"
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    with pytest.raises(ValueError, match="PAYTABS_CAPTURED_SALE_REQUIRED"):
         parse_and_validate_payment(
             raw, signature(raw), KEY,
             expected_order_id="BRAIN-TEST-1",
