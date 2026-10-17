@@ -10,6 +10,7 @@ from brain_v12.brain.bitcoin_mining_intelligence_api import (
     bitcoin_mining_status,
     HashBenchmarkRequest,
     bitcoin_mining_benchmark,
+    router,
 )
 
 
@@ -87,6 +88,21 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
         self.assertFalse(result["pool_connected"])
         self.assertFalse(result["real_bitcoin_mining"])
         self.assertFalse(result["revenue_verified"])
+
+
+    def test_status_http_route_is_bound_to_status_payload_not_budget_helper(self):
+        status_routes = [
+            route for route in router.routes
+            if getattr(route, "path", None) == "/api/bitcoin-mining/status"
+            and "GET" in (getattr(route, "methods", set()) or set())
+        ]
+        self.assertEqual(len(status_routes), 1)
+        self.assertEqual(status_routes[0].path, "/api/bitcoin-mining/status")
+        self.assertIs(status_routes[0].endpoint, bitcoin_mining_status)
+        payload = status_routes[0].endpoint()
+        self.assertEqual(payload["execution_mode"], "ANALYSIS_AND_DRY_RUN_ONLY")
+        self.assertFalse(payload["real_mining_enabled"])
+        self.assertEqual(payload["verified_revenue_jod"], 0.0)
 
 
 if __name__ == "__main__":
