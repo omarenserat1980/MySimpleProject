@@ -74,13 +74,16 @@ def test_success_is_independent_pool_telemetry_not_brain_mining_or_revenue():
     result = collect_braiins_pool_evidence(api_token="test-token-not-a-real-secret",
                                           expected_worker_id="account.worker-01",
                                           client_factory=FakeClient, now=now)
-    assert result["status"] == "POOL_ACTIVITY_OBSERVED"
-    assert result["pool_activity_verified"] is True
+    assert result["status"] == "TEST_FIXTURE_ONLY"
+    assert result["pool_activity_verified"] is False
+    assert result["evidence_origin"] == "INJECTED_TEST_FIXTURE"
+    assert result["pool_source_authenticated_over_https"] is False
     assert result["accepted_share_submission_verified"] is False
     assert result["brain_runtime_activity_verified"] is False
     assert result["payout_verified"] is False
     assert result["revenue_verified"] is False
     assert result["pool_response_sha256"]
+    assert result["proof_level"] == "SYNTHETIC_TEST_FIXTURE"
     assert FakeClient.init_kwargs == {"verify": True, "timeout": 10.0, "follow_redirects": False}
     assert FakeClient.request_args[0] == BRAIINS_WORKERS_URL
     assert FakeClient.request_args[1] == {"Pool-Auth-Token": "test-token-not-a-real-secret"}

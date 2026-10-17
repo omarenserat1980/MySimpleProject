@@ -65,6 +65,9 @@ def collect_braiins_pool_evidence(
     if current.tzinfo is None:
         return _blocked("TIMEZONE_AWARE_CLOCK_REQUIRED")
 
+    # Injected clients are test doubles; their responses must never be accepted as
+    # independently sourced production evidence, even if the fixture looks valid.
+    injected_test_client = client_factory is not None
     factory = client_factory or httpx.Client
     try:
         # Fixed HTTPS URL, GET only, verified TLS, no redirects, bounded timeout.
@@ -156,7 +159,8 @@ def collect_braiins_pool_evidence(
         "http_status": 200,
         "pool_endpoint": BRAIINS_WORKERS_URL,
         "pool_response_sha256": response_digest,
-        "pool_source_authenticated_over_https": True,
+        "pool_source_authenticated_over_https": not injected_test_client,
+        "evidence_origin": "INJECTED_TEST_FIXTURE" if injected_test_client else "LIVE_HTTPS_RESPONSE",
         "pool_credential_scope_verified": False,
         "operator_must_use_read_only_access_profile": True,
         "worker_id": worker_id,
@@ -181,6 +185,15 @@ def collect_braiins_pool_evidence(
     if age < -30 or age > max_age_seconds:
         return {"ok": False, "status": "BLOCKED_STALE_POOL_ACTIVITY", "pool_activity_verified": False,
                 "reason": "POOL_LAST_SHARE_OUTSIDE_FRESHNESS_WINDOW", **common}
+    if injected_test_client:
+        return {
+            "ok": False,
+            "status": "TEST_FIXTURE_ONLY",
+            "pool_activity_verified": False,
+            "proof_level": "SYNTHETIC_TEST_FIXTURE",
+            "reason": "INJECTED_CLIENT_CANNOT_PRODUCE_REAL_WORLD_EVIDENCE",
+            **common,
+        }
     return {
         "ok": True,
         "status": "POOL_ACTIVITY_OBSERVED",
