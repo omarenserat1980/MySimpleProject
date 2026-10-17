@@ -265,6 +265,56 @@ def router(data_path: str | None = None) -> APIRouter:
         require_control_key(request)
         return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.dict())}
 
+    @api.post("/orders/{order_id}/paytabs-webhook")
+    async def paytabs_webhook(request: Request, order_id: str):
+        """Verify a signed PayTabs callback against the stored order before recording authority."""
+        server_key = os.getenv("PAYTABS_SERVER_KEY", "").strip()
+        if not server_key:
+            raise HTTPException(status_code=503, detail="PAYTABS_NOT_CONFIGURED")
+
+        order = store.get(order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
+
+        raw_body = await request.body()
+        signature = request.headers.get("signature", "") or request.headers.get("x-paytabs-signature", "")
+        expected_amount = f"{float(order['product']['price_usd']):.2f}"
+        try:
+            from brain.provider_hub.paytabs_webhook import parse_and_validate_payment
+            payload = parse_and_validate_payment(
+                raw_body,
+                signature,
+                server_key,
+                expected_order_id=order_id,
+                expected_amount=expected_amount,
+                expected_currency="USD",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+
+        transaction_id = str(payload["tran_ref"])
+        payment_ref = f"paytabs:{transaction_id}"
+        if order.get("payment", {}).get("status") == "VERIFIED":
+            authority = order.get("revenue_authority", {})
+            if (
+                order.get("payment", {}).get("transaction_id") == transaction_id
+                and authority.get("status") == "INDEPENDENTLY_VERIFIED"
+                and authority.get("provider") == "paytabs"
+                and authority.get("event_id") == transaction_id
+            ):
+                return {"ok": True, "duplicate": True, "order": order}
+            raise HTTPException(status_code=409, detail="PAYMENT_ALREADY_VERIFIED_WITH_DIFFERENT_EVIDENCE")
+
+        evidence = {
+            "transaction_id": transaction_id,
+            "evidence_ref": payment_ref,
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+            "provider": "paytabs",
+            "event_id": transaction_id,
+        }
+        updated = store.transition(order_id, "PAYMENT_VERIFIED", evidence)
+        return {"ok": True, "duplicate": False, "order": updated}
+
     @api.post("/orders/{order_id}/delivery-pending")
     def delivery_pending(request: Request, order_id: str, body: CommerceStateIn):
         from .control_auth import require_control_key
