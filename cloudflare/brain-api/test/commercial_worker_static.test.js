@@ -87,6 +87,8 @@ assert.match(worker, /state = 'RUNNING'/);
 assert.match(worker, /completeJob/);
 assert.match(worker, /STRUCTURED_RESULT_EVIDENCE_REQUIRED/, "job completion must reject free-form evidence");
 assert.match(worker, /HTTPS_ARTIFACT_URL_REQUIRED/, "job completion must require an HTTPS delivery artifact");
+assert.match(worker, /BRAIN_DELIVERY_ALLOWED_ORIGINS/, "delivery artifacts must use an explicitly configured origin allowlist");
+assert.match(worker, /ARTIFACT_ORIGIN_NOT_ALLOWED/, "unapproved delivery origins must be rejected");
 assert.match(worker, /ARTIFACT_SHA256_REQUIRED/, "job completion must require a SHA-256 artifact digest");
 assert.match(worker, /artifact_sha256/, "delivery evidence must bind the artifact digest");
 assert.match(worker, /JOB_NOT_RUNNING/);
