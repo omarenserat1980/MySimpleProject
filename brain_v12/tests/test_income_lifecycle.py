@@ -88,7 +88,7 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.life.prepare("LIVE-test")
         for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
             self.life.record_external("LIVE-test", status, evidence)
-        self.life.request_payment("LIVE-test",25,currency="JOD")
+        self.life.request_payment("LIVE-test",25,currency="JOD",order_id="ORDER-1")
         self.assertEqual(self.life.reconcile_payment("LIVE-test",20,"JOD","TX-002",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-002"},order_id="ORDER-1")["status"],"AMOUNT_MISMATCH")
         self.assertEqual(self.life.reconcile_payment("LIVE-test",25,"USD","TX-003",{"evidence_ref":"evidence","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-003"},order_id="ORDER-1")["status"],"CURRENCY_MISMATCH")
     def test_reconciliation_rejects_free_form_evidence(self):
