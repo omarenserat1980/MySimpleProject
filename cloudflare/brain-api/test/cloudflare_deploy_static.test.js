@@ -10,12 +10,14 @@ const production = fs.readFileSync("../../.github/workflows/last-light-no-pay.ym
 
 [
   "PAYTABS_SERVER_KEY","Signature","HMAC","PAYMENT_PENDING","PAYMENT_VERIFIED",
-  "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH","payment_events","REVENUE_REALIZED",
+  "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH","payment_events","DELIVERY_CONFIRMED_PENDING_SETTLEMENT",
   "createCinemaCheckout","cinemaAccess","cinemaStream","CINEMA_MEDIA",
   "cinema_entitlements","BRAIN_CINEMA_TOKEN"
 ].forEach(token => assert.ok(worker.includes(token), "missing: " + token));
 
 assert.ok(worker.includes('const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";'));
+assert.doesNotMatch(worker, /UPDATE\s+revenue_ledger\s+SET\s+state\s*=\s*['"]REVENUE_REALIZED['"]/i);
+assert.match(worker, /revenue_realized:\s*false/);
 assert.match(wrangler, /binding = "BRAIN_DB"/);
 assert.match(wrangler, /binding = "CINEMA_MEDIA"/);
 assert.match(wrangler, /bucket_name = "brain-cinema-media"/);
