@@ -92,7 +92,7 @@ class DecisionEngine:
                              "memory.read" if memory else "state.read")),
             asdict(Candidate("plan", "بناء خطة متعددة الخطوات", "خطة قابلة للتحقق", "low", [], True, ["goal"], .80, "tasks.create")),
         ]
-        if self._is_income_goal(goal):
+        if self._is_income_goal(goal) and not self._mission_tags(goal):
             options.insert(0, asdict(Candidate(
                 "income_opportunities",
                 "البحث عن فرص دخل حقيقية قابلة للتنفيذ بأقل تكلفة",
