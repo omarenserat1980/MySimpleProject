@@ -25,6 +25,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer;color:var(--txt)
 <button data-page="code">💻 <span class="label">برمجة العقل</span></button>
 <button data-page="memory">🧠 <span class="label">الذاكرة</span></button>
 <button data-page="tools">🛠️ <span class="label">الأدوات</span></button>
+<button data-page="mining">⛏️ <span class="label">SHA-256d</span></button>
 </div>
 <div class="section">المحادثات الأخيرة</div><div id="history" class="history"></div>
 <div class="account"><button class="new" onclick="location.href='/'">⚙️ <span class="label">مركز التحكم الكامل</span></button></div>
@@ -45,13 +46,23 @@ button,input,textarea,select{font:inherit}button{cursor:pointer;color:var(--txt)
 <section id="codePage" class="page hidden"><div class="panel"><h2>💻 برمجة العقل</h2><p style="color:#aaa">العقل يستطيع قراءة الكود، حفظ نقطة استرجاع، معاينة الفرق، التحقق، وتطبيق التغييرات عبر أداة الكود المقيدة.</p><div class="row"><input id="codePath" style="flex:1;background:#303030;color:white;border:1px solid #555;border-radius:8px;padding:10px" value="brain_v7/braincore_v2/brain_orchestrator.py"><button class="secondary" onclick="inspectCode()">قراءة</button><button class="secondary" onclick="verifyCode()">تحقق</button><button class="secondary" onclick="checkpoint()">نقطة استرجاع</button></div><textarea id="codeEditor" class="code" style="margin-top:10px"></textarea><div class="row"><button class="secondary" onclick="previewCode()">معاينة Diff</button><button class="primary" onclick="applyCode()">تنفيذ وحفظ</button><label style="padding:9px"><input id="approve" type="checkbox"> موافقة صريحة</label><label style="padding:9px"><input id="persist" type="checkbox" checked> GitHub عند توفره</label></div><pre id="codeOut" style="white-space:pre-wrap;background:#111;padding:12px;border-radius:10px;margin-top:12px">—</pre></div></section>
 <section id="memoryPage" class="page hidden"><div class="panel"><h2>🧠 الذاكرة</h2><div id="memoryOut">جاري التحميل...</div></div></section>
 <section id="toolsPage" class="page hidden"><div class="panel"><h2>🛠️ الأدوات</h2><div id="toolsOut">جاري التحميل...</div></div></section>
+<section id="miningPage" class="page hidden"><div class="panel"><h2>⛏️ مختبر SHA-256d — أدلة التنفيذ</h2>
+<p style="color:#aaa">هذه الصفحة تفصل بين المحاكاة البرمجية والمحاكاة الرقمية. لا تتصل بمجمع تعدين، ولا ترسل حصصًا، ولا تثبت وجود ASIC مادي.</p>
+<div class="cards">
+<div class="card"><h3>محاكي المنطق</h3><p id="asicLogicStatus">لم يُفحص بعد</p><span style="color:#aaa">لا وصول إلى عتاد أو شبكة</span></div>
+<div class="card"><h3>محاكاة RTL</h3><p id="rtlStatus">لم تُشغّل في هذه الجلسة</p><span style="color:#aaa">Icarus Verilog / VVP على خادم Brain</span></div>
+<div class="card"><h3>ASIC مادي / Pool</h3><p>غير مثبت</p><span style="color:#aaa">لا تُحوّل نتائج المحاكاة إلى تعدين حي</span></div>
+</div>
+<div class="row" style="margin-top:14px"><button class="secondary" onclick="loadMiningStatus()">فحص الحالة</button><button class="primary" id="rtlRunButton" onclick="runRtlSelfTest()">تشغيل اختبار RTL الآن</button></div>
+<pre id="miningOut" style="white-space:pre-wrap;background:#111;padding:12px;border-radius:10px;margin-top:12px">لم يُنفّذ اختبار RTL من هذه الصفحة بعد.</pre>
+</div></section>
 </div>
 <div class="composerWrap" id="composerWrap"><div class="composer"><textarea id="input" placeholder="اكتب رسالة إلى العقل..." rows="1"></textarea><div class="bar"><div class="actions"><button class="icon" title="إرفاق" onclick="page('files')">＋</button><button class="icon" title="صوت" onclick="voice()">🎙️</button><button class="icon" title="كاميرا" onclick="location.href='/'">📷</button></div><button class="send" id="send" onclick="send()">↑</button></div></div></div>
 </main></div>
 <div id="modal" class="modal"><div class="modalBox"><button class="secondary" onclick="closeModal()">إغلاق</button><pre id="modalOut"></pre></div></div>
 <script>
 const $=id=>document.getElementById(id);let current=[];
-function page(name){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$(name+'Page').classList.remove('hidden');$('composerWrap').style.display=name==='chat'?'block':'none';document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='memory')loadMemory();if(name==='tools')loadTools()}
+function page(name){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$(name+'Page').classList.remove('hidden');$('composerWrap').style.display=name==='chat'?'block':'none';document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='memory')loadMemory();if(name==='tools')loadTools();if(name==='mining')loadMiningStatus()}
 function add(role,text){let d=document.createElement('div');d.className='msg '+role;d.innerHTML='<div class="avatar">'+(role==='user'?'أنت':'🧠')+'</div><div class="bubble"></div>';d.querySelector('.bubble').textContent=text;$('chat').append(d);$('chat').scrollTop=$('chat').scrollHeight}
 async function api(u,o){let r=await fetch(u,o);return r.json()}
 async function send(){let q=$('input').value.trim();if(!q)return;$('send').disabled=true;add('user',q);$('input').value='';try{let r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});add('assistant',r.reply||JSON.stringify(r,null,2));saveHistory(q)}catch(e){add('assistant','حدث خطأ: '+e.message)}$('send').disabled=false}
@@ -66,6 +77,8 @@ async function previewCode(){let c=[{path:$('codePath').value,content:$('codeEdi
 async function applyCode(){if(!$('approve').checked){$('codeOut').textContent='الموافقة الصريحة مطلوبة قبل تطبيق التغيير.';return}let c=[{path:$('codePath').value,content:$('codeEditor').value,reason:'Brain UI code change'}];let r=await api('/api/code/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:c,reason:'Brain UI controlled code change',commit_message:'brain: code change from independent brain UI',approved:true,persist_to_github:$('persist').checked})});$('codeOut').textContent=JSON.stringify(r,null,2)}
 async function loadMemory(){let r=await api('/api/memory');$('memoryOut').innerHTML=(r||[]).map(x=>'<div class="card"><b>'+esc(x.key)+'</b><div>'+esc(x.value)+'</div></div>').join('')||'لا توجد ذاكرة'}
 async function loadTools(){let r=await api('/api/capabilities');$('toolsOut').innerHTML='<div class="cards">'+(r.tools||[]).map(x=>'<div class="card"><h3>'+esc(x.name||'أداة')+'</h3><p>'+esc(x.description||'')+'</p><span style="color:#aaa">'+esc(x.risk||'')+'</span></div>').join('')+'</div>'}
+async function loadMiningStatus(){try{let r=await api('/api/asic-sim/status');$('asicLogicStatus').textContent=r.ok?'متاح: '+(r.model||'محاكي'):'الحالة غير مؤكدة';$('miningOut').textContent=JSON.stringify({simulator_status:r,rtl_note:'حالة RTL هنا تعكس آخر تشغيل من هذه الصفحة فقط؛ نجاح GitHub Actions منفصل.'},null,2)}catch(e){$('asicLogicStatus').textContent='تعذر فحص الحالة';$('miningOut').textContent='فشل طلب الحالة: '+e.message}}
+async function runRtlSelfTest(){let b=$('rtlRunButton');b.disabled=true;$('rtlStatus').textContent='جارٍ الاختبار…';$('miningOut').textContent='يُشغّل اختبار RTL الفعلي على خادم Brain. قد يستغرق عدة ثوانٍ.';try{let r=await api('/api/asic-sim/sha256d-rtl-self-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resource_id:'brain-sha256d-rtl-ui',timeout_seconds:20})});$('rtlStatus').textContent=r.status||'نتيجة غير معروفة';$('miningOut').textContent=JSON.stringify({response:r,claims:{rtl_simulation_verified:r.status==='RTL_SIMULATION_VERIFIED'&&r.ok===true,physical_asic_executed:false,pool_contacted:false,share_submitted:false,revenue_verified:false}},null,2)}catch(e){$('rtlStatus').textContent='فشل أو تعذر الاتصال';$('miningOut').textContent='لم يتم تأكيد الاختبار: '+e.message+'\\nلا يُعد فشل الاتصال نجاحًا.'}finally{b.disabled=false}}
 function openCode(p){page('code');$('codePath').value=p;inspectCode()}
 function voice(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert('التعرف الصوتي غير متاح في هذا المتصفح.');let r=new SR();r.lang='ar-JO';r.onresult=e=>{$('input').value=e.results[0][0].transcript;send()};r.start()}
 function closeModal(){$('modal').classList.remove('show')}
