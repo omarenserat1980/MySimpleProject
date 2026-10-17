@@ -7,6 +7,7 @@ claim that a native compute backend exists.
 """
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any
 
 SUPPORTED_ALGORITHMS = {"sha256d", "randomx", "kawpow", "cryptonight", "ghostrider"}
@@ -95,11 +96,21 @@ def classify_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("INVALID_EVIDENCE")
     if evidence.get("simulation") is True or str(evidence.get("evidence_class", "")).startswith("SIMULATION"):
         return {"status": "SIMULATION_ONLY", "counts_as_real_mining": False, "revenue_verified": False}
-    try:
-        hashrate = float(evidence.get("hashrate_hs", 0))
-        accepted = int(evidence.get("accepted_shares", 0))
-    except (TypeError, ValueError):
+    raw_hashrate = evidence.get("hashrate_hs", 0)
+    raw_accepted = evidence.get("accepted_shares", 0)
+    # bool is an int subclass in Python, but True is not valid telemetry.
+    if isinstance(raw_hashrate, bool) or isinstance(raw_accepted, bool):
         return {"status": "INVALID_EVIDENCE_FIELDS", "counts_as_real_mining": False, "revenue_verified": False}
+    try:
+        hashrate = float(raw_hashrate)
+        accepted_number = float(raw_accepted)
+    except (TypeError, ValueError, OverflowError):
+        return {"status": "INVALID_EVIDENCE_FIELDS", "counts_as_real_mining": False, "revenue_verified": False}
+    if not isfinite(hashrate) or not isfinite(accepted_number):
+        return {"status": "INVALID_EVIDENCE_FIELDS", "counts_as_real_mining": False, "revenue_verified": False}
+    if accepted_number < 0 or not accepted_number.is_integer():
+        return {"status": "INVALID_EVIDENCE_FIELDS", "counts_as_real_mining": False, "revenue_verified": False}
+    accepted = int(accepted_number)
     if hashrate <= 0 or accepted <= 0:
         return {"status": "NO_PROOF_OF_ACTIVE_MINING", "counts_as_real_mining": False, "revenue_verified": False}
     valid_provenance = (
