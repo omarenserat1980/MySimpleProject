@@ -1,3 +1,5 @@
+"""Prevent mining API routers from silently becoming unreachable."""
+
 import ast
 from pathlib import Path
 
