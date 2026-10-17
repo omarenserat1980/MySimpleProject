@@ -15,7 +15,15 @@ export default {
 
     if (url.pathname === "/health") {
       const db = Boolean(env.BRAIN_DB);
-      return json({ ok: true, service: "brain-cloud-api", mode: "commercial-edge", d1: db ? "CONFIGURED" : "NOT_CONFIGURED" }, 200, requestOrigin, allowedOrigin);
+      const deliveryOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
+        .split(",").map(value => value.trim()).filter(Boolean);
+      return json({
+        ok: true,
+        service: "brain-cloud-api",
+        mode: "commercial-edge",
+        d1: db ? "CONFIGURED" : "NOT_CONFIGURED",
+        delivery_artifact_policy: deliveryOrigins.length > 0 ? "CONFIGURED" : "NOT_CONFIGURED",
+      }, 200, requestOrigin, allowedOrigin);
     }
 
     if (url.pathname === "/api/supervisor/tick" && request.method === "POST") {
@@ -395,7 +403,8 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   const tranRef = String(payload.tran_ref || "");
   const amount = Number(payload.cart_amount);
   const currency = String(payload.cart_currency || "");
-  const status = String((payload.payment_result || {}).response_status || "");
+  const status = String((payload.payment_result || payload).response_status || "");
+  const transactionType = String(payload.tran_type || "").trim().toLowerCase();
 
   if (!orderId || !tranRef) return json({ ok: false, error: "PAYMENT_IDENTIFIERS_MISSING" }, 400, requestOrigin, allowedOrigin);
 
@@ -404,11 +413,16 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   ).bind(tranRef, orderId).first();
 
   if (!payment) return json({ ok: false, error: "PAYMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  if (payment.state === "PAYMENT_VERIFIED") {
-    return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef, idempotent: true }, 200, requestOrigin, allowedOrigin);
-  }
-  if (Number(payment.amount) !== amount || String(payment.currency) !== currency) {
+  // Check signed callback fields before the idempotent path; a repeated transaction
+  // reference must not make a mismatched amount/currency appear valid.
+  if (!Number.isFinite(amount) || Number(payment.amount) !== amount || String(payment.currency) !== currency) {
     return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+  if (payment.state === "PAYMENT_VERIFIED") {
+    if (status !== "A" || transactionType !== "sale") {
+      return json({ ok: false, error: "VERIFIED_PAYMENT_CALLBACK_CONFLICT" }, 409, requestOrigin, allowedOrigin);
+    }
+    return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef, idempotent: true }, 200, requestOrigin, allowedOrigin);
   }
 
   const eventId = await sha256Hex(new TextEncoder().encode(tranRef + ":" + new TextDecoder().decode(raw)));
@@ -418,7 +432,7 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     "INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, ?, ?)"
   ).bind(eventId, orderId, tranRef, status === "A" ? "PAYMENT_VERIFIED" : "PAYMENT_REJECTED", evidence).run();
 
-  if (status !== "A") {
+  if (status !== "A" || transactionType !== "sale") {
     await env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_FAILED', raw_evidence = ? WHERE tran_ref = ?")
       .bind(evidence, tranRef).run();
     return json({ ok: true, state: "PAYMENT_FAILED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
@@ -474,13 +488,15 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   const payment = await env.BRAIN_DB.prepare(
     "SELECT tran_ref, amount, currency, state FROM payments WHERE order_id = ? AND provider = 'paytabs' AND state = 'PAYMENT_VERIFIED' LIMIT 1"
   ).bind(delivery.order_id).first();
+  let revenueRealized = false;
   if (payment) {
-    await env.BRAIN_DB.prepare(
+    const revenueUpdate = await env.BRAIN_DB.prepare(
       "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
     ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
+    revenueRealized = Number(revenueUpdate.meta?.changes || 0) > 0;
   }
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });
-  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: revenueRealized });
+  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: revenueRealized }, 200, requestOrigin, allowedOrigin);
 }
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
@@ -493,18 +509,49 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   const jobId = String(body.job_id || "").trim();
   const evidence = body.evidence;
   const artifactUrl = String(body.artifact_url || "").trim();
-  if (!jobId || !evidence || (typeof evidence !== "string" && typeof evidence !== "object")) return json({ ok: false, error: "RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  const evidenceObject = evidence && typeof evidence === "object" && !Array.isArray(evidence) ? evidence : null;
+  const artifactHash = String(evidenceObject?.artifact_sha256 || "").trim().toLowerCase();
+  let parsedArtifactUrl;
+  try { parsedArtifactUrl = new URL(artifactUrl); } catch {}
+  if (!jobId || !evidenceObject || Object.keys(evidenceObject).length === 0) {
+    return json({ ok: false, error: "STRUCTURED_RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
+  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname) {
+    return json({ ok: false, error: "HTTPS_ARTIFACT_URL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
+  const allowedArtifactOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
+    .split(",").map(value => value.trim()).filter(Boolean);
+  if (allowedArtifactOrigins.length === 0 || !allowedArtifactOrigins.includes(parsedArtifactUrl.origin)) {
+    return json({ ok: false, error: "ARTIFACT_ORIGIN_NOT_ALLOWED" }, 400, requestOrigin, allowedOrigin);
+  }
+  if (!/^[a-f0-9]{64}$/.test(artifactHash)) {
+    return json({ ok: false, error: "ARTIFACT_SHA256_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
   const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
-  const evidenceText = typeof evidence === "string" ? evidence : JSON.stringify(evidence);
-  await env.BRAIN_DB.prepare("UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ?").bind(evidenceText, jobId).run();
+  const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
+  // Compare-and-set prevents two concurrent completion requests from both claiming success.
+  const completion = await env.BRAIN_DB.prepare(
+    "UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ? AND state = 'RUNNING'"
+  ).bind(evidenceText, jobId).run();
+  if (Number(completion.meta?.changes || 0) !== 1) {
+    return json({ ok: false, error: "JOB_COMPLETION_RACE" }, 409, requestOrigin, allowedOrigin);
+  }
   const deliveryId = "DEL-" + crypto.randomUUID().toUpperCase();
-  await env.BRAIN_DB.prepare(
+  const deliveryInsert = await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO deliveries (delivery_id, order_id, state, artifact_url, evidence) VALUES (?, ?, 'READY', ?, ?)"
-  ).bind(deliveryId, job.order_id, artifactUrl || null, evidenceText).run();
+  ).bind(deliveryId, job.order_id, artifactUrl, evidenceText).run();
+  let finalDeliveryId = deliveryId;
+  if (Number(deliveryInsert.meta?.changes || 0) !== 1) {
+    const existingDelivery = await env.BRAIN_DB.prepare(
+      "SELECT delivery_id, state FROM deliveries WHERE order_id = ?"
+    ).bind(job.order_id).first();
+    if (!existingDelivery) return json({ ok: false, error: "DELIVERY_PERSISTENCE_FAILED" }, 500, requestOrigin, allowedOrigin);
+    finalDeliveryId = String(existingDelivery.delivery_id);
+  }
   await env.BRAIN_DB.prepare("UPDATE orders SET state = 'READY' WHERE order_id = ? AND state = 'PAYMENT_VERIFIED'").bind(job.order_id).run();
-  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: deliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
+  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: finalDeliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
 }
 
 async function claimNextJob(request, env, requestOrigin, allowedOrigin) {

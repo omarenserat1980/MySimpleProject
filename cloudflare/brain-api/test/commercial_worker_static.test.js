@@ -11,6 +11,8 @@ const jobsMigration = fs.readFileSync("migrations/0006_jobs.sql", "utf8");
 const cinemaMigration = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
+assert.match(worker, /delivery_artifact_policy/, "health must report delivery artifact policy readiness");
+assert.match(worker, /deliveryOrigins\.length > 0 \? "CONFIGURED" : "NOT_CONFIGURED"/, "health readiness must reflect the artifact origin allowlist");
 assert.match(worker, /PAYTABS_SERVER_KEY/);
 assert.match(worker, /Signature/);
 assert.match(worker, /HMAC/);
@@ -85,7 +87,15 @@ assert.match(worker, /attempt < 3/);
 assert.match(worker, /state = 'RUNNING'/);
 
 assert.match(worker, /completeJob/);
-assert.match(worker, /RESULT_EVIDENCE_REQUIRED/);
+assert.match(worker, /WHERE job_id = \? AND state = 'RUNNING'/, "job completion must use compare-and-set to prevent concurrent completion");
+assert.match(worker, /JOB_COMPLETION_RACE/, "concurrent completion must fail closed");
+assert.match(worker, /DELIVERY_PERSISTENCE_FAILED/, "completion must not claim success if delivery persistence failed");
+assert.match(worker, /STRUCTURED_RESULT_EVIDENCE_REQUIRED/, "job completion must reject free-form evidence");
+assert.match(worker, /HTTPS_ARTIFACT_URL_REQUIRED/, "job completion must require an HTTPS delivery artifact");
+assert.match(worker, /BRAIN_DELIVERY_ALLOWED_ORIGINS/, "delivery artifacts must use an explicitly configured origin allowlist");
+assert.match(worker, /ARTIFACT_ORIGIN_NOT_ALLOWED/, "unapproved delivery origins must be rejected");
+assert.match(worker, /ARTIFACT_SHA256_REQUIRED/, "job completion must require a SHA-256 artifact digest");
+assert.match(worker, /artifact_sha256/, "delivery evidence must bind the artifact digest");
 assert.match(worker, /JOB_NOT_RUNNING/);
 assert.match(worker, /state = 'SUCCESS'/);
 assert.match(worker, /order_state: "READY"/);
@@ -110,3 +120,12 @@ assert.match(worker, /PAYTABS_MODE \\|\\| "test"/, "payment mode must default sa
 assert.match(worker, /SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY/, "sandbox payments must be separately classified");
 assert.match(worker, /environment = 'live'/, "revenue realization must require live environment");
 console.log("SANDBOX_CANNOT_REALIZE_REVENUE=PASS");
+
+
+assert.match(worker, /payload\.payment_result \|\| payload/, "PayTabs callback must support top-level response_status");
+assert.match(worker, /transactionType !== "sale"/, "authorization/refund callbacks must not verify a sale payment");
+assert.ok(worker.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < worker.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "amount/currency must be validated before idempotent success");
+assert.match(worker, /revenueRealized = Number\(revenueUpdate\.meta\?\.changes \|\| 0\) > 0/, "revenue is realized only when ledger update changes a row");
+assert.match(worker, /revenue_realized: revenueRealized/, "audit event must reflect actual ledger update, not payment existence");
+console.log("PAYTABS_CALLBACK_AMOUNT_IDEMPOTENCY_GATES=PASS");
+console.log("REVENUE_LEDGER_UPDATE_EVIDENCE_GATE=PASS");
