@@ -71,14 +71,14 @@ jobs:
 
           # With a configured key, unauthenticated requests must be rejected,
           # and authenticated requests must honestly report that execution is not wired yet.
-          docker run --rm -d --name brain-cloud-worker-auth-smoke -p 127.0.0.1:18082:8080 -e BRAIN_CLOUD_API_KEY=ci-test-only-key brain-cloud-worker:ci
+          docker run --rm -d --name brain-cloud-worker-auth-smoke -p 127.0.0.1:18081:8080 -e BRAIN_CLOUD_API_KEY=ci-test-only-key brain-cloud-worker:ci
           python - <<'PY'
           import json
           import time
           import urllib.error
           import urllib.request
 
-          base = "http://127.0.0.1:18082"
+          base = "http://127.0.0.1:18081"
           for _ in range(20):
               try:
                   with urllib.request.urlopen(base + "/health", timeout=2):
