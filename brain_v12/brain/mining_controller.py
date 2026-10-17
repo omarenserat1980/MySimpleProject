@@ -202,6 +202,87 @@ def can_start(
     return False, "separate_execution_review_required"
 
 
+def verify_payout_proof(
+    *,
+    evidence: dict[str, Any],
+    expected_worker_id: str,
+    expected_currency: str,
+    independent_source_verified: bool = False,
+) -> dict[str, Any]:
+    """Conservatively classify payout proof; this function never contacts a provider."""
+    if not isinstance(evidence, dict):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "INVALID_EVIDENCE",
+        }
+    if independent_source_verified is not True:
+        return {
+            "status": "PAYOUT_PROOF_PENDING_INDEPENDENT_SOURCE",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "INDEPENDENT_PAYMENT_SOURCE_NOT_VERIFIED",
+        }
+
+    required_text = ("transaction_id", "worker_id", "currency", "source")
+    if any(
+        not isinstance(evidence.get(name), str)
+        or not evidence[name].strip()
+        or any(ord(ch) < 32 for ch in evidence[name])
+        for name in required_text
+    ):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "REQUIRED_PAYMENT_FIELDS_INVALID",
+        }
+
+    amount = evidence.get("amount")
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "PAYMENT_AMOUNT_INVALID",
+        }
+    try:
+        amount_value = float(amount)
+    except (OverflowError, ValueError):
+        amount_value = math.nan
+    if not math.isfinite(amount_value) or amount_value <= 0:
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "PAYMENT_AMOUNT_INVALID",
+        }
+    if evidence["worker_id"].strip() != expected_worker_id.strip():
+        return {
+            "status": "PAYOUT_PROOF_MISMATCH",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "WORKER_ID_MISMATCH",
+        }
+    if evidence["currency"].strip().upper() != expected_currency.strip().upper():
+        return {
+            "status": "PAYOUT_PROOF_MISMATCH",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "CURRENCY_MISMATCH",
+        }
+    return {
+        "status": "PAYOUT_PROOF_REQUIRES_TRUSTED_PROVIDER_ATTESTATION",
+        "payment_independently_verified": False,
+        "revenue_realized": False,
+        "reason": "CALLER_FLAG_IS_NOT_PROVIDER_ATTESTATION",
+        "transaction_id": evidence["transaction_id"].strip(),
+        "amount": amount_value,
+        "currency": evidence["currency"].strip().upper(),
+    }
+
+
 def evidence_record(
     *,
     worker_id: str,
