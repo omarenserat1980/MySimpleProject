@@ -6,11 +6,19 @@ from unittest.mock import patch
 
 from brain_v12.brain.termux_bitcoin_worker import (
     build_command, validate_pool_url, _positive_int, parse_miner_line, main,
-    supervisor_exit_code,
+    supervisor_exit_code, is_cpu_thermal_zone_type,
 )
 
 
 class TermuxBitcoinWorkerTests(unittest.TestCase):
+    def test_only_cpu_related_thermal_zones_are_accepted(self):
+        for zone_type in ("cpu-thermal", "CPU0", "soc_thermal", "gpu-therm", "package"):
+            with self.subTest(zone_type=zone_type):
+                self.assertTrue(is_cpu_thermal_zone_type(zone_type))
+        for zone_type in ("battery", "modem-therm", "skin", "usb", "tsens_tz_sensor0", "unknown"):
+            with self.subTest(zone_type=zone_type):
+                self.assertFalse(is_cpu_thermal_zone_type(zone_type))
+
     def test_expected_duration_limit_is_success_even_when_terminated_by_signal(self):
         self.assertEqual(supervisor_exit_code("duration_limit", -15), 0)
         self.assertEqual(supervisor_exit_code("duration_limit", 0), 0)
