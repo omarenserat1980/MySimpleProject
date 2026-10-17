@@ -180,7 +180,7 @@ app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
     return Results.Problem(
         statusCode: StatusCodes.Status501NotImplemented,
         title: "COMMAND_EXECUTION_NOT_CONNECTED",
-        detail: "Authentication succeeded, but no durable task queue is connected. No command was executed.");
+        detail: "Authentication succeeded, but command execution is intentionally disabled. Use the authenticated allow-listed task API for health_check or simulation_status; arbitrary commands are not executed.");
 });
 
 app.Run();
