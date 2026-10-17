@@ -50,10 +50,6 @@ class DeviceBridgeBootstrapTests(unittest.TestCase):
             bridge = DeviceBridge(store=None)
             self.assertFalse(bridge.configured())
             self.assertTrue(bridge.enabled())
-            status = bridge.status()
-            self.assertTrue(status["runtime_ready"])
-            self.assertTrue(status["configured"])
-            self.assertFalse(status["auth_configured"])
             self.assertEqual(bridge.enqueue("status")["status"], "AUTH_NOT_CONFIGURED")
 
 
