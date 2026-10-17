@@ -26,6 +26,38 @@ builder.Services.AddHostedService<HealthWorker>();
 
 var app = builder.Build();
 
+// Liveness only: confirms the HTTP process is responsive. It does not claim
+// that workers are ready, mining is active, or revenue has been realized.
+app.MapGet("/healthz", () => Results.Ok(new
+{
+    status = "ok",
+    service = "brain-cloud-worker"
+}));
+
+app.MapGet("/readyz", (WorkerState state) =>
+{
+    var requiredWorkers = new[]
+    {
+        "supervisor", "video", "mining", "quality", "self-healing",
+        "research", "architect", "economic", "health"
+    };
+    var cutoff = DateTimeOffset.UtcNow.AddMinutes(-2);
+    var latest = state.Snapshot()
+        .GroupBy(p => p.WorkerId)
+        .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.At).First());
+
+    var checks = requiredWorkers.ToDictionary(
+        id => id,
+        id => latest.TryGetValue(id, out var pulse)
+            && pulse.Status == "success"
+            && pulse.At >= cutoff);
+
+    var ready = checks.Values.All(passed => passed);
+    return ready
+        ? Results.Ok(new { ready = true, checks })
+        : Results.Json(new { ready = false, checks }, statusCode: StatusCodes.Status503ServiceUnavailable);
+});
+
 app.MapGet("/health", (WorkerState state, WorkerRegistry registry) => Results.Ok(new
 {
     ok = true,
