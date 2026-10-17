@@ -14,6 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 import secrets
 import hashlib
+import hmac
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -24,6 +25,12 @@ PRODUCTS = [
     {"id": "business-intelligence-pack", "name": "Business Intelligence Pack", "price_usd": 25, "type": "digital"},
     {"id": "media-toolkit", "name": "BRAIN Media Toolkit", "price_usd": 15, "type": "digital"},
 ]
+
+def payment_authority_proof(secret: str, order_id: str, transaction_id: str, provider: str, event_id: str) -> str:
+    """Bind revenue authority to a specific order and authenticated provider event."""
+    payload = "\\n".join(("brain-revenue-authority-v1", order_id, transaction_id, provider, event_id))
+    return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
 
 STATES = (
     "ORDER_DRAFT",
@@ -178,8 +185,15 @@ class CommerceStore:
                 if evidence_ref.get("independent_verification") == "SIGNED_PROVIDER_WEBHOOK":
                     provider = str(evidence_ref.get("provider", "")).strip()
                     event_id = str(evidence_ref.get("event_id", "")).strip()
+                    secret = os.getenv("BRAIN_PAYMENT_WEBHOOK_SECRET", "")
+                    supplied_proof = str(evidence_ref.get("authority_proof", "")).strip()
                     if not provider or not event_id:
                         raise HTTPException(status_code=400, detail="PROVIDER_AND_EVENT_ID_REQUIRED")
+                    if not secret or not supplied_proof:
+                        raise HTTPException(status_code=403, detail="PAYMENT_AUTHORITY_PROOF_REQUIRED")
+                    expected_proof = payment_authority_proof(secret, order_id, transaction_id, provider, event_id)
+                    if not hmac.compare_digest(supplied_proof, expected_proof):
+                        raise HTTPException(status_code=403, detail="INVALID_PAYMENT_AUTHORITY_PROOF")
                     order["revenue_authority"] = {
                         "status": "INDEPENDENTLY_VERIFIED",
                         "order_id": order_id,
