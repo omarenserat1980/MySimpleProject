@@ -5,6 +5,7 @@ import json
 
 from brain_v12.brain.braiins_pool_evidence_collector import (
     BRAIINS_WORKERS_URL,
+    MAX_RESPONSE_BYTES,
     collect_braiins_pool_evidence,
 )
 
@@ -138,6 +139,21 @@ def test_stale_share_and_zero_shares_are_not_verified():
                                           client_factory=FakeClient, now=now)
     assert result["status"] == "POOL_ACTIVITY_NOT_ESTABLISHED"
 
+
+
+def test_response_over_limit_is_rejected_during_streaming():
+    now = datetime(2026, 10, 17, 0, 0, tzinfo=timezone.utc)
+    setup_response(now)
+    FakeClient.response.content = b"x" * (MAX_RESPONSE_BYTES + 1)
+    result = collect_braiins_pool_evidence(
+        api_token="test-token",
+        expected_worker_id="account.worker-01",
+        client_factory=FakeClient,
+        now=now,
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "POOL_API_RESPONSE_SIZE_INVALID"
+    assert result["network_access_performed"] is True
 
 def test_nan_infinity_and_boolean_metrics_are_rejected():
     now = datetime(2026, 10, 17, 0, 0, tzinfo=timezone.utc)
