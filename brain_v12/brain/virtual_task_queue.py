@@ -7,6 +7,7 @@ from threading import RLock
 from time import time
 from uuid import uuid4
 import json
+import hashlib
 from .resource_manager import ResourceManager,ResourceRequirement
 from .durable_task_store import DurableTaskStore
 from .workload_controller import WorkloadController
@@ -29,6 +30,9 @@ class VirtualTask:
     attempt:int=0
     idempotency_key:str|None=None
     priority:str="NORMAL"
+    federated_resource_id:str|None=None
+    physical_execution:bool=False
+    federated_required_capacity:dict=field(default_factory=dict)
 
 class VirtualTaskQueue:
     """Durable queue with startup recovery and explicit verification boundary."""
@@ -47,6 +51,7 @@ class VirtualTaskQueue:
         self.virtual_ram_bytes=max(1024,int(os.getenv("BRAIN_VIRTUAL_RAM_BYTES_PER_BLADE","65536")))
         self.virtual_autoscale=os.getenv("BRAIN_VIRTUAL_AUTOSCALE","1").strip().lower() not in {"0","false","no","off"}
         self.pool=ThreadPoolExecutor(max_workers=max(1,int(max_workers))); self.store=DurableTaskStore(store_path)
+        self.federated_executors={}
         self._ensure_minimum_virtual_capacity()
         self._recover_on_start()
 
@@ -55,7 +60,8 @@ class VirtualTaskQueue:
         req=ResourceRequirement(**spec.get("requirement",{}))
         return VirtualTask(row["task_id"],spec.get("program",[]),set(spec.get("required_capabilities",[])),req,
           row["status"],row["blade_id"],row["lease_id"],row["lease_expires_at"],row["created_at"],None,None,result,
-          int(row.get("attempt") or 0),row.get("idempotency_key"),spec.get("priority","NORMAL"))
+          int(row.get("attempt") or 0),row.get("idempotency_key"),spec.get("priority","NORMAL"),
+          spec.get("federated_resource_id"),bool(spec.get("physical_execution",False)),dict(spec.get("federated_required_capacity",{})))
 
     def _recover_on_start(self):
         # A new process cannot trust old in-memory resource reservations. Requeue stale RUNNING work first.
@@ -69,10 +75,16 @@ class VirtualTaskQueue:
             self.tasks[task.task_id]=task
         self.pump()
 
-    def submit(self,program,required_capabilities=None,requirement=None,task_id=None,idempotency_key=None,priority="NORMAL"):
+    def register_federated_executor(self,resource_id,executor):
+        if not resource_id or not callable(executor): raise ValueError("RESOURCE_ID_AND_CALLABLE_EXECUTOR_REQUIRED")
+        self.federated_executors[resource_id]=executor
+
+    def submit(self,program,required_capabilities=None,requirement=None,task_id=None,idempotency_key=None,priority="NORMAL",federated_resource_id=None,physical_execution=False,federated_required_capacity=None):
         task_id=task_id or f"vtask-{uuid4().hex[:12]}"
         existing=self.store.submit(task_id,{"program":list(program),"required_capabilities":sorted(required_capabilities or {"cpu"}),
-          "requirement":(requirement or ResourceRequirement()).__dict__,"priority":str(priority).upper()},idempotency_key)
+          "requirement":(requirement or ResourceRequirement()).__dict__,"priority":str(priority).upper(),
+          "federated_resource_id":federated_resource_id,"physical_execution":bool(physical_execution),
+          "federated_required_capacity":dict(federated_required_capacity or {})},idempotency_key)
         task=self._row_to_task(existing)
         with self.lock: self.tasks[task.task_id]=task
         self._schedule(task.task_id)
@@ -136,6 +148,9 @@ class VirtualTaskQueue:
         with self.lock:
             task=self.tasks.get(task_id)
             if not task or task.status not in {"QUEUED","WAITING"}: return
+            if task.federated_resource_id:
+                self._schedule_federated(task)
+                return
             counts=self.store.counts()
             queued=int(counts.get("QUEUED",0))+int(counts.get("WAITING",0))
             active=int(counts.get("RUNNING",0))
@@ -186,6 +201,77 @@ class VirtualTaskQueue:
             self.resources.release(task_id)
             self._scale_in_idle_virtual_capacity()
             self.pump()
+
+
+    def _schedule_federated(self,task):
+        resource_id=task.federated_resource_id
+        executor=self.federated_executors.get(resource_id)
+        if executor is None:
+            task.status="WAITING"
+            return
+        from .device_cloud_federation import eligible_fabric_resources
+        snapshot=self.resources.hybrid_resource_status()
+        plan=eligible_fabric_resources(snapshot,task.required_capabilities,physical_execution=task.physical_execution)
+        resource=next((x for x in plan.get("eligible",[]) if x.get("resource_id")==resource_id),None)
+        if resource is None:
+            task.status="WAITING"
+            return
+        lease=self.resources.reserve_hybrid_resource(
+            resource_id,task.task_id,task.federated_required_capacity,task.required_capabilities,
+            permission="execute_physical" if task.physical_execution else "simulate",
+            physical_execution=task.physical_execution)
+        if not lease.get("ok"):
+            task.status="WAITING"
+            return
+        claimed=self.store.claim(task.task_id,resource_id,300)
+        if claimed is None:
+            self.resources.release_hybrid_resource(task.task_id)
+            task.status="WAITING"
+            return
+        task.status="RUNNING"; task.lease_id=lease["lease"]["lease_id"]
+        task.lease_expires_at=lease["lease"]["expires_at"]; task.attempt=claimed["attempt"]; task.started_at=time()
+        self.pool.submit(self._execute_federated,task.task_id,resource,executor)
+
+    def _execute_federated(self,task_id,resource,executor):
+        task=self.tasks[task_id]
+        try:
+            response=executor(task.program,resource,{"task_id":task_id,"resource_id":task.federated_resource_id,
+                "lease_id":task.lease_id,"physical_execution":task.physical_execution})
+            if not isinstance(response,dict) or response.get("ok") is not True:
+                raise ValueError("FEDERATED_EXECUTOR_RESULT_INVALID")
+            output=response.get("result")
+            digest=hashlib.sha256(json.dumps(output,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode("utf-8")).hexdigest()
+            evidence=response.get("evidence")
+            expected={"task_id":task_id,"resource_id":task.federated_resource_id,"lease_id":task.lease_id,"result_sha256":digest}
+            if not isinstance(evidence,dict) or any(evidence.get(k)!=v for k,v in expected.items()):
+                raise ValueError("FEDERATED_EXECUTION_EVIDENCE_MISMATCH")
+            recorded={"ok":True,"result":output,"execution_mode":"PHYSICAL" if task.physical_execution else "FEDERATED_ADAPTER","evidence":evidence}
+            with self.lock:
+                task.result=recorded; task.status="COMPLETED"; task.lease_expires_at=None; task.finished_at=time()
+                self.store.finish(task_id,True,recorded)
+        except Exception as exc:
+            with self.lock:
+                task.result={"ok":False,"error":str(exc)}; task.status="FAILED"; task.lease_expires_at=None; task.finished_at=time()
+                self.store.finish(task_id,False,task.result)
+        finally:
+            self.resources.release_hybrid_resource(task_id)
+            self.pump()
+
+    def reserve_federated_resource(self, resource_id, task_id, required_capacity=None,
+                                  required_capabilities=None, permission="simulate",
+                                  lease_seconds=60, physical_execution=False):
+        """Reserve an explicitly registered fabric resource; never auto-promote a simulator."""
+        return self.resources.reserve_hybrid_resource(
+            resource_id, task_id, required_capacity, required_capabilities,
+            permission, lease_seconds, physical_execution
+        )
+
+    def release_federated_resource(self, task_id):
+        """Release a fabric lease independently of the virtual blade reservation."""
+        return self.resources.release_hybrid_resource(task_id)
+
+    def federated_resource_status(self):
+        return self.resources.hybrid_resource_status()
 
     def heartbeat(self,task_id,lease_id):
         with self.lock:
