@@ -467,6 +467,40 @@ class MemoryStore:
         with self.connect() as con:
             return [dict(x) for x in con.execute("SELECT * FROM events ORDER BY id DESC LIMIT ?",(limit,)).fetchall()]
 
+    def robot_memory_context(self, agent_id, limit=5):
+        """Return a bounded, per-agent history of completed robot tasks."""
+        key = f"robot:{str(agent_id)}:memory"
+        with self.connect() as con:
+            row = con.execute("SELECT value FROM memories WHERE key=?", (key,)).fetchone()
+        if not row:
+            return {"agent_id": str(agent_id), "history": []}
+        try:
+            payload = json.loads(row["value"])
+        except (TypeError, ValueError):
+            payload = {}
+        history = payload.get("history", []) if isinstance(payload, dict) else []
+        return {"agent_id": str(agent_id), "history": history[-max(1, min(int(limit), 20)):]}
+
+    def record_robot_task_result(self, agent_id, task_id, task, ok, result=None, error=""):
+        """Persist compact task outcomes without retaining arbitrary output or secrets."""
+        key = f"robot:{str(agent_id)}:memory"
+        previous = self.robot_memory_context(agent_id, limit=20).get("history", [])
+        result = result if isinstance(result, dict) else {}
+        safe_result = {}
+        for field in ("status", "device", "machine", "python", "system", "release",
+                      "returncode", "exit_code", "verified", "opened"):
+            if field in result and isinstance(result[field], (str, int, float, bool, type(None))):
+                value = result[field]
+                safe_result[field] = value[:300] if isinstance(value, str) else value
+        entry = {
+            "task_id": str(task_id), "task": str(task)[:120], "ok": bool(ok),
+            "result": safe_result, "error": str(error or "")[:300], "recorded_at": now(),
+        }
+        history = (previous + [entry])[-20:]
+        self.save_memory(key, json.dumps({"agent_id": str(agent_id), "history": history}, ensure_ascii=False))
+        self.event("ROBOT_TASK_RESULT", {"agent_id": str(agent_id), **entry})
+        return entry
+
     def device_agent_touch(self, agent_id, seen_at=None):
         import time
         with self.connect() as con:
