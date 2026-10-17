@@ -160,7 +160,12 @@ def main() -> int:
         return 2
 
     initial_temp = read_max_temperature_c()
-    if initial_temp is not None and initial_temp >= max_temp:
+    if initial_temp is None:
+        emit("BLOCKED_THERMAL_SENSOR_UNAVAILABLE",
+             required="A readable Android/Termux thermal sensor is required before live mining.",
+             note="No miner process was started.")
+        return 2
+    if initial_temp >= max_temp:
         emit("BLOCKED_THERMAL_LIMIT", temperature_c=round(initial_temp, 2), max_temperature_c=max_temp)
         return 2
 
@@ -190,7 +195,11 @@ def main() -> int:
         while proc.poll() is None and time.monotonic() - started < duration:
             time.sleep(2)
             temp = read_max_temperature_c()
-            if temp is not None and temp >= max_temp:
+            if temp is None:
+                stop_reason = "thermal_sensor_lost"
+                proc.terminate()
+                break
+            if temp >= max_temp:
                 stop_reason = "thermal_limit"
                 proc.terminate()
                 break
