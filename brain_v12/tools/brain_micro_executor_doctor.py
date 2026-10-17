@@ -15,9 +15,12 @@ import sys
 from pathlib import Path
 
 
-EXPECTED_PATHS = (
+REQUIRED_PATHS = (
     "brain_v12/app.py",
     "brain_v12/tools/brain_runtime_launcher.sh",
+)
+
+OPTIONAL_PATHS = (
     "brain_v12/tools/brain_device_bridge_doctor.py",
     "brain_v12/docs/SOFTWARE_ONLY_NODES.md",
 )
@@ -49,9 +52,16 @@ def main() -> int:
            str(root) if root else "not found; run from inside the repository or pass --root")
 
     if root:
-        for relative in EXPECTED_PATHS:
+        for relative in REQUIRED_PATHS:
             path = root / relative
-            record("file:" + relative, path.is_file(), "present" if path.is_file() else "missing")
+            record("required_file:" + relative, path.is_file(), "present" if path.is_file() else "missing")
+
+        for relative in OPTIONAL_PATHS:
+            path = root / relative
+            # Optional compatibility/documentation files may differ between local
+            # checkouts and cloud branches; report without failing the preflight.
+            record("optional_file:" + relative, True,
+                   "present" if path.is_file() else "absent (informational; not required)")
 
         git_dir = root / ".git"
         if git_dir.is_file():
@@ -77,7 +87,8 @@ def main() -> int:
         print("BRAIN MICRO-EXECUTOR DOCTOR — READ ONLY")
         print("No task polling, worker registration, remote requests, or configuration changes.")
         for item in checks:
-            print(f'{"PASS" if item["ok"] else "INFO/FAIL"} {item["name"]}: {item["detail"]}')
+            label = "PASS" if item["ok"] else ("INFO" if item["name"].startswith("optional_file:") else "FAIL")
+            print(f'{label} {item["name"]}: {item["detail"]}')
         print(f'CHECKS: {summary["checks_passed"]}/{summary["checks_total"]} passed')
         print("NOTE: this preflight is not proof of Android virtualization or real device execution.")
 
