@@ -67,6 +67,9 @@ export default {
       return confirmDelivery(request, env, requestOrigin, allowedOrigin);
     }
 
+    if (url.pathname === "/api/payments/paytabs/reconcile-query" && request.method === "POST") {
+      return reconcilePayTabsTransactionQuery(request, env, requestOrigin, allowedOrigin);
+    }
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -382,6 +385,92 @@ async function handlePayTabsReturn(request, env, allowedOrigin) {
   const cinemaToken = new URL(request.url).searchParams.get("cinema_token");
   if (cinemaToken) target.searchParams.set("cinema_token", cinemaToken);
   return Response.redirect(target.toString(), 303);
+}
+
+
+async function reconcilePayTabsTransactionQuery(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const control = String(env.BRAIN_CONTROL_TOKEN || "");
+  if (!control || request.headers.get("Authorization") !== "Bearer " + control) {
+    return json({ ok: false, error: "CONTROL_AUTH_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  }
+  const serverKey = String(env.PAYTABS_SERVER_KEY || "");
+  const profileId = String(env.PAYTABS_PROFILE_ID || "");
+  if (!serverKey || !profileId || !/^\\d+$/.test(profileId)) {
+    return json({ ok: false, error: "PAYTABS_QUERY_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  }
+  let body;
+  try { body = await request.json(); } catch {
+    return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin);
+  }
+  const tranRef = String(body.tran_ref || "").trim();
+  if (!tranRef) return json({ ok: false, error: "TRAN_REF_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+
+  const ledger = await env.BRAIN_DB.prepare(
+    "SELECT order_id, tran_ref, amount, currency, state, environment, evidence FROM revenue_ledger WHERE tran_ref = ? LIMIT 1"
+  ).bind(tranRef).first();
+  if (!ledger || ledger.environment !== "live" || ledger.state !== "DELIVERY_CONFIRMED_PENDING_SETTLEMENT") {
+    return json({ ok: false, error: "LIVE_REVENUE_PENDING_SETTLEMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  }
+
+  let response;
+  try {
+    response = await fetch(PAYTABS_BASE_URL + "/payment/query", {
+      method: "POST",
+      headers: { Authorization: serverKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ profile_id: Number(profileId), tran_ref: tranRef }),
+    });
+  } catch {
+    return json({ ok: false, error: "PAYTABS_QUERY_UNAVAILABLE" }, 502, requestOrigin, allowedOrigin);
+  }
+  const provider = await response.json().catch(() => null);
+  if (!response.ok || !provider || typeof provider !== "object") {
+    return json({ ok: false, error: "PAYTABS_QUERY_FAILED" }, 502, requestOrigin, allowedOrigin);
+  }
+
+  const providerAmount = Number(provider.cart_amount);
+  const ledgerAmount = Number(ledger.amount);
+  const providerCurrency = String(provider.cart_currency || "").toUpperCase();
+  const ledgerCurrency = String(ledger.currency || "").toUpperCase();
+  const providerStatus = String(provider.payment_result?.response_status || "").toUpperCase();
+  const providerType = String(provider.tran_type || "").toLowerCase();
+  const matches = String(provider.tran_ref || "") === tranRef
+    && String(provider.cart_id || "") === String(ledger.order_id)
+    && Number.isFinite(providerAmount) && Number.isFinite(ledgerAmount)
+    && Math.round(providerAmount * 100) === Math.round(ledgerAmount * 100)
+    && providerCurrency === ledgerCurrency;
+  if (!matches) {
+    return json({ ok: false, error: "PAYTABS_QUERY_EVIDENCE_MISMATCH", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
+  if (providerStatus !== "A" || providerType !== "sale") {
+    return json({ ok: false, error: "PAYTABS_TRANSACTION_NOT_APPROVED", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
+
+  // A successful transaction query is not payout/settlement evidence. Record it for
+  // audit only; the revenue state intentionally remains pending settlement.
+  const queryEvidence = {
+    settlement_status: "TRANSACTION_QUERY_CONFIRMED_NOT_SETTLEMENT",
+    transaction_query_verified_at: new Date().toISOString(),
+    transaction_query_source: "PAYTABS_READ_ONLY_PAYMENT_QUERY",
+    transaction_query_status: providerStatus,
+    transaction_query_type: providerType,
+    transaction_query_tran_ref: tranRef,
+    transaction_query_cart_id: String(provider.cart_id),
+    transaction_query_amount: providerAmount,
+    transaction_query_currency: providerCurrency,
+  };
+  await env.BRAIN_DB.prepare(
+    "UPDATE revenue_ledger SET evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT'"
+  ).bind(JSON.stringify(queryEvidence), tranRef).run();
+
+  return json({
+    ok: true,
+    transaction_query_verified: true,
+    settlement_verified: false,
+    settlement_status: "TRANSACTION_QUERY_CONFIRMED_NOT_SETTLEMENT",
+    revenue_realized: false,
+    tran_ref: tranRef,
+  }, 200, requestOrigin, allowedOrigin);
 }
 
 async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin) {
