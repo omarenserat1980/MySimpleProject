@@ -10,7 +10,7 @@ class PaymentRequestBody(BaseModel):
     client_id: str
     amount_jod: float
     currency: str = "JOD"
-    order_id: str | None = None
+    order_id: str
 
 
 class PaymentAuthority(BaseModel):
@@ -26,7 +26,7 @@ class PaymentReconcileBody(BaseModel):
     currency: str = "JOD"
     transaction_id: str
     evidence: PaymentAuthority
-    order_id: str | None = None
+    order_id: str
 
 
 class RevenueRealizeBody(BaseModel):
