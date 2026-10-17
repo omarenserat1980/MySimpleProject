@@ -13,10 +13,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install test dependency
+        run: |
+          python -m pip install --disable-pip-version-check pytest
       - name: Test mining control plane
         run: |
           python -m pytest -q brain_v12/tests/test_mining_controller.py
       - name: Report safe status
+        if: success()
         run: |
           python -m brain_v12.brain.mining_controller
           echo "GitHub Actions is a control/test plane only; mining execution is blocked."
