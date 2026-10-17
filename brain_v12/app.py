@@ -1259,7 +1259,8 @@ def _deployment_snapshot():
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "github_sha": _DEPLOYMENT_IDENTITY["expected_commit"] or None,
+        "github_sha": os.getenv("GITHUB_SHA") or None,
+        "expected_commit": _DEPLOYMENT_IDENTITY["expected_commit"] or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
         "run_id": DEPLOY_RUN_ID,
