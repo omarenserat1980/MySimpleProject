@@ -1,6 +1,8 @@
 """Read-only-contract API for Brain's local ASIC logic simulator."""
 from __future__ import annotations
 
+import asyncio
+import threading
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
@@ -122,7 +124,7 @@ def asic_sha256d_pow_simulation(body: SHA256dPowSimulationRequest, request: Requ
 
 
 @router.post("/sha256d-rtl-self-test")
-def asic_sha256d_rtl_self_test(body: SHA256dRtlSelfTestRequest, request: Request):
+async def asic_sha256d_rtl_self_test(body: SHA256dRtlSelfTestRequest, request: Request):
     """Run the actual repository RTL testbench; never substitute software hashing."""
     supervisor = getattr(request.app.state, "brain_supervisor", None)
     adapter = getattr(supervisor, "asic_resources", None)
@@ -135,9 +137,18 @@ def asic_sha256d_rtl_self_test(body: SHA256dRtlSelfTestRequest, request: Request
     elif resource.execution_mode != "SIMULATOR":
         raise HTTPException(status_code=403, detail={"status": "SIMULATION_MODE_REQUIRED"})
     try:
-        result = adapter.simulate_sha256d_rtl(
-            body.resource_id, timeout_seconds=body.timeout_seconds
-        )
+        cancel_event = threading.Event()
+        work = asyncio.create_task(asyncio.to_thread(
+            adapter.simulate_sha256d_rtl,
+            body.resource_id,
+            timeout_seconds=body.timeout_seconds,
+            cancel_check=cancel_event.is_set,
+        ))
+        while not work.done():
+            if await request.is_disconnected():
+                cancel_event.set()
+            await asyncio.sleep(0.05)
+        result = await work
         status = result.get("result", {}).get("status", "UNKNOWN")
         if status != "VERIFIED":
             return {**result, "ok": False, "status": status}
