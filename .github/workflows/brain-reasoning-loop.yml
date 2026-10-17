@@ -46,6 +46,8 @@ jobs:
           PY
       - name: Run cognitive loop evidence tests
         run: python3 -m unittest brain_v12.tests.test_cognitive_loop_evidence -v
+      - name: Run evidence-gated task completion regression tests
+        run: python3 -m unittest brain_v12.tests.test_cognitive_loop_task_completion -v
       - name: Run logic unit propagation tests
         run: python3 -m unittest brain_v12.tests.test_logic_unit -v
       - name: Run complete self-test
