@@ -85,7 +85,10 @@ assert.match(worker, /attempt < 3/);
 assert.match(worker, /state = 'RUNNING'/);
 
 assert.match(worker, /completeJob/);
-assert.match(worker, /RESULT_EVIDENCE_REQUIRED/);
+assert.match(worker, /STRUCTURED_RESULT_EVIDENCE_REQUIRED/, "job completion must reject free-form evidence");
+assert.match(worker, /HTTPS_ARTIFACT_URL_REQUIRED/, "job completion must require an HTTPS delivery artifact");
+assert.match(worker, /ARTIFACT_SHA256_REQUIRED/, "job completion must require a SHA-256 artifact digest");
+assert.match(worker, /artifact_sha256/, "delivery evidence must bind the artifact digest");
 assert.match(worker, /JOB_NOT_RUNNING/);
 assert.match(worker, /state = 'SUCCESS'/);
 assert.match(worker, /order_state: "READY"/);
