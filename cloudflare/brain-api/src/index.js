@@ -15,7 +15,15 @@ export default {
 
     if (url.pathname === "/health") {
       const db = Boolean(env.BRAIN_DB);
-      return json({ ok: true, service: "brain-cloud-api", mode: "commercial-edge", d1: db ? "CONFIGURED" : "NOT_CONFIGURED" }, 200, requestOrigin, allowedOrigin);
+      const deliveryOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
+        .split(",").map(value => value.trim()).filter(Boolean);
+      return json({
+        ok: true,
+        service: "brain-cloud-api",
+        mode: "commercial-edge",
+        d1: db ? "CONFIGURED" : "NOT_CONFIGURED",
+        delivery_artifact_policy: deliveryOrigins.length > 0 ? "CONFIGURED" : "NOT_CONFIGURED",
+      }, 200, requestOrigin, allowedOrigin);
     }
 
     if (url.pathname === "/api/supervisor/tick" && request.method === "POST") {
