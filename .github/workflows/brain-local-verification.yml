@@ -9,6 +9,7 @@ on:
       - 'tests/test_executor_pool.py'
       - 'tests/test_local_worker_recovery_e2e.py'
       - 'tests/test_local_health_gate.py'
+      - 'tests/test_runtime_doctor.py'
       - '.github/workflows/brain-local-verification.yml'
   push:
     branches:
