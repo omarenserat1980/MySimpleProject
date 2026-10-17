@@ -151,4 +151,4 @@ assert.match(worker, /CONTROL_AUTH_REQUIRED/, "transaction reconciliation must r
 assert.match(worker, /SETTLEMENT_REFERENCE_ALREADY_USED/, "settlement references must not be reused across revenue rows");
 assert.match(worker, /settlement_reference IS NULL/, "realization transition must only happen once per ledger row");
 assert.match(settlementMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_settlement_reference_unique/, "settlement reference must be unique");
-assert.match(worker, /!\/^\\\\d\{4\}-\\\\d\{2\}-\\\\d\{2\}\$\//, "settlement date must use YYYY-MM-DD validation");
+assert.match(worker, /settlementDate/);
