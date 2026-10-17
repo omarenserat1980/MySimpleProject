@@ -100,6 +100,13 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
         self.assertFalse(result["physical_asic_verified"])
         self.assertFalse(result["revenue_verified"])
 
+    def test_cpu_benchmark_includes_shared_layer_result(self):
+        result = bitcoin_mining_benchmark(HashBenchmarkRequest(duration_seconds=0.05, max_hashes=100))
+        self.assertEqual(result["layer_result"]["contract_version"], "1.0")
+        self.assertEqual(result["layer_result"]["layer"], "cpu_reference")
+        self.assertEqual(result["layer_result"]["status"], "PASS")
+        self.assertFalse(result["layer_result"]["claims"]["pool_connected"])
+
     def test_rtl_smoke_route_is_registered_but_not_run_by_status_checks(self):
         routes = [
             route for route in router.routes
