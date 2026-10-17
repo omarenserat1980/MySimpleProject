@@ -153,11 +153,26 @@ jobs:
               {"Idempotency-Key": "ci-task-unsafe"})
           assert status4 == 400 and rejected.get("error") == "INVALID_TASK_REQUEST", (status4, rejected)
 
-          status5, detail = task_request("GET", "/api/tasks/" + task_id)
-          assert status5 == 200 and detail["task"]["taskId"] == task_id and detail["task"]["status"] == "queued", (status5, detail)
+          # The hosted bounded consumer should finish the allow-listed task.
+          # Poll rather than assuming the initial state, which is inherently racy.
+          detail = None
+          for _ in range(15):
+              status5, detail = task_request("GET", "/api/tasks/" + task_id)
+              assert status5 == 200 and detail["task"]["taskId"] == task_id, (status5, detail)
+              if detail["task"]["status"] == "succeeded":
+                  break
+              if detail["task"]["status"] in ("failed", "cancelled"):
+                  raise SystemExit(f"bounded task did not succeed: {detail}")
+              time.sleep(1)
+          assert detail["task"]["status"] == "succeeded", f"bounded consumer did not complete task: {detail}"
+          result = json.loads(detail["task"]["resultJson"])
+          assert result.get("task_type") == "health_check", result
+          assert result.get("evidence_level") == "LOCAL_QUEUE_CHECK_ONLY", result
+          assert result.get("external_runtime_verified") is False, result
           print("BRAIN_TASK_API_AUTH=PASS")
           print("BRAIN_TASK_API_IDEMPOTENCY=PASS")
           print("BRAIN_TASK_API_ALLOWLIST=PASS")
           print("BRAIN_TASK_API_STATUS_LOOKUP=PASS")
+          print("BRAIN_BOUNDED_CONSUMER_HTTP_E2E=PASS")
           PY
           docker logs brain-cloud-worker-auth-smoke
