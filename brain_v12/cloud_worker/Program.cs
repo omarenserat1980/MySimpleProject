@@ -26,8 +26,8 @@ builder.Services.AddHostedService<HealthWorker>();
 
 var app = builder.Build();
 
-// Liveness only: confirms the HTTP process is responsive. It does not claim
-// that workers are ready, mining is active, or revenue has been realized.
+// Liveness confirms only that the HTTP process responds. It does not claim
+// workers are ready, mining is active, or revenue has been realized.
 app.MapGet("/healthz", () => Results.Ok(new
 {
     status = "ok",
@@ -36,26 +36,15 @@ app.MapGet("/healthz", () => Results.Ok(new
 
 app.MapGet("/readyz", (WorkerState state) =>
 {
-    var requiredWorkers = new[]
-    {
-        "supervisor", "video", "mining", "quality", "self-healing",
-        "research", "architect", "economic", "health"
-    };
-    var cutoff = DateTimeOffset.UtcNow.AddMinutes(-2);
-    var latest = state.Snapshot()
-        .GroupBy(p => p.WorkerId)
-        .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.At).First());
+    var result = WorkerReadinessPolicy.Evaluate(
+        state.Snapshot(),
+        DateTimeOffset.UtcNow,
+        TimeSpan.FromMinutes(2));
 
-    var checks = requiredWorkers.ToDictionary(
-        id => id,
-        id => latest.TryGetValue(id, out var pulse)
-            && pulse.Status == "success"
-            && pulse.At >= cutoff);
-
-    var ready = checks.Values.All(passed => passed);
-    return ready
-        ? Results.Ok(new { ready = true, checks })
-        : Results.Json(new { ready = false, checks }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    return result.Ready
+        ? Results.Ok(new { ready = true, checks = result.Checks })
+        : Results.Json(new { ready = false, checks = result.Checks },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
 });
 
 app.MapGet("/health", (WorkerState state, WorkerRegistry registry) => Results.Ok(new
@@ -78,7 +67,6 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
 app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
 {
     var expected = Environment.GetEnvironmentVariable("BRAIN_CLOUD_API_KEY");
-    // Fail closed if deployment configuration omitted the API key.
     if (string.IsNullOrWhiteSpace(expected))
         return Results.Problem(
             statusCode: StatusCodes.Status503ServiceUnavailable,
@@ -92,8 +80,6 @@ app.MapPost("/api/brain/command", (HttpContext http, CommandRequest request) =>
     if (command.Length == 0 || command.Length > 4000)
         return Results.BadRequest(new { ok = false, error = "command must be 1..4000 characters" });
 
-    // Do not claim a command was accepted: this endpoint is not yet connected
-    // to the durable InternalTaskRuntime queue or a verified execution adapter.
     return Results.Problem(
         statusCode: StatusCodes.Status501NotImplemented,
         title: "COMMAND_EXECUTION_NOT_CONNECTED",
