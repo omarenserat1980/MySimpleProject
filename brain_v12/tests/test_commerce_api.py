@@ -146,6 +146,15 @@ class PayTabsCommerceWebhookTests(unittest.TestCase):
         self.assertEqual(authority["payment_transaction_id"], "PAYTABS-TEST-TX-001")
         self.assertTrue(authority["event_id"])
 
+    def test_duplicate_signed_callback_is_idempotent(self):
+        order_id = self._pending_order()
+        first = self._callback(order_id)
+        self.assertEqual(first.status_code, 200, first.text)
+        second = self._callback(order_id)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertTrue(second.json()["duplicate"])
+        self.assertEqual(second.json()["order"]["state"], "PAYMENT_VERIFIED")
+
     def test_invalid_provider_signature_does_not_change_order(self):
         order_id = self._pending_order()
         response = self._callback(order_id, signature_override="0" * 64)
