@@ -8,9 +8,12 @@ handles wallet credentials.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import hashlib
 from datetime import datetime, timezone
 import math
 from typing import Any
+
+from brain_v12.asic.bitcoin_pow_simulator import MAX_ATTEMPTS, simulate_pow
 
 from .capability_registry import CapabilityRegistry
 from .evidence_store import EvidenceStore
@@ -203,6 +206,74 @@ class ASICResourceAdapter:
         return {"task": self.tasks.tasks[task["id"]], "result": payload,
                 "evidence_ref": evidence["evidence_id"], "evidence_sha256": evidence["sha256"],
                 "evidence_verification": verification["status"]}
+
+    def simulate_sha256d_pow(
+        self,
+        resource_id: str,
+        *,
+        header: bytes,
+        target: int,
+        start_nonce: int = 0,
+        max_attempts: int = 1_000,
+    ) -> dict[str, Any]:
+        """Run real bounded SHA256d hashing through Brain's ASIC simulation resource.
+
+        This performs actual CPU/software hash calculations inside the current
+        process, but remains SIMULATOR evidence: it does not execute RTL or
+        physical ASIC hardware, contact a pool, submit shares, or prove revenue.
+        """
+        resource = self._require_resource(resource_id)
+        if resource.execution_mode != "SIMULATOR":
+            raise PermissionError("SIMULATION_MODE_REQUIRED")
+        # Validate before creating a task so bad inputs cannot leave a RUNNING task.
+        if not isinstance(header, bytes) or len(header) != 80:
+            raise ValueError("HEADER_MUST_BE_EXACTLY_80_BYTES")
+        if isinstance(target, bool) or not isinstance(target, int) or not 0 <= target < (1 << 256):
+            raise ValueError("TARGET_MUST_BE_A_256_BIT_UNSIGNED_INTEGER")
+        if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
+            raise ValueError("START_NONCE_OUT_OF_RANGE")
+        if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= MAX_ATTEMPTS:
+            raise ValueError("MAX_ATTEMPTS_MUST_BE_BETWEEN_1_AND_1000000")
+
+        task = self.tasks.create(f"SHA256d PoW simulation {resource_id}")
+        self.tasks.update(task["id"], "RUNNING")
+        result = simulate_pow(
+            header, target, start_nonce=start_nonce, max_attempts=max_attempts
+        )
+        payload = {
+            "resource_id": resource_id,
+            "resource_type": "ASIC",
+            "execution_mode": "SIMULATOR",
+            "algorithm": "SHA-256d",
+            "header_sha256": hashlib.sha256(header).hexdigest(),
+            "target_hex": f"{target:064x}",
+            "start_nonce": start_nonce,
+            "max_attempts": max_attempts,
+            "result": result.as_dict(),
+            "software_hashes_performed": result.attempts,
+            "software_hashing_performed": True,
+            "rtl_executed": False,
+            "physical_asic_executed": False,
+            "pool_contacted": False,
+            "share_submitted": False,
+            "pool_acceptance_verified": False,
+            "real_mining_verified": False,
+            "revenue_verified": False,
+            "evidence_status": "SIMULATION_ONLY",
+        }
+        evidence = self.evidence.append(
+            task["id"], "asic_sha256d_pow_simulation", payload,
+            producer="brain.asic_resource_adapter",
+        )
+        verification = self.evidence.verify_hash(evidence["evidence_id"])
+        self.tasks.verify_and_complete(task["id"], verification, evidence["evidence_id"])
+        return {
+            "task": self.tasks.tasks[task["id"]],
+            "result": payload,
+            "evidence_ref": evidence["evidence_id"],
+            "evidence_sha256": evidence["sha256"],
+            "evidence_verification": verification["status"],
+        }
 
     def record_telemetry(self, resource_id: str, telemetry: dict[str, Any]) -> dict[str, Any]:
         resource = self._require_resource(resource_id)
