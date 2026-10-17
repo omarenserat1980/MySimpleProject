@@ -18,6 +18,119 @@ class EmulatorTests(unittest.TestCase):
         self.assertEqual(self.e.audit()["records"][-1]["action"],"heartbeat")
     def test_shell_fail_closed(self):
         self.assertEqual(self.e.start_process("python --version")["status"],"SHELL_DISABLED")
+
+    def test_info_marks_virtual_reality(self):
+        info=self.e.info()
+        self.assertEqual(info["reality"],"SIMULATED")
+        self.assertEqual(info["execution_scope"],"LOCAL_SANDBOX_ONLY")
+
+    def test_invalid_environment_is_rejected(self):
+        e=DesktopCommanderEmulator(self.tmp.name,policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True))
+        result=e.start_process("python --version",env={"BROKEN":None})
+        self.assertEqual(result["status"],"INVALID_ENVIRONMENT")
+
+    def test_process_timeout_is_enforced(self):
+        import sys
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.05),
+        )
+        result=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(2)"')
+        self.assertTrue(result["ok"])
+        output=e.read_process_output(result["process_id"],timeout=0.2)
+        self.assertEqual(output["status"],"TIMED_OUT")
+        self.assertEqual(e.process_snapshot()["processes"],[])
+    def test_watchdog_expires_process_without_output_polling(self):
+        import sys, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.1),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(5)"')
+        self.assertTrue(started["ok"])
+        deadline=time.monotonic()+2
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        result=e.read_process_output(started["process_id"])
+        self.assertEqual(result["status"],"TIMED_OUT")
+        self.assertTrue(any(row["action"]=="process_timeout" for row in e.audit()["records"]))
+
+    def test_watchdog_preserves_natural_completion_without_output_polling(self):
+        import sys, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=1.0),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "print(42)"')
+        self.assertTrue(started["ok"])
+        deadline=time.monotonic()+2
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        result=e.read_process_output(started["process_id"])
+        self.assertEqual(result["status"],"COMPLETED")
+        self.assertIn("42",result["output"])
+
+    def test_stop_process_reaps_process_and_cleans_registry(self):
+        import sys
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=10),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(5)"')
+        self.assertTrue(started["ok"])
+        stopped=e.stop_process(started["process_id"])
+        self.assertEqual(stopped["status"],"STOPPED")
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        self.assertEqual(e.stop_process(started["process_id"])["status"],"PROCESS_NOT_FOUND")
+
+    def test_watchdog_kills_descendant_holding_output_pipe(self):
+        import sys, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.2),
+        )
+        child="import time; time.sleep(5)"
+        parent="import subprocess,sys; subprocess.Popen([sys.executable,'-c',sys.argv[1]])"
+        command=f'"{sys.executable}" -c "{parent}" "{child}"'
+        started=e.start_process(command)
+        self.assertTrue(started["ok"])
+        deadline=time.monotonic()+1.5
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        result=e.read_process_output(started["process_id"])
+        self.assertEqual(result["status"],"TIMED_OUT")
+
+    def test_stop_racing_watchdog_leaves_no_registered_process(self):
+        import sys, threading, time
+        e=DesktopCommanderEmulator(
+            self.tmp.name,
+            policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True,command_timeout_seconds=0.15),
+        )
+        started=e.start_process(f'"{sys.executable}" -c "import time; time.sleep(3)"')
+        self.assertTrue(started["ok"])
+        barrier=threading.Barrier(2)
+        result={}
+        def stop_at_deadline():
+            time.sleep(0.12)
+            barrier.wait()
+            result.update(e.stop_process(started["process_id"]))
+        stopper=threading.Thread(target=stop_at_deadline)
+        stopper.start()
+        barrier.wait()
+        stopper.join(timeout=3)
+        self.assertFalse(stopper.is_alive())
+        self.assertIn(result.get("status"),{"STOPPED","PROCESS_NOT_FOUND"})
+        deadline=time.monotonic()+2
+        while e.process_snapshot()["processes"] and time.monotonic()<deadline:
+            time.sleep(0.02)
+        self.assertEqual(e.process_snapshot()["processes"],[])
+        # If the watchdog won the race, the result must remain retrievable.
+        if result.get("status")=="PROCESS_NOT_FOUND":
+            self.assertIn(e.read_process_output(started["process_id"])["status"],{"TIMED_OUT","COMPLETED"})
+
     def test_process_roundtrip_when_explicitly_enabled(self):
         e=DesktopCommanderEmulator(self.tmp.name,policy=EmulatorPolicy(Path(self.tmp.name),allow_shell=True))
         r=e.start_process("python --version")
