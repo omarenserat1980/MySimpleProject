@@ -20,7 +20,7 @@ from typing import Protocol
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .commerce_api import CommerceStore
+from .commerce_api import CommerceStore, payment_authority_proof
 
 
 class PaymentIntent(BaseModel):
@@ -321,6 +321,9 @@ def router(data_path: str, replay_path: str | None = None) -> APIRouter:
             "event_id": payload.event_id,
             "verified_at": int(time.time()),
             "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+            "authority_proof": payment_authority_proof(
+                secret, payload.order_id, payload.payment_reference, payload.provider, payload.event_id
+            ),
             })
             journal.mark(payload.event_id, "COMMERCE_COMMITTED")
             replay.record(payload.event_id, payload.payment_reference, payload.order_id)
