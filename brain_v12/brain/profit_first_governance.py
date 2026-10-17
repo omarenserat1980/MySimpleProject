@@ -9,7 +9,8 @@ mining is actually running.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable
+from typing import Any
+from fastapi import APIRouter
 
 
 @dataclass(frozen=True)
@@ -160,3 +161,26 @@ def income_plan(current_budget: float = 0.0, target_budget: float = 1_000_000.0)
         "guaranteed_income": 0.0,
         "note": "The target is aspirational; future income is not guaranteed.",
     }
+
+
+router = APIRouter(prefix="/api/profit-first", tags=["profit-first"])
+
+
+@router.get("/plan")
+def profit_first_plan(current_budget: float = 0.0, target_budget: float = 1_000_000.0) -> dict[str, Any]:
+    """Expose the staged income-growth objective without promising returns."""
+    return income_plan(current_budget=current_budget, target_budget=target_budget)
+
+
+@router.post("/audit")
+def profit_first_audit(signals: dict[str, Any]) -> dict[str, Any]:
+    """Audit caller-supplied system capability signals; absent evidence stays unknown."""
+    return audit_profit_blockers(signals)
+
+
+@router.post("/evaluate")
+def profit_first_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate a profit scenario; execution is never initiated by this endpoint."""
+    allowed = {field for field in ProfitInputs.__dataclass_fields__}
+    values = {key: value for key, value in payload.items() if key in allowed}
+    return evaluate_profit(ProfitInputs(**values))
