@@ -183,4 +183,6 @@ def profit_first_evaluate(payload: dict[str, Any]) -> dict[str, Any]:
     """Evaluate a profit scenario; execution is never initiated by this endpoint."""
     allowed = {field for field in ProfitInputs.__dataclass_fields__}
     values = {key: value for key, value in payload.items() if key in allowed}
+    values.setdefault("expected_gross_revenue_per_day", None)
+    values.setdefault("electricity_cost_per_day", None)
     return evaluate_profit(ProfitInputs(**values))
