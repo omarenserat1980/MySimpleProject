@@ -74,9 +74,9 @@ jobs:
           assert report.get("status") == "SIMULATED_BOOT_SUCCESS", report.get("status")
           assert report.get("execution_mode") == "SIMULATION_ONLY"
           assert report.get("real_windows_boot_verified") is False
-          assert report.get("implementation_progress", {}).get("percent") == 18
+          assert report.get("implementation_progress", {}).get("percent") == 30
           assert report["implementation_progress"].get("real_windows_boot_verified") is False
-          print("SIMULATION_IMPLEMENTATION_PROGRESS=18%")
+          print("SIMULATION_IMPLEMENTATION_PROGRESS=30%")
           verification = report.get("verification") or {}
           assert verification.get("ok") is True, verification
           Path("artifacts/windows-server-2025-simulated-boot.json").write_text(

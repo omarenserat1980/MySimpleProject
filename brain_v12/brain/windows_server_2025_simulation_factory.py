@@ -159,6 +159,14 @@ class WindowsServer2025Simulator:
         if capability in REAL_CAPABILITIES or capability != SIMULATED_CAPABILITY:
             return self._blocked(run_id, scenario_id, "SIMULATION_CAPABILITY_MISMATCH")
         errors = self.hardware.validate()
+        if not errors:
+            firmware = self.hardware.firmware_version.strip()
+            if not firmware.startswith("BRAIN-UEFI-MODEL-"):
+                errors.append("UNSUPPORTED_UEFI_FIRMWARE_MODEL")
+            if not self.hardware.boot_config_valid:
+                errors.append("BOOT_CONFIGURATION_INVALID")
+            if not self.hardware.boot_disk_present:
+                errors.append("BOOT_DISK_NOT_PRESENT")
         if errors:
             recorder.record("PREFLIGHT", "FAILED", "INVALID_VIRTUAL_HARDWARE",
                             {"errors": errors})
