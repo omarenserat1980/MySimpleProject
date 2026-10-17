@@ -76,6 +76,9 @@ def benchmark_header_hashing(
         "host_identity": "NOT_ATTESTED",
     }
     return {
+        "contract_version": "brain.sha256d.execution.v1",
+        "status": "VERIFIED" if valid_measurement else "UNVERIFIED",
+        "execution_layer": "CPU_SOFTWARE",
         "ok": valid_measurement,
         "mode": "LOCAL_BENCHMARK_ONLY",
         "execution_mode": "CPU_SOFTWARE",
