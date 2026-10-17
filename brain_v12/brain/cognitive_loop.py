@@ -6,6 +6,7 @@ from .world_model import WorldModel
 from .quranic_reasoning_paths import select_reasoning_path
 from .logic_unit import LogicUnit
 from uuid import uuid4
+from contextvars import ContextVar
 import hashlib
 import json
 
@@ -33,12 +34,13 @@ class CognitiveLoop:
         self.world=WorldModel()
         self.code_tool=None
         self.logic_unit=LogicUnit(store)
-        self._active_logic_context=None
+        self._active_logic_context=ContextVar(f'brain_logic_context_{id(self)}', default=None)
 
     def _state(self,stage,status="RUNNING",**extra):
         current=self.store.state()
-        if self._active_logic_context:
-            extra.setdefault("logic_unit", self.logic_unit.trace(self._active_logic_context))
+        active_logic_context=self._active_logic_context.get()
+        if active_logic_context:
+            extra.setdefault("logic_unit", self.logic_unit.trace(active_logic_context))
         current.update({
             "status":status,
             "cognitive_stage":stage,
@@ -107,7 +109,7 @@ class CognitiveLoop:
 
     def run(self,goal):
         goal=(goal or "").strip()
-        self._active_logic_context=None
+        self._active_logic_context.set(None)
         run_id=str(uuid4())
         self._state("PERCEIVE",goal=goal,run_id=run_id)
         self.events.publish("COGNITIVE_RUN_STARTED",{"run_id":run_id,"goal":goal})
@@ -129,7 +131,7 @@ class CognitiveLoop:
             reasoning_path=reasoning_path,
             run_id=run_id,
         )
-        self._active_logic_context=logic_context
+        self._active_logic_context.set(logic_context)
         self._state("MEMORY",goal=goal,run_id=run_id)
         decision_memories=self.logic_unit.decision_memories(memories,logic_context)
         if reasoning_path:
