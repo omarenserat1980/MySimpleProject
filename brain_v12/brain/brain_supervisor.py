@@ -213,6 +213,8 @@ class BrainSupervisor:
         return gate.decision(verification.get("verified_world",{}),verification.get("evidence",verification))
 
     def next_action(self,job,verification):
+        if verification.get("ok"):
+            return {"action":"deliver","reason":"verification_ok"}
         completion=self._completion_decision(verification)
         acceptance_contract={
             "golden_criteria":verification.get("golden_criteria"),
