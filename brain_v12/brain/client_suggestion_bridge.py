@@ -80,6 +80,13 @@ class ClientSuggestionBridge:
                     return {"ok": True, "status": "INCOME_SEARCH_FAILED", "suggestion_id": sid,
                             "client_id": client_id, "decision": decision, "search": result,
                             "execution_allowed": False, "revenue_verified": False}
+                if int(income_search.get("received", 0) or 0) <= 0 and int(income_search.get("accepted", 0) or 0) <= 0:
+                    result = {**income_search, "ok": False, "status": "NO_LIVE_OPPORTUNITIES_FOUND",
+                              "next_action": "RETRY_RESEARCH_OR_REVIEW_SOURCE_ERRORS"}
+                    self._update(sid, "NO_LIVE_OPPORTUNITIES", advice_text, decision, result)
+                    return {"ok": True, "status": "NO_LIVE_OPPORTUNITIES", "suggestion_id": sid,
+                            "client_id": client_id, "decision": decision, "search": result,
+                            "execution_allowed": False, "revenue_verified": False}
             except Exception as exc:
                 result = {"ok": False, "status": "INCOME_SEARCH_FAILED", "error": str(exc)[:500]}
                 self._update(sid, "INCOME_SEARCH_FAILED", advice_text, decision, result)
@@ -100,6 +107,9 @@ class ClientSuggestionBridge:
             }
         outcome=self.action_requester(client_id,action)
         if not isinstance(outcome,dict): outcome={"result":outcome}
+        if income_search is not None:
+            # Keep discovery evidence in durable history; task acceptance is not revenue.
+            outcome["income_search"] = action["income_search"]
         status="ACTION_REQUESTED" if outcome.get("accepted") else "ACTION_REJECTED"
         self._update(sid,status,advice_text,decision,outcome)
         return {"ok":True,"status":status,"suggestion_id":sid,"client_id":client_id,
