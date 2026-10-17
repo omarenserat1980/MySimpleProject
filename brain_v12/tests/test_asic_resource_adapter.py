@@ -138,3 +138,46 @@ def test_asic_sha256d_simulation_rejects_real_resource_modes_and_bad_header():
             "sim-bad", header=b"bad", target=(1 << 256) - 1, max_attempts=1
         )
 
+
+
+def test_rtl_self_test_requires_real_tool_result_and_persists_distinct_evidence(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as module
+
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("rtl-sim"))
+    monkeypatch.setattr(module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "VERIFIED",
+        "rtl_executed": True,
+        "evidence_status": "RTL_SIMULATION_VERIFIED",
+        "physical_asic_executed": False,
+        "pool_contacted": False,
+        "share_submitted": False,
+        "pool_acceptance_verified": False,
+        "revenue_verified": False,
+    })
+    result = brain.simulate_sha256d_rtl("rtl-sim")
+    assert result["task"]["status"] == "COMPLETED"
+    assert result["result"]["execution_mode"] == "RTL_SIMULATION"
+    assert result["evidence_verification"] == "VERIFIED"
+    evidence = brain.evidence.get(result["evidence_ref"])
+    assert evidence["kind"] == "asic_sha256d_rtl_simulation"
+
+
+def test_rtl_self_test_failure_cannot_complete_task_or_create_success_evidence(monkeypatch):
+    import brain_v12.brain.asic_resource_adapter as module
+
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("rtl-blocked"))
+    monkeypatch.setattr(module, "run_sha256d_rtl_self_test", lambda **kwargs: {
+        "contract_version": "brain.sha256d.execution.v1",
+        "execution_mode": "RTL_SIMULATION",
+        "status": "BLOCKED_TOOLCHAIN_UNAVAILABLE",
+        "rtl_executed": False,
+        "evidence_status": "BLOCKED",
+    })
+    result = brain.simulate_sha256d_rtl("rtl-blocked")
+    assert result["task"]["status"] == "FAILED"
+    assert result["evidence_ref"] is None
+    assert result["evidence_verification"] == "NOT_VERIFIED"
