@@ -117,3 +117,16 @@ def test_backend_prerequisites_do_not_directly_authorize_execution():
     )
     assert not ok
     assert reason == "separate_execution_review_required"
+
+
+def test_profitability_gate_rejects_arithmetic_overflow():
+    with pytest.raises(ValueError, match="overflowed"):
+        profitability_gate(1.0, 1e308, 1e308)
+
+    with pytest.raises(ValueError, match="overflowed"):
+        profitability_gate(1e308, 0.0, 0.0, 0.0, 1e308)
+
+
+def test_profitability_gate_rejects_integer_too_large_for_float():
+    with pytest.raises(ValueError, match="finite number"):
+        profitability_gate(10**1000, 0.0)
