@@ -70,6 +70,9 @@ export default {
     if (url.pathname === "/api/payments/paytabs/reconcile-query" && request.method === "POST") {
       return reconcilePayTabsTransactionQuery(request, env, requestOrigin, allowedOrigin);
     }
+    if (url.pathname === "/api/revenue/settlement/verify" && request.method === "POST") {
+      return verifySignedSettlementEvidence(request, env, requestOrigin, allowedOrigin);
+    }
     if (url.pathname === "/api/payments/paytabs/callback" && request.method === "POST") {
       return handlePayTabsCallback(request, env, requestOrigin, allowedOrigin);
     }
@@ -470,6 +473,111 @@ async function reconcilePayTabsTransactionQuery(request, env, requestOrigin, all
     settlement_status: "TRANSACTION_QUERY_CONFIRMED_NOT_SETTLEMENT",
     revenue_realized: false,
     tran_ref: tranRef,
+  }, 200, requestOrigin, allowedOrigin);
+}
+
+
+async function verifySignedSettlementEvidence(request, env, requestOrigin, allowedOrigin) {
+  if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  const control = String(env.BRAIN_CONTROL_TOKEN || "");
+  if (!control || request.headers.get("Authorization") !== "Bearer " + control) {
+    return json({ ok: false, error: "CONTROL_AUTH_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  }
+  const attestationKey = String(env.BRAIN_SETTLEMENT_ATTESTATION_KEY || "");
+  if (attestationKey.length < 32) {
+    return json({ ok: false, error: "SETTLEMENT_ATTESTATION_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
+  }
+  let body;
+  try { body = await request.json(); } catch {
+    return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin);
+  }
+  const tranRef = String(body.tran_ref || "").trim();
+  const settlementReference = String(body.settlement_reference || "").trim();
+  const amount = Number(body.settled_amount);
+  const currency = String(body.currency || "").trim().toUpperCase();
+  const settlementDate = String(body.settlement_date || "").trim();
+  const source = String(body.source || "").trim();
+  const reportSha256 = String(body.report_sha256 || "").trim().toLowerCase();
+  const signature = String(body.signature || "").trim().toLowerCase();
+
+  if (!tranRef || !settlementReference || !Number.isFinite(amount) || amount <= 0
+      || !/^[A-Z]{3}$/.test(currency) || !/^\d{4}-\d{2}-\d{2}$/.test(settlementDate)
+      || !["PAYTABS_SETTLEMENT_REPORT", "BANK_STATEMENT"].includes(source)
+      || !/^[a-f0-9]{64}$/.test(reportSha256) || !/^[a-f0-9]{64}$/.test(signature)) {
+    return json({ ok: false, error: "SETTLEMENT_EVIDENCE_INVALID" }, 400, requestOrigin, allowedOrigin);
+  }
+
+  const ledger = await env.BRAIN_DB.prepare(
+    "SELECT order_id, tran_ref, amount, currency, state, environment, evidence FROM revenue_ledger WHERE tran_ref = ? LIMIT 1"
+  ).bind(tranRef).first();
+  if (!ledger || ledger.environment !== "live" || ledger.state !== "DELIVERY_CONFIRMED_PENDING_SETTLEMENT") {
+    return json({ ok: false, error: "LIVE_REVENUE_PENDING_SETTLEMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
+  }
+  if (Math.round(amount * 100) !== Math.round(Number(ledger.amount) * 100)
+      || currency !== String(ledger.currency || "").toUpperCase()) {
+    return json({ ok: false, error: "SETTLEMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+
+  // This signature attests that an authorized operator independently reviewed the
+  // referenced provider settlement report or bank statement. It is not generated
+  // from the PayTabs transaction-query response or from client-supplied delivery data.
+  const signedFields = {
+    tran_ref: tranRef,
+    settlement_reference: settlementReference,
+    settled_amount: Math.round(amount * 100) / 100,
+    currency,
+    settlement_date: settlementDate,
+    source,
+    report_sha256: reportSha256,
+  };
+  const canonical = JSON.stringify(signedFields);
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(attestationKey), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const signed = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(canonical)));
+  const expectedSignature = Array.from(signed, byte => byte.toString(16).padStart(2, "0")).join("");
+  if (signature.length !== expectedSignature.length) {
+    return json({ ok: false, error: "SETTLEMENT_SIGNATURE_INVALID" }, 401, requestOrigin, allowedOrigin);
+  }
+  let signatureDiff = 0;
+  for (let i = 0; i < signature.length; i++) signatureDiff |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+  if (signatureDiff !== 0) return json({ ok: false, error: "SETTLEMENT_SIGNATURE_INVALID" }, 401, requestOrigin, allowedOrigin);
+
+  const settlementEvidence = {
+    settlement_status: "SETTLEMENT_EVIDENCE_VERIFIED",
+    settlement_reference: settlementReference,
+    settlement_source: source,
+    settlement_report_sha256: reportSha256,
+    settlement_date: settlementDate,
+    settled_amount: Math.round(amount * 100) / 100,
+    settlement_currency: currency,
+    settlement_signature_algorithm: "HMAC-SHA256",
+    settlement_verified_at: new Date().toISOString(),
+    settlement_verification_method: "SIGNED_OPERATOR_ATTESTATION_AFTER_INDEPENDENT_SOURCE_REVIEW",
+  };
+  const priorSettlement = await env.BRAIN_DB.prepare(
+    "SELECT order_id, tran_ref FROM revenue_ledger WHERE settlement_reference = ? LIMIT 1"
+  ).bind(settlementReference).first();
+  if (priorSettlement && String(priorSettlement.tran_ref) !== tranRef) {
+    return json({ ok: false, error: "SETTLEMENT_REFERENCE_ALREADY_USED", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
+  let result;
+  try {
+    result = await env.BRAIN_DB.prepare(
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', settlement_reference = ?, evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT' AND amount = ? AND currency = ? AND settlement_reference IS NULL"
+    ).bind(settlementReference, JSON.stringify(settlementEvidence), tranRef, Number(ledger.amount), String(ledger.currency)).run();
+  } catch {
+    return json({ ok: false, error: "SETTLEMENT_REFERENCE_CONFLICT", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
+  }
+  return json({
+    ok: true,
+    state: "REVENUE_REALIZED",
+    settlement_verified: true,
+    settlement_verification_method: "SIGNED_OPERATOR_ATTESTATION_AFTER_INDEPENDENT_SOURCE_REVIEW",
+    revenue_realized: true,
+    tran_ref: tranRef,
+    settlement_reference: settlementReference,
   }, 200, requestOrigin, allowedOrigin);
 }
 

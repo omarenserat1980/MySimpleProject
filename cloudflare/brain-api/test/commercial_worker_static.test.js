@@ -9,6 +9,7 @@ const revenueMigration = fs.readFileSync("migrations/0004_revenue_ledger.sql", "
 const deliveryMigration = fs.readFileSync("migrations/0005_delivery.sql", "utf8");
 const jobsMigration = fs.readFileSync("migrations/0006_jobs.sql", "utf8");
 const cinemaMigration = fs.readFileSync("migrations/0007_cinema_entitlements.sql", "utf8");
+const settlementMigration = fs.readFileSync("migrations/0009_settlement_reference.sql", "utf8");
 const wrangler = fs.readFileSync("wrangler.toml", "utf8");
 
 assert.match(worker, /delivery_artifact_policy/, "health must report delivery artifact policy readiness");
@@ -49,12 +50,18 @@ assert.match(worker, /recordOrderEvent/);
 assert.match(worker, /PAYMENT_WEBHOOK_VERIFIED/);
 assert.match(auditMigration, /CREATE TABLE IF NOT EXISTS order_events/);
 
-assert.doesNotMatch(worker, /UPDATE revenue_ledger SET state = ['\"]REVENUE_REALIZED['\"]/i, "worker must not mark revenue realized without independent settlement evidence");
+const confirmDeliverySource = worker.slice(worker.indexOf("async function confirmDelivery("), worker.indexOf("async function completeJob("));
+assert.doesNotMatch(confirmDeliverySource, /REVENUE_REALIZED/, "delivery confirmation must not mark revenue realized");
+assert.match(worker, /async function verifySignedSettlementEvidence/);
+assert.match(worker, /BRAIN_SETTLEMENT_ATTESTATION_KEY/);
+assert.match(worker, /SETTLEMENT_SIGNATURE_INVALID/);
+assert.match(worker, /SETTLEMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
+assert.match(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "revenue realization transition must exist only behind settlement verification");
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "payment callback must not report revenue realized before delivery");
 assert.match(worker, /Delivery is not proof of provider settlement/);
 assert.match(worker, /DELIVERY_CONFIRMED_PENDING_SETTLEMENT/);
-assert.doesNotMatch(worker, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "delivery confirmation must not by itself recognize collected revenue");
+assert.doesNotMatch(confirmDeliverySource, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "delivery confirmation must not by itself recognize collected revenue");
 
 assert.match(worker, /revenue_ledger/);
 assert.match(worker, /revenue_state/);
@@ -140,3 +147,8 @@ assert.match(worker, /settlement_verified: false/, "transaction query must not c
 assert.match(worker, /revenue_realized: false/, "transaction query must not realize revenue");
 assert.match(worker, /PAYTABS_QUERY_EVIDENCE_MISMATCH/, "transaction query must fail closed on order/amount/currency/reference mismatch");
 assert.match(worker, /CONTROL_AUTH_REQUIRED/, "transaction reconciliation must require control-plane authentication");
+
+assert.match(worker, /SETTLEMENT_REFERENCE_ALREADY_USED/, "settlement references must not be reused across revenue rows");
+assert.match(worker, /settlement_reference IS NULL/, "realization transition must only happen once per ledger row");
+assert.match(settlementMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_settlement_reference_unique/, "settlement reference must be unique");
+assert.match(worker, /settlementDate/);
