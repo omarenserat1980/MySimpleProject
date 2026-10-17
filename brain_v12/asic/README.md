@@ -48,3 +48,14 @@ clear priority, and asynchronous reset. The runner requires a real Icarus Verilo
 marker and a non-empty Yosys synthesized netlist before reporting
 `MAC_DIGITAL_LAB_PASS`. This prototype is not yet integrated into the main ALU and
 does not claim measured PPA, formal proof, or fabricated silicon.
+
+
+## Bitcoin SHA-256d and nonce-search RTL evidence
+
+The ASIC workflow also runs the dedicated SHA-256d path gate:
+
+```bash
+python3 brain_v12/asic/sha256d_lab.py artifacts/asic-digital-lab/sha256d
+```
+
+It invokes Icarus Verilog on the genesis-header known-answer vector, target byte-order/acceptance checks, bounded nonce sweep, and integrated genesis nonce search. It writes per-test compile/run logs and `sha256d-rtl-evidence.json`. The gate reports `SHA256D_RTL_PASS` only when all four real RTL simulations return zero and emit their required pass markers; missing tools are marked `BLOCKED`. This remains RTL simulation evidence only, not physical ASIC, pool-share, hashrate, or revenue proof.
