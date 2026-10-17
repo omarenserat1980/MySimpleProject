@@ -52,6 +52,10 @@ def test_offline_pipeline_builds_header_from_notify_coinbase_and_merkle():
 def test_offline_pipeline_keeps_live_and_revenue_evidence_false():
     result = build(network_target=1)
     assert result["network_target_met"] is False
+    assert result["execution_mode"] == "OFFLINE_CANDIDATE_ONLY"
+    assert result["transport_connected"] is False
+    assert result["nonce_search_executed"] is False
+    assert result["live_execution_allowed"] is False
     assert result["pool_connection_opened"] is False
     assert result["credentials_loaded"] is False
     assert result["share_submitted"] is False
