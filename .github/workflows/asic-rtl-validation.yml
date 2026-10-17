@@ -4,12 +4,24 @@ on:
   pull_request:
     paths:
       - "brain_v12/asic/**"
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/brain/bitcoin_stratum_bridge.py"
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_stratum_bridge.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - ".github/workflows/asic-rtl-validation.yml"
   push:
     branches:
       - "feature/advanced-asic-prototype"
     paths:
       - "brain_v12/asic/**"
+      - "brain_v12/brain/bitcoin_mining_evidence_gate.py"
+      - "brain_v12/brain/bitcoin_stratum_bridge.py"
+      - "brain_v12/brain/termux_bitcoin_worker.py"
+      - "brain_v12/tests/test_bitcoin_mining_evidence_gate.py"
+      - "brain_v12/tests/test_bitcoin_stratum_bridge.py"
+      - "brain_v12/tests/test_termux_bitcoin_worker.py"
       - ".github/workflows/asic-rtl-validation.yml"
   workflow_dispatch:
 
@@ -43,6 +55,63 @@ jobs:
           vvp artifacts/asic/brain_asic_tb.vvp | tee artifacts/asic/rtl-simulation.log
           grep -q "ALL_RTL_TESTS_PASSED" artifacts/asic/rtl-simulation.log
 
+      - name: Compile and run SHA-256 compression known-answer vector
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_sha256_compress \
+            -o artifacts/asic/sha256-compress.vvp \
+            brain_v12/asic/rtl/sha256_compress.sv \
+            brain_v12/asic/rtl/tb_sha256_compress.sv
+          vvp artifacts/asic/sha256-compress.vvp | tee artifacts/asic/sha256-compress.log
+          grep -q "ALL_SHA256_RTL_TESTS_PASSED" artifacts/asic/sha256-compress.log
+
+      - name: Compile and run Bitcoin genesis SHA256d header vector
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_sha256d_header_hash \
+            -o artifacts/asic/sha256d-header.vvp \
+            brain_v12/asic/rtl/sha256_compress.sv \
+            brain_v12/asic/rtl/sha256d_header_hash.sv \
+            brain_v12/asic/rtl/tb_sha256d_header_hash.sv
+          vvp artifacts/asic/sha256d-header.vvp | tee artifacts/asic/sha256d-header.log
+          grep -q "ALL_SHA256D_HEADER_RTL_TESTS_PASSED" artifacts/asic/sha256d-header.log
+
+      - name: Compile and run Bitcoin proof-of-work target checks
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_bitcoin_pow_target_check \
+            -o artifacts/asic/bitcoin-target.vvp \
+            brain_v12/asic/rtl/bitcoin_pow_target_check.sv \
+            brain_v12/asic/rtl/tb_bitcoin_pow_target_check.sv
+          vvp artifacts/asic/bitcoin-target.vvp | tee artifacts/asic/bitcoin-target.log
+          grep -q "ALL_BITCOIN_TARGET_CHECK_TESTS_PASSED" artifacts/asic/bitcoin-target.log
+
+      - name: Compile and run bounded Bitcoin nonce sweep
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_bitcoin_nonce_sweep \
+            -o artifacts/asic/bitcoin-nonce-sweep.vvp \
+            brain_v12/asic/rtl/sha256_compress.sv \
+            brain_v12/asic/rtl/sha256d_header_hash.sv \
+            brain_v12/asic/rtl/bitcoin_pow_target_check.sv \
+            brain_v12/asic/rtl/bitcoin_nonce_sweep.sv \
+            brain_v12/asic/rtl/tb_bitcoin_nonce_sweep.sv
+          vvp artifacts/asic/bitcoin-nonce-sweep.vvp | tee artifacts/asic/bitcoin-nonce-sweep.log
+          grep -q "ALL_NONCE_SWEEP_TESTS_PASSED" artifacts/asic/bitcoin-nonce-sweep.log
+
+      - name: Compile and run Bitcoin genesis nonce-search integration vector
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_bitcoin_genesis_nonce_search \
+            -o artifacts/asic/bitcoin-genesis-search.vvp \
+            brain_v12/asic/rtl/sha256_compress.sv \
+            brain_v12/asic/rtl/sha256d_header_hash.sv \
+            brain_v12/asic/rtl/bitcoin_pow_target_check.sv \
+            brain_v12/asic/rtl/bitcoin_nonce_sweep.sv \
+            brain_v12/asic/rtl/tb_bitcoin_genesis_nonce_search.sv
+          vvp artifacts/asic/bitcoin-genesis-search.vvp | tee artifacts/asic/bitcoin-genesis-search.log
+          grep -q "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED" artifacts/asic/bitcoin-genesis-search.log
+
       - name: Prepare Python software-model worker
         uses: actions/setup-python@v5
         with:
@@ -56,6 +125,16 @@ jobs:
           python -m pytest brain_v12/tests/test_asic_hardware_simulator.py -q \
             | tee artifacts/asic/software-simulator-tests.log
           grep -Eq "[0-9]+ passed" artifacts/asic/software-simulator-tests.log
+
+      - name: Validate live-mining safety gates and evidence contract
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            brain_v12/tests/test_bitcoin_mining_evidence_gate.py \
+            brain_v12/tests/test_bitcoin_stratum_bridge.py \
+            brain_v12/tests/test_termux_bitcoin_worker.py \
+            | tee artifacts/asic/live-mining-safety-tests.log
+          grep -Eq "[0-9]+ passed" artifacts/asic/live-mining-safety-tests.log
 
       - name: Synthesize RTL with Yosys
         run: |
