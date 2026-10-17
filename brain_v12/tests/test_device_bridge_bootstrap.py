@@ -28,6 +28,7 @@ class DeviceBridgeBootstrapTests(unittest.TestCase):
                 bridge = DeviceBridge(store=None)
                 self.assertTrue(bridge.configured())
                 self.assertTrue(bridge.enabled())
+                self.assertEqual(bridge.auth_mode(), "KEY_FILE")
                 self.assertTrue(bridge.authenticate("test-agent-key"))
         finally:
             os.unlink(key_file)
