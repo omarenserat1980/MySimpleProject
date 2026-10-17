@@ -108,6 +108,10 @@ app.MapPost("/api/tasks", (HttpContext http, TaskSubmissionRequest request, Dura
     {
         return Results.Conflict(new { ok = false, error = "IDEMPOTENCY_KEY_PAYLOAD_CONFLICT" });
     }
+    catch (InvalidOperationException ex) when (ex.Message == "TASK_QUEUE_CAPACITY_REACHED")
+    {
+        return Results.Json(new { ok = false, error = "TASK_QUEUE_CAPACITY_REACHED" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
     catch (ArgumentException)
     {
         return Results.BadRequest(new { ok = false, error = "INVALID_TASK_REQUEST", allowedTaskTypes = new[] { "health_check", "simulation_status" } });
