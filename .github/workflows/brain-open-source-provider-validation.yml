@@ -1,0 +1,22 @@
+name: Brain Open-Source Provider Fabric Validation
+
+on:
+  push:
+    branches:
+      - brain/open-source-provider-fabric-v1
+  pull_request:
+    paths:
+      - "brain_v12/brain/open_source_provider_registry.py"
+      - "brain_v12/tests/test_open_source_provider_registry.py"
+      - "brain_v12/OPEN_SOURCE_AI_FABRIC.md"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Registry unit tests
+        run: python -m unittest brain_v12.tests.test_open_source_provider_registry -v
