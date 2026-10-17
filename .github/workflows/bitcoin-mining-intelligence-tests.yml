@@ -50,3 +50,40 @@ jobs:
             brain_v12/tests/test_mining_engine.py \
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py
+      - name: Capture bounded CPU benchmark evidence
+        env:
+          PYTHONPATH: .
+        run: |
+          mkdir -p artifacts/sha256d-benchmark
+          python - <<'PY'
+          import json
+          import pathlib
+          import platform
+          import subprocess
+          from brain_v12.brain.bitcoin_hash_benchmark import benchmark_header_hashing
+
+          result = benchmark_header_hashing(duration_seconds=0.25, max_hashes=100000)
+          evidence = {
+              **result,
+              "runner": "github-hosted-ubuntu",
+              "runner_os": platform.platform(),
+              "python_version": platform.python_version(),
+              "commit_sha": subprocess.check_output(
+                  ["git", "rev-parse", "HEAD"], text=True
+              ).strip(),
+              "claim_boundary": "GitHub-hosted CPU software benchmark only; not production, ASIC, pool, or revenue evidence",
+          }
+          path = pathlib.Path("artifacts/sha256d-benchmark/benchmark-evidence.json")
+          path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(evidence, indent=2))
+          if not result["ok"]:
+              raise SystemExit("SHA256D_BENCHMARK_EVIDENCE_INVALID")
+          PY
+      - name: Upload bounded CPU benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256d-benchmark-evidence
+          path: artifacts/sha256d-benchmark/benchmark-evidence.json
+          if-no-files-found: error
+          retention-days: 30
