@@ -26,7 +26,7 @@ class MiningUIContractTests(unittest.TestCase):
         self.assertIn('app.mount("/",StaticFiles(directory=os.path.join(ROOT,"web"),html=True),name="ui")', self.app)
 
     def test_ui_calls_registered_simulator_status_endpoint(self):
-        self.assertIn("api('/api/asic-sim/status')", self.ui)
+        self.assertIn("miningApi('/api/asic-sim/status')", self.ui)
         self.assertIn("app.include_router(asic_simulator_router)", self.app)
         self.assertIn('@router.get("/status")', self.api)
 
