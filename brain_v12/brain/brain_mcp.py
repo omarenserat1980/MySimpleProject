@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from .sha256d_execution_contract import layer_status_snapshot, validate_layer_result
+from .sha256d_rtl_adapter import run_rtl_smoke
 
 
 PROTOCOL_VERSION = "2026-07-28"
@@ -103,6 +104,19 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "execution_started": False,
         }
 
+    def sha256d_run_rtl_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        """Run one allowlisted, bounded local RTL testbench; no pool/network access."""
+        case = arguments.get("case", "genesis_nonce_search")
+        timeout_seconds = arguments.get("timeout_seconds", 30.0)
+        result = run_rtl_smoke(case=case, timeout_seconds=timeout_seconds)
+        return {
+            "ok": result.get("status") == "PASS",
+            "source": "electronic-brain",
+            "rtl_result": result,
+            "execution_scope": "LOCAL_RTL_SIMULATION_ONLY",
+            "external_claims_verified": False,
+        }
+
     def chat_handler(arguments: dict[str, Any]) -> dict[str, Any]:
         message = str(arguments.get("message", "")).strip()
         if not message:
@@ -147,6 +161,28 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         "Read Arabic SHA-256d CPU/RTL/MCP layer statuses and separate external pool/revenue evidence gates. Read-only; starts no simulation or mining.",
         {"type": "object", "properties": {}, "additionalProperties": False},
         sha256d_layers_handler,
+    )
+    register(
+        "brain.sha256d_run_rtl",
+        "Run one allowlisted local SHA-256d RTL testbench with bounded timeout. May execute local Icarus Verilog/VVP; no pool/network access and no physical ASIC or revenue claims.",
+        {
+            "type": "object",
+            "properties": {
+                "case": {
+                    "type": "string",
+                    "enum": ["genesis_nonce_search", "nonce_sweep", "header_hash"],
+                    "default": "genesis_nonce_search",
+                },
+                "timeout_seconds": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 60.0,
+                    "default": 30.0,
+                },
+            },
+            "additionalProperties": False,
+        },
+        sha256d_run_rtl_handler,
     )
     register(
         "brain.sha256d_validate_evidence",
