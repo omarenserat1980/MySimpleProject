@@ -9,6 +9,7 @@ on:
       - "brain_v12/tests/test_braiins_pool_evidence_collector.py"
       - "brain_v12/brain/brain_owned_mining_contract.py"
       - "brain_v12/brain/brain_owned_compute_runtime.py"
+      - "brain_v12/brain/bounded_pow_task_engine.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "docs/BRAIN_STRATUM_V1_PREVHASH_BYTE_ORDER.md"
       - "brain_v12/brain/stratum_v1_jobs.py"
@@ -17,6 +18,7 @@ on:
       - "brain_v12/self_healing/completion_audit.py"
       - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/tests/test_brain_owned_compute_runtime.py"
+      - "brain_v12/tests/test_bounded_pow_task_engine.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - "brain_v12/tests/test_stratum_candidate_pipeline.py"
@@ -34,6 +36,7 @@ on:
       - "brain_v12/tests/test_braiins_pool_evidence_collector.py"
       - "brain_v12/brain/brain_owned_mining_contract.py"
       - "brain_v12/brain/brain_owned_compute_runtime.py"
+      - "brain_v12/brain/bounded_pow_task_engine.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "docs/BRAIN_STRATUM_V1_PREVHASH_BYTE_ORDER.md"
       - "brain_v12/brain/stratum_v1_jobs.py"
@@ -42,6 +45,7 @@ on:
       - "brain_v12/self_healing/completion_audit.py"
       - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/tests/test_brain_owned_compute_runtime.py"
+      - "brain_v12/tests/test_bounded_pow_task_engine.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - "brain_v12/tests/test_stratum_candidate_pipeline.py"
@@ -87,6 +91,8 @@ jobs:
         run: python -m pytest -q brain_v12/tests/test_stratum_v1_jobs.py
       - name: Validate bounded SHA256d proof-of-work primitive and Bitcoin header vectors
         run: python -m pytest -q brain_v12/tests/test_brain_owned_compute_runtime.py brain_v12/tests/test_bitcoin_header.py
+      - name: Validate bounded cancellable offline proof-of-work task engine
+        run: python -m pytest -q brain_v12/tests/test_bounded_pow_task_engine.py
       - name: Validate read-only Braiins Pool evidence collection contract
         run: python -m pytest -q brain_v12/tests/test_braiins_pool_evidence_collector.py
       - name: Validate completion-audit fail-closed status recognition
