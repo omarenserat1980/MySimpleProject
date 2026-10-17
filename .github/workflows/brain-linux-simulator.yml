@@ -1,0 +1,32 @@
+name: Brain Linux Simulator Tests
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/linux_simulator.py"
+      - "brain_v12/tests/test_linux_simulator.py"
+      - ".github/workflows/brain-linux-simulator.yml"
+  push:
+    branches:
+      - "feat/brain-linux-simulator-isolated"
+    paths:
+      - "brain_v12/brain/linux_simulator.py"
+      - "brain_v12/tests/test_linux_simulator.py"
+      - ".github/workflows/brain-linux-simulator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-simulator-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Linux simulator regression tests
+        run: python -m unittest brain_v12.tests.test_linux_simulator -v
