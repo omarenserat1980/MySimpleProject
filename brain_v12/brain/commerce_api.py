@@ -279,6 +279,63 @@ def router(data_path: str | None = None) -> APIRouter:
         require_control_key(request)
         return {"ok": True, "order": store.transition(order_id, "PAYMENT_VERIFIED", body.dict())}
 
+    @api.post("/orders/{order_id}/paytabs-webhook")
+    async def paytabs_webhook(request: Request, order_id: str):
+        """Verify PayTabs IPN and mint order-bound authority only after signature validation."""
+        server_key = os.getenv("PAYTABS_SERVER_KEY", "").strip()
+        authority_secret = os.getenv("BRAIN_PAYMENT_WEBHOOK_SECRET", "")
+        if not server_key or not authority_secret:
+            raise HTTPException(status_code=503, detail="PAYTABS_OR_PAYMENT_AUTHORITY_NOT_CONFIGURED")
+
+        order = store.get(order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
+
+        raw_body = await request.body()
+        provider_signature = request.headers.get("signature", "") or request.headers.get("x-paytabs-signature", "")
+        try:
+            from brain.provider_hub.paytabs_webhook import parse_and_validate_payment
+            payload = parse_and_validate_payment(
+                raw_body,
+                provider_signature,
+                server_key,
+                expected_order_id=order_id,
+                expected_amount=f"{float(order['product']['price_usd']):.2f}",
+                expected_currency="USD",
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+
+        transaction_id = str(payload["tran_ref"]).strip()
+        event_id = transaction_id
+        payment_ref = f"paytabs:{transaction_id}"
+        if order.get("state") == "PAYMENT_VERIFIED":
+            authority = order.get("revenue_authority", {})
+            if (
+                order.get("payment", {}).get("transaction_id") == transaction_id
+                and authority.get("status") == "INDEPENDENTLY_VERIFIED"
+                and authority.get("provider") == "paytabs"
+                and authority.get("event_id") == event_id
+            ):
+                return {"ok": True, "duplicate": True, "order": order}
+            raise HTTPException(status_code=409, detail="PAYMENT_ALREADY_VERIFIED_WITH_DIFFERENT_EVIDENCE")
+        if order.get("state") != "PAYMENT_PENDING":
+            raise HTTPException(status_code=409, detail="INVALID_PAYMENT_STATE")
+
+        proof = payment_authority_proof(
+            authority_secret, order_id, transaction_id, "paytabs", event_id
+        )
+        evidence = {
+            "transaction_id": transaction_id,
+            "evidence_ref": payment_ref,
+            "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+            "provider": "paytabs",
+            "event_id": event_id,
+            "authority_proof": proof,
+        }
+        updated = store.transition(order_id, "PAYMENT_VERIFIED", evidence)
+        return {"ok": True, "duplicate": False, "order": updated}
+
     @api.post("/orders/{order_id}/delivery-pending")
     def delivery_pending(request: Request, order_id: str, body: CommerceStateIn):
         from .control_auth import require_control_key
