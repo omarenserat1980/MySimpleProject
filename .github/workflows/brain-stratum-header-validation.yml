@@ -1,0 +1,61 @@
+name: Brain Stratum Header Validation
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/stratum_v1_header_validation.py"
+      - "brain_v12/tests/test_stratum_v1_header_validation.py"
+      - ".github/workflows/brain-stratum-header-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "brain_v12/brain/stratum_v1_header_validation.py"
+      - "brain_v12/tests/test_stratum_v1_header_validation.py"
+      - ".github/workflows/brain-stratum-header-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-stratum-header-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-header-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile implementation and tests
+        run: python -m py_compile brain_v12/brain/stratum_v1_header_validation.py brain_v12/tests/test_stratum_v1_header_validation.py
+      - name: Run offline header and target tests
+        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_stratum_v1_header_validation.py
+      - name: Verify offline-only evidence contract
+        run: |
+          python - <<'PY'
+          from brain_v12.brain.stratum_v1_header_validation import assemble_header, validate_share_candidate
+          header = assemble_header(
+              version_le_hex="01000000",
+              prevhash_le_hex="00" * 32,
+              merkle_root_le_hex="11" * 32,
+              ntime_le_hex="aabbccdd",
+              nbits_le_hex="ffff001d",
+              nonce=7,
+          )
+          result = validate_share_candidate(header, nonce=7, share_target=(1 << 256) - 1)
+          assert len(header) == 80
+          assert result["share_target_met"] is True
+          assert result["pool_submission_attempted"] is False
+          assert result["pool_acceptance_verified"] is False
+          assert result["real_mining_verified"] is False
+          assert result["revenue_verified"] is False
+          print("OFFLINE_ONLY_EVIDENCE_BOUNDARY=PASS")
+          PY
