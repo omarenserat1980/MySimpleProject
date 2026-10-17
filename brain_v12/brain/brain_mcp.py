@@ -153,6 +153,44 @@ def build_mcp_router(brain_ai, device_bridge, store, asic_resources=None) -> API
             )
             return {"ok": True, "status": "SIMULATION_ONLY", **result}
 
+        def asic_sha256d_rtl_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+            from .asic_resource_adapter import ASICResource
+
+            resource_id = str(arguments.get("resource_id", "brain-sha256d-rtl-sim")).strip()
+            timeout_seconds = arguments.get("timeout_seconds", 20.0)
+            if not resource_id or len(resource_id) > 128:
+                return {"ok": False, "status": "INVALID_RESOURCE_ID"}
+            if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not 0.1 <= timeout_seconds <= 120:
+                return {"ok": False, "status": "TIMEOUT_OUT_OF_RANGE"}
+            resource = asic_resources.resources.get(resource_id)
+            if resource is None:
+                asic_resources.register(ASICResource(resource_id=resource_id, execution_mode="SIMULATOR"))
+            elif resource.execution_mode != "SIMULATOR":
+                return {"ok": False, "status": "SIMULATION_MODE_REQUIRED"}
+            result = asic_resources.simulate_sha256d_rtl(
+                resource_id, timeout_seconds=float(timeout_seconds)
+            )
+            result_status = result.get("result", {}).get("status")
+            return {
+                **result,
+                "ok": result_status == "VERIFIED" and result.get("evidence_verification") == "VERIFIED",
+                "status": "RTL_SIMULATION_VERIFIED" if result_status == "VERIFIED" and result.get("evidence_verification") == "VERIFIED" else (result_status or "RTL_VERIFICATION_FAILED"),
+            }
+
+        register(
+            "brain.asic_sha256d_rtl_self_test",
+            "Execute Brain's actual Icarus Verilog/VVP Bitcoin SHA-256d RTL known-answer testbench. Fails closed if tools or expected proof are missing; never substitutes Python hashing. Does not prove physical ASIC, pool acceptance, or revenue.",
+            {
+                "type": "object",
+                "properties": {
+                    "resource_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                    "timeout_seconds": {"type": "number", "minimum": 0.1, "maximum": 120},
+                },
+                "additionalProperties": False,
+            },
+            asic_sha256d_rtl_handler,
+        )
+
         register(
             "brain.asic_sha256d_simulate",
             "Run bounded SHA-256d proof-of-work in Brain's software ASIC simulator. No RTL, physical hardware, pool, share submission, or revenue is implied.",
