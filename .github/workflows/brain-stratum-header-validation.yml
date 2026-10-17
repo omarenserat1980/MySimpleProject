@@ -87,6 +87,10 @@ jobs:
               prevhash_dialect=LEGACY_PREVHASH_DIALECT,
           )
           assert result["header_bytes"] == 80
+          assert result["execution_mode"] == "OFFLINE_CANDIDATE_ONLY"
+          assert result["transport_connected"] is False
+          assert result["nonce_search_executed"] is False
+          assert result["live_execution_allowed"] is False
           assert result["pool_connection_opened"] is False
           assert result["credentials_loaded"] is False
           assert result["share_submitted"] is False
