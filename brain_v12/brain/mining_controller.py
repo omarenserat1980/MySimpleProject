@@ -117,39 +117,43 @@ def profitability_gate(
     hardware_cost_per_hour: float = 0.0,
     minimum_margin: float = 0.0,
 ) -> dict[str, Any]:
-    """Calculate a hypothetical estimate; reject invalid numeric inputs.
+    """Calculate a hypothetical estimate; reject invalid or overflowing inputs.
 
     This is only an estimate based on caller-supplied values, not proof of
     current mining revenue, pool acceptance, payout, or realized profit.
     """
-    values = {
+    raw_values = {
         "gross_revenue_per_hour": gross_revenue_per_hour,
         "electricity_cost_per_hour": electricity_cost_per_hour,
         "pool_fee_per_hour": pool_fee_per_hour,
         "hardware_cost_per_hour": hardware_cost_per_hour,
         "minimum_margin": minimum_margin,
     }
-    for name, value in values.items():
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    values: dict[str, float] = {}
+    for name, value in raw_values.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"{name} must be a finite number")
-    for name in (
-        "gross_revenue_per_hour",
-        "electricity_cost_per_hour",
-        "pool_fee_per_hour",
-        "hardware_cost_per_hour",
-        "minimum_margin",
-    ):
-        if values[name] < 0:
+        try:
+            normalized = float(value)
+        except (OverflowError, ValueError):
+            raise ValueError(f"{name} must be a finite number") from None
+        if not math.isfinite(normalized):
+            raise ValueError(f"{name} must be a finite number")
+        if normalized < 0:
             raise ValueError(f"{name} must be non-negative")
+        values[name] = normalized
 
-    gross = float(gross_revenue_per_hour)
-    electricity = float(electricity_cost_per_hour)
-    pool_fee = float(pool_fee_per_hour)
-    hardware = float(hardware_cost_per_hour)
-    threshold = float(minimum_margin)
+    gross = values["gross_revenue_per_hour"]
+    electricity = values["electricity_cost_per_hour"]
+    pool_fee = values["pool_fee_per_hour"]
+    hardware = values["hardware_cost_per_hour"]
+    threshold = values["minimum_margin"]
     total_cost = electricity + pool_fee + hardware
     net = gross - total_cost
     margin = net / gross if gross > 0 else -1.0
+    if not all(math.isfinite(value) for value in (total_cost, net, margin)):
+        raise ValueError("profitability calculation overflowed")
+
     return {
         "gross_revenue_per_hour": gross,
         "cost_per_hour": total_cost,
