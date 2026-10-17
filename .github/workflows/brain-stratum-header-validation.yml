@@ -7,6 +7,8 @@ on:
       - "brain_v12/brain/stratum_v1_offline_candidate.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "brain_v12/brain/stratum_v1_jobs.py"
+      - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
@@ -48,12 +50,14 @@ jobs:
           python -m py_compile \
             brain_v12/brain/bitcoin_header.py \
             brain_v12/brain/stratum_v1_jobs.py \
+            brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/brain/stratum_v1_offline_candidate.py \
             brain_v12/tests/test_bitcoin_header.py \
             brain_v12/tests/test_stratum_v1_jobs.py \
+            brain_v12/tests/test_stratum_v1_protocol.py \
             brain_v12/tests/test_stratum_v1_offline_candidate.py
       - name: Run offline Stratum-to-header tests
-        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_bitcoin_header.py brain_v12/tests/test_stratum_v1_jobs.py brain_v12/tests/test_stratum_v1_offline_candidate.py
+        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_bitcoin_header.py brain_v12/tests/test_stratum_v1_jobs.py brain_v12/tests/test_stratum_v1_protocol.py brain_v12/tests/test_stratum_v1_offline_candidate.py
       - name: Verify offline-only evidence contract
         run: |
           python - <<'PY'
