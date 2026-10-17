@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import time
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -94,6 +95,7 @@ def run_sha256d_rtl_self_test(
 
     import tempfile
 
+    deadline = time.monotonic() + float(timeout_seconds)
     try:
         with tempfile.TemporaryDirectory(prefix="brain-rtl-") as temp_dir:
             output = str(Path(temp_dir) / "genesis-search.vvp")
