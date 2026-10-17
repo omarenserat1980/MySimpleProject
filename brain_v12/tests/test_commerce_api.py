@@ -1,8 +1,14 @@
+import hashlib
+import hmac
+import json
+import os
 import tempfile
 import unittest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from pathlib import Path
 
-from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore
+from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore, router as commerce_router
 
 
 class CommerceApiTests(unittest.TestCase):
@@ -56,3 +62,90 @@ class CommerceApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PayTabsCommerceWebhookTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.db = str(Path(self.temp.name) / "commerce.json")
+        self.old_db = os.environ.get("BRAIN_COMMERCE_DB")
+        self.old_key = os.environ.get("PAYTABS_SERVER_KEY")
+        os.environ["BRAIN_COMMERCE_DB"] = self.db
+        os.environ["PAYTABS_SERVER_KEY"] = "TEST_ONLY_SECRET"
+        app = FastAPI()
+        app.include_router(commerce_router(self.db))
+        self.client = TestClient(app)
+
+    def tearDown(self):
+        if self.old_db is None:
+            os.environ.pop("BRAIN_COMMERCE_DB", None)
+        else:
+            os.environ["BRAIN_COMMERCE_DB"] = self.old_db
+        if self.old_key is None:
+            os.environ.pop("PAYTABS_SERVER_KEY", None)
+        else:
+            os.environ["PAYTABS_SERVER_KEY"] = self.old_key
+        self.temp.cleanup()
+
+    def _create_pending_order(self):
+        response = self.client.post("/api/commerce/orders", json={
+            "customer_name": "Test Customer",
+            "contact": "test@example.com",
+            "product_id": "ai-starter-kit",
+        })
+        self.assertEqual(response.status_code, 200)
+        order = response.json()["order"]
+        pending = self.client.post(
+            f"/api/commerce/orders/{order['order_id']}/payment-pending",
+            json={"evidence_ref": "checkout-test"},
+        )
+        self.assertEqual(pending.status_code, 200)
+        return order["order_id"]
+
+    def _callback(self, order_id, amount="9.00"):
+        body = json.dumps({
+            "cart_id": order_id,
+            "cart_amount": amount,
+            "cart_currency": "USD",
+            "payment_result": {"response_status": "A"},
+            "tran_ref": "TX-TEST-001",
+        }, separators=(",", ":")).encode()
+        signature = hmac.new(b"TEST_ONLY_SECRET", body, hashlib.sha256).hexdigest()
+        return body, signature
+
+    def test_signed_paytabs_callback_sets_provider_authority_and_is_idempotent(self):
+        order_id = self._create_pending_order()
+        body, signature = self._callback(order_id)
+        url = f"/api/commerce/orders/{order_id}/paytabs-webhook"
+        first = self.client.post(url, content=body, headers={"signature": signature})
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertFalse(first.json()["duplicate"])
+        order = first.json()["order"]
+        self.assertEqual(order["payment"]["transaction_id"], "TX-TEST-001")
+        self.assertEqual(order["revenue_authority"]["status"], "INDEPENDENTLY_VERIFIED")
+        self.assertEqual(order["revenue_authority"]["provider"], "paytabs")
+        second = self.client.post(url, content=body, headers={"signature": signature})
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertTrue(second.json()["duplicate"])
+
+    def test_invalid_signature_cannot_verify_payment(self):
+        order_id = self._create_pending_order()
+        body, _ = self._callback(order_id)
+        response = self.client.post(
+            f"/api/commerce/orders/{order_id}/paytabs-webhook",
+            content=body,
+            headers={"signature": "0" * 64},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "INVALID_PAYTABS_SIGNATURE")
+
+    def test_amount_mismatch_cannot_verify_payment(self):
+        order_id = self._create_pending_order()
+        body, signature = self._callback(order_id, amount="90.00")
+        response = self.client.post(
+            f"/api/commerce/orders/{order_id}/paytabs-webhook",
+            content=body,
+            headers={"signature": signature},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "PAYTABS_AMOUNT_MISMATCH")
