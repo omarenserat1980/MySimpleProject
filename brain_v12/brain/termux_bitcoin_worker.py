@@ -194,6 +194,8 @@ def main() -> int:
                 stop_reason = "thermal_limit"
                 proc.terminate()
                 break
+        if proc.poll() is not None and stop_reason == "duration_limit" and time.monotonic() - started < duration:
+            stop_reason = "process_exit"
         if proc.poll() is None:
             proc.terminate()
             try:
