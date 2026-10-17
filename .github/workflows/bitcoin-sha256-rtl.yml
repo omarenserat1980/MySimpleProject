@@ -31,6 +31,7 @@ on:
       - "brain_v12/brain/asic_resource_adapter.py"
       - "brain_v12/brain/asic_simulator_api.py"
       - "brain_v12/brain/brain_mcp.py"
+      - "brain_v12/web/brain-chat-simulator.html"
       - "brain_v12/tests/test_rtl_simulator_adapter.py"
       - "brain_v12/tests/test_asic_resource_adapter.py"
       - "brain_v12/asic/rtl/sha256_compress.sv"
