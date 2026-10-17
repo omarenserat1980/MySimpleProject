@@ -104,7 +104,7 @@ jobs:
           status, payload = post({"X-Brain-Api-Key": "ci-test-only-key"})
           assert status == 501, f"expected HTTP 501 until execution queue is connected, got {status}: {payload}"
           assert "COMMAND_EXECUTION_NOT_CONNECTED" in payload, payload
-          assert "No command was executed" in payload, payload
+          assert "arbitrary commands are not executed" in payload, payload
           print("BRAIN_WORKER_WRONG_OR_MISSING_KEY=BLOCKED")
           print("BRAIN_WORKER_EXECUTION_STATUS=HONESTLY_NOT_CONNECTED")
 
