@@ -130,3 +130,13 @@ assert.match(worker, /revenue_realized: false/, "delivery confirmation must not 
 assert.match(worker, /settlement_required: settlementRequired/, "delivery response must surface the outstanding settlement gate");
 console.log("PAYTABS_CALLBACK_AMOUNT_IDEMPOTENCY_GATES=PASS");
 console.log("REVENUE_LEDGER_UPDATE_EVIDENCE_GATE=PASS");
+
+
+assert.match(worker, /reconcilePayTabsTransactionQuery/, "read-only PayTabs transaction reconciliation handler must exist");
+assert.match(worker, /\/api\/payments\/paytabs\/reconcile-query/, "reconciliation endpoint must be registered");
+assert.match(worker, /PAYTABS_BASE_URL \+ "\/payment\/query"/, "reconciliation must use the documented PayTabs query endpoint");
+assert.match(worker, /TRANSACTION_QUERY_CONFIRMED_NOT_SETTLEMENT/, "a transaction query must not be misrepresented as payout settlement");
+assert.match(worker, /settlement_verified: false/, "transaction query must not claim settlement verification");
+assert.match(worker, /revenue_realized: false/, "transaction query must not realize revenue");
+assert.match(worker, /PAYTABS_QUERY_EVIDENCE_MISMATCH/, "transaction query must fail closed on order/amount/currency/reference mismatch");
+assert.match(worker, /CONTROL_AUTH_REQUIRED/, "transaction reconciliation must require control-plane authentication");
