@@ -217,6 +217,11 @@ public static class WorkerRuntimeSelfTest
             }
             catch (InvalidOperationException ex) when (ex.Message == "TASK_QUEUE_CAPACITY_REACHED") { }
 
+            var capacity = queue.CapacitySnapshot();
+            if (capacity.Total != 2 || capacity.Queued != 2 || capacity.MaxRecords != 2 ||
+                capacity.Remaining != 0 || capacity.UtilizationPercent != 100 || !capacity.AtCapacity)
+                throw new InvalidOperationException("queue capacity snapshot is inaccurate");
+
             // Existing idempotent retries must still work at capacity.
             var duplicate = queue.Submit("self-test", "capacity-1", "health_check", "{}");
             if (!duplicate.Duplicate || queue.Snapshot().Count != 2)

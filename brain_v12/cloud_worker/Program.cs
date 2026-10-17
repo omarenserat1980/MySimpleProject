@@ -89,6 +89,21 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
     recent_pulses = state.Snapshot().TakeLast(50)
 }));
 
+// Queue capacity is operational metadata; keep it authenticated to avoid leaking workload details.
+app.MapGet("/api/tasks/queue-status", (HttpContext http, DurableFileTaskQueue queue) =>
+{
+    if (!IsAuthorized(http))
+        return Results.Unauthorized();
+
+    return Results.Ok(new
+    {
+        ok = true,
+        mode = "DURABLE_FILE_QUEUE",
+        execution_enabled_by_this_endpoint = false,
+        capacity = queue.CapacitySnapshot()
+    });
+});
+
 // Bounded task API: it only queues allow-listed task types. It does not execute them.
 app.MapPost("/api/tasks", (HttpContext http, TaskSubmissionRequest request, DurableFileTaskQueue queue) =>
 {
