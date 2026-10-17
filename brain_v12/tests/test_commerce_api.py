@@ -150,10 +150,9 @@ class PayTabsCommerceWebhookTests(unittest.TestCase):
         order_id = self._pending_order()
         response = self._callback(order_id, signature_override="0" * 64)
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            self.client.get(f"/api/commerce/orders/{order_id}").status_code,
-            401,
-        )
+        order = CommerceStore(self.db).get(order_id)
+        self.assertEqual(order["state"], "PAYMENT_PENDING")
+        self.assertNotIn("revenue_authority", order)
 
     def test_authorization_only_callback_is_rejected(self):
         order_id = self._pending_order()
