@@ -511,6 +511,11 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname) {
     return json({ ok: false, error: "HTTPS_ARTIFACT_URL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
+  const allowedArtifactOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
+    .split(",").map(value => value.trim()).filter(Boolean);
+  if (allowedArtifactOrigins.length === 0 || !allowedArtifactOrigins.includes(parsedArtifactUrl.origin)) {
+    return json({ ok: false, error: "ARTIFACT_ORIGIN_NOT_ALLOWED" }, 400, requestOrigin, allowedOrigin);
+  }
   if (!/^[a-f0-9]{64}$/.test(artifactHash)) {
     return json({ ok: false, error: "ARTIFACT_SHA256_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
