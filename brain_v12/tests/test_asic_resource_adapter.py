@@ -181,3 +181,37 @@ def test_rtl_self_test_failure_cannot_complete_task_or_create_success_evidence(m
     assert result["task"]["status"] == "FAILED"
     assert result["evidence_ref"] is None
     assert result["evidence_verification"] == "NOT_VERIFIED"
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error"),
+    [
+        ({"start_nonce": -1}, "START_NONCE_OUT_OF_RANGE"),
+        ({"start_nonce": 0x1_0000_0000}, "START_NONCE_OUT_OF_RANGE"),
+        ({"start_nonce": True}, "START_NONCE_OUT_OF_RANGE"),
+        ({"max_attempts": 0}, "MAX_ATTEMPTS_MUST_BE_BETWEEN_1_AND_1000000"),
+        ({"max_attempts": 1_000_001}, "MAX_ATTEMPTS_MUST_BE_BETWEEN_1_AND_1000000"),
+        ({"max_attempts": True}, "MAX_ATTEMPTS_MUST_BE_BETWEEN_1_AND_1000000"),
+        ({"target": -1}, "TARGET_MUST_BE_A_256_BIT_UNSIGNED_INTEGER"),
+        ({"target": 1 << 256}, "TARGET_MUST_BE_A_256_BIT_UNSIGNED_INTEGER"),
+    ],
+)
+def test_sha256d_simulation_rejects_nonce_target_and_attempt_bounds(kwargs, error):
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("bounds-sim"))
+    args = {"header": bytes(80), "target": (1 << 256) - 1, "start_nonce": 0, "max_attempts": 1}
+    args.update(kwargs)
+    with pytest.raises(ValueError, match=error):
+        brain.simulate_sha256d_pow("bounds-sim", **args)
+
+
+def test_sha256d_simulation_accepts_last_uint32_nonce_without_wrapping_when_found():
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("last-nonce-sim"))
+    result = brain.simulate_sha256d_pow(
+        "last-nonce-sim", header=bytes(80), target=(1 << 256) - 1,
+        start_nonce=0xFFFFFFFF, max_attempts=1,
+    )
+    assert result["result"]["result"]["found"] is True
+    assert result["result"]["result"]["nonce"] == 0xFFFFFFFF
+    assert result["result"]["software_hashes_performed"] == 1
