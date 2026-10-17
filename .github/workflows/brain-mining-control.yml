@@ -1,22 +1,41 @@
 name: Brain Mining Control Plane
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-mining-control.yml"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_mining_controller.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-mining-control.yml"
+      - "brain_v12/brain/mining_controller.py"
+      - "brain_v12/tests/test_mining_controller.py"
   workflow_dispatch:
   schedule:
     - cron: "17 */6 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install test dependency
+        run: |
+          python -m pip install --disable-pip-version-check pytest
       - name: Test mining control plane
         run: |
           python -m pytest -q brain_v12/tests/test_mining_controller.py
       - name: Report safe status
+        if: success()
         run: |
           python -m brain_v12.brain.mining_controller
           echo "GitHub Actions is a control/test plane only; mining execution is blocked."
