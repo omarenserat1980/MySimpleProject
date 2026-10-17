@@ -30,6 +30,12 @@ class MiningUIContractTests(unittest.TestCase):
         self.assertIn("app.include_router(asic_simulator_router)", self.app)
         self.assertIn('@router.get("/status")', self.api)
 
+    def test_mining_ui_surfaces_non_2xx_api_errors(self):
+        self.assertIn("async function miningApi(u,o)", self.ui)
+        self.assertIn("HTTP '+r.status", self.ui)
+        self.assertIn("await miningApi('/api/asic-sim/status')", self.ui)
+        self.assertIn("await miningApi('/api/asic-sim/sha256d-rtl-self-test'", self.ui)
+
     def test_ui_rtl_action_uses_real_rtl_endpoint_not_software_fallback(self):
         self.assertIn("fetch(u,o)", self.ui)
         self.assertIn("'/api/asic-sim/sha256d-rtl-self-test'", self.ui)
