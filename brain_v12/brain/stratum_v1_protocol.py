@@ -57,6 +57,7 @@ class StratumV1Session:
     authorized: bool = False
     difficulty: float | None = None
     current_job_id: str | None = None
+    active_job_ids: set[str] = field(default_factory=set)
     pending: dict[int, str] = field(default_factory=dict)
     accepted_shares: int = 0
     rejected_shares: int = 0
@@ -79,7 +80,7 @@ class StratumV1Session:
                        nonce: str) -> bytes:
         if not self.authorized:
             raise StratumProtocolError("POOL_AUTHORIZATION_REQUIRED")
-        if not self.current_job_id or job_id != self.current_job_id:
+        if not self.current_job_id or job_id not in self.active_job_ids:
             raise StratumProtocolError("UNKNOWN_OR_STALE_JOB")
         fields = (extranonce2, ntime, nonce)
         if any(not isinstance(value, str) or not value or len(value) % 2
@@ -115,6 +116,9 @@ class StratumV1Session:
                     job = StratumJob.from_notify(params)
                 except (TypeError, ValueError) as exc:
                     raise StratumProtocolError("INVALID_MINING_JOB") from exc
+                if job.clean_jobs:
+                    self.active_job_ids.clear()
+                self.active_job_ids.add(job.job_id)
                 self.current_job_id = job.job_id
             elif method == "mining.set_extranonce":
                 if len(params) != 2 or not isinstance(params[0], str):
@@ -178,6 +182,7 @@ class StratumV1Session:
             "authorized": self.authorized,
             "difficulty": self.difficulty,
             "current_job_id": self.current_job_id,
+            "active_job_count": len(self.active_job_ids),
             "pending_requests": len(self.pending),
             "accepted_shares_reported_by_pool": self.accepted_shares,
             "rejected_shares_reported_by_pool": self.rejected_shares,
