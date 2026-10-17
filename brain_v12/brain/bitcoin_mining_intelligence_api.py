@@ -1,6 +1,7 @@
 """Bitcoin Mining Intelligence: zero-capital, simulation-first analysis for Electronic Brain."""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -26,16 +27,32 @@ class MiningAnalysisRequest(BaseModel):
 
 
 @router.get("/status")
+def _configured_capital_budget_jod() -> float:
+    """Zero is the default starting budget, not a permanent income ceiling."""
+    try:
+        value = float(os.getenv("BRAIN_CAPITAL_BUDGET_JOD", "0"))
+    except (TypeError, ValueError):
+        return 0.0
+    return value if value >= 0 else 0.0
+
+
 def bitcoin_mining_status() -> dict[str, Any]:
+    capital_budget = _configured_capital_budget_jod()
+    paid_mining_authorized = os.getenv("BRAIN_ALLOW_PAID_MINING", "0").strip() == "1" and capital_budget > 0
     return {
         "ok": True,
         "module": "Bitcoin Mining Intelligence",
         "status": "READY",
         "execution_mode": "ANALYSIS_AND_DRY_RUN_ONLY",
-        "capital_budget_jod": 0,
+        "income_objective": "maximize verified net income; zero budget is a starting condition, not a permanent target",
+        "capital_budget_jod": capital_budget,
+        "capital_budget_source": "BRAIN_CAPITAL_BUDGET_JOD environment setting; defaults to 0",
+        "zero_upfront_cost_priority": capital_budget <= 0,
         "real_mining_enabled": False,
+        "real_mining_blocker": "NO_VERIFIED_PHYSICAL_MINING_ADAPTER",
         "wallet_access": False,
-        "paid_cloud_mining_allowed": False,
+        "paid_cloud_mining_allowed": paid_mining_authorized,
+        "paid_cloud_mining_policy": "requires BRAIN_ALLOW_PAID_MINING=1 and positive configured budget; never enabled by profitability estimates alone",
         "live_market_data": False,
         "asic_simulator": "/api/asic-sim/status",
         "verified_revenue_jod": 0.0,
@@ -64,7 +81,9 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
     """Create a safe plan only. This endpoint never starts a miner or connects a wallet."""
     analysis = bitcoin_mining_analyze(body)
     profitable_on_inputs = analysis.get("net_jod_per_day", 0) > 0
-    zero_cost = body.hardware_cost_jod == 0 and body.other_daily_cost_jod == 0
+    # Zero-capital means no upfront hardware purchase. Operating costs remain in
+    # the net-profit calculation; they must not be confused with capital spend.
+    zero_cost = body.hardware_cost_jod == 0
     return {
         "ok": True,
         "status": "BLOCKED_REVENUE_UNVERIFIED" if profitable_on_inputs and zero_cost else "BLOCKED",
@@ -73,7 +92,7 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
         "stages": [
             {"name": "INPUT_VALIDATION", "status": "PASS"},
             {"name": "ECONOMICS_ANALYSIS", "status": "PASS"},
-            {"name": "ZERO_CAPITAL_GATE", "status": "PASS" if zero_cost else "BLOCKED"},
+            {"name": "ZERO_UPFRONT_CAPITAL_GATE", "status": "PASS" if zero_cost else "BLOCKED"},
             {"name": "REAL_HARDWARE_ATTESTATION", "status": "BLOCKED_NOT_CONFIGURED"},
             {"name": "MINING_EXECUTION", "status": "DISABLED"},
             {"name": "REVENUE_VERIFICATION", "status": "NOT_ESTABLISHED"},
@@ -82,7 +101,7 @@ def bitcoin_mining_plan(body: MiningAnalysisRequest) -> dict[str, Any]:
         "spend_authorized": False,
         "real_mining_started": False,
         "verified_revenue_jod": 0.0,
-        "next_step": "Revenue remains unverified; this endpoint is analysis-only and never authorizes real mining execution.",
+        "next_step": "Find and validate the highest-value no-upfront-cost path first. Real mining remains blocked only because a verified physical adapter and independent pool/payout evidence are not connected; this endpoint never starts mining.",
     }
 
 
