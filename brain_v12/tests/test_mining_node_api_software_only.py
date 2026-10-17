@@ -13,6 +13,9 @@ def test_node_status_declares_gateway_only_software_execution():
     assert status["execution_mode"] == "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY"
     assert status["physical_devices_role"] == "CONNECTIVITY_OBSERVATION_ONLY"
     assert status["native_pow_primitive"] == "IMPLEMENTED_SHA256D_BOUNDED"
+    assert status["bounded_nonce_search_available"] is True
+    assert status["production_compute_service_implemented"] is False
+    assert status["execution_gate_state"] == "BLOCKED"
     assert status["native_mining_backend"] == "NOT_IMPLEMENTED"
     assert status["bounded_software_compute_primitive"] == "AVAILABLE_SHA256D_LIBRARY"
     assert status["live_compute_ready"] is False
@@ -27,7 +30,11 @@ def test_readiness_blocks_real_mining_on_missing_brain_backend_not_missing_devic
     assert status["gates"]["G1a_sha256d_pow_primitive"] == "READY_BOUNDED_LIBRARY_ONLY"
     assert status["gates"]["G2_brain_owned_compute_backend"] == "BLOCKED_LIVE_BACKEND_NOT_IMPLEMENTED"
     assert status["gates"]["G2a_bounded_sha256d_primitive"] == "READY_BOUNDED_LIBRARY_ONLY"
+    assert status["gates"]["G2a1_bounded_nonce_search"] == "AVAILABLE_LIBRARY_ONLY"
     assert status["gates"]["G2b_live_compute_host_attestation"] == "BLOCKED_HOST_ATTESTATION_REQUIRED"
+    assert status["gates"]["G2b1_live_compute_service"] == "BLOCKED_NOT_EXPOSED"
+    assert status["execution_allowed"] is False
+    assert status["execution_started"] is False
     assert status["gates"]["G2c_pool_share_submission_adapter"] == "BLOCKED_NOT_IMPLEMENTED"
     assert status["gates"]["G4_gateway_connectivity"] == "NOT_REQUIRED_FOR_COMPUTE"
     assert any("production brain-owned compute service is not implemented" in item.lower() for item in status["blockers"])

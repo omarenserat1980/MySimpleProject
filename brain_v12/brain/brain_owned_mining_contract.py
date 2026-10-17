@@ -75,9 +75,14 @@ def execution_gate(
         blockers.append("EXPLICIT_USER_APPROVAL_REQUIRED")
     if running_on_github_actions:
         blockers.append("GITHUB_ACTIONS_MINING_FORBIDDEN")
+    prerequisites_satisfied = not blockers
     return {
-        "ok": not blockers,
+        # `ok` means gate evaluation completed without declared blockers; it does
+        # not mean execution is authorized. Keep the distinction explicit.
+        "ok": prerequisites_satisfied,
+        "prerequisites_satisfied": prerequisites_satisfied,
         "status": "BLOCKED" if blockers else "READY_FOR_SEPARATE_EXECUTION_REVIEW",
+        "execution_review_required": prerequisites_satisfied,
         "blockers": blockers,
         "execution_allowed": False,
         "execution_started": False,

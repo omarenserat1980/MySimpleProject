@@ -48,6 +48,10 @@ def test_complete_gate_is_only_ready_for_separate_review_not_execution():
         explicit_user_approval=True,
     )
     assert gate["status"] == "READY_FOR_SEPARATE_EXECUTION_REVIEW"
+    assert gate["ok"] is True
+    assert gate["prerequisites_satisfied"] is True
+    assert gate["execution_review_required"] is True
+    # Satisfied prerequisites only permit a separate review, never execution.
     assert gate["execution_allowed"] is False
     assert gate["execution_started"] is False
 
