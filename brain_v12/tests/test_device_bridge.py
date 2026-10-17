@@ -14,15 +14,21 @@ class DeviceBridgeTests(unittest.TestCase):
             "BRAIN_AGENT_KEY_SHA256",
             "BRAIN_AGENT_KEYS_JSON",
             "BRAIN_EMULATOR_KEY",
+            "BRAIN_EMULATOR_AGENT_KEY",
+            "BRAIN_ENABLE_DEVICE_BRIDGE",
+            "BRAIN_AGENT_KEY_FILE",
+            "V12_AGENT_KEY_FILE",
         )
         self.old_env = {key: os.environ.get(key) for key in self.env_keys}
         for key in self.env_keys:
             os.environ.pop(key, None)
         # The bridge uses BRAIN_AGENT_KEY as its local trust root.
         # TERMUX_AGENT_KEY is a legacy variable and must not enable the bridge.
-        os.environ["BRAIN_AGENT_KEY"] = "test-device-key"
         self.tmp = tempfile.NamedTemporaryFile(delete=False)
         self.tmp.close()
+        # Isolate key-file lookup from any real operator credential on this host.
+        os.environ["BRAIN_AGENT_KEY_FILE"] = self.tmp.name + ".missing-key"
+        os.environ["BRAIN_AGENT_KEY"] = "test-device-key"
         self.store = MemoryStore(self.tmp.name)
         self.store.init()
         self.bridge = DeviceBridge(self.store)
@@ -37,6 +43,42 @@ class DeviceBridgeTests(unittest.TestCase):
             os.unlink(self.tmp.name)
         except FileNotFoundError:
             pass
+
+    def test_runtime_ready_is_independent_of_credentials_and_device_presence(self):
+        for key in (
+            "BRAIN_AGENT_KEY",
+            "BRAIN_AGENT_KEY_SHA256",
+            "BRAIN_AGENT_KEYS_JSON",
+            "BRAIN_EMULATOR_KEY",
+            "BRAIN_EMULATOR_AGENT_KEY",
+        ):
+            os.environ.pop(key, None)
+
+        status = self.bridge.status()
+        self.assertTrue(self.bridge.enabled())
+        self.assertTrue(status["configured"])
+        self.assertTrue(status["runtime_ready"])
+        self.assertTrue(status["enabled"])
+        self.assertFalse(status["auth_configured"])
+        self.assertFalse(status["agents"]["online"])
+        self.assertEqual(self.bridge.enqueue("status")["status"], "AUTH_NOT_CONFIGURED")
+
+    def test_runtime_switch_can_disable_bridge_without_credentials(self):
+        for key in (
+            "BRAIN_AGENT_KEY",
+            "BRAIN_AGENT_KEY_SHA256",
+            "BRAIN_AGENT_KEYS_JSON",
+            "BRAIN_EMULATOR_KEY",
+            "BRAIN_EMULATOR_AGENT_KEY",
+        ):
+            os.environ.pop(key, None)
+        os.environ["BRAIN_ENABLE_DEVICE_BRIDGE"] = "0"
+
+        status = self.bridge.status()
+        self.assertTrue(status["runtime_ready"])
+        self.assertFalse(status["enabled"])
+        self.assertFalse(status["auth_configured"])
+        self.assertEqual(self.bridge.enqueue("status")["status"], "BRIDGE_DISABLED")
 
     def test_authentication(self):
         self.assertTrue(self.bridge.configured())
