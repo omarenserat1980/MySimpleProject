@@ -206,11 +206,17 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PAYTABS_PROFILE_ID: ${{ vars.PAYTABS_PROFILE_ID || secrets.PAYTABS_PROFILE_ID }}
           BRAIN_ORIGIN: ${{ vars.BRAIN_ORIGIN || secrets.BRAIN_ORIGIN }}
+          PAYTABS_MODE: ${{ vars.PAYTABS_MODE || 'test' }}
           WRANGLER_OUTPUT_FILE_PATH: /tmp/wrangler-output.ndjson
         run: |
           set -euo pipefail
+          case "$PAYTABS_MODE" in
+            test|live) ;;
+            *) echo "PAYTABS_MODE_INVALID=TRUE"; exit 1 ;;
+          esac
+          echo "PAYTABS_MODE=$PAYTABS_MODE"
           rm -f /tmp/wrangler-output.ndjson
-          npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID" --var "BRAIN_ORIGIN:$BRAIN_ORIGIN" | tee /tmp/wrangler-deploy.log
+          npx wrangler deploy --var "PAYTABS_PROFILE_ID:$PAYTABS_PROFILE_ID" --var "BRAIN_ORIGIN:$BRAIN_ORIGIN" --var "PAYTABS_MODE:$PAYTABS_MODE" | tee /tmp/wrangler-deploy.log
           WORKER_URL=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' /tmp/wrangler-deploy.log | tail -1 || true)
           if [ -z "$WORKER_URL" ]; then echo "WORKER_URL_NOT_FOUND"; exit 1; fi
           echo "WORKER_URL=$WORKER_URL"

@@ -39,7 +39,8 @@ REVENUE_REALIZED remains false until payment evidence is independently confirmed
 ## Test vs Live revenue boundary
 
 - `PAYTABS_MODE` defaults to `test`; Sandbox callbacks are recorded as `SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY` and can never transition to `REVENUE_REALIZED`.
-- Set `PAYTABS_MODE=live` only after PayTabs has approved and enabled the merchant for live payments and the Live Server Key/Profile ID are stored as production Worker secrets/variables. Never put credentials in source control or logs.
+- The Cloudflare deploy workflow passes `PAYTABS_MODE` from the GitHub Actions variable `PAYTABS_MODE`; when that variable is absent it explicitly deploys `test`. The workflow accepts only `test` or `live`.
+- Keep `PAYTABS_MODE` unset (safe default `test`) while validating sandbox. Set the GitHub Actions repository/environment variable `PAYTABS_MODE=live` only after PayTabs has approved and enabled the merchant for live payments and the Live Server Key/Profile ID are stored as production Worker secrets/variables. Never put credentials in source control or logs. Changing this variable does not itself prove that a live transaction or settlement occurred.
 - A Live payment starts at `PAYMENT_VERIFIED_PENDING_DELIVERY`. Only verified delivery for the same order/transaction can transition a row with `environment='live'` to `REVENUE_REALIZED`.
 - `REVENUE_REALIZED` is an accounting/work-delivery state, not proof of bank settlement. Track provider settlement separately and do not report collected cash until a settlement/payout record confirms it.
 - Existing rows receive `environment='test'` via migration 0008; they are not retroactively promoted to Live.
