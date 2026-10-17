@@ -27,6 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Resolve immutable checkpoint commit
+        id: resolve_checkpoint
         env:
           CHECKPOINT_ID: ${{ inputs.checkpoint_id }}
         run: |
@@ -43,13 +44,15 @@ jobs:
           print("SOURCE_COMMIT="+commit)
           with open(os.environ["GITHUB_ENV"],"a") as f:
               f.write("CHECKPOINT_SOURCE_COMMIT="+commit+"\n")
+          with open(os.environ["GITHUB_OUTPUT"],"a") as f:
+              f.write("source_commit="+commit+"\n")
           PY
           git cat-file -e "$CHECKPOINT_SOURCE_COMMIT^{commit}"
 
       - name: Checkout immutable checkpoint source
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.CHECKPOINT_SOURCE_COMMIT }}
+          ref: ${{ steps.resolve_checkpoint.outputs.source_commit }}
           fetch-depth: 0
 
       - name: Verify checkpoint source
