@@ -110,3 +110,12 @@ assert.match(worker, /PAYTABS_MODE \\|\\| "test"/, "payment mode must default sa
 assert.match(worker, /SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY/, "sandbox payments must be separately classified");
 assert.match(worker, /environment = 'live'/, "revenue realization must require live environment");
 console.log("SANDBOX_CANNOT_REALIZE_REVENUE=PASS");
+
+
+assert.match(worker, /payload\.payment_result \|\| payload/, "PayTabs callback must support top-level response_status");
+assert.match(worker, /transactionType !== "sale"/, "authorization/refund callbacks must not verify a sale payment");
+assert.ok(worker.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < worker.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "amount/currency must be validated before idempotent success");
+assert.match(worker, /revenueRealized = Number\(revenueUpdate\.meta\?\.changes \|\| 0\) > 0/, "revenue is realized only when ledger update changes a row");
+assert.match(worker, /revenue_realized: revenueRealized/, "audit event must reflect actual ledger update, not payment existence");
+console.log("PAYTABS_CALLBACK_AMOUNT_IDEMPOTENCY_GATES=PASS");
+console.log("REVENUE_LEDGER_UPDATE_EVIDENCE_GATE=PASS");
