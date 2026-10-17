@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from brain_v12.brain.brain_mcp import PROTOCOL_VERSION, build_mcp_router
+from brain_v12.brain.sha256d_execution_contract import make_layer_result
 
 
 class Sha256dMcpContractTests(unittest.TestCase):
@@ -26,6 +27,28 @@ class Sha256dMcpContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         names = [tool["name"] for tool in response.json()["result"]["tools"]]
         self.assertIn("brain.sha256d_layers", names)
+
+    def test_mcp_validates_shared_cpu_rtl_evidence_contract(self):
+        record = make_layer_result(
+            layer="cpu_reference", status="PASS",
+            evidence={"execution_scope": "HOST_CPU_SOFTWARE_ONLY", "hashes_completed": 1},
+        )
+        response = self.client.post("/mcp", headers=self.headers, json={
+            "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": {"name": "brain.sha256d_validate_evidence", "arguments": {"record": record}},
+        })
+        self.assertEqual(response.status_code, 200)
+        result = response.json()["result"]["structuredContent"]
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["validation"]["valid"])
+        self.assertFalse(result["external_claims_verified"])
+
+        record["evidence"]["hashes_completed"] = 999
+        bad = self.client.post("/mcp", headers=self.headers, json={
+            "jsonrpc": "2.0", "id": 4, "method": "tools/call",
+            "params": {"name": "brain.sha256d_validate_evidence", "arguments": {"record": record}},
+        })
+        self.assertFalse(bad.json()["result"]["structuredContent"]["ok"])
 
     def test_mcp_layer_snapshot_keeps_pool_and_revenue_separate(self):
         response = self.client.post("/mcp", headers=self.headers, json={
