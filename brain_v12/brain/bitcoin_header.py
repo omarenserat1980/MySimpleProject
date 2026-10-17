@@ -12,12 +12,11 @@ import hashlib
 def _fixed_hex(value: str, field: str, size: int) -> bytes:
     if not isinstance(value, str) or len(value) != size * 2:
         raise ValueError("INVALID_" + field.upper() + "_WIDTH")
-    try:
-        decoded = bytes.fromhex(value)
-    except ValueError as exc:
-        raise ValueError("INVALID_" + field.upper() + "_HEX") from exc
-    # bytes.fromhex accepts embedded ASCII whitespace; fixed-width protocol
-    # fields must contain exactly size bytes, not merely size characters.
+    # bytes.fromhex() accepts embedded ASCII whitespace. Protocol fields must
+    # be contiguous hexadecimal characters; reject non-canonical spellings.
+    if any(char not in "0123456789abcdefABCDEF" for char in value):
+        raise ValueError("INVALID_" + field.upper() + "_HEX")
+    decoded = bytes.fromhex(value)
     if len(decoded) != size:
         raise ValueError("INVALID_" + field.upper() + "_WIDTH")
     return decoded
