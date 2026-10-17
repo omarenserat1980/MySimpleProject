@@ -173,7 +173,6 @@ sync_store=BrainSyncStore(os.getenv("BRAIN_SYNC_REPLICA_ID", "brain-cloud"))
 sync_queue=DurableSyncQueue(os.getenv("BRAIN_SYNC_QUEUE", os.path.join(ROOT, ".brain", "state", "sync_queue.jsonl")))
 task_sync_adapter=TaskSyncAdapter(sync_store, sync_queue)
 brain_supervisor=BrainSupervisor()
-app.state.brain_supervisor = brain_supervisor
 from .github_actions_operator import GitHubActionsOperator
 from .brain.execution_gateway import BrainExecutionGateway
 execution_gateway=BrainExecutionGateway()
@@ -215,6 +214,7 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_S
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+app.state.brain_supervisor = brain_supervisor
 error_log_store = BrainErrorLogStore()
 app.add_middleware(BrainErrorLoggingMiddleware, store=error_log_store)
 suggestions_engine = BrainSuggestionsEngine(openai_provider, error_log_store)
