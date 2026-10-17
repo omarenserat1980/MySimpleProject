@@ -10,6 +10,8 @@ from brain_v12.brain.bitcoin_mining_intelligence_api import (
     bitcoin_mining_status,
     HashBenchmarkRequest,
     bitcoin_mining_benchmark,
+    bitcoin_sha256d_layer_status,
+    bitcoin_sha256d_rtl_smoke,
     router,
 )
 
@@ -89,6 +91,23 @@ class BitcoinMiningIntelligenceTests(unittest.TestCase):
         self.assertFalse(result["real_bitcoin_mining"])
         self.assertFalse(result["revenue_verified"])
 
+
+    def test_arabic_sha256d_layers_endpoint_separates_local_and_external_proof(self):
+        result = bitcoin_sha256d_layer_status()
+        self.assertIn("حالة طبقات SHA-256d", result["title_ar"])
+        self.assertEqual(result["layers"][1]["status"], "NOT_RUN")
+        self.assertFalse(result["pool_connected"])
+        self.assertFalse(result["physical_asic_verified"])
+        self.assertFalse(result["revenue_verified"])
+
+    def test_rtl_smoke_route_is_registered_but_not_run_by_status_checks(self):
+        routes = [
+            route for route in router.routes
+            if getattr(route, "path", None) == "/api/bitcoin-mining/rtl-smoke"
+            and "POST" in (getattr(route, "methods", set()) or set())
+        ]
+        self.assertEqual(len(routes), 1)
+        self.assertIs(routes[0].endpoint, bitcoin_sha256d_rtl_smoke)
 
     def test_status_http_route_is_bound_to_status_payload_not_budget_helper(self):
         status_routes = [
