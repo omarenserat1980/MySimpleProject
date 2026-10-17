@@ -1,0 +1,32 @@
+name: BRAIN ASIC Software Board Simulator
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/unit_001/board_simulator.py"
+      - "brain_v12/asic/unit_001/test_board_simulator.py"
+      - ".github/workflows/brain-asic-board-simulator.yml"
+  push:
+    branches: [main, "feat/brain-asic-001-board-simulator"]
+    paths:
+      - "brain_v12/asic/unit_001/board_simulator.py"
+      - "brain_v12/asic/unit_001/test_board_simulator.py"
+      - ".github/workflows/brain-asic-board-simulator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run software board simulator
+        run: python brain_v12/asic/unit_001/board_simulator.py --json
+      - name: Test evidence boundaries and SHA-256d known answer
+        run: python -m unittest brain_v12.asic.unit_001.test_board_simulator -v
