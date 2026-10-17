@@ -9,5 +9,6 @@ def test_mining_node_and_worker_routes_are_registered():
     assert "/api/mining-node/readiness" in paths
     assert "/api/mining-node/compute-preflight" in paths
     assert "/api/mining-node/pool-evidence/status" in paths
+    assert "/api/mining-node/simulation-contract" in paths
     assert "/api/bitcoin-mining/worker/heartbeat" in paths
     assert "/api/bitcoin-mining/worker/status" in paths

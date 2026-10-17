@@ -184,6 +184,36 @@ def pool_evidence_status() -> dict[str, Any]:
     }
 
 
+@router.get("/simulation-contract")
+def get_simulation_contract() -> dict[str, Any]:
+    """Backward-compatible offline contract check; never contacts a pool."""
+    from .stratum_v1_offline_simulator import OfflineStratumSimulator
+
+    simulator = OfflineStratumSimulator()
+    subscribe = simulator.handle({"id": 1, "method": "mining.subscribe", "params": []})
+    authorize = simulator.handle({"id": 2, "method": "mining.authorize", "params": ["sim.worker", "offline-placeholder"]})
+    submit = simulator.handle({"id": 3, "method": "mining.submit", "params": ["sim.worker", "offline-job", "aabb", "65aa0000", "00000000"]})
+    unauthorized = OfflineStratumSimulator().handle({"id": 4, "method": "mining.submit", "params": ["sim.worker", "offline-job", "aabb", "65aa0000", "00000000"]})
+    checks = {
+        "subscribe_contract": subscribe.get("result") is not None,
+        "authorize_contract": authorize.get("result") is True,
+        "submit_contract": submit.get("result") is True and simulator.submitted_count == 1,
+        "unauthorized_submit_blocked": isinstance(unauthorized.get("error"), dict),
+        "all_responses_marked_simulated": all(item.get("simulated") is True for item in (subscribe, authorize, submit, unauthorized)),
+        "no_response_claims_pool_acceptance": all(item.get("pool_acceptance_verified") is False for item in (subscribe, authorize, submit, unauthorized)),
+    }
+    return {
+        "status": "PASS" if all(checks.values()) else "FAIL",
+        "checks": checks,
+        "checks_passed": sum(checks.values()),
+        "checks_total": len(checks),
+        "network_access_performed": False,
+        "real_mining_verified": False,
+        "revenue_verified": False,
+        "note": "Offline compatibility contract only; not proof of live pool acceptance.",
+    }
+
+
 @router.get("/status")
 def get_mining_node_status() -> dict[str, Any]:
     """Return truthful node status without activating workers or external services."""
