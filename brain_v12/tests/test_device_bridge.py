@@ -7,11 +7,11 @@ from brain_v12.brain.memory import MemoryStore
 
 class DeviceBridgeTests(unittest.TestCase):
     def setUp(self):
-        self.env_keys = ("TERMUX_AGENT_KEY", "BRAIN_AGENT_KEY", "BRAIN_AGENT_KEY_SHA256", "BRAIN_EMULATOR_KEY")
+        self.env_keys = ("TERMUX_AGENT_KEY", "BRAIN_AGENT_KEY", "BRAIN_AGENT_KEY_SHA256", "BRAIN_EMULATOR_KEY", "BRAIN_EMULATOR_AGENT_KEY", "BRAIN_AGENT_KEY_FILE", "V12_AGENT_KEY_FILE")
         self.old_env = {k: os.environ.get(k) for k in self.env_keys}
         for key in self.env_keys:
             os.environ.pop(key, None)
-        os.environ["TERMUX_AGENT_KEY"] = "test-device-key"
+        os.environ["BRAIN_AGENT_KEY"] = "test-device-key"
         self.tmp = tempfile.NamedTemporaryFile(delete=False)
         self.tmp.close()
         self.store = MemoryStore(self.tmp.name)
@@ -30,8 +30,8 @@ class DeviceBridgeTests(unittest.TestCase):
             pass
 
     def test_authentication(self):
-        self.assertFalse(self.bridge.configured())
-        self.assertFalse(self.bridge.authenticate("test-device-key"))
+        self.assertTrue(self.bridge.configured())
+        self.assertTrue(self.bridge.authenticate("test-device-key"))
         self.assertFalse(self.bridge.authenticate("wrong-key"))
 
     def test_queue_poll_report(self):
@@ -46,6 +46,25 @@ class DeviceBridgeTests(unittest.TestCase):
         reported = self.bridge.report(task["task_id"], "android-test", True, {"status": "READY"})
         self.assertTrue(reported["ok"])
         self.assertEqual(reported["status"], "COMPLETED")
+
+    def test_heartbeat_registers_software_worker_without_hardware_claims(self):
+        agent_id = "software-executor-redmi3-01"
+        response = self.bridge.heartbeat(agent_id, {"node_type": "software", "runtime": "termux", "agent": "V12-Termux-Agent"})
+        self.assertEqual(response["status"], "HEARTBEAT")
+        self.assertEqual(response["agent_id"], agent_id)
+        self.assertEqual(response["metadata"]["node_type"], "software")
+        self.assertNotIn("cpu_cores", response["metadata"])
+        self.assertNotIn("memory_mb", response["metadata"])
+        status = self.bridge.agent_status()
+        self.assertTrue(status["online"])
+        self.assertEqual(status["agents"][0]["agent_id"], agent_id)
+
+    def test_software_worker_cannot_claim_android_capability_tasks(self):
+        queued = self.bridge.enqueue("internet_download", {"url": "https://example.invalid"})
+        self.assertTrue(queued["ok"])
+        polled = self.bridge.poll("software-executor-redmi3-01")
+        self.assertEqual(polled["status"], "IDLE")
+        self.assertIsNone(polled["task"])
 
     def test_rejects_unknown_task(self):
         result = self.bridge.enqueue("shell")
