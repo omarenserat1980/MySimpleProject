@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .brain.memory import MemoryStore
 from .brain.github_auth import build_github_headers
 from .brain.quranic_reasoning_paths import register_quranic_reasoning_paths
+from .brain.robotics_research_memory import ensure_catalog_in_memory
 from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
@@ -1876,6 +1877,10 @@ def system_diagnostics():
 
 @app.on_event("startup")
 def start_background_services():
+    try:
+        ensure_catalog_in_memory(store)
+    except Exception as exc:
+        store.event("OPEN_SOURCE_ROBOTICS_RESEARCH_CATALOG_SEED_FAILED", {"error": str(exc)[:1000]})
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
