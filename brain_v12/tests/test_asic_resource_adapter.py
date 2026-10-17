@@ -102,3 +102,39 @@ def test_register_simulator_fleet_rejects_unsafe_or_conflicting_config_before_re
     with pytest.raises(ValueError, match="FLEET_RESOURCE_ID_CONFLICT"):
         brain.register_simulator_fleet(2, prefix="fleet")
     assert list(brain.resources) == ["fleet-001"]
+
+def test_asic_simulator_runs_bounded_sha256d_and_records_simulation_only_evidence():
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("pow-sim"))
+    header = bytes(80)
+    result = brain.simulate_sha256d_pow(
+        "pow-sim", header=header, target=(1 << 256) - 1,
+        start_nonce=7, max_attempts=1,
+    )
+    assert result["result"]["software_hashes_performed"] == 1
+    assert result["result"]["result"]["found"] is True
+    assert result["result"]["result"]["nonce"] == 7
+    assert result["result"]["software_hashing_performed"] is True
+    assert result["result"]["rtl_executed"] is False
+    assert result["result"]["physical_asic_executed"] is False
+    assert result["result"]["pool_contacted"] is False
+    assert result["result"]["share_submitted"] is False
+    assert result["result"]["pool_acceptance_verified"] is False
+    assert result["result"]["revenue_verified"] is False
+    assert result["result"]["evidence_status"] == "SIMULATION_ONLY"
+    assert result["evidence_verification"] == "VERIFIED"
+
+
+def test_asic_sha256d_simulation_rejects_real_resource_modes_and_bad_header():
+    brain = ASICResourceAdapter()
+    brain.register(ASICResource("remote-pow", execution_mode="REMOTE_PROVIDER"))
+    with pytest.raises(PermissionError, match="SIMULATION_MODE_REQUIRED"):
+        brain.simulate_sha256d_pow(
+            "remote-pow", header=bytes(80), target=(1 << 256) - 1, max_attempts=1
+        )
+    brain.register(ASICResource("sim-bad"))
+    with pytest.raises(ValueError, match="HEADER_MUST_BE_EXACTLY_80_BYTES"):
+        brain.simulate_sha256d_pow(
+            "sim-bad", header=b"bad", target=(1 << 256) - 1, max_attempts=1
+        )
+
