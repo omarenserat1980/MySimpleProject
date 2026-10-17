@@ -279,14 +279,19 @@ class ASICResourceAdapter:
             "evidence_verification": verification["status"],
         }
 
-    def simulate_sha256d_rtl(self, resource_id: str, *, timeout_seconds: float = 20.0) -> dict[str, Any]:
+    def simulate_sha256d_rtl(
+        self, resource_id: str, *, timeout_seconds: float = 20.0,
+        cancel_check=None,
+    ) -> dict[str, Any]:
         """Execute the repository RTL testbench; never fall back to Python hashing."""
         resource = self._require_resource(resource_id)
         if resource.execution_mode != "SIMULATOR":
             raise PermissionError("SIMULATION_MODE_REQUIRED")
         task = self.tasks.create(f"SHA256d RTL self-test {resource_id}")
         self.tasks.update(task["id"], "RUNNING")
-        result = run_sha256d_rtl_self_test(timeout_seconds=timeout_seconds)
+        result = run_sha256d_rtl_self_test(
+            timeout_seconds=timeout_seconds, cancel_check=cancel_check
+        )
         payload = {
             "resource_id": resource_id,
             "resource_type": "ASIC",
