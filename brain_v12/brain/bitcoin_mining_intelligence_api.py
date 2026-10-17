@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from .mining_engine import MiningEngine
 from .bitcoin_hash_benchmark import benchmark_header_hashing
+from .sha256d_execution_contract import layer_status_snapshot
+from .sha256d_rtl_adapter import run_rtl_smoke
 
 router = APIRouter(prefix="/api/bitcoin-mining", tags=["Bitcoin Mining Intelligence"])
 engine = MiningEngine()
@@ -122,3 +124,20 @@ def bitcoin_mining_benchmark(body: HashBenchmarkRequest) -> dict[str, Any]:
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result
+
+
+class RtlSmokeRequest(BaseModel):
+    case: str = "genesis_nonce_search"
+    timeout_seconds: float = Field(default=30.0, ge=0.1, le=60.0)
+
+
+@router.get("/layers")
+def bitcoin_sha256d_layer_status() -> dict[str, Any]:
+    """Return Arabic layer status with simulation, pool, and revenue separated."""
+    return layer_status_snapshot()
+
+
+@router.post("/rtl-smoke")
+def bitcoin_sha256d_rtl_smoke(body: RtlSmokeRequest) -> dict[str, Any]:
+    """Run an allowlisted local RTL testbench only; never contacts a mining pool."""
+    return run_rtl_smoke(case=body.case, timeout_seconds=body.timeout_seconds)
