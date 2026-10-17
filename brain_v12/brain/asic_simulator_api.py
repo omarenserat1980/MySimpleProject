@@ -53,8 +53,6 @@ class SHA256dPowSimulationRequest(BaseModel):
         return value.strip()
 
 
-@router.get("/status")
-
 class SHA256dRtlSelfTestRequest(BaseModel):
     resource_id: str = Field(default="brain-sha256d-rtl-sim", min_length=1, max_length=128)
     timeout_seconds: float = Field(default=20.0, ge=0.1, le=120.0)
@@ -66,6 +64,8 @@ class SHA256dRtlSelfTestRequest(BaseModel):
             raise ValueError("INVALID_RESOURCE_ID")
         return value.strip()
 
+
+@router.get("/status")
 def asic_simulator_status():
     return {
         "ok": True,
