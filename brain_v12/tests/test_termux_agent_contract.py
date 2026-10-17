@@ -2,6 +2,7 @@ import importlib.util
 import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 AGENT_PATH = Path(__file__).resolve().parents[2] / "v12-agent" / "agent.py"
 
@@ -22,9 +23,9 @@ class TermuxAgentContractTests(unittest.TestCase):
             else:
                 os.environ[key] = value
 
-    def test_defaults_target_current_service_and_software_identity(self):
-        self.assertEqual(self.agent.BRAIN_URL, "https://mysimpleproject.onrender.com")
-        self.assertEqual(self.agent.AGENT_ID, "software-executor-redmi3-01")
+    def test_defaults_target_configured_control_plane_and_android_identity(self):
+        self.assertEqual(self.agent.BRAIN_URL, "https://brain-control-plane-main.onrender.com")
+        self.assertEqual(self.agent.AGENT_ID, "android-executor-redmi3-01")
 
     def test_heartbeat_metadata_identifies_software_not_hardware(self):
         metadata = self.agent.heartbeat_metadata()
@@ -44,9 +45,29 @@ class TermuxAgentContractTests(unittest.TestCase):
         self.assertEqual(result["status"], "HEARTBEAT")
         self.assertEqual(captured["method"], "POST")
         self.assertEqual(captured["path"], "/api/device/heartbeat")
-        self.assertEqual(captured["payload"]["agent_id"], "software-executor-redmi3-01")
+        self.assertEqual(captured["payload"]["agent_id"], "android-executor-redmi3-01")
         self.assertEqual(captured["payload"]["metadata"]["node_type"], "software")
         self.assertEqual(captured["key"], "test-key")
+
+    def test_request_includes_matching_agent_id_header(self):
+        captured = {}
+        class FakeResponse:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b'{"ok": true}'
+        def fake_urlopen(req, timeout=20):
+            captured["headers"] = {k.lower(): v for k, v in req.header_items()}
+            captured["url"] = req.full_url
+            return FakeResponse()
+        with patch.object(self.agent.urllib.request, "urlopen", side_effect=fake_urlopen):
+            result = self.agent.request("GET", "/api/device/status", key="test-key")
+        self.assertTrue(result["ok"])
+        self.assertEqual(captured["headers"]["x-v12-agent-id"], "android-executor-redmi3-01")
+        self.assertEqual(captured["headers"]["x-v12-agent-key"], "test-key")
+        self.assertTrue(captured["url"].startswith("https://brain-control-plane-main.onrender.com/"))
 
     def test_agent_rejects_unlisted_shell_execution(self):
         with self.assertRaises(ValueError):
