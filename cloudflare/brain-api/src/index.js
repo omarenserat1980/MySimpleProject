@@ -555,11 +555,20 @@ async function verifySignedSettlementEvidence(request, env, requestOrigin, allow
     settlement_verified_at: new Date().toISOString(),
     settlement_verification_method: "SIGNED_OPERATOR_ATTESTATION_AFTER_INDEPENDENT_SOURCE_REVIEW",
   };
-  const result = await env.BRAIN_DB.prepare(
-    "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', settlement_reference = ?, evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT' AND amount = ? AND currency = ? AND settlement_reference IS NULL"
-  ).bind(settlementReference, JSON.stringify(settlementEvidence), tranRef, Number(ledger.amount), String(ledger.currency)).run();
-  if (!result || !result.meta || Number(result.meta.changes || 0) !== 1) {
-    return json({ ok: false, error: "SETTLEMENT_STATE_RACE", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  const priorSettlement = await env.BRAIN_DB.prepare(
+    "SELECT order_id, tran_ref FROM revenue_ledger WHERE settlement_reference = ? LIMIT 1"
+  ).bind(settlementReference).first();
+  if (priorSettlement && String(priorSettlement.tran_ref) !== tranRef) {
+    return json({ ok: false, error: "SETTLEMENT_REFERENCE_ALREADY_USED", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
+  let result;
+  try {
+    result = await env.BRAIN_DB.prepare(
+      "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', settlement_reference = ?, evidence = json_patch(evidence, ?) WHERE tran_ref = ? AND environment = 'live' AND state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT' AND amount = ? AND currency = ? AND settlement_reference IS NULL"
+    ).bind(settlementReference, JSON.stringify(settlementEvidence), tranRef, Number(ledger.amount), String(ledger.currency)).run();
+  } catch {
+    return json({ ok: false, error: "SETTLEMENT_REFERENCE_CONFLICT", revenue_realized: false }, 409, requestOrigin, allowedOrigin);
+  }
   }
   return json({
     ok: true,
