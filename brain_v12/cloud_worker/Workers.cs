@@ -121,8 +121,10 @@ public sealed class SelfHealingWorker(WorkerState s, WorkerRegistry r, ILogger<S
 }
 
 public sealed class ResearchWorker(WorkerState s, WorkerRegistry r, ILogger<ResearchWorker> l)
-    : BrainPeriodicWorker("research", TimeSpan.FromHours(2), s, r, l)
+    : BrainPeriodicWorker("research", TimeSpan.FromSeconds(30), s, r, l)
 {
+    // This worker currently emits an inexpensive observation only. When real
+    // research is added, separate its task cadence from its health heartbeat.
     protected override Task ExecuteTickAsync(CancellationToken ct)
     {
         s.Record("research", "observe", "research_only;changes_require_verification");
@@ -131,8 +133,10 @@ public sealed class ResearchWorker(WorkerState s, WorkerRegistry r, ILogger<Rese
 }
 
 public sealed class ArchitectWorker(WorkerState s, WorkerRegistry r, ILogger<ArchitectWorker> l)
-    : BrainPeriodicWorker("architect", TimeSpan.FromHours(4), s, r, l)
+    : BrainPeriodicWorker("architect", TimeSpan.FromSeconds(60), s, r, l)
 {
+    // This worker currently emits an inexpensive observation only. When real
+    // architecture review is added, separate its task cadence from its health heartbeat.
     protected override Task ExecuteTickAsync(CancellationToken ct)
     {
         s.Record("architect", "observe", "architecture_review;no_unbounded_self_modification");
