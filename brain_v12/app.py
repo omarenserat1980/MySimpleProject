@@ -67,6 +67,11 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
+from .brain.mining_node_api import router as mining_node_router
+from .brain.digital_mining_node_api import router as digital_mining_node_router
+from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
+from .brain.bitcoin_worker_api import router as bitcoin_worker_router
+from .brain.asic_simulator_api import router as asic_simulator_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
@@ -175,6 +180,15 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+
+# Register the mining analysis, simulator, and worker telemetry APIs. These
+# endpoints do not launch mining; physical-worker telemetry remains authenticated
+# and pool shares/payouts still require independent verification.
+app.include_router(mining_node_router)
+app.include_router(digital_mining_node_router)
+app.include_router(bitcoin_mining_intelligence_router)
+app.include_router(bitcoin_worker_router)
+app.include_router(asic_simulator_router)
 
 @app.get("/api/brain/cloud/status")
 def brain_cloud_status():
