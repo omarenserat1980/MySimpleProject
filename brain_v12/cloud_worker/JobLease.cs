@@ -15,12 +15,18 @@ public sealed class JobLeaseStore
 
     public JobLease? TryAcquire(string jobId, string workerId, TimeSpan ttl, int attempt = 1)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workerId);
+        ValidateTtl(ttl);
+        if (attempt < 1) throw new ArgumentOutOfRangeException(nameof(attempt), "Attempt must be at least one.");
+
         lock (_gate)
         {
             if (_leases.TryGetValue(jobId, out var existing) && existing.ExpiresAt > DateTimeOffset.UtcNow)
                 return null;
+            var now = DateTimeOffset.UtcNow;
             var lease = new JobLease(jobId, workerId, Guid.NewGuid().ToString("N"),
-                DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.Add(ttl), attempt);
+                now, now.Add(ttl), attempt);
             _leases[jobId] = lease;
             return lease;
         }
@@ -28,6 +34,9 @@ public sealed class JobLeaseStore
 
     public bool Renew(string jobId, string leaseId, TimeSpan ttl)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
+        ValidateTtl(ttl);
         lock (_gate)
         {
             if (!_leases.TryGetValue(jobId, out var lease) || lease.LeaseId != leaseId || lease.ExpiresAt <= DateTimeOffset.UtcNow)
@@ -39,6 +48,8 @@ public sealed class JobLeaseStore
 
     public bool Release(string jobId, string leaseId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(leaseId);
         lock (_gate)
         {
             if (!_leases.TryGetValue(jobId, out var lease) || lease.LeaseId != leaseId) return false;
@@ -55,5 +66,11 @@ public sealed class JobLeaseStore
             foreach (var pair in _leases.Where(x => x.Value.ExpiresAt <= now).ToArray())
                 _leases.Remove(pair.Key);
         }
+    }
+
+    private static void ValidateTtl(TimeSpan ttl)
+    {
+        if (ttl <= TimeSpan.Zero || ttl > TimeSpan.FromHours(24))
+            throw new ArgumentOutOfRangeException(nameof(ttl), "Lease TTL must be greater than zero and no more than 24 hours.");
     }
 }
