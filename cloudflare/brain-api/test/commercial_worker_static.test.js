@@ -87,6 +87,9 @@ assert.match(worker, /attempt < 3/);
 assert.match(worker, /state = 'RUNNING'/);
 
 assert.match(worker, /completeJob/);
+assert.match(worker, /WHERE job_id = \? AND state = 'RUNNING'/, "job completion must use compare-and-set to prevent concurrent completion");
+assert.match(worker, /JOB_COMPLETION_RACE/, "concurrent completion must fail closed");
+assert.match(worker, /DELIVERY_PERSISTENCE_FAILED/, "completion must not claim success if delivery persistence failed");
 assert.match(worker, /STRUCTURED_RESULT_EVIDENCE_REQUIRED/, "job completion must reject free-form evidence");
 assert.match(worker, /HTTPS_ARTIFACT_URL_REQUIRED/, "job completion must require an HTTPS delivery artifact");
 assert.match(worker, /BRAIN_DELIVERY_ALLOWED_ORIGINS/, "delivery artifacts must use an explicitly configured origin allowlist");
