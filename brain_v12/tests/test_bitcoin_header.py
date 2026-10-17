@@ -90,7 +90,7 @@ def test_stratum_prevhash_normalizer_rejects_invalid_width():
 
 
 def test_fixed_width_header_fields_reject_embedded_whitespace():
-    with pytest.raises(ValueError, match="INVALID_VERSION_WIDTH"):
+    with pytest.raises(ValueError, match="INVALID_VERSION_HEX"):
         build_header_candidate(
             version_hex="01 000000",
             prevhash_wire_hex="00" * 32,
@@ -130,3 +130,93 @@ def test_target_comparison_is_inclusive_at_exact_boundary():
     if below_hash > 0:
         rejected = verify_candidate_against_target(header, below_hash)
         assert rejected["hash_integer_meets_target"] is False
+
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "expected"),
+    [
+        ("version_hex", "0100000g", "INVALID_VERSION_HEX"),
+        ("ntime_hex", "02 000000", "INVALID_NTIME_HEX"),
+        ("nbits_hex", "ffff00zz", "INVALID_NBITS_HEX"),
+        ("prevhash_wire_hex", "00" * 15 + "  " + "00" * 16, "INVALID_PREVHASH_WIRE_HEX"),
+    ],
+)
+def test_header_fields_reject_non_hex_and_embedded_whitespace(field, value, expected):
+    args = {
+        "version_hex": "01000000",
+        "prevhash_wire_hex": "00" * 32,
+        "merkle_root_raw": b"\x11" * 32,
+        "ntime_hex": "02000000",
+        "nbits_hex": "ffff001d",
+        "nonce": 0,
+        "share_target": 2**256 - 1,
+    }
+    args[field] = value
+    with pytest.raises(ValueError, match=expected):
+        build_header_candidate(**args)
+
+
+@pytest.mark.parametrize(
+    ("nonce", "share_target", "expected"),
+    [
+        (True, 1, "NONCE_OUT_OF_RANGE"),
+        (-1, 1, "NONCE_OUT_OF_RANGE"),
+        (0x100000000, 1, "NONCE_OUT_OF_RANGE"),
+        (0, True, "SHARE_TARGET_OUT_OF_RANGE"),
+        (0, 0, "SHARE_TARGET_OUT_OF_RANGE"),
+        (0, 2**256, "SHARE_TARGET_OUT_OF_RANGE"),
+    ],
+)
+def test_header_candidate_rejects_invalid_numeric_boundaries(nonce, share_target, expected):
+    with pytest.raises(ValueError, match=expected):
+        build_header_candidate(
+            version_hex="01000000",
+            prevhash_wire_hex="00" * 32,
+            merkle_root_raw=b"\x11" * 32,
+            ntime_hex="02000000",
+            nbits_hex="ffff001d",
+            nonce=nonce,
+            share_target=share_target,
+        )
+
+
+@pytest.mark.parametrize("merkle_root", [b"", b"\x00" * 31, bytearray(b"\x00" * 32)])
+def test_header_candidate_rejects_invalid_merkle_root_type_or_width(merkle_root):
+    with pytest.raises(ValueError, match="INVALID_MERKLE_ROOT"):
+        build_header_candidate(
+            version_hex="01000000",
+            prevhash_wire_hex="00" * 32,
+            merkle_root_raw=merkle_root,
+            ntime_hex="02000000",
+            nbits_hex="ffff001d",
+            nonce=0,
+            share_target=2**256 - 1,
+        )
+
+
+def test_independent_hash_verifier_matches_genesis_header_candidate():
+    candidate = build_header_candidate(
+        version_hex="01000000",
+        prevhash_wire_hex="00" * 32,
+        merkle_root_raw=bytes.fromhex(
+            "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"
+        ),
+        ntime_hex="29ab5f49",
+        nbits_hex="ffff001d",
+        nonce=0x7C2BAC1D,
+        share_target=compact_nbits_to_target("ffff001d"),
+    )
+    verified = verify_candidate_against_target(candidate.header_bytes, candidate.hash_integer)
+    assert verified["header_sha256d_display_hex"] == candidate.digest_display_hex
+    assert verified["hash_integer"] == candidate.hash_integer
+    assert verified["hash_integer_meets_target"] is True
+    just_below = verify_candidate_against_target(candidate.header_bytes, candidate.hash_integer - 1)
+    assert just_below["hash_integer_meets_target"] is False
+    assert just_below["pool_share_acceptance_verified"] is False
+
+
+@pytest.mark.parametrize("target", [True, False, 0, -1, 2**256])
+def test_independent_hash_verifier_rejects_invalid_target(target):
+    with pytest.raises(ValueError, match="TARGET_OUT_OF_RANGE"):
+        verify_candidate_against_target(b"\x00" * 80, target)
