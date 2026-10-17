@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 import hashlib
 import json
+import math
 
 
 class IncomeLifecycle:
@@ -124,25 +125,34 @@ class IncomeLifecycle:
         status = str(row.get("status") or "DISCOVERY")
         if status != "COMPLETED":
             return {"ok": False, "status": "DELIVERY_NOT_VERIFIED", "current": status}
-        amount = float(amount_jod)
-        if amount <= 0:
+        try:
+            amount = float(amount_jod)
+        except (TypeError, ValueError):
             return {"ok": False, "status": "INVALID_AMOUNT"}
+        if not math.isfinite(amount) or amount <= 0:
+            return {"ok": False, "status": "INVALID_AMOUNT"}
+        normalized_currency = str(currency or "").strip().upper()
+        normalized_order_id = str(order_id or "").strip()
+        if not normalized_currency or not normalized_order_id:
+            return {"ok": False, "status": "ORDER_ID_AND_CURRENCY_REQUIRED"}
         data = dict(row.get("data") or {})
         existing = data.get("payment_request") or {}
         if existing:
-            if float(existing.get("amount_jod", 0) or 0) == amount and existing.get("currency") == currency:
+            if (round(float(existing.get("amount_jod", 0) or 0), 2) == round(amount, 2)
+                    and existing.get("currency") == normalized_currency
+                    and existing.get("order_id") == normalized_order_id):
                 return {"ok": True, "status": "ALREADY_REQUESTED", "payment_request": existing}
             return {"ok": False, "status": "PAYMENT_REQUEST_IMMUTABLE"}
         request_id = "PAY-" + hashlib.sha1(
-            f"{opportunity_id}|{client_id}|{amount:.2f}|{currency}".encode()
+            f"{opportunity_id}|{client_id}|{amount:.2f}|{normalized_currency}|{normalized_order_id}".encode()
         ).hexdigest()[:12]
         payment_request = {
             "request_id": request_id,
             "opportunity_id": opportunity_id,
-            "order_id": order_id,
+            "order_id": normalized_order_id,
             "client_id": client_id,
             "amount_jod": round(amount, 2),
-            "currency": currency,
+            "currency": normalized_currency,
             "status": "REQUESTED",
             "created_at": self._now(),
             "payment_provider": "HUMAN_OR_CONNECTED_PROVIDER",
@@ -164,16 +174,28 @@ class IncomeLifecycle:
         request = data.get("payment_request") or {}
         if not request:
             return {"ok": False, "status": "PAYMENT_REQUEST_REQUIRED"}
-        if order_id and request.get("order_id") and order_id != request.get("order_id"):
+        requested_order_id = str(request.get("order_id") or "").strip()
+        supplied_order_id = str(order_id or "").strip()
+        if not requested_order_id or not supplied_order_id:
+            return {"ok": False, "status": "ORDER_ID_REQUIRED"}
+        if supplied_order_id != requested_order_id:
             return {"ok": False, "status": "ORDER_MISMATCH"}
-        if currency != request.get("currency"):
+        normalized_currency = str(currency or "").strip().upper()
+        if normalized_currency != str(request.get("currency") or "").upper():
             return {"ok": False, "status": "CURRENCY_MISMATCH"}
-        received = float(amount_jod)
-        requested = float(request.get("amount_jod", 0) or 0)
-        if received < requested:
+        try:
+            received = float(amount_jod)
+            requested = float(request.get("amount_jod", 0) or 0)
+        except (TypeError, ValueError):
+            return {"ok": False, "status": "INVALID_AMOUNT"}
+        if not math.isfinite(received) or not math.isfinite(requested) or received <= 0:
+            return {"ok": False, "status": "INVALID_AMOUNT"}
+        if round(received, 2) != round(requested, 2):
             return {"ok": False, "status": "AMOUNT_MISMATCH", "requested": requested, "received": received}
-        if not str(transaction_id).strip() or not str(evidence).strip():
+        if not str(transaction_id).strip() or not isinstance(evidence, dict):
             return {"ok": False, "status": "INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED"}
+        if any(not str(evidence.get(key) or "").strip() for key in ("evidence_ref", "provider", "event_id")):
+            return {"ok": False, "status": "SIGNED_PROVIDER_EVIDENCE_FIELDS_REQUIRED"}
         # Revenue conversion is fail-closed: free-form evidence is not enough.
         # A connected payment authority must explicitly mark the reconciliation
         # as independently verified (normally from a signed provider webhook).
