@@ -214,18 +214,62 @@ def evidence_record(
     verified_received: float = 0.0,
     currency: str = "XMR",
 ) -> dict[str, Any]:
-    """Return auditable evidence; verified_received must come from payment proof."""
-    return {
+    """Validate evidence fields; payment status is only a claim until independently verified."""
+    text_fields = {
         "worker_id": worker_id,
         "algorithm": algorithm,
+        "currency": currency,
+    }
+    for name, value in text_fields.items():
+        if not isinstance(value, str) or not value.strip() or any(ord(ch) < 32 for ch in value):
+            raise ValueError(f"{name} must be a non-empty valid string")
+
+    numeric_fields = {
         "runtime_seconds": runtime_seconds,
         "hashrate": hashrate,
         "accepted_shares": accepted_shares,
         "rejected_shares": rejected_shares,
-        "payout_tx_id": payout_tx_id,
         "verified_received": verified_received,
-        "currency": currency,
-        "status": "VERIFIED_RECEIVED" if verified_received > 0 and payout_tx_id else "MINING_EVIDENCE_ONLY",
+    }
+    normalized: dict[str, float] = {}
+    for name, value in numeric_fields.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name} must be a finite number")
+        try:
+            number = float(value)
+        except (OverflowError, ValueError):
+            raise ValueError(f"{name} must be a finite number") from None
+        if not math.isfinite(number) or number < 0:
+            raise ValueError(f"{name} must be finite and non-negative")
+        normalized[name] = number
+
+    for name in ("runtime_seconds", "accepted_shares", "rejected_shares"):
+        if not normalized[name].is_integer():
+            raise ValueError(f"{name} must be an integer")
+
+    if payout_tx_id is not None:
+        if (
+            not isinstance(payout_tx_id, str)
+            or not payout_tx_id.strip()
+            or any(ord(ch) < 32 for ch in payout_tx_id)
+        ):
+            raise ValueError("payout_tx_id must be None or a non-empty valid string")
+
+    return {
+        "worker_id": worker_id.strip(),
+        "algorithm": algorithm.strip().lower(),
+        "runtime_seconds": int(normalized["runtime_seconds"]),
+        "hashrate": normalized["hashrate"],
+        "accepted_shares": int(normalized["accepted_shares"]),
+        "rejected_shares": int(normalized["rejected_shares"]),
+        "payout_tx_id": payout_tx_id.strip() if payout_tx_id is not None else None,
+        "verified_received": normalized["verified_received"],
+        "currency": currency.strip().upper(),
+        # A transaction ID and amount are caller-supplied claims, not independent proof.
+        "status": "PAYMENT_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION"
+        if normalized["verified_received"] > 0 and payout_tx_id
+        else "MINING_EVIDENCE_ONLY",
+        "payment_independently_verified": False,
     }
 
 
