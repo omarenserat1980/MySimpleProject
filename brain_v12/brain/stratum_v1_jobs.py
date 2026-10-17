@@ -13,12 +13,16 @@ from typing import Any
 
 
 def _hex_bytes(value: Any, field: str, *, exact_bytes: int | None = None, max_bytes: int = 1_000_000) -> bytes:
-    if not isinstance(value, str) or len(value) % 2 or len(value) > max_bytes * 2:
+    # bytes.fromhex() accepts embedded ASCII whitespace. Protocol fields must
+    # use canonical contiguous hex so lexical ambiguity fails closed.
+    if (
+        not isinstance(value, str)
+        or len(value) % 2
+        or len(value) > max_bytes * 2
+        or any(char not in "0123456789abcdefABCDEF" for char in value)
+    ):
         raise ValueError("INVALID_HEX_" + field.upper())
-    try:
-        result = bytes.fromhex(value)
-    except ValueError as exc:
-        raise ValueError("INVALID_HEX_" + field.upper()) from exc
+    result = bytes.fromhex(value)
     if exact_bytes is not None and len(result) != exact_bytes:
         raise ValueError("INVALID_LENGTH_" + field.upper())
     return result
