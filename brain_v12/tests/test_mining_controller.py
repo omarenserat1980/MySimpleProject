@@ -53,3 +53,31 @@ def test_payment_evidence_required_for_verified_received():
         verified_received=0.0,
     )
     assert ev["status"] == "MINING_EVIDENCE_ONLY"
+
+
+def test_enabled_policy_still_blocks_when_native_backend_is_missing():
+    policy = MiningPolicy(enabled=True, allow_github_actions=False)
+    ok, reason = can_start(
+        policy,
+        worker_is_user_owned=True,
+        running_on_github_actions=False,
+    )
+    assert not ok
+    assert reason == "brain_owned_mining_backend_not_implemented"
+
+
+def test_backend_prerequisites_do_not_directly_authorize_execution():
+    policy = MiningPolicy(enabled=True, allow_github_actions=False)
+    ok, reason = can_start(
+        policy,
+        worker_is_user_owned=True,
+        running_on_github_actions=False,
+        brain_owned_backend_implemented=True,
+        backend_attested=True,
+        pool_endpoint_verified=True,
+        credentials_in_secret_store=True,
+        resource_budget_verified=True,
+        explicit_user_approval=True,
+    )
+    assert not ok
+    assert reason == "separate_execution_review_required"
