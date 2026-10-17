@@ -61,7 +61,8 @@ class DeviceBridgeTests(unittest.TestCase):
 
     def test_software_worker_cannot_claim_android_capability_tasks(self):
         queued = self.bridge.enqueue("internet_download", {"url": "https://example.invalid"})
-        self.assertTrue(queued["ok"])
+        self.assertFalse(queued["ok"])
+        self.assertEqual(queued["status"], "TASK_NOT_ALLOWED")
         polled = self.bridge.poll("software-executor-redmi3-01")
         self.assertEqual(polled["status"], "IDLE")
         self.assertIsNone(polled["task"])
