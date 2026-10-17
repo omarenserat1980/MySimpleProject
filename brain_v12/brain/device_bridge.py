@@ -125,6 +125,10 @@ class DeviceBridge:
         task=self.store.device_task_claim(agent_id, allowed_tasks=allowed_tasks)
         if self.sync_adapter and task:
             self.sync_adapter.task_transition(task["task_id"],status="CLAIMED",agent_id=agent_id,task=task.get("task"))
+        if task:
+            params = task.get("params") if isinstance(task.get("params"), dict) else {}
+            params["brain_memory_context"] = self.store.robot_memory_context(agent_id)
+            task["params"] = params
         return {"ok":True,"status":"TASK_AVAILABLE" if task else "IDLE","task":task}
     def heartbeat(self,agent_id,metadata=None):
         if not self.enabled(): return {"ok":False,"status":"BRIDGE_DISABLED","agent_id":agent_id}
@@ -137,6 +141,10 @@ class DeviceBridge:
         if status is None:return {"ok":False,"status":"TASK_NOT_FOUND"}
         if status=="AGENT_MISMATCH":return {"ok":False,"status":status}
         item=self.store.device_task_get(task_id) or {}
+        self.store.record_robot_task_result(
+            agent_id, task_id, item.get("task", "unknown"), status == "COMPLETED",
+            result=result or {}, error=error,
+        )
         self.sync_adapter.task_transition(task_id,status=status,agent_id=agent_id,task=item.get("task"),
                                           result=result or {},error=error,evidence_ref=(result or {}).get("evidence_ref"))
         return {"ok":True,"status":status,"task":item}
