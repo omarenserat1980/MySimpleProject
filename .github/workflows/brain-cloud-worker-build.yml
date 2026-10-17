@@ -182,7 +182,7 @@ jobs:
           except urllib.error.HTTPError as exc:
               assert exc.code == 401, f"expected HTTP 401 for incorrect-key status lookup, got {exc.code}"
 
-          status_unknown, unknown = task_request("GET", "/api/tasks/task-id-not-present")
+          status_unknown, unknown = task_request("GET", "/api/tasks/missingtask123")
           assert status_unknown == 404 and unknown.get("error") == "TASK_NOT_FOUND", (status_unknown, unknown)
           print("BRAIN_TASK_STATUS_UNAUTHENTICATED=BLOCKED")
           print("BRAIN_TASK_STATUS_WRONG_KEY=BLOCKED")
