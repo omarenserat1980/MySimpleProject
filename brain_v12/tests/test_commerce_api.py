@@ -107,6 +107,7 @@ class PayTabsCommerceWebhookTests(unittest.TestCase):
             "cart_id": order_id,
             "cart_amount": amount,
             "cart_currency": "USD",
+            "tran_type": "sale",
             "payment_result": {"response_status": "A"},
             "tran_ref": "TX-TEST-001",
         }, separators=(",", ":")).encode()
