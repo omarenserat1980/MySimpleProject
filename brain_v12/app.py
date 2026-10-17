@@ -147,6 +147,7 @@ client_suggestion_bridge=ClientSuggestionBridge(
     openai_provider,
     decision_engine,
     workforce.request_revenue_guardian_action,
+    income_searcher=lambda: live_income_researcher.run_once(),
 )
 brain_council=BrainCouncil(
     os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")),
