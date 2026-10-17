@@ -8,6 +8,9 @@ on:
       - "brain_v12/tests/test_device_bridge.py"
       - "brain_v12/brain/robotics_research_memory.py"
       - "brain_v12/tests/test_robotics_research_memory.py"
+      - "brain_v12/app.py"
+      - "brain_v12/brain/deployment_identity.py"
+      - "brain_v12/tests/test_deployment_identity.py"
       - ".github/workflows/brain-cloud-regression.yml"
   pull_request:
     paths:
@@ -16,6 +19,8 @@ on:
       - "brain_v12/tests/test_device_bridge.py"
       - "brain_v12/brain/robotics_research_memory.py"
       - "brain_v12/tests/test_robotics_research_memory.py"
+      - "brain_v12/brain/deployment_identity.py"
+      - "brain_v12/tests/test_deployment_identity.py"
       - ".github/workflows/brain-cloud-regression.yml"
   workflow_dispatch:
 
@@ -37,5 +42,7 @@ jobs:
         run: python -m unittest brain_v12.tests.test_ai_fabric_v3_loop -v
       - name: Run DeviceBridge regression
         run: python -m unittest brain_v12.tests.test_device_bridge -v
-      - name: Run robotics research memory tests
+      - name: Run robotics research memory lifecycle tests
         run: python -m unittest brain_v12.tests.test_robotics_research_memory -v
+      - name: Run deployment identity tests
+        run: python -m unittest brain_v12.tests.test_deployment_identity -v
