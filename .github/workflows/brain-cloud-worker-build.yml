@@ -188,6 +188,35 @@ jobs:
           print("BRAIN_TASK_STATUS_WRONG_KEY=BLOCKED")
           print("BRAIN_TASK_STATUS_UNKNOWN_ID=404")
 
+          # Queue capacity telemetry must be authenticated and must not imply execution.
+          unauth_queue = urllib.request.Request(base + "/api/tasks/queue-status", method="GET")
+          try:
+              urllib.request.urlopen(unauth_queue, timeout=3)
+              raise SystemExit("SECURITY FAILURE: queue status exposed without API key")
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 401, f"expected HTTP 401 for unauthenticated queue status, got {exc.code}"
+
+          wrong_key_queue = urllib.request.Request(
+              base + "/api/tasks/queue-status",
+              headers={"X-Brain-Api-Key": "incorrect-ci-key"}, method="GET")
+          try:
+              urllib.request.urlopen(wrong_key_queue, timeout=3)
+              raise SystemExit("SECURITY FAILURE: queue status exposed with incorrect API key")
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 401, f"expected HTTP 401 for incorrect-key queue status, got {exc.code}"
+
+          queue_status, queue_payload = task_request("GET", "/api/tasks/queue-status")
+          assert queue_status == 200 and queue_payload.get("ok") is True, (queue_status, queue_payload)
+          capacity = queue_payload.get("capacity", {})
+          assert capacity.get("total", 0) >= 1, capacity
+          assert capacity.get("maxRecords", 0) >= capacity.get("total", 0), capacity
+          assert capacity.get("remaining", -1) == capacity.get("maxRecords", 0) - capacity.get("total", 0), capacity
+          assert queue_payload.get("execution_enabled_by_this_endpoint") is False, queue_payload
+          print("BRAIN_QUEUE_STATUS_UNAUTHENTICATED=BLOCKED")
+          print("BRAIN_QUEUE_STATUS_WRONG_KEY=BLOCKED")
+          print("BRAIN_QUEUE_STATUS_AUTHENTICATED=PASS")
+          print("BRAIN_QUEUE_STATUS_EXECUTION_DISABLED=PASS")
+
 
           status3, conflict = task_request("POST", "/api/tasks",
               {"taskType": "health_check", "arguments": {"probe": "different"}},
