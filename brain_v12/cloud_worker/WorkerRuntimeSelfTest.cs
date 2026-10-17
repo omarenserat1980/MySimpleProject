@@ -36,6 +36,7 @@ public static class WorkerRuntimeSelfTest
                 throw new InvalidOperationException("release failed");
 
             VerifyDurableTaskQueue();
+            VerifyExpiredLeaseRecovery();
             VerifyReadinessPolicy();
             Console.WriteLine("BRAIN_WORKER_SELF_TEST=PASS");
         }
@@ -150,6 +151,48 @@ public static class WorkerRuntimeSelfTest
                 throw new InvalidOperationException("task result did not persist across queue reload");
             if (!reloaded.AuditSnapshot().Any(e => e.TaskId == first.Task.TaskId && e.Event == "succeeded"))
                 throw new InvalidOperationException("completion audit event was not persisted");
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
+    }
+
+    private static void VerifyExpiredLeaseRecovery()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "brain-task-expiry-" + Guid.NewGuid().ToString("N") + ".json");
+        var clock = new ManualTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+        try
+        {
+            var queue = new DurableFileTaskQueue(path, clock);
+            var submitted = queue.Submit("self-test", "expiry-1", "health_check", """{"probe":"expiry"}""");
+            var firstLease = queue.TryLeaseNext("worker-old", TimeSpan.FromMinutes(1))
+                ?? throw new InvalidOperationException("initial expiry-test lease failed");
+            clock.Advance(TimeSpan.FromMinutes(2));
+
+            var secondLease = queue.TryLeaseNext("worker-new", TimeSpan.FromMinutes(1))
+                ?? throw new InvalidOperationException("expired task was not requeued and leased");
+            if (secondLease.TaskId != submitted.Task.TaskId || secondLease.Attempt != 2 ||
+                secondLease.WorkerId != "worker-new" || secondLease.LeaseId == firstLease.LeaseId)
+                throw new InvalidOperationException("expired lease was not replaced with a fresh second lease");
+
+            if (queue.Complete(firstLease.TaskId, firstLease.LeaseId!, """{"ok":true}"""))
+                throw new InvalidOperationException("old worker completed task after lease expiry");
+            if (!queue.Complete(secondLease.TaskId, secondLease.LeaseId!, """{"ok":true}"""))
+                throw new InvalidOperationException("current lease could not complete recovered task");
+
+            var reloaded = new DurableFileTaskQueue(path, clock);
+            if (reloaded.Snapshot().Single(t => t.TaskId == submitted.Task.TaskId).Status != "succeeded")
+                throw new InvalidOperationException("recovered task result did not persist");
+            if (!reloaded.AuditSnapshot().Any(e => e.TaskId == submitted.Task.TaskId && e.Event == "lease_expired_requeued"))
+                throw new InvalidOperationException("lease-expiry recovery was not audited");
         }
         finally
         {

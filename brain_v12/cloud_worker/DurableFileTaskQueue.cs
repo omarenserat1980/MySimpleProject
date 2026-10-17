@@ -113,8 +113,13 @@ public sealed class DurableFileTaskQueue
         {
             var snapshot = ReadSnapshot();
             var now = _clock.GetUtcNow();
+            var recovered = RecoverExpiredLeases(snapshot, now);
             var index = snapshot.Tasks.FindIndex(t => t.Status == "queued");
-            if (index < 0) return null;
+            if (index < 0)
+            {
+                if (recovered > 0) WriteSnapshot(snapshot);
+                return null;
+            }
             var current = snapshot.Tasks[index];
             var leased = current with
             {
@@ -130,6 +135,45 @@ public sealed class DurableFileTaskQueue
             WriteSnapshot(snapshot);
             return leased;
         }
+    }
+
+    /// <summary>
+    /// Requeues leases whose deadline has passed. A fresh lease token is generated
+    /// on the next claim, so a previous worker cannot complete the recovered task.
+    /// </summary>
+    public int RecoverExpiredLeases()
+    {
+        lock (_gate)
+        {
+            var snapshot = ReadSnapshot();
+            var recovered = RecoverExpiredLeases(snapshot, _clock.GetUtcNow());
+            if (recovered > 0) WriteSnapshot(snapshot);
+            return recovered;
+        }
+    }
+
+    private static int RecoverExpiredLeases(DurableTaskQueueSnapshot snapshot, DateTimeOffset now)
+    {
+        var recovered = 0;
+        for (var i = 0; i < snapshot.Tasks.Count; i++)
+        {
+            var current = snapshot.Tasks[i];
+            if (current.Status != "leased" || current.LeaseExpiresAt is null || current.LeaseExpiresAt > now)
+                continue;
+
+            snapshot.Tasks[i] = current with
+            {
+                Status = "queued",
+                WorkerId = null,
+                LeaseId = null,
+                LeaseExpiresAt = null,
+                UpdatedAt = now
+            };
+            snapshot.Audit.Add(new DurableTaskAuditEvent(
+                current.TaskId, "lease_expired_requeued", now, current.Principal, current.WorkerId));
+            recovered++;
+        }
+        return recovered;
     }
 
     public bool Complete(string taskId, string leaseId, string resultJson)
