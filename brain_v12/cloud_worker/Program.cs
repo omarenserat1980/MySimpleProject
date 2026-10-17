@@ -52,7 +52,7 @@ app.MapGet("/health", (WorkerState state, WorkerRegistry registry) => Results.Ok
     ok = true,
     service = "brain-cloud-worker",
     state = "RUNNING",
-    workers = registry.Snapshot(),
+    workers = registry.SnapshotWithFreshness(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2)),
     recent_pulses = state.Snapshot().TakeLast(20)
 }));
 
@@ -60,7 +60,7 @@ app.MapGet("/api/brain/status", (WorkerState state, WorkerRegistry registry) => 
 {
     ok = true,
     service = "brain-cloud-worker",
-    workers = registry.Snapshot(),
+    workers = registry.SnapshotWithFreshness(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(2)),
     recent_pulses = state.Snapshot().TakeLast(50)
 }));
 
