@@ -494,7 +494,7 @@ class MemoryStore:
                 safe_result[field] = value[:300] if isinstance(value, str) else value
         entry = {
             "task_id": str(task_id), "task": str(task)[:120], "ok": bool(ok),
-            "result": safe_result, "error": str(error or "")[:300], "recorded_at": now(),
+            "result": safe_result, "error": "" if ok else "TASK_FAILED", "recorded_at": now(),
         }
         history = (previous + [entry])[-20:]
         self.save_memory(key, json.dumps({"agent_id": str(agent_id), "history": history}, ensure_ascii=False))
