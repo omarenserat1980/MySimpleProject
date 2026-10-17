@@ -67,6 +67,8 @@ class StratumV1Session:
             raise StratumProtocolError("POOL_USERNAME_REQUIRED")
         if not isinstance(self.password, str) or not self.password:
             raise StratumProtocolError("POOL_PASSWORD_REQUIRED")
+        if self.current_job_id:
+            self.active_job_ids.add(self.current_job_id)
 
     def request_subscribe(self, agent: str = "ElectronicBrain/BitcoinLab") -> bytes:
         return self._request("mining.subscribe", [agent], "subscribe")
