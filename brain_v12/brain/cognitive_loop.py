@@ -107,6 +107,7 @@ class CognitiveLoop:
 
     def run(self,goal):
         goal=(goal or "").strip()
+        self._active_logic_context=None
         run_id=str(uuid4())
         self._state("PERCEIVE",goal=goal,run_id=run_id)
         self.events.publish("COGNITIVE_RUN_STARTED",{"run_id":run_id,"goal":goal})
@@ -129,6 +130,7 @@ class CognitiveLoop:
             run_id=run_id,
         )
         self._active_logic_context=logic_context
+        self._state("MEMORY",goal=goal,run_id=run_id)
         decision_memories=self.logic_unit.decision_memories(memories,logic_context)
         if reasoning_path:
             decision_memories.append({
