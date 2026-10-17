@@ -46,6 +46,17 @@ module tb_bitcoin_nonce_sweep;
     end
     if (busy) $fatal(1,"busy remained high after finding a candidate");
     $display("PASS BOUNDED_NONCE_SWEEP_EASY_TARGET");
+    // A uint32 nonce range must stop at FFFFFFFF instead of wrapping to zero.
+    target_be=256'b0;
+    nonce_start=32'hFFFF_FFFF;
+    max_attempts=32'd3;
+    launch();
+    if (found || attempts !== 32'd1 || busy || !done) begin
+      $display("FAIL nonce wrap guard found=%b attempts=%0d busy=%b done=%b",found,attempts,busy,done);
+      $fatal(1);
+    end
+    $display("PASS NONCE_UINT32_WRAP_GUARD");
+
     $display("ALL_NONCE_SWEEP_TESTS_PASSED");
     $finish;
   end
