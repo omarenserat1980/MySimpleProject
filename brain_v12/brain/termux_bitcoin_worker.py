@@ -102,6 +102,16 @@ def read_max_temperature_c() -> float | None:
     return max(readings) if readings else None
 
 
+def supervisor_exit_code(stop_reason: str, miner_exit_code: int) -> int:
+    """Return the supervisor result separately from the miner process exit code."""
+    if stop_reason == "duration_limit":
+        # SIGTERM is expected when the supervisor enforces its configured time cap.
+        return 0
+    if stop_reason == "user_interrupt":
+        return 130
+    return 1
+
+
 def emit(status: str, **fields: object) -> None:
     print(json.dumps({"component": "termux-bitcoin-sha256d-worker", "status": status, **fields},
                      sort_keys=True), flush=True)
@@ -224,7 +234,7 @@ def main() -> int:
          revenue_verified=False,
          next_evidence=["independent pool-side authorization/session", "pool-side measured hashrate",
                         "pool-side accepted/rejected/stale share counters", "independent payout proof"])
-    return 0 if exit_code == 0 and stop_reason == "duration_limit" else 1
+    return supervisor_exit_code(stop_reason, exit_code)
 
 
 if __name__ == "__main__":
