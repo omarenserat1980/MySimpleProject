@@ -8,8 +8,8 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://mysimpleproject.onrender.com").rstrip("/")
-AGENT_ID = os.getenv("V12_AGENT_ID", "software-executor-redmi3-01")
+BRAIN_URL = os.getenv("V12_BRAIN_URL", "https://brain-control-plane-main.onrender.com").rstrip("/")
+AGENT_ID = os.getenv("V12_AGENT_ID", "android-executor-redmi3-01")
 KEY_FILE = os.path.expanduser(os.getenv("V12_AGENT_KEY_FILE", "~/v12-agent/agent.key"))
 POLL_SECONDS = float(os.getenv("V12_POLL_SECONDS", "3"))
 
@@ -22,7 +22,11 @@ def read_key():
 
 def request(method, path, payload=None, key=None, timeout=20):
     data = None
-    headers = {"Accept": "application/json", "User-Agent": "V12-Termux-Agent/1.0"}
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "V12-Termux-Agent/1.0",
+        "X-V12-Agent-Id": AGENT_ID,
+    }
     if key:
         headers["X-V12-Agent-Key"] = key
     if payload is not None:
@@ -51,12 +55,10 @@ def heartbeat_metadata():
     return {"agent": "V12-Termux-Agent", "python": platform.python_version(),
             "node_type": "software", "runtime": "termux"}
 
-
 def send_heartbeat(key):
     """Register liveness with the authenticated Brain device bridge."""
     return request("POST", "/api/device/heartbeat",
                    {"agent_id": AGENT_ID, "metadata": heartbeat_metadata()}, key=key)
-
 
 def main():
     key = read_key()
@@ -89,5 +91,4 @@ def main():
             time.sleep(max(POLL_SECONDS, 5))
 
 if __name__ == "__main__":
-    import urllib.parse
     main()
