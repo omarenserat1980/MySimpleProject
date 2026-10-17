@@ -50,3 +50,30 @@ returns HTTP 503 with `TASK_QUEUE_CAPACITY_REACHED`; operators must inspect and 
 retention deliberately before increasing capacity. This is a single-process file queue,
 not a distributed multi-replica queue. Do not change production environment settings without
 separate authorization and a tested rollout plan.
+
+
+## Queue capacity response runbook
+
+The authenticated `GET /api/tasks/queue-status` endpoint reports queue counts and utilization.
+It is observational only; it does not drain the queue, delete records, or enable task execution.
+
+1. Query the endpoint using the deployment's approved API credential. Never put credentials in
+   shell history, issue comments, CI logs, or screenshots.
+2. Record the timestamp, `total`, `maxRecords`, `remaining`, `utilizationPercent`, and
+   `atCapacity` fields from the response.
+3. If utilization is rising or `atCapacity` is true, stop automatic retries that would submit
+   new unique tasks and inspect task states and audit evidence.
+4. Do not delete or rewrite the queue file manually. Completed records still participate in
+   idempotency and the hard capacity count; deleting them could allow duplicate work or lose audit
+   history.
+5. Do not increase `BRAIN_TASK_QUEUE_MAX_RECORDS` merely to silence a capacity error. First
+   verify storage headroom, backup/recovery, idempotency retention requirements, and single-writer
+   deployment assumptions; make changes only through an approved, tested rollout.
+6. Treat HTTP 503 `TASK_QUEUE_CAPACITY_REACHED` as a deliberate fail-closed signal. Do not
+   report a task as accepted or executed unless its task ID and resulting status/evidence confirm it.
+
+### Not implemented yet
+
+Automated archival/retention is intentionally not implemented. A safe future design must preserve
+idempotency-key deduplication for the required retention window, audit integrity, crash recovery,
+and bounded disk usage before removing terminal task records.
