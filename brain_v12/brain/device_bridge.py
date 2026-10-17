@@ -55,6 +55,13 @@ class DeviceBridge:
         if os.getenv(AGENT_KEY_SHA256_ENV,""): return "SHA256_KEY"
         if os.getenv("BRAIN_EMULATOR_KEY",""): return "BRAIN_EMULATOR_KEY"
         if os.getenv("BRAIN_EMULATOR_AGENT_KEY",""): return "BRAIN_EMULATOR_AGENT_KEY (legacy documented alias)"
+        key_file = self._key_file()
+        try:
+            with open(key_file, encoding="utf-8") as stream:
+                if stream.read().strip():
+                    return "KEY_FILE"
+        except OSError:
+            pass
         return "NOT_CONFIGURED"
     def authenticate(self, supplied, agent_id=None):
         if not self.enabled() or not supplied:
