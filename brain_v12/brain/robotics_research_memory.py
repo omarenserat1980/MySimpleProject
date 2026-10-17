@@ -142,3 +142,35 @@ def persist_to_memory(store) -> dict:
         "external_actions_enabled": False,
         "dependencies_installed": False,
     }
+
+
+def ensure_catalog_in_memory(store) -> dict:
+    """Seed the catalog once during Brain startup without overwriting an existing record."""
+    existing = next((item for item in store.memories() if item.get("key") == MEMORY_KEY), None)
+    if existing is not None:
+        try:
+            decoded = json.loads(existing.get("value", ""))
+        except (TypeError, ValueError):
+            store.event("OPEN_SOURCE_ROBOTICS_RESEARCH_CATALOG_SEED_BLOCKED", {
+                "catalog_id": MEMORY_KEY,
+                "reason": "EXISTING_MEMORY_IS_NOT_VALID_JSON",
+            })
+            return {"ok": False, "status": "BLOCKED_EXISTING_INVALID_MEMORY", "memory_key": MEMORY_KEY}
+        if decoded.get("catalog_id") != MEMORY_KEY or not isinstance(decoded.get("projects"), list):
+            store.event("OPEN_SOURCE_ROBOTICS_RESEARCH_CATALOG_SEED_BLOCKED", {
+                "catalog_id": MEMORY_KEY,
+                "reason": "EXISTING_MEMORY_SCHEMA_MISMATCH",
+            })
+            return {"ok": False, "status": "BLOCKED_EXISTING_SCHEMA_MISMATCH", "memory_key": MEMORY_KEY}
+        return {
+            "ok": True,
+            "status": "ALREADY_PRESENT",
+            "memory_key": MEMORY_KEY,
+            "project_count": len(decoded["projects"]),
+            "written": False,
+        }
+
+    result = persist_to_memory(store)
+    result["status"] = "SEEDED"
+    result["written"] = True
+    return result
