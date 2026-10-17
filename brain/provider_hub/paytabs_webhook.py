@@ -47,7 +47,9 @@ def parse_and_validate_payment(
     if str(payload.get("cart_currency", "")) != expected_currency:
         raise ValueError("PAYTABS_CURRENCY_MISMATCH")
 
-    payment_result = payload.get("payment_result") or {}
+    # PayTabs IPN profiles may send response fields nested under payment_result
+    # or at the top level. Accept both documented payload shapes.
+    payment_result = payload.get("payment_result") or payload
     if payment_result.get("response_status") != "A":
         raise ValueError("PAYTABS_PAYMENT_NOT_AUTHORISED")
     # An authorization-only transaction is not sufficient evidence for revenue.
