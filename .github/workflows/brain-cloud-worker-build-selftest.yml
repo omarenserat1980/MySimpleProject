@@ -42,5 +42,40 @@ jobs:
       - name: Run worker self-test
         run: dotnet run --project brain_v12/cloud_worker/BrainCloudWorker.csproj --configuration Release --no-build -- --self-test
 
+      - name: Smoke-test liveness and worker readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BRAIN_WORKER_REGISTRY_PATH="$RUNNER_TEMP/brain-worker-registry.json"
+          dotnet brain_v12/cloud_worker/bin/Release/net10.0/BrainCloudWorker.dll --urls http://127.0.0.1:8080 >"$RUNNER_TEMP/brain-worker.log" 2>&1 &
+          worker_pid=$!
+          cleanup() {
+            kill "$worker_pid" 2>/dev/null || true
+            wait "$worker_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8080/healthz
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/readyz > "$RUNNER_TEMP/brain-ready.json"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat "$RUNNER_TEMP/brain-worker.log"
+            echo "Worker readiness did not pass within 30 seconds." >&2
+            exit 1
+          fi
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d.get("ready") is True and all(d.get("checks",{}).values()), d' "$RUNNER_TEMP/brain-ready.json"
+          echo "BRAIN_WORKER_HTTP_SMOKE_TEST=PASS"
+
       - name: Build container image
         run: docker build --file brain_v12/cloud_worker/Dockerfile --tag brain-cloud-worker:ci .
