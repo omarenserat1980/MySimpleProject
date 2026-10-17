@@ -71,33 +71,37 @@ def collect_braiins_pool_evidence(
     factory = client_factory or httpx.Client
     try:
         # Fixed HTTPS URL, GET only, verified TLS, no redirects, bounded timeout.
+        # Read incrementally and stop before retaining more than the configured cap.
         with factory(verify=True, timeout=10.0, follow_redirects=False) as client:
-            response = client.get(BRAIINS_WORKERS_URL, headers={"Pool-Auth-Token": token})
+            with client.stream("GET", BRAIINS_WORKERS_URL, headers={"Pool-Auth-Token": token}) as response:
+                response_url = str(response.url)
+                response_history = getattr(response, "history", ())
+                status_code = response.status_code
+                if response_url.rstrip("/") != BRAIINS_WORKERS_URL.rstrip("/") or response_history:
+                    result = _blocked("UNEXPECTED_POOL_API_URL_OR_REDIRECT")
+                    result["network_access_performed"] = True
+                    return result
+                if status_code != 200:
+                    result = _blocked("POOL_API_HTTP_STATUS_NOT_200")
+                    result.update({"http_status": status_code, "network_access_performed": True})
+                    return result
+                chunks: list[bytes] = []
+                total_bytes = 0
+                for chunk in response.iter_bytes():
+                    if not isinstance(chunk, bytes):
+                        result = _blocked("POOL_API_RESPONSE_SIZE_INVALID")
+                        result["network_access_performed"] = True
+                        return result
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_RESPONSE_BYTES:
+                        result = _blocked("POOL_API_RESPONSE_SIZE_INVALID")
+                        result.update({"network_access_performed": True, "response_size_limit_bytes": MAX_RESPONSE_BYTES})
+                        return result
+                    chunks.append(chunk)
+                content = b"".join(chunks)
     except Exception as exc:  # Do not leak exception strings, request headers, or credentials.
         result = _blocked("POOL_API_REQUEST_FAILED")
         result["error_type"] = type(exc).__name__
-        result["network_access_performed"] = True
-        return result
-
-    try:
-        response_url = str(response.url)
-        response_history = getattr(response, "history", ())
-        status_code = response.status_code
-        content = response.content
-    except Exception:
-        result = _blocked("POOL_API_RESPONSE_INVALID")
-        result["network_access_performed"] = True
-        return result
-    if response_url.rstrip("/") != BRAIINS_WORKERS_URL.rstrip("/") or response_history:
-        result = _blocked("UNEXPECTED_POOL_API_URL_OR_REDIRECT")
-        result["network_access_performed"] = True
-        return result
-    if status_code != 200:
-        result = _blocked("POOL_API_HTTP_STATUS_NOT_200")
-        result.update({"http_status": status_code, "network_access_performed": True})
-        return result
-    if not isinstance(content, bytes) or len(content) > MAX_RESPONSE_BYTES:
-        result = _blocked("POOL_API_RESPONSE_SIZE_INVALID")
         result["network_access_performed"] = True
         return result
     try:
