@@ -7,6 +7,7 @@ cancellation, or incomplete evidence never produce PASS.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 from pathlib import Path
 import shutil
@@ -199,24 +200,30 @@ def run_rtl_smoke(
 
 def normalize_cpu_benchmark(result: dict[str, Any]) -> dict[str, Any]:
     """Map a CPU benchmark into the same contract without implying RTL or mining."""
+    digest = result.get("last_digest_hex") if isinstance(result, dict) else None
+    count = result.get("hashes_completed") if isinstance(result, dict) else None
+    elapsed = result.get("elapsed_seconds") if isinstance(result, dict) else None
+    rate = result.get("hashrate_hs") if isinstance(result, dict) else None
     valid = (
         isinstance(result, dict)
         and result.get("mode") == "LOCAL_BENCHMARK_ONLY"
-        and isinstance(result.get("hashes_completed"), int)
-        and not isinstance(result.get("hashes_completed"), bool)
-        and result["hashes_completed"] > 0
-        and isinstance(result.get("last_digest_hex"), str)
-        and len(result["last_digest_hex"]) == 64
+        and isinstance(count, int) and not isinstance(count, bool) and count > 0
+        and isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool)
+        and math.isfinite(elapsed) and elapsed > 0
+        and isinstance(rate, (int, float)) and not isinstance(rate, bool)
+        and math.isfinite(rate) and rate > 0
+        and isinstance(digest, str) and len(digest) == 64
+        and all(char in "0123456789abcdefABCDEF" for char in digest)
     )
     return make_layer_result(
         layer="cpu_reference",
         status="PASS" if valid else "FAIL",
         evidence={
             "execution_scope": "HOST_CPU_SOFTWARE_ONLY",
-            "hashes_completed": result.get("hashes_completed") if isinstance(result, dict) else None,
-            "elapsed_seconds": result.get("elapsed_seconds") if isinstance(result, dict) else None,
-            "hashrate_hs": result.get("hashrate_hs") if isinstance(result, dict) else None,
-            "last_digest_hex": result.get("last_digest_hex") if isinstance(result, dict) else None,
+            "hashes_completed": count,
+            "elapsed_seconds": elapsed,
+            "hashrate_hs": rate,
+            "last_digest_hex": digest,
             "rtl_verified": False,
             "pool_connected": False,
             "revenue_verified": False,
