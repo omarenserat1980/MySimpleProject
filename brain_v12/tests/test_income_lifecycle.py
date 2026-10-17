@@ -52,6 +52,11 @@ class IncomeLifecycleTests(unittest.TestCase):
         })
         self.life=IncomeLifecycle(self.store)
 
+    def tearDown(self):
+        if self.previous_secret is None:
+            os.environ.pop("BRAIN_PAYMENT_WEBHOOK_SECRET", None)
+        else:
+            os.environ["BRAIN_PAYMENT_WEBHOOK_SECRET"] = self.previous_secret
     def test_prepare_does_not_claim_submission(self):
         q=self.life.qualify("LIVE-test")
         self.assertTrue(q["ok"])
