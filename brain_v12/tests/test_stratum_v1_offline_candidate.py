@@ -86,3 +86,23 @@ def test_malformed_notify_fails_before_candidate_is_created():
 def test_network_target_validation_fails_closed():
     with pytest.raises(ValueError, match="NETWORK_TARGET_OUT_OF_RANGE"):
         build(network_target=True)
+
+
+
+def test_share_target_failure_is_not_reported_as_a_met_share():
+    result = build(share_target=1, network_target=(1 << 256) - 1)
+    assert result["share_target_met"] is False
+    assert result["status"] == "SHARE_TARGET_NOT_MET"
+    assert result["network_target_met"] is True
+    assert result["pool_acceptance_verified"] is False
+    assert result["revenue_verified"] is False
+
+
+def test_share_target_and_network_target_are_independent_checks():
+    # The maximal share target accepts this local hash, while a stricter
+    # network target can remain unmet. Neither result means pool acceptance.
+    result = build(share_target=(1 << 256) - 1, network_target=1)
+    assert result["share_target_met"] is True
+    assert result["status"] == "LOCAL_SHARE_TARGET_MET"
+    assert result["network_target_met"] is False
+    assert result["pool_acceptance_verified"] is False
