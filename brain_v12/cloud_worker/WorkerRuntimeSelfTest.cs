@@ -55,6 +55,12 @@ public static class WorkerRuntimeSelfTest
         if (!WorkerReadinessPolicy.Evaluate(freshSuccesses, now, TimeSpan.FromMinutes(2)).Ready)
             throw new InvalidOperationException("fresh successful worker pulses should be ready");
 
+        var withInformationalEvents = freshSuccesses
+            .Concat(freshSuccesses.Select(p => p with { At = now, Status = "observe", Detail = "informational" }))
+            .ToArray();
+        if (!WorkerReadinessPolicy.Evaluate(withInformationalEvents, now, TimeSpan.FromMinutes(2)).Ready)
+            throw new InvalidOperationException("informational events must not mask successful worker pulses");
+
         var missingWorker = freshSuccesses.Where(p => p.WorkerId != "mining").ToArray();
         var missingResult = WorkerReadinessPolicy.Evaluate(missingWorker, now, TimeSpan.FromMinutes(2));
         if (missingResult.Ready || missingResult.Checks["mining"])
