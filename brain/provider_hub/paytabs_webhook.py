@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from decimal import Decimal, InvalidOperation
 
 
 def verify_ipn_signature(raw_body: bytes, signature: str, server_key: str) -> bool:
@@ -33,8 +34,14 @@ def parse_and_validate_payment(
     if str(payload.get("cart_id", "")) != expected_order_id:
         raise ValueError("PAYTABS_ORDER_MISMATCH")
 
-    actual_amount = payload.get("cart_amount")
-    if str(actual_amount) != str(expected_amount):
+    try:
+        actual_amount = Decimal(str(payload.get("cart_amount"))).quantize(Decimal("0.01"))
+        expected_amount_decimal = Decimal(str(expected_amount)).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        raise ValueError("PAYTABS_AMOUNT_INVALID") from None
+    if not actual_amount.is_finite() or not expected_amount_decimal.is_finite():
+        raise ValueError("PAYTABS_AMOUNT_INVALID")
+    if actual_amount != expected_amount_decimal:
         raise ValueError("PAYTABS_AMOUNT_MISMATCH")
 
     if str(payload.get("cart_currency", "")) != expected_currency:
