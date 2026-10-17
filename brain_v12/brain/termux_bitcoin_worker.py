@@ -17,6 +17,11 @@ import threading
 import time
 from urllib.parse import urlsplit
 
+from brain_v12.virtual_hardware.thermal_safety_policy import (
+    REAL_HARDWARE,
+    thermal_sensor_policy_gate,
+)
+
 MAX_RUNTIME_SECONDS = 300
 MAX_THREADS = 2
 DEFAULT_RUNTIME_SECONDS = 60
@@ -176,10 +181,19 @@ def main() -> int:
         return 2
 
     initial_temp = read_max_temperature_c()
-    if initial_temp is None:
-        emit("BLOCKED_THERMAL_SENSOR_UNAVAILABLE",
-             required="A readable Android/Termux thermal sensor is required before live mining.",
-             note="No miner process was started.")
+    thermal_gate = thermal_sensor_policy_gate(
+        REAL_HARDWARE,
+        sensor_required=True,
+        sensor_available=initial_temp is not None,
+        sensor_reading_valid=initial_temp is not None and 0.0 <= initial_temp <= 150.0,
+    )
+    if not thermal_gate["allowed"]:
+        emit(
+            "BLOCKED_THERMAL_SENSOR_UNAVAILABLE",
+            required="A readable Android/Termux CPU-related thermal sensor is required before live mining.",
+            thermal_policy=thermal_gate,
+            note="No miner process was started.",
+        )
         return 2
     if initial_temp >= max_temp:
         emit("BLOCKED_THERMAL_LIMIT", temperature_c=round(initial_temp, 2), max_temperature_c=max_temp)
