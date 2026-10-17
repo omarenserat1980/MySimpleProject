@@ -20,6 +20,8 @@ on:
       - "brain_v12/brain/stratum_v1_offline_candidate.py"
       - "brain_v12/brain/bitcoin_header.py"
       - "brain_v12/brain/stratum_v1_jobs.py"
+      - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_protocol.py"
       - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
       - "brain_v12/tests/test_bitcoin_header.py"
       - "brain_v12/tests/test_stratum_v1_jobs.py"
@@ -30,7 +32,7 @@ permissions:
 
 concurrency:
   group: brain-stratum-header-validation-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   offline-header-validation:
