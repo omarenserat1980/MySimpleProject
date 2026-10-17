@@ -35,6 +35,20 @@ def test_tampered_body_is_rejected():
     assert not verify_ipn_signature(raw + b"tampered", signature(raw), KEY)
 
 
+def test_documented_top_level_ipn_payload_is_accepted():
+    data = json.loads(body())
+    data["response_status"] = data["payment_result"].pop("response_status")
+    data.pop("payment_result")
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    result = parse_and_validate_payment(
+        raw, signature(raw), KEY,
+        expected_order_id="BRAIN-TEST-1",
+        expected_amount="1.00",
+        expected_currency="USD",
+    )
+    assert result["tran_ref"] == "TST123"
+
+
 def test_valid_payment_payload():
     raw = body()
     result = parse_and_validate_payment(
