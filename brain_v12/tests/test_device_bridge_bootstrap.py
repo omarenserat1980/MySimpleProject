@@ -21,6 +21,7 @@ class DeviceBridgeBootstrapTests(unittest.TestCase):
                     "BRAIN_AGENT_KEY_SHA256": "",
                     "BRAIN_AGENT_KEYS_JSON": "",
                     "BRAIN_EMULATOR_KEY": "",
+                    "BRAIN_EMULATOR_AGENT_KEY": "",
                 },
                 clear=False,
             ):
@@ -31,7 +32,7 @@ class DeviceBridgeBootstrapTests(unittest.TestCase):
         finally:
             os.unlink(key_file)
 
-    def test_missing_local_trust_root_keeps_bridge_disabled(self):
+    def test_missing_local_trust_root_keeps_runtime_ready_but_auth_blocked(self):
         missing = os.path.join(tempfile.gettempdir(), "brain-missing-agent-key-do-not-create")
         with patch.dict(
             os.environ,
@@ -42,12 +43,18 @@ class DeviceBridgeBootstrapTests(unittest.TestCase):
                 "BRAIN_AGENT_KEY_SHA256": "",
                 "BRAIN_AGENT_KEYS_JSON": "",
                 "BRAIN_EMULATOR_KEY": "",
+                "BRAIN_EMULATOR_AGENT_KEY": "",
             },
             clear=False,
         ):
             bridge = DeviceBridge(store=None)
             self.assertFalse(bridge.configured())
-            self.assertFalse(bridge.enabled())
+            self.assertTrue(bridge.enabled())
+            status = bridge.status()
+            self.assertTrue(status["runtime_ready"])
+            self.assertTrue(status["configured"])
+            self.assertFalse(status["auth_configured"])
+            self.assertEqual(bridge.enqueue("status")["status"], "AUTH_NOT_CONFIGURED")
 
 
 if __name__ == "__main__":
