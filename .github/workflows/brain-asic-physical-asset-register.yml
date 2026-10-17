@@ -1,0 +1,36 @@
+name: BRAIN ASIC Physical Asset Register
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/asic/unit_001/physical_asset_register.py"
+      - "brain_v12/asic/unit_001/physical_asset_register.json"
+      - "brain_v12/asic/unit_001/test_physical_asset_register.py"
+      - ".github/workflows/brain-asic-physical-asset-register.yml"
+  push:
+    branches: [main, "feat/brain-asic-001-standalone-unit"]
+    paths:
+      - "brain_v12/asic/unit_001/physical_asset_register.py"
+      - "brain_v12/asic/unit_001/physical_asset_register.json"
+      - "brain_v12/asic/unit_001/test_physical_asset_register.py"
+      - ".github/workflows/brain-asic-physical-asset-register.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-physical-asset-register:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate empty-by-default asset register
+        run: python brain_v12/asic/unit_001/physical_asset_register.py
+      - name: Run asset evidence policy tests
+        run: python -m unittest brain_v12.asic.unit_001.test_physical_asset_register -v
