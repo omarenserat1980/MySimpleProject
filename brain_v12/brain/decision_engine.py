@@ -173,6 +173,6 @@ class DecisionEngine:
             else:
                 result = {"status": "DECIDED", "goal": original_goal, "normalized_goal": goal, "selected": selected,
                           "score": round(score, 3), "reason": "tool_aware_heuristic",
-                          "alternatives": [item[1] for item in ranked[1:]], "north_star": compass.as_dict()}
+                          "alternatives": [item[1] for item in ranked[1:]], "north_star": compass_data}
         self.history.append(result)
         return result
