@@ -92,9 +92,10 @@ def main() -> int:
         print(f'CHECKS: {summary["checks_passed"]}/{summary["checks_total"]} passed')
         print("NOTE: this preflight is not proof of Android virtualization or real device execution.")
 
-    # Missing Termux or an optional project path is diagnostic information;
-    # only Python < 3.10 or failure to locate the repository fails the preflight.
-    return 0 if sys.version_info >= (3, 10) and root is not None else 1
+    # Termux detection and optional files are informational. Required runtime files
+    # must exist, otherwise callers should treat this preflight as failed.
+    required_files_ok = root is not None and all((root / relative).is_file() for relative in REQUIRED_PATHS)
+    return 0 if sys.version_info >= (3, 10) and root is not None and required_files_ok else 1
 
 
 if __name__ == "__main__":
