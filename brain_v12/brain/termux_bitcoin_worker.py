@@ -89,10 +89,26 @@ def parse_miner_line(line: str, counters: dict[str, object]) -> None:
         counters["hashrate_unit_source"] = "miner_stdout_stderr_unverified"
 
 
+def is_cpu_thermal_zone_type(zone_type: str) -> bool:
+    """Accept only explicitly CPU/SoC/GPU/package-labelled thermal zones.
+
+    Android thermal-zone names vary by vendor. Generic zones are intentionally
+    rejected rather than treating battery, modem, skin, or unknown temperatures
+    as proof that CPU temperature is being monitored.
+    """
+    normalized = zone_type.strip().lower()
+    if any(label in normalized for label in ("battery", "modem", "skin", "charger", "usb", "pa-therm")):
+        return False
+    return bool(re.search(r"(?:^|[^a-z])(cpu|soc|gpu|package)(?:$|[^a-z])|cpu[-_]?therm|soc[-_]?therm", normalized))
+
+
 def read_max_temperature_c() -> float | None:
     readings: list[float] = []
     for path in Path("/sys/class/thermal").glob("thermal_zone*/temp"):
         try:
+            zone_type = path.with_name("type").read_text(encoding="ascii").strip()
+            if not is_cpu_thermal_zone_type(zone_type):
+                continue
             value = float(path.read_text(encoding="ascii").strip())
             celsius = value / 1000.0 if value > 1000 else value
             if 0 <= celsius <= 150:
