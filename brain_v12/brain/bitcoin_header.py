@@ -13,9 +13,14 @@ def _fixed_hex(value: str, field: str, size: int) -> bytes:
     if not isinstance(value, str) or len(value) != size * 2:
         raise ValueError("INVALID_" + field.upper() + "_WIDTH")
     try:
-        return bytes.fromhex(value)
+        decoded = bytes.fromhex(value)
     except ValueError as exc:
         raise ValueError("INVALID_" + field.upper() + "_HEX") from exc
+    # bytes.fromhex accepts embedded ASCII whitespace; fixed-width protocol
+    # fields must contain exactly size bytes, not merely size characters.
+    if len(decoded) != size:
+        raise ValueError("INVALID_" + field.upper() + "_WIDTH")
+    return decoded
 
 
 def sha256d(data: bytes) -> bytes:
