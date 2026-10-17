@@ -6,7 +6,7 @@ from typing import Any, Callable
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from .sha256d_execution_contract import layer_status_snapshot
+from .sha256d_execution_contract import layer_status_snapshot, validate_layer_result
 
 
 PROTOCOL_VERSION = "2026-07-28"
@@ -80,6 +80,18 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             "count": len(events),
         }
 
+    def sha256d_validate_evidence_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+        """Validate a CPU/RTL envelope without executing tools or upgrading status."""
+        record = arguments.get("record")
+        validation = validate_layer_result(record)
+        return {
+            "ok": bool(validation.get("valid")),
+            "source": "electronic-brain",
+            "validation": validation,
+            "execution_started": False,
+            "external_claims_verified": False,
+        }
+
     def sha256d_layers_handler(_: dict[str, Any]) -> dict[str, Any]:
         """Read the shared Arabic SHA-256d status contract; no execution side effects."""
         snapshot = layer_status_snapshot()
@@ -135,6 +147,17 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         "Read Arabic SHA-256d CPU/RTL/MCP layer statuses and separate external pool/revenue evidence gates. Read-only; starts no simulation or mining.",
         {"type": "object", "properties": {}, "additionalProperties": False},
         sha256d_layers_handler,
+    )
+    register(
+        "brain.sha256d_validate_evidence",
+        "Validate a SHA-256d CPU/RTL result envelope and its digest. Read-only; never executes mining or verifies pool/revenue claims.",
+        {
+            "type": "object",
+            "properties": {"record": {"type": "object"}},
+            "required": ["record"],
+            "additionalProperties": False,
+        },
+        sha256d_validate_evidence_handler,
     )
     register(
         "brain.chat",
