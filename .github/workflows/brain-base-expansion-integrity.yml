@@ -10,6 +10,7 @@ on:
       - "tools/base_expansion_integrity.py"
       - "tools/phase_*_gate.py"
       - "tests/test_*.py"
+      - ".github/workflows/brain-base-expansion-integrity.yml"
 
 jobs:
   integrity:
@@ -30,6 +31,9 @@ jobs:
 
       - name: Run Base Expansion Integrity
         run: python tools/base_expansion_integrity.py
+
+      - name: Test mining API router registration
+        run: python -m pytest -q tests/test_mining_api_router_registration.py
 
       - name: Upload integrity evidence
         if: always()

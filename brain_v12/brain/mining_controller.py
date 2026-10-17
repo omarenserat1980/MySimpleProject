@@ -1,21 +1,20 @@
 """Brain Mining Controller.
 
-Safe control-plane for user-owned mining hosts.
-It discovers hardware, selects compatible open-source miners, estimates
-profitability, and enforces thermal/resource/payout gates.
+Safe planning and policy evaluation for a future Brain-owned mining backend.
+Hardware discovery and miner compatibility are advisory only: this module does
+not launch a miner, contact a pool, or establish that mining is profitable.
 
-Important: this module never mines inside GitHub Actions and never moves funds.
-Actual mining is opt-in on an explicitly registered external/self-hosted worker.
+Actual execution remains blocked until a native Brain-owned backend is
+implemented, attested, and separately reviewed. GitHub Actions never mines.
 """
-
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import json
+import math
 import os
 import platform
 import shutil
-import subprocess
 from typing import Any
 
 
@@ -46,6 +45,8 @@ class MiningPlan:
     backend: str
     mode: str
     reason: str
+    execution_mode: str = "PLAN_ONLY"
+    external_miner_execution_allowed: bool = False
 
 
 MINER_REGISTRY = {
@@ -84,6 +85,7 @@ def choose_plan(
     algorithm: str = "randomx",
     require_installed_miner: bool = False,
 ) -> MiningPlan:
+    """Return compatibility advice only; never authorize or start a miner."""
     algorithm = algorithm.lower()
     if algorithm not in MINER_REGISTRY:
         raise ValueError(f"unsupported algorithm: {algorithm}")
@@ -99,7 +101,12 @@ def choose_plan(
         miner=miner,
         backend=backend,
         mode=mode,
-        reason="CPU-first RandomX-compatible plan; actual execution is opt-in",
+        reason=(
+            "compatibility recommendation only; external miner execution is "
+            "blocked and the Brain-owned native backend is pending"
+        ),
+        execution_mode="PLAN_ONLY",
+        external_miner_execution_allowed=False,
     )
 
 
@@ -110,14 +117,51 @@ def profitability_gate(
     hardware_cost_per_hour: float = 0.0,
     minimum_margin: float = 0.0,
 ) -> dict[str, Any]:
-    net = gross_revenue_per_hour - electricity_cost_per_hour - pool_fee_per_hour - hardware_cost_per_hour
-    margin = (net / gross_revenue_per_hour) if gross_revenue_per_hour > 0 else -1.0
-    return {
+    """Calculate a hypothetical estimate; reject invalid or overflowing inputs.
+
+    This is only an estimate based on caller-supplied values, not proof of
+    current mining revenue, pool acceptance, payout, or realized profit.
+    """
+    raw_values = {
         "gross_revenue_per_hour": gross_revenue_per_hour,
-        "cost_per_hour": electricity_cost_per_hour + pool_fee_per_hour + hardware_cost_per_hour,
+        "electricity_cost_per_hour": electricity_cost_per_hour,
+        "pool_fee_per_hour": pool_fee_per_hour,
+        "hardware_cost_per_hour": hardware_cost_per_hour,
+        "minimum_margin": minimum_margin,
+    }
+    values: dict[str, float] = {}
+    for name, value in raw_values.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name} must be a finite number")
+        try:
+            normalized = float(value)
+        except (OverflowError, ValueError):
+            raise ValueError(f"{name} must be a finite number") from None
+        if not math.isfinite(normalized):
+            raise ValueError(f"{name} must be a finite number")
+        if normalized < 0:
+            raise ValueError(f"{name} must be non-negative")
+        values[name] = normalized
+
+    gross = values["gross_revenue_per_hour"]
+    electricity = values["electricity_cost_per_hour"]
+    pool_fee = values["pool_fee_per_hour"]
+    hardware = values["hardware_cost_per_hour"]
+    threshold = values["minimum_margin"]
+    total_cost = electricity + pool_fee + hardware
+    net = gross - total_cost
+    margin = net / gross if gross > 0 else -1.0
+    if not all(math.isfinite(value) for value in (total_cost, net, margin)):
+        raise ValueError("profitability calculation overflowed")
+
+    return {
+        "gross_revenue_per_hour": gross,
+        "cost_per_hour": total_cost,
         "net_per_hour": round(net, 8),
         "margin": round(margin, 6),
-        "profitable": net > minimum_margin,
+        "profitable": gross > 0 and net > threshold,
+        "estimate_only": True,
+        "realized_revenue_verified": False,
     }
 
 
@@ -127,8 +171,15 @@ def can_start(
     worker_is_user_owned: bool,
     running_on_github_actions: bool,
     current_temperature_c: float | None = None,
+    brain_owned_backend_implemented: bool = False,
+    backend_attested: bool = False,
+    pool_endpoint_verified: bool = False,
+    credentials_in_secret_store: bool = False,
+    resource_budget_verified: bool = False,
+    explicit_user_approval: bool = False,
 ) -> tuple[bool, str]:
-    if running_on_github_actions and not policy.allow_github_actions:
+    """Fail closed; this policy check never launches a process or contacts a pool."""
+    if running_on_github_actions:
         return False, "github_actions_mining_forbidden"
     if policy.require_user_owned_worker and not worker_is_user_owned:
         return False, "worker_not_registered_as_user_owned"
@@ -136,7 +187,100 @@ def can_start(
         return False, "mining_disabled_by_default"
     if current_temperature_c is not None and current_temperature_c >= policy.max_temperature_c:
         return False, "thermal_limit_reached"
-    return True, "approved_by_local_policy"
+    if not brain_owned_backend_implemented:
+        return False, "brain_owned_mining_backend_not_implemented"
+    if not backend_attested:
+        return False, "brain_backend_attestation_required"
+    if not pool_endpoint_verified:
+        return False, "pool_endpoint_verification_required"
+    if not credentials_in_secret_store:
+        return False, "pool_credentials_secret_store_required"
+    if not resource_budget_verified:
+        return False, "resource_budget_verification_required"
+    if not explicit_user_approval:
+        return False, "explicit_user_approval_required"
+    return False, "separate_execution_review_required"
+
+
+def verify_payout_proof(
+    *,
+    evidence: dict[str, Any],
+    expected_worker_id: str,
+    expected_currency: str,
+    independent_source_verified: bool = False,
+) -> dict[str, Any]:
+    """Conservatively classify payout proof; this function never contacts a provider."""
+    if not isinstance(evidence, dict):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "INVALID_EVIDENCE",
+        }
+    if independent_source_verified is not True:
+        return {
+            "status": "PAYOUT_PROOF_PENDING_INDEPENDENT_SOURCE",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "INDEPENDENT_PAYMENT_SOURCE_NOT_VERIFIED",
+        }
+
+    required_text = ("transaction_id", "worker_id", "currency", "source")
+    if any(
+        not isinstance(evidence.get(name), str)
+        or not evidence[name].strip()
+        or any(ord(ch) < 32 for ch in evidence[name])
+        for name in required_text
+    ):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "REQUIRED_PAYMENT_FIELDS_INVALID",
+        }
+
+    amount = evidence.get("amount")
+    if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "PAYMENT_AMOUNT_INVALID",
+        }
+    try:
+        amount_value = float(amount)
+    except (OverflowError, ValueError):
+        amount_value = math.nan
+    if not math.isfinite(amount_value) or amount_value <= 0:
+        return {
+            "status": "PAYOUT_PROOF_INVALID",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "PAYMENT_AMOUNT_INVALID",
+        }
+    if evidence["worker_id"].strip() != expected_worker_id.strip():
+        return {
+            "status": "PAYOUT_PROOF_MISMATCH",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "WORKER_ID_MISMATCH",
+        }
+    if evidence["currency"].strip().upper() != expected_currency.strip().upper():
+        return {
+            "status": "PAYOUT_PROOF_MISMATCH",
+            "payment_independently_verified": False,
+            "revenue_realized": False,
+            "reason": "CURRENCY_MISMATCH",
+        }
+    return {
+        "status": "PAYOUT_PROOF_REQUIRES_TRUSTED_PROVIDER_ATTESTATION",
+        "payment_independently_verified": False,
+        "revenue_realized": False,
+        "reason": "CALLER_FLAG_IS_NOT_PROVIDER_ATTESTATION",
+        "transaction_id": evidence["transaction_id"].strip(),
+        "amount": amount_value,
+        "currency": evidence["currency"].strip().upper(),
+    }
 
 
 def evidence_record(
@@ -151,18 +295,61 @@ def evidence_record(
     verified_received: float = 0.0,
     currency: str = "XMR",
 ) -> dict[str, Any]:
-    """Return auditable evidence; verified_received must come from payment proof."""
-    return {
+    """Validate evidence fields; payment status is only a claim until independently verified."""
+    text_fields = {
         "worker_id": worker_id,
         "algorithm": algorithm,
+        "currency": currency,
+    }
+    for name, value in text_fields.items():
+        if not isinstance(value, str) or not value.strip() or any(ord(ch) < 32 for ch in value):
+            raise ValueError(f"{name} must be a non-empty valid string")
+
+    numeric_fields = {
         "runtime_seconds": runtime_seconds,
         "hashrate": hashrate,
         "accepted_shares": accepted_shares,
         "rejected_shares": rejected_shares,
-        "payout_tx_id": payout_tx_id,
         "verified_received": verified_received,
-        "currency": currency,
-        "status": "VERIFIED_RECEIVED" if verified_received > 0 and payout_tx_id else "MINING_EVIDENCE_ONLY",
+    }
+    normalized: dict[str, float] = {}
+    for name, value in numeric_fields.items():
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(f"{name} must be a finite number")
+        try:
+            number = float(value)
+        except (OverflowError, ValueError):
+            raise ValueError(f"{name} must be a finite number") from None
+        if not math.isfinite(number) or number < 0:
+            raise ValueError(f"{name} must be finite and non-negative")
+        normalized[name] = number
+
+    for name in ("runtime_seconds", "accepted_shares", "rejected_shares"):
+        if not normalized[name].is_integer():
+            raise ValueError(f"{name} must be an integer")
+
+    if payout_tx_id is not None:
+        if (
+            not isinstance(payout_tx_id, str)
+            or not payout_tx_id.strip()
+            or any(ord(ch) < 32 for ch in payout_tx_id)
+        ):
+            raise ValueError("payout_tx_id must be None or a non-empty valid string")
+
+    return {
+        "worker_id": worker_id.strip(),
+        "algorithm": algorithm.strip().lower(),
+        "runtime_seconds": int(normalized["runtime_seconds"]),
+        "hashrate": normalized["hashrate"],
+        "accepted_shares": int(normalized["accepted_shares"]),
+        "rejected_shares": int(normalized["rejected_shares"]),
+        "payout_tx_id": payout_tx_id.strip() if payout_tx_id is not None else None,
+        "verified_received": normalized["verified_received"],
+        "currency": currency.strip().upper(),
+        # A transaction ID and amount are caller-supplied claims, not independent proof.
+        "status": "MINING_EVIDENCE_ONLY",
+        "payment_claim_present": bool(payout_tx_id) and normalized["verified_received"] > 0,
+        "payment_independently_verified": False,
     }
 
 
@@ -172,7 +359,9 @@ def status() -> dict[str, Any]:
         "policy": asdict(MiningPolicy()),
         "hardware": asdict(detect_hardware()),
         "github_actions_mining": "BLOCKED",
-        "default_mode": "BENCHMARK_ONLY",
+        "default_mode": "PLAN_ONLY",
+        "external_miner_execution": "BLOCKED",
+        "brain_owned_backend": "PENDING_IMPLEMENTATION_AND_REVIEW",
     }
 
 

@@ -7,6 +7,7 @@ from brain_v12.brain.memory import MemoryStore
 from brain_v12.brain.robotics_research_memory import (
     MEMORY_KEY,
     PROJECTS,
+    ensure_catalog_in_memory,
     persist_to_memory,
     snapshot,
 )
@@ -36,6 +37,33 @@ class RoboticsResearchMemoryTests(unittest.TestCase):
                              "READ_ONLY_RESEARCH_AND_SOFTWARE_SIMULATION")
             self.assertTrue(any(event["kind"] == "OPEN_SOURCE_ROBOTICS_RESEARCH_CATALOG_SAVED"
                                 for event in _events(store)))
+
+    def test_startup_seed_is_idempotent_and_preserves_existing_memory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            first = ensure_catalog_in_memory(store)
+            self.assertEqual(first["status"], "SEEDED")
+            self.assertTrue(first["written"])
+            saved = next(item for item in store.memories() if item["key"] == MEMORY_KEY)
+            original_value = saved["value"]
+
+            second = ensure_catalog_in_memory(store)
+            saved_after_restart = next(item for item in store.memories() if item["key"] == MEMORY_KEY)
+            self.assertEqual(second["status"], "ALREADY_PRESENT")
+            self.assertFalse(second["written"])
+            self.assertEqual(saved_after_restart["value"], original_value)
+
+    def test_startup_seed_blocks_corrupt_existing_memory_without_overwriting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = MemoryStore(str(Path(directory) / "brain.db"))
+            store.init()
+            store.save_memory(MEMORY_KEY, "not-json")
+            result = ensure_catalog_in_memory(store)
+            saved = next(item for item in store.memories() if item["key"] == MEMORY_KEY)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["status"], "BLOCKED_EXISTING_INVALID_MEMORY")
+            self.assertEqual(saved["value"], "not-json")
 
 
 def _events(store):

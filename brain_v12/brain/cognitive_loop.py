@@ -69,7 +69,18 @@ class CognitiveLoop:
         elif tool_id=="tasks.create":
             result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.create(str(params.get("title","مهمة جديدة")))}
         elif tool_id=="tasks.complete":
-            result={"ok":True,"status":"COMPLETED","tool":tool_id,"data":self.tasks.update(str(params.get("task_id")),"COMPLETED")}
+            completion=self.tasks.update(
+                str(params.get("task_id")),
+                "COMPLETED",
+                evidence_ref=params.get("evidence_ref"),
+            )
+            completed=completion.get("status")=="COMPLETED"
+            result={
+                "ok":completed,
+                "status":"COMPLETED" if completed else completion.get("error","TASK_COMPLETION_REJECTED"),
+                "tool":tool_id,
+                "data":completion,
+            }
         elif tool_id=="code.inspect":
             if not self.code_tool:
                 result={"ok":False,"status":"UNAVAILABLE","tool":tool_id}

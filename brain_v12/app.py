@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .brain.memory import MemoryStore
 from .brain.github_auth import build_github_headers
 from .brain.quranic_reasoning_paths import register_quranic_reasoning_paths
+from .brain.robotics_research_memory import ensure_catalog_in_memory
 from .brain.core import BrainCore
 from .brain.agent import Agent
 from .brain.builder import SoftwareBuilder
@@ -66,6 +67,11 @@ from .brain.verification_engine import VerificationEngine
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .brain.youtube_oauth import YouTubeOAuth
 from .brain.commercial_dashboard_api import router as commercial_dashboard_router
+from .brain.mining_node_api import router as mining_node_router
+from .brain.digital_mining_node_api import router as digital_mining_node_router
+from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
+from .brain.bitcoin_worker_api import router as bitcoin_worker_router
+from .brain.asic_simulator_api import router as asic_simulator_router
 from .movie_summary_factory.engine import create_job, mark_stage
 from .movie_summary_factory.cinematic_v3 import build_v3_plan, validate_v3
 from . import media_engine
@@ -142,12 +148,16 @@ for p in PLUGINS:
     if isinstance(p,dict) and p.get("enabled"):
         plugins.enable(plugin_id)
 
+from .brain.deployment_identity import deployment_identity
+
 APP_VERSION=os.getenv("BRAIN_V14_VERSION","14.0")
-DEPLOY_COMMIT=os.getenv("GITHUB_SHA") or os.getenv("GIT_COMMIT") or "unknown"
-DEPLOY_BRANCH=os.getenv("GITHUB_REF_NAME","unknown")
-DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY","unknown")
-DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID","unknown")
-RUNTIME_INSTANCE=os.getenv("HOSTNAME") or os.getenv("HOSTNAME") or "unknown"
+_DEPLOYMENT_IDENTITY=deployment_identity()
+DEPLOY_COMMIT=_DEPLOYMENT_IDENTITY["commit"]
+DEPLOY_BRANCH=_DEPLOYMENT_IDENTITY["branch"]
+DEPLOY_REPOSITORY=_DEPLOYMENT_IDENTITY["repository"]
+DEPLOY_SERVICE_ID=_DEPLOYMENT_IDENTITY["service_id"]
+DEPLOY_RUN_ID=_DEPLOYMENT_IDENTITY["run_id"]
+RUNTIME_INSTANCE=_DEPLOYMENT_IDENTITY["instance"]
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature"])
@@ -170,6 +180,15 @@ app.include_router(customer_router(os.path.join(ROOT, "brain_v12_commerce.json")
 app.include_router(economic_reconciliation_router(os.path.join(ROOT, "brain_v12_economic_reconciliation.json")))
 app.include_router(commerce_reversals_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(commercial_dashboard_router())
+
+# Register the mining analysis, simulator, and worker telemetry APIs. These
+# endpoints do not launch mining; physical-worker telemetry remains authenticated
+# and pool shares/payouts still require independent verification.
+app.include_router(mining_node_router)
+app.include_router(digital_mining_node_router)
+app.include_router(bitcoin_mining_intelligence_router)
+app.include_router(bitcoin_worker_router)
+app.include_router(asic_simulator_router)
 
 @app.get("/api/brain/cloud/status")
 def brain_cloud_status():
@@ -1251,16 +1270,17 @@ def health():
     }
 
 def _deployment_snapshot():
-    expected = os.getenv("GITHUB_SHA", "")
     return {
         "version": APP_VERSION,
         "commit": DEPLOY_COMMIT,
-        "github_sha": expected or None,
+        "github_sha": os.getenv("GITHUB_SHA") or None,
+        "expected_commit": _DEPLOYMENT_IDENTITY["expected_commit"] or None,
         "branch": DEPLOY_BRANCH,
         "repository": DEPLOY_REPOSITORY,
-        "run_id": DEPLOY_SERVICE_ID,
+        "run_id": DEPLOY_RUN_ID,
+        "service_id": DEPLOY_SERVICE_ID,
         "instance": RUNTIME_INSTANCE,
-        "converged": bool(DEPLOY_COMMIT and expected and DEPLOY_COMMIT == expected),
+        "converged": _DEPLOYMENT_IDENTITY["converged"],
     }
 
 @app.get("/api/deploy/diagnostics")
@@ -1876,6 +1896,10 @@ def system_diagnostics():
 
 @app.on_event("startup")
 def start_background_services():
+    try:
+        ensure_catalog_in_memory(store)
+    except Exception as exc:
+        store.event("OPEN_SOURCE_ROBOTICS_RESEARCH_CATALOG_SEED_FAILED", {"error": str(exc)[:1000]})
     try:
         income_strategy.income_engine.discover(20)
     except Exception as exc:
