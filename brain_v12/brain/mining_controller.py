@@ -266,9 +266,8 @@ def evidence_record(
         "verified_received": normalized["verified_received"],
         "currency": currency.strip().upper(),
         # A transaction ID and amount are caller-supplied claims, not independent proof.
-        "status": "PAYMENT_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION"
-        if normalized["verified_received"] > 0 and payout_tx_id
-        else "MINING_EVIDENCE_ONLY",
+        "status": "MINING_EVIDENCE_ONLY",
+        "payment_claim_present": bool(payout_tx_id) and normalized["verified_received"] > 0,
         "payment_independently_verified": False,
     }
 
