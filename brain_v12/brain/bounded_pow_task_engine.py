@@ -55,7 +55,7 @@ def run_bounded_pow_task(
         raise ValueError("MAX_TOTAL_HASHES_OUT_OF_RANGE")
     if isinstance(batch_hashes, bool) or not isinstance(batch_hashes, int) or not 1 <= batch_hashes <= MAX_BATCH_HASHES:
         raise ValueError("BATCH_HASHES_OUT_OF_RANGE")
-    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
+    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or not 0 < timeout_seconds <= 3600:
         raise ValueError("TIMEOUT_SECONDS_OUT_OF_RANGE")
     if cancel_requested is not None and not callable(cancel_requested):
         raise ValueError("CANCEL_CHECK_MUST_BE_CALLABLE")
