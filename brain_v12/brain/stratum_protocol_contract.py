@@ -23,6 +23,8 @@ class StratumProtocolError(ValueError):
 
 def parse_json_line(raw: str | bytes, *, max_bytes: int = MAX_MESSAGE_BYTES) -> dict[str, Any]:
     """Parse exactly one bounded JSON object from a Stratum newline frame."""
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or not 1 <= max_bytes <= MAX_MESSAGE_BYTES:
+        raise StratumProtocolError("INVALID_MAX_MESSAGE_BYTES")
     if isinstance(raw, bytes):
         try:
             text = raw.decode("utf-8", errors="strict")
@@ -75,9 +77,23 @@ def build_authorize_request(request_id: int, username: str, password: str) -> di
     return build_request(request_id, "mining.authorize", [username, password])
 
 
-def _hex_field(value: Any, name: str, *, min_length: int = 1, max_length: int = 256) -> str:
-    if (not isinstance(value, str) or not min_length <= len(value) <= max_length
-            or len(value) % 2 or not _HEX.fullmatch(value)):
+def _hex_field(
+    value: Any,
+    name: str,
+    *,
+    min_length: int = 1,
+    max_length: int = 256,
+    allow_empty: bool = False,
+) -> str:
+    if not isinstance(value, str):
+        raise StratumProtocolError(f"INVALID_{name.upper()}")
+    if allow_empty and value == "":
+        return ""
+    if (
+        not min_length <= len(value) <= max_length
+        or len(value) % 2
+        or not _HEX.fullmatch(value)
+    ):
         raise StratumProtocolError(f"INVALID_{name.upper()}")
     return value.lower()
 
@@ -111,18 +127,24 @@ def parse_response(message: dict[str, Any], expected_id: int) -> dict[str, Any]:
     """Validate a JSON-RPC response envelope without treating it as pool proof."""
     if not isinstance(message, dict):
         raise StratumProtocolError("RESPONSE_OBJECT_REQUIRED")
-    if message.get("id") != expected_id:
+    if isinstance(expected_id, bool) or not isinstance(expected_id, int) or expected_id < 1:
+        raise StratumProtocolError("INVALID_EXPECTED_RESPONSE_ID")
+    response_id = message.get("id")
+    if isinstance(response_id, bool) or response_id != expected_id:
         raise StratumProtocolError("RESPONSE_ID_MISMATCH")
     if "result" not in message or "error" not in message:
         raise StratumProtocolError("RESPONSE_FIELDS_REQUIRED")
     error = message["error"]
     if error is not None and not isinstance(error, (list, dict, str)):
         raise StratumProtocolError("INVALID_RESPONSE_ERROR")
+    reports_acceptance = message["result"] is True and error is None
     return {
         "request_id": expected_id,
         "result": message["result"],
         "error": error,
-        "accepted": message["result"] is True and error is None,
+        "pool_response_reports_acceptance": reports_acceptance,
+        # Compatibility field: this is only the response's claim, never proof.
+        "accepted": reports_acceptance,
         "source": "untrusted_stratum_response_requires_transport_and_session_verification",
     }
 
@@ -140,20 +162,29 @@ def parse_difficulty(params: Any) -> float:
 
 
 def parse_notify(params: Any) -> dict[str, Any]:
-    """Validate the common mining.notify field shape, preserving raw job values."""
+    """Validate fixed-width Stratum job fields before any header construction."""
     if not isinstance(params, list) or len(params) < 9:
         raise StratumProtocolError("INVALID_NOTIFY_PARAMS")
     job_id, prevhash, coinb1, coinb2, branches, version, nbits, ntime, clean = params[:9]
-    if not isinstance(job_id, str) or not job_id or len(job_id) > 256:
+    if (
+        not isinstance(job_id, str)
+        or not job_id
+        or len(job_id) > 256
+        or any(ord(char) < 32 for char in job_id)
+    ):
         raise StratumProtocolError("INVALID_JOB_ID")
-    for name, value in (("prevhash", prevhash), ("coinb1", coinb1), ("coinb2", coinb2),
-                        ("version", version), ("nbits", nbits), ("ntime", ntime)):
-        if not isinstance(value, str) or not value or len(value) > 512:
-            raise StratumProtocolError(f"INVALID_{name.upper()}")
+    prevhash = _hex_field(prevhash, "prevhash", min_length=64, max_length=64)
+    coinb1 = _hex_field(coinb1, "coinb1", min_length=0, max_length=MAX_MESSAGE_BYTES * 2, allow_empty=True)
+    coinb2 = _hex_field(coinb2, "coinb2", min_length=0, max_length=MAX_MESSAGE_BYTES * 2, allow_empty=True)
+    version = _hex_field(version, "version", min_length=8, max_length=8)
+    nbits = _hex_field(nbits, "nbits", min_length=8, max_length=8)
+    ntime = _hex_field(ntime, "ntime", min_length=8, max_length=8)
     if not isinstance(branches, list) or len(branches) > 4096:
         raise StratumProtocolError("INVALID_MERKLE_BRANCHES")
-    if any(not isinstance(item, str) or len(item) > 128 for item in branches):
-        raise StratumProtocolError("INVALID_MERKLE_BRANCH")
+    normalized_branches = [
+        _hex_field(item, "merkle_branch", min_length=64, max_length=64)
+        for item in branches
+    ]
     if not isinstance(clean, bool):
         raise StratumProtocolError("INVALID_CLEAN_JOBS_FLAG")
     return {
@@ -161,7 +192,7 @@ def parse_notify(params: Any) -> dict[str, Any]:
         "prevhash": prevhash,
         "coinb1": coinb1,
         "coinb2": coinb2,
-        "merkle_branches": list(branches),
+        "merkle_branches": normalized_branches,
         "version": version,
         "nbits": nbits,
         "ntime": ntime,
