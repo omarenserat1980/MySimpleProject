@@ -1,4 +1,6 @@
 from brain.provider_hub.evidence import CommercialEvidenceGate, Evidence
+from brain.provider_hub.payment_guard import PaymentIdempotencyGuard
+from brain.provider_hub.payment_verification import EvidenceBoundPaymentService
 
 
 def ev(eid, typ, oid, ref):
@@ -35,3 +37,91 @@ def test_duplicate_evidence_rejected():
         assert str(e) == "DUPLICATE_EVIDENCE:e1"
     else:
         raise AssertionError("duplicate evidence accepted")
+
+
+def _payment_service(verifier=None):
+    return EvidenceBoundPaymentService(
+        PaymentIdempotencyGuard(), CommercialEvidenceGate(), verifier
+    )
+
+
+def test_payment_verification_fails_closed_without_provider_verifier():
+    service = _payment_service()
+    evidence = ev("pay-e1", "PAYMENT_VERIFICATION", "order-1", "tx-1")
+    service.evidence.add(evidence)
+
+    result = service.verify("order-1", "test", evidence)
+
+    assert result.verified is False
+    assert result.reason == "TRUSTED_PROVIDER_VERIFIER_NOT_CONFIGURED"
+
+
+def test_payment_verification_requires_registered_evidence():
+    service = _payment_service(lambda evidence, provider: True)
+    evidence = ev("pay-e2", "PAYMENT_VERIFICATION", "order-1", "tx-2")
+
+    result = service.verify("order-1", "test", evidence)
+
+    assert result.verified is False
+    assert result.reason == "PAYMENT_EVIDENCE_NOT_REGISTERED"
+
+
+def test_payment_verification_rejects_provider_mismatch():
+    service = _payment_service(lambda evidence, provider: True)
+    evidence = Evidence.create(
+        "pay-e3", "PAYMENT_VERIFICATION", "order-1", "different-provider",
+        "tx-3", {"ok": True}
+    )
+    service.evidence.add(evidence)
+
+    result = service.verify("order-1", "test", evidence)
+
+    assert result.verified is False
+    assert result.reason == "EVIDENCE_PROVIDER_MISMATCH"
+
+
+def test_payment_verification_rejects_false_or_non_boolean_verifier_results():
+    for verifier_result in (False, 1, "true", None):
+        service = _payment_service(
+            lambda evidence, provider, value=verifier_result: value
+        )
+        evidence = ev(
+            f"pay-e4-{verifier_result!s}", "PAYMENT_VERIFICATION",
+            "order-1", "tx-4"
+        )
+        service.evidence.add(evidence)
+
+        result = service.verify("order-1", "test", evidence)
+
+        assert result.verified is False
+        assert result.reason == "TRUSTED_PROVIDER_EVIDENCE_REJECTED"
+
+
+def test_payment_verification_succeeds_only_after_trusted_verifier_accepts():
+    service = _payment_service(
+        lambda evidence, provider: (
+            evidence.reference == "tx-5" and provider == "test"
+        )
+    )
+    evidence = ev("pay-e5", "PAYMENT_VERIFICATION", "order-1", "tx-5")
+    service.evidence.add(evidence)
+
+    result = service.verify("order-1", "test", evidence)
+
+    assert result.verified is True
+    assert result.reason == "PAYMENT_VERIFIED"
+    assert result.evidence_id == "pay-e5"
+
+
+def test_payment_verification_treats_verifier_exception_as_rejection():
+    def broken_verifier(evidence, provider):
+        raise RuntimeError("provider verifier unavailable")
+
+    service = _payment_service(broken_verifier)
+    evidence = ev("pay-e6", "PAYMENT_VERIFICATION", "order-1", "tx-6")
+    service.evidence.add(evidence)
+
+    result = service.verify("order-1", "test", evidence)
+
+    assert result.verified is False
+    assert result.reason == "TRUSTED_PROVIDER_EVIDENCE_REJECTED"
