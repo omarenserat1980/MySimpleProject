@@ -52,6 +52,12 @@ def heartbeat_metadata():
             "node_type": "software", "runtime": "termux"}
 
 
+def send_heartbeat(key):
+    """Register liveness with the authenticated Brain device bridge."""
+    return request("POST", "/api/device/heartbeat",
+                   {"agent_id": AGENT_ID, "metadata": heartbeat_metadata()}, key=key)
+
+
 def main():
     key = read_key()
     print("V12-Termux-Agent ONLINE")
@@ -59,6 +65,7 @@ def main():
     print("Agent:", AGENT_ID)
     while True:
         try:
+            send_heartbeat(key)
             polled = request("GET", "/api/device/poll?agent_id=" + urllib.parse.quote(AGENT_ID, safe=""), key=key)
             task = polled.get("task")
             if task:
