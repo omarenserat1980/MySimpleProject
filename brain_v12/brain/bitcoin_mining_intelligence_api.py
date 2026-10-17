@@ -26,7 +26,6 @@ class MiningAnalysisRequest(BaseModel):
     other_daily_cost_jod: float = Field(default=0, ge=0)
 
 
-@router.get("/status")
 def _configured_capital_budget_jod() -> float:
     """Zero is the default starting budget, not a permanent income ceiling."""
     try:
@@ -36,6 +35,7 @@ def _configured_capital_budget_jod() -> float:
     return value if value >= 0 else 0.0
 
 
+@router.get("/status")
 def bitcoin_mining_status() -> dict[str, Any]:
     capital_budget = _configured_capital_budget_jod()
     paid_mining_authorized = os.getenv("BRAIN_ALLOW_PAID_MINING", "0").strip() == "1" and capital_budget > 0
