@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "project": "BRAIN-ASIC-001",
+  "owner": "Project owner",
+  "budget_jod": 0,
+  "items": [],
+  "policy": {
+    "simulation_is_not_physical_inventory": true,
+    "market_value_requires_real_identified_asset_and_sources": true,
+    "realized_revenue_requires_payment_evidence": true,
+    "financial_execution_enabled": false
+  }
+}
