@@ -58,7 +58,7 @@ class ASICLogicSimulator:
             if len(inputs) != expected:
                 raise ASICSimulationError("INVALID_INPUT_COUNT:" + name)
             value = raw.get("value")
-            if op == "CONST" and value not in (0, 1, False, True):
+            if op == "CONST" and (not isinstance(value, (int, bool)) or value not in (0, 1, False, True)):
                 raise ASICSimulationError("CONST_VALUE_MUST_BE_0_OR_1")
             if op == "INPUT" and value is not None:
                 raise ASICSimulationError("INPUT_DEFAULT_NOT_SUPPORTED")
@@ -108,7 +108,9 @@ class ASICLogicSimulator:
 
     @staticmethod
     def _bit(value: Any, label: str) -> int:
-        if value not in (0, 1, False, True):
+        # Equality alone would accept 0.0 and 1.0; logic signals are binary
+        # integers/booleans, not floating-point numeric coercions.
+        if not isinstance(value, (int, bool)) or value not in (0, 1):
             raise ASICSimulationError("SIGNAL_MUST_BE_0_OR_1:" + label)
         return int(value)
 
