@@ -109,6 +109,7 @@ from .brain.bitcoin_worker_api import router as bitcoin_worker_router
 from .brain.brain_cloud_provider_api import router as brain_cloud_provider_router
 from .brain.digital_mining_node_api import router as digital_mining_node_router
 from .brain.mining_node_api import router as mining_node_router
+from .brain.profit_first_governance import router as profit_first_router
 
 ROOT=os.path.dirname(__file__)
 store=MemoryStore(os.getenv("BRAIN_DB",os.path.join(ROOT,"brain_v12.db"))); store.init()
@@ -267,6 +268,7 @@ app.include_router(bitcoin_worker_router)
 app.include_router(brain_cloud_provider_router)
 app.include_router(digital_mining_node_router)
 app.include_router(mining_node_router)
+app.include_router(profit_first_router)
 
 
 @app.get("/api/logs/errors")
