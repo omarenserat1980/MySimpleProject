@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,6 +45,44 @@ def canonical_digest(record: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _pass_evidence_failures(layer: str, evidence: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    if not evidence:
+        return ["PASS_WITHOUT_EVIDENCE"]
+    if layer == "cpu_reference":
+        count = evidence.get("hashes_completed")
+        elapsed = evidence.get("elapsed_seconds")
+        rate = evidence.get("hashrate_hs")
+        digest = evidence.get("last_digest_hex")
+        if evidence.get("execution_scope") != "HOST_CPU_SOFTWARE_ONLY":
+            failures.append("CPU_SCOPE_MISSING")
+        if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+            failures.append("CPU_HASH_COUNT_INVALID")
+        for name, value in (("elapsed_seconds", elapsed), ("hashrate_hs", rate)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                failures.append("CPU_" + name.upper() + "_INVALID")
+        if not isinstance(digest, str) or len(digest) != 64 or any(ch not in "0123456789abcdefABCDEF" for ch in digest):
+            failures.append("CPU_DIGEST_INVALID")
+    elif layer == "rtl_simulator":
+        if not isinstance(evidence.get("case"), str) or not evidence.get("case"):
+            failures.append("RTL_CASE_MISSING")
+        if not isinstance(evidence.get("top_module"), str) or not evidence.get("top_module"):
+            failures.append("RTL_TOP_MODULE_MISSING")
+        if not isinstance(evidence.get("source_sha256"), dict) or not evidence.get("source_sha256"):
+            failures.append("RTL_SOURCE_HASHES_MISSING")
+        for phase in ("compile", "simulation"):
+            result = evidence.get(phase)
+            if not isinstance(result, dict) or result.get("status") != "PASS" or result.get("exit_code") != 0:
+                failures.append("RTL_" + phase.upper() + "_NOT_PASS")
+        if not isinstance(evidence.get("required_success_marker"), str) or not evidence.get("required_success_marker"):
+            failures.append("RTL_SUCCESS_MARKER_MISSING")
+        if evidence.get("success_marker_found") is not True:
+            failures.append("RTL_SUCCESS_MARKER_NOT_FOUND")
+        if evidence.get("execution_scope") != "LOCAL_RTL_SIMULATION_ONLY":
+            failures.append("RTL_SCOPE_MISSING")
+    return failures
+
+
 def make_layer_result(
     *,
     layer: str,
@@ -57,8 +96,10 @@ def make_layer_result(
     if status not in STATUSES:
         status, error_code = "FAIL", "INVALID_STATUS"
     evidence = evidence if isinstance(evidence, dict) else {}
-    if status == "PASS" and not evidence:
-        status, error_code = "FAIL", "PASS_WITHOUT_EVIDENCE"
+    if status == "PASS":
+        evidence_failures = _pass_evidence_failures(layer, evidence)
+        if evidence_failures:
+            status, error_code = "FAIL", "PASS_EVIDENCE_INCOMPLETE:" + ",".join(evidence_failures)
     record: dict[str, Any] = {
         "contract_version": CONTRACT_VERSION,
         "layer": layer,
@@ -97,8 +138,8 @@ def validate_layer_result(record: Any) -> dict[str, Any]:
         failures.append("LAYER_MISSING")
     if not isinstance(record.get("evidence"), dict):
         failures.append("EVIDENCE_NOT_OBJECT")
-    if record.get("status") == "PASS" and not record.get("evidence"):
-        failures.append("PASS_WITHOUT_EVIDENCE")
+    if record.get("status") == "PASS" and isinstance(record.get("evidence"), dict):
+        failures.extend(_pass_evidence_failures(record.get("layer", ""), record["evidence"]))
     digest = record.get("evidence_sha256")
     if not isinstance(digest, str) or digest != canonical_digest(record):
         failures.append("EVIDENCE_DIGEST_MISMATCH")
