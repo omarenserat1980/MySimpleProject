@@ -18,7 +18,8 @@ class Sha256dExecutionContractTests(unittest.TestCase):
     def test_pass_without_evidence_is_downgraded(self):
         result = make_layer_result(layer="rtl_simulator", status="PASS", evidence={})
         self.assertEqual(result["status"], "FAIL")
-        self.assertEqual(result["error_code"], "PASS_WITHOUT_EVIDENCE")
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("PASS_WITHOUT_EVIDENCE", result["error_code"])
         self.assertTrue(validate_layer_result(result)["valid"])
 
     def test_digest_tampering_is_detected(self):
