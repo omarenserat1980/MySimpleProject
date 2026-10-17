@@ -47,6 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           export BRAIN_WORKER_REGISTRY_PATH="$RUNNER_TEMP/brain-worker-registry.json"
+          export BRAIN_HEARTBEAT_PATH="$RUNNER_TEMP/brain-worker-heartbeat.json"
           dotnet brain_v12/cloud_worker/bin/Release/net10.0/BrainCloudWorker.dll --urls http://127.0.0.1:8080 >"$RUNNER_TEMP/brain-worker.log" 2>&1 &
           worker_pid=$!
           cleanup() {
