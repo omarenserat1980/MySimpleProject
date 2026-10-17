@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from .mining_engine import MiningEngine
 from .bitcoin_hash_benchmark import benchmark_header_hashing
 from .sha256d_execution_contract import layer_status_snapshot
-from .sha256d_rtl_adapter import run_rtl_smoke
+from .sha256d_rtl_adapter import normalize_cpu_benchmark, run_rtl_smoke
 
 router = APIRouter(prefix="/api/bitcoin-mining", tags=["Bitcoin Mining Intelligence"])
 engine = MiningEngine()
@@ -121,6 +121,7 @@ def bitcoin_mining_benchmark(body: HashBenchmarkRequest) -> dict[str, Any]:
             duration_seconds=body.duration_seconds,
             max_hashes=body.max_hashes,
         )
+        result["layer_result"] = normalize_cpu_benchmark(result)
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result
