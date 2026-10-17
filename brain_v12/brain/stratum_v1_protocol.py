@@ -11,6 +11,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from brain_v12.brain.stratum_v1_jobs import StratumJob
+
 
 class StratumProtocolError(ValueError):
     """Raised when a Stratum V1 message is malformed or out of sequence."""
@@ -109,11 +111,11 @@ class StratumV1Session:
                     raise StratumProtocolError("INVALID_DIFFICULTY")
                 self.difficulty = difficulty
             elif method == "mining.notify":
-                if len(params) < 9 or not isinstance(params[0], str) or not params[0]:
-                    raise StratumProtocolError("INVALID_MINING_JOB")
-                if not isinstance(params[4], list):
-                    raise StratumProtocolError("INVALID_MERKLE_BRANCHES")
-                self.current_job_id = params[0]
+                try:
+                    job = StratumJob.from_notify(params)
+                except (TypeError, ValueError) as exc:
+                    raise StratumProtocolError("INVALID_MINING_JOB") from exc
+                self.current_job_id = job.job_id
             elif method == "mining.set_extranonce":
                 if len(params) != 2 or not isinstance(params[0], str):
                     raise StratumProtocolError("INVALID_EXTRANONCE")
