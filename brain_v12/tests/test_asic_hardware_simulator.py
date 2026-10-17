@@ -67,8 +67,15 @@ def test_cycle_limit_and_nonbinary_signal_are_rejected():
     sim = ASICLogicSimulator({"nodes": [{"name": "a", "op": "INPUT"}]})
     with pytest.raises(ASICSimulationError, match="SIGNAL_MUST_BE_0_OR_1"):
         sim.step({"a": "x"})
+    with pytest.raises(ASICSimulationError, match="SIGNAL_MUST_BE_0_OR_1"):
+        sim.step({"a": 1.0})
     with pytest.raises(ASICSimulationError, match="CYCLE_LIMIT_EXCEEDED"):
         sim.run([{"a": 0}, {"a": 1}], max_cycles=1)
+
+
+def test_const_rejects_floating_point_bit_values():
+    with pytest.raises(ASICSimulationError, match="CONST_VALUE_MUST_BE_0_OR_1"):
+        ASICLogicSimulator({"nodes": [{"name": "c", "op": "CONST", "value": 1.0}]})
 
 
 def test_failed_run_rolls_back_all_mutable_simulation_state():
