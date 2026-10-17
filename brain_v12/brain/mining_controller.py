@@ -127,8 +127,20 @@ def can_start(
     worker_is_user_owned: bool,
     running_on_github_actions: bool,
     current_temperature_c: float | None = None,
+    brain_owned_backend_implemented: bool = False,
+    backend_attested: bool = False,
+    pool_endpoint_verified: bool = False,
+    credentials_in_secret_store: bool = False,
+    resource_budget_verified: bool = False,
+    explicit_user_approval: bool = False,
 ) -> tuple[bool, str]:
-    if running_on_github_actions and not policy.allow_github_actions:
+    """Fail closed until a real Brain-owned backend passes separate review.
+
+    This function only evaluates policy; it never launches a process or contacts
+    a pool. An installed external miner is not a substitute for the native
+    Brain-owned backend.
+    """
+    if running_on_github_actions:
         return False, "github_actions_mining_forbidden"
     if policy.require_user_owned_worker and not worker_is_user_owned:
         return False, "worker_not_registered_as_user_owned"
@@ -136,7 +148,21 @@ def can_start(
         return False, "mining_disabled_by_default"
     if current_temperature_c is not None and current_temperature_c >= policy.max_temperature_c:
         return False, "thermal_limit_reached"
-    return True, "approved_by_local_policy"
+    if not brain_owned_backend_implemented:
+        return False, "brain_owned_mining_backend_not_implemented"
+    if not backend_attested:
+        return False, "brain_backend_attestation_required"
+    if not pool_endpoint_verified:
+        return False, "pool_endpoint_verification_required"
+    if not credentials_in_secret_store:
+        return False, "pool_credentials_secret_store_required"
+    if not resource_budget_verified:
+        return False, "resource_budget_verification_required"
+    if not explicit_user_approval:
+        return False, "explicit_user_approval_required"
+    # Passing these checks is not permission to launch; a separate execution
+    # review and runtime authorization are still required.
+    return False, "separate_execution_review_required"
 
 
 def evidence_record(
