@@ -49,10 +49,17 @@ public static class WorkerRuntimeSelfTest
     {
         var now = DateTimeOffset.UtcNow;
         var freshSuccesses = WorkerReadinessPolicy.RequiredWorkers
-            .Select(id => new WorkerPulse(id, now.AddSeconds(-10), "success", "test"));
+            .Select(id => new WorkerPulse(id, now.AddSeconds(-10), "success", "test"))
+            .ToArray();
 
         if (!WorkerReadinessPolicy.Evaluate(freshSuccesses, now, TimeSpan.FromMinutes(2)).Ready)
             throw new InvalidOperationException("fresh successful worker pulses should be ready");
+
+        var withInformationalEvents = freshSuccesses
+            .Concat(freshSuccesses.Select(p => p with { At = now, Status = "observe", Detail = "informational" }))
+            .ToArray();
+        if (!WorkerReadinessPolicy.Evaluate(withInformationalEvents, now, TimeSpan.FromMinutes(2)).Ready)
+            throw new InvalidOperationException("informational events must not mask successful worker pulses");
 
         var missingWorker = freshSuccesses.Where(p => p.WorkerId != "mining").ToArray();
         var missingResult = WorkerReadinessPolicy.Evaluate(missingWorker, now, TimeSpan.FromMinutes(2));
@@ -85,5 +92,40 @@ public static class WorkerRuntimeSelfTest
             .ToArray();
         if (!WorkerReadinessPolicy.Evaluate(olderFailureAfterSuccess, now, TimeSpan.FromMinutes(2)).Ready)
             throw new InvalidOperationException("older pulse should not override the latest pulse");
+
+        var healthyRegistry = WorkerReadinessPolicy.RequiredWorkers
+            .Select(id => new WorkerRegistryEntry(
+                new WorkerRegistration(id, [id], now.AddSeconds(-20), now.AddSeconds(-5), "healthy"),
+                true,
+                "healthy"))
+            .ToArray();
+        if (!WorkerReadinessPolicy.Evaluate(freshSuccesses, healthyRegistry, now, TimeSpan.FromMinutes(2)).Ready)
+            throw new InvalidOperationException("fresh pulses and healthy registry heartbeats should be ready");
+
+        var missingRegistration = healthyRegistry.Where(entry => entry.Registration.WorkerId != "mining").ToArray();
+        var missingRegistrationResult = WorkerReadinessPolicy.Evaluate(
+            freshSuccesses, missingRegistration, now, TimeSpan.FromMinutes(2));
+        if (missingRegistrationResult.Ready || missingRegistrationResult.Checks["mining"])
+            throw new InvalidOperationException("missing registry entry incorrectly passed readiness");
+
+        var staleRegistration = healthyRegistry
+            .Select(entry => entry.Registration.WorkerId == "video"
+                ? entry with { Fresh = false, EffectiveStatus = "stale" }
+                : entry)
+            .ToArray();
+        var staleRegistrationResult = WorkerReadinessPolicy.Evaluate(
+            freshSuccesses, staleRegistration, now, TimeSpan.FromMinutes(2));
+        if (staleRegistrationResult.Ready || staleRegistrationResult.Checks["video"])
+            throw new InvalidOperationException("stale registry heartbeat incorrectly passed readiness");
+
+        var failedRegistration = healthyRegistry
+            .Select(entry => entry.Registration.WorkerId == "quality"
+                ? entry with { EffectiveStatus = "failed" }
+                : entry)
+            .ToArray();
+        var failedRegistrationResult = WorkerReadinessPolicy.Evaluate(
+            freshSuccesses, failedRegistration, now, TimeSpan.FromMinutes(2));
+        if (failedRegistrationResult.Ready || failedRegistrationResult.Checks["quality"])
+            throw new InvalidOperationException("failed registry status incorrectly passed readiness");
     }
 }

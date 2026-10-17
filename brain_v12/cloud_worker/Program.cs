@@ -34,12 +34,15 @@ app.MapGet("/healthz", () => Results.Ok(new
     service = "brain-cloud-worker"
 }));
 
-app.MapGet("/readyz", (WorkerState state) =>
+app.MapGet("/readyz", (WorkerState state, WorkerRegistry registry) =>
 {
+    var now = DateTimeOffset.UtcNow;
+    var maxAge = TimeSpan.FromMinutes(2);
     var result = WorkerReadinessPolicy.Evaluate(
         state.Snapshot(),
-        DateTimeOffset.UtcNow,
-        TimeSpan.FromMinutes(2));
+        registry.SnapshotWithFreshness(now, maxAge),
+        now,
+        maxAge);
 
     return result.Ready
         ? Results.Ok(new { ready = true, checks = result.Checks })
