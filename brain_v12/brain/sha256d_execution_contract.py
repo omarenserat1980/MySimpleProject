@@ -118,10 +118,7 @@ def layer_status_snapshot() -> dict[str, Any]:
     layers = [
         make_layer_result(layer="cpu_reference", status="NOT_RUN"),
         make_layer_result(layer="rtl_simulator", status="NOT_RUN"),
-        make_layer_result(layer="mcp_contract", status="PASS", evidence={
-            "contract_version": CONTRACT_VERSION,
-            "read_only_status_surface": True,
-        }),
+        make_layer_result(layer="mcp_contract", status="NOT_RUN", error_code="MCP_INTEGRATION_TEST_NOT_RUN"),
         make_layer_result(layer="pool_activity", status="BLOCKED", error_code="INDEPENDENT_POOL_EVIDENCE_REQUIRED"),
         make_layer_result(layer="revenue", status="BLOCKED", error_code="INDEPENDENT_PAYOUT_EVIDENCE_REQUIRED"),
     ]
