@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pathlib import Path
 
-from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore
+from brain_v12.brain.commerce_api import CommerceOrderIn, CommerceStore, router as commerce_router
 
 
 class CommerceApiTests(unittest.TestCase):
