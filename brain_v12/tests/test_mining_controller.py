@@ -1,3 +1,7 @@
+import math
+
+import pytest
+
 from brain_v12.brain.mining_controller import (
     HardwareProfile,
     MiningPolicy,
@@ -43,6 +47,35 @@ def test_profitability_gate():
     result = profitability_gate(1.0, 0.2, 0.1, 0.1)
     assert result["net_per_hour"] == 0.6
     assert result["profitable"]
+    assert result["estimate_only"]
+    assert not result["realized_revenue_verified"]
+
+
+@pytest.mark.parametrize("bad_value", [math.nan, math.inf, -math.inf, True, "1.0"])
+def test_profitability_gate_rejects_non_finite_or_non_numeric_inputs(bad_value):
+    with pytest.raises(ValueError):
+        profitability_gate(bad_value, 0.0)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (-1.0, 0.0),
+        (1.0, -0.1),
+        (1.0, 0.0, -0.1),
+        (1.0, 0.0, 0.0, -0.1),
+        (1.0, 0.0, 0.0, 0.0, -0.1),
+    ],
+)
+def test_profitability_gate_rejects_negative_values(args):
+    with pytest.raises(ValueError):
+        profitability_gate(*args)
+
+
+def test_zero_gross_revenue_is_never_profitable():
+    result = profitability_gate(0.0, 0.0)
+    assert result["net_per_hour"] == 0.0
+    assert not result["profitable"]
 
 
 def test_payment_evidence_required_for_verified_received():
