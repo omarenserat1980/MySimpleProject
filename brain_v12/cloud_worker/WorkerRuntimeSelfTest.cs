@@ -10,8 +10,20 @@ public static class WorkerRuntimeSelfTest
         {
             var registry = new WorkerRegistry();
             registry.Register("test-worker", ["video", "qa"]);
-            if (!registry.Heartbeat("test-worker")) throw new InvalidOperationException("heartbeat failed");
+            if (!registry.Heartbeat("test-worker", "running")) throw new InvalidOperationException("running heartbeat failed");
             if (registry.Snapshot().Count != 1) throw new InvalidOperationException("registration missing");
+            if (registry.Snapshot()[0].Status != "running")
+                throw new InvalidOperationException("running status was not recorded");
+            if (!registry.Heartbeat("test-worker", "healthy")) throw new InvalidOperationException("healthy heartbeat failed");
+            if (registry.Snapshot()[0].Status != "healthy")
+                throw new InvalidOperationException("healthy status was not recorded");
+            if (!registry.Heartbeat("test-worker", "failed")) throw new InvalidOperationException("failed heartbeat failed");
+            if (registry.Snapshot()[0].Status != "failed")
+                throw new InvalidOperationException("failed status was not recorded");
+
+            var reloadedRegistry = new WorkerRegistry();
+            if (reloadedRegistry.Snapshot().Count != 1 || reloadedRegistry.Snapshot()[0].Status != "failed")
+                throw new InvalidOperationException("registry status did not persist across reload");
 
             var leases = new JobLeaseStore();
             var first = leases.TryAcquire("job-1", "test-worker", TimeSpan.FromMinutes(1))
