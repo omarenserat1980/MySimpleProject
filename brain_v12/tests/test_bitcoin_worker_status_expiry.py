@@ -45,5 +45,18 @@ class WorkerStatusExpiryTests(unittest.TestCase):
         self.assertEqual(result["workers"][0]["worker_id"], "fresh-worker")
 
 
+    def test_worker_heartbeat_rejects_unsafe_worker_id(self) -> None:
+        with self.assertRaises(Exception):
+            api.WorkerHeartbeat(
+                worker_id="worker/with/slash",
+                algorithm="sha256d",
+                hashrate_hs=0,
+                accepted_shares=0,
+                rejected_shares=0,
+                stale_shares=0,
+                observed_at=1,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
