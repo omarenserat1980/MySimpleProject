@@ -176,5 +176,6 @@ def test_evidence_record_does_not_claim_independent_payment_verification():
         verified_received=0.25,
         currency="XMR",
     )
-    assert result["status"] == "PAYMENT_CLAIM_REQUIRES_INDEPENDENT_VERIFICATION"
+    assert result["status"] == "MINING_EVIDENCE_ONLY"
+    assert result["payment_claim_present"] is True
     assert result["payment_independently_verified"] is False
