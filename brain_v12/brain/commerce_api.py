@@ -28,7 +28,7 @@ PRODUCTS = [
 
 def payment_authority_proof(secret: str, order_id: str, transaction_id: str, provider: str, event_id: str) -> str:
     """Bind revenue authority to a specific order and authenticated provider event."""
-    payload = "\\n".join(("brain-revenue-authority-v1", order_id, transaction_id, provider, event_id))
+    payload = "\n".join(("brain-revenue-authority-v1", order_id, transaction_id, provider, event_id))
     return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
