@@ -9,6 +9,10 @@ import json
 
 import pytest
 
+from brain_v12.brain.stratum_v1_offline_candidate import (
+    LEGACY_PREVHASH_DIALECT,
+    build_offline_stratum_candidate,
+)
 from brain_v12.brain.stratum_v1_protocol import StratumProtocolError, StratumV1Session
 
 
@@ -102,7 +106,7 @@ def test_fake_server_subscription_authorization_and_job_lifecycle_are_offline():
     assert session.current_job_id == "job-001"
 
     # A valid new job supersedes the old job; stale submissions are blocked.
-    session.receive(json.dumps(notify("job-002", clean=False)))
+    session.receive(json.dumps(notify("job-002", clean=True)))
     assert session.current_job_id == "job-002"
     with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
         session.request_submit("job-001", "00000001", "65aa0000", "00000001")
@@ -158,3 +162,40 @@ def test_fake_reconnect_notification_requires_action_and_does_not_connect():
     }))
     assert event == {"event": "RECONNECT_REQUESTED", "action_required": True}
     assert session.snapshot()["transport_connected"] is False
+
+
+
+def test_session_job_and_bitcoin_header_candidate_stay_correlated_offline():
+    session = StratumV1Session(
+        "worker-test", "test-only-password", subscribed=True, authorized=True,
+    )
+    first = notify("job-before")
+    session.receive(json.dumps(first))
+    # Stratum notify version/nbits/ntime are converted explicitly to serialized
+    # header byte order; the candidate builder never guesses these fields.
+    candidate = build_offline_stratum_candidate(
+        first["params"],
+        extranonce1_hex="a1b2",
+        extranonce2_hex="c3d4",
+        extranonce2_size=2,
+        version_header_hex=bytes.fromhex(first["params"][5])[::-1].hex(),
+        ntime_header_hex=bytes.fromhex(first["params"][7])[::-1].hex(),
+        nbits_header_hex=bytes.fromhex(first["params"][6])[::-1].hex(),
+        nonce=0,
+        share_target=(1 << 256) - 1,
+        prevhash_dialect=LEGACY_PREVHASH_DIALECT,
+    )
+    assert candidate["job_id"] == session.current_job_id == "job-before"
+    assert candidate["header_bytes"] == 80
+    assert candidate["share_target_met"] is True
+    assert candidate["share_submitted"] is False
+    assert candidate["pool_acceptance_verified"] is False
+
+    # clean_jobs=true invalidates the previous job for new share submissions.
+    second = notify("job-after", clean=True)
+    session.receive(json.dumps(second))
+    assert session.current_job_id == "job-after"
+    with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
+        session.request_submit("job-before", "00000001", "65aa0000", "00000001")
+    assert session.snapshot()["real_bitcoin_mining"] is False
+    assert session.snapshot()["revenue_verified"] is False
