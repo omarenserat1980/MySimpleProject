@@ -17,6 +17,16 @@ class CommerceApiTests(unittest.TestCase):
             ))
             oid = order["order_id"]
             s.transition(oid, "PAYMENT_PENDING", "checkout-intent:smoke")
+            with self.assertRaises(Exception) as spoof:
+                s.transition(oid, "PAYMENT_VERIFIED", {
+                    "transaction_id": "tx-spoof",
+                    "evidence_ref": "caller-claimed-receipt",
+                    "provider": "test",
+                    "event_id": "evt_spoof123",
+                    "independent_verification": "SIGNED_PROVIDER_WEBHOOK",
+                })
+            self.assertEqual(getattr(spoof.exception, "status_code", None), 403)
+            self.assertEqual(s.get(oid)["state"], "PAYMENT_PENDING")
             s.transition(oid, "PAYMENT_VERIFIED", {"transaction_id": "tx-smoke", "evidence_ref": "provider-receipt:smoke"})
             s.transition(oid, "DELIVERY_PENDING", "delivery-request:smoke")
             s.transition(oid, "DELIVERED", "delivery-proof:smoke")
