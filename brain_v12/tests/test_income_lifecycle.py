@@ -98,7 +98,7 @@ class IncomeLifecycleTests(unittest.TestCase):
             self.life.record_external("LIVE-test", status, evidence)
         self.life.request_payment("LIVE-test",25,currency="JOD")
         result=self.life.reconcile_payment("LIVE-test",25,"JOD","TX-004","typed-receipt",order_id="ORDER-1")
-        self.assertEqual(result["status"],"SIGNED_PROVIDER_AUTHORITY_REQUIRED")
+        self.assertEqual(result["status"],"INDEPENDENT_PAYMENT_EVIDENCE_REQUIRED")
 
     def test_payment_cannot_skip_delivery(self):
         self.life.qualify("LIVE-test")
