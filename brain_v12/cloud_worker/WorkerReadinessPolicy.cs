@@ -19,7 +19,11 @@ public static class WorkerReadinessPolicy
             throw new ArgumentOutOfRangeException(nameof(maxAge), "Maximum pulse age must be positive.");
 
         var cutoff = now - maxAge;
+        // Worker details such as "observe" and "verify" are informational
+        // events emitted after a successful tick. Only lifecycle outcomes
+        // participate in readiness, so those details cannot mask a success.
         var latest = pulses
+            .Where(p => p.Status is "running" or "success" or "failed")
             .GroupBy(p => p.WorkerId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.At).First());
 
