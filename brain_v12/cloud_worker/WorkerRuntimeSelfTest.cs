@@ -113,11 +113,11 @@ public static class WorkerRuntimeSelfTest
         try
         {
             var queue = new DurableFileTaskQueue(path);
-            var first = queue.Submit("self-test", "idem-1", "health_check", "{\\"probe\\":\\"local\\"}");
+            var first = queue.Submit("self-test", "idem-1", "health_check", """{"probe":"local"}""");
             if (first.Duplicate || first.Task.Status != "queued")
                 throw new InvalidOperationException("new durable task was not queued");
 
-            var duplicate = queue.Submit("self-test", "idem-1", "health_check", "{ \\"probe\\" : \\"local\\" }");
+            var duplicate = queue.Submit("self-test", "idem-1", "health_check", """{ "probe" : "local" }""");
             if (!duplicate.Duplicate || duplicate.Task.TaskId != first.Task.TaskId)
                 throw new InvalidOperationException("idempotent submission did not return the original task");
 
@@ -130,7 +130,7 @@ public static class WorkerRuntimeSelfTest
 
             try
             {
-                queue.Submit("self-test", "idem-2", "shell", "{\\"cmd\\":\\"echo unsafe\\"}");
+                queue.Submit("self-test", "idem-2", "shell", """{"cmd":"echo unsafe"}""");
                 throw new InvalidOperationException("non-allow-listed task type was accepted");
             }
             catch (ArgumentException) { }
@@ -139,9 +139,9 @@ public static class WorkerRuntimeSelfTest
                 ?? throw new InvalidOperationException("queued task could not be leased");
             if (lease.TaskId != first.Task.TaskId || lease.LeaseId is null)
                 throw new InvalidOperationException("lease metadata was not recorded");
-            if (!queue.Complete(lease.TaskId, lease.LeaseId, "{\\"ok\\":true}"))
+            if (!queue.Complete(lease.TaskId, lease.LeaseId, """{"ok":true}"""))
                 throw new InvalidOperationException("valid lease could not complete task");
-            if (queue.Complete(lease.TaskId, lease.LeaseId, "{\\"ok\\":true}"))
+            if (queue.Complete(lease.TaskId, lease.LeaseId, """{"ok":true}"""))
                 throw new InvalidOperationException("completed task accepted a stale completion");
 
             var reloaded = new DurableFileTaskQueue(path);
@@ -156,5 +156,4 @@ public static class WorkerRuntimeSelfTest
             try { File.Delete(path); } catch { }
         }
     }
-
 }
