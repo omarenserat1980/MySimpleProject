@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Electronic Brain — طبقات SHA-256d</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 4vw, 2.2rem); }
+    .muted { color: #aab5d0; line-height: 1.7; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+    button { background: #243b70; border: 1px solid #5477bf; color: white; border-radius: 10px; padding: 11px 15px; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .card { background: #131c33; border: 1px solid #2b395b; border-radius: 14px; padding: 15px; min-width: 0; }
+    .card h2 { margin: 0 0 8px; font-size: 1.05rem; }
+    .status { display: inline-block; border-radius: 7px; padding: 4px 8px; background: #303a52; font-size: .9rem; }
+    .detail { overflow-wrap: anywhere; font-size: .9rem; line-height: 1.65; color: #c9d3e9; }
+    .notice { border-right: 4px solid #e1b75b; background: #292516; padding: 12px 14px; border-radius: 8px; margin: 16px 0; line-height: 1.7; }
+    .good { border-color: #3e956d; } .bad { border-color: #b66a65; }
+    a { color: #9fc2ff; }
+    #message { min-height: 1.5em; color: #c9d3e9; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>الدماغ الإلكتروني — محرك SHA-256d</h1>
+  <p class="muted">لوحة تحقق منفصلة لمرجع CPU ومحاكي RTL الرقمي وواجهة MCP. بايثون هنا ينسّق أدوات RTL ولا يُعامل على أنه RTL.</p>
+  <div class="notice">حدود الإثبات: نجاح المحاكاة لا يعني وجود ASIC فعلي أو اتصال بالمسبح أو قبول مشاركات أو تحقيق دخل. هذه اللوحة لا تتصل بمسبح ولا بمحفظة ولا تبدأ تعديناً خارجياً.</div>
+  <div class="actions">
+    <button id="refresh">تحديث الحالات</button>
+    <button id="run-cpu">تشغيل مرجع CPU محدود</button>
+    <button id="run-rtl">تشغيل اختبار RTL محدود</button>
+  </div>
+  <p id="message" role="status" aria-live="polite"></p>
+  <section id="layers" class="grid" aria-label="حالة طبقات SHA-256d"></section>
+  <p class="muted">المسار البرمجي: <code>/api/bitcoin-mining/layers</code>. اختبار RTL: <code>/api/bitcoin-mining/rtl-smoke</code>. أدلة التجزئة المحلية ليست توقيعاً أو مصادقة مستقلة.</p>
+</main>
+<script>
+(() => {
+  const layers = document.getElementById("layers");
+  const message = document.getElementById("message");
+  const refreshButton = document.getElementById("refresh");
+  const runButton = document.getElementById("run-rtl");
+  const cpuButton = document.getElementById("run-cpu");
+  function addText(parent, tag, value, className) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = value == null ? "—" : String(value);
+    parent.appendChild(node);
+    return node;
+  }
+  function render(snapshot) {
+    layers.replaceChildren();
+    for (const layer of (snapshot.layers || [])) {
+      const card = document.createElement("article");
+      card.className = "card";
+      addText(card, "h2", layer.layer_ar || layer.layer);
+      const status = addText(card, "p", layer.status_ar || layer.status, "status");
+      if (layer.status === "PASS") status.classList.add("good");
+      if (["FAIL", "BLOCKED", "TIMEOUT", "CANCELLED"].includes(layer.status)) status.classList.add("bad");
+      addText(card, "p", "الرمز: " + (layer.error_code || "لا يوجد"), "detail");
+      addText(card, "p", "وقت الفحص: " + (layer.finished_at_utc || "لم يُنفذ"), "detail");
+      if (layer.evidence && Object.keys(layer.evidence).length) {
+        addText(card, "p", "نوع الدليل: " + (layer.evidence.execution_scope || layer.evidence.case || layer.evidence.contract_version || "دليل محلي"), "detail");
+        addText(card, "p", "بصمة الدليل: " + (layer.evidence_sha256 || "غير متاحة"), "detail");
+      }
+      layers.appendChild(card);
+    }
+  }
+  async function refresh() {
+    refreshButton.disabled = true;
+    message.textContent = "جارٍ قراءة الحالات…";
+    try {
+      const response = await fetch("/api/bitcoin-mining/layers", { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error("تعذر قراءة الحالات");
+      render(data);
+      message.textContent = data.summary_ar || "تم تحديث الحالات.";
+    } catch (error) {
+      message.textContent = "فشل جلب الحالات: " + (error.message || "خطأ غير معروف");
+    } finally {
+      refreshButton.disabled = false;
+    }
+  }
+  async function runCpu() {
+    cpuButton.disabled = true;
+    message.textContent = "جارٍ تشغيل مرجع CPU بحد زمني وعدد هاشات محدود؛ هذا ليس RTL أو تعديناً خارجياً…";
+    try {
+      const response = await fetch("/api/bitcoin-mining/benchmark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ duration_seconds: 0.2, max_hashes: 10000 })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error("فشل اختبار CPU");
+      const snapshotResponse = await fetch("/api/bitcoin-mining/layers");
+      const snapshot = await snapshotResponse.json();
+      if (snapshot.ok && result.layer_result) {
+        snapshot.layers = (snapshot.layers || []).map(item => item.layer === "cpu_reference" ? result.layer_result : item);
+        render(snapshot);
+      }
+      message.textContent = result.layer_result?.status_ar || result.layer_result?.status || "انتهى اختبار CPU.";
+    } catch (error) {
+      message.textContent = "فشل طلب اختبار CPU: " + (error.message || "خطأ غير معروف");
+    } finally {
+      cpuButton.disabled = false;
+    }
+  }
+  async function runRtl() {
+    runButton.disabled = true;
+    message.textContent = "جارٍ تشغيل محاكي RTL ضمن مهلة محدودة؛ لن يبدأ تعدين خارجي…";
+    try {
+      const response = await fetch("/api/bitcoin-mining/rtl-smoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ case: "genesis_nonce_search", timeout_seconds: 30 })
+      });
+      const result = await response.json();
+      const snapshotResponse = await fetch("/api/bitcoin-mining/layers");
+      const snapshot = await snapshotResponse.json();
+      if (snapshot.ok) {
+        snapshot.layers = (snapshot.layers || []).map(item => item.layer === "rtl_simulator" ? result : item);
+        render(snapshot);
+      }
+      message.textContent = result.status_ar || result.status || "انتهى الاختبار دون حالة واضحة.";
+    } catch (error) {
+      message.textContent = "فشل طلب اختبار RTL: " + (error.message || "خطأ غير معروف");
+    } finally {
+      runButton.disabled = false;
+    }
+  }
+  refreshButton.addEventListener("click", refresh);
+  cpuButton.addEventListener("click", runCpu);
+  runButton.addEventListener("click", runRtl);
+  refresh();
+})();
+</script>
+</body>
+</html>
