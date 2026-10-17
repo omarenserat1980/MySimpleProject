@@ -51,7 +51,7 @@ jobs:
             brain_v12/asic/rtl/sha256_compress.sv \
             brain_v12/asic/rtl/tb_sha256_compress.sv
           vvp artifacts/asic/sha256-compress.vvp | tee artifacts/asic/sha256-compress.log
-          grep -q "PASS SHA256_COMPRESS" artifacts/asic/sha256-compress.log
+          grep -q "ALL_SHA256_RTL_TESTS_PASSED" artifacts/asic/sha256-compress.log
 
       - name: Compile and run Bitcoin genesis SHA256d header vector
         run: |
