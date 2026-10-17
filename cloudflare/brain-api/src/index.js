@@ -395,7 +395,8 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   const tranRef = String(payload.tran_ref || "");
   const amount = Number(payload.cart_amount);
   const currency = String(payload.cart_currency || "");
-  const status = String((payload.payment_result || {}).response_status || "");
+  const status = String((payload.payment_result || payload).response_status || "");
+  const transactionType = String(payload.tran_type || "").trim().toLowerCase();
 
   if (!orderId || !tranRef) return json({ ok: false, error: "PAYMENT_IDENTIFIERS_MISSING" }, 400, requestOrigin, allowedOrigin);
 
@@ -404,11 +405,16 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
   ).bind(tranRef, orderId).first();
 
   if (!payment) return json({ ok: false, error: "PAYMENT_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  if (payment.state === "PAYMENT_VERIFIED") {
-    return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef, idempotent: true }, 200, requestOrigin, allowedOrigin);
-  }
-  if (Number(payment.amount) !== amount || String(payment.currency) !== currency) {
+  // Check signed callback fields before the idempotent path; a repeated transaction
+  // reference must not make a mismatched amount/currency appear valid.
+  if (!Number.isFinite(amount) || Number(payment.amount) !== amount || String(payment.currency) !== currency) {
     return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+  if (payment.state === "PAYMENT_VERIFIED") {
+    if (status !== "A" || transactionType !== "sale") {
+      return json({ ok: false, error: "VERIFIED_PAYMENT_CALLBACK_CONFLICT" }, 409, requestOrigin, allowedOrigin);
+    }
+    return json({ ok: true, state: "PAYMENT_VERIFIED", tran_ref: tranRef, idempotent: true }, 200, requestOrigin, allowedOrigin);
   }
 
   const eventId = await sha256Hex(new TextEncoder().encode(tranRef + ":" + new TextDecoder().decode(raw)));
@@ -418,7 +424,7 @@ async function handlePayTabsCallback(request, env, requestOrigin, allowedOrigin)
     "INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, ?, ?)"
   ).bind(eventId, orderId, tranRef, status === "A" ? "PAYMENT_VERIFIED" : "PAYMENT_REJECTED", evidence).run();
 
-  if (status !== "A") {
+  if (status !== "A" || transactionType !== "sale") {
     await env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_FAILED', raw_evidence = ? WHERE tran_ref = ?")
       .bind(evidence, tranRef).run();
     return json({ ok: true, state: "PAYMENT_FAILED", tran_ref: tranRef }, 200, requestOrigin, allowedOrigin);
@@ -474,13 +480,15 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   const payment = await env.BRAIN_DB.prepare(
     "SELECT tran_ref, amount, currency, state FROM payments WHERE order_id = ? AND provider = 'paytabs' AND state = 'PAYMENT_VERIFIED' LIMIT 1"
   ).bind(delivery.order_id).first();
+  let revenueRealized = false;
   if (payment) {
-    await env.BRAIN_DB.prepare(
+    const revenueUpdate = await env.BRAIN_DB.prepare(
       "UPDATE revenue_ledger SET state = 'REVENUE_REALIZED', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
     ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), verified_by: client.email }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
+    revenueRealized = Number(revenueUpdate.meta?.changes || 0) > 0;
   }
-  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: Boolean(payment) });
-  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId }, 200, requestOrigin, allowedOrigin);
+  await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: revenueRealized });
+  return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: revenueRealized }, 200, requestOrigin, allowedOrigin);
 }
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
