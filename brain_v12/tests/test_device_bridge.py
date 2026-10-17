@@ -119,6 +119,35 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertTrue(reported["ok"])
         self.assertEqual(reported["status"], "COMPLETED")
 
+    def test_capability_task_requires_online_android_executor(self):
+        result = self.bridge.enqueue(
+            "internet_download", {"url": "https://example.invalid"}
+        )
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"], "CAPABILITY_WORKER_OFFLINE")
+        self.assertEqual(result["required_executor"], "android-executor-*")
+
+    def test_non_android_worker_cannot_claim_android_capability_tasks(self):
+        # Synthetic heartbeats exercise routing only; no physical device is contacted.
+        self.bridge.heartbeat(
+            "software-executor-redmi3-01",
+            {"node_type": "software", "runtime": "termux"},
+        )
+        self.bridge.heartbeat(
+            "android-executor-test",
+            {"node_type": "android_executor", "runtime": "test"},
+        )
+        queued = self.bridge.enqueue(
+            "internet_download", {"url": "https://example.invalid"}
+        )
+        self.assertTrue(queued["ok"])
+        software_poll = self.bridge.poll("software-executor-redmi3-01")
+        self.assertEqual(software_poll["status"], "IDLE")
+        self.assertIsNone(software_poll["task"])
+        android_poll = self.bridge.poll("android-executor-test")
+        self.assertEqual(android_poll["status"], "TASK_AVAILABLE")
+        self.assertEqual(android_poll["task"]["task"], "internet_download")
+
     def test_rejects_unknown_task(self):
         result = self.bridge.enqueue("shell")
         self.assertFalse(result["ok"])
