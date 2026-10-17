@@ -59,7 +59,7 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertTrue(status["online"])
         self.assertEqual(status["agents"][0]["agent_id"], agent_id)
 
-    def test_software_worker_cannot_claim_android_capability_tasks(self):
+    def test_unknown_android_capability_task_is_rejected_before_queueing(self):
         queued = self.bridge.enqueue("internet_download", {"url": "https://example.invalid"})
         self.assertFalse(queued["ok"])
         self.assertEqual(queued["status"], "TASK_NOT_ALLOWED")
