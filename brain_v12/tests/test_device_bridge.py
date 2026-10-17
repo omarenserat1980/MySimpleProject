@@ -63,6 +63,27 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertFalse(status["agents"]["online"])
         self.assertEqual(self.bridge.enqueue("status")["status"], "AUTH_NOT_CONFIGURED")
 
+    def test_robot_memory_is_returned_to_agent_and_persists_reported_results(self):
+        self.store.record_robot_task_result(
+            "redmi3-01", "prior-task", "python_version", True,
+            {"stdout": "Python 3.13.13", "returncode": 0},
+        )
+        self.store.device_task_create("memory-task", "brain_memory_context", {}, 1)
+        claimed = self.bridge.poll("redmi3-01")
+        self.assertEqual(claimed["task"]["task_id"], "memory-task")
+        history = claimed["task"]["params"]["brain_memory_context"]["history"]
+        self.assertEqual(history[-1]["task_id"], "prior-task")
+        self.assertNotIn("stdout", history[-1]["result"])
+
+        report = self.bridge.report(
+            "memory-task", "redmi3-01", True,
+            {"status": "MEMORY_CONTEXT_RECEIVED", "history_count": len(history)},
+        )
+        self.assertEqual(report["status"], "COMPLETED")
+        persisted = self.store.robot_memory_context("redmi3-01")["history"]
+        self.assertEqual(persisted[-1]["task_id"], "memory-task")
+        self.assertEqual(persisted[-1]["result"]["status"], "MEMORY_CONTEXT_RECEIVED")
+
     def test_runtime_switch_can_disable_bridge_without_credentials(self):
         for key in (
             "BRAIN_AGENT_KEY",
