@@ -11,6 +11,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from brain_v12.brain.stratum_v1_jobs import StratumJob
+
 
 class StratumProtocolError(ValueError):
     """Raised when a Stratum V1 message is malformed or out of sequence."""
@@ -55,6 +57,7 @@ class StratumV1Session:
     authorized: bool = False
     difficulty: float | None = None
     current_job_id: str | None = None
+    active_job_ids: set[str] = field(default_factory=set)
     pending: dict[int, str] = field(default_factory=dict)
     accepted_shares: int = 0
     rejected_shares: int = 0
@@ -64,6 +67,8 @@ class StratumV1Session:
             raise StratumProtocolError("POOL_USERNAME_REQUIRED")
         if not isinstance(self.password, str) or not self.password:
             raise StratumProtocolError("POOL_PASSWORD_REQUIRED")
+        if self.current_job_id:
+            self.active_job_ids.add(self.current_job_id)
 
     def request_subscribe(self, agent: str = "ElectronicBrain/BitcoinLab") -> bytes:
         return self._request("mining.subscribe", [agent], "subscribe")
@@ -77,7 +82,7 @@ class StratumV1Session:
                        nonce: str) -> bytes:
         if not self.authorized:
             raise StratumProtocolError("POOL_AUTHORIZATION_REQUIRED")
-        if not self.current_job_id or job_id != self.current_job_id:
+        if not self.current_job_id or job_id not in self.active_job_ids:
             raise StratumProtocolError("UNKNOWN_OR_STALE_JOB")
         fields = (extranonce2, ntime, nonce)
         if any(not isinstance(value, str) or not value or len(value) % 2
@@ -109,11 +114,14 @@ class StratumV1Session:
                     raise StratumProtocolError("INVALID_DIFFICULTY")
                 self.difficulty = difficulty
             elif method == "mining.notify":
-                if len(params) < 9 or not isinstance(params[0], str) or not params[0]:
-                    raise StratumProtocolError("INVALID_MINING_JOB")
-                if not isinstance(params[4], list):
-                    raise StratumProtocolError("INVALID_MERKLE_BRANCHES")
-                self.current_job_id = params[0]
+                try:
+                    job = StratumJob.from_notify(params)
+                except (TypeError, ValueError) as exc:
+                    raise StratumProtocolError("INVALID_MINING_JOB") from exc
+                if job.clean_jobs:
+                    self.active_job_ids.clear()
+                self.active_job_ids.add(job.job_id)
+                self.current_job_id = job.job_id
             elif method == "mining.set_extranonce":
                 if len(params) != 2 or not isinstance(params[0], str):
                     raise StratumProtocolError("INVALID_EXTRANONCE")
@@ -176,6 +184,7 @@ class StratumV1Session:
             "authorized": self.authorized,
             "difficulty": self.difficulty,
             "current_job_id": self.current_job_id,
+            "active_job_count": len(self.active_job_ids),
             "pending_requests": len(self.pending),
             "accepted_shares_reported_by_pool": self.accepted_shares,
             "rejected_shares_reported_by_pool": self.rejected_shares,

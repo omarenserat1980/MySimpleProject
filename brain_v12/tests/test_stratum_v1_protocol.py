@@ -24,7 +24,7 @@ def test_subscription_authorization_and_share_acceptance_are_distinct():
     session.receive(json.dumps({"id": auth["id"], "result": True, "error": None}))
     assert session.authorized
     session.receive(json.dumps({"id": None, "method": "mining.notify",
-                                "params": ["job-1", "prev", "cb1", "cb2", [], "v", "b", "t", True]}))
+                                "params": ["job-1", "00" * 32, "01020304", "aabbccdd", [], "20000000", "1d00ffff", "65aa0000", True]}))
     share = json.loads(session.request_submit("job-1", "00000001", "65a1b2c3", "00000001"))
     assert share["method"] == "mining.submit"
     result = session.receive(json.dumps({"id": share["id"], "result": True, "error": None}))
@@ -102,3 +102,15 @@ def test_invalid_authorize_result_does_not_consume_pending_request():
     assert request["id"] in session.pending
     session.receive(json.dumps({"id": request["id"], "result": True, "error": None}))
     assert session.authorized is True
+
+
+@pytest.mark.parametrize("params", [
+    ["job", "00", "0102", "0304", [], "20000000", "1d00ffff", "65aa0000", True],
+    ["job", "0000000000000000000000000000000000000000000000000000000000000000", "0102", "0304", [], "20000000", "1d00ffff", "65aa0000"],
+    ["job", "0000000000000000000000000000000000000000000000000000000000000000", "0102", "0304", [], "20000000", "1d00ffff", "65aa0000", "true"],
+])
+def test_malformed_notify_jobs_are_rejected_without_advancing_current_job(params):
+    session = StratumV1Session("worker", "secret", current_job_id="previous-job")
+    with pytest.raises(StratumProtocolError, match="INVALID_MINING_JOB"):
+        session.receive(json.dumps({"id": None, "method": "mining.notify", "params": params}))
+    assert session.current_job_id == "previous-job"

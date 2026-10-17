@@ -30,6 +30,11 @@ def test_offline_pipeline_builds_and_revalidates_candidate():
     assert result.share_submitted is False
     assert result.pool_acceptance_verified is False
     assert result.revenue_verified is False
+    assert result.execution_mode == "OFFLINE_BOUNDED_SHA256D"
+    assert result.transport_connected is False
+    assert result.credentials_loaded is False
+    assert result.live_execution_allowed is False
+    assert result.evidence_class == "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY"
 
 
 def test_offline_pipeline_keeps_share_target_separate_from_nbits():
@@ -45,6 +50,14 @@ def test_offline_pipeline_keeps_share_target_separate_from_nbits():
     assert result.status == "NONCE_NOT_FOUND_WITHIN_BOUND"
     assert result.hashes_checked == 2
     assert result.header_bytes is None
+    assert result.execution_mode == "OFFLINE_BOUNDED_SHA256D"
+    assert result.transport_connected is False
+    assert result.credentials_loaded is False
+    assert result.live_execution_allowed is False
+    assert result.pool_contacted is False
+    assert result.share_submitted is False
+    assert result.pool_acceptance_verified is False
+    assert result.revenue_verified is False
 
 
 def test_pipeline_rejects_implicit_or_malformed_prevhash_order():

@@ -1,0 +1,126 @@
+name: Brain Stratum Header Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "brain_v12/brain/stratum_v1_offline_candidate.py"
+      - "brain_v12/brain/stratum_candidate_pipeline.py"
+      - "brain_v12/brain/bitcoin_header.py"
+      - "brain_v12/brain/stratum_v1_jobs.py"
+      - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_offline_session_simulator.py"
+      - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
+      - "brain_v12/tests/test_stratum_candidate_pipeline.py"
+      - "brain_v12/tests/test_bitcoin_header.py"
+      - "brain_v12/tests/test_stratum_v1_jobs.py"
+      - ".github/workflows/brain-stratum-header-validation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "brain_v12/brain/stratum_v1_offline_candidate.py"
+      - "brain_v12/brain/stratum_candidate_pipeline.py"
+      - "brain_v12/brain/bitcoin_header.py"
+      - "brain_v12/brain/stratum_v1_jobs.py"
+      - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_offline_session_simulator.py"
+      - "brain_v12/tests/test_stratum_v1_offline_candidate.py"
+      - "brain_v12/tests/test_stratum_candidate_pipeline.py"
+      - "brain_v12/tests/test_bitcoin_header.py"
+      - "brain_v12/tests/test_stratum_v1_jobs.py"
+      - ".github/workflows/brain-stratum-header-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-stratum-header-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  offline-header-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile implementation and tests
+        run: |
+          python -m py_compile \
+            brain_v12/brain/bitcoin_header.py \
+            brain_v12/brain/stratum_v1_jobs.py \
+            brain_v12/brain/stratum_v1_protocol.py \
+            brain_v12/brain/stratum_v1_offline_candidate.py \
+            brain_v12/brain/stratum_candidate_pipeline.py \
+            brain_v12/tests/test_bitcoin_header.py \
+            brain_v12/tests/test_stratum_v1_jobs.py \
+            brain_v12/tests/test_stratum_v1_protocol.py \
+            brain_v12/tests/test_stratum_v1_offline_session_simulator.py \
+            brain_v12/tests/test_stratum_v1_offline_candidate.py \
+            brain_v12/tests/test_stratum_candidate_pipeline.py
+      - name: Run offline Stratum-to-header tests
+        run: python -m pytest -q -p no:cacheprovider brain_v12/tests/test_bitcoin_header.py brain_v12/tests/test_stratum_v1_jobs.py brain_v12/tests/test_stratum_v1_protocol.py brain_v12/tests/test_stratum_v1_offline_session_simulator.py brain_v12/tests/test_stratum_v1_offline_candidate.py brain_v12/tests/test_stratum_candidate_pipeline.py
+      - name: Verify offline-only evidence contract
+        run: |
+          python - <<'PY'
+          from brain_v12.brain.stratum_v1_offline_candidate import (
+              LEGACY_PREVHASH_DIALECT,
+              build_offline_stratum_candidate,
+          )
+          params = [
+              "ci-offline-job", "00" * 32, "01020304", "aabbccdd",
+              ["11" * 32], "01000000", "1d00ffff", "495fab29", True,
+          ]
+          result = build_offline_stratum_candidate(
+              params,
+              extranonce1_hex="a1b2",
+              extranonce2_hex="c3d4",
+              extranonce2_size=2,
+              version_header_hex="01000000",
+              ntime_header_hex="29ab5f49",
+              nbits_header_hex="ffff001d",
+              nonce=7,
+              share_target=(1 << 256) - 1,
+              prevhash_dialect=LEGACY_PREVHASH_DIALECT,
+          )
+          assert result["header_bytes"] == 80
+          assert result["execution_mode"] == "OFFLINE_CANDIDATE_ONLY"
+          assert result["transport_connected"] is False
+          assert result["nonce_search_executed"] is False
+          assert result["live_execution_allowed"] is False
+          assert result["pool_connection_opened"] is False
+          assert result["credentials_loaded"] is False
+          assert result["share_submitted"] is False
+          assert result["pool_acceptance_verified"] is False
+          assert result["revenue_verified"] is False
+          from brain_v12.brain.stratum_candidate_pipeline import prepare_and_search_job
+          from brain_v12.brain.stratum_v1_jobs import StratumJob
+          job = StratumJob.from_notify([
+              "ci-bounded-job", "00" * 32, "01020304", "aabbccdd", [],
+              "01000000", "ffff001d", "29ab5f49", True,
+          ])
+          bounded = prepare_and_search_job(
+              job, extranonce1_hex="a1b2", extranonce2_hex="c3d4",
+              extranonce2_size=2, prevhash_wire_hex="00" * 32,
+              share_target=(1 << 256) - 1, start_nonce=0, max_hashes=1,
+          )
+          assert bounded.execution_mode == "OFFLINE_BOUNDED_SHA256D"
+          assert bounded.transport_connected is False
+          assert bounded.credentials_loaded is False
+          assert bounded.live_execution_allowed is False
+          assert bounded.pool_contacted is False
+          assert bounded.share_submitted is False
+          assert bounded.pool_acceptance_verified is False
+          assert bounded.revenue_verified is False
+          assert bounded.evidence_class == "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY"
+          print("OFFLINE_ONLY_EVIDENCE_BOUNDARY=PASS")
+          PY

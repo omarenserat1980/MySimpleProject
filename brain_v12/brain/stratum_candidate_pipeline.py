@@ -31,6 +31,11 @@ class OfflineCandidateResult:
     share_submitted: bool = False
     pool_acceptance_verified: bool = False
     revenue_verified: bool = False
+    execution_mode: str = "OFFLINE_BOUNDED_SHA256D"
+    transport_connected: bool = False
+    credentials_loaded: bool = False
+    live_execution_allowed: bool = False
+    evidence_class: str = "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY"
 
 
 def prepare_and_search_job(
