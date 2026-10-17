@@ -41,6 +41,30 @@ if ! python -c 'import brain_v12.brain.termux_bitcoin_worker' >/dev/null 2>&1; t
   exit 2
 fi
 
+echo "thermal_preflight_begin"
+python - <<'PY'
+from pathlib import Path
+from brain_v12.brain.termux_bitcoin_worker import is_cpu_thermal_zone_type, read_max_temperature_c
+
+matched = []
+for temp_path in Path("/sys/class/thermal").glob("thermal_zone*/temp"):
+    try:
+        zone_type = temp_path.with_name("type").read_text(encoding="ascii").strip()
+        if is_cpu_thermal_zone_type(zone_type):
+            matched.append(zone_type)
+    except OSError:
+        continue
+print("cpu_thermal_zone_count=" + str(len(matched)))
+print("cpu_thermal_zone_types=" + (",".join(sorted(set(matched))) if matched else "none"))
+temperature = read_max_temperature_c()
+print("cpu_thermal_max_c=" + (f"{temperature:.2f}" if temperature is not None else "unavailable"))
+if temperature is None:
+    print("live_mining_thermal_gate=BLOCKED_NO_CPU_THERMAL_SENSOR")
+else:
+    print("live_mining_thermal_gate=CPU_SENSOR_READABLE_CHECK_LIMIT_BEFORE_RUN")
+PY
+echo "thermal_preflight_end"
+
 echo "unit_tests_begin"
 if python -m unittest brain_v12.tests.test_termux_bitcoin_worker -v; then
   echo "unit_tests=PASS"
