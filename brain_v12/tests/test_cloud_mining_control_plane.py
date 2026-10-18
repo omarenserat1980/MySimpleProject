@@ -34,7 +34,7 @@ def test_worker_identity_cannot_be_reassigned_to_another_owner_or_kind():
     cp.register_worker(CloudWorker("w1", "vm", "region-a", "owner-a", enabled=True))
     for replacement in (
         CloudWorker("w1", "vm", "region-b", "owner-b", enabled=True),
-        CloudWorker("w1", "android", "region-a", "owner-a", enabled=True),
+        CloudWorker("w1", "container", "region-a", "owner-a", enabled=True),
     ):
         try:
             cp.register_worker(replacement)
