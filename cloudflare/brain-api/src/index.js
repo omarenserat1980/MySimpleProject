@@ -467,7 +467,11 @@ async function capturePayPalPayment(request, env, requestOrigin, allowedOrigin) 
   if (String(order.client_email || "").toLowerCase() !== client.email.toLowerCase()) return json({ ok: false, error: "ORDER_ACCESS_DENIED" }, 403, requestOrigin, allowedOrigin);
   const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return json({ ok: false, error: "PAYPAL_ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, state: "PAYMENT_VERIFIED", order_id: orderId, paypal_order_id: paypalOrderId, idempotent: true }, 200, requestOrigin, allowedOrigin);
+  // Validate persisted order/payment amount and currency before any idempotent success.
+  if (Number(order.amount) !== Number(payment.amount) || String(order.currency || "").toUpperCase() !== String(payment.currency || "").toUpperCase()) {
+    return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+  if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY", order_id: orderId, paypal_order_id: paypalOrderId, idempotent: true }, 200, requestOrigin, allowedOrigin);
   const access = await getPayPalAccessToken(env);
   if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
   const response = await fetch(PAYPAL_API_BASE + "/v2/checkout/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
