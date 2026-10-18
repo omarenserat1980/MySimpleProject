@@ -53,6 +53,27 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             "ARTIFACT_AUTHENTICITY_VERIFIED",
         )
 
+    def test_image_inspection_requires_matching_evidence_record(self):
+        result = validate_artifact_manifest(valid_manifest())
+        self.assertEqual(
+            evaluate_artifact_state(
+                result,
+                publisher_signature_independently_verified=True,
+                image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
+                                           "artifact_sha256": result["sha256"]},
+            )["state"],
+            "IMAGE_INSPECTED",
+        )
+        self.assertEqual(
+            evaluate_artifact_state(
+                result,
+                publisher_signature_independently_verified=True,
+                image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
+                                           "artifact_sha256": "b" * 64},
+            )["state"],
+            "ARTIFACT_AUTHENTICITY_VERIFIED",
+        )
+
     def test_invalid_digest_is_rejected(self):
         result = validate_artifact_manifest(valid_manifest(sha256="xyz"))
         self.assertFalse(result["ok"])
@@ -80,14 +101,21 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("PUBLISHER_SIGNATURE_VERIFICATION_FAILED", result["errors"])
 
-    def test_synthetic_evidence_never_promotes_to_real_boot(self):
+    def test_guest_boot_requires_matching_in_guest_evidence(self):
         result = validate_artifact_manifest(valid_manifest())
+        inspection = {"status": "VERIFIED", "evidence_id": "inspection-1",
+                      "artifact_sha256": result["sha256"]}
+        servicing = {"status": "VERIFIED", "evidence_id": "servicing-1",
+                     "artifact_sha256": result["sha256"]}
+        guest = {"status": "VERIFIED", "evidence_id": "guest-1",
+                 "artifact_sha256": result["sha256"], "source": "IN_GUEST",
+                 "os_edition": "Windows Server 2025 Evaluation", "os_build": "test-build",
+                 "boot_time_utc": "2026-10-18T10:30:00Z", "vm_config_sha256": "c" * 64,
+                 "independent_verification": True}
         state = evaluate_artifact_state(
-            result,
-            publisher_signature_independently_verified=True,
-            image_inspected=True,
-            image_serviced=True,
-            guest_boot_evidence_verified=True,
+            result, publisher_signature_independently_verified=True,
+            image_inspection_evidence=inspection, servicing_evidence=servicing,
+            guest_boot_evidence=guest,
         )
         self.assertEqual(state["state"], "GUEST_BOOT_VERIFIED")
         self.assertTrue(state["real_guest_boot_verified"])
@@ -95,12 +123,30 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         simulated = evaluate_artifact_state(
             {**result, "evidence_type": "SYNTHETIC_SIMULATION_EVENT"},
             publisher_signature_independently_verified=True,
-            image_inspected=True,
-            image_serviced=True,
-            guest_boot_evidence_verified=True,
+            image_inspection_evidence=inspection, servicing_evidence=servicing,
+            guest_boot_evidence=guest,
         )
         self.assertEqual(simulated["state"], "SIMULATED")
         self.assertFalse(simulated["real_guest_boot_verified"])
+
+    def test_guest_boot_evidence_must_match_artifact_and_be_in_guest(self):
+        result = validate_artifact_manifest(valid_manifest())
+        inspection = {"status": "VERIFIED", "evidence_id": "inspection-1",
+                      "artifact_sha256": result["sha256"]}
+        servicing = {"status": "VERIFIED", "evidence_id": "servicing-1",
+                     "artifact_sha256": result["sha256"]}
+        guest = {"status": "VERIFIED", "evidence_id": "guest-1",
+                 "artifact_sha256": "d" * 64, "source": "SIMULATOR",
+                 "os_edition": "Windows Server 2025 Evaluation", "os_build": "test-build",
+                 "boot_time_utc": "2026-10-18T10:30:00Z", "vm_config_sha256": "c" * 64,
+                 "independent_verification": True}
+        state = evaluate_artifact_state(
+            result, publisher_signature_independently_verified=True,
+            image_inspection_evidence=inspection, servicing_evidence=servicing,
+            guest_boot_evidence=guest,
+        )
+        self.assertEqual(state["state"], "IMAGE_SERVICED")
+        self.assertFalse(state["real_guest_boot_verified"])
 
     def test_bool_is_not_accepted_as_integer_size(self):
         result = validate_artifact_manifest(valid_manifest(size_bytes=True))
