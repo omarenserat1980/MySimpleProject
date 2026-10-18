@@ -154,3 +154,30 @@ def test_invalid_worker_limits_are_rejected():
             pass
         else:
             raise AssertionError("invalid worker limits must be rejected")
+
+
+def test_snapshot_exposes_machine_readable_blockers_without_claiming_live_mining():
+    cp = CloudMiningControlPlane()
+    snapshot = cp.snapshot()
+    assert snapshot["worker_count"] == 0
+    assert snapshot["enabled_worker_count"] == 0
+    assert snapshot["execution_ready"] is False
+    assert snapshot["live_mining_verified"] is False
+    assert snapshot["accepted_shares_independently_verified"] is False
+    assert snapshot["revenue_realized"] is False
+    assert "NO_REGISTERED_WORKERS" in snapshot["blockers"]
+    assert "NATIVE_MINING_BACKEND_NOT_IMPLEMENTED" in snapshot["blockers"]
+    assert "VERIFIED_STRATUM_SESSION_REQUIRED" in snapshot["blockers"]
+    assert "INDEPENDENT_ACCEPTED_SHARE_PROOF_REQUIRED" in snapshot["blockers"]
+    assert "INDEPENDENT_PAYOUT_RECONCILIATION_REQUIRED" in snapshot["blockers"]
+
+
+def test_snapshot_reports_worker_and_blocked_job_counts():
+    cp, job = _planned_job()
+    snapshot = cp.snapshot()
+    assert snapshot["worker_count"] == 1
+    assert snapshot["enabled_worker_count"] == 1
+    assert snapshot["job_count"] == 1
+    assert snapshot["blocked_job_count"] == 1
+    assert "NO_REGISTERED_WORKERS" not in snapshot["blockers"]
+    assert "NATIVE_MINING_BACKEND_NOT_IMPLEMENTED" in snapshot["blockers"]

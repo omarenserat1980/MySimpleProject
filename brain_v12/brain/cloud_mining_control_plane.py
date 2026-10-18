@@ -173,11 +173,40 @@ class CloudMiningControlPlane:
         }
 
     def snapshot(self) -> dict[str, Any]:
+        """Return machine-readable blockers without implying live mining or revenue."""
+        workers = [asdict(w) for w in self.workers.values()]
+        jobs = [asdict(j) for j in self.jobs.values()]
+        blockers: list[str] = []
+        if not workers:
+            blockers.append("NO_REGISTERED_WORKERS")
+        if not any(worker["enabled"] for worker in workers):
+            blockers.append("NO_ENABLED_WORKERS")
+        # This is intentionally a hard blocker until a Brain-owned compute backend
+        # exists. A plan, simulated nonce search, or CI job is not a live miner.
+        blockers.append("NATIVE_MINING_BACKEND_NOT_IMPLEMENTED")
+        blockers.append("VERIFIED_STRATUM_SESSION_REQUIRED")
+        blockers.append("INDEPENDENT_ACCEPTED_SHARE_PROOF_REQUIRED")
+        blockers.append("INDEPENDENT_PAYOUT_RECONCILIATION_REQUIRED")
         return {
             "service": "Brain Cloud Mining Control Plane",
-            "workers": [asdict(w) for w in self.workers.values()],
-            "jobs": [asdict(j) for j in self.jobs.values()],
+            "workers": workers,
+            "jobs": jobs,
+            "worker_count": len(workers),
+            "enabled_worker_count": sum(1 for worker in workers if worker["enabled"]),
+            "job_count": len(jobs),
+            "blocked_job_count": sum(1 for job in jobs if str(job["status"]).startswith("BLOCKED")),
             "execution": "brain_owned_software_runtime_plan_only",
+            "execution_ready": False,
+            "live_mining_verified": False,
+            "accepted_shares_independently_verified": False,
+            "revenue_realized": False,
+            "blockers": blockers,
+            "next_actions": [
+                "Implement and test a Brain-owned native mining backend.",
+                "Establish a verified Stratum session using operator-provided runtime secrets.",
+                "Capture independently verifiable accepted-share evidence from the pool.",
+                "Reconcile any payout against independent blockchain evidence before revenue recognition.",
+            ],
             "physical_devices_role": "connectivity_observation_only",
             "native_mining_backend": "NOT_IMPLEMENTED",
             "external_miner_execution": "FORBIDDEN",
