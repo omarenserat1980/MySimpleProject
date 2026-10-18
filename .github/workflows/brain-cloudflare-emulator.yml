@@ -54,6 +54,7 @@ jobs:
           node --check src/index.js
           node test/cloudflare_deploy_static.test.js
           node test/commercial_worker_static.test.js
+          node test/payment_delivery_flow.test.mjs
           node test/cinema_worker_static.test.js
           node test/devkit_static.test.js
       - name: Start local Wrangler and verify Worker health
