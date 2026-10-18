@@ -1,0 +1,59 @@
+name: Brain Self-Healing Runtime Setup Tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-continuous-self-healing.yml"
+      - ".github/workflows/brain-self-healing-runtime-setup-tests.yml"
+      - "requirements.txt"
+      - "brain_v12/requirements.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-self-healing-runtime-setup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Install runtime dependencies
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check -q httpx fastapi python-multipart google-api-python3-client google-auth-oauthlib google-auth-httplib2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          mkdir -p brain_v12/bin
+          ln -sf "$(command -v ffmpeg)" brain_v12/bin/ffmpeg
+          ln -sf "$(command -v ffprobe)" brain_v12/bin/ffprobe
+          echo "$PWD/brain_v12/bin" >> "$GITHUB_PATH"
+          test -x brain_v12/bin/ffmpeg
+          test -x brain_v12/bin/ffprobe
+
+      - name: Verify installed Python dependencies
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from importlib.metadata import version
+          import fastapi, httpx
+          print("BRAIN_RUNTIME_DEPS=READY")
+          print("FASTAPI=" + fastapi.__version__)
+          print("HTTPX=" + httpx.__version__)
+          print("PYTHON_MULTIPART=" + version("python-multipart"))
+          PY
+
+      - name: Verify media tools are discoverable
+        run: |
+          set -euo pipefail
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+          echo "BRAIN_MEDIA_TOOLS=READY"
