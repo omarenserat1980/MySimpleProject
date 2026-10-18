@@ -39,7 +39,7 @@ These are candidates to evaluate, not tools already installed or integrated. Pin
 
 ### Stage 2 — RAM and server simulation
 - Initial adapter implemented: `brain_v12/hardware/ramulator_adapter.py`, with contract tests in `brain_v12/hardware/test_ramulator_adapter.py` and CI matrix registration.
-- The adapter probes for `ramulator2`, accepts a local config file, hashes the config, bounds execution time, and returns a structured simulated-evidence record. It does not install/download the upstream tool.
+- The adapter follows the upstream Ramulator 2.1 Python interface: it probes the installed Python package and runs a reviewed local `.py` example/configuration script, hashes the script, bounds execution time, and returns structured simulated-evidence. It does not install/download the upstream tool. Since these scripts are executable code, only reviewed scripts should run in an isolated runner.
 - Next acceptance gate: CI must pass, then a pinned Ramulator 2.1 build and known example trace must run in an authorized runner with the tool version, config hash, trace identity and output artifact recorded.
 - Keep model outputs separate from OS memory telemetry. A simulated 64 GiB configuration must never be reported as installed physical RAM.
 - Integrate QEMU only after the runner has adequate resources and VM isolation.
