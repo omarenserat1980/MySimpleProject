@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 from urllib.parse import urlparse
+from datetime import datetime, timedelta, timezone
 import re
 
 _TXID = re.compile(r"^[0-9a-fA-F]{64}$")
@@ -41,6 +42,7 @@ def audit_realized_bitcoin_payout(
     pool_payout: dict[str, Any],
     chain_transaction: dict[str, Any],
     minimum_confirmations: int = 3,
+    max_evidence_age_seconds: int = 7 * 24 * 60 * 60,
 ) -> dict[str, Any]:
     """Reconcile a pool payout against independently sourced on-chain transaction data.
 
@@ -53,8 +55,10 @@ def audit_realized_bitcoin_payout(
     """
     if not isinstance(pool_payout, dict) or not isinstance(chain_transaction, dict):
         raise ValueError("pool_payout and chain_transaction must be objects")
-    if minimum_confirmations < 1:
-        raise ValueError("minimum_confirmations must be >= 1")
+    if isinstance(minimum_confirmations, bool) or not isinstance(minimum_confirmations, int) or minimum_confirmations < 1:
+        raise ValueError("minimum_confirmations must be an integer >= 1")
+    if isinstance(max_evidence_age_seconds, bool) or not isinstance(max_evidence_age_seconds, int) or max_evidence_age_seconds < 1:
+        raise ValueError("max_evidence_age_seconds must be an integer >= 1")
 
     provider = str(pool_payout.get("provider", "")).strip()
     payout_id = str(pool_payout.get("payout_id", "")).strip()
@@ -93,6 +97,19 @@ def audit_realized_bitcoin_payout(
         raise ValueError("chain source must be a recognized public Bitcoin explorer")
     if not observed_at:
         raise ValueError("chain observed_at timestamp is required")
+    try:
+        normalized_timestamp = observed_at[:-1] + "+00:00" if observed_at.endswith(("Z", "z")) else observed_at
+        observed_time = datetime.fromisoformat(normalized_timestamp)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("chain observed_at must be a valid ISO 8601 timestamp") from exc
+    if observed_time.tzinfo is None or observed_time.utcoffset() is None:
+        raise ValueError("chain observed_at must include a timezone")
+    observed_time = observed_time.astimezone(timezone.utc)
+    now = datetime.now(timezone.utc)
+    if observed_time > now + timedelta(minutes=5):
+        raise ValueError("chain evidence timestamp is in the future")
+    if now - observed_time > timedelta(seconds=max_evidence_age_seconds):
+        raise ValueError("chain evidence is stale")
     if pool_source_url == chain_source_url:
         raise ValueError("pool and chain evidence must come from distinct source URLs")
 
@@ -132,6 +149,8 @@ def audit_realized_bitcoin_payout(
             "independent_chain_source_required": True,
             "destination_output_amount_matched": True,
             "minimum_confirmations": minimum_confirmations,
+            "max_evidence_age_seconds": max_evidence_age_seconds,
+            "evidence_freshness_verified": True,
             "network_calls_performed": False,
             "funds_moved_by_brain": False,
             "simulated_evidence_accepted": False,
