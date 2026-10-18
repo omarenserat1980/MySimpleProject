@@ -121,12 +121,37 @@ jobs:
           qemu-img create -f qcow2 windows-server-2025.qcow2 64G
           rm -f qemu-monitor.sock qemu.log windows-boot.ppm
           OVMF_CODE=""
-          for candidate in /usr/share/OVMF/OVMF_CODE.fd /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/qemu/OVMF.fd /usr/share/qemu/OVMF_CODE.fd /usr/share/qemu/OVMF_CODE_4M.fd; do
-            if [ -f "$candidate" ]; then OVMF_CODE="$candidate"; break; fi
+          OVMF_VARS_TEMPLATE=""
+          for pair in \
+            "/usr/share/OVMF/OVMF_CODE_4M.fd:/usr/share/OVMF/OVMF_VARS_4M.fd" \
+            "/usr/share/OVMF/OVMF_CODE.fd:/usr/share/OVMF/OVMF_VARS.fd" \
+            "/usr/share/qemu/OVMF_CODE_4M.fd:/usr/share/qemu/OVMF_VARS_4M.fd" \
+            "/usr/share/qemu/OVMF_CODE.fd:/usr/share/qemu/OVMF_VARS.fd"; do
+            code="${pair%%:*}"
+            vars="${pair#*:}"
+            if [ -f "$code" ] && [ -f "$vars" ]; then
+              OVMF_CODE="$code"
+              OVMF_VARS_TEMPLATE="$vars"
+              break
+            fi
           done
-          test -n "$OVMF_CODE" || { echo "BLOCKED: OVMF UEFI firmware not found"; exit 2; }
-          echo "UEFI_FIRMWARE=$OVMF_CODE"
-          qemu-system-x86_64 -machine q35,accel=tcg -cpu max -smp 2 -m 4096 -bios "$OVMF_CODE" -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio -cdrom windows-server-2025.iso -boot menu=on,order=d -display none -vga std -monitor unix:qemu-monitor.sock,server,nowait -no-reboot -no-shutdown >qemu.log 2>&1 &
+          test -n "$OVMF_CODE" && test -n "$OVMF_VARS_TEMPLATE" || {
+            echo "BLOCKED: matching OVMF CODE and VARS firmware pair not found"
+            find /usr/share/OVMF /usr/share/qemu -maxdepth 1 -type f -iname '*OVMF*' -print 2>/dev/null || true
+            exit 2
+          }
+          cp "$OVMF_VARS_TEMPLATE" OVMF_VARS.fd
+          test -s OVMF_VARS.fd
+          echo "UEFI_CODE_FIRMWARE=$OVMF_CODE"
+          echo "UEFI_VARS_TEMPLATE=$OVMF_VARS_TEMPLATE"
+          qemu-system-x86_64 \
+            -machine q35,accel=tcg -cpu max -smp 2 -m 4096 \
+            -drive if=pflash,format=raw,readonly=on,file="$OVMF_CODE" \
+            -drive if=pflash,format=raw,file=OVMF_VARS.fd \
+            -drive file=windows-server-2025.qcow2,format=qcow2,if=virtio \
+            -cdrom windows-server-2025.iso -boot menu=on,order=d \
+            -display none -vga std -monitor unix:qemu-monitor.sock,server,nowait \
+            -no-reboot -no-shutdown >qemu.log 2>&1 &
           qemu_pid=$!
           echo "$qemu_pid" > qemu.pid
           for i in $(seq 1 90); do
