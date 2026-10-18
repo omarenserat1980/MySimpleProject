@@ -79,6 +79,24 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             "ARTIFACT_FINGERPRINTED",
         )
 
+    def test_signature_evidence_with_invalid_certificate_chain_is_rejected(self):
+        result = validate_artifact_manifest(valid_manifest())
+        evidence = signature_evidence(result)
+        evidence["certificate_chain_result"] = "INVALID"
+        self.assertEqual(
+            evaluate_artifact_state(result, publisher_signature_evidence=evidence)["state"],
+            "ARTIFACT_FINGERPRINTED",
+        )
+
+    def test_signature_evidence_with_untrusted_verification_method_is_rejected(self):
+        result = validate_artifact_manifest(valid_manifest())
+        evidence = signature_evidence(result)
+        evidence["verification_method"] = "USER_ASSERTION"
+        self.assertEqual(
+            evaluate_artifact_state(result, publisher_signature_evidence=evidence)["state"],
+            "ARTIFACT_FINGERPRINTED",
+        )
+
     def test_image_inspection_requires_matching_evidence_record(self):
         result = validate_artifact_manifest(valid_manifest())
         self.assertEqual(
