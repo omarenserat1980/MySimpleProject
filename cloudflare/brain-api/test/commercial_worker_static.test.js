@@ -162,8 +162,8 @@ assert.match(paypalVerifier, /INSERT OR IGNORE INTO revenue_ledger/);
 assert.match(paypalVerifier, /INSERT OR IGNORE INTO service_jobs/);
 assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
 assert.match(paypalVerifier, /PAYPAL_SERVICE_JOB_NOT_PERSISTED/);
-assert.match(paypalVerifier, /SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = \\? AND tran_ref = \\?/, "PayPal recovery must read back its exact revenue ledger row");
-assert.match(paypalVerifier, /SELECT job_id, state FROM service_jobs WHERE job_id = \\? AND order_id = \\?/, "PayPal recovery must read back its exact service job");
+assert.match(paypalVerifier, /SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = \? AND tran_ref = \?/, "PayPal recovery must read back its exact revenue ledger row");
+assert.match(paypalVerifier, /SELECT job_id, state FROM service_jobs WHERE job_id = \? AND order_id = \?/, "PayPal recovery must read back its exact service job");
 assert.match(paypalVerifier, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 // Keep PayPal webhook trust checks scoped to the webhook handler, not just present elsewhere in the Worker.
 const paypalWebhookGuardStart = worker.indexOf("async function handlePayPalWebhook");
