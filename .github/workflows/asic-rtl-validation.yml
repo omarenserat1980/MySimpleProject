@@ -121,6 +121,48 @@ jobs:
           vvp artifacts/asic/bitcoin-genesis-search.vvp | tee artifacts/asic/bitcoin-genesis-search.log
           grep -q "ALL_GENESIS_NONCE_SEARCH_TESTS_PASSED" artifacts/asic/bitcoin-genesis-search.log
 
+      - name: Compile and run SHA-256 compression known-answer vector (new core)
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_brain_sha256_compress \
+            -o artifacts/asic/brain-sha256-compress.vvp \
+            brain_v12/asic/rtl/brain_sha256_compress.sv \
+            brain_v12/asic/rtl/tb_brain_sha256_compress.sv
+          vvp artifacts/asic/brain-sha256-compress.vvp | tee artifacts/asic/brain-sha256-compress.log
+          grep -q "PASS: SHA-256 empty-message compression vector" artifacts/asic/brain-sha256-compress.log
+
+      - name: Compile and run fixed-length SHA256d primitive vector
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_brain_sha256d_256 \
+            -o artifacts/asic/brain-sha256d-256.vvp \
+            brain_v12/asic/rtl/brain_sha256_compress.sv \
+            brain_v12/asic/rtl/brain_sha256d_256.sv \
+            brain_v12/asic/rtl/tb_brain_sha256d_256.sv
+          vvp artifacts/asic/brain-sha256d-256.vvp | tee artifacts/asic/brain-sha256d-256.log
+          grep -q "PASS: SHA256d 32-byte known vector" artifacts/asic/brain-sha256d-256.log
+
+      - name: Compile and run Bitcoin 80-byte header SHA256d vector
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_brain_bitcoin_header_sha256d \
+            -o artifacts/asic/brain-bitcoin-header.vvp \
+            brain_v12/asic/rtl/brain_sha256_compress.sv \
+            brain_v12/asic/rtl/brain_bitcoin_header_sha256d.sv \
+            brain_v12/asic/rtl/tb_brain_bitcoin_header_sha256d.sv
+          vvp artifacts/asic/brain-bitcoin-header.vvp | tee artifacts/asic/brain-bitcoin-header.log
+          grep -q "PASS: Bitcoin genesis 80-byte header SHA256d vector" artifacts/asic/brain-bitcoin-header.log
+
+      - name: Compile and run Bitcoin target comparator vectors
+        run: |
+          set -euo pipefail
+          iverilog -g2012 -Wall -s tb_brain_bitcoin_target_check \
+            -o artifacts/asic/brain-bitcoin-target.vvp \
+            brain_v12/asic/rtl/brain_bitcoin_target_check.sv \
+            brain_v12/asic/rtl/tb_brain_bitcoin_target_check.sv
+          vvp artifacts/asic/brain-bitcoin-target.vvp | tee artifacts/asic/brain-bitcoin-target.log
+          grep -q "PASS: Bitcoin digest byte order and target comparator vectors" artifacts/asic/brain-bitcoin-target.log
+
       - name: Prepare Python software-model worker
         uses: actions/setup-python@v5
         with:
