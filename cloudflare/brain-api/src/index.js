@@ -416,9 +416,10 @@ async function createPayPalPayment(request, env, url, requestOrigin, allowedOrig
   if (existing && existing.state === "PAYMENT_VERIFIED") return json({ ok: false, error: "PAYMENT_ALREADY_VERIFIED" }, 409, requestOrigin, allowedOrigin);
   const access = await getPayPalAccessToken(env);
   if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
+  const createRequestId = (await sha256Hex(new TextEncoder().encode("paypal-create:" + orderId))).slice(0, 32);
   const response = await fetch(PAYPAL_API_BASE + "/v2/checkout/orders", {
     method: "POST",
-    headers: { Authorization: "Bearer " + access.token, "Content-Type": "application/json", Prefer: "return=representation" },
+    headers: { Authorization: "Bearer " + access.token, "Content-Type": "application/json", Prefer: "return=representation", "PayPal-Request-Id": createRequestId },
     body: JSON.stringify({
       intent: "CAPTURE",
       purchase_units: [{
@@ -474,9 +475,10 @@ async function capturePayPalPayment(request, env, requestOrigin, allowedOrigin) 
   if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY", order_id: orderId, paypal_order_id: paypalOrderId, idempotent: true }, 200, requestOrigin, allowedOrigin);
   const access = await getPayPalAccessToken(env);
   if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
+  const captureRequestId = (await sha256Hex(new TextEncoder().encode("paypal-capture:" + paypalOrderId))).slice(0, 32);
   const response = await fetch(PAYPAL_API_BASE + "/v2/checkout/orders/" + encodeURIComponent(paypalOrderId) + "/capture", {
     method: "POST",
-    headers: { Authorization: "Bearer " + access.token, "Content-Type": "application/json", Prefer: "return=representation" },
+    headers: { Authorization: "Bearer " + access.token, "Content-Type": "application/json", Prefer: "return=representation", "PayPal-Request-Id": captureRequestId },
     body: "{}",
   });
   const result = await response.json().catch(() => ({}));
@@ -524,6 +526,7 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
   if (!verifyResponse.ok || verify.verification_status !== "SUCCESS") return json({ ok: false, error: "PAYPAL_WEBHOOK_SIGNATURE_INVALID" }, 401, requestOrigin, allowedOrigin);
   if (event.event_type !== "PAYMENT.CAPTURE.COMPLETED") return json({ ok: true, ignored: true, event_type: event.event_type || "UNKNOWN" }, 200, requestOrigin, allowedOrigin);
   const resource = event.resource || {};
+  if (String(resource.status || "").toUpperCase() !== "COMPLETED") return json({ ok: false, error: "PAYPAL_CAPTURE_NOT_COMPLETED" }, 409, requestOrigin, allowedOrigin);
   const paypalOrderId = String(resource.supplementary_data?.related_ids?.order_id || "");
   const captureId = String(resource.id || "");
   if (!paypalOrderId || !captureId) return json({ ok: false, error: "PAYPAL_CAPTURE_IDENTIFIERS_MISSING" }, 400, requestOrigin, allowedOrigin);
@@ -540,7 +543,12 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
 async function markPayPalPaymentVerified(env, orderId, paypalOrderId, captureId, amount, currency, evidenceObject) {
   const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return { ok: false, error: "PAYPAL_PAYMENT_NOT_FOUND", status: 404 };
-  if (Number(payment.amount) !== amount || String(payment.currency).toUpperCase() !== currency) return { ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH", status: 409 };
+  const order = await env.BRAIN_DB.prepare("SELECT amount, currency FROM orders WHERE order_id = ?").bind(orderId).first();
+  if (!order) return { ok: false, error: "ORDER_NOT_FOUND", status: 404 };
+  if (Number(payment.amount) !== amount || String(payment.currency).toUpperCase() !== currency ||
+      Number(order.amount) !== amount || String(order.currency).toUpperCase() !== currency) {
+    return { ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH", status: 409 };
+  }
 
   // Stable IDs make retries repair missing dependent rows after a partial prior failure.
   const key = (await sha256Hex(new TextEncoder().encode("paypal-order:" + orderId))).slice(0, 32).toUpperCase();
