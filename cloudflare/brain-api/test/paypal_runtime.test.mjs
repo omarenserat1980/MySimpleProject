@@ -41,3 +41,25 @@ test("health reports missing delivery artifact policy rather than claiming readi
   assert.equal(body.d1, "NOT_CONFIGURED");
   assert.equal(body.delivery_artifact_policy, "NOT_CONFIGURED");
 });
+
+test("PayPal create requires an authenticated client session", async () => {
+  const response = await post("/api/payments/paypal/create", { BRAIN_DB: {} }, { order_id: "order-test" });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { ok: false, error: "AUTH_REQUIRED" });
+});
+
+test("PayPal capture requires an authenticated client session", async () => {
+  const response = await post("/api/payments/paypal/capture", { BRAIN_DB: {} }, { order_id: "order-test", paypal_order_id: "paypal-test" });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { ok: false, error: "AUTH_REQUIRED" });
+});
+
+test("PayPal create fails closed when client identity provider is not configured", async () => {
+  const response = await worker.fetch(new Request("https://brain.test/api/payments/paypal/create", {
+    method: "POST",
+    headers: { "content-type": "application/json", "authorization": "Bearer synthetic-test-token" },
+    body: JSON.stringify({ order_id: "order-test" }),
+  }), { BRAIN_DB: {}, BRAIN_ORIGIN: "" });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, error: "CLIENT_AUTH_ORIGIN_NOT_CONFIGURED" });
+});
