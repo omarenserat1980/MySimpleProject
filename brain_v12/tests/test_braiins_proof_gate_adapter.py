@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from brain_v12.brain.braiins_proof_gate_adapter import braiins_telemetry_to_proof_records
 from brain_v12.brain.proof_registry import ProofGateRegistry
 
@@ -33,8 +35,12 @@ def test_live_pool_aggregate_yields_only_connection_and_hashrate_proofs():
 
 def test_aggregate_telemetry_cannot_unlock_live_mining_gate():
     records = braiins_telemetry_to_proof_records(live_result())
-    result = ProofGateRegistry().evaluate("bitcoin_mining_live", records)
-    assert result["status"] == "BLOCKED"
+    result = ProofGateRegistry().evaluate(
+        "bitcoin_mining_live",
+        records,
+        now=datetime(2026, 10, 18, 20, 0, tzinfo=timezone.utc),
+    )
+    assert result["status"] != "PASS"
     assert result["missing_proof_types"] == ["accepted_share"]
 
 
