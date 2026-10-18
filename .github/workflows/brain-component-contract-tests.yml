@@ -180,7 +180,7 @@ jobs:
               "media_engine", "asic_software_simulator",
               "software_node_discovery", "software_capability_gap_audit",
               "software_capability_candidate_catalog", "software_capability_promotion_gate",
-              "windows_artifact_manifest", "ramulator_adapter", "hardware_reality_audit",
+              "windows_artifact_manifest", "ramulator_adapter", "hardware_reality_audit", "qemu_host_preflight",
           }
           records = []
           errors = []
