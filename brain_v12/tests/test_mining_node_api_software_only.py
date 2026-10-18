@@ -1,6 +1,7 @@
 from brain_v12.brain.mining_node_api import (
     classify_real_mining_evidence,
     compute_backend_preflight,
+    compute_resource_status,
     pool_evidence_status,
     get_software_only_contract,
     node_status,
@@ -85,3 +86,16 @@ def test_pool_evidence_status_is_read_only_and_does_not_claim_pool_activity():
     assert result["payout_verified"] is False
     assert result["revenue_verified"] is False
     assert result["execution_allowed"] is False
+
+
+def test_compute_resource_status_is_read_only_and_keeps_mining_gates_closed():
+    result = compute_resource_status()
+    assert result["schema"] == "brain-compute-resource-report/v1"
+    assert result["status"] == "READ_ONLY_RESOURCE_INVENTORY_AVAILABLE"
+    assert result["endpoint_execution_performed"] is False
+    assert result["safety"]["network_access_performed"] is False
+    assert result["safety"]["subprocesses_started"] is False
+    assert result["execution_gates"]["live_mining_authorized"] is False
+    assert result["execution_gates"]["share_submission_enabled"] is False
+    assert result["execution_gates"]["pool_acceptance_verified"] is False
+    assert result["execution_gates"]["revenue_verified"] is False
