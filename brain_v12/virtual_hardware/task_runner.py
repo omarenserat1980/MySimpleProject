@@ -116,3 +116,119 @@ class BrainVMTaskRunner:
             "kernel": self.kernel.status(),
             "physical_hardware": False,
         }
+
+
+    def checkpoint(self) -> dict:
+        """Serialize programs and all scheduler state for deterministic resume."""
+        return {
+            "schema": "brainvm-task-runner-checkpoint-v1",
+            "mode": "SIMULATED_BRAINVM_TASK_RUNNER",
+            "ram_cells": self.ram_cells,
+            "clock_width_bits": self.clock_width_bits,
+            "cursor": self._cursor,
+            "kernel": {
+                "ticks": self.kernel.ticks,
+                "interrupts": [dict(event) for event in self.kernel.interrupts],
+                "syscalls": [dict(event) for event in self.kernel.syscalls],
+            },
+            "tasks": [
+                {
+                    "pid": pid,
+                    "name": task["process"].name,
+                    "state": task["process"].state,
+                    "process_ticks": task["process"].ticks,
+                    "program": [list(instruction) for instruction in task["program"]],
+                    "board": task["board"].checkpoint(),
+                    "steps": task["steps"],
+                }
+                for pid, task in self._tasks.items()
+            ],
+            "task_programs_included": True,
+            "physical_hardware": False,
+            "native_code_execution": False,
+        }
+
+    def restore_checkpoint(self, checkpoint: dict) -> dict:
+        """Validate into a fresh runner, then atomically replace this runner's state."""
+        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brainvm-task-runner-checkpoint-v1":
+            raise ValueError("TASK_RUNNER_CHECKPOINT_SCHEMA_UNSUPPORTED")
+        if checkpoint.get("mode") != "SIMULATED_BRAINVM_TASK_RUNNER" or checkpoint.get("task_programs_included") is not True:
+            raise ValueError("TASK_RUNNER_CHECKPOINT_MODE_OR_PROGRAMS_INVALID")
+        try:
+            ram_cells = checkpoint["ram_cells"]
+            width = checkpoint["clock_width_bits"]
+            cursor = checkpoint["cursor"]
+            kernel_data = checkpoint["kernel"]
+            tasks_data = checkpoint["tasks"]
+            ticks = kernel_data["ticks"]
+            interrupts = kernel_data["interrupts"]
+            syscalls = kernel_data["syscalls"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError("TASK_RUNNER_CHECKPOINT_MALFORMED") from exc
+        for value, code in ((ram_cells, "RAM"), (width, "CLOCK"), (cursor, "CURSOR"), (ticks, "TICKS")):
+            if not isinstance(value, int) or isinstance(value, bool) or value < (1 if code in ("RAM", "CLOCK") else 0):
+                raise ValueError("TASK_RUNNER_CHECKPOINT_" + code + "_INVALID")
+        if not isinstance(tasks_data, list) or not isinstance(interrupts, list) or not isinstance(syscalls, list):
+            raise ValueError("TASK_RUNNER_CHECKPOINT_COLLECTION_INVALID")
+        if any(not isinstance(event, dict) for event in interrupts + syscalls):
+            raise ValueError("TASK_RUNNER_CHECKPOINT_EVENT_INVALID")
+        if len({item.get("pid") for item in tasks_data if isinstance(item, dict)} ) != len(tasks_data):
+            raise ValueError("TASK_RUNNER_CHECKPOINT_PID_DUPLICATE")
+        candidate = BrainVMTaskRunner(ram_cells=ram_cells, clock_width_bits=width)
+        candidate.kernel.ticks = ticks
+        candidate.kernel.interrupts = [dict(event) for event in interrupts]
+        candidate.kernel.syscalls = [dict(event) for event in syscalls]
+        for item in tasks_data:
+            if not isinstance(item, dict):
+                raise ValueError("TASK_RUNNER_CHECKPOINT_TASK_INVALID")
+            try:
+                pid, name, state = item["pid"], item["name"], item["state"]
+                process_ticks, program, board_data, steps = item["process_ticks"], item["program"], item["board"], item["steps"]
+            except (KeyError, TypeError) as exc:
+                raise ValueError("TASK_RUNNER_CHECKPOINT_TASK_MALFORMED") from exc
+            if not isinstance(pid, str) or not pid or state not in ("READY", "RUNNING", "TERMINATED"):
+                raise ValueError("TASK_RUNNER_CHECKPOINT_PROCESS_INVALID")
+            for value in (process_ticks, steps):
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    raise ValueError("TASK_RUNNER_CHECKPOINT_COUNTER_INVALID")
+            if not isinstance(program, list) or not program:
+                raise ValueError("TASK_RUNNER_CHECKPOINT_PROGRAM_INVALID")
+            for instruction in program:
+                if (not isinstance(instruction, list) or not instruction or not isinstance(instruction[0], str)
+                    or any(not isinstance(arg, (str, int)) or isinstance(arg, bool) for arg in instruction)):
+                    raise ValueError("TASK_RUNNER_CHECKPOINT_INSTRUCTION_INVALID")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("TASK_RUNNER_CHECKPOINT_NAME_INVALID")
+            if not isinstance(board_data, dict):
+                raise ValueError("TASK_RUNNER_CHECKPOINT_BOARD_INVALID")
+            candidate_pid = candidate.create_task(name, program)
+            task = candidate._tasks.pop(candidate_pid)
+            process = task["process"]
+            candidate.kernel.processes.pop(candidate_pid, None)
+            process.pid = pid
+            process.state = state
+            process.ticks = process_ticks
+            candidate.kernel.processes[pid] = process
+            task["program"] = tuple(tuple(instruction) for instruction in program)
+            task["board"].restore_checkpoint(board_data)
+            task["steps"] = steps
+            if steps != task["board"].instructions_executed:
+                raise ValueError("TASK_RUNNER_CHECKPOINT_STEP_COUNT_MISMATCH")
+            if state == "TERMINATED" and not task["board"].cpu.halted:
+                raise ValueError("TASK_RUNNER_CHECKPOINT_TERMINATED_TASK_NOT_HALTED")
+            if state != "TERMINATED" and task["board"].cpu.halted:
+                raise ValueError("TASK_RUNNER_CHECKPOINT_HALTED_TASK_NOT_TERMINATED")
+            candidate._tasks[pid] = task
+        if interrupts and any(not isinstance(event.get("tick"), int) or event["tick"] < 0 for event in interrupts):
+            raise ValueError("TASK_RUNNER_CHECKPOINT_INTERRUPT_TICK_INVALID")
+        if any(event.get("tick", 0) > ticks for event in interrupts):
+            raise ValueError("TASK_RUNNER_CHECKPOINT_INTERRUPT_IN_FUTURE")
+        if cursor < 0:
+            raise ValueError("TASK_RUNNER_CHECKPOINT_CURSOR_INVALID")
+        candidate._cursor = cursor
+        self.ram_cells = candidate.ram_cells
+        self.clock_width_bits = candidate.clock_width_bits
+        self.kernel = candidate.kernel
+        self._tasks = candidate._tasks
+        self._cursor = candidate._cursor
+        return self.status()
