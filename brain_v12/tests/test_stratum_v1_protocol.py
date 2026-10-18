@@ -259,3 +259,16 @@ def test_set_extranonce_notification_updates_only_after_full_validation():
     }))
     assert session.extranonce1_hex == "a1b2"
     assert session.extranonce2_size == 8
+
+
+def test_share_submit_enforces_negotiated_extranonce2_width():
+    session = StratumV1Session(
+        "worker", "secret", authorized=True, current_job_id="job",
+        extranonce1_hex="a1b2", extranonce2_size=4,
+    )
+    with pytest.raises(StratumProtocolError, match="INVALID_EXTRANONCE2_NEGOTIATED_WIDTH"):
+        session.request_submit("job", "0001", "00000000", "00000000")
+    assert not session.pending
+    request = json.loads(session.request_submit("job", "00000001", "00000000", "00000000"))
+    assert request["method"] == "mining.submit"
+    assert request["params"][2] == "00000001"
