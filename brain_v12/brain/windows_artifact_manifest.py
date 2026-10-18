@@ -109,6 +109,15 @@ def _evidence_matches_artifact(evidence: Any, manifest_result: dict[str, Any]) -
     )
 
 
+def _signature_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]) -> bool:
+    return bool(
+        _evidence_matches_artifact(evidence, manifest_result)
+        and evidence.get("verification_method")
+        and evidence.get("verifier_identity")
+        and evidence.get("signature_subject")
+    )
+
+
 def _guest_boot_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]) -> bool:
     if not _evidence_matches_artifact(evidence, manifest_result):
         return False
@@ -127,7 +136,7 @@ def _guest_boot_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]
 def evaluate_artifact_state(
     manifest_result: dict[str, Any],
     *,
-    publisher_signature_independently_verified: bool = False,
+    publisher_signature_evidence: dict[str, Any] | None = None,
     image_inspection_evidence: dict[str, Any] | None = None,
     servicing_evidence: dict[str, Any] | None = None,
     guest_boot_evidence: dict[str, Any] | None = None,
@@ -135,7 +144,7 @@ def evaluate_artifact_state(
     """Derive a conservative state; metadata validity alone never proves a boot."""
     if not isinstance(manifest_result, dict) or not manifest_result.get("ok"):
         state = "NOT_VERIFIED"
-    elif publisher_signature_independently_verified is True:
+    elif _signature_evidence_is_valid(publisher_signature_evidence, manifest_result):
         state = "ARTIFACT_AUTHENTICITY_VERIFIED"
     else:
         state = "ARTIFACT_FINGERPRINTED"
