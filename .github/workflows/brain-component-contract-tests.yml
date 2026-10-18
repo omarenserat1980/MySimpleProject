@@ -18,6 +18,7 @@ on:
       - "brain_v12/tests/test_software_capability_candidate_catalog.py"
       - "brain_v12/tests/test_software_capability_promotion_gate.py"
       - "brain_v12/test_windows_artifact_manifest.py"
+      - "brain_v12/hardware/**"
       - ".github/workflows/brain-component-contract-tests.yml"
   push:
     branches: [main]
@@ -78,6 +79,8 @@ jobs:
             test: brain_v12.tests.test_software_capability_promotion_gate
           - component: windows_artifact_manifest
             test: brain_v12.test_windows_artifact_manifest
+          - component: ramulator_adapter
+            test: brain_v12.hardware.test_ramulator_adapter
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -174,7 +177,7 @@ jobs:
               "media_engine", "asic_software_simulator",
               "software_node_discovery", "software_capability_gap_audit",
               "software_capability_candidate_catalog", "software_capability_promotion_gate",
-              "windows_artifact_manifest",
+              "windows_artifact_manifest", "ramulator_adapter",
           }
           records = []
           errors = []
