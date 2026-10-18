@@ -42,6 +42,10 @@ Use `brain_v12/tools/windows_artifact_hash_verify.ps1` to compare an artifact ag
 
 The tool refuses to overwrite the artifact or an existing evidence file. A matching digest proves only that the bytes match the supplied digest. The report deliberately sets `reference_independently_reviewed`, `publisher_authenticity_verified`, and `real_guest_boot_verified` to false: a URL string and hash comparison do not establish that the reference is authentic or that the OS booted.
 
+## Evidence-state gate behavior
+
+The manifest evaluator intentionally fails closed. It may report whether evidence fields have the expected shape and whether an evidence record names the same SHA-256, but these checks are not cryptographic validation of the evidence producer. It therefore does not promote JSON claims to `ARTIFACT_AUTHENTICITY_VERIFIED`, `IMAGE_INSPECTED`, `IMAGE_SERVICED`, or `GUEST_BOOT_VERIFIED`. Those states require a separately trusted verifier/attestation path before they can be enabled. Synthetic simulation events remain `SIMULATED`.
+
 ## Next gate
 
 1. Review the manifest and independently verify publisher signature/provenance through an approved mechanism.
