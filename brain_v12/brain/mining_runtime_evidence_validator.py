@@ -1,10 +1,13 @@
-"""Read-only validation for the mining runtime evidence contract.
+"""Read-only structural and integrity validation for mining evidence.
 
-This validator checks envelope shape and enum values only. It performs no I/O,
-does not authenticate a source, and never upgrades evidence into mining proof.
+No collection or network access occurs. A matching SHA-256 detects payload changes
+relative to this envelope; it does not authenticate the source or prove mining.
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -34,10 +37,10 @@ def _is_utc_timestamp(value: Any) -> bool:
     if not isinstance(value, str) or not value.endswith("Z"):
         return False
     try:
-        datetime.fromisoformat(value[:-1] + "+00:00")
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError:
         return False
-    return True
+    return parsed.utcoffset() is not None
 
 
 def _contains_forbidden_key(value: Any) -> bool:
@@ -58,15 +61,26 @@ def _contains_forbidden_key(value: Any) -> bool:
     return False
 
 
+def canonical_payload_sha256(evidence: dict[str, Any]) -> str:
+    """Hash the canonical JSON envelope excluding its integrity block."""
+    payload = {key: value for key, value in evidence.items() if key != "integrity"}
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def validate_mining_runtime_evidence(evidence: Any) -> dict[str, Any]:
-    """Validate structure and report trust limitations; never perform collection."""
+    """Validate structure and payload hash, without authenticating the source."""
     errors: list[str] = []
+    hash_verified = False
     if not isinstance(evidence, dict):
         return {
             "schema_version": SCHEMA_VERSION,
             "valid": False,
             "errors": ["EVIDENCE_MUST_BE_OBJECT"],
             "source_authenticated": False,
+            "integrity_hash_verified": False,
             "real_mining_verified": False,
             "brain_work_attribution_verified": False,
             "revenue_verified": False,
@@ -118,8 +132,15 @@ def validate_mining_runtime_evidence(evidence: Any) -> dict[str, Any]:
     integrity = evidence.get("integrity")
     if not isinstance(integrity, dict) or not isinstance(integrity.get("payload_sha256"), str):
         errors.append("INTEGRITY_HASH_MISSING")
-    elif len(integrity["payload_sha256"]) != 64 or any(c not in "0123456789abcdefABCDEF" for c in integrity["payload_sha256"]):
-        errors.append("INTEGRITY_HASH_INVALID")
+    else:
+        supplied_hash = integrity["payload_sha256"]
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", supplied_hash):
+            errors.append("INTEGRITY_HASH_INVALID")
+        else:
+            calculated_hash = canonical_payload_sha256(evidence)
+            hash_verified = supplied_hash.lower() == calculated_hash
+            if not hash_verified:
+                errors.append("INTEGRITY_HASH_MISMATCH")
 
     if _contains_forbidden_key(evidence):
         errors.append("FORBIDDEN_SECRET_LIKE_FIELD")
@@ -129,7 +150,7 @@ def validate_mining_runtime_evidence(evidence: Any) -> dict[str, Any]:
         "valid": not errors,
         "errors": errors,
         "source_authenticated": False,
-        "integrity_hash_verified": False,
+        "integrity_hash_verified": hash_verified,
         "real_mining_verified": False,
         "brain_work_attribution_verified": False,
         "revenue_verified": False,
@@ -138,8 +159,8 @@ def validate_mining_runtime_evidence(evidence: Any) -> dict[str, Any]:
         "settings_changed": False,
         "miner_started_or_stopped": False,
         "limitations": [
-            "Structural validation is not source authentication.",
-            "A hash supplied by the same untrusted source is not an independent attestation.",
+            "A matching SHA-256 detects payload changes but does not authenticate the source.",
+            "A signature is not verified by this validator.",
             "Pool-side shares, Brain work attribution, hashrate, and revenue require separate evidence gates.",
         ],
     }
