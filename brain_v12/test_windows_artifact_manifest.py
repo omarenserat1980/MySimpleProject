@@ -64,7 +64,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         self.assertEqual(
             evaluate_artifact_state(
                 result,
-                publisher_signature_independently_verified=True,
+                publisher_signature_evidence=signature_evidence(result),
                 image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
                                            "artifact_sha256": result["sha256"]},
             )["state"],
@@ -73,7 +73,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         self.assertEqual(
             evaluate_artifact_state(
                 result,
-                publisher_signature_independently_verified=True,
+                publisher_signature_evidence=signature_evidence(result),
                 image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
                                            "artifact_sha256": "b" * 64},
             )["state"],
@@ -119,7 +119,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
                  "boot_time_utc": "2026-10-18T10:30:00Z", "vm_config_sha256": "c" * 64,
                  "independent_verification": True}
         state = evaluate_artifact_state(
-            result, publisher_signature_independently_verified=True,
+            result, publisher_signature_evidence=signature_evidence(result),
             image_inspection_evidence=inspection, servicing_evidence=servicing,
             guest_boot_evidence=guest,
         )
@@ -128,7 +128,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
 
         simulated = evaluate_artifact_state(
             {**result, "evidence_type": "SYNTHETIC_SIMULATION_EVENT"},
-            publisher_signature_independently_verified=True,
+            publisher_signature_evidence=signature_evidence(result),
             image_inspection_evidence=inspection, servicing_evidence=servicing,
             guest_boot_evidence=guest,
         )
@@ -147,7 +147,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
                  "boot_time_utc": "2026-10-18T10:30:00Z", "vm_config_sha256": "c" * 64,
                  "independent_verification": True}
         state = evaluate_artifact_state(
-            result, publisher_signature_independently_verified=True,
+            result, publisher_signature_evidence=signature_evidence(result),
             image_inspection_evidence=inspection, servicing_evidence=servicing,
             guest_boot_evidence=guest,
         )
