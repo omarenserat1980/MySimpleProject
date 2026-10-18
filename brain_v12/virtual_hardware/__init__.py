@@ -3,6 +3,12 @@
 Deterministic, inspectable software-defined hardware plus guest-OS contracts.
 """
 from .computer import VirtualComputer
+from .execution_board import BrainVMExecutionBoard
+from .task_runner import BrainVMTaskRunner
+from .virtual_server_runtime import BrainVirtualServerRuntime
+from .virtual_host import BrainVirtualHost
+from .cluster_manager import BrainVirtualClusterManager
+from .blade_server_fabric import BrainBladeServerFabric
 from .digital_logic import DigitalClock, MiniCalculator
 from .cpu import VirtualCPU
 from .memory import VirtualRAM
@@ -32,7 +38,7 @@ from .extended_devices import (
 )
 
 __all__ = [
-    "VirtualComputer", "DigitalClock", "MiniCalculator", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric", "VirtualECCMemoryController",
+    "VirtualComputer", "BrainVMExecutionBoard", "BrainVMTaskRunner", "BrainVirtualServerRuntime", "BrainVirtualHost", "BrainVirtualClusterManager", "BrainBladeServerFabric", "DigitalClock", "MiniCalculator", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric", "VirtualECCMemoryController",
     "VirtualNIC", "VirtualStorage", "VirtualGPU", "VirtualDisk", "VirtualUEFI",
     "X86_64CPU", "X86UnsupportedInstruction", "CPUProfile", "get_cpu_profile", "list_cpu_profiles",
     "StorageProfile", "get_storage_profile", "list_storage_profiles", "MemoryProfile", "CacheHierarchy",
