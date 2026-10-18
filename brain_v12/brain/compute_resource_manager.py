@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import platform
 import sys
@@ -104,7 +105,7 @@ def build_compute_resource_report(
         raise ValueError("requested_hashes must be positive")
     if isinstance(requested_seconds, bool) or not isinstance(requested_seconds, (int, float)):
         raise ValueError("requested_seconds must be numeric")
-    if requested_seconds <= 0:
+    if not math.isfinite(requested_seconds) or requested_seconds <= 0:
         raise ValueError("requested_seconds must be positive")
 
     logical = os.cpu_count()
