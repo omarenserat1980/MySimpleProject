@@ -506,20 +506,35 @@ async function markPayPalPaymentVerified(env, orderId, paypalOrderId, captureId,
   const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return { ok: false, error: "PAYPAL_PAYMENT_NOT_FOUND", status: 404 };
   if (Number(payment.amount) !== amount || String(payment.currency).toUpperCase() !== currency) return { ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH", status: 409 };
-  if (payment.state === "PAYMENT_VERIFIED") return { ok: true, idempotent: true };
+
+  // Stable IDs make retries repair missing dependent rows after a partial prior failure.
+  const key = (await sha256Hex(new TextEncoder().encode("paypal-order:" + orderId))).slice(0, 32).toUpperCase();
+  const revenueId = "REV-PAYPAL-" + key;
+  const jobId = "JOB-PAYPAL-" + key;
   const evidence = JSON.stringify(evidenceObject);
   const eventId = await sha256Hex(new TextEncoder().encode("paypal:" + captureId));
-  await env.BRAIN_DB.prepare("INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, 'PAYMENT_VERIFIED', ?)").bind(eventId, orderId, paypalOrderId, evidence).run();
+
+  // D1 batch keeps payment/order state and required ledger/job records in one atomic unit.
+  // It also repairs missing rows when a replay arrives after an earlier incomplete transition.
   await env.BRAIN_DB.batch([
-    env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_VERIFIED', verified_at = CURRENT_TIMESTAMP, raw_evidence = ? WHERE tran_ref = ? AND provider = 'paypal' AND state <> 'PAYMENT_VERIFIED'").bind(evidence, paypalOrderId),
-    env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ? AND state <> 'PAYMENT_VERIFIED'").bind(orderId),
+    env.BRAIN_DB.prepare("INSERT OR IGNORE INTO payment_events (event_id, order_id, tran_ref, event_type, evidence) VALUES (?, ?, ?, 'PAYMENT_VERIFIED', ?)").bind(eventId, orderId, paypalOrderId, evidence),
+    env.BRAIN_DB.prepare("UPDATE payments SET state = 'PAYMENT_VERIFIED', verified_at = COALESCE(verified_at, CURRENT_TIMESTAMP), raw_evidence = ? WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal' AND state IN ('PAYMENT_PENDING', 'PAYMENT_VERIFIED')").bind(evidence, paypalOrderId, orderId),
+    env.BRAIN_DB.prepare("UPDATE orders SET state = 'PAYMENT_VERIFIED' WHERE order_id = ? AND state IN ('PAYMENT_PENDING', 'PAYMENT_VERIFIED')").bind(orderId),
+    env.BRAIN_DB.prepare("INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'PAYMENT_VERIFIED_PENDING_DELIVERY', ?)").bind(revenueId, orderId, paypalOrderId, amount, currency, evidence),
+    env.BRAIN_DB.prepare("INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)").bind(jobId, orderId),
   ]);
-  const revenueId = "REV-" + crypto.randomUUID().toUpperCase();
-  await env.BRAIN_DB.prepare("INSERT OR IGNORE INTO revenue_ledger (revenue_id, order_id, tran_ref, amount, currency, state, evidence) VALUES (?, ?, ?, ?, ?, 'PAYMENT_VERIFIED_PENDING_DELIVERY', ?)").bind(revenueId, orderId, paypalOrderId, amount, currency, evidence).run();
-  const jobId = "JOB-" + crypto.randomUUID().toUpperCase();
-  await env.BRAIN_DB.prepare("INSERT OR IGNORE INTO service_jobs (job_id, order_id, state, attempt, result_evidence) VALUES (?, ?, 'PENDING', 0, NULL)").bind(jobId, orderId).run();
-  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYPAL_PAYMENT_VERIFIED", { paypal_order_id: paypalOrderId, capture_id: captureId, revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY" });
-  return { ok: true };
+
+  const [verifiedPayment, ledger, job] = await Promise.all([
+    env.BRAIN_DB.prepare("SELECT state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first(),
+    env.BRAIN_DB.prepare("SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = ?").bind(orderId).first(),
+    env.BRAIN_DB.prepare("SELECT job_id, state FROM service_jobs WHERE order_id = ?").bind(orderId).first(),
+  ]);
+  if (!verifiedPayment || verifiedPayment.state !== "PAYMENT_VERIFIED") return { ok: false, error: "PAYPAL_PAYMENT_STATE_NOT_PERSISTED", status: 409 };
+  if (!ledger || ledger.tran_ref !== paypalOrderId || Number(ledger.amount) !== amount || String(ledger.currency).toUpperCase() !== currency) return { ok: false, error: "PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED", status: 409 };
+  if (!job) return { ok: false, error: "PAYPAL_SERVICE_JOB_NOT_PERSISTED", status: 409 };
+
+  await recordOrderEvent(env, orderId, "PAYMENT_PENDING", "PAYMENT_VERIFIED", "PAYPAL_PAYMENT_VERIFIED", { paypal_order_id: paypalOrderId, capture_id: captureId, revenue_state: ledger.state });
+  return { ok: true, idempotent: payment.state === "PAYMENT_VERIFIED", ledger_state: ledger.state, job_id: job.job_id };
 }
 
 async function handlePayTabsReturn(request, env, allowedOrigin) {
