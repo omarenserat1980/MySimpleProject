@@ -20,6 +20,8 @@ def live_result(**overrides):
         "worker_id": "account.worker-01",
         "hashrate_5m_provider_units": 12.5,
         "hashrate_unit": "Gh/s",
+        "shares_5m_pool_reported": 3,
+        "last_share_age_seconds": 12,
     }
     result.update(overrides)
     return result
@@ -60,6 +62,12 @@ class BraiinsProofGateAdapterTests(unittest.TestCase):
         self.assertEqual(braiins_telemetry_to_proof_records(live_result(worker_id="")), [])
         self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=True)), [])
         self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=0)), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=float("nan"))), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=float("inf"))), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(shares_5m_pool_reported=0)), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(shares_5m_pool_reported=1.5)), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(last_share_age_seconds=301)), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(last_share_age_seconds=-31)), [])
 
 
 if __name__ == "__main__":
