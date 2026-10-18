@@ -90,7 +90,7 @@ def compact_nbits_to_target(nbits_hex: str) -> int:
     exponent = compact >> 24
     mantissa = compact & 0x007FFFFF
     negative = bool(compact & 0x00800000)
-    if negative or mantissa == 0:
+    if negative or mantissa == 0 or exponent > 32:
         raise ValueError("INVALID_COMPACT_TARGET")
 
     # Bitcoin SetCompact semantics: for exponents <= 3 the mantissa is shifted
