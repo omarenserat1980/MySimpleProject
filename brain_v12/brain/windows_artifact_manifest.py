@@ -90,7 +90,7 @@ def validate_artifact_manifest(manifest: Any) -> dict[str, Any]:
         "ok": ok,
         "status": "MANIFEST_VALID_METADATA_ONLY" if ok else "INVALID_MANIFEST",
         "errors": errors,
-        "artifact_authenticity_verified": bool(ok and signature == "VERIFIED"),
+        # A manifest claim is not independent proof of publisher authenticity.\n        "artifact_authenticity_verified": False,
         "real_guest_boot_verified": False,
         "execution_performed": False,
     }
