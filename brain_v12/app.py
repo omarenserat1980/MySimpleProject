@@ -105,6 +105,7 @@ from .brain.cloud_executor_attestation_api import router as cloud_executor_attes
 from .brain.open_source_tools_api import router as open_source_tools_router
 from .brain.asic_simulator_api import router as asic_simulator_router
 from .brain.bitcoin_mining_intelligence_api import router as bitcoin_mining_intelligence_router
+from .brain.physical_asic_api import router as physical_asic_router
 from .brain.bitcoin_worker_api import router as bitcoin_worker_router
 from .brain.brain_cloud_provider_api import router as brain_cloud_provider_router
 from .brain.digital_mining_node_api import router as digital_mining_node_router
@@ -266,6 +267,7 @@ app.include_router(cloud_executor_attestation_router)
 app.include_router(open_source_tools_router)
 app.include_router(asic_simulator_router)
 app.include_router(bitcoin_mining_intelligence_router)
+app.include_router(physical_asic_router)
 app.include_router(bitcoin_worker_router)
 app.include_router(brain_cloud_provider_router)
 app.include_router(digital_mining_node_router)
