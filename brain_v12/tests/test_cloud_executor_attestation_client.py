@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from tools.request_cloud_executor_attestation import post
+from tools.request_cloud_executor_attestation import _safe_http_error, post
 
 
 class CloudExecutorAttestationClientTests(unittest.TestCase):
@@ -26,6 +26,49 @@ class CloudExecutorAttestationClientTests(unittest.TestCase):
         self.assertNotIn(secret_like, str(ctx.exception))
         # Untrusted detail must be dropped entirely, not replaced by a guessed code.
         self.assertEqual(str(ctx.exception), "CLOUD_EXECUTOR_HTTP_403")
+
+
+    def test_safe_configuration_error_is_preserved_for_diagnosis(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED"}).encode()
+        error = HTTPError("https://example.invalid/attestation/challenge", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED",
+        )
+
+    def test_safe_host_inventory_error_is_preserved_for_diagnosis(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID"}).encode()
+        error = HTTPError("https://example.invalid/attestation/challenge", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID",
+        )
+
+    def test_unknown_server_detail_and_url_are_not_echoed(self):
+        private_like = "internal/path/with-secret-value"
+        body = json.dumps({"detail": private_like}).encode()
+        error = HTTPError("https://example.invalid/private/path", 503, "Unavailable", {}, io.BytesIO(body))
+        message = str(_safe_http_error(error))
+        self.assertEqual(message, "CLOUD_EXECUTOR_HTTP_503")
+        self.assertNotIn(private_like, message)
+        self.assertNotIn("example.invalid", message)
+
+
+    def test_allowlisted_challenge_replay_error_is_preserved(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ISSUER_CHALLENGE_REPLAY"}).encode()
+        error = HTTPError("https://example.invalid/attestation/issue", 403, "Forbidden", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_403:CLOUD_EXECUTOR_ISSUER_CHALLENGE_REPLAY",
+        )
+
+    def test_allowlisted_registry_error_is_preserved(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ATTESTATION_REGISTRY_UNAVAILABLE"}).encode()
+        error = HTTPError("https://example.invalid/attestation/consume", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_ATTESTATION_REGISTRY_UNAVAILABLE",
+        )
 
 
 if __name__ == "__main__":
