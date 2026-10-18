@@ -113,13 +113,23 @@ class ShareLifecycle:
             return {"status": "UNKNOWN_OR_DUPLICATE_RESPONSE", "pool_acceptance_verified": False}
         # Do not let a malformed or mismatched response consume the real pending
         # request; otherwise a forged response could erase share correlation.
-        if not isinstance(response, dict) or response.get("id") != request_id:
+        if (
+            not isinstance(response, dict)
+            or isinstance(response.get("id"), bool)
+            or not isinstance(response.get("id"), int)
+            or response.get("id") != request_id
+            or "result" not in response
+            or "error" not in response
+        ):
             return {"status": "MALFORMED_OR_MISMATCHED_RESPONSE", "pool_acceptance_verified": False}
+        # Only a structurally complete JSON-RPC response may consume the pending
+        # candidate. In particular, missing error/result fields must not be
+        # interpreted as a successful pool response.
         self._pending.pop(request_id, None)
-        if response.get("error") not in (None, False):
+        if response["error"] is not None:
             return {"status": "SHARE_REJECTED_OR_ERROR", "pool_acceptance_verified": False,
                     "job_id": pending["job_id"]}
-        if response.get("result") is True:
+        if response["result"] is True:
             return {"status": "POOL_RESPONSE_SAYS_ACCEPTED", "pool_acceptance_verified": False,
                     "job_id": pending["job_id"], "fingerprint": pending["fingerprint"],
                     "evidence_required": ["authenticated_transport", "timestamped_redacted_pool_response",
