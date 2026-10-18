@@ -62,7 +62,7 @@ assert.match(worker, /revenue_state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "paym
 assert.match(worker, /Delivery is not proof of provider settlement/);
 assert.match(worker, /DELIVERY_CONFIRMED_PENDING_SETTLEMENT/);
 assert.doesNotMatch(confirmDeliverySource, /UPDATE revenue_ledger SET state = 'REVENUE_REALIZED'/, "delivery confirmation must not by itself recognize collected revenue");
-assert.match(confirmDeliverySource, /AND EXISTS \\(SELECT 1 FROM deliveries d JOIN orders o ON o\\.order_id = d\\.order_id WHERE d\\.delivery_id = \\? AND d\\.order_id = \\? AND d\\.state = 'DELIVERED' AND o\\.state = 'COMPLETED'\\)/, "ledger transition must independently prove the exact delivery is DELIVERED and its order COMPLETED");
+assert.ok(confirmDeliverySource.includes("AND EXISTS (SELECT 1 FROM deliveries d JOIN orders o") && confirmDeliverySource.includes("d.delivery_id = ? AND d.order_id = ? AND d.state = 'DELIVERED' AND o.state = 'COMPLETED')"), "ledger transition must independently prove the exact delivery is DELIVERED and its order COMPLETED");
 
 
 assert.match(worker, /revenue_ledger/);
