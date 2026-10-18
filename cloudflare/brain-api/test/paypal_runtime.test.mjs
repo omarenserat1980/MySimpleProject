@@ -306,3 +306,77 @@ test("verified PayPal retry rebuilds both missing ledger and service-job rows", 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("verified PayPal retry rejects incomplete persisted capture evidence without repairing or calling provider", async () => {
+  const order = {
+    order_id: "ORDER-BROKEN-EVIDENCE",
+    amount: 4.5,
+    currency: "JOD",
+    state: "PAYMENT_VERIFIED",
+    client_email: "buyer@example.test",
+  };
+  const payment = {
+    tran_ref: "PP-BROKEN-EVIDENCE",
+    order_id: "ORDER-BROKEN-EVIDENCE",
+    amount: 4.5,
+    currency: "JOD",
+    state: "PAYMENT_VERIFIED",
+    raw_evidence: JSON.stringify({ provider: "paypal", status: "COMPLETED" }),
+  };
+  let batchCalls = 0;
+  const db = {
+    prepare(sql) {
+      return {
+        sql,
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async first() {
+          if (this.sql.includes("FROM orders WHERE order_id = ?")) return order;
+          if (this.sql.includes("FROM payments WHERE tran_ref = ?")) return payment;
+          throw new Error("unexpected database read after incomplete evidence");
+        },
+        async run() { throw new Error("unexpected database write for incomplete evidence"); },
+      };
+    },
+    async batch() {
+      batchCalls += 1;
+      throw new Error("unexpected batch for incomplete evidence");
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  const providerCalls = [];
+  globalThis.fetch = async url => {
+    if (String(url) === "https://auth.test/auth/me") {
+      return new Response(JSON.stringify({ account: { email: "buyer@example.test" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    providerCalls.push(String(url));
+    throw new Error("PayPal provider must not be called for an already-verified payment with broken evidence");
+  };
+
+  try {
+    const response = await worker.fetch(new Request("https://brain.test/api/payments/paypal/capture", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer synthetic-session" },
+      body: JSON.stringify({
+        order_id: "ORDER-BROKEN-EVIDENCE",
+        paypal_order_id: "PP-BROKEN-EVIDENCE",
+      }),
+    }), {
+      BRAIN_DB: db,
+      BRAIN_ORIGIN: "https://auth.test",
+      BRAIN_ALLOWED_ORIGIN: "https://brain.test",
+    });
+
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { ok: false, error: "PAYPAL_VERIFIED_EVIDENCE_INCOMPLETE" });
+    assert.equal(batchCalls, 0, "incomplete evidence must not write ledger/job records");
+    assert.deepEqual(providerCalls, [], "incomplete verified retries must not call the provider");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
