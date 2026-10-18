@@ -101,3 +101,61 @@ def attestation_consume(body: ConsumeRequest, x_brain_executor_token: str = Head
         code = str(exc)
         status = 403 if "MISMATCH" in code or "REPLAY" in code else 503
         raise HTTPException(status_code=status, detail=code) from exc
+
+@router.get("/status")
+def attestation_status():
+    """Expose redacted readiness only; configuration presence is not live identity proof."""
+    def _json_object(name: str) -> dict:
+        try:
+            value = json.loads(os.environ.get(name, "{}"))
+        except (TypeError, json.JSONDecodeError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
+    enrollments = _json_object("BRAIN_CLOUD_EXECUTOR_ENROLLMENTS_SHA256_JSON")
+    bindings = _json_object("BRAIN_CLOUD_EXECUTOR_HOST_BINDINGS_JSON")
+    signing_key_present = bool(os.environ.get("BRAIN_EXECUTOR_ATTESTATION_SIGNING_KEY_B64", "").strip())
+    registry = os.environ.get(
+        "BRAIN_CLOUD_EXECUTOR_REGISTRY_DB",
+        os.environ.get("BRAIN_DB", "/var/lib/brain/cloud-executor-registry.sqlite3"),
+    ).strip()
+    if registry.startswith(("postgres://", "postgresql://")):
+        registry_configured = True
+        registry_kind = "postgresql"
+    else:
+        registry_path = Path(registry) if registry else None
+        registry_configured = bool(
+            registry_path
+            and not registry_path.is_symlink()
+            and registry_path.parent.is_dir()
+        )
+        registry_kind = "sqlite" if registry_path else "missing"
+
+    valid_enrollment_count = sum(
+        1 for value in enrollments.values()
+        if isinstance(value, str) and len(value) == 64
+    )
+    valid_binding_count = sum(
+        1 for value in bindings.values()
+        if isinstance(value, dict)
+        and isinstance(value.get("hostname"), str) and bool(value["hostname"].strip())
+        and isinstance(value.get("architecture"), str)
+        and value["architecture"].strip().lower() in {"x86_64", "amd64"}
+    )
+    configured = bool(
+        signing_key_present and registry_configured
+        and valid_enrollment_count > 0 and valid_binding_count > 0
+    )
+    return {
+        "ok": True,
+        "status": "CONFIGURED_UNVERIFIED" if configured else "NOT_READY",
+        "control_plane_configured": configured,
+        "signing_key_present": signing_key_present,
+        "registry_configured": registry_configured,
+        "registry_kind": registry_kind,
+        "enrolled_executor_count": valid_enrollment_count,
+        "valid_host_binding_count": valid_binding_count,
+        "live_attestation_verified": False,
+        "physical_hardware_verified": False,
+        "note": "Configuration readiness is not proof of a live executor identity. A fresh challenge, valid signature, host-side verification, and one-time central nonce consumption are still required.",
+    }
