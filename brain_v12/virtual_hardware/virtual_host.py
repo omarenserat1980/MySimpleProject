@@ -73,78 +73,60 @@ class BrainVirtualHost:
         }
 
     def checkpoint(self) -> dict:
-        """Capture a recoverable manifest; task program state is intentionally excluded."""
+        """Capture service and complete task-runner state for simulation recovery."""
         return {
-            "schema": "brain-virtual-host-checkpoint-v1",
+            "schema": "brain-virtual-host-checkpoint-v2",
             "mode": "SIMULATED_BRAIN_VIRTUAL_HOST",
             "host_id": self.host_id,
             "server": self.server.checkpoint(),
+            "task_runner": self.tasks.checkpoint(),
             "events": [dict(event) for event in self.events],
-            "task_manifest": [
-                {
-                    "pid": pid,
-                    "name": task["process"].name,
-                    "state": task["process"].state,
-                    "instructions_executed": task["steps"],
-                    "board_checkpoint": task["board"].checkpoint(),
-                }
-                for pid, task in self.tasks._tasks.items()
-            ],
-            "task_programs_included": False,
+            "task_programs_included": True,
             "network_listener_enabled": False,
             "physical_hardware": False,
+            "guest_os_boot_verified": False,
         }
 
     def restore_checkpoint(self, checkpoint: dict) -> dict:
-        """Restore service state and validate the host manifest without claiming task resume."""
-        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brain-virtual-host-checkpoint-v1":
+        """Restore both services and runnable tasks only after validating candidates."""
+        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brain-virtual-host-checkpoint-v2":
             raise ValueError("VIRTUAL_HOST_CHECKPOINT_SCHEMA_UNSUPPORTED")
         if checkpoint.get("mode") != "SIMULATED_BRAIN_VIRTUAL_HOST":
             raise ValueError("VIRTUAL_HOST_CHECKPOINT_MODE_INVALID")
         host_id = checkpoint.get("host_id")
         events = checkpoint.get("events")
-        task_manifest = checkpoint.get("task_manifest")
         if not isinstance(host_id, str) or not host_id.strip():
             raise ValueError("VIRTUAL_HOST_CHECKPOINT_ID_INVALID")
-        if not isinstance(events, list) or not isinstance(task_manifest, list):
-            raise ValueError("VIRTUAL_HOST_CHECKPOINT_COLLECTIONS_INVALID")
+        if not isinstance(events, list):
+            raise ValueError("VIRTUAL_HOST_CHECKPOINT_EVENTS_INVALID")
         candidate_events = []
         for event in events:
             if not isinstance(event, dict) or not isinstance(event.get("type"), str):
                 raise ValueError("VIRTUAL_HOST_CHECKPOINT_EVENT_INVALID")
             candidate_events.append(dict(event))
-        # Task programs are not serialized; refuse to imply they can resume autonomously.
-        for item in task_manifest:
-            if not isinstance(item, dict) or not isinstance(item.get("board_checkpoint"), dict):
-                raise ValueError("VIRTUAL_HOST_CHECKPOINT_TASK_INVALID")
-            if not isinstance(item.get("name"), str) or not isinstance(item.get("pid"), str):
-                raise ValueError("VIRTUAL_HOST_CHECKPOINT_TASK_INVALID")
-            if item.get("state") not in {"READY", "RUNNING", "TERMINATED"}:
-                raise ValueError("VIRTUAL_HOST_CHECKPOINT_TASK_STATE_INVALID")
+
+        # Construct candidates first; a failure must not mutate the live host.
         server_candidate = BrainVirtualServerRuntime()
         server_candidate.restore_checkpoint(checkpoint.get("server"))
-        # Validate all board snapshots against a fresh board before changing live state.
-        from .execution_board import BrainVMExecutionBoard
-        for item in task_manifest:
-            board_candidate = BrainVMExecutionBoard(
-                ram_cells=self.tasks.ram_cells,
-                clock_width_bits=self.tasks.clock_width_bits,
-            )
-            board_candidate.restore_checkpoint(item["board_checkpoint"])
-            if item.get("instructions_executed") != board_candidate.instructions_executed:
-                raise ValueError("VIRTUAL_HOST_CHECKPOINT_TASK_COUNTER_MISMATCH")
+        if server_candidate.server_id != host_id.strip():
+            raise ValueError("VIRTUAL_HOST_CHECKPOINT_SERVER_ID_MISMATCH")
+        task_candidate = BrainVMTaskRunner(
+            ram_cells=self.tasks.ram_cells,
+            clock_width_bits=self.tasks.clock_width_bits,
+        )
+        task_candidate.restore_checkpoint(checkpoint.get("task_runner"))
+        if checkpoint.get("task_programs_included") is not True:
+            raise ValueError("VIRTUAL_HOST_CHECKPOINT_PROGRAMS_MISSING")
+
         self.host_id = host_id.strip()
         self.server = server_candidate
+        self.tasks = task_candidate
         self.events = candidate_events
-        # Scheduler tasks are not resumed because their program bodies are not included.
-        self.tasks = BrainVMTaskRunner(
-            ram_cells=self.tasks.ram_cells, clock_width_bits=self.tasks.clock_width_bits
-        )
         return {
             **self.health(),
-            "restored_task_snapshots": len(task_manifest),
-            "tasks_resumed": False,
-            "reason": "PROGRAMS_NOT_INCLUDED_IN_HOST_CHECKPOINT",
+            "restored_task_count": len(self.tasks._tasks),
+            "tasks_resumed": True,
+            "reason": "SIMULATED_TASK_PROGRAMS_AND_STATE_RESTORED",
         }
 
     def _event(self, event_type: str, **details) -> None:
