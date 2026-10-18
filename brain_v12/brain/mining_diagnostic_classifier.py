@@ -40,13 +40,9 @@ def classify_mining_runtime_diagnosis(evidence: Any) -> dict[str, Any]:
     shares = _enum(source.get("accepted_shares"), _SHARE_STATES)
     account = _enum(source.get("account_match"), _ACCOUNT_STATES)
 
-    # Prefer a concrete failure over an absence of a local process. A remote ASIC
-    # can mine without a host-side miner process, so that observation is not proof
-    # that mining is absent.
-    if account == "MISMATCH":
-        diagnosis = "POOL_ACCOUNT_MISMATCH"
-        next_action = "Verify the selected read-only API profile and account identity; do not change pool settings."
-    elif stages["dns"] == "FAIL":
+    # Transport/protocol failures take precedence: account and share observations
+    # cannot establish a successful pool session when an earlier stage failed.
+    if stages["dns"] == "FAIL":
         diagnosis = "DNS_RESOLUTION_FAILURE"
         next_action = "Check the configured hostname and host DNS resolver using authorized read-only diagnostics."
     elif stages["tcp"] == "FAIL":
@@ -58,6 +54,9 @@ def classify_mining_runtime_diagnosis(evidence: Any) -> dict[str, Any]:
     elif stages["stratum"] == "FAIL":
         diagnosis = "STRATUM_HANDSHAKE_FAILURE"
         next_action = "Review sanitized protocol/version/response codes; do not log credentials or full authorization payloads."
+    elif account == "MISMATCH":
+        diagnosis = "POOL_ACCOUNT_MISMATCH"
+        next_action = "Verify the selected read-only API profile and account identity; do not change pool settings."
     elif authorization == "REJECTED":
         diagnosis = "AUTHORIZATION_OR_WORKER_REJECTED"
         next_action = "Check the worker/account mapping with read-only evidence; do not rotate tokens or edit pool settings."
